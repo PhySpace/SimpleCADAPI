@@ -60,10 +60,10 @@ fem = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/NiJingzhe/SimpleCADAPI"
-Repository = "https://github.com/NiJingzhe/SimpleCADAPI"
-Documentation = "https://github.com/NiJingzhe/SimpleCADAPI#readme"
-Issues = "https://github.com/NiJingzhe/SimpleCADAPI/issues"
+Homepage = "https://github.com/PhySpace/SimpleCADAPI"
+Repository = "https://github.com/PhySpace/SimpleCADAPI"
+Documentation = "https://github.com/PhySpace/SimpleCADAPI#readme"
+Issues = "https://github.com/PhySpace/SimpleCADAPI/issues"
 
 [build-system]
 requires = ["hatchling"]
