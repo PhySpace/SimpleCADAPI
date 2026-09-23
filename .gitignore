@@ -12,7 +12,6 @@ wheels/
 .env
 
 output/
-.harbor-ci/
 
 # Sandbox artifacts
 sandbox/
