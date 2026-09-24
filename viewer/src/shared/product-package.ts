@@ -1,4 +1,5 @@
 import { strFromU8, unzipSync } from 'fflate';
+import type { SceneManifest } from './scene2';
 
 export type PackageFiles = Record<string, Uint8Array>;
 
@@ -81,23 +82,7 @@ type ProductManifest = {
   projections: { scene?: SceneProjection };
 };
 
-type SceneProductAsset = AssetRecord & {
-  definition_id: string;
-  definition_kind: DefinitionKind;
-  revision: string;
-  content_hash: string;
-};
 
-type SceneManifest = {
-  schema_version: string;
-  scene_id: string;
-  revision: string;
-  geometry_assets: AssetRecord[];
-  entity_assets: AssetRecord[];
-  product_assets: SceneProductAsset[];
-  feature_graph_assets: AssetRecord[];
-  source_assets: AssetRecord[];
-};
 
 const MAX_PACKAGE_BYTES = 256 * 1024 * 1024;
 const MAX_PACKAGE_MEMBERS = 10_000;
@@ -389,23 +374,21 @@ function parseProductManifest(manifest: Record<string, unknown>): ParsedPackage 
 
 function parseSceneManifest(value: unknown, name: string): SceneManifest {
   const manifest = requireObject(value, name);
-  const scene: SceneManifest = {
-    schema_version: requireString(manifest, 'schema_version', name),
-    scene_id: requireString(manifest, 'scene_id', name),
-    revision: requireString(manifest, 'revision', name),
-    geometry_assets: requireRecordArray(manifest.geometry_assets, 'scene geometry_assets').map((raw) => requireAssetRecord(raw, 'scene geometry asset')),
-    entity_assets: requireRecordArray(manifest.entity_assets, 'scene entity_assets').map((raw) => requireAssetRecord(raw, 'scene entity asset')),
-    product_assets: requireRecordArray(manifest.product_assets, 'scene product_assets').map((raw) => ({
-      ...requireAssetRecord(raw, 'scene product asset'),
-      definition_id: requireString(raw, 'definition_id', 'scene product asset'),
-      definition_kind: requireDefinitionKind(raw, 'scene product asset'),
-      revision: requireString(raw, 'revision', 'scene product asset'),
-      content_hash: requireSha256(raw, 'content_hash', 'scene product asset'),
-    })),
-    feature_graph_assets: requireRecordArray(manifest.feature_graph_assets, 'scene feature_graph_assets').map((raw) => requireAssetRecord(raw, 'scene feature graph asset')),
-    source_assets: requireRecordArray(manifest.source_assets, 'scene source_assets').map((raw) => requireAssetRecord(raw, 'scene source asset')),
-  };
-  if (scene.schema_version !== '2.0') throw new Error(`unsupported scene schema: ${scene.schema_version}`);
+  if (requireString(manifest, 'schema_version', name) !== '2.0') throw new Error(`unsupported scene schema: ${String(manifest.schema_version)}`);
+  if (requireString(manifest, 'units', name) !== 'mm') throw new Error(`${name} units are unsupported`);
+  const revision = requireSha256(manifest, 'revision', name);
+  for (const field of ['roots', 'definitions', 'geometry_assets', 'entity_assets', 'product_assets', 'feature_graph_assets', 'source_assets', 'nodes', 'connectors', 'joints', 'feature_index', 'source_index', 'connector_index', 'joint_index']) {
+    if (!Array.isArray(manifest[field])) throw new Error(`${name} ${field} must be an array`);
+  }
+  requireObject(manifest.camera, `${name} camera`);
+  requireObject(manifest.extensions, `${name} extensions`);
+  const scene = manifest as unknown as SceneManifest;
+  for (const asset of [...scene.geometry_assets, ...scene.entity_assets, ...scene.source_assets]) {
+    if (typeof asset.uri !== 'string' || !SHA256_PATTERN.test(asset.sha256) || !Number.isSafeInteger(asset.byte_length)) {
+      throw new Error(`${name} contains an invalid asset record`);
+    }
+  }
+  if (!SHA256_PATTERN.test(revision)) throw new Error(`${name} revision is invalid`);
   return scene;
 }
 

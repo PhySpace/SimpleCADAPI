@@ -8,9 +8,9 @@
 // Everything except mountScene/openCadPackage is considered capture tooling.
 
 import * as THREE from 'three';
-import { SceneView } from './scene-view';
-import { openCadPackage } from './product-package';
-import type { PackageFiles } from './product-package';
+import { SceneView } from '../shared/scene-view';
+import { openCadPackage } from '../shared/product-package';
+import type { PackageFiles } from '../shared/product-package';
 
 export { openCadPackage, SceneView };
 
@@ -34,14 +34,14 @@ export async function mountScene(
 }
 
 function aim(view: SceneView, direction: THREE.Vector3, distanceFactor: number): void {
-  const box = new THREE.Box3().setFromObject(view.modelRoot);
+  const box = new THREE.Box3().setFromObject(view.engine.modelRoot);
   if (box.isEmpty()) return;
   const center = box.getCenter(new THREE.Vector3());
   const radius = Math.max(box.getSize(new THREE.Vector3()).length() * 0.5, 0.01);
-  view.camera.position.copy(center).addScaledVector(direction.clone().normalize(), radius * distanceFactor);
-  view.camera.updateProjectionMatrix();
-  view.controls.target.copy(center);
-  view.controls.update();
+  view.engine.camera.position.copy(center).addScaledVector(direction.clone().normalize(), radius * distanceFactor);
+  view.engine.camera.updateProjectionMatrix();
+  view.engine.controls.target.copy(center);
+  view.engine.controls.update();
 }
 
 /** Camera helpers shared by the harness and future embeds. */
@@ -56,7 +56,7 @@ export const utils = {
     aim(view, new THREE.Vector3(Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el)), distanceFactor);
   },
   setWireframe(view: SceneView, on: boolean): void {
-    view.modelRoot.traverse((object) => {
+    view.engine.modelRoot.traverse((object) => {
       const mesh = object as THREE.Mesh;
       if (!mesh.isMesh) return;
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];

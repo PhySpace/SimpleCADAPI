@@ -144,6 +144,10 @@ export class SourceDock {
     this.syncLayout();
   }
 
+  dispose(): void {
+    this.editor.view.destroy();
+  }
+
   clear(): void {
     this.files.clear();
     this.rows.clear();
@@ -207,7 +211,11 @@ export class SourceDock {
     this.options.emptyState.hidden = true;
     for (const [rowPath, row] of this.rows) {
       const selected = rowPath === path;
-      row.classList.toggle('selected', selected);
+      row.classList.toggle('border-l-lime', selected);
+      row.classList.toggle('bg-[#17201e]', selected);
+      row.classList.toggle('text-[#edf3f9]', selected);
+      row.classList.toggle('border-l-transparent', !selected);
+      row.classList.toggle('text-[#96a3b2]', !selected);
       row.setAttribute('aria-selected', String(selected));
     }
   }
@@ -217,13 +225,13 @@ export class SourceDock {
     this.options.fileList.replaceChildren();
     for (const path of this.files.keys()) {
       const row = document.createElement('button');
-      row.className = 'source-file-row';
+      row.className = 'group flex w-full min-w-0 flex-col gap-0.5 overflow-hidden border-0 border-l-2 border-l-transparent bg-transparent px-3 py-1.5 text-left text-[#96a3b2] transition-colors hover:bg-[#171d24] hover:text-[#edf3f9]';
       row.type = 'button';
       row.dataset.sourcePath = path;
       row.setAttribute('role', 'option');
       const basename = path.split('/').pop() || path;
       const directory = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '.';
-      row.innerHTML = `<span class="source-file-name">${escapeHtml(basename)}</span><span class="source-file-directory">${escapeHtml(directory)}</span>`;
+      row.innerHTML = `<span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px]">${escapeHtml(basename)}</span><span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[8px] text-[#586676]">${escapeHtml(directory)}</span>`;
       row.addEventListener('click', () => this.showFile(path));
       this.options.fileList.append(row);
       this.rows.set(path, row);
@@ -235,43 +243,39 @@ export class SourceDock {
     const nextOpen = open && available;
     this.options.dock.hidden = !nextOpen;
     this.options.resizer.hidden = !nextOpen;
-    this.options.toggleButton.classList.toggle('active', nextOpen);
+    this.options.toggleButton.classList.toggle('border-lime', nextOpen);
+    this.options.toggleButton.classList.toggle('text-lime', nextOpen);
     this.options.toggleButton.setAttribute('aria-expanded', String(nextOpen));
     this.syncLayout();
-    if (nextOpen) {
-      requestAnimationFrame(() => {
-        this.editor.requestMeasure();
-        if (this.currentHighlight) this.showFile(this.activeFilePath!, this.currentHighlight);
-      });
-    }
+    if (nextOpen) requestAnimationFrame(() => { this.editor.requestMeasure(); if (this.currentHighlight) this.showFile(this.activeFilePath!, this.currentHighlight); });
   }
 
   private syncLayout(): void {
     const open = !this.options.dock.hidden && this.files.size > 0;
-    this.options.workspace.classList.toggle('source-dock-open', open);
-    this.options.dock.style.setProperty('--source-files-width', `${this.fileListWidth}px`);
+    this.options.workspace.dataset.sourceOpen = String(open);
+    this.options.workspace.style.setProperty('--source-files-width', `${this.fileListWidth}px`);
     this.options.workspace.style.setProperty('--source-dock-height', open && this.media.matches ? `${this.dockHeight}px` : '0px');
   }
 
   private bindHeightResize(): void {
     const { resizer, workspace } = this.options;
     resizer.addEventListener('pointerdown', (event) => {
-      if (!this.media.matches || resizer.hidden) return;
+      if (event.button !== 0 || !this.media.matches || resizer.hidden) return;
       event.preventDefault();
       const startY = event.clientY;
       const startHeight = this.options.dock.getBoundingClientRect().height;
       const minHeight = this.options.minHeight ?? 160;
       const maxHeight = Math.min(this.options.maxHeight ?? 620, Math.max(minHeight, workspace.clientHeight - 180));
-      resizer.classList.add('dragging');
-      document.body.classList.add('resizing-dock');
+      resizer.classList.add('bg-[#18221c]');
+      document.body.dataset.resizing = 'dock';
       resizer.setPointerCapture(event.pointerId);
       const move = (moveEvent: PointerEvent): void => {
         this.dockHeight = Math.max(minHeight, Math.min(maxHeight, startHeight + startY - moveEvent.clientY));
         this.syncLayout();
       };
       const finish = (): void => {
-        resizer.classList.remove('dragging');
-        document.body.classList.remove('resizing-dock');
+        resizer.classList.remove('bg-[#18221c]');
+        delete document.body.dataset.resizing;
         resizer.removeEventListener('pointermove', move);
         resizer.removeEventListener('pointerup', finish);
         resizer.removeEventListener('pointercancel', finish);
@@ -288,14 +292,14 @@ export class SourceDock {
   private bindFileListResize(): void {
     const { dock, fileListResizer } = this.options;
     fileListResizer.addEventListener('pointerdown', (event) => {
-      if (!this.media.matches || dock.hidden) return;
+      if (event.button !== 0 || !this.media.matches || dock.hidden) return;
       event.preventDefault();
       const startX = event.clientX;
       const startWidth = this.fileListWidth;
       const minWidth = this.options.minFileListWidth ?? 112;
       const maxWidth = Math.min(this.options.maxFileListWidth ?? 360, Math.max(minWidth, dock.clientWidth - 280));
-      fileListResizer.classList.add('dragging');
-      document.body.classList.add('resizing-panels');
+      fileListResizer.classList.add('bg-[#18221c]');
+      document.body.dataset.resizing = 'panels';
       fileListResizer.setPointerCapture(event.pointerId);
       const move = (moveEvent: PointerEvent): void => {
         this.fileListWidth = Math.max(minWidth, Math.min(maxWidth, startWidth + moveEvent.clientX - startX));
@@ -303,8 +307,8 @@ export class SourceDock {
         this.editor.requestMeasure();
       };
       const finish = (): void => {
-        fileListResizer.classList.remove('dragging');
-        document.body.classList.remove('resizing-panels');
+        fileListResizer.classList.remove('bg-[#18221c]');
+        delete document.body.dataset.resizing;
         fileListResizer.removeEventListener('pointermove', move);
         fileListResizer.removeEventListener('pointerup', finish);
         fileListResizer.removeEventListener('pointercancel', finish);

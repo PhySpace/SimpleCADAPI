@@ -41,7 +41,7 @@ export class OpSuggest {
 
   constructor(private readonly composer: TokenComposer) {
     this.popup = document.createElement('div');
-    this.popup.className = 're-op-suggest';
+    this.popup.className = 'absolute bottom-[calc(100%+10px)] left-3.5 right-3.5 z-40 max-h-[300px] overflow-y-auto rounded-[14px] border border-edge bg-panel/95 p-1.5 shadow-2xl shadow-black/60 backdrop-blur-[14px]';
     this.popup.hidden = true;
     this.popup.addEventListener('mousedown', (event) => event.preventDefault());
     this.composer.host.addEventListener('input', () => this.refresh());
@@ -112,7 +112,7 @@ export class OpSuggest {
       this.popup.hidden = false;
       this.popup.replaceChildren();
       const empty = document.createElement('div');
-      empty.className = 're-op-suggest-empty';
+      empty.className = 'px-3 py-2.5 text-[11px] text-dim';
       empty.textContent = `no operation matches “${match.raw}”`;
       this.popup.append(empty);
       return;
@@ -171,18 +171,19 @@ export class OpSuggest {
       if (operation.category !== lastCategory) {
         lastCategory = operation.category;
         const label = document.createElement('div');
-        label.className = 're-op-suggest-group';
+        label.className = 'px-2.5 pb-0.5 pt-1.5 font-mono text-[9px] font-medium tracking-[0.14em] text-faint';
         label.textContent = CATEGORY_LABELS[operation.category] ?? operation.category;
         this.popup.append(label);
       }
       const row = document.createElement('button');
       row.type = 'button';
-      row.className = `re-op-suggest-row re-opcat-${operation.category}${index === this.highlighted ? ' active' : ''}`;
+      row.dataset.highlighted = String(index === this.highlighted);
+      row.className = 'group flex w-full items-baseline gap-2.5 rounded-[9px] border-0 bg-transparent px-2.5 py-1.5 text-left text-[11px] text-ink hover:bg-[rgb(179_227_107_/_0.08)] data-[highlighted=true]:bg-[rgb(179_227_107_/_0.08)]';
       const name = document.createElement('span');
-      name.className = 're-op-suggest-name';
+      name.className = `font-mono text-[11px] ${operation.category === 'sketch' ? 'text-[#a8e0da]' : operation.category === 'solid' ? 'text-[#b9c8ee]' : operation.category === 'modify' ? 'text-[#eeb9c3]' : operation.category === 'surface' ? 'text-[#d3c4ee]' : operation.category === 'pattern' ? 'text-[#e6bce6]' : operation.category === 'primitive' ? 'text-[#e6d3ab]' : 'text-[#cdd3dd]'}`;
       name.textContent = `/${operation.op_id}`;
       const hint = document.createElement('span');
-      hint.className = 're-op-suggest-hint';
+      hint.className = 'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[10px] text-dim';
       hint.textContent = operation.hint;
       row.append(name, hint);
       row.addEventListener('mouseenter', () => {
@@ -192,7 +193,7 @@ export class OpSuggest {
       row.addEventListener('click', () => this.insert(operation));
       this.popup.append(row);
     });
-    const active = this.popup.querySelector<HTMLElement>('.re-op-suggest-row.active');
+    const active = this.popup.querySelector<HTMLElement>('[data-highlighted="true"]');
     active?.scrollIntoView({ block: 'nearest' });
   }
 }

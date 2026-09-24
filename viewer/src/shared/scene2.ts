@@ -54,10 +54,11 @@ export type Entity = {
   tags: string[];
 };
 export type EntitySidecar = {
-  schema_version: '2.0';
+  schema_version: '1.0';
   definition_id: string;
   geometry_asset_id: string;
   edge_asset_id: string;
+  geometry_engine?: Record<string, unknown>;
   entities: Entity[];
   face_groups: FaceGroup[];
   edge_groups: FaceGroup[];
@@ -97,10 +98,10 @@ export type ConnectorSnapshot = {
   definition_kind: 'single_solid' | 'assembly';
   connector_id: string;
   name: string;
-  anchor_kind: 'placement' | 'geometry' | 'forwarded';
+  anchor_kind: 'placement' | 'geometry' | 'public';
   local_frame: Transform;
   binding: Record<string, unknown> | null;
-  forwarded_from: Record<string, unknown> | null;
+  source_connector_snapshot_id: string | null;
   source_feature_id: string | null;
 };
 export type ConnectorRef = {
@@ -121,7 +122,8 @@ export type Joint = {
   source_feature_id: string | null;
 };
 export type SceneManifest = {
-  schema_version: '2.0';
+  schema_version: '2.0' | 're-mode-source-1';
+  artifact_kind?: 're_mode_source_scene';
   scene_id: string;
   revision: string;
   units: 'mm';
@@ -129,7 +131,7 @@ export type SceneManifest = {
   definitions: Definition[];
   geometry_assets: Asset[];
   entity_assets: Asset[];
-  product_assets: Array<Asset & { definition_id: string }>;
+  product_assets: Array<Asset & { definition_id: string; definition_kind: 'single_solid' | 'assembly'; revision: string; content_hash: string }>,
   feature_graph_assets: Array<Asset & { definition_id: string; graph_id: string; graph_revision: string }>;
   source_assets: SourceAsset[];
   nodes: SceneNode[];

@@ -6,15 +6,15 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      // The re-studio local server (viewer/server) owns the case state.
+      // The local studio server owns case state and the WebApp RPC boundary.
       '/api': 'http://127.0.0.1:7170',
+      '/rpc': 'http://127.0.0.1:7170',
     },
   },
   build: {
     rollupOptions: {
       input: {
         main: 'index.html',
-        re: 're.html',
         gif: 'gif-harness.html',
       },
     },

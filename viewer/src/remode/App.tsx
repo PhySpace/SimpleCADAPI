@@ -40,11 +40,12 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { PythonEditor } from '../components/source-dock';
-import { openCadPackage, type PackageFiles } from '../product-package';
-import { buildFederatedFeatureModel, type ModelDocument, type SceneManifest } from '../scene2';
-import { MARK_COLORS, SceneView, type PickResult, type SelectionMode } from '../scene-view';
+import { PythonEditor } from '../shared/components/source-dock';
+import { openCadPackage, type PackageFiles } from '../shared/product-package';
+import { buildFederatedFeatureModel, type ModelDocument, type SceneManifest } from '../shared/scene2';
+import { MARK_COLORS, SceneView, type PickResult, type SelectionMode } from '../shared/scene-view';
 import { TokenComposer, type ComposerTokenKind } from './composer';
+import { agentSession } from '../agent/session';
 import { reStudioEditorTheme } from './code-theme';
 import { FeatureTreeView } from './feature-tree';
 import { OpSuggest, type SuggestOperation } from './op-suggest';
@@ -119,6 +120,7 @@ type SubmissionRecord = {
 };
 
 type InspectorState = { canonical: string; rows: string[]; details: string };
+// The Web Editor shell owns one session shared across modes.
 
 // -- shared helpers (pure, module scope) --------------------------------------
 
@@ -138,23 +140,16 @@ function serializeAnnotation(annotation: Annotation): Record<string, unknown> {
 
 async function postAnnotation(action: 'add' | 'remove', annotation: Annotation): Promise<void> {
   try {
-    await fetch('/api/annotate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, annotation: serializeAnnotation(annotation) }),
-    });
+    await agentSession.recordAnnotation({ action, annotation: serializeAnnotation(annotation) });
   } catch {
     toast.error('annotation log unreachable');
   }
 }
 
 function postSelectEvent(entityIds: string[]): void {
-  void fetch('/api/event', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'select', entity_ids: entityIds }),
-  }).catch(() => {});
+  void agentSession.recordEvent({ type: 'select', entity_ids: entityIds }).catch(() => {});
 }
+
 
 function decodeFiles(encoded: Record<string, string>): PackageFiles {
   const files: PackageFiles = {};
@@ -237,9 +232,9 @@ function InspectorCard({ data, onClose }: { data: InspectorState; onClose: () =>
           <X className="size-3" />
         </button>
       </div>
-      <details className="re-details mt-1">
-        <summary>adjacency + geometry</summary>
-        <pre className="re-mini-json scroll-thin">{data.details}</pre>
+      <details className="mt-1">
+        <summary className="cursor-pointer text-[10px] text-[#7fa8d4]">adjacency + geometry</summary>
+        <pre className="mt-1.5 max-h-[200px] overflow-auto rounded-lg border border-line bg-void p-2 font-mono text-[10px] leading-[1.5] text-[#b8c4d4]">{data.details}</pre>
       </details>
     </div>
   );
@@ -428,22 +423,13 @@ export function ReStudio() {
     setSubmitting(true);
     const snapshot = view.snapshotPng();
     try {
-      const response = await fetch('/api/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ annotations: annotationsRef.current.map(serializeAnnotation), note: '', snapshot_png: snapshot }),
-      });
-      if (!response.ok) {
-        toast.error(`submit failed: ${await response.text()}`);
-        return;
-      }
-      const result = await response.json();
+      const result = await agentSession.createSubmission<{ seq: number }>({ annotations: annotationsRef.current.map(serializeAnnotation), note: '', snapshot_png: snapshot });
       setAgentLabel(`submitted #${result.seq} — waiting for agent`);
       setAgentWaiting(true);
       toast(`submission #${result.seq} delivered; agent is reconstructing`);
       loadSubmissionRef.current();
-    } catch {
-      toast.error('submit unreachable');
+    } catch (error) {
+      toast.error(`submit failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setSubmitting(false);
     }
@@ -525,9 +511,7 @@ export function ReStudio() {
       const entry = canonical ? draft.current.get(canonical) : undefined;
       if (!entry) return;
       try {
-        const response = await fetch(`/api/entity?id=${encodeURIComponent(entry.canonical)}`);
-        if (!response.ok) return;
-        const descriptor = await response.json();
+        const descriptor = await agentSession.describeEntity<Record<string, any>>(entry.canonical);
         const adjacency = descriptor.adjacency?.direct?.slice(0, 24) ?? [];
         const rows: string[] = [];
         if (descriptor.geometry?.type) rows.push(`type ${descriptor.geometry.type}`);
@@ -681,17 +665,7 @@ export function ReStudio() {
 
     async function resolveRegion(polygon: Array<[number, number]>): Promise<void> {
       try {
-        const response = await fetch('/api/region/resolve', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ camera: originalView.getCameraState(), polygon }),
-        });
-        if (!response.ok) {
-          toast.error(`region resolve failed: ${await response.text()}`);
-          renderAnnotationsCanvas();
-          return;
-        }
-        const result = (await response.json()) as RegionResolveResponse;
+        const result = await agentSession.resolveRegion<RegionResolveResponse>(originalView.getCameraState(), polygon);
         const wantedKind = originalView.selectionMode === 'vertex' ? 'vertex' : 'face';
         let added = 0;
         for (const canonical of result.entity_ids) {
@@ -758,22 +732,17 @@ export function ReStudio() {
     // -- artifact / session loading ----------------------------------------------
 
     async function loadOriginalScene(): Promise<void> {
-      const response = await fetch('/api/scene/original');
-      if (response.status === 503) {
-        setSceneStatus('scene is building…');
-        return;
+      try {
+        const payload = await agentSession.getScene<{ files: Record<string, string> }>();
+        await originalView.loadScene(decodeFiles(payload.files));
+        indexSidecarIds();
+        sceneBusyRef.current = false;
+        setSceneBusy(false);
+        setSceneReady(true);
+        setStatus('scene ready — select and annotate');
+      } catch (error) {
+        setSceneStatus(`scene failed: ${error instanceof Error ? error.message : String(error)}`);
       }
-      if (!response.ok) {
-        setSceneStatus(`scene failed: ${await response.text()}`);
-        return;
-      }
-      const payload = await response.json();
-      await originalView.loadScene(decodeFiles(payload.files));
-      indexSidecarIds();
-      sceneBusyRef.current = false;
-      setSceneBusy(false);
-      setSceneReady(true);
-      setStatus('scene ready — select and annotate');
     }
 
     async function loadRebuilt(mtime: number): Promise<void> {
@@ -812,12 +781,7 @@ export function ReStudio() {
 
     async function loadSubmissionTab(): Promise<void> {
       try {
-        const response = await fetch('/api/submission');
-        if (!response.ok) {
-          setSubmission(null);
-          return;
-        }
-        setSubmission((await response.json()) as SubmissionRecord);
+        setSubmission(await agentSession.getSubmission<SubmissionRecord>());
       } catch {
         setSubmission(null);
       }
@@ -826,12 +790,7 @@ export function ReStudio() {
 
     async function loadOperations(): Promise<void> {
       try {
-        const response = await fetch('/api/operations');
-        if (!response.ok) {
-          toast.error('operation registry unavailable — slash suggest offline');
-          return;
-        }
-        const payload = (await response.json()) as OperationsPayload;
+        const payload = await agentSession.listOperations<OperationsPayload>();
         setOperationsState(payload);
         opSuggest.setOperations(payload.operations as SuggestOperation[]);
         if (payload.errors.length) toast(`operation registry: ${payload.errors.join('; ')}`);
@@ -878,8 +837,7 @@ export function ReStudio() {
 
     const poll = window.setInterval(async () => {
       try {
-        const response = await fetch('/api/session');
-        if (response.ok) updateSessionState(await response.json());
+        updateSessionState(await agentSession.getSession<SessionPayload>());
       } catch {
         /* server restarting */
       }
@@ -906,7 +864,7 @@ export function ReStudio() {
 
   return (
     <TooltipProvider>
-      <div className="flex h-screen flex-col overflow-hidden bg-void font-sans text-ink antialiased">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-void font-sans text-ink antialiased">
         {/* top bar */}
         <header className="flex h-12 shrink-0 items-center gap-4 border-b border-line bg-panel px-4">
           <div className="flex items-center gap-2.5">
@@ -1117,7 +1075,7 @@ export function ReStudio() {
                           ))}
                         </div>
                       )}
-                      <div ref={sourceEditorHostRef} className="re-source-editor min-h-0 flex-1 overflow-hidden" />
+                      <div ref={sourceEditorHostRef} className="min-h-0 flex-1 overflow-hidden" />
                     </div>
                   </TabsContent>
 

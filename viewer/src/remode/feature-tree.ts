@@ -18,7 +18,7 @@ import {
   Scissors,
   createIcons,
 } from 'lucide';
-import type { ModelDocument, ModelNode } from '../scene2';
+import type { ModelDocument, ModelNode } from '../shared/scene2';
 
 const lucideIcons = {
   Box,
@@ -37,7 +37,7 @@ const lucideIcons = {
 
 type IconName = keyof typeof lucideIcons;
 
-function iconMarkup(name: IconName, className = 'ui-icon'): string {
+function iconMarkup(name: IconName, className = 'size-3.5 shrink-0') : string {
   const iconName = name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
   return `<i data-lucide="${iconName}" class="${className}" aria-hidden="true"></i>`;
 }
@@ -100,7 +100,7 @@ export class FeatureTreeView {
   }
 
   private renderEmpty(message: string): void {
-    this.host.innerHTML = `<div class="tree-empty" style="padding:8px;color:#6f7d8e;font-size:12px">${message}</div>`;
+    this.host.innerHTML = `<div class="p-2 text-[11px] text-dim">${message}</div>`;
   }
 
   private render(): void {
@@ -169,17 +169,17 @@ export class FeatureTreeView {
       const reference = canonicalPath !== undefined || ancestors.has(featureId);
       if (!reference) canonicalPathById.set(featureId, path);
       const row = document.createElement('button');
-      row.className = `tree-row feature-tree-row${reference ? ' feature-reference-row' : ''}`;
-      row.style.setProperty('--depth', String(depth));
+      const selected = featureId === this.selectedFeatureId;
+      row.className = `group flex w-full items-center gap-2 border-0 border-l-2 px-3 py-2 text-left text-[12px] transition-colors hover:bg-[#171d24] hover:text-[#edf3f9] ${selected ? 'border-l-lime bg-[#1a2324] text-[#f2f8fb]' : 'border-l-transparent text-[#94a1b2]'} ${reference ? 'italic text-dim' : ''}`;
+      row.style.paddingLeft = `calc(12px + ${depth} * 16px)`;
       row.dataset.featureId = featureId;
       row.dataset.featurePath = path;
-      row.classList.toggle('selected', featureId === this.selectedFeatureId);
       const expanded = !reference && inputs.length > 0 && expandedPaths.has(path);
       const shared = (consumerCount.get(featureId) ?? 0) > 1;
       const prefixIcon = reference ? 'Link' : inputs.length ? (expanded ? 'ChevronDown' : 'ChevronRight') : 'CircleDot';
       row.setAttribute('aria-expanded', inputs.length && !reference ? String(expanded) : 'false');
       row.setAttribute('aria-label', reference ? `Reference to ${featureTreeLabel(feature)}` : featureTreeLabel(feature));
-      row.innerHTML = `<span class="tree-chevron">${iconMarkup(prefixIcon, 'tree-chevron-icon')}</span><span class="tree-glyph feature-glyph">${iconMarkup(featureIconName(feature.op), 'tree-type-icon')}</span><span class="tree-label" title="${escapeHtml(feature.op)}">${escapeHtml(featureTreeLabel(feature))}</span>${reference ? '<span class="feature-reference-mark">REF</span>' : ''}${shared && !reference ? `<span class="feature-shared-mark" title="Used by ${consumerCount.get(featureId)} operations">USED ${consumerCount.get(featureId)}</span>` : ''}${inputs.length && !reference ? `<span class="feature-input-count" title="${inputs.length} visible graph input${inputs.length === 1 ? '' : 's'}">${inputs.length} IN</span>` : ''}`;
+      row.innerHTML = `<span class="grid size-2.5 shrink-0 place-items-center text-[#697889]">${iconMarkup(prefixIcon)}</span><span class="grid size-3.5 shrink-0 place-items-center text-[#91b8ed]">${iconMarkup(featureIconName(feature.op))}</span><span class="min-w-0 flex-1 truncate" title="${escapeHtml(feature.op)}">${escapeHtml(featureTreeLabel(feature))}</span>${reference ? '<span class="ml-auto shrink-0 font-mono text-[8px] tracking-[0.06em] text-[#91b8ed]">REF</span>' : ''}${shared && !reference ? `<span class="ml-auto shrink-0 font-mono text-[8px] tracking-[0.06em] text-[#c7a86f]">USED ${consumerCount.get(featureId)}</span>` : ''}${inputs.length && !reference ? `<span class="ml-auto shrink-0 font-mono text-[8px] tracking-[0.06em] text-dim">${inputs.length} IN</span>` : ''}`;
       renderIcons(row);
       row.addEventListener('click', () => {
         this.selectFeature(featureId);
@@ -187,8 +187,8 @@ export class FeatureTreeView {
           const targetPath = canonicalPathById.get(featureId);
           const target = targetPath ? rowsByPath.get(targetPath) : undefined;
           target?.scrollIntoView({ block: 'center' });
-          target?.classList.add('feature-reference-target');
-          window.setTimeout(() => target?.classList.remove('feature-reference-target'), 700);
+          target?.setAttribute('data-reference-target', 'true');
+          window.setTimeout(() => target?.removeAttribute('data-reference-target'), 700);
           return;
         }
         if (!inputs.length) return;
@@ -223,16 +223,21 @@ export class FeatureTreeView {
       const canonicalPath = canonicalPathById.get(featureId) ?? targetPath;
       const row = rowsByPath.get(canonicalPath);
       row?.scrollIntoView({ block: 'center' });
-      row?.classList.add('feature-reference-target');
-      window.setTimeout(() => row?.classList.remove('feature-reference-target'), 700);
+      row?.setAttribute('data-reference-target', 'true');
+      window.setTimeout(() => row?.removeAttribute('data-reference-target'), 700);
     };
   }
 
   private selectFeature(featureId: string): void {
     this.selectedFeatureId = featureId;
     const feature = this.model?.graph.nodes.find((item) => item.node_id === featureId);
-    for (const row of this.host.querySelectorAll<HTMLButtonElement>('.tree-row')) {
-      row.classList.toggle('selected', row.dataset.featureId === featureId);
+    for (const row of this.host.querySelectorAll<HTMLButtonElement>('[data-feature-id]')) {
+      const selected = row.dataset.featureId === featureId;
+      row.classList.toggle('border-l-lime', selected);
+      row.classList.toggle('bg-[#1a2324]', selected);
+      row.classList.toggle('text-[#f2f8fb]', selected);
+      row.classList.toggle('border-l-transparent', !selected);
+      row.classList.toggle('text-[#94a1b2]', !selected);
     }
     if (feature) this.callbacks.onSelectFeature?.(feature);
   }

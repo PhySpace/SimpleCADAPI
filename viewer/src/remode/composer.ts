@@ -154,10 +154,22 @@ export class TokenComposer {
 
   private buildChip(token: ComposerToken): HTMLSpanElement {
     const chip = document.createElement('span');
-    chip.className =
-      token.kind === 'op'
-        ? `re-token re-token-op re-opcat-${token.category ?? 'op'}`
-        : `re-token re-token-${token.kind}`;
+    const kindClasses: Record<ComposerTokenKind, string> = {
+      face: 'text-[#a8cdf5] border-[#33587e] bg-[rgb(79_156_240_/_0.13)]',
+      edge: 'text-[#a9e2bd] border-[#2f5c42] bg-[rgb(79_197_122_/_0.13)]',
+      vertex: 'text-[#f2c4a3] border-[#7c5232] bg-[rgb(224_129_79_/_0.13)]',
+      body: 'text-[#e7d5a8] border-[#79622f] bg-[rgb(201_162_79_/_0.13)]',
+      op: ({
+        sketch: 'text-[#a8e0da] border-[#2f5c57] bg-[rgb(69_184_173_/_0.12)]',
+        boolean: 'text-[#cdd3dd] border-[#4a5462] bg-[rgb(148_163_184_/_0.13)]',
+        solid: 'text-[#b9c8ee] border-[#3c4d7e] bg-[rgb(122_148_212_/_0.12)]',
+        primitive: 'text-[#e6d3ab] border-[#6f5c33] bg-[rgb(206_170_96_/_0.13)]',
+        modify: 'text-[#eeb9c3] border-[#7e3c4a] bg-[rgb(212_122_138_/_0.13)]',
+        surface: 'text-[#d3c4ee] border-[#4c3a7e] bg-[rgb(157_122_212_/_0.12)]',
+        pattern: 'text-[#e6bce6] border-[#6b3a6b] bg-[rgb(196_111_196_/_0.12)]',
+      }[token.category ?? ''] ?? 'text-ink border-edge bg-inset'),
+    };
+    chip.className = `inline-flex items-center gap-1 mx-px rounded-full border px-[7px] text-[9px] leading-[1.7] align-baseline select-all whitespace-nowrap ${kindClasses[token.kind]}`;
     chip.contentEditable = 'false';
     chip.dataset.token = token.token;
     chip.dataset.label = token.label;
@@ -165,10 +177,10 @@ export class TokenComposer {
     if (token.category) chip.dataset.category = token.category;
     chip.title = token.token;
     const glyph = document.createElement('span');
-    glyph.className = 're-token-glyph';
+    glyph.className = 'font-mono text-[8px] font-bold leading-none tracking-[0.04em] opacity-85';
     glyph.textContent = KIND_GLYPH[token.kind];
     const label = document.createElement('span');
-    label.className = 're-token-label';
+    label.className = 'font-mono';
     label.textContent = token.label;
     chip.append(glyph, label);
     return chip;

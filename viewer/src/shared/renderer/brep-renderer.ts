@@ -290,7 +290,7 @@ export class BRepRenderer {
     const cached = this.entityCache.get(asset.asset_id);
     if (cached) return cached;
     const parsed = JSON.parse(strFromU8(this.bytesFor(asset.uri))) as EntitySidecar;
-    if (parsed.schema_version !== '2.0') throw new Error(`entity sidecar schema differs: ${asset.uri}`);
+    if (parsed.schema_version !== '1.0' || parsed.definition_id !== node.definition_id) throw new Error(`entity sidecar identity differs: ${asset.uri}`);
     this.entityCache.set(asset.asset_id, parsed);
     return parsed;
   }
@@ -299,7 +299,7 @@ export class BRepRenderer {
     const sceneBytes = files['scene.json'];
     if (!sceneBytes) throw new Error('scene.json is missing from the scene files');
     const manifest = JSON.parse(strFromU8(sceneBytes)) as SceneManifest;
-    if (manifest.schema_version !== '2.0') throw new Error(`unsupported scene schema: ${manifest.schema_version}`);
+    if (manifest.schema_version !== '2.0' && manifest.schema_version !== 're-mode-source-1') throw new Error(`unsupported scene schema: ${manifest.schema_version}`);
     this.clearScene();
     this.files = files;
     this.manifest = manifest;

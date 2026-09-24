@@ -62,16 +62,16 @@ export function bindResizablePanels(options: ResizablePanelsOptions): () => void
       const startX = event.clientX;
       const startWidth = panelFor(side).getBoundingClientRect().width;
       resizer.setPointerCapture(event.pointerId);
-      resizer.classList.add('dragging');
-      document.body.classList.add('resizing-panels');
+      resizer.classList.add('bg-[#18221c]');
+      document.body.dataset.resizing = 'panels';
 
       const onPointerMove = (moveEvent: PointerEvent): void => {
         const delta = moveEvent.clientX - startX;
         setWidth(side, startWidth + (side === 'navigator' ? delta : -delta));
       };
       const finish = (): void => {
-        resizer.classList.remove('dragging');
-        document.body.classList.remove('resizing-panels');
+        resizer.classList.remove('bg-[#18221c]');
+        delete document.body.dataset.resizing;
         resizer.removeEventListener('pointermove', onPointerMove);
         resizer.removeEventListener('pointerup', finish);
         resizer.removeEventListener('pointercancel', finish);
