@@ -29,7 +29,7 @@ available semantic metadata.
 | `hydraulic_rod_assembly/` | assembly | `uv run python examples/hydraulic_rod_assembly/model.py` | `hydraulic_rod_assembly.scadpkg` + `.step` + `.FCStd` |
 | `external_reference_gear_train/` | assembly (nested) | `uv run python examples/external_reference_gear_train/model.py` | `nested_external_reference_gear_trains.scadpkg` |
 | `u_link_motor_mount/` | assembly | `uv run python examples/u_link_motor_mount/assembly.py` | `u_link_motor_mount.scadpkg` + STEP/STL (`demo/index.html` session replay) |
-| `bowl_connector/` | reverse engineering | re-studio session (`viewer/re.html` against the STEP) | rebuild artifacts under `re_work/` |
+| `bowl_connector/` | reverse engineering | Re-mode workspace in the unified Web Editor | rebuild artifacts under `re_work/` |
 | `ap242_gmsh_volume_mesh/` | FEM / data exchange | see below | AP242 + Gmsh volume mesh + Calculix statics |
 | `demo_kit/` | infra | — | shared single-file demo builder (`build_demo.py`) |
 | `histcad_demo/` | translation demos | `uv run python examples/histcad_demo/<script>.py` | per-dialect FTC script + render |

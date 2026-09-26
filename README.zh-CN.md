@@ -39,8 +39,8 @@ HTML，忠实回放完整录制的对话（用户输入、Agent 思考、每一�
 <td>“把已有的 L 形直角连接件 legacy 脚本按 single-part-modeling 工作流正式化：FTC 特征块 + 命名参数重建；与旧版几何等价（体积偏差 &lt; 0.1%）；<code>interface.*</code> FEM 边界标签必须原样保留——下游 Gmsh/CalculiX 按标签选面。”</td>
 <td><img src="img/capability/bracket_turntable.gif" width="420" alt="支架旋转展示"></td>
 </tr>
-旋转展示由仓库内 [Scene Viewer](viewer/) 的 BRep 渲染器渲染（面着色 + 宽棱边），
-一圈 = 48 个确定性方位角步进，经 `viewer/gif-harness.html` 驱动生成。
+旋转展示由独立的 [sca-web-editor](https://github.com/PhySpace/sca-web-editor) 的 BRep
+渲染器渲染（面着色 + 宽棱边），一圈 = 48 个确定性方位角步进，经其 `gif-harness.html` 驱动生成。
 
 </table>
 

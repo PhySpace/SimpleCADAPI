@@ -1,6 +1,6 @@
 # Workflow: Reverse-Engineering Studio (human-in-the-loop)
 
-Drive the interactive reconstruction studio (`viewer/` re-mode) as the agent
+Drive the interactive reconstruction studio (the standalone [sca-web-editor](https://github.com/PhySpace/sca-web-editor) re-mode) as the agent
 side of a two-actor loop: a human annotates the STEP target in the browser,
 the agent reconstructs from those annotations, and the browser displays the
 artifacts for the next refinement round.
@@ -90,7 +90,7 @@ verification artifacts. Without an operator, stay on the autonomous path
 ## Operation tips (content is markdown, not code)
 
 Each palette entry is a packaged prompt defined by
-`viewer/server/operations/<op_id>.md`: YAML-style frontmatter (`label`,
+`sca_web_editor/operations/<op_id>.md` in the sca-web-editor repo: YAML-style frontmatter (`label`,
 `category`, `api`, `reads`, `doc_refs`) plus the hint text as body. The
 registry loader validates and serves them (`GET /api/operations`) and
 `compose_submission` embeds the tips for every referenced operation.
@@ -106,21 +106,22 @@ registry loader validates and serves them (`GET /api/operations`) and
 
 ## Agent loop
 
-1. Start the studio and hand the URL to the operator:
+1. Start the studio and hand the URL to the operator (all commands run from a
+   checkout of [sca-web-editor](https://github.com/PhySpace/sca-web-editor)):
 
    ```bash
-   uv run python -m viewer.server <case_dir> --daemon
+   uv run python -m sca_web_editor <case_dir> --daemon
    ```
 
-   The detached server binds `127.0.0.1:7170` (lockfile
-   `<case_dir>/.re_server.lock`), builds the scene in the background, and
-   opens `http://127.0.0.1:7170/re.html` (built frontend from `viewer/dist`;
-   during development run `npm run dev` in `viewer/`, which proxies `/api`).
+   The detached server binds `127.0.0.1:7170` and opens
+   `http://127.0.0.1:7170/`, the single Web Editor entry. Choose `Re-mode`
+   in the mode switcher. During development run `npm run dev` in the
+   sca-web-editor repo, which proxies `/api` and `/rpc`.
 
 2. Block on the next submission (stay under the Bash tool timeout):
 
    ```bash
-   uv run python -m viewer.server <case_dir> --wait-only --timeout 590
+   uv run python -m sca_web_editor <case_dir> --wait-only --timeout 590
    ```
 
    Exit 0 = fresh submission; 124 = timeout (re-check `re_work/submission.json`
@@ -159,7 +160,7 @@ registry loader validates and serves them (`GET /api/operations`) and
 6. Loop to step 2 for the next refinement round. Finish with:
 
    ```bash
-   uv run python -m viewer.server <case_dir> --shutdown
+   uv run python -m sca_web_editor <case_dir> --shutdown
    ```
 
 ## Data output

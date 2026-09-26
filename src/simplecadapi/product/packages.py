@@ -385,7 +385,12 @@ def _scene_projection(root: Definition, store: _BlobStore, objects: dict[str, by
     }
 
 
-def build_product_package(value: Any, *, include_scene: bool = True) -> ProductPackage:
+def build_product_package(
+    value: Any,
+    *,
+    include_scene: bool = True,
+    validate: bool = True,
+) -> ProductPackage:
     root = _coerce_definition(value)
     definitions = _definition_closure(root)
     store = _BlobStore()
@@ -415,7 +420,15 @@ def build_product_package(value: Any, *, include_scene: bool = True) -> ProductP
     }
     manifest = {**draft, "content_hash": content_hash(draft, omit=())}
     package = ProductPackage(manifest=manifest, objects=objects, root_definition=root)
-    validate_product_package(package)
+    if validate:
+        # Full decode-and-verify round-trip. Trusted in-process callers
+        # (e.g. the live export path) may skip it; package LOADERS always
+        # validate on their side.
+        validate_product_package(package)
+    else:
+        # Mark trusted-by-construction so encode_product_package does not
+        # silently re-run the same verification we just skipped.
+        _mark_package_validated(package, DEFAULT_ARTIFACT_LIMITS)
     return package
 
 

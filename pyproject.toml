@@ -34,6 +34,8 @@ dependencies = [
     "ocp-gordon>=0.2,<0.3",
     "ezdxf>=1.4.4",
     "pymupdf>=1.28.2",
+    "marimo>=0.25.0",
+    "plotly>=7.1.0",
 ]
 
 [project.optional-dependencies]
@@ -134,7 +136,7 @@ unresolved-reference = "ignore"
 unresolved-import = "ignore"
 
 [tool.ty.src]
-include = ["src", "test", "tests", "examples", "tools", "viewer/server"]
+include = ["src", "test", "tests", "examples", "tools"]
 exclude = [
     "**/__pycache__/**",
     ".venv/**",
