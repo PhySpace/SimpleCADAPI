@@ -425,6 +425,10 @@ def build_product_package(
         # (e.g. the live export path) may skip it; package LOADERS always
         # validate on their side.
         validate_product_package(package)
+    else:
+        # Mark trusted-by-construction so encode_product_package does not
+        # silently re-run the same verification we just skipped.
+        _mark_package_validated(package, DEFAULT_ARTIFACT_LIMITS)
     return package
 
 
