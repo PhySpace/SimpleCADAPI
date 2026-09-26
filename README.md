@@ -43,9 +43,9 @@ deterministic face tags that survive re-parameterization, and synchronized
 <td>"Formalize the existing legacy L-bracket script through the single-part workflow: rebuild with FTC feature blocks and named parameters; geometric equivalence to the legacy model (volume delta < 0.1%); the <code>interface.*</code> FEM boundary tags must survive untouched — the downstream Gmsh/CalculiX pipeline selects faces by them."</td>
 <td><img src="img/capability/bracket_turntable.gif" width="420" alt="bracket turntable"></td>
 </tr>
-Turntables are rendered by the in-repo [Scene Viewer](viewer/)'s BRep renderer
-(face shading + wide edges); one full turn = 48 deterministic azimuth steps
-driven through `viewer/gif-harness.html`.
+Turntables are rendered by the standalone [sca-web-editor](https://github.com/PhySpace/sca-web-editor)'s
+BRep renderer (face shading + wide edges); one full turn = 48 deterministic
+azimuth steps driven through its `gif-harness.html`.
 
 </table>
 
@@ -550,8 +550,8 @@ uv run python examples/ap242_gmsh_volume_mesh/model.py
 uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py
 ```
 
-Reverse engineering runs through the browser studio in `viewer/re.html`
-against a target STEP (see `examples/bowl_connector/`).
+Reverse engineering runs through the `Re-mode` workspace in the unified Web
+Editor at `/` against a target STEP (see `examples/bowl_connector/`).
 
 ## Documentation
 
