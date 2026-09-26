@@ -1,7 +1,7 @@
 """Structural graph analysis and recorded geometry selectors.
 
-Translation never replays source solids or measures expected feature results.
-Cross-kernel measurements live in the workspace test harness.
+Translation never replays source solids or measures expected feature results;
+expected values are asserted by the test suite.
 """
 from __future__ import annotations
 import copy

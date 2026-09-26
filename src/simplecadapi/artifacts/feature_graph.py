@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 import stat
+import threading
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from functools import lru_cache
 from importlib.resources import files
@@ -37,6 +39,11 @@ FEATURE_GRAPH_SCHEMA_VERSION = "1.0"
 FEATURE_GRAPH_PROFILE = "simplecad-feature-graph-1"
 FEATURE_GRAPH_MEDIA_TYPE = "application/vnd.simplecad.feature-graph+zip"
 _FEATURE_GRAPH_MANIFEST = "feature-graph.json"
+
+# Content-addressed memo for load_feature_graph_artifact (bounded LRU).
+_LOAD_CACHE: "OrderedDict[str, FeatureGraphArtifact]" = OrderedDict()
+_LOAD_CACHE_LOCK = threading.Lock()
+_LOAD_CACHE_MAX = 32
 
 
 @lru_cache(maxsize=1)
@@ -240,6 +247,12 @@ class FeatureGraphArtifact:
     source_files: tuple[SourceFileSnapshot, ...]
     content_hash: str = ""
     blobs: Mapping[str, bytes] = field(default_factory=dict, compare=False, repr=False)
+
+    # Lazily-filled cache for `canonical_bytes` (frozen+slots: bypass both via
+    # object.__setattr__; excluded from init/repr/compare on purpose).
+    _canonical_bytes_memo: bytes | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
 
     schema_version: str = field(default=FEATURE_GRAPH_SCHEMA_VERSION, init=False)
     artifact_kind: str = field(default="feature_graph", init=False)
@@ -448,7 +461,11 @@ class FeatureGraphArtifact:
 
     @property
     def canonical_bytes(self) -> bytes:
-        return canonical_bytes(self.to_dict())
+        """Canonical serialization, memoized per instance (artifacts are
+        closed payloads; the canonical form is deterministic from fields)."""
+        if self._canonical_bytes_memo is None:
+            object.__setattr__(self, "_canonical_bytes_memo", canonical_bytes(self.to_dict()))
+        return self._canonical_bytes_memo
 
     def restore_session(self):
         """Restore a detached GraphSession from the durable payload."""
@@ -744,9 +761,32 @@ def encode_feature_graph_artifact(artifact: FeatureGraphArtifact) -> bytes:
 def load_feature_graph_artifact(
     data: bytes | bytearray | memoryview | str | Path,
 ) -> FeatureGraphArtifact:
-    """Read and fully validate one canonical feature graph archive."""
+    """Read and fully validate one canonical feature graph archive.
 
+    Archives are content-addressed, so loads are memoized by SHA-256 of the
+    raw bytes: repeated loads of the same artifact (scene compilation and
+    package validation both re-read definitions) return the same closed
+    instance instead of re-running zip preflight, schema validation, and
+    graph reconstruction. The returned artifact is shared — treat it as
+    read-only (the artifact contract already requires this).
+    """
     raw = Path(data).read_bytes() if isinstance(data, (str, Path)) else bytes(data)
+    key = sha256_bytes(raw)
+    with _LOAD_CACHE_LOCK:
+        cached = _LOAD_CACHE.get(key)
+        if cached is not None:
+            _LOAD_CACHE.move_to_end(key)
+            return cached
+    artifact = _load_feature_graph_artifact(raw)
+    with _LOAD_CACHE_LOCK:
+        _LOAD_CACHE[key] = artifact
+        while len(_LOAD_CACHE) > _LOAD_CACHE_MAX:
+            _LOAD_CACHE.popitem(last=False)
+    return artifact
+
+
+def _load_feature_graph_artifact(raw: bytes) -> FeatureGraphArtifact:
+    """Uncached load: fully validate and reconstruct one feature graph."""
     archive = preflight_zip_bytes(raw, manifest_name=_FEATURE_GRAPH_MANIFEST)
     manifest = parse_canonical_json(archive.members[_FEATURE_GRAPH_MANIFEST])
     if not isinstance(manifest, Mapping):

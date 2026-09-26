@@ -1,0 +1,6 @@
+{"ts": "2026-09-25T17:40:12.208+00:00", "type": "server_start", "pid": 98298, "port": 7170, "target": "/Users/lildino/Project/ocws/SimpleCADAPI/examples/marimo_interactive/studio_case/target.step"}
+{"ts": "2026-09-25T17:40:14.418+00:00", "type": "scene_built", "target": "/Users/lildino/Project/ocws/SimpleCADAPI/examples/marimo_interactive/studio_case/target.step", "faces": 15, "edges": 33, "vertices": 21}
+{"ts": "2026-09-25T18:38:49.109+00:00", "type": "server_start", "pid": 10071, "port": 7170, "target": "/Users/lildino/Project/ocws/SimpleCADAPI/examples/marimo_interactive/studio_case/target.step"}
+{"ts": "2026-09-25T18:38:50.380+00:00", "type": "scene_built", "target": "/Users/lildino/Project/ocws/SimpleCADAPI/examples/marimo_interactive/studio_case/target.step", "faces": 15, "edges": 33, "vertices": 21}
+{"ts": "2026-09-25T18:39:07.146+00:00", "type": "server_start", "pid": 10165, "port": 7170, "target": "/Users/lildino/Project/ocws/SimpleCADAPI/examples/marimo_interactive/studio_case/target.step"}
+{"ts": "2026-09-25T18:39:08.399+00:00", "type": "scene_built", "target": "/Users/lildino/Project/ocws/SimpleCADAPI/examples/marimo_interactive/studio_case/target.step", "faces": 15, "edges": 33, "vertices": 21}
