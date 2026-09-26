@@ -630,17 +630,24 @@ def _write_window_supersampled(window, output: Path, factor: int) -> None:
     """Write through an integer-factor LANCZOS downsample.
 
     vtkPNGWriter needs a real path, so the supersampled frame lands in a
-    temporary sibling file before PIL downsamples it onto ``output``.
+    temporary sibling file before PIL downsamples it onto ``output``. The
+    temp file is created with ``mkstemp`` and its handle closed immediately:
+    vtkPNGWriter opens the same path itself, and Windows denies a second
+    open while a handle is still held (POSIX masks this). The file is
+    unlinked in a ``finally`` so render failures don't leak temp siblings.
     """
+    import os
     import tempfile
 
     from PIL import Image
 
-    with tempfile.NamedTemporaryFile(
+    fd, raw_name = tempfile.mkstemp(
         prefix=f".{output.stem}-ss{factor}x-", suffix=".png", dir=output.parent
-    ) as raw:
-        _write_window(window, Path(raw.name))
-        with Image.open(raw.name) as frame:
+    )
+    os.close(fd)
+    try:
+        _write_window(window, Path(raw_name))
+        with Image.open(raw_name) as frame:
             frame = frame.convert("RGB")
             downsampled = frame.resize(
                 (frame.width // factor, frame.height // factor),
@@ -650,6 +657,11 @@ def _write_window_supersampled(window, output: Path, factor: int) -> None:
                 downsampled.save(output, quality=95)
             else:
                 downsampled.save(output)
+    finally:
+        try:
+            os.unlink(raw_name)
+        except OSError:
+            pass
 
 
 def _prepare_sdk_screenshot(
