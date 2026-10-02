@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 import weakref
-from collections import defaultdict
+from collections import defaultdict, deque
 from copy import deepcopy
 from dataclasses import dataclass, field, fields, replace
 from enum import Enum, auto
@@ -928,52 +928,38 @@ class OperationGraph:
         """Nodes with no downstream consumers."""
         return [self._nodes[nid] for nid in self._nodes if not self._adj.get(nid)]
 
+    def _kahn_order(self) -> List[str]:
+        # Iterative (Kahn) so long operation chains, e.g. an assembly adding
+        # thousands of components, do not hit the Python recursion limit.
+        # Nodes on a cycle never reach in-degree zero and are left out.
+        in_degree: Dict[str, int] = {nid: 0 for nid in self._nodes}
+        for child, parent in self._edges:
+            in_degree[parent] = in_degree.get(parent, 0) + 1
+
+        queue: deque[str] = deque(nid for nid, d in in_degree.items() if d == 0)
+        order: List[str] = []
+
+        while queue:
+            nid = queue.popleft()
+            order.append(nid)
+            for child in self._adj.get(nid, []):
+                in_degree[child] -= 1
+                if in_degree[child] == 0:
+                    queue.append(child)
+        return order
+
     def is_dag(self) -> bool:
         """Return ``True`` if the graph has no cycles (always valid for correct usage)."""
-        visited: Set[str] = set()
-        on_stack: Set[str] = set()
-
-        def dfs(nid: str) -> bool:
-            visited.add(nid)
-            on_stack.add(nid)
-            for child in self._adj.get(nid, []):
-                if child not in visited:
-                    if not dfs(child):
-                        return False
-                elif child in on_stack:
-                    return False
-            on_stack.discard(nid)
-            return True
-
-        for nid in self._nodes:
-            if nid not in visited:
-                if not dfs(nid):
-                    return False
-        return True
+        return len(self._kahn_order()) == len(self._nodes)
 
     def topological_order(self) -> List[OperationNode]:
         """Return nodes in valid execution (topological) order.
 
         Raises ``ValueError`` if the graph contains a cycle.
         """
-        if not self.is_dag():
+        order = self._kahn_order()
+        if len(order) != len(self._nodes):
             raise ValueError("graph contains a cycle")
-
-        in_degree: Dict[str, int] = {nid: 0 for nid in self._nodes}
-        for child, parent in self._edges:
-            in_degree[parent] = in_degree.get(parent, 0) + 1
-
-        queue: List[str] = [nid for nid, d in in_degree.items() if d == 0]
-        order: List[str] = []
-
-        while queue:
-            nid = queue.pop(0)
-            order.append(nid)
-            for child in self._adj.get(nid, []):
-                in_degree[child] -= 1
-                if in_degree[child] == 0:
-                    queue.append(child)
-
         return [self._nodes[nid] for nid in order]
 
     # ------------------------------------------------------------------

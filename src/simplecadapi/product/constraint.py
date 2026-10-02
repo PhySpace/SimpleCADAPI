@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Optional, Tuple
 
@@ -236,7 +237,7 @@ def _validate_constraints(constraints: Iterable[Constraint]) -> Tuple[Constraint
         if not isinstance(constraint, Constraint):
             raise TypeError("constraints must contain Constraint values")
     ids = [constraint.constraint_id for constraint in result]
-    duplicates = sorted({constraint_id for constraint_id in ids if ids.count(constraint_id) > 1})
+    duplicates = sorted(constraint_id for constraint_id, count in Counter(ids).items() if count > 1)
     if duplicates:
         raise ValueError("duplicate constraint_id: " + ", ".join(duplicates))
     return result
