@@ -30,7 +30,7 @@ whole API index up front.
 | `requirement-refinement` | request → brief (dimensions, units, datums, validation targets) |
 | `part-modeling` | single-solid parts: primitives, profiles, features, booleans, transforms |
 | `sketch-and-features` | declarative constrained sketches and promotion |
-| `assembly-and-product` | parts, placements, connectors, constraints, @part/@assemble, cache, `.scadpkg` |
+| `assembly-and-product` | parts, placements, connectors, constraints, notebooks and `scad.use`, @part/@assemble, `.scadpkg` |
 | `standard-parts` | stdlib gears, ring gears, racks, cycloidal discs, bearings |
 | `step-inspection` | STEP/BREP evidence, comparison, reconstruction evaluation |
 | `drawing-inspection` | vector-PDF coordinates and dimensions, model-section measurements, independent evidence validation |

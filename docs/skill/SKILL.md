@@ -85,16 +85,19 @@ it and stop that route; never invent an alternative route.
    stdlib function, except the canonical durable export call
    `capture(result, path)`, whose two required arguments are
    positional.
-3. One part per file; one assembly file per product; parameters
-   live in the file that consumes them; exposed tunable parameters
-   are `var()`/`Var` declarations (optionally with `unit`,
-   `tolerance`). Part sources follow the Feature Tree Convention
+3. Every model is a marimo notebook with a `[tool.simplecadapi]`
+   header (`references/docs/guides/notebook-runtime.md`): one part
+   per notebook; one assembly notebook per product, composing
+   children with `scad.use(...)`; parameters live in the notebook
+   that consumes them; exposed tunable parameters are `var()`/`Var`
+   declarations (optionally with `unit`, `tolerance`). Part sources
+   follow the Feature Tree Convention
    (`references/discipline/feature-tree-convention.md`): block
    structure `sketch → basic body op → bool → modifier`, one
-   feature per block with a mandatory boundary comment
-   `# ---- feature: <slug> (<role>) ----`; 2D profiles and planar
-   paths go through the sketch API, primitives only when the shape
-   is completely contained in the basic form.
+   feature per block and one block per cell, with a mandatory
+   boundary comment `# ---- feature: <slug> (<role>) ----`; 2D
+   profiles and planar paths go through the sketch API, primitives
+   only when the shape is completely contained in the basic form.
 4. Booleans (`union_rsolid`, `cut_rsolid`, `intersect_rsolid`)
    accept mixed inputs and return exactly one `Solid`; union
    defaults to `glue=False` with a conservative scale-relative
@@ -116,19 +119,24 @@ it and stop that route; never invent an alternative route.
    it never propagates downward); inspect with
    `list_tags(shape=...)`; keep numeric facts in metadata, never in
    tags.
-8. `@scad.part` for one physical single-solid product;
-   `@scad.assemble` for assemblies with explicit definitions.
-   Neither nests inside an active `GraphSession`. Durable delivery
-   is `capture(result, "out/product.scadpkg")` in one call.
+8. The notebook file is the only source of truth; `.scadpkg` is
+   generated from it for exchange and publishing (`sca run
+   product.py --out out/product.scadpkg`, or
+   `capture(result, "out/product.scadpkg")` in one call) and is
+   never read back as a source. `@scad.part` / `@scad.assemble`
+   are for reusable library parts in plain modules; they may be
+   called inside a notebook cell.
 9. `simplecadapi.inspect.brep` and `simplecadapi.inspect.drawing` are
    diagnostic-only and rejected inside `GraphSession`; obtain/export
    geometry first, inspect outside.
 10. Standard parts first: before hand-modeling a gear, ring gear,
     rack, cycloidal disc, or bearing, check `scad.std.gear` /
     `scad.std.bearing`.
-11. Read `references/docs/guides/cache-build-workflow.md` in full
-    before configuring persistent cache, durable builds, or cache
-    maintenance; cache mutation requires explicit confirmation.
+11. Read `references/docs/guides/notebook-runtime.md` in full
+    before writing a notebook, composing notebooks, or reasoning
+    about the cell cache. Run models with `sca run`; never enable
+    marimo's `[tool.marimo.runtime] cache_cells` in the editor, and
+    never commit the generated `__marimo__/` directory.
 
 ## Boundaries
 
@@ -187,7 +195,7 @@ print(len(rebuilt))
 - `references/domains/addon-development.md` — `sca` addon CLI and authoring guide
 - `references/docs/guides/reconstruction-agent-test-prompt.md`
 - `references/docs/guides/reconstruction-agent-strategy.md`
-- `references/docs/guides/cache-build-workflow.md`
+- `references/docs/guides/notebook-runtime.md`
 - `references/ql-playbook.md`
 - `references/scadpkg-format.md` — `.scadpkg` consumer spec: member
   layout, tag channel, minimal readers (addon exporters read this)

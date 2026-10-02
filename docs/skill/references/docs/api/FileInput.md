@@ -14,4 +14,4 @@ class FileInput(path: str)
 
 ## Description
 
-A declared external file whose bytes participate in a build key.
+A declared external file whose bytes are recorded in the Part definition.

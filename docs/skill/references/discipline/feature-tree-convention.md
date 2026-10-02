@@ -6,6 +6,11 @@ Fusion 360), readable by humans and LLMs, and translatable by the package
 translators. This convention is mandatory for every part source authored in
 any workflow.
 
+A model is a marimo notebook (`docs/guides/notebook-runtime.md`), and each
+block is one cell of it: the cell is the unit the runtime caches and re-runs,
+so one feature per cell makes an edit re-run that feature and its downstream
+features only.
+
 ## The paradigm
 
 A part is a chain of blocks, each block being one step of:
@@ -26,6 +31,11 @@ body = scad.fillet_rsolid(solid=body, edges=sel, radius=r)  # modify
 There is no accumulator object and no hidden state: inputs are explicit,
 the recorded graph mirrors the source structure, and a failed operation
 names one feature.
+
+Inside one builder function the blocks rebind one `body` name. Across
+notebook cells they cannot — marimo forbids defining a variable in two
+cells — so each cell binds the body under a name of its own (see
+[Blocks are cells](#blocks-are-cells)).
 
 ## Block header comments (mandatory)
 
@@ -101,75 +111,125 @@ design parameters) stay in the source; geometric verification never does
 — it lives in the external verification scripts per
 `geometric-validation.md`.
 
-## The `@scad.part` decorator and its cache
+## Blocks are cells
 
-`@scad.part` accepts keyword parameters only; emitted corpus sources state
-them explicitly so the meaning is legible from the source itself:
+In a notebook every block is one `@app.cell`:
 
-- `id` — logical part identity (defaults to the function name); part of the
-  cache key.
-- `revision` — `'1.0.0'` by default; bump it to force rebuilds; part of the
-  cache key.
+- The block header is the first line of the cell body.
+- The cell returns the body under the block's slug in snake_case
+  (`base-plate` → `base_plate`), and the next block reads that name. The
+  variable names then spell the feature tree, and an override
+  (`sca run --set`) or a failure points at one feature.
+- Each block binds a new name because marimo gives every top-level
+  variable exactly one defining cell: that is how it orders cells by data
+  dependency and keys each cell's cache by the values it reads. Rebinding
+  `body` in a second cell is a multiple-definition error.
+- Tools, profiles, and other temporaries are cell-local: prefix them with
+  `_` (`_pockets = ...`) so marimo keeps them out of the notebook's
+  namespace.
+- Several small blocks that always change together may share one cell,
+  rebinding the body inside it; the cell returns the body under the last
+  block's slug. They are then cached and re-run as one unit, so keep this
+  the exception.
+- Parameters live in their own cell(s) at the top (`# ---- params ----`),
+  grouped by what is overridden together: an override replaces every
+  variable of its cell. The product — the `Part` or `Assembly` whose id is
+  the notebook id — is made in the last cell. A notebook that describes a part family names the
+  product `scad.notebook_id()`, and each use gives the member its id
+  (`scad.use("link_bar.py", id="crank", ...)`).
+- Imports from local modules go in the cell that uses them, or in the setup
+  cell; either way, editing the module invalidates the notebook's cache.
+
+## Library parts: the `@scad.part` decorator
+
+Parts reused by several notebooks live in plain `.py` modules as
+`@scad.part` (or `@scad.assemble`) builders, their blocks inside the builder
+function rebinding `body`. `@scad.part` accepts keyword parameters only;
+emitted corpus sources state them explicitly so the meaning is legible from
+the source itself:
+
+- `id` — logical part identity (defaults to the function name).
+- `revision` — `'1.0.0'` by default.
 - `inputs` — sequence of `file_input()` declarations; the referenced files'
-  content snapshots enter the cache key.
-- `cache` — cache policy: `"auto"` (read/write), `"off"`, `"read_only"`,
-  `"read_write"`, `"refresh"`, or a policy dict / `CachePolicy`.
-- `project_root` — anchor for the part cache, file inputs, and project
-  config. Default: the directory containing the builder's source file —
-  a script is its own project, runs from anywhere, and its cache lands
-  beside it. Pass it explicitly only to anchor at a larger project
-  (project-level cache or `[tool.simplecadapi.cache]` config).
+  content snapshots are recorded in the definition.
+- `project_root` — anchor for file inputs and recorded source paths.
+  Default: the directory containing the builder's source file, so a module
+  runs from anywhere. Pass it explicitly only to anchor at a larger project.
 - `tolerance_profile` — kernel tolerance fingerprint (default
-  `'simplecad-default'`); part of the cache key.
+  `'simplecad-default'`).
 
-**Where the cache lands.** The cache root is `<anchor>/.simplecad/cache`
-(`records/`, `objects/`, `locks/`, `quarantine/`); part interface state
-lives beside it at `<anchor>/.simplecad/state/latest-parts.json` and
-follows the cache root. Overrides resolve as decorator `cache=` >
-environment (`SIMPLECAD_CACHE_DIR`, `SIMPLECAD_CACHE_MODE`, …) >
-`[tool.simplecadapi.cache]` in the `pyproject.toml` at the anchor >
-defaults. The cache key covers `id`, `revision`, `tolerance_profile`,
-normalized call arguments, the whole-file source fingerprint, file-input
-snapshots, and the generator profile (SDK/OCC versions) — any source edit
-invalidates.
+A builder never caches; each call builds afresh. Inside a notebook the
+calling cell is cached, and editing the module invalidates it.
 
 **Delivered sources state the anchor explicitly.** A translator-emitted
 or standalone `.ftc.py` passes `project_root=Path(__file__).parent`
-explicitly so the cache location is legible from the source itself —
-even though it matches the default, the corpus states it rather than
-relying on implicit resolution.
+explicitly so the anchor is legible from the source itself — even though
+it matches the default, the corpus states it rather than relying on
+implicit resolution.
 
 ## Reference shape of a compliant source
 
 ```python
-# ---- params ----
-PLATE_T = scad.var("plate_t", 6.0, unit="mm")
-...
+# /// script
+# dependencies = ["simplecadapi"]
+#
+# [tool.simplecadapi]
+# id = "motor-mount"
+# revision = "1.0.0"
+# ///
+import marimo
 
-def _pocket_tools(p):
-    ...  # block-local, geometry tier when tools are pure primitives
+app = marimo.App()
 
-@scad.part(id="motor-mount", revision="1.0.0",
-           project_root=Path(__file__).parent)
-def build_motor_mount() -> scad.Part:
+with app.setup:
+    import simplecadapi as scad
+    from simplecadapi import ql
+
+
+@app.cell
+def _():
+    # ---- params ----
+    PLATE_T = scad.var("plate_t", 6.0, unit="mm")
+    FILLET_R = scad.var("fillet_r", 1.0, unit="mm")
+    ...
+    return (FILLET_R, PLATE_T)
+
+
+@app.cell
+def _(PLATE_T):
     # ---- feature: base-plate (build, profile=sketch) ----
-    s = scad.make_sketch_rsketch(name="base", plane="XY")
-    ...  # constrained rectangle, promoted to face
-    body = scad.extrude_rsolid(profile=face, direction=(0, 0, 1), distance=PLATE_T)
+    _s = scad.make_sketch_rsketch(name="base", plane="XY")
+    ...  # constrained rectangle, promoted to _face
+    base_plate = scad.extrude_rsolid(profile=_face, direction=(0, 0, 1), distance=PLATE_T)
+    return (base_plate,)
 
+
+@app.cell
+def _(base_plate):
     # ---- feature: motor-pockets (subtract, profile=geometry) ----
-    body = scad.cut_rsolid(body, _pocket_tools(p))
+    _pockets = ...  # pure primitives: geometry tier
+    motor_pockets = scad.cut_rsolid(base_plate, _pockets)
+    return (motor_pockets,)
 
+
+@app.cell
+def _(FILLET_R, motor_pockets):
     # ---- feature: mount-fillet (modify) ----
-    body = scad.fillet_rsolid(
-        solid=body,
+    mount_fillet = scad.fillet_rsolid(
+        solid=motor_pockets,
         edges=ql.edges().where(ql.and_(
             ql.prop("geom.type", "==", "CIRCLE"),
             ql.prop("geom.center.z", ">=", ...),
         )).exactly(2),
         radius=FILLET_R,
     )
-    ...
+    return (mount_fillet,)
+
+
+@app.cell
+def _(mount_fillet):
+    motor_mount = scad.Part(part_id="motor-mount", body=mount_fillet)
+    return (motor_mount,)
 ```
 
 Each Onshape-style feature tree entry maps to exactly one header here —
