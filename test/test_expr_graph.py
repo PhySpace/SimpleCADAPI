@@ -43,6 +43,19 @@ class TestExpressionGraph(unittest.TestCase):
         )
         self.assertIn("distance", param_exprs)
 
+    def test_default_expression_ids_derive_from_content(self):
+        # Equal expressions get equal ids, so a content hash is reproducible
+        # across processes; a different value or comment is a different node.
+        first = scad.var("r", 5.0, unit="mm") * 2 + 1
+        second = scad.var("r", 5.0, unit="mm") * 2 + 1
+        self.assertEqual(first.expr_id, second.expr_id)
+        self.assertNotEqual(
+            scad.var("r", 5.0).expr_id, scad.var("r", 6.0).expr_id
+        )
+        from simplecadapi.params.expr import Var
+
+        self.assertEqual(Var("r", 5.0, expr_id="radius").expr_id, "radius")
+
 
 if __name__ == "__main__":
     unittest.main()

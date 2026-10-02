@@ -88,6 +88,34 @@ class TestTrackedCut(unittest.TestCase):
         self.assertGreater(result.solid.get_volume(), 0)
 
 
+
+class TestMultiToolCut(unittest.TestCase):
+    """A cut with many tools records one delta merged from its steps."""
+
+    @staticmethod
+    def _cut_entries():
+        with scad.GraphSession(graph_id="multi_cut"):
+            plate = scad.make_box_rsolid(60.0, 40.0, 4.0)
+            # Overlapping tools: each step modifies faces the step before
+            # made, and those intermediate faces are freed.
+            tools = [
+                scad.make_box_rsolid(3.0, 18.0, 6.0, bottom_face_center=(-26.0 + 2.0 * k, 0.0, -1.0))
+                for k in range(16)
+            ]
+            tools += [
+                scad.make_cylinder_rsolid(2.0, 6.0, bottom_face_center=(-26.0 + 2.0 * k, 9.0, -1.0))
+                for k in range(16)
+            ]
+            result = scad.cut_rsolid(plate, tools)
+            return result._get_runtime("graph.node").topo_delta.entries
+
+    def test_the_merged_delta_is_the_same_on_every_run(self):
+        # A freed intermediate face's address can be reused by an output
+        # face; a stale step entry then resolved to it, run-dependently.
+        first = self._cut_entries()
+        for _ in range(3):
+            self.assertEqual(self._cut_entries(), first)
+
 class TestTrackedUnion(unittest.TestCase):
     def setUp(self):
         self.body = scad.make_box_rsolid(10, 10, 10)

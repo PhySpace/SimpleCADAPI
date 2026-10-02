@@ -32,16 +32,22 @@ class FrameGraph:
         parent_frame_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> FrameNode:
-        node = FrameNode(
-            frame_id=frame_id,
-            origin=origin,
-            x_axis=x_axis,
-            y_axis=y_axis,
-            z_axis=z_axis,
-            parent_frame_id=parent_frame_id,
-            metadata=dict(metadata or {}),
+        return self.add(
+            FrameNode(
+                frame_id=frame_id,
+                origin=origin,
+                x_axis=x_axis,
+                y_axis=y_axis,
+                z_axis=z_axis,
+                parent_frame_id=parent_frame_id,
+                metadata=dict(metadata or {}),
+            )
         )
-        self._nodes[frame_id] = node
+
+    def add(self, node: FrameNode) -> FrameNode:
+        """Register *node*, replacing any frame with the same id."""
+
+        self._nodes[node.frame_id] = node
         return node
 
     @property

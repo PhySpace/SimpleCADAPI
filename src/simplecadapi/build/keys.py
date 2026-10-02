@@ -1,4 +1,4 @@
-"""Canonical whole-part build key encoding."""
+"""Build identity helpers: generator profile, project root, canonical values."""
 
 from __future__ import annotations
 
@@ -10,21 +10,14 @@ import sys
 from dataclasses import fields, is_dataclass
 from enum import Enum
 from pathlib import Path
+from types import CodeType
 from typing import Any, Callable, Mapping
 
-from ..artifacts.canonical import (
-    SOLID_EVALUATOR_PROFILE,
-    ArtifactValidationError,
-    canonical_bytes,
-    sha256_bytes,
-)
-from ..artifacts.references import FileInputSnapshot
+from ..artifacts.canonical import ArtifactValidationError, sha256_bytes
 from ..params.expr import Const, Expr, Var
-from .dependencies import read_stable_file
+from ..recording.source_mapping import resolve_source
 
-PART_CACHE_PROFILE = "simplecad-part-cache-4"
 SEMANTIC_REGISTRY_VERSION = "simplecad-operations-2.0"
-_MAX_SOURCE_BYTES = 64 * 1024 * 1024
 
 
 def _qualified_type(value: Any) -> str:
@@ -181,34 +174,29 @@ def normalize_build_value(
     )
 
 
-def normalize_bound_arguments(
-    function: Callable[..., Any], args: tuple[Any, ...], kwargs: Mapping[str, Any]
-) -> Mapping[str, Any]:
-    """Bind defaults and normalize a call according to its Python signature."""
-
-    try:
-        bound = inspect.signature(function).bind(*args, **dict(kwargs))
-    except TypeError:
-        raise
-    bound.apply_defaults()
-    return {
-        name: normalize_build_value(value, f"/arguments/{name}")
-        for name, value in bound.arguments.items()
-    }
-
-
 def infer_project_root(
     function: Callable[..., Any], explicit: str | Path | None = None
 ) -> Path:
-    """Resolve the anchor directory for a builder (cache, file inputs, config).
+    """Resolve the anchor directory for a builder (file inputs, source paths).
 
-    Default anchor is the directory containing the builder's source file —
-    a script is its own project, so a standalone source runs anywhere and
-    its cache lands beside it. An explicit ``project_root`` relocates the
-    anchor (project-level cache or config) and must contain the source.
+    Default anchor is the directory containing the builder's source file, so
+    a standalone source runs anywhere. An explicit ``project_root`` relocates
+    the anchor and must contain the source.
     """
 
-    source_name = inspect.getsourcefile(function) or inspect.getfile(function)
+    # A builder defined in a notebook cell compiles under a temporary name;
+    # its source file is the notebook.
+    code = getattr(function, "__code__", None)
+    cell = (
+        resolve_source(code.co_filename, code.co_firstlineno)
+        if isinstance(code, CodeType)
+        else None
+    )
+    source_name = (
+        str(cell.path)
+        if cell is not None
+        else inspect.getsourcefile(function) or inspect.getfile(function)
+    )
     if not source_name or source_name.startswith("<"):
         raise ArtifactValidationError(
             "source_unavailable",
@@ -230,31 +218,6 @@ def infer_project_root(
     return source_path.parent
 
 
-def builder_source_fingerprint(
-    function: Callable[..., Any], *, project_root: Path
-) -> Mapping[str, Any]:
-    source_name = inspect.getsourcefile(function) or inspect.getfile(function)
-    source_path = Path(source_name).expanduser().resolve()
-    try:
-        relative = source_path.relative_to(project_root.resolve()).as_posix()
-    except ValueError as exc:
-        raise ArtifactValidationError(
-            "source_unsafe", "/builder/source", "builder source is outside project root"
-        ) from exc
-    payload = read_stable_file(
-        source_path,
-        max_bytes=_MAX_SOURCE_BYTES,
-        error_path="/builder/source",
-    )
-    return {
-        "module": function.__module__,
-        "qualified_name": function.__qualname__,
-        "path": relative,
-        "byte_length": len(payload),
-        "sha256": sha256_bytes(payload),
-    }
-
-
 def generator_profile() -> Mapping[str, str]:
     def version(distribution: str, fallback: str) -> str:
         try:
@@ -271,40 +234,9 @@ def generator_profile() -> Mapping[str, str]:
     }
 
 
-def part_build_key(
-    *,
-    definition_id: str,
-    revision: str,
-    tolerance_profile: str,
-    arguments: Mapping[str, Any],
-    source: Mapping[str, Any],
-    file_inputs: tuple[FileInputSnapshot, ...],
-    generator: Mapping[str, str],
-) -> tuple[str, Mapping[str, Any]]:
-    record = {
-        "profile": PART_CACHE_PROFILE,
-        "definition_id": definition_id,
-        "definition_kind": "single_solid",
-        "revision": revision,
-        "units": "mm",
-        "tolerance_profile": tolerance_profile,
-        "evaluator_profile": SOLID_EVALUATOR_PROFILE,
-        "decorator_contract": {"exact_solid_count": 1, "self_contained": True},
-        "arguments": dict(arguments),
-        "project_source": dict(source),
-        "file_inputs": [item.to_dict() for item in file_inputs],
-        "generator": dict(generator),
-    }
-    return sha256_bytes(canonical_bytes(record)), record
-
-
 __all__ = [
-    "PART_CACHE_PROFILE",
     "SEMANTIC_REGISTRY_VERSION",
-    "builder_source_fingerprint",
     "generator_profile",
     "infer_project_root",
-    "normalize_bound_arguments",
     "normalize_build_value",
-    "part_build_key",
 ]

@@ -106,7 +106,7 @@ class TestAutoDocsGenPathResolution(unittest.TestCase):
             self.assertIn("inspect/brep/queries.py", resolved_names)
             self.assertIn("exporter/mjcf.py", resolved_names)
 
-    def test_default_source_files_include_cache_build_public_surface(self):
+    def test_default_source_files_include_build_public_surface(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             package_root = Path(tmp_dir) / "src/simplecadapi"
             package_root.mkdir(parents=True, exist_ok=True)
@@ -120,10 +120,9 @@ class TestAutoDocsGenPathResolution(unittest.TestCase):
             self.assertIn("build/dependencies.py", resolved_names)
             self.assertIn("build/results.py", resolved_names)
             self.assertIn("product/capture.py", resolved_names)
-            self.assertIn("cache/policy.py", resolved_names)
-            self.assertIn("cache/store.py", resolved_names)
+            self.assertNotIn("cache/policy.py", resolved_names)
 
-    def test_real_cache_build_sources_document_only_top_level_surface(self):
+    def test_real_build_sources_document_only_top_level_surface(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             generator = auto_docs_gen.APIDocumentGenerator(
                 source_files=auto_docs_gen._default_source_files(
@@ -140,10 +139,7 @@ class TestAutoDocsGenPathResolution(unittest.TestCase):
                 "file_input",
                 "part",
                 "AssemblyBuildResult",
-                "AssemblySolveReport",
-                "CachePolicy",
-                "CacheReport",
-                "ContentAddressedStore",
+                "PartBuildResult",
                 "ProductMJCFExportReport",
                 "export_product_package_to_mjcf",
             ):

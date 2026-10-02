@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 import importlib
-from pathlib import Path
 import sys
 
 from test_product_exporter import _build_nested_package
@@ -36,10 +35,10 @@ def test_backend_imports_without_target_runtime_modules() -> None:
     assert solidworks.CAPABILITIES.input_schema_versions == ("product-package-2.0",)
 
 
-def test_nested_package_emits_deterministic_compilable_script(tmp_path: Path) -> None:
+def test_nested_package_emits_deterministic_compilable_script() -> None:
     from simplecadapi.translator.solidworks_translator import SolidWorksTranslator
 
-    package = _build_nested_package(tmp_path)
+    package = _build_nested_package()
     translator = SolidWorksTranslator(document_name="ContractSolidWorks")
     first = translator.translate_product_package(package)
     second = translator.translate_product_package(package)
@@ -53,13 +52,11 @@ def test_nested_package_emits_deterministic_compilable_script(tmp_path: Path) ->
     assert translator.capabilities.targets[0].requires_external_runtime
 
 
-def test_product_payload_resolves_references_and_keeps_solved_placements(
-    tmp_path: Path,
-) -> None:
+def test_product_payload_resolves_references_and_keeps_solved_placements() -> None:
     from simplecadapi.translator.solidworks_translator import SolidWorksTranslator
 
     script = SolidWorksTranslator().translate_product_package(
-        _build_nested_package(tmp_path)
+        _build_nested_package()
     ).content
     payload = _model_payload(script)
     operations = [node["op"] for node in payload["graph"]["nodes"]]
@@ -75,11 +72,11 @@ def test_product_payload_resolves_references_and_keeps_solved_placements(
     assert evaluations[0]["constraint_report"]["solved"] is True
 
 
-def test_script_owns_com_and_contains_native_product_paths(tmp_path: Path) -> None:
+def test_script_owns_com_and_contains_native_product_paths() -> None:
     from simplecadapi.translator.solidworks_translator import SolidWorksTranslator
 
     script = SolidWorksTranslator(visible=True).translate_product_package(
-        _build_nested_package(tmp_path)
+        _build_nested_package()
     ).content
 
     main_offset = script.index("def main():")

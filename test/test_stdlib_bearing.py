@@ -288,6 +288,50 @@ class TestBallBearingAssembly(unittest.TestCase):
             ).within_tolerance
         )
 
+    def test_durable_bearing_keeps_separate_balls(self):
+        bearing = scad.std.bearing.build_ball_bearing(
+            bore_diameter=3.2,
+            outer_diameter=6.6,
+            bearing_width=2.0,
+            ball_diameter=0.55,
+            ball_count=8,
+            raceway_clearance=0.03,
+            assembly_id="durable_ball_bearing",
+            fuse_rolling_elements=False,
+        )
+        self.assertEqual(
+            sorted(ref.definition_id for ref in bearing.definition.definition_refs),
+            [
+                "durable_ball_bearing_ball",
+                "durable_ball_bearing_inner_ring",
+                "durable_ball_bearing_outer_ring",
+            ],
+        )
+        balls = [
+            c for c in bearing.assembly.components if c.component_id.startswith("ball_")
+        ]
+        self.assertEqual(len(balls), 8)
+        self.assertEqual({c.item.part_id for c in balls}, {"durable_ball_bearing_ball"})
+
+    def test_durable_bearing_accepts_material_recorded_in_caller_graph(self):
+        # A notebook cell records into its own graph; the bearing's rings are
+        # recorded in theirs, so the material must cross by value.
+        with scad.GraphSession():
+            steel = scad.make_material_rmaterial(
+                "bearing_steel_in_caller_graph", density=7.85, density_unit="g/cm3"
+            )
+            bearing = scad.std.bearing.build_ball_bearing(
+                bore_diameter=3.0,
+                outer_diameter=6.0,
+                bearing_width=2.0,
+                ball_diameter=0.7,
+                ball_count=8,
+                assembly_id="caller_graph_material_bearing",
+                material=steel,
+            )
+        outer = bearing.assembly.get_component("outer_ring").item
+        self.assertEqual(outer.material.material_id, "bearing_steel_in_caller_graph")
+
     def test_durable_bearing_definition_supports_external_dual_fixed(self):
         from pathlib import Path
 
@@ -300,7 +344,6 @@ class TestBallBearingAssembly(unittest.TestCase):
             raceway_clearance=0.0,
             edge_chamfer=0.0,
             assembly_id="durable_std_bearing",
-            cache="off",
         )
         self.assertEqual(bearing.definition.definition_kind, "assembly")
         self.assertEqual(

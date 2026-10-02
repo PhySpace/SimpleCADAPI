@@ -7,8 +7,7 @@ from pathlib import Path
 import simplecadapi as scad
 
 
-def _build_two_id_package(root: Path) -> scad.ProductPackage:
-    cache = scad.CachePolicy(root=root / "cache")
+def _build_two_id_package() -> scad.ProductPackage:
     material = scad.make_material_rmaterial(
         material_id="dual_steel", density=7.85e-6, density_unit="kg/mm^3"
     )
@@ -24,11 +23,11 @@ def _build_two_id_package(root: Path) -> scad.ProductPackage:
             ),
         )
 
-    @scad.part(id="bar_left", cache=cache, project_root=Path(__file__).parent)
+    @scad.part(id="bar_left", project_root=Path(__file__).parent)
     def build_left() -> scad.Part:
         return make_bar("bar_left")
 
-    @scad.part(id="bar_right", cache=cache, project_root=Path(__file__).parent)
+    @scad.part(id="bar_right", project_root=Path(__file__).parent)
     def build_right() -> scad.Part:
         # Same geometry and material as bar_left; only the id differs.
         return make_bar("bar_right")
@@ -39,7 +38,6 @@ def _build_two_id_package(root: Path) -> scad.ProductPackage:
     @scad.assemble(
         id="dual_bars",
         definitions=(left, right),
-        cache=cache,
         project_root=Path(__file__).parent,
     )
     def build_fixture() -> scad.Assembly:
@@ -71,7 +69,7 @@ class TestSameContentDistinctIdUnits(unittest.TestCase):
     def test_units_and_step_export_keep_both_definitions(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            package = _build_two_id_package(root)
+            package = _build_two_id_package()
 
             from simplecadapi.translator.package_units import (
                 read_product_package_translation_units,

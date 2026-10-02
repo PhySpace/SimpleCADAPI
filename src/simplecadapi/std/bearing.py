@@ -493,7 +493,6 @@ def build_ball_bearing(
     rolling_element_fuse_overlap: float = 0.01,
     material: Optional[Material] = None,
     ground: Optional[str] = "outer_ring",
-    cache: object = "off",
 ):
     """Build one ball bearing as a reusable durable sub-assembly definition.
 
@@ -502,9 +501,8 @@ def build_ball_bearing(
     over one internal ``inner_outer_revolute`` constraint, returned unsolved so
     a parent assembly can drive both rings through external fixed constraints.
     ``ground`` selects the ring the nested definition grounds for its own
-    incremental solve (``"outer_ring"``, ``"inner_ring"``, or ``None``).
+    constraint solve (``"outer_ring"``, ``"inner_ring"``, or ``None``).
     """
-
 
     from ..build import assemble, part
 
@@ -512,6 +510,17 @@ def build_ball_bearing(
 
     if ground not in (None, "outer_ring", "inner_ring"):
         raise ValueError("ground must be 'outer_ring', 'inner_ring', or None")
+    if material is not None:
+        # Each ring is recorded in its own build graph, so the material is
+        # passed by value: a copy without the caller's graph lineage (a
+        # material made in a notebook cell belongs to the notebook's graph).
+        material = Material(
+            material.material_id,
+            name=material.name,
+            density=material.density,
+            density_unit=material.density_unit,
+            color=material.color,
+        )
 
     def _spec_kwargs():
         return dict(
@@ -529,32 +538,33 @@ def build_ball_bearing(
             material=material,
         )
 
-    def _ring_result(role: str):
+    def _component_result(component_id: str, role: str):
+        # The definition id is the part id the factory gives the component:
+        # ``<assembly_id>_<role>``; every ball component shares the one
+        # ``<assembly_id>_ball`` part.
         @part(
             id=f"{assembly_id}_{role}",
             revision=revision,
-            cache=cache,
             project_root=stdlib_root,
         )
         def build_ring() -> Part:
             return make_ball_bearing_rassembly(**_spec_kwargs()).get_component(
-                role
+                component_id
             ).item
 
         return build_ring()
 
-    outer = _ring_result("outer_ring")
-    inner = _ring_result("inner_ring")
+    outer = _component_result("outer_ring", "outer_ring")
+    inner = _component_result("inner_ring", "inner_ring")
     declared = (outer, inner)
     if not fuse_rolling_elements:
-        ball = _ring_result("ball_00")
+        ball = _component_result("ball_00", "ball")
         declared = (*declared, ball)
 
     @assemble(
         id=assembly_id,
         revision=revision,
         definitions=declared,
-        cache=cache,
         project_root=stdlib_root,
     )
     def build() -> Assembly:
@@ -576,17 +586,19 @@ def build_ball_bearing(
             placement=identity,
         )
         if not fuse_rolling_elements:
-            probe = make_ball_bearing_rassembly(**_spec_kwargs())
-            meta = probe.get_metadata("std.bearing.ball_bearing")
-            for component_id in meta["ball_component_ids"]:
+            # The ball layout of make_ball_bearing_rassembly, computed here:
+            # calling the factory would add a second assembly with this id
+            # to the build session.
+            pitch_radius = (bore_diameter + outer_diameter) / 4.0
+            count = _validate_ball_count(ball_count, pitch_radius, ball_diameter)
+            digits = max(2, len(str(count - 1)))
+            for index in range(count):
+                component_id = f"ball_{index:0{digits}d}"
                 bearing = add_component_rassembly(
                     bearing,
                     ball.part,
                     component_id=component_id,
-                    placement=_ball_placement(
-                        (bore_diameter + outer_diameter) / 4.0,
-                        meta["ball_angles_degrees"][component_id],
-                    ),
+                    placement=_ball_placement(pitch_radius, 360.0 * index / count),
                 )
                 bearing = ground_component_rassembly(bearing, component_id)
         if ground is not None:

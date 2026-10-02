@@ -149,3 +149,7 @@ testpaths = ["test", "tests"]
 
 [project.scripts]
 sca = "simplecadapi.cli:main"
+
+# The marimo editor runs SimpleCAD notebooks' cells with this executor.
+[project.entry-points."marimo.cell.executor"]
+simplecadapi = "simplecadapi.runtime.executor:executor_factory"

@@ -28,7 +28,7 @@ def _entity_documents(scene: ProductScenePackage) -> list[dict]:
 
 
 def test_capture_part_embeds_one_complete_independent_scene(tmp_path: Path) -> None:
-    result = _build_named_part(tmp_path, "captured_part")
+    result = _build_named_part("captured_part")
     path = tmp_path / "out" / "captured_part.scadpkg"
 
     captured = scad.capture(result, path)
@@ -54,7 +54,7 @@ def test_capture_part_embeds_one_complete_independent_scene(tmp_path: Path) -> N
 def test_capture_federates_definition_graphs_sources_connectors_and_joints(
     tmp_path: Path,
 ) -> None:
-    _part, _child, root = _build_nested_assembly(tmp_path)
+    _part, _child, root = _build_nested_assembly()
     path = tmp_path / "out" / "root.scadpkg"
 
     scene = scad.capture(root, path).scene
@@ -97,9 +97,7 @@ def test_capture_federates_definition_graphs_sources_connectors_and_joints(
 
 
 def test_capture_preserves_gear_coupling_joint(tmp_path: Path) -> None:
-    policy = scad.CachePolicy(root=tmp_path / "cache")
-
-    @scad.part(id="coupling_base", cache=policy)
+    @scad.part(id="coupling_base")
     def build_base() -> scad.Part:
         part = scad.make_part_rpart(
             part_id="coupling_base",
@@ -118,7 +116,7 @@ def test_capture_preserves_gear_coupling_joint(tmp_path: Path) -> None:
             )
         return part
 
-    @scad.part(id="coupling_wheel", cache=policy)
+    @scad.part(id="coupling_wheel")
     def build_wheel() -> scad.Part:
         part = scad.make_part_rpart(
             part_id="coupling_wheel",
@@ -138,7 +136,6 @@ def test_capture_preserves_gear_coupling_joint(tmp_path: Path) -> None:
     @scad.assemble(
         id="gear_coupling",
         definitions=(base, wheel),
-        cache=policy,
     )
     def build_assembly() -> scad.Assembly:
         assembly = scad.make_assembly_rassembly(assembly_id="gear_coupling")
@@ -215,7 +212,7 @@ def test_capture_preserves_gear_coupling_joint(tmp_path: Path) -> None:
 
 
 def test_entity_feature_output_matches_durable_topology_snapshot(tmp_path: Path) -> None:
-    result = _build_named_part(tmp_path, "lineage_part")
+    result = _build_named_part("lineage_part")
     path = tmp_path / "out" / "lineage_part.scadpkg"
     scene = scad.capture(result, path).scene
     definition = result.definition
@@ -239,22 +236,21 @@ def test_entity_feature_output_matches_durable_topology_snapshot(tmp_path: Path)
         assert source["topo_id"] == feature_output["topo_id"]
 
 
-def test_cold_and_warm_capture_are_byte_identical(tmp_path: Path) -> None:
-    cold = _build_named_part(tmp_path, "deterministic_capture")
-    warm = _build_named_part(tmp_path, "deterministic_capture")
-    cold_path = tmp_path / "out" / "cold.scadpkg"
-    warm_path = tmp_path / "out" / "warm.scadpkg"
+def test_repeated_builds_capture_byte_identical_packages(tmp_path: Path) -> None:
+    first = _build_named_part("deterministic_capture")
+    second = _build_named_part("deterministic_capture")
+    first_path = tmp_path / "out" / "first.scadpkg"
+    second_path = tmp_path / "out" / "second.scadpkg"
 
-    assert warm.cache_report.hit
-    cold_capture = scad.capture(cold, cold_path)
-    warm_capture = scad.capture(warm, warm_path)
-    assert cold_capture.package_bytes == warm_capture.package_bytes
-    assert cold_path.read_bytes() == warm_path.read_bytes()
+    first_capture = scad.capture(first, first_path)
+    second_capture = scad.capture(second, second_path)
+    assert first_capture.package_bytes == second_capture.package_bytes
+    assert first_path.read_bytes() == second_path.read_bytes()
 
 
 def test_product_package_rejects_mutated_scene_projection(tmp_path: Path) -> None:
     package_path = tmp_path / "out" / "mutated_scene.scadpkg"
-    captured = scad.capture(_build_named_part(tmp_path, "mutated_scene"), package_path)
+    captured = scad.capture(_build_named_part("mutated_scene"), package_path)
     scene_path = captured.package.scene_path
     assert scene_path is not None
     scene_manifest = parse_canonical_json(captured.package.objects[scene_path])

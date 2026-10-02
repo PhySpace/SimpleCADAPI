@@ -6,9 +6,13 @@ import ast
 import dis
 import hashlib
 import inspect
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from types import CodeType
+from typing import Any, Callable, Dict, Iterator, List, Optional, Protocol, Tuple, TypeVar
 
 
 _CALL_OPS = {
@@ -24,9 +28,135 @@ _SOURCE_MODULE = Path(__file__).resolve()
 # levels up; frames inside it are treated as internal implementation.
 _PACKAGE_ROOT = _SOURCE_MODULE.parent.parent
 
+# Code objects of definition-build wrappers (``@part``/``@assemble``). The
+# frame walk stops at them: whoever called the build is not part of the
+# definition, so its call site must never leak into the recorded graph.
+_BOUNDARY_CODES: set[CodeType] = set()
+
+_F = TypeVar("_F", bound=Callable[..., Any])
+
+
+def source_boundary(function: _F) -> _F:
+    """Mark *function* as a provenance boundary and return it unchanged.
+
+    Operations recorded while *function* runs take their source from the
+    first user frame *inside* it; an operation with no such frame (one the
+    wrapper records itself) gets no source instead of the caller's line.
+    Every closure made from one ``def`` shares a code object, so marking a
+    decorator's inner wrapper once covers all functions it decorates.
+    """
+
+    code = getattr(function, "__code__", None)
+    if not isinstance(code, CodeType):
+        raise TypeError("source_boundary expects a plain Python function")
+    _BOUNDARY_CODES.add(code)
+    return function
+
+
+@dataclass(frozen=True)
+class ResolvedSource:
+    """The code a frame runs, handed over instead of reading its file.
+
+    Notebook cells compile under a temporary filename (marimo's editor) or
+    share one file with every other cell (a notebook run as a script), so
+    the notebook runtime supplies the cell's own code.  Recorded lines and
+    columns are then relative to that code, which keeps them valid while
+    cells above it change, and the record names the cell.
+    """
+
+    text: str
+    """The cell's code; recorded positions are relative to it."""
+    path: Path
+    """The notebook file."""
+    line_offset: int
+    """Frame line numbers minus the matching line numbers in *text*."""
+    cell: str
+    """Key of the cell, recorded as ``source["cell"]``."""
+
+
+@dataclass(frozen=True)
+class CellPlacement:
+    """Where a cell's code sits in the notebook file on disk."""
+
+    path: Path
+    line_offset: int
+    """File line numbers minus the matching line numbers in the cell."""
+    column_offset: int
+    """Indentation of the cell body; marimo indents every line alike."""
+
+
+class CellSourceMap(Protocol):
+    """Source lookup for code that runs as notebook cells."""
+
+    def resolve(self, filename: str, line: int) -> Optional[ResolvedSource]:
+        """Return the cell code running at *filename*:*line*, if any."""
+
+    def place(self, cell: str) -> Optional[CellPlacement]:
+        """Return where cell *cell* sits in the saved file, if it is there."""
+
+
+_cell_sources_var: ContextVar[Optional[CellSourceMap]] = ContextVar(
+    "simplecad_cell_sources", default=None
+)
+
+
+@contextmanager
+def cell_sources(sources: CellSourceMap) -> Iterator[None]:
+    """Record and finalize cell-relative sources through *sources*."""
+
+    token = _cell_sources_var.set(sources)
+    try:
+        yield
+    finally:
+        _cell_sources_var.reset(token)
+
+
+def resolve_source(filename: str, line: int) -> Optional[ResolvedSource]:
+    """Return the notebook cell running at *filename*:*line*, if any."""
+
+    sources = _cell_sources_var.get()
+    return sources.resolve(filename, line) if sources is not None else None
+
+
+def finalize_source(source: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Return *source* positioned in its file, as a definition stores it.
+
+    A record without a ``cell`` key already is.  A cell-relative record is
+    moved to the cell's place in the saved notebook, with the ``cell`` key
+    dropped and the callsite id recomputed; ``None`` means the cell is not
+    in the saved file (edited but not saved), so the position is unknown.
+    """
+
+    cell = source.get("cell")
+    if cell is None:
+        return source
+    sources = _cell_sources_var.get()
+    placement = sources.place(str(cell)) if sources is not None else None
+    if placement is None:
+        return None
+    payload = dict(source)
+    del payload["cell"]
+    path_value, path_kind = _portable_path(placement.path)
+    payload.update(path=path_value, path_kind=path_kind, local_path=str(placement.path))
+    for key in ("line", "end_line"):
+        payload[key] = int(payload[key]) + placement.line_offset
+    for key in ("column", "end_column"):
+        payload[key] = int(payload[key]) + placement.column_offset
+    payload["callsite_id"] = _callsite_id(
+        path_value=_callsite_path(path_value, path_kind, None),
+        start_line=payload["line"],
+        start_column=payload["column"],
+        end_line=payload["end_line"],
+        end_column=payload["end_column"],
+        call_text=str(payload.get("call_text", "")),
+    )
+    return payload
+
 
 def capture_source_provenance() -> Optional[Dict[str, Any]]:
     """Capture provenance for the first non-SimpleCAD caller frame.
+
+    The walk ends at a :func:`source_boundary` frame without a result.
 
     Source discovery is intentionally failure-tolerant.  Interactive shells,
     generated code, frozen applications, and deleted source files can all
@@ -37,8 +167,9 @@ def capture_source_provenance() -> Optional[Dict[str, Any]]:
     try:
         frame = frame.f_back if frame is not None else None
         while frame is not None:
-            filename = frame.f_code.co_filename
-            if not _is_internal_filename(filename):
+            if frame.f_code in _BOUNDARY_CODES:
+                return None
+            if not _is_internal_filename(frame.f_code.co_filename):
                 return _capture_frame(frame)
             frame = frame.f_back
     finally:
@@ -77,28 +208,36 @@ def _is_internal_filename(filename: str) -> bool:
 
 
 def _capture_frame(frame: Any) -> Optional[Dict[str, Any]]:
-    try:
-        path = Path(frame.f_code.co_filename).resolve()
-        source, _tree = _read_source(path)
-    except (OSError, SyntaxError, UnicodeError):
-        return None
+    code = frame.f_code
+    resolved = resolve_source(code.co_filename, frame.f_lineno)
+    cell: Optional[str] = None
+    line_offset = 0
+    if resolved is None:
+        try:
+            path = Path(code.co_filename).resolve()
+            source = _read_file(path)
+        except (OSError, UnicodeError):
+            return None
+    else:
+        path, source = resolved.path, resolved.text
+        line_offset, cell = resolved.line_offset, resolved.cell
 
-    calls, parents = _indexed_calls(
-        path,
-        frame.f_code.co_name,
-        int(getattr(frame.f_code, "co_firstlineno", frame.f_lineno)),
-    )
+    try:
+        calls, parents = _indexed_calls(
+            source, code.co_name, int(code.co_firstlineno) - line_offset
+        )
+    except SyntaxError:
+        return None
     if not calls:
         return None
 
-    selected = _select_call(calls, frame)
-    if selected is None:
+    call = _select_call(calls, frame, line_offset)
+    if call is None:
         return None
-    call = selected
 
     path_value, path_kind = _portable_path(path)
     call_text = ast.get_source_segment(source, call) or ""
-    start_line = int(getattr(call, "lineno", frame.f_lineno))
+    start_line = int(call.lineno)
     end_line = int(getattr(call, "end_lineno", start_line))
     start_column = _character_column(source, start_line, int(call.col_offset))
     end_column = _character_column(
@@ -106,7 +245,7 @@ def _capture_frame(frame: Any) -> Optional[Dict[str, Any]]:
         end_line,
         int(getattr(call, "end_col_offset", call.col_offset)),
     )
-    return {
+    record: Dict[str, Any] = {
         "schema_version": "1.0",
         "path": path_value,
         "path_kind": path_kind,
@@ -117,7 +256,7 @@ def _capture_frame(frame: Any) -> Optional[Dict[str, Any]]:
         "end_column": end_column,
         "call_text": call_text,
         "callsite_id": _callsite_id(
-            path_value=path_value if path_kind == "project_relative" else None,
+            path_value=_callsite_path(path_value, path_kind, cell),
             start_line=start_line,
             start_column=start_column,
             end_line=end_line,
@@ -126,11 +265,25 @@ def _capture_frame(frame: Any) -> Optional[Dict[str, Any]]:
         ),
         "assignment_targets": _assignment_targets(call, source, parents),
     }
+    if cell is not None:
+        record["cell"] = cell
+    return record
 
 
-def _read_source(path: Path) -> Tuple[str, ast.AST]:
+def _callsite_path(
+    path_value: Optional[str], path_kind: Optional[str], cell: Optional[str]
+) -> Optional[str]:
+    """Path material of a callsite id; cell-relative spans also name the cell."""
+
+    path = path_value if path_kind == "project_relative" else None
+    if cell is None:
+        return path
+    return f"{path or ''}#{cell}"
+
+
+def _read_file(path: Path) -> str:
     stat = path.stat()
-    return _read_source_version(
+    return _read_file_version(
         path,
         int(stat.st_mtime_ns),
         int(stat.st_size),
@@ -139,11 +292,8 @@ def _read_source(path: Path) -> Tuple[str, ast.AST]:
 
 
 @lru_cache(maxsize=128)
-def _read_source_version(
-    path: Path, _mtime_ns: int, _size: int, _inode: int
-) -> Tuple[str, ast.AST]:
-    source = path.read_text(encoding="utf-8")
-    return source, ast.parse(source, filename=str(path))
+def _read_file_version(path: Path, _mtime_ns: int, _size: int, _inode: int) -> str:
+    return path.read_text(encoding="utf-8")
 
 
 def _portable_path(path: Path) -> Tuple[Optional[str], str]:
@@ -166,7 +316,7 @@ def _find_scope(
     if code_name == "<module>":
         return tree, None
 
-    candidates: List[ast.AST] = []
+    candidates: List[ast.FunctionDef | ast.AsyncFunctionDef] = []
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
@@ -188,30 +338,16 @@ def _find_scope(
     return scope, code_name
 
 
-def _indexed_calls(
-    path: Path, code_name: str, first_line: int
-) -> Tuple[List[ast.Call], Dict[int, ast.AST]]:
-    stat = path.stat()
-    return _indexed_calls_version(
-        path,
-        code_name,
-        first_line,
-        int(stat.st_mtime_ns),
-        int(stat.st_size),
-        int(getattr(stat, "st_ino", 0)),
-    )
+@lru_cache(maxsize=128)
+def _parse(source: str) -> ast.AST:
+    return ast.parse(source)
 
 
 @lru_cache(maxsize=256)
-def _indexed_calls_version(
-    path: Path,
-    code_name: str,
-    first_line: int,
-    _mtime_ns: int,
-    _size: int,
-    _inode: int,
+def _indexed_calls(
+    source: str, code_name: str, first_line: int
 ) -> Tuple[List[ast.Call], Dict[int, ast.AST]]:
-    _source, tree = _read_source(path)
+    tree = _parse(source)
     scope, _function_name = _find_scope(tree, code_name, first_line)
     return _collect_calls(scope, root_is_module=scope is tree)
 
@@ -263,9 +399,11 @@ def _collect_calls(
 
 
 def _select_call(
-    calls: List[ast.Call], frame: Any
+    calls: List[ast.Call], frame: Any, line_offset: int
 ) -> Optional[ast.Call]:
-    line = int(frame.f_lineno)
+    # *calls* are positioned in the parsed source, the frame in its code
+    # object; the two differ by *line_offset* for a resolved cell.
+    line = int(frame.f_lineno) - line_offset
     line_calls = [call for call in calls if int(call.lineno) == line]
     if not line_calls:
         nearest_distance = min(abs(int(call.lineno) - line) for call in calls)
@@ -275,7 +413,7 @@ def _select_call(
     if len(line_calls) == 1:
         return line_calls[0]
 
-    ordinal = _call_ordinal(frame, line)
+    ordinal = _call_ordinal(frame, line + line_offset)
     if ordinal is None or ordinal < 1 or ordinal > len(line_calls):
         return None
     return line_calls[ordinal - 1]
