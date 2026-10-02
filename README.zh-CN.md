@@ -39,10 +39,10 @@ HTML，忠实回放完整录制的对话（用户输入、Agent 思考、每一�
 <td>“把已有的 L 形直角连接件 legacy 脚本按 single-part-modeling 工作流正式化：FTC 特征块 + 命名参数重建；与旧版几何等价（体积偏差 &lt; 0.1%）；<code>interface.*</code> FEM 边界标签必须原样保留——下游 Gmsh/CalculiX 按标签选面。”</td>
 <td><img src="img/capability/bracket_turntable.gif" width="420" alt="支架旋转展示"></td>
 </tr>
+</table>
+
 旋转展示由独立的 [sca-web-editor](https://github.com/PhySpace/sca-web-editor) 的 BRep
 渲染器渲染（面着色 + 宽棱边），一圈 = 48 个确定性方位角步进，经其 `gif-harness.html` 驱动生成。
-
-</table>
 
 ### 2 · 装配体建模
 
@@ -133,6 +133,11 @@ tag 通道见[完整中文更新说明](docs/updates/2.1.3b1.zh-CN.md)。2.1.2 �
 锚定 part cache（[docs/updates/2.1.2.zh-CN.md](docs/updates/2.1.2.zh-CN.md)）
 已由 notebook 运行时及其 cell 缓存取代。
 
+每个示例模型都是 notebook；导出脚本用 `run_notebook` 载入产品，捕获一个
+`.scadpkg`，再从同一个产品包转换出 AP242 `.step` 和可编辑 `.FCStd`。
+`examples/ap242_gmsh_volume_mesh/` 下的 AP242/Gmsh 示例把每个导出和 FEM 阶段
+都做成可直接运行的独立脚本。
+
 ---
 
 <div align="center">
@@ -152,18 +157,22 @@ SimpleCADAPI 是一个基于 OCP 的 Python CAD SDK，提供清晰的函数式�
 
 ## 核心能力
 
+- 模型即 [marimo](https://marimo.io) notebook：普通 `.py` 文件就是唯一的真相
+  来源，一个 cell 一个特征，按 cell 缓存实现增量无头运行（`sca run`），并可用
+  `scad.use` 组合 notebook。
+- 由 notebook 生成的规范 `.scadpkg` 产品包，用于交换和发布，不会反过来作为模型
+  输入。
 - 基于 OCP 的 `Vertex`、`Edge`、`Wire`、`Face` 和 `Solid` 类型。
 - 支持基本体、轮廓、拉伸、旋转、放样、扫掠、布尔运算、变换、阵列、圆角、倒角和抽壳等函数式建模操作。
 - 通过显式 `GraphSession`、`export_model_json(...)`、`import_model_json(...)` 和 `replay_model_json(...)` 记录并重放操作图。
 - 通过 `var(...)`、算术表达式和可序列化表达式图定义参数。
 - 使用 QL 选择器定位几何、查询拓扑并稳定选择特征。
 - 通过 `apply_tag(shape=..., tag=...)` 和 `list_tags(shape=...)` 管理语义标签。
-- 支持 STEP/STL 导出，以及 FreeCAD 脚本和 `.FCStd` 转换。
+- 支持 STEP/STL/OBJ 导出、可编辑 FreeCAD 产品包转换，以及带材料和命名元数据
+  属性的 AP242 产品结构导出。
 - 面向 Agent 的 STEP/BREP 逆向能力，提供稳定实体 ID、局部诊断、区域高亮截图和
   可测量的验收门槛。
 - 可回放的开放/周期插值 B 样条 Edge 和 Wire，可用于自由轮廓与 Loft 截面。
-- 模型即 marimo notebook：一个 cell 一个特征，按 cell 缓存实现增量无头运行
-  （`sca run`），并可用 `scad.use` 组合 notebook。
 
 ## 安装
 
@@ -206,80 +215,19 @@ sca skill install --target zcode --skills-dir ~/.zcode/skills
 
 ## 快速开始
 
-```python
-from pathlib import Path
-
-import simplecadapi as scad
-
-out = Path("out")
-
-@scad.part(id="bracket")
-def build_bracket() -> scad.Solid:
-    base = scad.make_box_rsolid(
-        width=60.0, height=36.0, depth=8.0, bottom_face_center=(0.0, 0.0, 0.0)
-    )
-    hole = scad.make_cylinder_rsolid(
-        radius=5.0, height=14.0, bottom_face_center=(0.0, 0.0, -3.0)
-    )
-    body = scad.cut_rsolid(base, hole)
-    return scad.apply_tag(shape=body, tag="role.demo.bracket")
-
-result = build_bracket()
-package_path = out / "bracket.scadpkg"
-scad.capture(result, package_path)
-print("volume", round(result.part.body.get_volume(), 3))
-print("tags", scad.list_tags(shape=result.part.body))
-scad.exporter.export_product_package_to_step(package_path, out / "bracket.step")
-scad.exporter.export_product_package_to_stl(package_path, out / "bracket.stl")
-scad.exporter.export_product_package_to_obj(package_path, out / "bracket.obj")
-```
-
-
-## 可重放操作图
-
-几何流程需要检查、序列化、重放或转换到其他 CAD 环境时，请使用显式
-`GraphSession`：
+模型是一个 [marimo](https://marimo.io) notebook：仓库里的一个普通 `.py` 文件，
+它始终是唯一的真相来源。PEP 723 头部的 `[tool.simplecadapi]` 表声明产品；每个
+cell 放一个[特征块](docs/skill/references/discipline/feature-tree-convention.md)，
+几何会被自动记录——不需要 session 或装饰器样板代码。
 
 ```python
-import simplecadapi as scad
-from simplecadapi import GraphSession, export_model_json, replay_model_json
-
-with GraphSession(graph_id="drilled_block") as session:
-    body = scad.make_box_rsolid(
-        width=40.0, height=24.0, depth=10.0,
-        bottom_face_center=(0.0, 0.0, 0.0),
-    )
-    cutter = scad.make_cylinder_rsolid(
-        radius=4.0, height=16.0, bottom_face_center=(0.0, 0.0, -3.0)
-    )
-    drilled = scad.cut_rsolid(body, cutter)
-    session.capture_result(value=drilled)
-    model_json = export_model_json(session=session)
-    recorded_nodes = session.graph.node_count
-
-rebuilt = replay_model_json(json_str=model_json)
-print("recorded_nodes", recorded_nodes)
-print("replayed_outputs", len(rebuilt))
-```
-
-显式 `GraphSession` 在调用导出 API 前只存在于内存。需要持久 CAD/Viewer
-交付物时，一个物理单实体零件使用 `@scad.part`，装配使用 `@scad.assemble`，
-直接调用 `scad.capture(result, "out/product.scadpkg")`，一次完成捕获和写盘。
-`.scadpkg` 包含完整定义闭包、求值场景、特征图、源码快照、拓扑以及渲染/选择资源。
-STEP、STL、FCStd 和底层 JSON 仍由显式导出 API 生成。
-
-## Notebook 运行时
-
-模型是一个 [marimo](https://marimo.io) notebook：仓库里的一个普通 `.py`
-文件，它始终是唯一的真相来源。PEP 723 头部的 `[tool.simplecadapi]` 表声明
-产品 id；每个 cell 放一个特征块，几何会被自动记录。
-
-```python
+# bracket.py
 # /// script
+# requires-python = ">=3.10"
 # dependencies = ["simplecadapi"]
 #
 # [tool.simplecadapi]
-# id = "mounting_plate"
+# id = "bracket"
 # revision = "1.0.0"
 # ///
 import marimo
@@ -292,101 +240,177 @@ with app.setup:
 
 @app.cell
 def _():
-    width = 30.0
+    # ---- params: plate ----
+    width = scad.var("width", 60.0, unit="mm")
     return (width,)
 
 
 @app.cell
-def _(width):
-    # ---- feature: plate (build) ----
-    plate = scad.make_box_rsolid(width=width, height=20.0, depth=3.0)
-    return (plate,)
+def _():
+    # ---- params: bore ----
+    hole_radius = scad.var("hole_radius", 5.0, unit="mm")
+    return (hole_radius,)
 
 
 @app.cell
-def _(plate):
-    mounting_plate = scad.make_part_rpart(part_id="mounting_plate", body=plate)
-    return (mounting_plate,)
+def _(width):
+    # ---- feature: base-plate (build) ----
+    base = scad.make_box_rsolid(
+        width=width, height=36.0, depth=8.0, bottom_face_center=(0.0, 0.0, 0.0)
+    )
+    return (base,)
+
+
+@app.cell
+def _(base, hole_radius):
+    # ---- feature: bore-and-slot (subtract) ----
+    _bore = scad.make_cylinder_rsolid(
+        radius=hole_radius, height=14.0, bottom_face_center=(0.0, 0.0, -3.0)
+    )
+    _slot = scad.make_box_rsolid(
+        width=18.0, height=8.0, depth=14.0, bottom_face_center=(14.0, 0.0, -3.0)
+    )
+    drilled = scad.cut_rsolid(base, _bore, _slot)
+    return (drilled,)
+
+
+@app.cell
+def _(drilled):
+    # ---- feature: boss (add) ----
+    _boss = scad.make_cylinder_rsolid(
+        radius=8.0, height=7.0, bottom_face_center=(-18.0, 0.0, 8.0)
+    )
+    bossed = scad.union_rsolid(drilled, _boss)
+    return (bossed,)
+
+
+@app.cell
+def _(bossed):
+    # ---- feature: role-tag (annotate) ----
+    tagged = scad.apply_tag(shape=bossed, tag="role.demo.bracket")
+    return (tagged,)
+
+
+@app.cell
+def _(tagged):
+    bracket = scad.Part(part_id="bracket", body=tagged)
+    return (bracket,)
+
+
+if __name__ == "__main__":
+    app.run()
 ```
 
-同一个运行时既在 marimo 编辑器里运行 notebook，也能无头运行，只需安装
-`simplecadapi`。无头运行会缓存每个 cell，重跑时只执行代码、输入文件、本地
-模块或子 notebook 发生变化的 cell：
+产品是 id 等于 notebook id 的那个顶层变量。可以在编辑器里交互修改，也可以只装
+`simplecadapi` 无头运行：
 
 ```bash
-sca run mounting_plate.py                                  # 输出 JSON 报告
-sca run mounting_plate.py --set width=40 --out out/mounting_plate.scadpkg
+marimo edit bracket.py                                    # 响应式编辑器
+sca run bracket.py                                        # 运行并输出 JSON 报告
+sca run bracket.py --set width=80 --out out/bracket.scadpkg
+sca export out/bracket.scadpkg --output-dir out/exports   # AP242 STEP、STL、OBJ
 ```
 
-装配 notebook 用 `scad.use("mounting_plate.py", width=40.0)` 引入其他
-notebook。`@scad.part` / `@scad.assemble` 保留为可在 cell 中调用的可复用库
-构建函数。cell 缓存、组合与产品包导出见
+## Notebook 运行时
+
+marimo 编辑器、`sca run` 和 Python 里的 `simplecadapi.runtime.run_notebook()`
+用的是同一个运行时。无头运行会缓存每个 cell，重跑时只执行代码、输入文件、本地
+模块或子 notebook 发生变化的 cell。`--set` 覆盖一个顶层变量（定义它的 cell
+不再运行，所以要按“一起变化”的原则把参数分进不同 cell）；报告里每个 cell 的
+状态是 `ran`、`cached` 或 `skipped`。
+
+导出和验证脚本是普通 Python 脚本，用 `run_notebook` 载入产品再写出产品包：
+
+```python
+from pathlib import Path
+
+import simplecadapi as scad
+from simplecadapi.runtime import run_notebook
+
+out = Path("out")
+run = run_notebook("bracket.py", overrides={"width": 80.0})
+print("volume", round(run.product.body.get_volume(), 3))
+print("tags", scad.list_tags(shape=run.product.body))
+
+package = out / "bracket.scadpkg"
+scad.capture(run.definition, package)
+scad.exporter.export_product_package_to_step(package, out / "bracket.step")
+scad.exporter.export_product_package_to_stl(package, out / "bracket.stl")
+scad.exporter.export_product_package_to_obj(package, out / "bracket.obj")
+```
+
+`.scadpkg` 包含完整定义闭包、求值场景、特征图、源码快照、拓扑以及渲染/选择
+资源。它由代码生成，只用于交换和发布，不会反过来作为模型输入。
+
+### 组合 notebook
+
+装配 notebook 用 `scad.use` 引入其他 notebook。相对路径相对于调用方 notebook，
+关键字参数覆盖子 notebook 的顶层变量：
+
+```python
+@app.cell
+def _():
+    bracket = scad.use("bracket.py", width=80.0)
+    return (bracket,)
+
+
+@app.cell
+def _(bracket):
+    rig = scad.make_assembly_rassembly(assembly_id="rig", name="Rig")
+    rig = scad.add_component_rassembly(
+        assembly=rig, item=bracket, component_id="bracket",
+        placement=scad.identity_placement_rplacement(),
+    )
+    return (rig,)
+```
+
+一个 notebook 可以描述一个零件族——只有参数不同的一组零件，比如连杆机构里的
+各根连杆。产品写成 `part_id=scad.notebook_id()`，每处使用时给成员起名：
+`scad.use("link_bar.py", id="crank", center_distance=40.0)`（或
+`sca run link_bar.py --id crank`）。每个成员是一个独立定义，有自己的内容哈希和
+cell 缓存。
+
+`@scad.part` / `@scad.assemble` 保留给放在 notebook 旁边普通模块里的可复用库
+构建函数；cell 调用它们并取 `.value`。工程目录结构、cell 缓存和下游格式见
 [Notebook 运行时与产品构建工作流](docs/skill/references/docs/guides/notebook-runtime.md)。
 
-## STEP/BREP Agent 逆向
+### 从 `@scad.part` 脚本迁移
 
-需要生成同步 STEP 视图或局部高亮截图时，请安装渲染依赖：
+2.1.2 的脚本锚定 part cache（构建函数的 `cache=` 选项、`.simplecad` 缓存目录和
+增量装配报告）已删除；现在缓存的单位是 cell。
 
-```bash
-pip install "simplecadapi[inverse-engineer]"
-```
+- 每个零件搬进一个 notebook：参数放进 params cell，每个 FTC 块单独一个 cell
+  （每个 cell 绑定一个新名字），最后一个 cell 构建 `scad.Part(...)` 或装配体。
+- 用调用 `run_notebook` 和 `scad.capture` 的导出脚本，替换那些顺带构建并导出的
+  `main.py` 入口。
+- 产品之间直接调用构建函数的地方改成 `scad.use(...)`；`@scad.part` 构建函数只
+  保留给在 cell 中调用的库零件。
+- 把 `__marimo__/`（生成的运行时状态）加入 `.gitignore`。
 
-专用命名空间 `simplecadapi.inverse_engineer.brep` 提供稳定的
-Body/Face/Edge/Vertex ID，以及与 Agent 框架无关的工具注册表。逆向时应先读取
-有界证据，只有在候选模型足够接近后，才执行成本较高的材料差集或严格拓扑检查：
+### 命令行产品导出
 
-```python
-from simplecadapi.inverse_engineer import brep
-
-schemas = brep.agent_tool_schemas()
-summary = brep.call_agent_tool(
-    name="get_model_summary",
-    arguments={
-        "model_path": "target.step",
-        "include_parameter_groups": True,
-    },
-)
-face = brep.call_agent_tool(
-    name="inspect_entity",
-    arguments={"model_path": "target.step", "entity_id": "face:0"},
-)
-
-print("tools", len(schemas))
-print("faces", summary["face_count"])
-print("carrier", face["geometry"]["type"])
-```
-
-CLI 使用同一份工具契约：
+不写包装脚本，直接从经过验证的产品包导出标准交付集（AP242 STEP、二进制 STL
+和 OBJ）：
 
 ```bash
-simplecad-brep tools
-simplecad-brep tool get_model_summary --arguments-file summary-args.json
+uv run sca export out/bracket.scadpkg --output-dir out/exports
 ```
 
-受控测试请使用 [Reconstruction Agent 测试规范](docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md)，
-完整证据、建模、回放和验收流程请阅读
-[STEP BREP 逆向工程指南](docs/skill/references/workflows/reverse-engineering-studio.md)。
+其他格式需显式指定。FCStd 需要 `FreeCADCmd`（或显式的 `--freecad-cmd` 路径）；
+`--check` 只校验产品包、输出路径和所选格式的前置条件，不写文件。
 
-## FreeCAD 转换
-
-外部 CAD 转换只接受经过验证的 `.scadpkg` 产品包：
-
-```python
-package_path = artifacts.artifact_paths["product"]
-script = scad.translator.freecad_translator.translate_product_package_to_freecad_script(
-    package_path
-)
-scad.translator.freecad_translator.translate_product_package_to_fcstd(
-    package_path, "bracket.FCStd"
-)
-scad.exporter.export_product_package_to_step(package_path, "bracket.step")
-scad.exporter.export_product_package_to_stl(package_path, "bracket.stl")
-scad.exporter.export_product_package_to_obj(package_path, "bracket.obj")
+```bash
+uv run sca export out/bracket.scadpkg \
+  --format fcstd --format mjcf --output-dir out/exports --check
+uv run sca export out/bracket.scadpkg \
+  --format fcstd --freecad-cmd /path/to/FreeCADCmd --output-dir out/exports
 ```
 
 STL 与 OBJ 共用 OpenCASCADE 对求值后 BREP 的直接三角化。两种格式包含相同的
 定向三角面，不再需要可选 remeshing 依赖。曲面精度由 `linear_deflection` 和
 `angular_deflection_degrees` 控制。
+
+### 可选 CalculiX FEM 流程
 
 AP242/Gmsh 示例还包含可选 CalculiX FEM 流程。Python 侧依赖通过
 `uv sync --extra fem` 安装；CalculiX 求解器需要单独安装（macOS：
@@ -413,6 +437,126 @@ uv run --extra fem python examples/ap242_gmsh_volume_mesh/study_mesh_convergence
 `h=0.375 mm` 同网格上与 SPOOLES 的位移和峰值应力差异均低于 `0.005%`，从而
 绕过直接求解器的内存容量限制。
 
+## 可重放操作图
+
+notebook 之外的几何流程需要检查、序列化或重放时，使用显式 `GraphSession`：
+
+```python
+import simplecadapi as scad
+from simplecadapi import GraphSession, export_model_json, replay_model_json
+from simplecadapi import ql as Q
+
+with GraphSession(graph_id="chamfered_block") as session:
+    body = scad.make_box_rsolid(
+        width=40.0, height=24.0, depth=10.0,
+        bottom_face_center=(0.0, 0.0, 0.0),
+    )
+    cutter = scad.make_cylinder_rsolid(
+        radius=4.0, height=16.0, bottom_face_center=(0.0, 0.0, -3.0)
+    )
+    drilled = scad.cut_rsolid(body, cutter)
+
+    bottom_circle = (
+        Q.edges()
+        .where(Q.curve_type(kind="circle"))
+        .order_by(Q.center_axis(axis="z"))
+        .take(1)
+        .exactly(1)
+    )
+    final = scad.chamfer_rsolid(solid=drilled, edges=bottom_circle, distance=0.6)
+    session.capture_result(value=final)
+    model_json = export_model_json(session=session)
+    recorded_nodes = session.graph.node_count
+
+rebuilt = replay_model_json(json_str=model_json)
+print("recorded_nodes", recorded_nodes)
+print("replayed_outputs", len(rebuilt))
+```
+
+显式 `GraphSession` 用于 notebook 之外的检查、序列化和重放；notebook 的每个
+cell 已经记录进各自的 session，不要在 cell 里再开一个。它在调用导出 API 前只
+存在于内存。持久的 CAD/Viewer 交付物是 notebook 产品捕获出的 `.scadpkg`（见
+[Notebook 运行时](#notebook-运行时)）。
+
+## STEP/BREP 检查
+
+需要同步 STEP 视图、区域高亮或截面叠加时，安装可选渲染依赖：
+
+```bash
+pip install "simplecadapi[inspect]"
+```
+
+检查 API 位于 `simplecadapi.inspect.brep`。它们是诊断工具，不是建模操作：不进入
+操作图，在 `GraphSession` 内调用会被拒绝。先导出或拿到几何，再在建模脚本之外
+检查。
+
+按当前问题需要的证据选择调用，而不是走固定的逆向流程。先取有界的全局和局部
+事实；只有这些事实回答得了当前问题时，才再加截面、组件渲染、边界距离、材料差集
+或严格拓扑比较。
+
+```python
+from simplecadapi.inspect import brep
+
+summary = brep.inspect_step_rsummary(
+    path="target.step",
+    include_parameter_groups=True,
+)
+face = brep.inspect_step_entity_rdescriptor(
+    path="target.step",
+    entity_id="face:0",
+)
+
+print("faces", summary["face_count"])
+print("carrier", face["geometry"]["type"])
+```
+
+受控测试请使用 [Reconstruction Agent 测试规范](docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md)，
+检查原语、建模循环、回放检查和验收门槛请阅读
+[STEP BREP 逆向工程指南](docs/skill/references/workflows/reverse-engineering-studio.md)。
+
+## FreeCAD 转换
+
+外部 CAD 转换只接受经过验证的 `.scadpkg` 产品包：
+
+```python
+package_path = "out/bracket.scadpkg"
+script = scad.translator.freecad_translator.translate_product_package_to_freecad_script(
+    package_path
+)
+scad.translator.freecad_translator.translate_product_package_to_fcstd(
+    package_path, "out/bracket.FCStd"
+)
+```
+
+Part/Assembly 模型写成可编辑的 FreeCAD 装配结构：零件是 `App::Part`，装配是
+`Assembly::AssemblyObject`，组件是链接。中性 STEP 与 STL 文件由 exporter 命名
+空间输出。
+
+## 示例
+
+每个示例都是一个自包含目录：零件和装配 notebook、它们导入的普通模块、导出与
+验证脚本，以及 `examples/<name>/out/` 下的新鲜产物。覆盖零件建模、装配、逆向
+工程和 FEM——分类索引见 [`examples/README.md`](examples/README.md)。
+
+```bash
+# 零件（快速入门 FTC notebook，附外部验证脚本）
+marimo edit examples/flange_plate/flange_plate.py
+uv run python examples/flange_plate/verify.py
+
+# 装配（两级行星减速器：零件族 notebook、MJCF 导出）
+sca run examples/compact_two_stage_planetary_reducer/compact_two_stage_planetary_reducer.py
+uv run python examples/compact_two_stage_planetary_reducer/export_mjcf.py
+
+# FEM（AP242 STEP -> Gmsh 体网格 -> CalculiX 静力）
+uv run python examples/ap242_gmsh_volume_mesh/export_step.py
+uv run --extra gmsh python examples/ap242_gmsh_volume_mesh/export_fem_mesh.py
+uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py
+```
+
+逆向工程在独立的 [sca-web-editor](https://github.com/PhySpace/sca-web-editor)
+的 `Re-mode` 工作区里针对目标 STEP 进行（见 `examples/bowl_connector/` 和
+[逆向工程 studio 工作流](docs/skill/references/workflows/reverse-engineering-studio.md)）。
+
 ## 文档
 
 - 2.1.3b1 更新说明：[`docs/updates/2.1.3b1.zh-CN.md`](docs/updates/2.1.3b1.zh-CN.md)
@@ -430,7 +574,7 @@ uv run --extra fem python examples/ap242_gmsh_volume_mesh/study_mesh_convergence
 - 序列化与重放：[`docs/core/serialization/README.md`](docs/skill/references/docs/core/serialization/README.md)
 - 操作图 JSON 规范：[`docs/core/operation_graph_json_spec.md`](docs/skill/references/docs/core/operation_graph_json_spec.md)
 - 示例索引：[`examples/README.md`](examples/README.md)
-  `.scadpkg` 产品包规范：[`design-docs/scadpkg-spec.md`](design-docs/scadpkg-spec.md)
+- `.scadpkg` 产品包格式：[`docs/skill/references/scadpkg-format.md`](docs/skill/references/scadpkg-format.md)
 
 ## 发布 Agent Skill
 
