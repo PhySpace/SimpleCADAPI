@@ -1,8 +1,8 @@
 """Failure-time geometric diagnosis and evidence rendering.
 
 Diagnosis runs only on failure paths, computes the geometric facts behind the
-failure (measurements), and optionally renders one evidence image next to the
-part-cache root. Everything here is best-effort: a diagnosis crash must never
+failure (measurements), and optionally renders one evidence image under
+``.simplecad/diagnostics`` in the working directory. Everything here is best-effort: a diagnosis crash must never
 replace the real error, so public entries swallow their own failures.
 """
 
@@ -13,7 +13,6 @@ import os
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape
@@ -22,6 +21,7 @@ from OCP.TopAbs import TopAbs_SOLID
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopoDS import TopoDS
 
+from .._internal.workspace import diagnostics_dir
 from ..errors import (
     ErrorEvidence,
     ErrorMeasurement,
@@ -60,22 +60,6 @@ _DIAGNOSTIC_VIEWS = (
 
 def diagnostics_enabled() -> bool:
     return os.environ.get(_DISABLE_ENV, "").strip().lower() not in _TRUTHY
-
-
-def diagnostics_dir() -> Path:
-    """Diagnostics directory anchored next to the part-cache root.
-
-    Follows the ``@part`` cache resolution (project config and SCA_CACHE_ROOT
-    environment overrides included): cache root ``<anchor>/.simplecad/cache``
-    yields ``<anchor>/.simplecad/diagnostics``.
-    """
-
-    # Lazy import: cache.__init__ pulls artifacts, which would cycle through
-    # operators at module import time.
-    from ..cache.policy import resolve_cache_policy
-
-    policy = resolve_cache_policy(None, project_root=".")
-    return policy.root.parent / "diagnostics"
 
 
 # Ink palette for the 2D wire-plan schematics — same visual language as the

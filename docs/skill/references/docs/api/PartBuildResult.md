@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class PartBuildResult(value: Part, definition: PartDefinition, feature_graph: FeatureGraphArtifact, cache_report: CacheReport, interface_diff: PartInterfaceDiff | None = None)
+class PartBuildResult(value: Part, definition: PartDefinition, feature_graph: FeatureGraphArtifact)
 ```
 
 *Source: build/results.py*
@@ -14,4 +14,4 @@ class PartBuildResult(value: Part, definition: PartDefinition, feature_graph: Fe
 
 ## Description
 
-Runtime Part plus its durable definition, feature DAG, and cache evidence.
+Runtime Part plus its durable definition and feature DAG.

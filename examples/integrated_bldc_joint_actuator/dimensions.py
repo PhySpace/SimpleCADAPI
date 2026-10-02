@@ -36,6 +36,10 @@ PCB_RADIUS = 22.2
 PCB_CENTER_BORE_RADIUS = 5.0
 PCB_STANDOFF_PCD = 33.0
 PCB_MOUNT_HOLE_RADIUS = 1.10
+PHASE_TERMINAL_CENTER = (-11.0, 0.0)
+POWER_CAN_TERMINAL_CENTER = (11.0, 0.0)
+MOSFET_CENTER_RADIUS = 13.2
+MOSFET_ANGLES = (22.5, 67.5, 112.5, 202.5, 247.5, 292.5)
 REAR_COLUMN_PCD = 40.6
 REAR_COLUMN_RADIUS = 3.2
 REAR_SPIDER_BOSS_RADIUS = 2.9
@@ -189,6 +193,9 @@ INTERSTAGE_BEARING_CENTER_Z = (
 ) / 2.0
 
 TOTAL_REDUCTION = STAGE_1.fixed_ring_ratio * STAGE_2.fixed_ring_ratio
+
+# Stage specs by id: the ``STAGE`` parameter of the gear family notebooks.
+STAGES = {stage.stage_id: stage for stage in (STAGE_1, STAGE_2)}
 
 
 def validate_design_dimensions() -> None:

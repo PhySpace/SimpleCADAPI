@@ -55,7 +55,7 @@ build_case({
             ["render_*.png", "×4", "等轴 / 正视 / 俯视 / 孔+圆角特写"],
         ],
         "scripts": [
-            "s1_hypothesis", "s1_verify", "s2_hypothesis", "s2_verify", "s3_guard_evidence",
+            "verify", "verify/s2_verify", "verify/s3_guard_evidence",
         ],
         "notes": [
             "改参守卫链：PCD 88 拒（轮辐 0.5<2）· 85 相切排除 · 84.5 交付",

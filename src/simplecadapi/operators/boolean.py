@@ -289,6 +289,11 @@ def cut_rsolid(
         result_solid = remaining[0]
         deltas: List[TopoDelta] = []
         merged_delta_entries: Dict[str, Dict[str, object]] = {}
+        # Step deltas name faces by kernel hashes, which come from the shapes'
+        # addresses. Every intermediate result stays alive until the merged
+        # delta is recorded: a freed face's address could otherwise be reused
+        # by an output face, and a stale entry would resolve to that face.
+        intermediates: List[Solid] = []
         cut_performed = False
 
         for i in range(1, len(remaining)):
@@ -335,6 +340,7 @@ def cut_rsolid(
                     failure_reason="差集运算失败: OCC 未返回有效实体",
                 )
             new_result._metadata = result_solid._metadata.copy()
+            intermediates.append(result_solid)
             result_solid = new_result
             if tracked is not None:
                 deltas.append(tracked.delta)
@@ -434,6 +440,11 @@ def intersect_rsolid(*solids: Union[Solid, Sequence[Solid]]) -> Solid:
         result_solid = remaining[0]
         deltas: List[TopoDelta] = []
         merged_delta_entries: Dict[str, Dict[str, object]] = {}
+        # Step deltas name faces by kernel hashes, which come from the shapes'
+        # addresses. Every intermediate result stays alive until the merged
+        # delta is recorded: a freed face's address could otherwise be reused
+        # by an output face, and a stale entry would resolve to that face.
+        intermediates: List[Solid] = []
         intersect_performed = False
 
         for i in range(1, len(remaining)):
@@ -453,6 +464,7 @@ def intersect_rsolid(*solids: Union[Solid, Sequence[Solid]]) -> Solid:
             if tracked.solid is None:
                 raise ValueError("交集结果为空或 OCC 未返回有效实体")
 
+            intermediates.append(result_solid)
             result_solid = tracked.solid
             deltas.append(tracked.delta)
             merged_delta_entries.update(

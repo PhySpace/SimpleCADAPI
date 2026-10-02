@@ -13,9 +13,12 @@ still and the GIF are shot from an INCLINED circular camera orbit whose
 view-up is the track normal, so the stack leans in frame and the model
 genuinely rotates as the camera circles it.
 
-The script re-opens the captured .scadpkg in this fresh process (which also
-serves as the package reopen gate), materializes the definition DAG, and
-applies each component's composed placement to its part body before render.
+The script captures the product package (``export.capture_package``, unless
+``--reuse-package``), re-opens the .scadpkg (which also serves as the package
+reopen gate), materializes the definition DAG, and applies each component's
+composed placement to its part body before render.
+
+    uv run python examples/integrated_bldc_joint_actuator/render_showcase.py [--reuse-package] [--skip-gif]
 """
 from __future__ import annotations
 
@@ -25,8 +28,7 @@ from pathlib import Path
 import simplecadapi as scad
 from simplecadapi.kernel.ocp_properties import center_of_mass
 
-OUT_DIR = Path(__file__).resolve().parent / "out"
-PACKAGE = OUT_DIR / "integrated_bldc_joint_actuator.scadpkg"
+from export import OUT_DIR, PACKAGE_PATH, capture_package
 
 # Exploded view tuning: module separation along the axis, then a world tilt
 # that lays the stack on the frame diagonal so GAP can stay generous while
@@ -165,8 +167,10 @@ def _inclined_orbit(phase_deg: float, tilt_deg: float = ORBIT_TILT_DEG) -> tuple
     return elevation, azimuth, (0.0, -math.sin(beta), math.cos(beta))
 
 
-def main(*, skip_gif: bool = False) -> None:
-    definition = scad.load_product_package(PACKAGE)
+def main(*, capture: bool = True, skip_gif: bool = False) -> None:
+    if capture:
+        capture_package()
+    definition = scad.load_product_package(PACKAGE_PATH)
     root = scad.materialize_definition(definition)
     print(f"materialized: {type(root).__name__}")
 
@@ -268,7 +272,10 @@ def main(*, skip_gif: bool = False) -> None:
     if not skip_gif:
         render_exploded_gif(layout)
 
-    for name in ("bldc_assembly.png", "bldc_front.png", "bldc_exploded.png", "bldc_exploded.gif"):
+    names = ["bldc_assembly.png", "bldc_front.png", "bldc_exploded.png"]
+    if not skip_gif:
+        names.append("bldc_exploded.gif")
+    for name in names:
         path = OUT_DIR / name
         print(f"render {path} ({path.stat().st_size / 1e3:.0f} KB)")
 
@@ -342,4 +349,4 @@ def render_exploded_gif(layout: list[tuple[scad.Solid, float, tuple[float, float
 if __name__ == "__main__":
     import sys
 
-    main(skip_gif="--skip-gif" in sys.argv)
+    main(capture="--reuse-package" not in sys.argv, skip_gif="--skip-gif" in sys.argv)

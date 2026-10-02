@@ -43,11 +43,11 @@ deterministic face tags that survive re-parameterization, and synchronized
 <td>"Formalize the existing legacy L-bracket script through the single-part workflow: rebuild with FTC feature blocks and named parameters; geometric equivalence to the legacy model (volume delta < 0.1%); the <code>interface.*</code> FEM boundary tags must survive untouched — the downstream Gmsh/CalculiX pipeline selects faces by them."</td>
 <td><img src="img/capability/bracket_turntable.gif" width="420" alt="bracket turntable"></td>
 </tr>
+</table>
+
 Turntables are rendered by the standalone [sca-web-editor](https://github.com/PhySpace/sca-web-editor)'s
 BRep renderer (face shading + wide edges); one full turn = 48 deterministic
 azimuth steps driven through its `gif-harness.html`.
-
-</table>
 
 ### 2 · Assembly Modeling
 
@@ -74,9 +74,11 @@ concentric parts peel into radius bands; camera circles on an inclined orbit
 </tr>
 </table>
 
-Reproduce it: `uv run python examples/integrated_bldc_joint_actuator/main.py`
-builds the package from scratch; `render_showcase.py` renders the views above;
-`export_all.py` emits STEP / editable FCStd / MJCF.
+Reproduce it: the model is the `integrated_bldc_joint_actuator.py` assembly
+notebook, composed with `scad.use` from part and sub-assembly notebooks.
+`uv run python examples/integrated_bldc_joint_actuator/export_all.py` emits
+the package plus STEP / editable FCStd / MJCF; `render_showcase.py` renders
+the views above.
 
 ### 3 · Reverse Engineering
 
@@ -145,13 +147,15 @@ a strict `sca-addon.toml` descriptor with platform and `[compat] sca` gates, and
 a consumer-facing `.scadpkg` format spec written so an agent given the document
 alone can produce a correct parser or exporter. See the
 [full English update notes](docs/updates/2.1.3b1.md) for the CLI contract, the
-two legal integration modes, and the tag channel; 2.1.2's script-anchored part
-cache is described in [docs/updates/2.1.2.md](docs/updates/2.1.2.md).
+two legal integration modes, and the tag channel. 2.1.2's script-anchored part
+cache ([docs/updates/2.1.2.md](docs/updates/2.1.2.md)) has since been replaced
+by the notebook runtime and its cell cache.
 
-All formal single-script examples emit a synchronized `.scadpkg`, AP242
-`.step`, and editable `.FCStd` from the same product package. The
-split AP242/Gmsh example under `examples/ap242_gmsh_volume_mesh/` exposes
-each build and export stage as a separate directly runnable script.
+Every example model is a notebook; its export scripts load the product with
+`run_notebook`, capture one `.scadpkg`, and translate AP242 `.step` and
+editable `.FCStd` from that same package. The AP242/Gmsh example under
+`examples/ap242_gmsh_volume_mesh/` exposes each export and FEM stage as a
+separate directly runnable script.
 
 ---
 
@@ -175,9 +179,14 @@ Current release: `simplecadapi==2.1.3`.
 
 ## What It Provides
 
+- Models as [marimo](https://marimo.io) notebooks: plain `.py` files that are
+  the only source of truth, one feature per cell, a per-cell cache for
+  incremental headless runs (`sca run`), and notebook composition (`scad.use`).
 - OCP-native shape types: `Vertex`, `Edge`, `Wire`, `Face`, and `Solid`.
 - Functional modeling operations for primitives, profiles, extrude, revolve,
   loft, sweep, booleans, transforms, patterns, fillets, chamfers, and shells.
+- Canonical `.scadpkg` product packages generated from the notebooks for
+  exchange and publishing; they are never read back as model input.
 - Replayable operation graphs with explicit `GraphSession`,
   `export_model_json(...)`, `import_model_json(...)`, and `replay_model_json(...)`.
 - Expression parameters with `var(...)`, arithmetic expressions, and serialized
@@ -193,8 +202,6 @@ Current release: `simplecadapi==2.1.3`.
   diagnostics, highlighted region renders, and measured acceptance gates.
 - Replayable open and periodic interpolated B-spline Edges/Wires for freeform
   profiles and Loft sections.
-- Durable `@part`/`@assemble` definitions, incremental assembly solving, and a
-  persistent content-addressed cache with corruption quarantine and JSON diagnostics.
 
 ## Install
 
@@ -239,47 +246,249 @@ only if it is a directory whose `SKILL.md` declares the matching skill name
 
 ## Quick Start
 
+A model is a [marimo](https://marimo.io) notebook: a plain `.py` file in your
+repository, which stays the only source of truth. A `[tool.simplecadapi]`
+table in its PEP 723 header names the product; each cell holds one
+[feature block](docs/skill/references/discipline/feature-tree-convention.md)
+and records its geometry automatically — no session or decorator boilerplate.
+
+```python
+# bracket.py
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["simplecadapi"]
+#
+# [tool.simplecadapi]
+# id = "bracket"
+# revision = "1.0.0"
+# ///
+import marimo
+
+app = marimo.App()
+
+with app.setup:
+    import simplecadapi as scad
+
+
+@app.cell
+def _():
+    # ---- params: plate ----
+    width = scad.var("width", 60.0, unit="mm")
+    return (width,)
+
+
+@app.cell
+def _():
+    # ---- params: bore ----
+    hole_radius = scad.var("hole_radius", 5.0, unit="mm")
+    return (hole_radius,)
+
+
+@app.cell
+def _(width):
+    # ---- feature: base-plate (build) ----
+    base = scad.make_box_rsolid(
+        width=width, height=36.0, depth=8.0, bottom_face_center=(0.0, 0.0, 0.0)
+    )
+    return (base,)
+
+
+@app.cell
+def _(base, hole_radius):
+    # ---- feature: bore-and-slot (subtract) ----
+    _bore = scad.make_cylinder_rsolid(
+        radius=hole_radius, height=14.0, bottom_face_center=(0.0, 0.0, -3.0)
+    )
+    _slot = scad.make_box_rsolid(
+        width=18.0, height=8.0, depth=14.0, bottom_face_center=(14.0, 0.0, -3.0)
+    )
+    drilled = scad.cut_rsolid(base, _bore, _slot)
+    return (drilled,)
+
+
+@app.cell
+def _(drilled):
+    # ---- feature: boss (add) ----
+    _boss = scad.make_cylinder_rsolid(
+        radius=8.0, height=7.0, bottom_face_center=(-18.0, 0.0, 8.0)
+    )
+    bossed = scad.union_rsolid(drilled, _boss)
+    return (bossed,)
+
+
+@app.cell
+def _(bossed):
+    # ---- feature: role-tag (annotate) ----
+    tagged = scad.apply_tag(shape=bossed, tag="role.demo.bracket")
+    return (tagged,)
+
+
+@app.cell
+def _(tagged):
+    bracket = scad.Part(part_id="bracket", body=tagged)
+    return (bracket,)
+
+
+if __name__ == "__main__":
+    app.run()
+```
+
+The product is the top-level value whose id equals the notebook id. Edit the
+notebook interactively, or run it headlessly with only `simplecadapi`
+installed:
+
+```bash
+marimo edit bracket.py                                    # reactive editor
+sca run bracket.py                                        # run, print a JSON report
+sca run bracket.py --set width=80 --out out/bracket.scadpkg
+sca export out/bracket.scadpkg --output-dir out/exports   # AP242 STEP, STL, OBJ
+```
+
+## Notebook Runtime
+
+The same runtime runs a notebook in the marimo editor, under `sca run`, and
+from Python with `simplecadapi.runtime.run_notebook()`. Headless runs cache
+every cell, so a rerun only executes the cells whose code, inputs, local
+modules, or child notebooks changed. `--set` overrides a top-level variable
+(the cell that defines it is skipped, so group parameters into cells by what
+changes together); the report lists each cell as `ran`, `cached`, or
+`skipped`.
+
+Export and verification scripts are plain Python that load the product with
+`run_notebook` and write packages from it:
+
 ```python
 from pathlib import Path
 
 import simplecadapi as scad
+from simplecadapi.runtime import run_notebook
 
 out = Path("out")
+run = run_notebook("bracket.py", overrides={"width": 80.0})
+print("volume", round(run.product.body.get_volume(), 3))
+print("tags", scad.list_tags(shape=run.product.body))
 
-@scad.part(id="bracket")
-def build_bracket() -> scad.Solid:
-    base = scad.make_box_rsolid(
-        width=60.0, height=36.0, depth=8.0, bottom_face_center=(0.0, 0.0, 0.0)
-    )
-    hole = scad.make_cylinder_rsolid(
-        radius=5.0, height=14.0, bottom_face_center=(0.0, 0.0, -3.0)
-    )
-    slot = scad.make_box_rsolid(
-        width=18.0, height=8.0, depth=14.0, bottom_face_center=(14.0, 0.0, -3.0)
-    )
-    body = scad.cut_rsolid(base, hole, slot)
-    boss = scad.make_cylinder_rsolid(
-        radius=8.0, height=7.0, bottom_face_center=(-18.0, 0.0, 8.0)
-    )
-    return scad.apply_tag(
-        shape=scad.union_rsolid(body, boss),
-        tag="role.demo.bracket",
-    )
-
-result = build_bracket()
-package_path = out / "bracket.scadpkg"
-scad.capture(result, package_path)
-print("volume", round(result.part.body.get_volume(), 3))
-print("tags", scad.list_tags(shape=result.part.body))
-scad.exporter.export_product_package_to_step(package_path, out / "bracket.step")
-scad.exporter.export_product_package_to_stl(package_path, out / "bracket.stl")
-scad.exporter.export_product_package_to_obj(package_path, out / "bracket.obj")
+package = out / "bracket.scadpkg"
+scad.capture(run.definition, package)
+scad.exporter.export_product_package_to_step(package, out / "bracket.step")
+scad.exporter.export_product_package_to_stl(package, out / "bracket.stl")
+scad.exporter.export_product_package_to_obj(package, out / "bracket.obj")
 ```
+
+The `.scadpkg` embeds the definition closure, evaluated scene, feature
+graphs, source snapshots, topology, and render/selection assets. It is
+generated for exchange and publishing, never read back as model input.
+
+### Composing notebooks
+
+An assembly notebook brings in other notebooks with `scad.use`. A relative
+path is relative to the calling notebook, and keyword arguments override the
+child's top-level variables:
+
+```python
+@app.cell
+def _():
+    bracket = scad.use("bracket.py", width=80.0)
+    return (bracket,)
+
+
+@app.cell
+def _(bracket):
+    rig = scad.make_assembly_rassembly(assembly_id="rig", name="Rig")
+    rig = scad.add_component_rassembly(
+        assembly=rig, item=bracket, component_id="bracket",
+        placement=scad.identity_placement_rplacement(),
+    )
+    return (rig,)
+```
+
+One notebook can describe a part family — parts that differ only in their
+parameters, such as the links of a linkage. Its product takes
+`part_id=scad.notebook_id()`, and each use names its member:
+`scad.use("link_bar.py", id="crank", center_distance=40.0)` (or
+`sca run link_bar.py --id crank`). Each member is one definition with its own
+content hash and cell cache.
+
+`@scad.part` / `@scad.assemble` remain for reusable library builders in plain
+modules next to the notebooks; cells call them and take `.value`. See the
+[notebook runtime and product build workflow](docs/skill/references/docs/guides/notebook-runtime.md)
+for the project layout, the cell cache, and downstream targets.
+
+### Migrating from `@scad.part` scripts
+
+The script-anchored part cache of 2.1.2 (the `cache=` builder option, the
+`.simplecad` cache directories, and the incremental assembly report) is
+removed; the cell is now the unit of caching.
+
+- Move each part into a notebook: its parameters into params cells, each FTC
+  block into a cell of its own (each cell binds a new name), and the final
+  `scad.Part(...)` / assembly into the last cell.
+- Replace `main.py` entry points that build and export as a side effect with
+  export scripts that call `run_notebook` and `scad.capture`.
+- Replace direct builder calls between products with `scad.use(...)`; keep
+  `@scad.part` builders only for library parts called from cells.
+- Add `__marimo__/` (generated runtime state) to `.gitignore`.
+
+### Command-line product export
+
+Export the standard delivery set (AP242 STEP, binary STL, and OBJ) from a
+validated product package with no wrapper script:
+
+```bash
+uv run sca export out/bracket.scadpkg --output-dir out/exports
+```
+
+Request additional targets explicitly.  FCStd requires `FreeCADCmd` (or an
+explicit `--freecad-cmd` path); `--check` validates the package, output paths,
+and selected target prerequisites without writing files.
+
+```bash
+uv run sca export out/bracket.scadpkg \
+  --format fcstd --format mjcf --output-dir out/exports --check
+uv run sca export out/bracket.scadpkg \
+  --format fcstd --freecad-cmd /path/to/FreeCADCmd --output-dir out/exports
+```
+
+STL and OBJ share one direct OpenCASCADE tessellation of the evaluated BREP.
+Both outputs contain the same oriented triangles and require no optional
+remeshing dependency. Control curved-surface accuracy with `linear_deflection`
+and `angular_deflection_degrees`.
+
+### Optional CalculiX FEM workflow
+
+The AP242/Gmsh example also includes an optional CalculiX FEM workflow. Install
+the Python-side FEM dependencies with `uv sync --extra fem`, and install the
+external CalculiX solver separately (on macOS: `brew install
+costerwi/homebrew-calculix/calculix-ccx`). The example uses consistent `mm`,
+`N`, and `MPa` units:
+
+```bash
+uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py \
+  --ccx "$(brew --prefix calculix-ccx)/bin/ccx_2.23"
+uv run --extra fem python examples/ap242_gmsh_volume_mesh/visualize_calculix.py
+uv run --extra fem python examples/ap242_gmsh_volume_mesh/study_mesh_convergence.py \
+  --ccx "$(brew --prefix calculix-ccx)/bin/ccx_2.23" \
+  --linear-solver "ITERATIVE CHOLESKY" --solver-timeout 2400
+```
+
+The analysis writes CalculiX `.inp`, `.dat`, `.frd`, solver-log, summary JSON,
+ParaView `.vtu`, and displaced von-Mises PNG artifacts. The preview shows the
+load physical group's yellow boundary and red `-Z` force arrows without
+covering the stress heatmap. The convergence study supports `--resume`; failed
+solver levels are reported separately and never enter the numerical sequence.
+
+The checked-in `-1000 N` study evaluates eleven mesh sizes from `h=3.0 mm` to
+`h=0.25 mm`. A platform requires three consecutive refinement pairs below `5%`
+maximum-displacement change and `10%` peak integration-point von-Mises change.
+The verification level N is `h=0.25 mm` (`0.0331843 mm`, `98.6392 MPa`), so the
+recommended production level N-1 is `h=0.27 mm`. Fine levels use iterative
+Cholesky after a same-mesh comparison at `h=0.375 mm` matched SPOOLES within
+`0.005%`; this avoids the direct solver's in-memory capacity limit.
 
 ## Replayable Operation Graphs
 
-Use an explicit `GraphSession` when a geometry flow should be inspectable,
-serializable, replayable, or translated into another CAD environment.
+Use an explicit `GraphSession` when a geometry flow outside a notebook should
+be inspectable, serializable, or replayable.
 
 ```python
 import simplecadapi as scad
@@ -313,116 +522,11 @@ print("recorded_nodes", recorded_nodes)
 print("replayed_outputs", len(rebuilt))
 ```
 
-An explicit `GraphSession` remains in memory until an export API is called.
-For a durable CAD/viewer deliverable, define one physical single-solid part with
-`@scad.part` or an assembly with `@scad.assemble`, then capture and write it in one call:
-
-```python
-scad.capture(result, "out/product.scadpkg")
-```
-
-The package embeds the definition closure, evaluated scene, feature graphs,
-source snapshots, topology, and render/selection assets. STEP, STL, FCStd, and
-low-level JSON remain explicit exports.
-
-## Persistent Product Builds And Cache
-
-Use `@scad.part` for one physical single-solid part and `@scad.assemble` for an
-assembly with explicit external definitions. Both use the unified `CachePolicy`;
-same-key part calls reuse the runtime PRT in process, while durable part bundles
-persist unchanged PRTs across later runs.
-
-```python
-@scad.part(id="mounting_plate", cache="auto")
-def build_plate(width: float = 30.0) -> scad.Part:
-    body = scad.make_box_rsolid(width=width, height=20.0, depth=3.0)
-    return scad.make_part_rpart(part_id="mounting_plate", body=body)
-
-cold = build_plate()
-warm = build_plate()
-print(cold.cache_report.hit, warm.cache_report.hit)
-```
-
-Inspect or maintain the cache with stable JSON output:
-
-```bash
-sca cache status
-sca cache verify
-sca cache prune
-```
-
-See the [persistent cache and product build workflow](docs/skill/references/docs/guides/cache-build-workflow.md)
-for cache modes, configuration precedence, PRT reuse, incremental invalidation,
-corruption repair, and destructive-command confirmation.
-
-```python
-scad.capture(warm, "out/mounting_plate.scadpkg")
-scad.translator.freecad_translator.translate_product_package_to_fcstd(
-    "out/mounting_plate.scadpkg", "out/mounting_plate.FCStd"
-)
-scad.exporter.export_product_package_to_step(
-    "out/mounting_plate.scadpkg", "out/mounting_plate.step"
-)
-scad.exporter.export_product_package_to_stl(
-    "out/mounting_plate.scadpkg", "out/mounting_plate.stl"
-)
-scad.exporter.export_product_package_to_obj(
-    "out/mounting_plate.scadpkg", "out/mounting_plate.obj"
-)
-```
-
-### Command-line product export
-
-Export the standard delivery set (AP242 STEP, binary STL, and OBJ) from a
-validated product package with no wrapper script:
-
-```bash
-uv run sca export out/mounting_plate.scadpkg --output-dir out/exports
-```
-
-Request additional targets explicitly.  FCStd requires `FreeCADCmd` (or an
-explicit `--freecad-cmd` path); `--check` validates the package, output paths,
-and selected target prerequisites without writing files.
-
-```bash
-uv run sca export out/mounting_plate.scadpkg \
-  --format fcstd --format mjcf --output-dir out/exports --check
-uv run sca export out/mounting_plate.scadpkg \
-  --format fcstd --freecad-cmd /path/to/FreeCADCmd --output-dir out/exports
-```
-STL and OBJ share one direct OpenCASCADE tessellation of the evaluated BREP.
-Both outputs contain the same oriented triangles and require no optional
-remeshing dependency. Control curved-surface accuracy with `linear_deflection`
-and `angular_deflection_degrees`.
-
-The AP242/Gmsh example also includes an optional CalculiX FEM workflow. Install
-the Python-side FEM dependencies with `uv sync --extra fem`, and install the
-external CalculiX solver separately (on macOS: `brew install
-costerwi/homebrew-calculix/calculix-ccx`). The example uses consistent `mm`,
-`N`, and `MPa` units:
-
-```bash
-uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py \
-  --ccx "$(brew --prefix calculix-ccx)/bin/ccx_2.23"
-uv run --extra fem python examples/ap242_gmsh_volume_mesh/visualize_calculix.py
-uv run --extra fem python examples/ap242_gmsh_volume_mesh/study_mesh_convergence.py \
-  --ccx "$(brew --prefix calculix-ccx)/bin/ccx_2.23" \
-  --linear-solver "ITERATIVE CHOLESKY" --solver-timeout 2400
-```
-
-The analysis writes CalculiX `.inp`, `.dat`, `.frd`, solver-log, summary JSON,
-ParaView `.vtu`, and displaced von-Mises PNG artifacts. The preview shows the
-load physical group's yellow boundary and red `-Z` force arrows without
-covering the stress heatmap. The convergence study supports `--resume`; failed
-solver levels are reported separately and never enter the numerical sequence.
-
-The checked-in `-1000 N` study evaluates eleven mesh sizes from `h=3.0 mm` to
-`h=0.25 mm`. A platform requires three consecutive refinement pairs below `5%`
-maximum-displacement change and `10%` peak integration-point von-Mises change.
-The verification level N is `h=0.25 mm` (`0.0331843 mm`, `98.6392 MPa`), so the
-recommended production level N-1 is `h=0.27 mm`. Fine levels use iterative
-Cholesky after a same-mesh comparison at `h=0.375 mm` matched SPOOLES within
-`0.005%`; this avoids the direct solver's in-memory capacity limit.
+An explicit `GraphSession` is for inspection, serialization, and replay
+outside a notebook; notebook cells already record into sessions of their own,
+so do not open one there. It stays in memory until an export API is called.
+A durable CAD/viewer deliverable is a notebook product captured to
+`.scadpkg` (see [Notebook Runtime](#notebook-runtime)).
 
 ## STEP/BREP Inspection
 
@@ -515,6 +619,7 @@ expression.
   child-geometry getter, such as `get_edges(index)`, `get_faces(index)`,
   `get_wires(index)`, or `get_vertices(index)`, so replayable graph workflows
   preserve the pick as a geo select node.
+
 Use model JSON only for graph replay and inspection. External CAD translation and
 file export consume the validated `.scadpkg` closure:
 
@@ -533,25 +638,31 @@ The exporter namespace owns neutral STEP and STL file output.
 
 ## Examples
 
-Every example is a self-contained folder: sources, verification scripts, and
-fresh artifacts under `examples/<name>/out/`. The set covers part modeling,
+Every example is a self-contained folder: part and assembly notebooks, the
+plain modules they import, export and verification scripts, and fresh
+artifacts under `examples/<name>/out/`. The set covers part modeling,
 assemblies, reverse engineering, and FEM — see the category index in
 [`examples/README.md`](examples/README.md).
 
 ```bash
-# part (quickstart FTC example, external verification script included)
-uv run python examples/flange_plate/model.py
+# part (quickstart FTC notebook, external verification script included)
+marimo edit examples/flange_plate/flange_plate.py
+uv run python examples/flange_plate/verify.py
 
-# assembly (two-stage planetary reducer, MJCF export)
-uv run python examples/compact_two_stage_planetary_reducer/main.py
+# assembly (two-stage planetary reducer: part-family notebooks, MJCF export)
+sca run examples/compact_two_stage_planetary_reducer/compact_two_stage_planetary_reducer.py
+uv run python examples/compact_two_stage_planetary_reducer/export_mjcf.py
 
 # FEM (AP242 STEP -> Gmsh volume mesh -> Calculix statics)
-uv run python examples/ap242_gmsh_volume_mesh/model.py
+uv run python examples/ap242_gmsh_volume_mesh/export_step.py
+uv run --extra gmsh python examples/ap242_gmsh_volume_mesh/export_fem_mesh.py
 uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py
 ```
 
-Reverse engineering runs through the `Re-mode` workspace in the unified Web
-Editor at `/` against a target STEP (see `examples/bowl_connector/`).
+Reverse engineering runs in the `Re-mode` workspace of the standalone
+[sca-web-editor](https://github.com/PhySpace/sca-web-editor) against a target
+STEP (see `examples/bowl_connector/` and the
+[reverse-engineering studio workflow](docs/skill/references/workflows/reverse-engineering-studio.md)).
 
 ## Documentation
 
@@ -563,8 +674,8 @@ Editor at `/` against a target STEP (see `examples/bowl_connector/`).
   [`docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md`](docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md)
 - Reverse-engineering studio workflow:
   [`docs/skill/references/workflows/reverse-engineering-studio.md`](docs/skill/references/workflows/reverse-engineering-studio.md)
-- Persistent cache and product build workflow:
-  [`docs/skill/references/docs/guides/cache-build-workflow.md`](docs/skill/references/docs/guides/cache-build-workflow.md)
+- Notebook runtime and product build workflow:
+  [`docs/skill/references/docs/guides/notebook-runtime.md`](docs/skill/references/docs/guides/notebook-runtime.md)
 - Public API reference: [`docs/skill/references/docs/api/`](docs/skill/references/docs/api/)
 - Core type and modeling notes: [`docs/skill/references/docs/core/`](docs/skill/references/docs/core/)
 - Serialization and replay details:
@@ -575,7 +686,8 @@ Editor at `/` against a target STEP (see `examples/bowl_connector/`).
   [`docs/core/physical-units.md`](docs/skill/references/docs/core/physical-units.md)
 - Operation graph JSON spec:
   [`docs/core/operation_graph_json_spec.md`](docs/skill/references/docs/core/operation_graph_json_spec.md)
-  `.scadpkg` 产品包规范（中文）：[`design-docs/scadpkg-spec.md`](design-docs/scadpkg-spec.md)
+- `.scadpkg` package format:
+  [`docs/skill/references/scadpkg-format.md`](docs/skill/references/scadpkg-format.md)
 
 ## Releasing the Agent Skill
 

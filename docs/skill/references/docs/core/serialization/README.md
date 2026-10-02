@@ -70,7 +70,7 @@ Many user-facing functions are convenience APIs. During an active `GraphSession`
 ## Examples
 
 The retained examples use the current replay and durable product contracts. See
-[`../../../examples/constrained_sketch/model.py`](../../../examples/constrained_sketch/model.py)
+[`../../../examples/constrained_sketch/constrained_sketch.py`](../../../examples/constrained_sketch/constrained_sketch.py)
 for sketch promotion and replay, and
-[`../../../examples/external_reference_gear_train/model.py`](../../../examples/external_reference_gear_train/model.py)
-for cached parts, explicit external definitions, repeated/nested assemblies, and independent definition export.
+[`../../../examples/external_reference_gear_train/nested_external_reference_gear_trains.py`](../../../examples/external_reference_gear_train/nested_external_reference_gear_trains.py)
+for library parts, explicit external definitions, repeated/nested assemblies, and independent definition export.

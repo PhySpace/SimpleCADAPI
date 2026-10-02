@@ -51,7 +51,14 @@ def _reject_unpaired_surrogates(value: Any) -> Any:
     return value
 
 
-def parse_strict_json(data: bytes | bytearray | memoryview | str) -> Any:
+def _jcs_int(token: str) -> int | float:
+    # JCS numbers are doubles, and integral doubles below 1e21 print without an exponent
+    # (a slab's inertia 1.18e19 -> "11773562012270215000"): read such tokens back as that double.
+    value = int(token)
+    return float(value) if abs(value) > MAX_SAFE_INTEGER else value
+
+
+def parse_strict_json(data: bytes | bytearray | memoryview | str, *, _jcs_numbers: bool = False) -> Any:
     """Parse one strict UTF-8 JSON value while rejecting duplicate keys.
 
     BOMs, invalid UTF-8, comments, non-finite numbers, and trailing tokens are
@@ -73,6 +80,7 @@ def parse_strict_json(data: bytes | bytearray | memoryview | str) -> Any:
                 text,
                 object_pairs_hook=_reject_duplicate_pairs,
                 parse_constant=_reject_nonfinite,
+                parse_int=_jcs_int if _jcs_numbers else None,
             )
         )
     except RecursionError as exc:
@@ -95,7 +103,7 @@ def parse_canonical_json(data: bytes | bytearray | memoryview | str) -> Any:
         raw = data.encode("utf-8")
     else:
         raw = bytes(data)
-    value = parse_strict_json(raw)
+    value = parse_strict_json(raw, _jcs_numbers=True)
     canonical = canonical_json_bytes(value)
     if raw != canonical:
         raise ValueError("JSON bytes are not RFC 8785 canonical")

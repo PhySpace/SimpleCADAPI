@@ -19,12 +19,8 @@ from simplecadapi.scene import (
 )
 
 
-def _policy(root: Path) -> scad.CachePolicy:
-    return scad.CachePolicy(root=root)
-
-
-def _build_named_part(tmp_path: Path, part_id: str = "box") -> scad.PartBuildResult:
-    @scad.part(id=part_id, cache=_policy(tmp_path / "cache"))
+def _build_named_part(part_id: str = "box") -> scad.PartBuildResult:
+    @scad.part(id=part_id)
     def build() -> scad.Part:
         body = scad.make_box_rsolid(width=1.0, height=2.0, depth=3.0)
         named_face = body.get_faces(0)
@@ -45,10 +41,10 @@ def _build_named_part(tmp_path: Path, part_id: str = "box") -> scad.PartBuildRes
     return build()
 
 
-def _build_nested_assembly(tmp_path: Path):
-    part = _build_named_part(tmp_path, "linked")
+def _build_nested_assembly():
+    part = _build_named_part("linked")
 
-    @scad.assemble(id="child", definitions=(part,), cache=_policy(tmp_path / "cache"))
+    @scad.assemble(id="child", definitions=(part,))
     def build_child() -> scad.Assembly:
         assembly = scad.make_assembly_rassembly(
             assembly_id="child", name="Child assembly"
@@ -83,9 +79,7 @@ def _build_nested_assembly(tmp_path: Path):
 
     child = build_child()
 
-    @scad.assemble(
-        id="root", definitions=(child, part), cache=_policy(tmp_path / "cache")
-    )
+    @scad.assemble(id="root", definitions=(child, part))
     def build_root() -> scad.Assembly:
         assembly = scad.make_assembly_rassembly(
             assembly_id="root", name="Root assembly"
@@ -108,10 +102,8 @@ def _build_nested_assembly(tmp_path: Path):
     return part, child, build_root()
 
 
-def test_part_package_wraps_canonical_prt_and_preserves_naming_binding(
-    tmp_path: Path,
-) -> None:
-    part = _build_named_part(tmp_path)
+def test_part_package_wraps_canonical_prt_and_preserves_naming_binding() -> None:
+    part = _build_named_part()
     package = scad.build_product_package(part)
     payload = scad.encode_product_package(package)
 
@@ -141,10 +133,8 @@ def test_part_package_wraps_canonical_prt_and_preserves_naming_binding(
     assert rebuilt.connectors[0].anchor_kind == "geometry"
 
 
-def test_cache_off_part_package_is_byte_deterministic(tmp_path: Path) -> None:
-    policy = scad.CachePolicy(mode="off", root=tmp_path / "cache")
-
-    @scad.part(id="deterministic_part", cache=policy)
+def test_part_package_is_byte_deterministic() -> None:
+    @scad.part(id="deterministic_part")
     def build() -> scad.Part:
         body = scad.make_box_rsolid(width=1.0, height=2.0, depth=3.0)
         tagged_face = scad.apply_tag(
@@ -169,10 +159,8 @@ def test_cache_off_part_package_is_byte_deterministic(tmp_path: Path) -> None:
     ) == scad.encode_product_package(scad.build_product_package(second))
 
 
-def test_nested_assembly_package_preserves_hierarchy_relations_and_dedup(
-    tmp_path: Path,
-) -> None:
-    part, child, root = _build_nested_assembly(tmp_path)
+def test_nested_assembly_package_preserves_hierarchy_relations_and_dedup() -> None:
+    part, child, root = _build_nested_assembly()
     package = scad.build_product_package(root)
     payload = scad.encode_product_package(package)
     loaded = scad.load_product_package(payload)
@@ -208,20 +196,17 @@ def test_nested_assembly_package_preserves_hierarchy_relations_and_dedup(
     assert sum(path.startswith("definitions/part/") for path in package.objects) == 1
 
 
-def test_warm_cache_product_package_is_byte_deterministic(tmp_path: Path) -> None:
-    first = _build_named_part(tmp_path, "warm_part")
-    second = _build_named_part(tmp_path, "warm_part")
+def test_rebuilt_named_part_package_is_byte_deterministic() -> None:
+    first = _build_named_part("rebuilt_part")
+    second = _build_named_part("rebuilt_part")
 
-    assert second.cache_report.hit
     assert scad.encode_product_package(
         scad.build_product_package(first)
     ) == scad.encode_product_package(scad.build_product_package(second))
 
 
-def test_product_package_rejects_mutation_missing_and_extra_objects(
-    tmp_path: Path,
-) -> None:
-    _part, _child, root = _build_nested_assembly(tmp_path)
+def test_product_package_rejects_mutation_missing_and_extra_objects() -> None:
+    _part, _child, root = _build_nested_assembly()
     package = scad.build_product_package(root)
     target_path = next(
         path for path in package.objects if path.startswith("definitions/")
@@ -249,8 +234,8 @@ def test_product_package_rejects_mutation_missing_and_extra_objects(
         )
 
 
-def test_product_package_encode_round_trip_is_byte_identical(tmp_path: Path) -> None:
-    package = scad.build_product_package(_build_named_part(tmp_path))
+def test_product_package_encode_round_trip_is_byte_identical() -> None:
+    package = scad.build_product_package(_build_named_part())
     first = scad.encode_product_package(package)
     loaded = scad.read_product_package(first)
     second = scad.encode_product_package(loaded)
@@ -258,11 +243,9 @@ def test_product_package_encode_round_trip_is_byte_identical(tmp_path: Path) -> 
     assert first == second
 
 
-def test_validated_package_skips_repeated_decode_validation(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+def test_validated_package_skips_repeated_decode_validation(monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    package = scad.build_product_package(_build_named_part(tmp_path))
+    package = scad.build_product_package(_build_named_part())
     payload = scad.encode_product_package(package)
     loaded = scad.read_product_package(payload)
     assert loaded._validated_manifest is not None
@@ -270,8 +253,8 @@ def test_validated_package_skips_repeated_decode_validation(
     assert scad.encode_product_package(loaded) == payload
 
 
-def test_unvalidated_package_is_checked_before_encoding(tmp_path: Path) -> None:
-    package = scad.build_product_package(_build_named_part(tmp_path))
+def test_unvalidated_package_is_checked_before_encoding() -> None:
+    package = scad.build_product_package(_build_named_part())
     target_path = next(iter(package.objects))
     mutated = dict(package.objects)
     mutated[target_path] += b"x"
@@ -282,11 +265,9 @@ def test_unvalidated_package_is_checked_before_encoding(tmp_path: Path) -> None:
         )
 
 
-def test_materialize_reuses_validated_dag_and_checks_unvalidated_once(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+def test_materialize_reuses_validated_dag_and_checks_unvalidated_once(monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _part, _child, root = _build_nested_assembly(tmp_path)
+    _part, _child, root = _build_nested_assembly()
     validation_calls = 0
     original = assembly_io.validate_assembly_definition_graph
 
@@ -311,10 +292,8 @@ def test_materialize_reuses_validated_dag_and_checks_unvalidated_once(
     assert validation_calls == 1
 
 
-def test_validated_package_manifest_mutation_forces_revalidation(
-    tmp_path: Path,
-) -> None:
-    package = scad.build_product_package(_build_named_part(tmp_path))
+def test_validated_package_manifest_mutation_forces_revalidation() -> None:
+    package = scad.build_product_package(_build_named_part())
     draft = dict(package.manifest)
     draft["root"] = {**draft["root"], "revision": "changed"}
     mutated = ProductPackage(draft, package.objects, package.root_definition)
@@ -323,10 +302,8 @@ def test_validated_package_manifest_mutation_forces_revalidation(
         scad.encode_product_package(mutated)
 
 
-def test_build_package_validates_definition_and_occurrence_closure(
-    tmp_path: Path,
-) -> None:
-    _part, _child, root = _build_nested_assembly(tmp_path)
+def test_build_package_validates_definition_and_occurrence_closure() -> None:
+    _part, _child, root = _build_nested_assembly()
     package = scad.build_product_package(root)
 
     assert package.root_id == "root"
@@ -431,10 +408,8 @@ def test_occurrence_validation_rejects_connector_forwarding_cycle() -> None:
         ProductOccurrenceGraph(_minimal_occurrence_manifest(nodes, connectors))
 
 
-def test_product_package_rejects_resigned_occurrence_transform(
-    tmp_path: Path,
-) -> None:
-    package = scad.build_product_package(_build_named_part(tmp_path))
+def test_product_package_rejects_resigned_occurrence_transform() -> None:
+    package = scad.build_product_package(_build_named_part())
     occurrence_path = package.occurrence_graph_path
     occurrence = parse_canonical_json(package.objects[occurrence_path])
     occurrence["nodes"][0]["transform"]["origin"][0] = 1
@@ -463,11 +438,9 @@ def test_product_package_rejects_resigned_occurrence_transform(
     with pytest.raises(ProductPackageError, match="occurrence graph differs"):
         scad.read_product_package(payload)
 
-def test_package_read_materialize_reuses_validated_part_brep(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+def test_package_read_materialize_reuses_validated_part_brep(monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    package = scad.build_product_package(_build_named_part(tmp_path))
+    package = scad.build_product_package(_build_named_part())
     loaded = scad.read_product_package(scad.encode_product_package(package))
 
     monkeypatch.setattr(
@@ -483,10 +456,8 @@ def test_package_read_materialize_reuses_validated_part_brep(
     assert rebuilt.part_id == "box"
 
 
-def test_replaced_part_definition_does_not_inherit_validation(
-    tmp_path: Path,
-) -> None:
-    definition = _build_named_part(tmp_path).definition
+def test_replaced_part_definition_does_not_inherit_validation() -> None:
+    definition = _build_named_part().definition
     mutated_blobs = dict(definition.blobs)
     mutated_blobs[definition.solid_cache_ref.path] += b"x"
     mutated = replace(definition, blobs=mutated_blobs)
@@ -496,7 +467,7 @@ def test_replaced_part_definition_does_not_inherit_validation(
 
 
 def test_capture_function_exports_unified_product_package(tmp_path: Path) -> None:
-    part = _build_named_part(tmp_path, "exported")
+    part = _build_named_part("exported")
     path = tmp_path / "out" / "exported.scadpkg"
     captured = scad.capture(part, path)
 
@@ -508,7 +479,7 @@ def test_capture_function_exports_unified_product_package(tmp_path: Path) -> Non
 
 
 def test_capture_assembly_exports_unified_product_package(tmp_path: Path) -> None:
-    _part, _child, root = _build_nested_assembly(tmp_path)
+    _part, _child, root = _build_nested_assembly()
     path = tmp_path / "out" / "root.scadpkg"
     captured = scad.capture(root, path)
 
@@ -520,7 +491,7 @@ def test_capture_assembly_exports_unified_product_package(tmp_path: Path) -> Non
 
 
 def test_capture_rejects_legacy_keyword_signature(tmp_path: Path) -> None:
-    part = _build_named_part(tmp_path, "no_keyword_compatibility")
+    part = _build_named_part("no_keyword_compatibility")
     path = tmp_path / "out" / "no_keyword_compatibility.scadpkg"
 
     with pytest.raises(TypeError, match="positional-only"):

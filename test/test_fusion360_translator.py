@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 import importlib
-from pathlib import Path
 import sys
 
 import pytest
@@ -38,10 +37,10 @@ def test_backend_imports_without_target_runtime_modules() -> None:
     assert fusion.CAPABILITIES.input_schema_versions == ("product-package-2.0",)
 
 
-def test_nested_package_emits_deterministic_compilable_script(tmp_path: Path) -> None:
+def test_nested_package_emits_deterministic_compilable_script() -> None:
     from simplecadapi.translator.fusion360_translator import Fusion360Translator
 
-    package = _build_nested_package(tmp_path)
+    package = _build_nested_package()
     translator = Fusion360Translator(document_name="ContractFusion")
     first = translator.translate_product_package(package)
     second = translator.translate_product_package(package)
@@ -55,13 +54,11 @@ def test_nested_package_emits_deterministic_compilable_script(tmp_path: Path) ->
     assert translator.capabilities.targets[0].requires_external_runtime
 
 
-def test_product_payload_resolves_references_and_keeps_solved_placements(
-    tmp_path: Path,
-) -> None:
+def test_product_payload_resolves_references_and_keeps_solved_placements() -> None:
     from simplecadapi.translator.fusion360_translator import Fusion360Translator
 
     script = Fusion360Translator().translate_product_package(
-        _build_nested_package(tmp_path)
+        _build_nested_package()
     ).content
     payload = _model_payload(script)
     operations = [node["op"] for node in payload["graph"]["nodes"]]
@@ -85,11 +82,11 @@ def test_product_payload_resolves_references_and_keeps_solved_placements(
     )
 
 
-def test_runtime_uses_shared_nested_product_definitions(tmp_path: Path) -> None:
+def test_runtime_uses_shared_nested_product_definitions() -> None:
     from simplecadapi.translator.fusion360_translator import Fusion360Translator
 
     script = Fusion360Translator().translate_product_package(
-        _build_nested_package(tmp_path)
+        _build_nested_package()
     ).content
 
     assert "self.product_definition_components = {}" in script

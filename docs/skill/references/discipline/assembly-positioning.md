@@ -96,8 +96,8 @@ that is dependency propagation, not a solver error.
 4. Compose with placements; declare public connectors where a parent will
    consume a subassembly.
 5. Add declarative constraints for mating and motion.
-6. Solve; read `AssemblySolveReport`, residuals
-   (`measure_constraint_residual_rconstraintresidual`), and
+6. Solve; read residuals
+   (`measure_constraint_residual_rconstraintresidual`) and
    `inspect_assembly_constraints_rconstraintreport`.
 7. Validate placement outcomes with measurements, not impressions.
 

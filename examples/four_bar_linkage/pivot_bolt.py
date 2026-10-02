@@ -1,87 +1,102 @@
-"""Hex-head pivot bolts for the four-bar linkage joints.
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["simplecadapi"]
+#
+# [tool.simplecadapi]
+# id = "pivot_bolt"
+# ///
+"""Hex-head pivot bolt for the four-bar linkage joints.
 
-Each bolt is a hex-prism head, a washer shoulder, and a plain shank the bar
-stack rotates on. The thread is not modeled: MJCF and STEP outputs treat each
-joint pivot as a smooth pin, and the hex head carries the fastener identity
-visually and for assembly documentation.
+A hex-prism head, a washer shoulder and a plain shank the bar stack rotates
+on, along Z with the head above the origin plane and the shank through -Z.
+The thread is not modeled: MJCF and STEP treat each pivot as a smooth pin,
+and the hex head carries the fastener identity.
 """
 
-from __future__ import annotations
+import marimo
 
-import math
-import sys
-from pathlib import Path
+app = marimo.App()
 
-import simplecadapi as scad
+with app.setup:
+    import math
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import simplecadapi as scad
 
-from dimensions import (  # noqa: E402
-    PIVOT_BOLT_HEAD_RADIUS,
-    PIVOT_BOLT_HEAD_THICKNESS,
-    PIVOT_BOLT_SHAFT_RADIUS,
-)
+    from dimensions import (
+        PIVOT_BOLT_HEAD_RADIUS,
+        PIVOT_BOLT_HEAD_THICKNESS,
+        PIVOT_BOLT_SHAFT_RADIUS,
+        PIVOT_BOLT_SHANK_LENGTH,
+    )
 
 
-def _hex_prism(radius: float, height: float, bottom_z: float) -> scad.Solid:
-    """Regular hexagonal prism along Z starting at bottom_z."""
+@app.cell
+def _():
+    # ---- params ----
+    SHANK_LENGTH = PIVOT_BOLT_SHANK_LENGTH
+    return (SHANK_LENGTH,)
 
-    points = [
+
+@app.cell
+def _():
+    # ---- feature: hex-head (build) ----
+    # A regular hexagon on the head radius, extruded up from -head thickness.
+    _corners = [
         (
-            radius * math.cos(math.radians(60.0 * index)),
-            radius * math.sin(math.radians(60.0 * index)),
+            PIVOT_BOLT_HEAD_RADIUS * math.cos(math.radians(60.0 * _index)),
+            PIVOT_BOLT_HEAD_RADIUS * math.sin(math.radians(60.0 * _index)),
             0.0,
         )
-        for index in range(6)
+        for _index in range(6)
     ]
-    wire = scad.make_polyline_rwire(points=[*points, points[0]])
-    face = scad.make_face_from_wire_rface(wire=wire)
-    solid = scad.extrude_rsolid(
-        face, direction=(0.0, 0.0, 1.0), distance=height
+    _hexagon = scad.make_face_from_wire_rface(
+        wire=scad.make_polyline_rwire(points=[*_corners, _corners[0]])
     )
-    return scad.translate_shape(solid, vector=(0.0, 0.0, bottom_z))
-
-
-def make_pivot_bolt_solid(shank_length: float) -> scad.Solid:
-    """One hex-head pivot bolt along Z: head at top, shank through -Z."""
-
-    head = _hex_prism(
-        radius=PIVOT_BOLT_HEAD_RADIUS,
-        height=PIVOT_BOLT_HEAD_THICKNESS,
-        bottom_z=-PIVOT_BOLT_HEAD_THICKNESS,
+    _prism = scad.extrude_rsolid(
+        _hexagon, direction=(0.0, 0.0, 1.0), distance=PIVOT_BOLT_HEAD_THICKNESS
     )
-    shank = scad.make_cylinder_rsolid(
+    hex_head = scad.translate_shape(_prism, vector=(0.0, 0.0, -PIVOT_BOLT_HEAD_THICKNESS))
+    return (hex_head,)
+
+
+@app.cell
+def _(SHANK_LENGTH, hex_head):
+    # ---- feature: shank (add) ----
+    _shank = scad.make_cylinder_rsolid(
         radius=PIVOT_BOLT_SHAFT_RADIUS,
-        height=shank_length,
-        bottom_face_center=(0.0, 0.0, -shank_length),
+        height=SHANK_LENGTH,
+        bottom_face_center=(0.0, 0.0, -SHANK_LENGTH),
     )
-    shoulder = scad.make_cylinder_rsolid(
+    _shoulder = scad.make_cylinder_rsolid(
         radius=PIVOT_BOLT_HEAD_RADIUS * 0.8,
         height=0.6,
         bottom_face_center=(0.0, 0.0, -0.3),
     )
-    body = scad.union_rsolid([head, shank, shoulder])
-    return scad.apply_tag(shape=body, tag="role.pivot_bolt")
+    shank = scad.union_rsolid([hex_head, _shank, _shoulder])
+    return (shank,)
 
 
-def make_pivot_bolt_part(
-    part_id: str,
-    shank_length: float,
-    *,
-    material: "scad.Material | None" = None,
-) -> scad.Part:
-    """One bolt Part with a Z-axis connector at the head center."""
-
-    body = make_pivot_bolt_solid(shank_length)
-    part = scad.make_part_rpart(
-        part_id=part_id, body=body, name=part_id.replace("_", " ")
+@app.cell
+def _(shank):
+    _steel = scad.make_material_rmaterial(
+        material_id="bolt_steel",
+        name="Bolt steel",
+        density=7.85e-6,
+        density_unit="kg/mm^3",
+        color=(0.25, 0.27, 0.30),
     )
-    if material is not None:
-        part = scad.assign_material_rpart(part=part, material=material)
-    return scad.add_connector_rpart(
-        part=part,
+    _body = scad.apply_tag(shape=shank, tag="role.pivot_bolt")
+    _part = scad.make_part_rpart(part_id="pivot_bolt", body=_body, name="pivot bolt")
+    _part = scad.assign_material_rpart(part=_part, material=_steel)
+    # The axis connector sits at the head center.
+    pivot_bolt = scad.add_connector_rpart(
+        part=_part,
         connector=scad.make_placement_connector_rconnector(
-            connector_id="axis",
-            placement=scad.identity_placement_rplacement(),
+            connector_id="axis", placement=scad.identity_placement_rplacement()
         ),
     )
+    return (pivot_bolt,)
+
+
+if __name__ == "__main__":
+    app.run()

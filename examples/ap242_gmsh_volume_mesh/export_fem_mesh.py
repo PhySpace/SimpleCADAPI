@@ -152,7 +152,7 @@ def mesh_step_with_gmsh(
     if not source.is_file():
         raise FileNotFoundError(f"Run export_step.py first: {source}")
     if package is not None and not package.is_file():
-        raise FileNotFoundError(f"Run model.py first: {package}")
+        raise FileNotFoundError(f"Run export_step.py first: {package}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     if mapping is not None:
         mapping.parent.mkdir(parents=True, exist_ok=True)

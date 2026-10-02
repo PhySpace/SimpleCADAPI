@@ -16,9 +16,9 @@ P0 families use:
   entities of likely conflict partners are purple.  This is the drawing
   engine's ``diag_png`` pattern transplanted to sketch documents.
 
-Layering: this module sits beside ``sketch.py`` and imports only ``errors``;
-``Sketch.solve`` imports it lazily inside the failure branches so the import
-graph stays acyclic (operators may import sketch, never the reverse).  The
+Layering: this module sits beside ``sketch.py`` and imports only ``errors``
+and ``_internal``; ``Sketch.solve`` imports it lazily inside the failure
+branches so the import graph stays acyclic (operators may import sketch, never the reverse).  The
 3D evidence machinery in ``operators/_diagnostics.py`` cannot be reused here
 for the same reason.
 
@@ -33,9 +33,9 @@ import math
 import os
 import textwrap
 from datetime import datetime
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
+from ._internal.workspace import diagnostics_dir
 from .errors import (
     ErrorEvidence,
     ErrorMeasurement,
@@ -62,21 +62,6 @@ _SKETCH_RENDER_DEDUP: Set[str] = set()
 # satisfied constraints collapse into a single count row beyond this window.
 _MAX_RELATED_CONSTRAINTS = 8
 _MAX_INVENTORY_OK_ROWS = 8
-
-
-def _diagnostics_dir() -> Path:
-    """Diagnostics directory: sibling of the ``@part`` cache root.
-
-    Mirrors ``operators/_diagnostics.diagnostics_dir`` so every family writes
-    evidence to the same place; duplicated here because the sketch layer must
-    not import from the operators layer (see module docstring).  The lazy
-    cache import avoids the cache→artifacts→operators import cycle.
-    """
-
-    from .cache.policy import resolve_cache_policy
-
-    policy = resolve_cache_policy(None, project_root=".")
-    return policy.root.parent / "diagnostics"
 
 
 def _render_enabled() -> bool:
@@ -460,7 +445,7 @@ def render_sketch_evidence(
             fontsize=9, color="#555555", va="top",
         )
 
-        root = _diagnostics_dir()
+        root = diagnostics_dir()
         root.mkdir(parents=True, exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         path = root / f"sketch-{mode}-{stamp}.png"

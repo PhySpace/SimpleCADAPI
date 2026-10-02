@@ -12,6 +12,7 @@ from typing import (
     Sequence,
     Tuple,
     cast,
+    overload,
 )
 
 from .errors import (
@@ -1813,6 +1814,12 @@ def surface_type(kind: str) -> SerializablePredicate:
     return prop("geom.type", "==", kind.upper())
 
 
+# Combining serializable predicates gives a serializable predicate, which is
+# what ``ShapeSelector.where`` takes; the overloads let type checkers see that.
+@overload
+def and_(*predicates: SerializablePredicate) -> SerializablePredicate: ...
+@overload
+def and_(*predicates: Predicate) -> Predicate: ...
 def and_(*predicates: Predicate) -> Predicate:
     """Combine predicates so all of them must match."""
 
@@ -1828,6 +1835,10 @@ def and_(*predicates: Predicate) -> Predicate:
     return _predicate
 
 
+@overload
+def or_(*predicates: SerializablePredicate) -> SerializablePredicate: ...
+@overload
+def or_(*predicates: Predicate) -> Predicate: ...
 def or_(*predicates: Predicate) -> Predicate:
     """Combine predicates so at least one of them must match."""
 
@@ -1843,6 +1854,10 @@ def or_(*predicates: Predicate) -> Predicate:
     return _predicate
 
 
+@overload
+def not_(predicate: SerializablePredicate) -> SerializablePredicate: ...
+@overload
+def not_(predicate: Predicate) -> Predicate: ...
 def not_(predicate: Predicate) -> Predicate:
     """Negate a QL predicate."""
 

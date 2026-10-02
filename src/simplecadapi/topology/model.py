@@ -9,13 +9,30 @@ These models form the foundation for:
 from __future__ import annotations
 
 import uuid
-from collections import defaultdict
-from dataclasses import dataclass, field
+import weakref
+from collections import defaultdict, deque
+from copy import deepcopy
+from dataclasses import dataclass, field, fields, replace
 from enum import Enum, auto
 from importlib import metadata as importlib_metadata
-from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    FrozenSet,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
 
 from ..recording.source_mapping import canonical_source_payload
+
+if TYPE_CHECKING:
+    from ..params.expr import ScalarExpr
+    from ..params.frame import FrameNode
 
 GRAPH_SCHEMA_VERSION = "2.0"
 
@@ -403,6 +420,16 @@ class OperationNode:
         topo_delta:   Topological change set (may be ``None`` for simple primitives).
         tags:         Free-form labels for annotation.
         source:       Best-effort Python source provenance; ignored by replay.
+        expressions:  The expressions ``param_exprs`` refers to.
+        frame:        The coordinate frame current when the node was recorded.
+
+    ``expressions`` and ``frame`` duplicate what the recording session keeps
+    in its expression and frame graphs. They travel with the node so a node
+    that outlives its session (a notebook cell's result, restored from the
+    cell cache) can still be registered in a new one. They are excluded from
+    equality and from :meth:`OperationGraph.to_dict`.
+
+    Nodes pickle and deep-copy without recursion (see :meth:`__reduce__`).
     """
 
     node_id: str
@@ -417,6 +444,185 @@ class OperationNode:
     tags: FrozenSet[str] = frozenset()
     graph_id: Optional[str] = None
     source: Optional[Dict[str, Any]] = None
+    expressions: Tuple["ScalarExpr", ...] = field(
+        default=(), compare=False, repr=False
+    )
+    frame: Optional["FrameNode"] = field(default=None, compare=False, repr=False)
+
+    def __reduce__(self) -> Tuple[Any, ...]:
+        # The default pickle recurses through ``inputs`` and overflows the
+        # stack on long chains. Instead the whole upstream closure is written
+        # as a flat list of records, inputs first, each naming its inputs by
+        # id. The records hold the nodes' own field objects, so pickle's memo
+        # writes data shared between several pickled nodes only once.
+        records = tuple(_node_record(node) for node in upstream_closure((self,)))
+        return (_restore_operation_node, (_NODE_FIELD_NAMES, records))
+
+    def __deepcopy__(self, memo: Dict[int, Any]) -> "OperationNode":
+        # Same reason as ``__reduce__``: copy the closure iteratively. Every
+        # field except ``inputs`` is deep-copied; ``memo`` keeps nodes shared
+        # within one ``deepcopy`` call shared in the copy.
+        copies: Dict[str, OperationNode] = {}
+
+        def copied(node: OperationNode) -> OperationNode:
+            done = memo.get(id(node))
+            return done if done is not None else copies[node.node_id]
+
+        for node in upstream_closure((self,), stop_at=lambda node: id(node) in memo):
+            copy = replace(
+                node,
+                inputs=tuple(copied(item) for item in node.inputs),
+                **{
+                    name: deepcopy(getattr(node, name), memo)
+                    for name in _NODE_FIELD_NAMES
+                    if name != "inputs"
+                },
+            )
+            memo[id(node)] = copies[node.node_id] = copy
+        return memo[id(self)]
+
+
+_NODE_FIELD_NAMES: Tuple[str, ...] = tuple(item.name for item in fields(OperationNode))
+# What two node objects must agree on to be the same operation, besides
+# their input ids (see same_node_content).
+_NODE_CONTENT_FIELDS: Tuple[str, ...] = tuple(
+    item.name for item in fields(OperationNode) if item.compare and item.name != "inputs"
+)
+
+
+class StaleLineageError(ValueError):
+    """Two different operations carry the same node id.
+
+    In a notebook this means values from an older run of a cell met values
+    from a newer run of the same cell; re-running the cells that produced
+    them resolves it.
+    """
+
+    def __init__(self, node_id: str) -> None:
+        super().__init__(
+            f"node '{node_id}' exists in two different versions (stale lineage); "
+            "re-run the cells that produced these values"
+        )
+        self.node_id = node_id
+
+
+def same_node_content(first: OperationNode, second: OperationNode) -> bool:
+    """Whether two node objects record the same operation.
+
+    Shallow on purpose: every field other than ``inputs`` must be equal and
+    the inputs must have the same ids in the same order. The dataclass
+    ``==`` compares ``inputs`` recursively, which is exponential on
+    diamond-shaped graphs.
+    """
+
+    if first is second:
+        return True
+    return all(
+        getattr(first, name) == getattr(second, name) for name in _NODE_CONTENT_FIELDS
+    ) and _input_ids(first) == _input_ids(second)
+
+
+def upstream_closure(
+    roots: Iterable[OperationNode],
+    *,
+    stop_at: Optional[Callable[[OperationNode], bool]] = None,
+) -> List[OperationNode]:
+    """Return *roots* and every node upstream of them, inputs first.
+
+    The walk is an iterative depth-first post-order over ``inputs``, so
+    chains of any length are fine and the order is deterministic. Nodes are
+    identified by ``node_id``: a second object with an id already seen is
+    skipped when :func:`same_node_content` holds and raises
+    :class:`StaleLineageError` otherwise. Nodes for which *stop_at* returns
+    true are neither returned nor walked through.
+    """
+
+    order: List[OperationNode] = []
+    seen: Dict[str, OperationNode] = {}
+    # (node, inputs_done): a node is emitted once all its inputs have been.
+    stack: List[Tuple[OperationNode, bool]] = [
+        (root, False) for root in reversed(tuple(roots))
+    ]
+    while stack:
+        node, inputs_done = stack.pop()
+        if inputs_done:
+            order.append(node)
+            continue
+        known = seen.get(node.node_id)
+        if known is not None:
+            if not same_node_content(known, node):
+                raise StaleLineageError(node.node_id)
+            continue
+        if stop_at is not None and stop_at(node):
+            continue
+        seen[node.node_id] = node
+        stack.append((node, True))
+        stack.extend((item, False) for item in reversed(node.inputs))
+    return order
+
+
+def _input_ids(node: OperationNode) -> Tuple[str, ...]:
+    return tuple(item.node_id for item in node.inputs)
+
+
+def _node_record(node: OperationNode) -> Tuple[Any, ...]:
+    """One node's fields in ``_NODE_FIELD_NAMES`` order, inputs as ids."""
+
+    return tuple(
+        _input_ids(node) if name == "inputs" else getattr(node, name)
+        for name in _NODE_FIELD_NAMES
+    )
+
+
+# Nodes restored from pickles, by (graph_id, node_id). marimo pickles every
+# cell variable separately; this lets two variables that shared a node before
+# pickling share one node object again after loading.
+_RESTORED_NODES: "weakref.WeakValueDictionary[Tuple[Optional[str], str], OperationNode]" = (
+    weakref.WeakValueDictionary()
+)
+
+
+def _restore_operation_node(
+    field_names: Tuple[str, ...], records: Tuple[Tuple[Any, ...], ...]
+) -> OperationNode:
+    """Rebuild the node pickled by :meth:`OperationNode.__reduce__`.
+
+    *records* is its upstream closure, inputs first, so the pickled node is
+    the last one. The field names are stored with the records, which keeps
+    old pickles loadable after fields with defaults are added.
+    """
+
+    restored: Dict[str, OperationNode] = {}
+    node: Optional[OperationNode] = None
+    for record in records:
+        state = dict(zip(field_names, record))
+        state["inputs"] = tuple(restored[node_id] for node_id in state["inputs"])
+        node = _share_restored(OperationNode(**state))
+        restored[node.node_id] = node
+    if node is None:
+        raise ValueError("an operation node pickle holds no records")
+    return node
+
+
+def _share_restored(node: OperationNode) -> OperationNode:
+    """Return the live restored twin of *node*, or register *node* as one.
+
+    A twin must hold the very same input objects: *node*'s inputs are
+    already shared, so an input that was replaced by a newer version makes
+    every node downstream of it a new version too.
+    """
+
+    key = (node.graph_id, node.node_id)
+    existing = _RESTORED_NODES.get(key)
+    if (
+        existing is not None
+        and len(existing.inputs) == len(node.inputs)
+        and all(old is new for old, new in zip(existing.inputs, node.inputs))
+        and same_node_content(existing, node)
+    ):
+        return existing
+    _RESTORED_NODES[key] = node
+    return node
 
 
 def _make_id(prefix: str = "node") -> str:
@@ -542,22 +748,39 @@ class OperationGraph:
         e2 = g.add_node("make_line_redge", {"start": (1, 0, 0), "end": (1, 1, 0)})
         wire = g.add_node("make_wire_from_edges_rwire", {"edge_count": 2}, inputs=[e1, e2])
         assert wire.node_id == g.leaf_nodes()[0].node_id
+
+    A *namespace* prefixes every id the graph allocates
+    (``<namespace>_node_00000001``). Graphs that share a ``graph_id`` but
+    allocate ids independently, such as the per-cell graphs of a notebook,
+    use distinct namespaces so their nodes can later meet in one graph
+    (:meth:`adopt`) without id clashes.
     """
 
-    def __init__(self, graph_id: Optional[str] = None) -> None:
+    def __init__(
+        self, graph_id: Optional[str] = None, *, namespace: Optional[str] = None
+    ) -> None:
+        if namespace is not None and not namespace:
+            raise ValueError("graph namespace must be a non-empty string")
         self.graph_id: str = graph_id or _make_id("graph")
+        self.namespace: Optional[str] = namespace
         self._nodes: Dict[str, OperationNode] = {}
         self._edges: List[Tuple[str, str]] = []
         self._adj: Dict[str, List[str]] = defaultdict(list)
         self._radj: Dict[str, List[str]] = defaultdict(list)
         self._counter: int = 0
 
+    def namespaced(self, prefix: str) -> str:
+        """Return *prefix* qualified with this graph's namespace, if any."""
+
+        return prefix if self.namespace is None else f"{self.namespace}_{prefix}"
+
     def allocate_node_id(self, prefix: str = "node") -> str:
         """Allocate the next deterministic graph-local node identifier."""
 
+        qualified = self.namespaced(prefix)
         while True:
             self._counter += 1
-            node_id = f"{prefix}_{self._counter:08x}"
+            node_id = f"{qualified}_{self._counter:08x}"
             if node_id not in self._nodes:
                 return node_id
 
@@ -578,6 +801,8 @@ class OperationGraph:
         context: Optional[Dict[str, Any]] = None,
         tags: Optional[Set[str]] = None,
         source: Optional[Dict[str, Any]] = None,
+        expressions: Iterable[ScalarExpr] = (),
+        frame: Optional[FrameNode] = None,
     ) -> OperationNode:
         """Add an operation node and wire its input edges.
 
@@ -619,15 +844,50 @@ class OperationGraph:
             tags=frozenset(tags) if tags else frozenset(),
             graph_id=self.graph_id,
             source=dict(source) if source else None,
+            expressions=tuple(expressions),
+            frame=frame,
         )
-        self._nodes[nid] = node
-
-        for inp in input_nodes:
-            self._edges.append((inp.node_id, nid))
-            self._adj[inp.node_id].append(nid)
-            self._radj[nid].append(inp.node_id)
-
+        self._insert(node)
         return node
+
+    def adopt(self, node: OperationNode) -> OperationNode:
+        """Make *node* and everything upstream of it part of this graph.
+
+        Nodes keep their ids and stay the same objects. An id this graph
+        already has is accepted when it is the same object or has the same
+        content (:func:`same_node_content`); the graph keeps its own object
+        then, and nothing upstream of it is revisited. A different node under
+        a known id raises :class:`StaleLineageError`. Nodes must carry this
+        graph's ``graph_id``.
+
+        Returns the graph's node for ``node.node_id``, which is *node* or an
+        object with the same content.
+        """
+
+        def known(item: OperationNode) -> bool:
+            owned = self._nodes.get(item.node_id)
+            if owned is None:
+                return False
+            if not same_node_content(owned, item):
+                raise StaleLineageError(item.node_id)
+            return True
+
+        for item in upstream_closure((node,), stop_at=known):
+            if item.graph_id != self.graph_id:
+                raise ValueError(
+                    f"node '{item.node_id}' belongs to graph '{item.graph_id}', "
+                    f"this graph is '{self.graph_id}'"
+                )
+            self._insert(item)
+        return self._nodes[node.node_id]
+
+    def _insert(self, node: OperationNode) -> None:
+        # Callers guarantee a new id whose inputs are already in the graph.
+        self._nodes[node.node_id] = node
+        for inp in node.inputs:
+            self._edges.append((inp.node_id, node.node_id))
+            self._adj[inp.node_id].append(node.node_id)
+            self._radj[node.node_id].append(inp.node_id)
 
     # ------------------------------------------------------------------
     # Queries
@@ -668,52 +928,38 @@ class OperationGraph:
         """Nodes with no downstream consumers."""
         return [self._nodes[nid] for nid in self._nodes if not self._adj.get(nid)]
 
+    def _kahn_order(self) -> List[str]:
+        # Iterative (Kahn) so long operation chains, e.g. an assembly adding
+        # thousands of components, do not hit the Python recursion limit.
+        # Nodes on a cycle never reach in-degree zero and are left out.
+        in_degree: Dict[str, int] = {nid: 0 for nid in self._nodes}
+        for child, parent in self._edges:
+            in_degree[parent] = in_degree.get(parent, 0) + 1
+
+        queue: deque[str] = deque(nid for nid, d in in_degree.items() if d == 0)
+        order: List[str] = []
+
+        while queue:
+            nid = queue.popleft()
+            order.append(nid)
+            for child in self._adj.get(nid, []):
+                in_degree[child] -= 1
+                if in_degree[child] == 0:
+                    queue.append(child)
+        return order
+
     def is_dag(self) -> bool:
         """Return ``True`` if the graph has no cycles (always valid for correct usage)."""
-        visited: Set[str] = set()
-        on_stack: Set[str] = set()
-
-        def dfs(nid: str) -> bool:
-            visited.add(nid)
-            on_stack.add(nid)
-            for child in self._adj.get(nid, []):
-                if child not in visited:
-                    if not dfs(child):
-                        return False
-                elif child in on_stack:
-                    return False
-            on_stack.discard(nid)
-            return True
-
-        for nid in self._nodes:
-            if nid not in visited:
-                if not dfs(nid):
-                    return False
-        return True
+        return len(self._kahn_order()) == len(self._nodes)
 
     def topological_order(self) -> List[OperationNode]:
         """Return nodes in valid execution (topological) order.
 
         Raises ``ValueError`` if the graph contains a cycle.
         """
-        if not self.is_dag():
+        order = self._kahn_order()
+        if len(order) != len(self._nodes):
             raise ValueError("graph contains a cycle")
-
-        in_degree: Dict[str, int] = {nid: 0 for nid in self._nodes}
-        for child, parent in self._edges:
-            in_degree[parent] = in_degree.get(parent, 0) + 1
-
-        queue: List[str] = [nid for nid, d in in_degree.items() if d == 0]
-        order: List[str] = []
-
-        while queue:
-            nid = queue.pop(0)
-            order.append(nid)
-            for child in self._adj.get(nid, []):
-                in_degree[child] -= 1
-                if in_degree[child] == 0:
-                    queue.append(child)
-
         return [self._nodes[nid] for nid in order]
 
     # ------------------------------------------------------------------

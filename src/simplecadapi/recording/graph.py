@@ -44,9 +44,15 @@ from typing import (
 )
 from pathlib import Path
 
-from ..params.expr import ExpressionGraph, ScalarLike, ToleranceLike, canonicalize_params
+from ..params.expr import (
+    ExpressionGraph,
+    ScalarLike,
+    ToleranceLike,
+    canonicalize_params,
+    referenced_expressions,
+)
 from ..params.units import UnitLike
-from ..params.frame import FrameGraph
+from ..params.frame import FrameGraph, FrameNode
 from ..params.tolerance import (
     ToleranceGraph,
     ToleranceMethod,
@@ -63,7 +69,18 @@ from ..topology.model import (
 )
 from ..topology.model import SemanticDelta, SemanticRef
 from ..topology.model import TopoKind, TopoRef, topo_ref_to_dict
-from ..core import Compound, Edge, Face, Shell, Solid, Vertex, Wire, get_current_cs
+from ..core import (
+    WORLD_CS,
+    Compound,
+    Edge,
+    Face,
+    Shell,
+    Solid,
+    Vertex,
+    Wire,
+    get_current_cs,
+    use_coordinate_system,
+)
 from ..product.assembly import Assembly
 from ..product.part import Part
 from .source_mapping import capture_source_provenance
@@ -101,6 +118,18 @@ class GraphSession:
 
         # Access the graph after the session
         print(session.graph.topological_order())
+
+    Args:
+        graph_id: Id of the recorded graph (random when omitted).
+        allow_external_definitions: Let built ``Part``/``Assembly`` values
+            that carry their own definition enter as ``reference_definition``
+            nodes instead of being rejected.
+        namespace: Prefix for every node and object id this session
+            allocates, as in ``OperationGraph(namespace=...)``.
+        shared_lineage: Accept values recorded by other sessions with the
+            same ``graph_id`` by adopting their nodes, as in
+            ``OperationGraph.adopt``. Notebook cell sessions use this;
+            every other session only accepts nodes its own graph owns.
     """
 
     def __init__(
@@ -108,8 +137,10 @@ class GraphSession:
         graph_id: Optional[str] = None,
         *,
         allow_external_definitions: bool = False,
+        namespace: Optional[str] = None,
+        shared_lineage: bool = False,
     ) -> None:
-        self.graph = OperationGraph(graph_id=graph_id)
+        self.graph = OperationGraph(graph_id=graph_id, namespace=namespace)
         self.expression_graph = ExpressionGraph()
         self.tolerance_graph = ToleranceGraph(self.expression_graph)
         self.frame_graph = FrameGraph()
@@ -122,6 +153,7 @@ class GraphSession:
         self._external_definition_nodes: Dict[int, OperationNode] = {}
         self._external_definition_nodes_by_id: Dict[str, OperationNode] = {}
         self._allow_external_definitions = bool(allow_external_definitions)
+        self._shared_lineage = bool(shared_lineage)
 
     def start(self) -> None:
         if self._active_session_token is not None:
@@ -145,7 +177,24 @@ class GraphSession:
 
         next_value = self._object_id_counters.get(prefix, 0) + 1
         self._object_id_counters[prefix] = next_value
-        return f"{prefix}_{next_value:08x}"
+        return f"{self.graph.namespaced(prefix)}_{next_value:08x}"
+
+    def owned_node(self, node: OperationNode) -> OperationNode:
+        """Return this session's graph node for *node*.
+
+        A shared-lineage session adopts *node* with its upstream nodes and
+        may return an equal node object it already had. Any other session
+        requires *node* to be the very object its graph owns.
+        """
+
+        if self._shared_lineage:
+            return self.graph.adopt(node)
+        if self.graph.get_node(node.node_id) is not node:
+            raise ValueError(
+                f"graph node '{node.node_id}' is not owned by active graph "
+                f"'{self.graph.graph_id}'"
+            )
+        return node
 
     def register_external_definition(
         self,
@@ -166,7 +215,18 @@ class GraphSession:
         expected_kind = "single_solid" if isinstance(value, Part) else "assembly"
         if expected_id != definition_id or expected_kind != definition_kind:
             raise ValueError("external definition runtime identity differs")
+        node_id: str | None = None
+        if self._shared_lineage:
+            # Cells referencing one definition must agree on its node, so
+            # the projected product holds a single reference to it.
+            node_id = "ref_" + content_hash.removeprefix("sha256:")[:16]
+            shared = self.graph.get_node(node_id)
+            if shared is not None:
+                self._external_definition_nodes[marker] = shared
+                self._external_definition_nodes_by_id[definition_id] = shared
+                return shared
         node = self.graph.add_node(
+            node_id=node_id,
             op="reference_definition",
             params={
                 "definition_kind": definition_kind,
@@ -220,6 +280,7 @@ class GraphSession:
         ``tolerance_unit`` defaults to the target's canonical unit for
         unit-aware expressions. The requirement is validated immediately and at
         session/model export, import, replay, and translation boundaries.
+        ``requirement_id`` defaults to the next ``tolreq`` object id.
         """
 
         return self.tolerance_graph.require(
@@ -227,7 +288,11 @@ class GraphSession:
             tolerance,
             method=method,
             name=name,
-            requirement_id=requirement_id,
+            requirement_id=(
+                self.allocate_object_id("tolreq")
+                if requirement_id is None
+                else requirement_id
+            ),
             tolerance_unit=tolerance_unit,
         )
 
@@ -264,18 +329,9 @@ class GraphSession:
                 "capture_result() requires a value containing at least one "
                 "graph-backed shape or semantic value"
             )
+        # validate_graph_ownership has checked (or adopted) every node.
         captured_ids: List[str] = []
         for node in nodes:
-            if node.graph_id not in {None, self.graph.graph_id}:
-                raise ValueError(
-                    f"result node '{node.node_id}' belongs to graph "
-                    f"'{node.graph_id}', active graph is '{self.graph.graph_id}'"
-                )
-            if self.graph.get_node(node.node_id) is not node:
-                raise ValueError(
-                    f"result node '{node.node_id}' is not owned by graph "
-                    f"'{self.graph.graph_id}'"
-                )
             if node.node_id not in captured_ids:
                 captured_ids.append(node.node_id)
         self._has_explicit_results = True
@@ -304,7 +360,9 @@ class GraphSession:
                         f"value contains graph node '{node.node_id}' from graph "
                         f"'{source_graph_id}', active graph is '{self.graph.graph_id}'"
                     )
-                if self.graph.get_node(node.node_id) is not node:
+                if self._shared_lineage:
+                    self.graph.adopt(node)
+                elif self.graph.get_node(node.node_id) is not node:
                     raise ValueError(
                         f"value contains graph node '{node.node_id}' not owned by "
                         f"active graph '{self.graph.graph_id}'"
@@ -342,6 +400,26 @@ def suspend_graph_recording():
         yield
     finally:
         _recording_suspend_depth_var.reset(token)
+
+
+@contextmanager
+def isolated_recording():
+    """Run a nested definition build as if it were called at top level.
+
+    The caller's session is hidden (no active session, recording not
+    suspended) and the world coordinate system is current, so the nested
+    build records only into its own session and does not depend on where it
+    was called from. Everything is restored on exit.
+    """
+
+    session_token = _active_session_var.set(None)
+    suspend_token = _recording_suspend_depth_var.set(0)
+    try:
+        with use_coordinate_system(WORLD_CS):
+            yield
+    finally:
+        _recording_suspend_depth_var.reset(suspend_token)
+        _active_session_var.reset(session_token)
 
 
 def _graph_node_and_id(value: Any) -> Optional[Tuple[OperationNode, Optional[str]]]:
@@ -431,7 +509,7 @@ def _extract_input_nodes(
             if node.node_id in seen:
                 continue
             seen.add(node.node_id)
-            nodes.append(node)
+            nodes.append(session.owned_node(node))
     return nodes
 
 
@@ -473,16 +551,23 @@ def _current_context_snapshot() -> Dict[str, Any]:
     }
 
 
-def _register_current_frame(session: GraphSession, node_id: str) -> None:
+def _current_frame(node_id: str) -> FrameNode:
+    """The current coordinate system as the frame of node *node_id*."""
+
     cs = get_current_cs()
-    session.frame_graph.ensure_frame(
-        f"frame:{node_id}",
-        origin=tuple(float(v) for v in cs.origin),
-        x_axis=tuple(float(v) for v in cs.x_axis),
-        y_axis=tuple(float(v) for v in cs.y_axis),
-        z_axis=tuple(float(v) for v in cs.z_axis),
+    return FrameNode(
+        frame_id=f"frame:{node_id}",
+        origin=_vector3(cs.origin),
+        x_axis=_vector3(cs.x_axis),
+        y_axis=_vector3(cs.y_axis),
+        z_axis=_vector3(cs.z_axis),
         metadata={"node_id": node_id},
     )
+
+
+def _vector3(values: Iterable[Any]) -> Tuple[float, float, float]:
+    x, y, z = (float(v) for v in values)
+    return (x, y, z)
 
 
 def _shape_kind(shape: Any) -> Optional[TopoKind]:
@@ -557,7 +642,7 @@ def _topology_wrappers(shape: Any) -> List[Any]:
 def _unique_ref_index(
     shapes: Iterable[Any],
     *,
-    ref_factory: Optional[Callable[[Any], TopoRef]] = None,
+    ref_factory: Optional[Callable[[Any, TopoKind], TopoRef]] = None,
 ) -> Dict[tuple[TopoKind, str], TopoRef]:
     candidates: Dict[tuple[TopoKind, str], List[TopoRef]] = {}
     for shape in shapes:
@@ -570,7 +655,7 @@ def _unique_ref_index(
                 if not isinstance(ref, TopoRef):
                     continue
             else:
-                ref = ref_factory(wrapper)
+                ref = ref_factory(wrapper, kind)
             key = (kind, _kernel_topo_id(wrapper))
             candidates.setdefault(key, []).append(ref)
 
@@ -595,11 +680,11 @@ def _canonicalize_recorded_topo_delta(
         return None
 
     def output_ref_factory(slot: int):
-        return lambda wrapper: TopoRef(
+        return lambda wrapper, kind: TopoRef(
             graph_id=graph_id,
             node_id=node_id,
             output_slot=slot,
-            kind=_shape_kind(wrapper),
+            kind=kind,
             topo_id=_shape_topo_id(wrapper),
         )
 
@@ -904,18 +989,13 @@ def record_operation_if_active(
     if session is None or _recording_suspend_depth_var.get() > 0:
         return None
 
-    numeric_params = dict(params) if params else {}
-    param_exprs: Dict[str, Any] = {}
-    if params:
-        numeric_params, param_exprs = canonicalize_params(
-            params, session.expression_graph
-        )
-
+    numeric_params, param_exprs = canonicalize_params(params, session.expression_graph)
     output_list = _normalize_output_shapes(outputs)
     input_list = list(input_shapes or ())
     _validate_input_graph_ownership(input_list, session)
     input_nodes = _extract_input_nodes(input_list, session)
     node_id = session.graph.allocate_node_id()
+    frame = _current_frame(node_id)
     canonical_topo_delta = _canonicalize_recorded_topo_delta(
         topo_delta,
         graph_id=session.graph.graph_id,
@@ -935,9 +1015,10 @@ def record_operation_if_active(
         context=context or _current_context_snapshot(),
         tags=tags,
         source=(source if source is not None else capture_source_provenance()),
+        expressions=referenced_expressions(param_exprs, session.expression_graph),
+        frame=frame,
     )
-
-    _register_current_frame(session, node.node_id)
+    session.frame_graph.add(frame)
 
     for idx, output in enumerate(output_list):
         attach_graph_node(
@@ -983,25 +1064,23 @@ def record_operation(
             "No active GraphSession. Use `with GraphSession() as session:` "
             "or call `session.start()` before recording."
         )
-    numeric_params = dict(params) if params else {}
-    param_exprs: Dict[str, Any] = {}
-    if params:
-        numeric_params, param_exprs = canonicalize_params(
-            params, session.expression_graph
-        )
-
+    numeric_params, param_exprs = canonicalize_params(params, session.expression_graph)
+    resolved_id = node_id or session.graph.allocate_node_id()
+    frame = _current_frame(resolved_id)
     node = session.graph.add_node(
         op=op,
         params=numeric_params,
         param_exprs=param_exprs or None,
-        inputs=inputs,
-        node_id=node_id,
+        inputs=[session.owned_node(item) for item in inputs or ()],
+        node_id=resolved_id,
         output_count=output_count,
         semantic_delta=semantic_delta,
         topo_delta=topo_delta,
         context=context,
         tags=tags,
         source=(source if source is not None else capture_source_provenance()),
+        expressions=referenced_expressions(param_exprs, session.expression_graph),
+        frame=frame,
     )
-    _register_current_frame(session, node.node_id)
+    session.frame_graph.add(frame)
     return node

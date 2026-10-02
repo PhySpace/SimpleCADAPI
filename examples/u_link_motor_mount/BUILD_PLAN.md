@@ -1,5 +1,19 @@
 # BUILD_PLAN: u_link_motor_mount
 
+> **File layout after the notebook migration.** This plan is the build log;
+> the stage scripts it names (`verify/s*_verify.py`, the hypothesis, probe and
+> diag scripts, `assembly.py`) were folded into the current layout:
+>
+> - `u_link.py`, `shell.py`: part notebooks, one cell per feature;
+>   `u_link_motor_mount.py`: the assembly notebook (`scad.use` of both).
+> - `dimensions.py` (shared `ULinkDimensions`, guard chain `check()`),
+>   `common.py` (shared sweep and cutter helpers): plain modules.
+> - `export.py`: package, STEP, STL, renders into `out/`.
+> - `verify/acceptance.py`: every stage contract below (S1–S4, S6 guard
+>   matrix, S10–S13) on the notebook cell values;
+>   `verify/export_artifacts.py` and `verify/render_check.py`: the S5 checks
+>   of the exported files.
+
 Datum（来自功能基准）: 原点 = 底部圆柱轴线中点；+X 沿连杆（指向右臂）；+Y 向上（U 开口方向）；+Z 横向。
 平底面 y=0、槽底安装面 y=D_motor/2、臂端面 y=D 均为受控基准面。对称性：关于 XZ 原点对称（左右臂）、关于 XY 对称（z 镜像）。
 

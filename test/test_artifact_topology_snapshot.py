@@ -1,8 +1,10 @@
+import pickle
 from copy import deepcopy
 
 import pytest
 
 import simplecadapi as scad
+import simplecadapi.ql as ql
 from simplecadapi.artifacts.brep import read_brep_solid, write_brep_bytes
 from simplecadapi.artifacts.canonical import ArtifactValidationError
 from simplecadapi.artifacts.topology_snapshot import (
@@ -71,6 +73,85 @@ def _flatten_metadata_values(value):
             yield from _flatten_metadata_values(child)
     else:
         yield value
+
+
+def test_brep_bytes_are_a_fixed_point_of_decoding():
+    # Four holes rotated by 90 degrees leave zeros that OCCT reads back as
+    # -0.0; a cached (decoded) body must still encode like the built one.
+    tool = scad.make_cylinder_rsolid(radius=2, height=15, bottom_face_center=(12, 0, -5))
+    tools = scad.radial_pattern_rsolidlist(
+        shape=tool, center=(0, 0, 0), axis=(0, 0, 1), count=4, total_rotation_angle=360.0
+    )
+    plate = scad.cut_rsolid(scad.make_cylinder_rsolid(radius=20, height=5), tools)
+
+    payload = write_brep_bytes(plate)
+
+    assert write_brep_bytes(read_brep_solid(payload)) == payload
+
+
+def _chamfered_ribs():
+    # Two triangular ribs under a slab, their hypotenuses chamfered. On the
+    # OCCT build this was found with, a few doubles of this shape move by an
+    # ulp on every BinTools read and alternate between two encodings.
+    def triangle(a, b, c):
+        return scad.make_face_from_wire_rface(
+            scad.make_wire_from_edges_rwire(
+                edges=[
+                    scad.make_segment_redge(start=a, end=b),
+                    scad.make_segment_redge(start=b, end=c),
+                    scad.make_segment_redge(start=c, end=a),
+                ]
+            )
+        )
+
+    slab = scad.make_box_rsolid(20, 4, 20, bottom_face_center=(0, 2, -10))
+    column = scad.make_cylinder_rsolid(
+        radius=2.5, height=5, bottom_face_center=(0, 0, 0), axis=(0, -1, 0)
+    )
+    ribs = [
+        scad.extrude_rsolid(
+            profile=triangle((s * 2.5, 0, -0.6), (s * 5.5, 0, -0.6), (s * 2.5, -5, -0.6)),
+            direction=(0, 0, 1),
+            distance=1.2,
+        )
+        for s in (-1, 1)
+    ]
+    body = scad.union_rsolid(slab, column, *ribs)
+    hypotenuse = 34**0.5
+    edges = ql.edges().where(
+        ql.and_(
+            ql.prop("geom.length", ">=", hypotenuse - 0.1),
+            ql.prop("geom.length", "<=", hypotenuse + 0.1),
+        )
+    )
+    return scad.chamfer_rsolid(solid=body, edges=edges, distance=0.2)
+
+
+def test_brep_bytes_settle_when_decoding_cycles():
+    # Decoding never reaches a fixed point here, so the canonical bytes are a
+    # member of the cycle. A body restored from a pickle (the cell cache) or
+    # from a package must still encode like the built one.
+    built = _chamfered_ribs()
+    payload = write_brep_bytes(built)
+
+    assert write_brep_bytes(pickle.loads(pickle.dumps(built))) == payload
+    assert write_brep_bytes(read_brep_solid(payload)) == payload
+
+
+def test_brep_bytes_agree_when_decoding_never_settles(monkeypatch):
+    # Some orbits drift forever. With the bound below the cycle the ribs
+    # stand in for such a shape: a restored body, and one restored twice,
+    # must still encode like the built one.
+    import simplecadapi.artifacts.brep as brep
+
+    monkeypatch.setattr(brep, "_MAX_DECODE_ROUNDS", 1)
+    built = _chamfered_ribs()
+    payload = write_brep_bytes(built)
+    restored = pickle.loads(pickle.dumps(built))
+
+    assert write_brep_bytes(restored) == payload
+    assert write_brep_bytes(pickle.loads(pickle.dumps(restored))) == payload
+    assert write_brep_bytes(read_brep_solid(payload)) == payload
 
 
 def test_topology_snapshot_restores_exact_semantic_state_after_brep_roundtrip():

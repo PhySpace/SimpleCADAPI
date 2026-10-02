@@ -11,11 +11,11 @@ The goal of this module is to provide a low-intrusion parametric layer:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+import hashlib
 import math
 from numbers import Real
 from typing import Any, Dict, List, Mapping, Sequence, Tuple, Union, cast
-import uuid
 
 from .units import (
     Dimension,
@@ -27,8 +27,23 @@ from .units import (
 )
 
 
-def _make_expr_id(prefix: str = "expr") -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:8]}"
+def _structural_expr_id(prefix: str, node: ScalarExpr) -> str:
+    """The id a node gets when none is given: a digest of its content.
+
+    Nodes with the same content (for ``Expr``: the same op over the same
+    operands) get the same id, so building the same model twice records the
+    same expression graph, and so the same content hash.
+    """
+
+    signature = repr(_expr_signature(node)).encode("utf-8")
+    return f"{prefix}_{hashlib.sha256(signature).hexdigest()[:16]}"
+
+
+def _settle_expr_id(node: ScalarExpr, prefix: str) -> None:
+    if not isinstance(node.expr_id, str):
+        raise ValueError("Expression id must be a string")
+    if not node.expr_id:
+        object.__setattr__(node, "expr_id", _structural_expr_id(prefix, node))
 
 
 def _finite_scalar(value: Any, *, label: str) -> float:
@@ -204,12 +219,11 @@ class Const(ScalarExprBase):
     """Immutable constant node used in the v2 expression graph."""
 
     value: float
-    expr_id: str = field(default_factory=lambda: _make_expr_id("const"))
+    expr_id: str = ""  # empty: derived from the content
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "value", _finite_scalar(self.value, label="value"))
-        if not isinstance(self.expr_id, str) or not self.expr_id:
-            raise ValueError("Expression id must be a non-empty string")
+        _settle_expr_id(self, "const")
 
     def evaluate(self, bindings: Mapping[str, float] | None = None) -> float:
         return float(self.value)
@@ -227,7 +241,7 @@ class Var(ScalarExprBase):
     name: str
     default: float
     comment: str | None = None
-    expr_id: str = field(default_factory=lambda: _make_expr_id("var"))
+    expr_id: str = ""  # empty: derived from the content
     tolerance: DimensionTolerance | None = None
     unit: Unit | None = None
     tolerance_unit: Unit | None = None
@@ -267,8 +281,7 @@ class Var(ScalarExprBase):
             self.unit.to_canonical(self.default)
         if self.canonical_tolerance is not None:
             self.canonical_tolerance.width
-        if not isinstance(self.expr_id, str) or not self.expr_id:
-            raise ValueError("Expression id must be a non-empty string")
+        _settle_expr_id(self, "var")
 
     @property
     def dimension(self) -> Dimension | None:
@@ -302,7 +315,7 @@ class Expr(ScalarExprBase):
 
     op: str
     args: Tuple[ScalarExpr, ...]
-    expr_id: str = field(default_factory=lambda: _make_expr_id("expr"))
+    expr_id: str = ""  # empty: derived from the content
 
     def __post_init__(self) -> None:
         if not isinstance(self.args, tuple):
@@ -318,8 +331,7 @@ class Expr(ScalarExprBase):
             )
         if not all(isinstance(arg, (Const, Var, Expr)) for arg in self.args):
             raise TypeError("Expression arguments must be scalar expression nodes")
-        if not isinstance(self.expr_id, str) or not self.expr_id:
-            raise ValueError("Expression id must be a non-empty string")
+        _settle_expr_id(self, "expr")
 
     def evaluate(self, bindings: Mapping[str, float] | None = None) -> float:
         from .units import infer_dimension
@@ -829,3 +841,36 @@ def canonicalize_params(
         if expr_value is not None:
             param_exprs[key] = expr_value
     return numeric_params, param_exprs
+
+
+def referenced_expressions(
+    param_exprs: Mapping[str, Any], expression_graph: ExpressionGraph
+) -> Tuple[ScalarExpr, ...]:
+    """Return the expressions *param_exprs* refers to, in first-use order.
+
+    *param_exprs* is the second value of :func:`canonicalize_params`: the
+    params' nesting with a ``{"expr_id": ...}`` leaf for every expression.
+    Registering the returned expressions in another graph (which also
+    registers their operands) makes the ids resolvable there.
+    """
+
+    found: Dict[str, ScalarExpr] = {}
+
+    def visit(value: Any) -> None:
+        if isinstance(value, dict):
+            expr_id = value.get("expr_id")
+            if len(value) == 1 and isinstance(expr_id, str):
+                expr = expression_graph.get(expr_id)
+                if expr is None:
+                    raise KeyError(f"unknown expression id '{expr_id}'")
+                found.setdefault(expr_id, expr)
+                return
+            for item in value.values():
+                visit(item)
+        elif isinstance(value, list):
+            for item in value:
+                visit(item)
+
+    for item in param_exprs.values():
+        visit(item)
+    return tuple(found.values())

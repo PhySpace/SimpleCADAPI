@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from decimal import Decimal, localcontext
 from fractions import Fraction
 import math
@@ -167,12 +167,18 @@ class ToleranceRequirement:
     name: str = ""
     tolerance_unit: Unit | None = None
     target_dimension: Dimension | None = None
+    # The target expression itself. Not part of the payload (that stores
+    # ``target_expr_id``); kept so a requirement can be declared again in
+    # another session, e.g. when a notebook projects its product.
+    target: ScalarExpr | None = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         if not isinstance(self.requirement_id, str) or not self.requirement_id:
             raise ValueError("Tolerance requirement id must be a non-empty string")
         if not isinstance(self.target_expr_id, str) or not self.target_expr_id:
             raise ValueError("Tolerance target expression id must be a non-empty string")
+        if self.target is not None and self.target.expr_id != self.target_expr_id:
+            raise ValueError("Tolerance target expression does not match target_expr_id")
         _validate_method(self.method)
         if not isinstance(self.tolerance, DimensionTolerance):
             raise TypeError(
@@ -1548,6 +1554,7 @@ def check_tolerance(
         name=expr.expr_id if name is None else name,
         tolerance_unit=resolved_tolerance_unit,
         target_dimension=target_dimension,
+        target=expr,
     )
     return _check_requirement(expr, requirement)
 
@@ -1631,11 +1638,35 @@ class ToleranceGraph:
             else name,
             tolerance_unit=resolved_tolerance_unit,
             target_dimension=target_dimension,
+            target=expr,
         )
         # Reject incomplete or mathematically invalid chains when declared.
         _check_requirement(expr, requirement)
         self.expression_graph.register(expr)
         self._requirements[resolved_id] = requirement
+        return requirement
+
+    def add(self, requirement: ToleranceRequirement) -> ToleranceRequirement:
+        """Register a requirement declared in another graph, with its target.
+
+        Adding one requirement twice is a no-op; a different requirement
+        under a taken id is rejected.
+        """
+
+        if requirement.target is None:
+            raise ValueError(
+                f"Tolerance requirement '{requirement.requirement_id}' "
+                "does not carry its target expression"
+            )
+        existing = self._requirements.get(requirement.requirement_id)
+        if existing is not None:
+            if existing != requirement:
+                raise ValueError(
+                    f"Duplicate tolerance requirement id '{requirement.requirement_id}'"
+                )
+            return existing
+        self.expression_graph.register(requirement.target)
+        self._requirements[requirement.requirement_id] = requirement
         return requirement
 
     def validate(self, *, raise_on_failure: bool = False) -> ToleranceReport:

@@ -134,6 +134,8 @@ from ..topology.model import (
     TopoEntry,
     TopoKind,
     TopoRef,
+    OperationNode,
+    StaleLineageError,
     topo_ref_to_dict,
 )
 
@@ -1321,9 +1323,19 @@ def _active_graph_node_for_shape(shape: AnyShape) -> Optional[object]:
     node_id = getattr(node, "node_id", None)
     if node_id is None:
         return None
-    if session.graph.get_node(str(node_id)) is None:
+    if session.graph.get_node(str(node_id)) is not None:
+        return node
+    # A shape from an earlier notebook cell was recorded by that cell's
+    # session. A shared-lineage session adopts it, as it does for operator
+    # inputs; any other session does not own it.
+    if not isinstance(node, OperationNode) or node.graph_id != session.graph.graph_id:
         return None
-    return node
+    try:
+        return session.owned_node(node)
+    except StaleLineageError:
+        raise
+    except ValueError:
+        return None
 
 def _parent_shapes(shape: AnyShape) -> List[AnyShape]:
     parents: List[AnyShape] = []

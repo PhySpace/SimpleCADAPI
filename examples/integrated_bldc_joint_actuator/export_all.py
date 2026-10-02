@@ -1,4 +1,7 @@
-"""Run the integrated BLDC actuator export scripts concurrently."""
+"""Capture the BLDC actuator package once, then export STEP, FCStd and MJCF in parallel.
+
+    uv run python examples/integrated_bldc_joint_actuator/export_all.py
+"""
 
 from __future__ import annotations
 
@@ -6,18 +9,18 @@ import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
-SCRIPTS = (
-    "examples/integrated_bldc_joint_actuator/export_mjcf.py",
-    "examples/integrated_bldc_joint_actuator/export_step.py",
-    "examples/integrated_bldc_joint_actuator/export_fcstd.py",
-)
+from export import capture_package
+
+HERE = Path(__file__).resolve().parent
+SCRIPTS = tuple(str(HERE / name) for name in ("export_mjcf.py", "export_step.py", "export_fcstd.py"))
 
 
 def run(script: str) -> tuple[str, int, float, str, str]:
     start = time.perf_counter()
     proc = subprocess.run(
-        [sys.executable, script],
+        [sys.executable, script, "--reuse-package"],
         capture_output=True,
         text=True,
     )
@@ -26,9 +29,11 @@ def run(script: str) -> tuple[str, int, float, str, str]:
 
 
 def main() -> None:
-    """Export MJCF, STEP, and FCStd from the captured package in parallel."""
+    """Export MJCF, STEP, and FCStd from one captured package in parallel."""
 
     start = time.perf_counter()
+    capture_package()
+    print(f"[export] capture {time.perf_counter() - start:.1f}s")
     with ThreadPoolExecutor(max_workers=len(SCRIPTS)) as pool:
         futures = [pool.submit(run, script) for script in SCRIPTS]
         results = [future.result() for future in futures]

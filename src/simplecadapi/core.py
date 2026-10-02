@@ -921,6 +921,13 @@ class TopoMixein:
         self.parent: Optional[AnyShape] = None
         self.parents: List[AnyShape] = []
 
+    def __reduce__(self) -> Tuple[Any, Tuple[Any, ...]]:
+        # Kernel handles cannot be pickled: store exact BinTools bytes plus
+        # per-entity semantic state (see _internal/shape_pickle.py).
+        from ._internal.shape_pickle import reduce_shape
+
+        return reduce_shape(cast("AnyShape", self))
+
     def set_parent(self, parent: "AnyShape") -> None:
         self.parent = parent
         if parent not in self.parents:

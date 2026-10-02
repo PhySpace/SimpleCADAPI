@@ -34,10 +34,8 @@ from simplecadapi.translator.freecad_translator.semantic import (
 )
 
 
-def _build_freecad_nested_package(tmp_path: Path):
-    cache = scad.CachePolicy(root=tmp_path / "cache")
-
-    @scad.part(id="linked", cache=cache)
+def _build_freecad_nested_package():
+    @scad.part(id="linked")
     def build_part() -> scad.Part:
         body = scad.make_box_rsolid(width=1.0, height=2.0, depth=3.0)
         named_face = scad.apply_tag(body.get_faces(0), "interface.mount_face")
@@ -47,7 +45,7 @@ def _build_freecad_nested_package(tmp_path: Path):
 
     part = build_part()
 
-    @scad.assemble(id="child", definitions=(part,), cache=cache)
+    @scad.assemble(id="child", definitions=(part,))
     def build_child() -> scad.Assembly:
         assembly = scad.make_assembly_rassembly("child", name="Child assembly")
         for component_id in ("inner_a", "inner_b"):
@@ -76,7 +74,7 @@ def _build_freecad_nested_package(tmp_path: Path):
 
     child = build_child()
 
-    @scad.assemble(id="root", definitions=(child, part), cache=cache)
+    @scad.assemble(id="root", definitions=(child, part))
     def build_root() -> scad.Assembly:
         assembly = scad.make_assembly_rassembly("root", name="Root assembly")
         assembly = scad.add_component_rassembly(
@@ -97,10 +95,8 @@ def _build_freecad_nested_package(tmp_path: Path):
     return scad.build_product_package(build_root())
 
 
-def _build_freecad_feature_history_package(tmp_path: Path):
-    cache = scad.CachePolicy(root=tmp_path / "cache")
-
-    @scad.part(id="feature_history", cache=cache)
+def _build_freecad_feature_history_package():
+    @scad.part(id="feature_history")
     def build_part() -> scad.Part:
         base = scad.make_box_rsolid(width=10.0, height=8.0, depth=4.0)
         tool = scad.make_cylinder_rsolid(
@@ -114,8 +110,7 @@ def _build_freecad_feature_history_package(tmp_path: Path):
     return scad.build_product_package(build_part())
 
 
-def _build_freecad_material_package(tmp_path: Path):
-    cache = scad.CachePolicy(root=tmp_path / "cache")
+def _build_freecad_material_package():
     blue = scad.make_material_rmaterial(
         "blue_aluminum",
         name="Blue aluminum",
@@ -129,7 +124,7 @@ def _build_freecad_material_package(tmp_path: Path):
     )
 
     def build_part_result(part_id: str, x: float, material: scad.Material):
-        @scad.part(id=part_id, cache=cache, project_root=Path(__file__).parent)
+        @scad.part(id=part_id, project_root=Path(__file__).parent)
         def build_part() -> scad.Part:
             body = scad.make_box_rsolid(
                 1.0,
@@ -153,7 +148,6 @@ def _build_freecad_material_package(tmp_path: Path):
     @scad.assemble(
         id="material_fixture",
         definitions=parts,
-        cache=cache,
         project_root=Path(__file__).parent,
     )
     def build_assembly() -> scad.Assembly:
@@ -606,12 +600,11 @@ with open(OUT_PATH, 'w', encoding='utf-8') as fh:
             self.assertEqual(record["volume"], 24.0)
 
     def test_translate_product_package_emits_dependency_first_definition_registry(self):
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            package = _build_freecad_nested_package(Path(tmp_dir))
+        package = _build_freecad_nested_package()
 
-            script = freecad_translator.translate_product_package_to_freecad_script(
-                package
-            )
+        script = freecad_translator.translate_product_package_to_freecad_script(
+            package
+        )
 
         compile(script, "simplecad_product_package.py", "exec")
         linked_index = script.index('DEFINITION_REGISTRY["linked"]')
@@ -625,9 +618,8 @@ with open(OUT_PATH, 'w', encoding='utf-8') as fh:
         self.assertEqual(script.count("Translated definition identity differs"), 3)
 
     def test_translate_product_package_fcstd_preserves_nested_occurrences(self):
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            package = _build_freecad_nested_package(Path(tmp_dir))
-            probe = """
+        package = _build_freecad_nested_package()
+        probe = """
 import json
 import FreeCAD as App
 
@@ -662,7 +654,7 @@ with open(OUT_PATH, 'w', encoding='utf-8') as fh:
         ),
     }, fh)
 """
-            result = self._inspect_product_package_fcstd_json(package, probe)
+        result = self._inspect_product_package_fcstd_json(package, probe)
 
         self.assertEqual(
             result["assemblies"],
@@ -1445,9 +1437,8 @@ with open(OUT_PATH, 'w', encoding='utf-8') as fh:
         self.assertGreater(result["compound_volume"], 0.0)
 
     def test_translate_product_package_fcstd_preserves_editable_materials(self):
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            package = _build_freecad_material_package(Path(tmp_dir))
-            probe = """
+        package = _build_freecad_material_package()
+        probe = """
 import json
 import FreeCAD as App
 
@@ -1473,7 +1464,7 @@ with open(OUT_PATH, 'w', encoding='utf-8') as fh:
         'component_materials': {obj.SimpleCADComponentId: obj.SimpleCADMaterialObject.SimpleCADMaterialId for obj in components},
     }, fh)
 """
-            result = self._inspect_product_package_fcstd_json(package, probe)
+        result = self._inspect_product_package_fcstd_json(package, probe)
 
         self.assertEqual(set(result["materials"]), {"blue_aluminum", "uncolored_steel"})
         self.assertEqual(result["materials"]["blue_aluminum"]["name"], "Blue aluminum")

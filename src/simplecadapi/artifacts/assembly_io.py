@@ -713,6 +713,35 @@ def _apply_verified_snapshot(
     return candidate
 
 
+# Runtime keys a built or materialized value carries. The hash/kind/revision
+# keys let another session reference the value as an external definition; the
+# object key lets an assembly (or a notebook projection) reach the child
+# definition itself without a separate registry.
+_DEFINITION_OBJECT_KEY = "definition.object"
+
+
+def attach_definition(
+    value: Part | Assembly, definition: PartDefinition | AssemblyDefinition
+) -> None:
+    """Mark *value* as the runtime form of *definition*."""
+
+    value._set_runtime("definition.content_hash", definition.content_hash)
+    value._set_runtime("definition.kind", definition.definition_kind)
+    value._set_runtime("definition.revision", definition.revision)
+    value._set_runtime(_DEFINITION_OBJECT_KEY, definition)
+
+
+def attached_definition(value: Any) -> PartDefinition | AssemblyDefinition | None:
+    """Return the definition a Part/Assembly was built or materialized from."""
+
+    if not isinstance(value, (Part, Assembly)):
+        return None
+    definition = value._get_runtime(_DEFINITION_OBJECT_KEY)
+    if isinstance(definition, (PartDefinition, AssemblyDefinition)):
+        return definition
+    return None
+
+
 def materialize_definition(
     definition: PartDefinition | AssemblyDefinition,
 ) -> Part | Assembly:
@@ -747,9 +776,7 @@ def materialize_definition(
                 material=_material_from_definition(node),
                 connectors=tuple(_runtime_connector(item) for item in node.connectors),
             )
-            value._set_runtime("definition.content_hash", node.content_hash)
-            value._set_runtime("definition.kind", node.definition_kind)
-            value._set_runtime("definition.revision", node.revision)
+            attach_definition(value, node)
             cache[key] = value
             return value
 
@@ -789,9 +816,7 @@ def materialize_definition(
                 if authored.constraints
                 else authored
             )
-        restored._set_runtime("definition.content_hash", node.content_hash)
-        restored._set_runtime("definition.kind", node.definition_kind)
-        restored._set_runtime("definition.revision", node.revision)
+        attach_definition(restored, node)
         cache[key] = restored
         return restored
 
@@ -799,6 +824,8 @@ def materialize_definition(
 
 
 __all__ = [
+    "attach_definition",
+    "attached_definition",
     "decode_assembly_definition",
     "definition_archive_name",
     "encode_assembly_definition",

@@ -79,10 +79,8 @@ def _read_simplecad_metadata(path: Path) -> dict[str, dict[str, object]]:
     return records
 
 
-def _build_nested_package(root: Path):
-    cache = scad.CachePolicy(root=root / "cache")
-
-    @scad.part(id="linked", cache=cache, project_root=Path(__file__).parent)
+def _build_nested_package():
+    @scad.part(id="linked", project_root=Path(__file__).parent)
     def build_part() -> scad.Part:
         body = scad.make_box_rsolid(1.0, 2.0, 3.0)
         face = scad.apply_tag(body.get_faces(0), "interface.mount_face")
@@ -97,7 +95,6 @@ def _build_nested_package(root: Path):
     @scad.assemble(
         id="child",
         definitions=(part,),
-        cache=cache,
         project_root=Path(__file__).parent,
     )
     def build_child() -> scad.Assembly:
@@ -128,7 +125,6 @@ def _build_nested_package(root: Path):
     @scad.assemble(
         id="root",
         definitions=(child, part),
-        cache=cache,
         project_root=Path(__file__).parent,
     )
     def build_root() -> scad.Assembly:
@@ -151,12 +147,9 @@ def _build_nested_package(root: Path):
     return scad.build_product_package(build_root())
 
 
-def _build_cylinder_package(root: Path):
-    cache = scad.CachePolicy(root=root / "cache")
-
+def _build_cylinder_package():
     @scad.part(
         id="cylinder",
-        cache=cache,
         project_root=Path(__file__).parent,
     )
     def build_cylinder() -> scad.Part:
@@ -190,10 +183,9 @@ class TestProductExporter(unittest.TestCase):
         self.assertFalse(hasattr(scad.translator, "ap242_translator"))
 
     def test_nested_package_preserves_ap242_product_structure_and_placements(self):
-
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            package = _build_nested_package(root)
+            package = _build_nested_package()
             step_path = root / "nested.step"
             report = scad.exporter.export_product_package_to_step(package, step_path)
             records = _read_occurrences(step_path)
@@ -272,14 +264,11 @@ class TestProductExporter(unittest.TestCase):
         self.assertFalse(any("OCAF comments" in item for item in report.limitations))
 
     def test_part_material_and_color_enter_stepcaf_payload(self):
-
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            cache = scad.CachePolicy(root=root / "cache")
 
             @scad.part(
                 id="colored",
-                cache=cache,
                 project_root=Path(__file__).parent,
             )
             def build_colored() -> scad.Part:
@@ -318,7 +307,7 @@ class TestProductExporter(unittest.TestCase):
     def test_nested_package_exports_matching_direct_brep_meshes(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            package = _build_nested_package(root)
+            package = _build_nested_package()
             stl_path = root / "nested.stl"
             obj_path = root / "nested.obj"
             stl_report = scad.exporter.export_product_package_to_stl(
@@ -380,7 +369,7 @@ class TestProductExporter(unittest.TestCase):
     def test_smaller_deflection_refines_curved_brep(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            package = _build_cylinder_package(root)
+            package = _build_cylinder_package()
             coarse_path = root / "cylinder-coarse.obj"
             fine_path = root / "cylinder-fine.obj"
             coarse = scad.exporter.export_product_package_to_obj(
@@ -412,7 +401,6 @@ class TestProductExporter(unittest.TestCase):
     def test_mjcf_exporter_builds_named_body_joint_site_and_mapping(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            cache = scad.CachePolicy(root=root / "cache")
             material = scad.make_material_rmaterial(
                 "test_aluminum",
                 density=2.7e-6,
@@ -431,11 +419,11 @@ class TestProductExporter(unittest.TestCase):
                     ),
                 )
 
-            @scad.part(id="mjcf_base", cache=cache, project_root=Path(__file__).parent)
+            @scad.part(id="mjcf_base", project_root=Path(__file__).parent)
             def build_base() -> scad.Part:
                 return make_link("mjcf_base")
 
-            @scad.part(id="mjcf_rotor", cache=cache, project_root=Path(__file__).parent)
+            @scad.part(id="mjcf_rotor", project_root=Path(__file__).parent)
             def build_rotor() -> scad.Part:
                 return make_link("mjcf_rotor")
 
@@ -445,7 +433,6 @@ class TestProductExporter(unittest.TestCase):
             @scad.assemble(
                 id="mjcf_fixture",
                 definitions=(base, rotor),
-                cache=cache,
                 project_root=Path(__file__).parent,
             )
             def build_fixture() -> scad.Assembly:
@@ -498,7 +485,6 @@ class TestProductExporter(unittest.TestCase):
     def test_mjcf_exporter_works_without_scene_projection(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            cache = scad.CachePolicy(root=root / "cache")
 
             def make_link(part_id: str) -> scad.Part:
                 body = scad.make_cylinder_rsolid(radius=2.0, height=4.0)
@@ -512,13 +498,13 @@ class TestProductExporter(unittest.TestCase):
                 )
 
             @scad.part(
-                id="sceneless_base", cache=cache, project_root=Path(__file__).parent
+                id="sceneless_base", project_root=Path(__file__).parent
             )
             def build_base() -> scad.Part:
                 return make_link("sceneless_base")
 
             @scad.part(
-                id="sceneless_rotor", cache=cache, project_root=Path(__file__).parent
+                id="sceneless_rotor", project_root=Path(__file__).parent
             )
             def build_rotor() -> scad.Part:
                 return make_link("sceneless_rotor")
@@ -529,7 +515,6 @@ class TestProductExporter(unittest.TestCase):
             @scad.assemble(
                 id="sceneless_arm",
                 definitions=(base, rotor),
-                cache=cache,
                 project_root=Path(__file__).parent,
             )
             def build_arm() -> scad.Assembly:
@@ -575,7 +560,6 @@ class TestProductExporter(unittest.TestCase):
     def test_mjcf_exporter_generates_unique_names_for_colliding_logical_ids(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            cache = scad.CachePolicy(root=root / "cache")
             material = scad.make_material_rmaterial(
                 material_id="collision_material",
                 density=2.7e-6,
@@ -600,7 +584,6 @@ class TestProductExporter(unittest.TestCase):
 
             @scad.part(
                 id="mjcf_base",
-                cache=cache,
                 project_root=Path(__file__).parent,
             )
             def build_base() -> scad.Part:
@@ -608,7 +591,6 @@ class TestProductExporter(unittest.TestCase):
 
             @scad.part(
                 id="mjcf-link-a",
-                cache=cache,
                 project_root=Path(__file__).parent,
             )
             def build_first_link() -> scad.Part:
@@ -616,7 +598,6 @@ class TestProductExporter(unittest.TestCase):
 
             @scad.part(
                 id="mjcf.link.a",
-                cache=cache,
                 project_root=Path(__file__).parent,
             )
             def build_second_link() -> scad.Part:
@@ -629,7 +610,6 @@ class TestProductExporter(unittest.TestCase):
             @scad.assemble(
                 id="mjcf_name_collision",
                 definitions=(base, first, second),
-                cache=cache,
                 project_root=Path(__file__).parent,
             )
             def build_fixture() -> scad.Assembly:
@@ -699,7 +679,6 @@ class TestProductExporter(unittest.TestCase):
     def test_mjcf_exporter_preserves_public_movable_attachment(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            cache = scad.CachePolicy(root=root / "cache")
             material = scad.make_material_rmaterial(
                 material_id="public_material",
                 density=2.7e-6,
@@ -720,7 +699,6 @@ class TestProductExporter(unittest.TestCase):
 
             @scad.part(
                 id="public_base",
-                cache=cache,
                 project_root=Path(__file__).parent,
             )
             def build_base() -> scad.Part:
@@ -728,7 +706,6 @@ class TestProductExporter(unittest.TestCase):
 
             @scad.part(
                 id="public_link",
-                cache=cache,
                 project_root=Path(__file__).parent,
             )
             def build_link() -> scad.Part:
@@ -740,7 +717,6 @@ class TestProductExporter(unittest.TestCase):
             @scad.assemble(
                 id="public_child",
                 definitions=(link,),
-                cache=cache,
                 project_root=Path(__file__).parent,
             )
             def build_child() -> scad.Assembly:
@@ -761,7 +737,6 @@ class TestProductExporter(unittest.TestCase):
             @scad.assemble(
                 id="public_root",
                 definitions=(base, child),
-                cache=cache,
                 project_root=Path(__file__).parent,
             )
             def build_fixture() -> scad.Assembly:
@@ -816,7 +791,6 @@ class TestProductExporter(unittest.TestCase):
     def test_mjcf_coupling_uses_tree_support_for_shared_connector(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            cache = scad.CachePolicy(root=root / "cache")
             material = scad.make_material_rmaterial(
                 material_id="tree_support_material",
                 density=2.7e-6,
@@ -837,7 +811,6 @@ class TestProductExporter(unittest.TestCase):
 
             @scad.part(
                 id="tree_support_base",
-                cache=cache,
                 project_root=Path(__file__).parent,
             )
             def build_base() -> scad.Part:
@@ -845,7 +818,6 @@ class TestProductExporter(unittest.TestCase):
 
             @scad.part(
                 id="tree_support_driver",
-                cache=cache,
                 project_root=Path(__file__).parent,
             )
             def build_driver() -> scad.Part:
@@ -853,7 +825,6 @@ class TestProductExporter(unittest.TestCase):
 
             @scad.part(
                 id="tree_support_follower",
-                cache=cache,
                 project_root=Path(__file__).parent,
             )
             def build_follower() -> scad.Part:
@@ -866,7 +837,6 @@ class TestProductExporter(unittest.TestCase):
             @scad.assemble(
                 id="tree_support_fixture",
                 definitions=(base, driver, follower),
-                cache=cache,
                 project_root=Path(__file__).parent,
             )
             def build_fixture() -> scad.Assembly:
@@ -955,7 +925,6 @@ class TestProductExporter(unittest.TestCase):
     def test_mjcf_exporter_emits_closure_equality_for_kinematic_loop(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            cache = scad.CachePolicy(root=root / "cache")
 
             def make_bar(part_id: str, length: float) -> scad.Part:
                 body = scad.make_box_rsolid(width=length, height=2.0, depth=2.0)
@@ -975,19 +944,19 @@ class TestProductExporter(unittest.TestCase):
                     ),
                 )
 
-            @scad.part(id="fb_ground", cache=cache, project_root=Path(__file__).parent)
+            @scad.part(id="fb_ground", project_root=Path(__file__).parent)
             def build_ground() -> scad.Part:
                 return make_bar("fb_ground", 40.0)
 
-            @scad.part(id="fb_crank", cache=cache, project_root=Path(__file__).parent)
+            @scad.part(id="fb_crank", project_root=Path(__file__).parent)
             def build_crank() -> scad.Part:
                 return make_bar("fb_crank", 20.0)
 
-            @scad.part(id="fb_coupler", cache=cache, project_root=Path(__file__).parent)
+            @scad.part(id="fb_coupler", project_root=Path(__file__).parent)
             def build_coupler() -> scad.Part:
                 return make_bar("fb_coupler", 50.0)
 
-            @scad.part(id="fb_rocker", cache=cache, project_root=Path(__file__).parent)
+            @scad.part(id="fb_rocker", project_root=Path(__file__).parent)
             def build_rocker() -> scad.Part:
                 return make_bar("fb_rocker", 35.0)
 
@@ -1001,7 +970,6 @@ class TestProductExporter(unittest.TestCase):
             @scad.assemble(
                 id="four_bar_loop",
                 definitions=(ground, crank, coupler, rocker),
-                cache=cache,
                 project_root=Path(__file__).parent,
             )
             def build_fixture() -> scad.Assembly:
@@ -1072,7 +1040,7 @@ class TestProductExporter(unittest.TestCase):
     def test_mesh_exporters_reject_invalid_tessellation_parameters(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            package = _build_cylinder_package(root)
+            package = _build_cylinder_package()
 
             with self.assertRaisesRegex(ValueError, "linear_deflection"):
                 scad.exporter.export_product_package_to_stl(

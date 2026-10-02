@@ -35,10 +35,12 @@ Standing discipline, binding for every role:
   evidence-backed constraints; intentional free DOF are recorded in the
   brief, never left silent. Capability detail:
   `domains/sketch-and-features.md`.
-- **Feature Tree Convention.** Every part source is authored as
+- **Feature Tree Convention.** Every part source is a marimo notebook
+  (`references/docs/guides/notebook-runtime.md`) authored as
   block-structured features per `discipline/feature-tree-convention.md`
-  (sketch → basic body op → bool → modifier, one feature per block with its
-  boundary comment); read it before Role 4 writes any model source.
+  (sketch → basic body op → bool → modifier, one feature per block and one
+  block per cell, each with its boundary comment); read both before Role 4
+  writes any model source.
 - **Repair the owning artifact.** A failed verification reopens the current
   stage's verifier contract or model, whichever owns the failure. Never patch
   downstream symptoms or weaken a check to pass it.
@@ -1123,7 +1125,8 @@ fields, and the reviewer input description.
 ## Role 5 — Exporter
 
 Read the export rows from `REQUIREMENTS.md`. Durable canonical delivery is
-`capture(result, "out/<part>.scadpkg")`; external formats go through
+`sca run <part>.py --out out/<part>.scadpkg` (or
+`capture(run.definition, ...)` after `run_notebook`); external formats go through
 `domains/export-and-translation.md` capabilities. Post-export gate:
 re-open the package in a fresh process (`validate_product_package` /
 definition materialization) and confirm definition/solid counts; list every
@@ -1146,7 +1149,7 @@ through the role map to the owning artifact.
 - Repeated dead ends → `discipline/failure-and-repair.md`; reconsider the
   BUILD_PLAN stage, not the same retry.
 
-Part source file, `REQUIREMENTS.md`, `BUILD_PLAN.md` with stage output
+Part notebook, `REQUIREMENTS.md`, `BUILD_PLAN.md` with stage output
 boundaries, verifier contracts, executable verification scripts, modeling
 hypotheses, and method proofs; evidence pack paths; image verdicts quoted
 from isolated subagent reviews; package/exports with sizes; assumptions made;
