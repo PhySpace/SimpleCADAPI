@@ -40,3 +40,7 @@ downsamples with LANCZOS for deterministic crisp edges; 1 renders 1:1.
 for high-resolution exports. ``edge_width_scale`` tunes the studio edge
 tube radius as a fraction of model span (default 0.0026; use ~0.001 for
 exploded stacks so the ink does not swamp small parts).
+
+The prepare half (validation + tessellation) runs on the calling
+thread; the GL work runs in a crash-isolated worker subprocess, so a
+native VTK crash can never take the caller down.

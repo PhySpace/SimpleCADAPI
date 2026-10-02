@@ -473,7 +473,14 @@ def make_surface_patch_rface(
     holes: Sequence[Wire] = (),
     tag_prefix: Optional[str] = None,
 ) -> Face:
-    """Fill a constrained boundary network into one Face, optionally with holes."""
+    """Fill a constrained boundary network into one Face, optionally with holes.
+
+    The filling kernel re-fits each boundary edge, so adjacent patches built
+    with this operation do not keep identical shared boundary curves. When
+    several patches must share exact boundary edges and sew into one closed
+    shell, build each patch with ``make_gordon_surface_rface`` from a shared
+    profile/guide edge network instead.
+    """
     try:
         boundary_list = list(boundaries)
         if not boundary_list or not all(
@@ -541,6 +548,10 @@ def make_surface_patch_rface(
             how_to_fix=[
                 "Pass non-empty SurfaceBoundary values with valid Edge objects.",
                 "Use C0/G1/G2 continuity and explicit positive filling tolerances.",
+                "For patches that must share exact boundary edges with neighbors "
+                "and sew into a closed shell, build them with "
+                "make_gordon_surface_rface on a shared edge network instead; "
+                "filling re-fits boundaries and breaks edge identity.",
             ],
             error=e,
         )
@@ -897,8 +908,15 @@ def sew_faces_rshell(
             possible_causes=[
                 "Faces are disconnected or their gaps exceed tolerance.",
                 "The sewing result contains multiple shell components.",
+                "Faces built with make_surface_patch_rface re-fit their "
+                "boundary edges, so patches no longer share exact boundaries.",
             ],
-            how_to_fix=["Pass connected Face objects and a positive sewing tolerance."],
+            how_to_fix=[
+                "Pass connected Face objects and a positive sewing tolerance.",
+                "When freeform patches must share exact boundary edges, build "
+                "them with make_gordon_surface_rface on a shared edge network "
+                "before sewing.",
+            ],
             error=e,
         )
 
