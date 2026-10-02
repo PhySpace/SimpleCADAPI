@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class Const(value: float, expr_id: str = field(default_factory=lambda : _make_expr_id('const')))
+class Const(value: float, expr_id: str = '')
 ```
 
 *Source: params/expr.py*
