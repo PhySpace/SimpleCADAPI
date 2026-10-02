@@ -2,21 +2,18 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import simplecadapi as scad
 
+from bracket_package import OUT_DIR, capture_bracket
 
-OUT_DIR = Path(__file__).resolve().parent / "out"
-PACKAGE_PATH = OUT_DIR / "ap242_gmsh_bracket.scadpkg"
+
 STEP_PATH = OUT_DIR / "ap242_gmsh_bracket.step"
 
 
 def main() -> None:
-    if not PACKAGE_PATH.is_file():
-        raise FileNotFoundError(f"Run model.py first: {PACKAGE_PATH}")
+    package_path = capture_bracket()
     report = scad.exporter.export_product_package_to_step(
-        data=PACKAGE_PATH,
+        data=package_path,
         output_path=STEP_PATH,
     )
     print("ap242_step", report.output_path)

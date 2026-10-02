@@ -1,14 +1,15 @@
-"""Export the compact reducer product package as MuJoCo MJCF."""
+"""Export the compact two-stage planetary reducer as MuJoCo MJCF.
 
-from __future__ import annotations
+    uv run python examples/compact_two_stage_planetary_reducer/export_mjcf.py
 
-from pathlib import Path
+Writes the product package first (``export.capture_package``), then the
+MJCF, its mapping and the meshes to ``out/``.
+"""
 
 import simplecadapi as scad
 
+from export import OUT_DIR, PACKAGE_PATH, capture_package
 
-OUT_DIR = Path(__file__).resolve().parent / "out"
-PACKAGE_PATH = OUT_DIR / "compact_two_stage_planetary_reducer.scadpkg"
 MJCF_PATH = OUT_DIR / "compact_two_stage_planetary_reducer.xml"
 MAPPING_PATH = OUT_DIR / "compact_two_stage_planetary_reducer.mapping.json"
 MESH_DIR = OUT_DIR / "compact_two_stage_planetary_reducer_meshes"
@@ -16,8 +17,7 @@ BEARING_STEEL_DENSITY_KG_M3 = 7850.0
 
 
 def main() -> None:
-    if not PACKAGE_PATH.is_file():
-        raise FileNotFoundError(f"Run main.py first: {PACKAGE_PATH}")
+    capture_package()
     report = scad.exporter.export_product_package_to_mjcf(
         data=PACKAGE_PATH,
         output_path=MJCF_PATH,

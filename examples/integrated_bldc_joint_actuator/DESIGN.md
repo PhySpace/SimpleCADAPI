@@ -121,6 +121,29 @@ This sequence avoids the trapped 43 mm ring-gear problem in Case 16: both ring
 inserts and carriers enter through the open reducer front before the bearing cap
 is installed.
 
+## File Layout
+
+Every part is a marimo notebook with one feature block per cell. The stator,
+rotor and controller are sub-assembly notebooks, and the product is an assembly
+notebook that composes all of them with `scad.use`. Shared numbers and helpers
+live in plain modules that the notebooks import, so the cell cache tracks them.
+
+| File | Kind | Role |
+| --- | --- | --- |
+| `integrated_bldc_joint_actuator.py` | assembly notebook | product: components, bearings, public datums, constraints, strict solve |
+| `bldc_stator.py`, `bldc_rotor.py`, `integrated_controller.py` | sub-assembly notebooks | stator core + 12 winding packs; rotor/shaft/sun + 14 magnets; PCB + 6 MOSFETs + 2 terminals |
+| `reducer_housing.py`, `motor_shell.py`, `rear_bearing_spider.py`, `rear_electronics_cover.py`, `output_bearing_cap.py` | part notebooks | fixed housing stack |
+| `stator_core.py`, `slot_winding.py`, `rotor_core_shaft_sun.py`, `rotor_magnet.py` | part notebooks | motor parts; one winding and one magnet definition are reused at every slot and pole |
+| `ring_gear.py`, `planet_gear.py` | part families | used once per stage: `scad.use("planet_gear.py", id="stage2_reusable_planet", STAGE="stage2")` |
+| `stage1_carrier_sun.py`, `output_carrier_flange.py` | part notebooks | stage-1 carrier with the stage-2 sun; stage-2 carrier with the output flange |
+| `controller_pcb.py`, `power_mosfet.py` | part notebooks | controller board; one MOSFET reused at all six bridge positions |
+| `terminal_block.py` | part family | rear terminals: `scad.use("terminal_block.py", id="power_can_terminal", PIN_COUNT=4, TERMINAL_NAME=...)` |
+| `dimensions.py` | plain module | envelope, `StageSpec` per stage, `BearingSpec` per bearing size, `validate_design_dimensions()` |
+| `common.py`, `materials.py`, `bearings.py` | plain modules | geometry, placement and connector helpers; materials; standard-bearing factory and placements |
+| `export.py` | script | runs the notebook and writes `out/integrated_bldc_joint_actuator.scadpkg` |
+| `export_step.py`, `export_fcstd.py`, `export_mjcf.py`, `export_all.py` | scripts | AP242 STEP, FCStd, MuJoCo MJCF; `export_all.py` captures once and runs the three in parallel |
+| `render_showcase.py` | script | assembled, front and exploded studio renders plus the exploded GIF |
+
 ## Strength And Thermal Notes
 
 - The motor shell retains 1.80 mm radial wall around the stator and the reducer

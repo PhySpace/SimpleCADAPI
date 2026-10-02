@@ -1,5 +1,23 @@
 # BUILD_PLAN: ap242_gmsh_bracket 正式化重建
 
+> **File layout after the notebook migration.** This plan is the build log;
+> the stage scripts it names (`model.py`, `verify/s*_verify.py`,
+> `s3_equivalence.py`, `s3_render.py`, the hypothesis scripts) were folded
+> into the current layout:
+>
+> - `bracket.py`: the part notebook, one cell per feature block (the S1
+>   boundary is the `gusset_ribs` cell).
+> - `bracket_package.py`: runs the notebook and writes
+>   `out/ap242_gmsh_bracket.scadpkg`; every `export_*.py` and
+>   `translate_*_script.py` starts from it.
+> - `export_fem_mesh.py`, `run_calculix.py`, `visualize_calculix.py`,
+>   `study_mesh_convergence.py`: plain FEM modules that read the STEP and
+>   the package (run `export_step.py` first).
+> - `render_views.py`: the demo gallery renders.
+> - `verify/acceptance.py`: the S1–S3 contracts below against the legacy
+>   facts, plus the parameter guards; `verify/fcstd_check.py`: the S4
+>   FreeCAD check.
+
 Datum（来自功能基准）: 沿用 legacy 原点 = 竖壁底面中心（X 壁厚中面 / Y 宽度中面 / Z 底面）；+X 壁厚方向（fixed_support 背面 x=-2），+Y 宽度方向（零件关于 XZ 面 y=0 对称），+Z 高度方向。等价重建不改基准——下游 interface 面坐标（x=-2 / z=4 / z=22.32）全部锚定此系。
 
 构造策略（block-and-feature）: 三块形体均为"完全含于基本形体"或"坐标已知的转录轮廓"——竖壁/横板是盒（FTC geometry tier 基元条款），三角筋是 legacy 坐标转录的 closed profile extrude（FTC 转录条款，`profile=geometry` 诚实标注），孔工具是圆柱基元（纯工具体条款）。理由：等价重建的忠实性优先，参数直接映射 legacy 命名常量（`scad.var` + unit）；不强行 sketch 化（约束未知 = 转录，这正是 FTC 允许 geometry tier 的场景）。特征顺序按 feature-ordering：build 基体 → add 筋 → subtract 孔 → annotate 标签。

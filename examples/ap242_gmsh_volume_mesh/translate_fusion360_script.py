@@ -2,21 +2,18 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import simplecadapi as scad
 
+from bracket_package import OUT_DIR, capture_bracket
 
-OUT_DIR = Path(__file__).resolve().parent / "out"
-PACKAGE_PATH = OUT_DIR / "ap242_gmsh_bracket.scadpkg"
+
 SCRIPT_PATH = OUT_DIR / "ap242_gmsh_bracket.fusion360.py"
 
 
 def main() -> None:
-    if not PACKAGE_PATH.is_file():
-        raise FileNotFoundError(f"Run model.py first: {PACKAGE_PATH}")
+    package_path = capture_bracket()
     script = scad.translator.fusion360_translator.translate_product_package_to_fusion360_script(
-        data=PACKAGE_PATH,
+        data=package_path,
         document_name="AP242GmshBracket",
     )
     SCRIPT_PATH.write_text(script, encoding="utf-8")
