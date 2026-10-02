@@ -17,7 +17,7 @@ from typing import Any, Mapping, Sequence
 from jsonschema import Draft202012Validator
 
 from ..scene.archive import canonical_zip_bytes, preflight_zip_bytes
-from ..recording.source_mapping import canonical_source_payload
+from ..recording.source_mapping import canonical_source_payload, finalize_source
 from .._internal.os_compat import with_binary_flag
 from ..topology import OperationGraph, semantic_delta_to_dict, topo_delta_to_dict
 from .canonical import (
@@ -664,10 +664,15 @@ def capture_feature_graph(
     source_blobs: dict[str, bytes] = {}
     total = 0
     for node_index, node in enumerate(session.graph.topological_order()):
-        source = node.source
-        if not isinstance(source, Mapping):
+        if not isinstance(node.source, Mapping):
             continue
-        durable = canonical_source_payload(dict(source)) or {}
+        # A notebook cell records positions relative to itself; the stored
+        # definition needs them in the saved file, or not at all.
+        source = finalize_source(dict(node.source))
+        if source is None:
+            payload_nodes[node.node_id].pop("source", None)
+            continue
+        durable = canonical_source_payload(source) or {}
         local_path = source.get("local_path")
         if isinstance(local_path, str) and local_path:
             resolved = Path(local_path).expanduser().resolve()

@@ -23,10 +23,12 @@ from typing import Any, Iterable
 import numpy as np
 
 import simplecadapi as scad
+from simplecadapi.runtime import run_notebook
 
 
 EXAMPLE_DIR = Path(__file__).resolve().parent
 OUTPUT_DIR = EXAMPLE_DIR / "out" / "fem"
+NOTEBOOK_PATH = EXAMPLE_DIR / "arc_handle.py"
 PACKAGE_PATH = EXAMPLE_DIR / "out" / "arc_handle.scadpkg"
 STEP_PATH = OUTPUT_DIR / "arc_handle.step"
 MESH_PATH = OUTPUT_DIR / "arc_handle.msh"
@@ -124,9 +126,9 @@ def _mounting_surfaces(gmsh: Any) -> tuple[int, ...]:
 
 
 def export_step() -> Path:
-    if not PACKAGE_PATH.is_file():
-        raise FileNotFoundError(f"build the handle first: {PACKAGE_PATH}")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    # The notebook run is cell-cached, so loading the product here is cheap.
+    scad.capture(run_notebook(NOTEBOOK_PATH).definition, PACKAGE_PATH)
     report = scad.exporter.step.export_product_package_to_step(
         data=PACKAGE_PATH,
         output_path=STEP_PATH,

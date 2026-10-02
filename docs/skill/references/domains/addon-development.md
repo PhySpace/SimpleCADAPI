@@ -228,7 +228,7 @@ sca addon list                     # registry contents + on-disk drift + cached 
 
 ### Shell integration (`sca init`)
 
-`sca` is the single CLI for the whole SDK (`sca addon …`, `sca cache …`,
+`sca` is the single CLI for the whole SDK (`sca addon …`, `sca run …`,
 `sca export …`), and `sca init` makes it resolve in any new shell —
 interactive or scripted, on any of the supported platforms:
 

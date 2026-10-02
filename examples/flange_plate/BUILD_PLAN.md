@@ -1,5 +1,11 @@
 # BUILD_PLAN: flange_plate
 
+> 迁移说明（2026-10）：下文是原建模会话的构建记录。代码已迁为 notebook
+> `flange_plate.py`：`build_solid()` 的各块成为 cell，`assert_params()` 成为 guard cell；
+> 阶段脚本收敛为 `verify/s2_verify.py`（终态几何，含 S1 的 bbox / 凸台顶 / 孔壁卡）与
+> `verify/s3_guard_evidence.py`（改参守卫证据，含 S1 C6 的 4 组 known-bad），产物在
+> `examples/flange_plate/out/`。
+
 Datum（来自功能基准）: 原点 = 法兰轴线 ∩ 盘底平面；+Z 向上（凸台方向）。
 受控基准面：盘底 z=0、盘顶 z=`flange_t`、凸台顶 z=`boss_top_z`；法兰轴线 = Z 轴。
 对称性：基体轴对称（Z），螺栓阵按 `bolt_count` 旋转对称，首孔相位 +X（0°）。

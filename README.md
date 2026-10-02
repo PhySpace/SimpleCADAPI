@@ -74,9 +74,11 @@ concentric parts peel into radius bands; camera circles on an inclined orbit
 </tr>
 </table>
 
-Reproduce it: `uv run python examples/integrated_bldc_joint_actuator/main.py`
-builds the package from scratch; `render_showcase.py` renders the views above;
-`export_all.py` emits STEP / editable FCStd / MJCF.
+Reproduce it: the model is the `integrated_bldc_joint_actuator.py` assembly
+notebook, composed with `scad.use` from part and sub-assembly notebooks.
+`uv run python examples/integrated_bldc_joint_actuator/export_all.py` emits
+the package plus STEP / editable FCStd / MJCF; `render_showcase.py` renders
+the views above.
 
 ### 3 · Reverse Engineering
 
@@ -145,13 +147,15 @@ a strict `sca-addon.toml` descriptor with platform and `[compat] sca` gates, and
 a consumer-facing `.scadpkg` format spec written so an agent given the document
 alone can produce a correct parser or exporter. See the
 [full English update notes](docs/updates/2.1.3b1.md) for the CLI contract, the
-two legal integration modes, and the tag channel; 2.1.2's script-anchored part
-cache is described in [docs/updates/2.1.2.md](docs/updates/2.1.2.md).
+two legal integration modes, and the tag channel. 2.1.2's script-anchored part
+cache ([docs/updates/2.1.2.md](docs/updates/2.1.2.md)) has since been replaced
+by the notebook runtime and its cell cache.
 
-All formal single-script examples emit a synchronized `.scadpkg`, AP242
-`.step`, and editable `.FCStd` from the same product package. The
-split AP242/Gmsh example under `examples/ap242_gmsh_volume_mesh/` exposes
-each build and export stage as a separate directly runnable script.
+Every example model is a notebook; its export scripts load the product with
+`run_notebook`, capture one `.scadpkg`, and translate AP242 `.step` and
+editable `.FCStd` from that same package. The AP242/Gmsh example under
+`examples/ap242_gmsh_volume_mesh/` exposes each export and FEM stage as a
+separate directly runnable script.
 
 ---
 
@@ -193,8 +197,8 @@ Current release: `simplecadapi==2.1.3`.
   diagnostics, highlighted region renders, and measured acceptance gates.
 - Replayable open and periodic interpolated B-spline Edges/Wires for freeform
   profiles and Loft sections.
-- Durable `@part`/`@assemble` definitions, incremental assembly solving, and a
-  persistent content-addressed cache with corruption quarantine and JSON diagnostics.
+- Models as marimo notebooks: one feature per cell, a per-cell cache for
+  incremental headless runs (`sca run`), and notebook composition (`scad.use`).
 
 ## Install
 
@@ -325,38 +329,69 @@ The package embeds the definition closure, evaluated scene, feature graphs,
 source snapshots, topology, and render/selection assets. STEP, STL, FCStd, and
 low-level JSON remain explicit exports.
 
-## Persistent Product Builds And Cache
+## Notebook Runtime
 
-Use `@scad.part` for one physical single-solid part and `@scad.assemble` for an
-assembly with explicit external definitions. Both use the unified `CachePolicy`;
-same-key part calls reuse the runtime PRT in process, while durable part bundles
-persist unchanged PRTs across later runs.
+A model is a [marimo](https://marimo.io) notebook: a plain `.py` file in the
+repository, which stays the only source of truth. A `[tool.simplecadapi]`
+table in its PEP 723 header names the product; each cell holds one feature
+block and records its geometry automatically.
 
 ```python
-@scad.part(id="mounting_plate", cache="auto")
-def build_plate(width: float = 30.0) -> scad.Part:
-    body = scad.make_box_rsolid(width=width, height=20.0, depth=3.0)
-    return scad.make_part_rpart(part_id="mounting_plate", body=body)
+# /// script
+# dependencies = ["simplecadapi"]
+#
+# [tool.simplecadapi]
+# id = "mounting_plate"
+# revision = "1.0.0"
+# ///
+import marimo
 
-cold = build_plate()
-warm = build_plate()
-print(cold.cache_report.hit, warm.cache_report.hit)
+app = marimo.App()
+
+with app.setup:
+    import simplecadapi as scad
+
+
+@app.cell
+def _():
+    width = 30.0
+    return (width,)
+
+
+@app.cell
+def _(width):
+    # ---- feature: plate (build) ----
+    plate = scad.make_box_rsolid(width=width, height=20.0, depth=3.0)
+    return (plate,)
+
+
+@app.cell
+def _(plate):
+    mounting_plate = scad.make_part_rpart(part_id="mounting_plate", body=plate)
+    return (mounting_plate,)
 ```
 
-Inspect or maintain the cache with stable JSON output:
+The same runtime runs the notebook in the marimo editor and headlessly, with
+only `simplecadapi` installed. Headless runs cache every cell, so a rerun only
+executes the cells whose code, inputs, local modules, or child notebooks
+changed:
 
 ```bash
-sca cache status
-sca cache verify
-sca cache prune
+sca run mounting_plate.py                                  # JSON report
+sca run mounting_plate.py --set width=40 --out out/mounting_plate.scadpkg
 ```
 
-See the [persistent cache and product build workflow](docs/skill/references/docs/guides/cache-build-workflow.md)
-for cache modes, configuration precedence, PRT reuse, incremental invalidation,
-corruption repair, and destructive-command confirmation.
+An assembly notebook brings in other notebooks with
+`scad.use("mounting_plate.py", width=40.0)`. `@scad.part` / `@scad.assemble`
+remain for reusable library builders called from cells. See the
+[notebook runtime and product build workflow](docs/skill/references/docs/guides/notebook-runtime.md)
+for the cell cache, composition, and package export.
 
 ```python
-scad.capture(warm, "out/mounting_plate.scadpkg")
+from simplecadapi.runtime import run_notebook
+
+run = run_notebook("mounting_plate.py")
+scad.capture(run.definition, "out/mounting_plate.scadpkg")
 scad.translator.freecad_translator.translate_product_package_to_fcstd(
     "out/mounting_plate.scadpkg", "out/mounting_plate.FCStd"
 )
@@ -533,20 +568,24 @@ The exporter namespace owns neutral STEP and STL file output.
 
 ## Examples
 
-Every example is a self-contained folder: sources, verification scripts, and
-fresh artifacts under `examples/<name>/out/`. The set covers part modeling,
+Every example is a self-contained folder: part and assembly notebooks, the
+plain modules they import, export and verification scripts, and fresh
+artifacts under `examples/<name>/out/`. The set covers part modeling,
 assemblies, reverse engineering, and FEM — see the category index in
 [`examples/README.md`](examples/README.md).
 
 ```bash
-# part (quickstart FTC example, external verification script included)
-uv run python examples/flange_plate/model.py
+# part (quickstart FTC notebook, external verification script included)
+marimo edit examples/flange_plate/flange_plate.py
+uv run python examples/flange_plate/verify.py
 
-# assembly (two-stage planetary reducer, MJCF export)
-uv run python examples/compact_two_stage_planetary_reducer/main.py
+# assembly (two-stage planetary reducer: part-family notebooks, MJCF export)
+sca run examples/compact_two_stage_planetary_reducer/compact_two_stage_planetary_reducer.py
+uv run python examples/compact_two_stage_planetary_reducer/export_mjcf.py
 
 # FEM (AP242 STEP -> Gmsh volume mesh -> Calculix statics)
-uv run python examples/ap242_gmsh_volume_mesh/model.py
+uv run python examples/ap242_gmsh_volume_mesh/export_step.py
+uv run --extra gmsh python examples/ap242_gmsh_volume_mesh/export_fem_mesh.py
 uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py
 ```
 
@@ -563,8 +602,8 @@ Editor at `/` against a target STEP (see `examples/bowl_connector/`).
   [`docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md`](docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md)
 - Reverse-engineering studio workflow:
   [`docs/skill/references/workflows/reverse-engineering-studio.md`](docs/skill/references/workflows/reverse-engineering-studio.md)
-- Persistent cache and product build workflow:
-  [`docs/skill/references/docs/guides/cache-build-workflow.md`](docs/skill/references/docs/guides/cache-build-workflow.md)
+- Notebook runtime and product build workflow:
+  [`docs/skill/references/docs/guides/notebook-runtime.md`](docs/skill/references/docs/guides/notebook-runtime.md)
 - Public API reference: [`docs/skill/references/docs/api/`](docs/skill/references/docs/api/)
 - Core type and modeling notes: [`docs/skill/references/docs/core/`](docs/skill/references/docs/core/)
 - Serialization and replay details:

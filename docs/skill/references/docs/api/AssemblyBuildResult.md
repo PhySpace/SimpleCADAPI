@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class AssemblyBuildResult(value: Assembly, definition: AssemblyDefinition, feature_graph: FeatureGraphArtifact, solve_report: AssemblySolveReport)
+class AssemblyBuildResult(value: Assembly, definition: AssemblyDefinition, feature_graph: FeatureGraphArtifact)
 ```
 
 *Source: build/results.py*
@@ -14,4 +14,4 @@ class AssemblyBuildResult(value: Assembly, definition: AssemblyDefinition, featu
 
 ## Description
 
-Runtime Assembly plus its durable definition, feature DAG, and solve evidence.
+Runtime Assembly plus its durable definition and feature DAG.

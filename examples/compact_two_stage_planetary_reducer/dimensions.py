@@ -1,7 +1,12 @@
-"""Design constants for the compact two-stage planetary reducer."""
+"""Design constants for the compact two-stage planetary reducer.
+
+A plain module: every part notebook imports its numbers from here, so a
+change to one constant re-runs exactly the notebooks that read it.
+"""
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 
@@ -108,27 +113,33 @@ INPUT_SHAFT_RADIUS = 1.45
 STAGE1_CARRIER_SHAFT_RADIUS = 1.35
 OUTPUT_SHAFT_RADIUS = 1.50
 
-STAGE1_CARRIER_PLATE_BOTTOM_Z = -3.25
-STAGE1_CARRIER_PLATE_THICKNESS = 1.65
-STAGE1_PIN_BOTTOM_Z = -8.15
-STAGE1_PIN_RADIUS = 1.10
-STAGE1_PIN_LAND_RADIUS = 1.18
-STAGE1_HUB_RADIUS = 3.40
-STAGE1_ARM_WIDTH = 2.50
-STAGE1_PAD_RADIUS = 4.10
-
-STAGE2_CARRIER_PLATE_BOTTOM_Z = 6.45
-STAGE2_CARRIER_PLATE_THICKNESS = 1.65
-STAGE2_PIN_BOTTOM_Z = 1.45
-STAGE2_PIN_RADIUS = 0.82
-STAGE2_PIN_LAND_RADIUS = 0.93
-STAGE2_HUB_RADIUS = 3.35
-STAGE2_ARM_WIDTH = 2.35
-STAGE2_PAD_RADIUS = 3.20
-
 INPUT_BEARING_Z = -11.0
 INTERMEDIATE_BEARING_Z = 0.0
 OUTPUT_BEARING_Z = 10.8
+
+
+@dataclass(frozen=True)
+class BearingSpec:
+    """A small radial ball bearing package."""
+
+    bore_diameter: float
+    outer_diameter: float
+    width: float
+    ball_diameter: float
+    ball_count: int
+    raceway_clearance: float = 0.03
+    edge_chamfer: float = 0.0
+
+
+# A single reusable 3.2 x 6.6 x 2.0 mm bearing sits at all nine friction
+# locations: the three coaxial shaft seats and the six planet bores.
+UNIVERSAL_RADIAL_BEARING = BearingSpec(
+    bore_diameter=3.2,
+    outer_diameter=6.6,
+    width=2.0,
+    ball_diameter=0.55,
+    ball_count=8,
+)
 
 
 @dataclass(frozen=True)
@@ -141,6 +152,8 @@ class StageSpec:
     planet_teeth: int
     bottom_z: float
     sun_helix_angle: float
+    sun_bore_radius: float
+    planet_bearing: BearingSpec
 
     @property
     def ring_teeth(self) -> int:
@@ -191,18 +204,42 @@ class StageSpec:
         tooth_root_allowance = MODULE * (ADDENDUM_FACTOR + CLEARANCE_FACTOR)
         return self.ring_pitch_radius + tooth_root_allowance + RING_RIM_THICKNESS
 
+    def planet_angle(self, planet_index: int) -> float:
+        """Carrier angle of one planet, in degrees."""
+        return 360.0 * planet_index / PLANET_COUNT
+
+    def planet_center(self, planet_index: int) -> tuple[float, float]:
+        """XY center of one planet (and of its carrier pin)."""
+        angle = math.radians(self.planet_angle(planet_index))
+        return (
+            self.planet_center_radius * math.cos(angle),
+            self.planet_center_radius * math.sin(angle),
+        )
+
 
 @dataclass(frozen=True)
-class BearingSpec:
-    """A small radial ball bearing package."""
+class CarrierSpec:
+    """The plate, pins and coaxial drive shaft of one stage carrier.
 
-    bore_diameter: float
-    outer_diameter: float
-    width: float
-    ball_diameter: float
-    ball_count: int
-    raceway_clearance: float = 0.03
-    edge_chamfer: float = 0.0
+    The plate sits above the stage's gear plane; the pins hang down into the
+    planets, and the central shaft runs up to the next element of the power
+    path (the stage 2 sun for stage 1, the output flange for stage 2).
+    """
+
+    plate_bottom_z: float
+    plate_thickness: float
+    pin_bottom_z: float
+    pin_radius: float
+    pin_land_radius: float
+    hub_radius: float
+    arm_width: float
+    pad_radius: float
+    shaft_radius: float
+    shaft_top_z: float
+    drive_connector_id: str
+    shaft_bearing_connector_id: str
+    shaft_bearing_z: float
+    shaft_bearing_name: str
 
 
 STAGE_1 = StageSpec(
@@ -212,6 +249,8 @@ STAGE_1 = StageSpec(
     planet_teeth=18,
     bottom_z=-8.40,
     sun_helix_angle=HELIX_ANGLE,
+    sun_bore_radius=1.56,
+    planet_bearing=UNIVERSAL_RADIAL_BEARING,
 )
 STAGE_2 = StageSpec(
     stage_id="stage2",
@@ -220,19 +259,45 @@ STAGE_2 = StageSpec(
     planet_teeth=12,
     bottom_z=1.20,
     sun_helix_angle=HELIX_ANGLE,
+    sun_bore_radius=1.43,
+    planet_bearing=UNIVERSAL_RADIAL_BEARING,
 )
+# The part families (ring/sun/planet gear, carrier) take a stage key.
+STAGES = {stage.stage_id: stage for stage in (STAGE_1, STAGE_2)}
 
-UNIVERSAL_RADIAL_BEARING = BearingSpec(
-    bore_diameter=3.2,
-    outer_diameter=6.6,
-    width=2.0,
-    ball_diameter=0.55,
-    ball_count=8,
-)
-INPUT_SHAFT_BEARING = UNIVERSAL_RADIAL_BEARING
-INTERMEDIATE_SHAFT_BEARING = UNIVERSAL_RADIAL_BEARING
-OUTPUT_SHAFT_BEARING = UNIVERSAL_RADIAL_BEARING
-STAGE1_PLANET_BEARING = UNIVERSAL_RADIAL_BEARING
-STAGE2_PLANET_BEARING = UNIVERSAL_RADIAL_BEARING
+CARRIERS = {
+    "stage1": CarrierSpec(
+        plate_bottom_z=-3.25,
+        plate_thickness=1.65,
+        pin_bottom_z=-8.15,
+        pin_radius=1.10,
+        pin_land_radius=1.18,
+        hub_radius=3.40,
+        arm_width=2.50,
+        pad_radius=4.10,
+        shaft_radius=STAGE1_CARRIER_SHAFT_RADIUS,
+        shaft_top_z=STAGE_2.top_z,
+        drive_connector_id="stage2_sun_axis",
+        shaft_bearing_connector_id="intermediate_bearing_axis",
+        shaft_bearing_z=INTERMEDIATE_BEARING_Z,
+        shaft_bearing_name="Intermediate bearing shaft seat axis",
+    ),
+    "stage2": CarrierSpec(
+        plate_bottom_z=6.45,
+        plate_thickness=1.65,
+        pin_bottom_z=1.45,
+        pin_radius=0.82,
+        pin_land_radius=0.93,
+        hub_radius=3.35,
+        arm_width=2.35,
+        pad_radius=3.20,
+        shaft_radius=OUTPUT_SHAFT_RADIUS,
+        shaft_top_z=OUTPUT_FLANGE_TOP_Z,
+        drive_connector_id="output_axis",
+        shaft_bearing_connector_id="output_bearing_axis",
+        shaft_bearing_z=OUTPUT_BEARING_Z,
+        shaft_bearing_name="Output bearing shaft seat axis",
+    ),
+}
 
 TOTAL_REDUCTION = STAGE_1.fixed_ring_ratio * STAGE_2.fixed_ring_ratio

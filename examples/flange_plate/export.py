@@ -1,4 +1,4 @@
-"""Role 5 export: durable package + STEP + STL from the validated 8-hole model.
+"""Role 5 export: durable package + STEP + STL from the flange_plate notebook.
 
     uv run python examples/flange_plate/export.py                     # capture + STEP
     uv run --extra gmsh python examples/flange_plate/export.py        # same + STL (gmsh backend)
@@ -7,21 +7,20 @@
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+import simplecadapi as scad
+from simplecadapi.runtime import run_notebook
 
-import simplecadapi as scad  # noqa: E402
-import flange_plate as fp  # noqa: E402
-
-OUT = Path(__file__).resolve().parent / "out"
+HERE = Path(__file__).resolve().parent
+OUT = HERE / "out"
 PKG = OUT / "flange_plate.scadpkg"
 
 
 def capture_and_export() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    result = fp.build_flange_plate()          # PartBuildResult (cached single-solid part)
-    cap = scad.capture(result, PKG)            # canonical durable export (positional contract)
+    run = run_notebook(HERE / "flange_plate.py")   # cell-cached: cheap on a re-run
+    cap = scad.capture(run.definition, PKG)        # the package is for exchange only
     print(f"capture: {PKG.name} exists={PKG.exists()} "
-          f"result_type={type(cap).__name__}")
+          f"result_type={type(cap).__name__} content_hash={run.definition.content_hash}")
 
     step_report = scad.exporter.step.export_product_package_to_step(
         data=PKG, output_path=OUT / "flange_plate.step")
@@ -46,10 +45,9 @@ def validate_reopen() -> None:
     package = scad.read_product_package(PKG)
     scad.validate_product_package(package)
     definition = scad.load_product_package(PKG)
-    print(f"reopen: validate OK, root_definition={package.root_definition} "
+    print(f"reopen: validate OK, root_definition={package.root_definition.definition_id} "
           f"root_kind={package.root_kind} definition_id={definition.definition_id} "
           f"definition_kind={definition.definition_kind} revision={definition.revision} "
-          f"solid_cache={'present' if definition.solid_cache_ref else 'absent'} "
           f"(single-solid part product)")
 
 

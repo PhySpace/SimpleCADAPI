@@ -26,7 +26,7 @@
 - Output shaft bearing: one radial ball bearing near the output flange.
 - Stage 1 planet bearings: three radial ball bearing placements centered inside the stage 1 planet gears.
 - Stage 2 planet bearings: three radial ball bearing placements centered inside the stage 2 planet gears.
-- A single reusable `3.2 x 6.6 x 2.0 mm` bearing standard assembly is instanced at all nine friction locations. This keeps the graph replay stable while still using the standard bearing library.
+- A single reusable `3.2 x 6.6 x 2.0 mm` bearing standard assembly is instanced at all nine friction locations. One definition is placed nine times.
 - Bearing assemblies are only placed for location and packaging. Their internal standard-library revolute detail remains visual; no extra reducer-level bearing rotation constraints are added.
 
 ## Assembly Plan
@@ -38,9 +38,28 @@
 - Fix the output flange to the stage 2 carrier/output shaft.
 - Add external gear constraints from each sun to its planets using `add_gear_constraint_rassembly`.
 - Add internal ring-to-planet mesh constraints using same-direction `add_belt_constraint_rassembly` with ring and planet pitch radii.
-- Build every physical single-solid component through `@scad.part`, preserve the reusable bearing as a nested `@scad.assemble`, and build the reducer root through `@scad.assemble` with explicit immutable definitions.
-- Export `compact_two_stage_planetary_reducer.scadpkg` as the primary product; derive optional model/session JSON and STEP artifacts from the same durable feature DAG and validate strict product replay.
-- Ground every build step with concise QL-backed prints: part face counts, volumes, tags, bearing component counts, gear radii, constraint residuals, replay counts, and exported file paths.
+- Strict solve: every constraint residual must close.
+
+## File Layout
+
+Every part is a marimo notebook with one feature block per cell; the product
+is an assembly notebook that composes them with `scad.use`. Shared numbers
+and helpers live in plain modules the notebooks import, so the cell cache
+tracks them.
+
+| File | Kind | Role |
+| --- | --- | --- |
+| `compact_two_stage_planetary_reducer.py` | assembly notebook | product: components, bearings, public datums, constraints, strict solve |
+| `housing.py` | part notebook | fixed outer housing (`reducer_housing`) |
+| `input_flange.py`, `output_flange.py` | part notebooks | rotating end flanges |
+| `input_shaft.py` | part notebook | input shaft carrying the stage 1 sun |
+| `ring_gear.py`, `sun_gear.py`, `planet_gear.py`, `carrier.py` | part families | one notebook per gear/carrier, used once per stage: `scad.use("planet_gear.py", id="stage2_planet_gear", STAGE="stage2")` |
+| `dimensions.py` | plain module | envelope, `StageSpec` / `CarrierSpec` per stage, bearing spec |
+| `common.py`, `materials.py` | plain modules | connector, bore and placement helpers; materials |
+| `export.py`, `export_mjcf.py` | scripts | product package, AP242 STEP, FCStd; MuJoCo MJCF |
+
+The bearing is `scad.std.bearing.build_ball_bearing(...)`, called once in the
+assembly notebook and instanced at all nine seats.
 
 ## Validation Assumptions
 

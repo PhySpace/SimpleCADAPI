@@ -353,6 +353,87 @@ class TestSurfaceApi(unittest.TestCase):
         self.assertEqual(len(replayed[1]._iter_edges()), 4)
         self.assertIn("patch.face", scad.list_tags(replayed[1]))
 
+    def test_shared_boundary_gordon_patches_sew_into_closed_solid(self):
+        side = 40.0
+        amplitude = 10.0
+        samples = 9
+
+        def wave(u, v):
+            envelope = math.sin(math.pi * u) ** 2 * math.sin(math.pi * v) ** 2
+            return amplitude * envelope * math.sin(4 * math.pi * u) * math.sin(6 * math.pi * v)
+
+        def corner(label):
+            return tuple((1 if c == "+" else -1) * side for c in label)
+
+        def point_on(face, u, v):
+            a = (u - 0.5) * 2 * side
+            b = (v - 0.5) * 2 * side
+            offset = wave(u, v)
+            return {
+                "+z": (a, b, side + offset),
+                "-z": (a, b, -side - offset),
+                "+x": (side + offset, a, b),
+                "-x": (-side - offset, a, b),
+                "+y": (a, side + offset, b),
+                "-y": (a, -side - offset, b),
+            }[face]
+
+        loops = {
+            "+z": ("--+", "+-+", "+++", "-++"),
+            "-z": ("---", "+--", "++-", "-+-"),
+            "+x": ("+--", "++-", "+++", "+-+"),
+            "-x": ("---", "-+-", "-++", "--+"),
+            "+y": ("-+-", "++-", "+++", "-++"),
+            "-y": ("---", "+--", "+-+", "--+"),
+        }
+
+        shared = {}
+        for face_corners in loops.values():
+            for first, second in zip(face_corners, face_corners[1:] + face_corners[:1]):
+                key = tuple(sorted((first, second)))
+                if key not in shared:
+                    shared[key] = scad.make_line_redge(corner(key[0]), corner(key[1]))
+        self.assertEqual(len(shared), 12)
+
+        faces = []
+        for face, corners in loops.items():
+            profiles = []
+            for row in range(samples):
+                v = row / (samples - 1)
+                if row == 0:
+                    edge = shared[tuple(sorted((corners[0], corners[1])))]
+                elif row == samples - 1:
+                    edge = shared[tuple(sorted((corners[3], corners[2])))]
+                else:
+                    edge = scad.make_interpolated_spline_redge(
+                        points=[point_on(face, column / (samples - 1), v) for column in range(samples)],
+                        tolerance=1e-5,
+                    )
+                profiles.append(edge)
+            guides = []
+            for column in range(samples):
+                u = column / (samples - 1)
+                if column == 0:
+                    edge = shared[tuple(sorted((corners[0], corners[3])))]
+                elif column == samples - 1:
+                    edge = shared[tuple(sorted((corners[1], corners[2])))]
+                else:
+                    edge = scad.make_interpolated_spline_redge(
+                        points=[point_on(face, u, row / (samples - 1)) for row in range(samples)],
+                        tolerance=1e-5,
+                    )
+                guides.append(edge)
+            faces.append(scad.make_gordon_surface_rface(profiles, guides, tolerance=1e-4))
+
+        shell = scad.sew_faces_rshell(faces=faces, tolerance=1e-5)
+        self.assertTrue(shell.is_closed())
+        self.assertEqual(len(list(shell._iter_faces())), 6)
+
+        solid = scad.make_solid_from_shell_rsolid(shell)
+        self.assertIsInstance(solid, scad.Solid)
+        self.assertAlmostEqual(solid.get_volume(), 512019.199, delta=2.0)
+        self.assertTrue(all(face.get_area() > 4 * side * side for face in solid._iter_faces()))
+
     def test_trim_surface_with_hole_and_replay(self):
         with scad.GraphSession() as session:
             carrier = scad.make_bezier_surface_rface(

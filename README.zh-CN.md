@@ -67,9 +67,10 @@ HTML，忠实回放完整录制的对话（用户输入、Agent 思考、每一�
 </tr>
 </table>
 
-复现方式：`uv run python examples/integrated_bldc_joint_actuator/main.py`
-从零构建装配包；`render_showcase.py` 渲染上述视图；`export_all.py` 导出
-STEP / 可编辑 FCStd / MJCF。
+复现方式：模型是装配 notebook `integrated_bldc_joint_actuator.py`，用
+`scad.use` 组合各零件与子装配 notebook。
+`uv run python examples/integrated_bldc_joint_actuator/export_all.py` 导出装配包和
+STEP / 可编辑 FCStd / MJCF；`render_showcase.py` 渲染上述视图。
 
 ### 3 · 逆向工程
 
@@ -128,9 +129,9 @@ SimpleCADAPI 2.1.3b1 带来插件生态：`sca` 命令行安装第三方 skill+�
 （`sca addon init/add/update/remove/list`）、带平台与 `[compat] sca` 硬门的
 严格 `sca-addon.toml` 描述文件，以及面向消费者的 `.scadpkg` 格式规范——把
 文档交给 agent 即可写出正确的解析器/导出器。CLI 契约、两种合法集成模式与
-tag 通道见[完整中文更新说明](docs/updates/2.1.3b1.zh-CN.md)；2.1.2 的脚本
-锚定 part cache 见
-[docs/updates/2.1.2.zh-CN.md](docs/updates/2.1.2.zh-CN.md)。
+tag 通道见[完整中文更新说明](docs/updates/2.1.3b1.zh-CN.md)。2.1.2 的脚本
+锚定 part cache（[docs/updates/2.1.2.zh-CN.md](docs/updates/2.1.2.zh-CN.md)）
+已由 notebook 运行时及其 cell 缓存取代。
 
 ---
 
@@ -161,8 +162,8 @@ SimpleCADAPI 是一个基于 OCP 的 Python CAD SDK，提供清晰的函数式�
 - 面向 Agent 的 STEP/BREP 逆向能力，提供稳定实体 ID、局部诊断、区域高亮截图和
   可测量的验收门槛。
 - 可回放的开放/周期插值 B 样条 Edge 和 Wire，可用于自由轮廓与 Loft 截面。
-- 持久 `@part`/`@assemble` 定义、增量装配求解，以及具备损坏隔离和 JSON 诊断的
-  content-addressed cache。
+- 模型即 marimo notebook：一个 cell 一个特征，按 cell 缓存实现增量无头运行
+  （`sca run`），并可用 `scad.use` 组合 notebook。
 
 ## 安装
 
@@ -267,32 +268,60 @@ print("replayed_outputs", len(rebuilt))
 `.scadpkg` 包含完整定义闭包、求值场景、特征图、源码快照、拓扑以及渲染/选择资源。
 STEP、STL、FCStd 和底层 JSON 仍由显式导出 API 生成。
 
-## 持久产品构建与缓存
+## Notebook 运行时
 
-一个物理单实体零件使用 `@scad.part`；具有显式外部定义的装配使用
-`@scad.assemble`。同 build key 的 PRT 在进程内直接复用，持久 part bundle 则跨运行复用未变 PRT。
+模型是一个 [marimo](https://marimo.io) notebook：仓库里的一个普通 `.py`
+文件，它始终是唯一的真相来源。PEP 723 头部的 `[tool.simplecadapi]` 表声明
+产品 id；每个 cell 放一个特征块，几何会被自动记录。
 
 ```python
-@scad.part(id="mounting_plate", cache="auto")
-def build_plate(width: float = 30.0) -> scad.Part:
-    body = scad.make_box_rsolid(width=width, height=20.0, depth=3.0)
-    return scad.make_part_rpart(part_id="mounting_plate", body=body)
+# /// script
+# dependencies = ["simplecadapi"]
+#
+# [tool.simplecadapi]
+# id = "mounting_plate"
+# revision = "1.0.0"
+# ///
+import marimo
 
-cold = build_plate()
-warm = build_plate()
-print(cold.cache_report.hit, warm.cache_report.hit)
+app = marimo.App()
+
+with app.setup:
+    import simplecadapi as scad
+
+
+@app.cell
+def _():
+    width = 30.0
+    return (width,)
+
+
+@app.cell
+def _(width):
+    # ---- feature: plate (build) ----
+    plate = scad.make_box_rsolid(width=width, height=20.0, depth=3.0)
+    return (plate,)
+
+
+@app.cell
+def _(plate):
+    mounting_plate = scad.make_part_rpart(part_id="mounting_plate", body=plate)
+    return (mounting_plate,)
 ```
 
-缓存检查和维护命令输出稳定 JSON：
+同一个运行时既在 marimo 编辑器里运行 notebook，也能无头运行，只需安装
+`simplecadapi`。无头运行会缓存每个 cell，重跑时只执行代码、输入文件、本地
+模块或子 notebook 发生变化的 cell：
 
 ```bash
-sca cache status
-sca cache verify
-sca cache prune
+sca run mounting_plate.py                                  # 输出 JSON 报告
+sca run mounting_plate.py --set width=40 --out out/mounting_plate.scadpkg
 ```
 
-cache mode、配置优先级、PRT 复用、增量失效、损坏修复和破坏性命令确认见
-[持久缓存与产品构建工作流](docs/skill/references/docs/guides/cache-build-workflow.md)。
+装配 notebook 用 `scad.use("mounting_plate.py", width=40.0)` 引入其他
+notebook。`@scad.part` / `@scad.assemble` 保留为可在 cell 中调用的可复用库
+构建函数。cell 缓存、组合与产品包导出见
+[Notebook 运行时与产品构建工作流](docs/skill/references/docs/guides/notebook-runtime.md)。
 
 ## STEP/BREP Agent 逆向
 
@@ -394,8 +423,8 @@ uv run --extra fem python examples/ap242_gmsh_volume_mesh/study_mesh_convergence
   [`docs/guides/reconstruction-agent-test-prompt.md`](docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md)
 - STEP BREP 逆向工程指南：
   [`docs/guides/step-brep-reverse-engineering.md`](docs/skill/references/workflows/reverse-engineering-studio.md)
-- 持久缓存与产品构建工作流：
-  [`docs/guides/cache-build-workflow.md`](docs/skill/references/docs/guides/cache-build-workflow.md)
+- Notebook 运行时与产品构建工作流：
+  [`docs/guides/notebook-runtime.md`](docs/skill/references/docs/guides/notebook-runtime.md)
 - 公共 API 参考：[`docs/api/`](docs/skill/references/docs/api/)
 - 核心类型与建模说明：[`docs/core/`](docs/skill/references/docs/core/)
 - 序列化与重放：[`docs/core/serialization/README.md`](docs/skill/references/docs/core/serialization/README.md)

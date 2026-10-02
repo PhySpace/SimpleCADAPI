@@ -1,8 +1,9 @@
 # Task Domain: Assembly and Product
 
 Compose multi-part products with explicit placement, connectors, and
-declarative constraints; build durable definitions with `@part`/`@assemble`,
-incremental solving, the persistent cache, and `.scadpkg` delivery.
+declarative constraints; compose notebooks with `scad.use`, build durable
+definitions (notebook products, `@part`/`@assemble` library parts), and
+deliver `.scadpkg` packages.
 
 ## Use when
 
@@ -12,8 +13,8 @@ incremental solving, the persistent cache, and `.scadpkg` delivery.
   than raw transforms.
 - The product needs motion semantics: hinges, sliders, gear meshes, rack and
   pinion, belt drives, or loop-closing joints.
-- The build needs durable definitions, whole-part caching, incremental
-  invalidation, or a canonical delivery package.
+- The build needs durable definitions, notebook composition, or a canonical
+  delivery package.
 
 ## Do not use
 
@@ -48,17 +49,20 @@ incremental solving, the persistent cache, and `.scadpkg` delivery.
 
 ## Product boundaries
 
-- `@scad.part` for one physical single-solid product; `@scad.assemble` for an
-  assembly with explicit external definitions. Both own definition-local
-  `GraphSession`s and cannot be nested inside another active session.
-- Repeated calls with the same build key reuse the runtime PRT in process;
-  durable part bundles restore unchanged PRTs across runs.
-- The incremental solver invalidates only components reached through changed
-  geometry, connector, binding, material, or nested public-connector
-  interfaces; cached placements still pass residual verification.
-- Inspect evidence with `solve_report.component_hits`, `component_misses`,
-  dirty instances, and `measure_constraint_residual_rconstraintresidual`;
-  `inspect_assembly_constraints_rconstraintreport` reports constraint status.
+- Every product is a notebook (`docs/guides/notebook-runtime.md`): a part
+  notebook's product is a `Part`, an assembly notebook's product an
+  `Assembly`, each with the notebook's id. An assembly notebook takes its
+  parts and subassemblies from child notebooks with
+  `scad.use("child.py", **overrides)`; each child product carries its own
+  definition and is referenced, not copied.
+- `@scad.part` (one physical single-solid part) and `@scad.assemble` (an
+  assembly with explicit external definitions) build reusable library parts
+  in plain modules. Each call builds in a session of its own, so it may be
+  made inside a notebook cell or another builder.
+- The notebook runtime caches cells, not parts or solves: an assembly is
+  solved strictly whenever its cell runs. Inspect the solve with
+  `inspect_assembly_constraints_rconstraintreport` and
+  `measure_constraint_residual_rconstraintresidual`.
 
 ## Canonical delivery
 
@@ -74,13 +78,13 @@ incremental solving, the persistent cache, and `.scadpkg` delivery.
 ## API groups
 
 Read the exact page under `references/docs/api/` for every API used, plus
-`references/docs/guides/cache-build-workflow.md` completely before configuring
-persistent cache, writing a durable build, or running cache maintenance.
+`references/docs/guides/notebook-runtime.md` completely before writing or
+composing notebooks.
 
-- Product build: `part`, `assemble`, `file_input`, `resolve_cache_policy`,
-  `PartBuildResult`, `AssemblyBuildResult`, `AssemblySolveReport`, `CacheReport`.
-- Cache: `CachePolicy`, `CacheMode`, `ContentAddressedStore`,
-  `sca cache` CLI (status/verify/prune/clear).
+- Notebook runtime: `use`, `run_notebook`, `NotebookRun`, `CellReport`,
+  `NotebookConfig`, `sca run` CLI.
+- Product build: `part`, `assemble`, `file_input`, `PartBuildResult`,
+  `AssemblyBuildResult`.
 - Packages: `capture`, `CaptureResult`, `ProductPackage`,
   `build_product_package`, `read_product_package`, `load_product_package`,
   `validate_product_package`.
@@ -89,12 +93,10 @@ persistent cache, writing a durable build, or running cache maintenance.
 
 - Placement semantics: moving a component changes placement only; the part's
   internal solid is never transformed.
-- Solve report shows expected hits/misses; residuals within tolerance after
-  solving; grounded root is the intended fixed part.
+- Residuals within tolerance after solving; grounded root is the intended
+  fixed part.
 - Public connector frames resolve through nested placements; changing a public
-  declaration changes the interface hash and invalidates dependents.
-- Cache mutation (`verify --repair`, `prune --apply`, `clear`) requires explicit
-  confirmation; status/verify/default prune are read-only.
+  declaration changes the definition's content hash.
 
 ## Failure modes
 
@@ -104,5 +106,5 @@ persistent cache, writing a durable build, or running cache maintenance.
   movable by itself.
 - Duplicate component ids, cycles in subassembly references, or invalid
   placements are rejected; fix the structure, not the symptom.
-- Corrupt cache bundles are quarantined and rebuilt automatically; report the
-  quarantine rather than disabling the cache.
+- A stale or suspicious cell cache is never repaired by hand: rerun with
+  `sca run --no-cache` and report the difference.

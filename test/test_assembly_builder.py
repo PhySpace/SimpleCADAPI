@@ -28,12 +28,8 @@ GENERATOR = {
 }
 
 
-def _policy(root: Path) -> scad.CachePolicy:
-    return scad.CachePolicy(root=root)
-
-
-def _build_nested_gear_train(tmp_path: Path):
-    @scad.part(id="train_base", cache=_policy(tmp_path / "cache"))
+def _build_nested_gear_train():
+    @scad.part(id="train_base")
     def build_base() -> scad.Part:
         body = scad.make_box_rsolid(width=30.0, height=8.0, depth=2.0)
         part = scad.make_part_rpart(part_id="train_base", body=body)
@@ -48,7 +44,7 @@ def _build_nested_gear_train(tmp_path: Path):
         part = scad.add_connector_rpart(part=part, connector=left)
         return scad.add_connector_rpart(part=part, connector=right)
 
-    @scad.part(id="train_gear", cache=_policy(tmp_path / "cache"))
+    @scad.part(id="train_gear")
     def build_gear() -> scad.Part:
         body = scad.make_cylinder_rsolid(radius=4.0, height=3.0)
         part = scad.make_part_rpart(part_id="train_gear", body=body)
@@ -156,7 +152,7 @@ def _build_nested_gear_train(tmp_path: Path):
 def test_assemble_external_reference_round_trip_preserves_hierarchy_and_coupling(
     tmp_path: Path,
 ) -> None:
-    _base, gear, train, pair = _build_nested_gear_train(tmp_path)
+    _base, gear, train, pair = _build_nested_gear_train()
 
     assert len(train.definition.definition_refs) == 2
     assert [item.definition_id for item in train.definition.instances].count(
@@ -199,10 +195,8 @@ def test_assemble_external_reference_round_trip_preserves_hierarchy_and_coupling
     )
 
 
-def test_assemble_keeps_authored_placements_separate_from_solved_snapshot(
-    tmp_path: Path,
-) -> None:
-    _base, _gear, train, _pair = _build_nested_gear_train(tmp_path)
+def test_assemble_keeps_authored_placements_separate_from_solved_snapshot() -> None:
+    _base, _gear, train, _pair = _build_nested_gear_train()
 
     authored = {
         instance.instance_id: instance.placement
@@ -243,12 +237,8 @@ def test_assemble_keeps_authored_placements_separate_from_solved_snapshot(
     assert placement_ticks(rebuilt.get_component("gear_b").placement) == solved["gear_b"]
 
 
-def test_nested_occurrence_placements_survive_materialization_and_replay(
-    tmp_path: Path,
-) -> None:
-    policy = _policy(tmp_path / "cache")
-
-    @scad.part(id="durable_nested_ring", cache=policy)
+def test_nested_occurrence_placements_survive_materialization_and_replay() -> None:
+    @scad.part(id="durable_nested_ring")
     def build_ring() -> scad.Part:
         part = scad.make_part_rpart(
             part_id="durable_nested_ring",
@@ -267,7 +257,6 @@ def test_nested_occurrence_placements_survive_materialization_and_replay(
     @scad.assemble(
         id="durable_nested_bearing",
         definitions=(ring,),
-        cache=policy,
     )
     def build_bearing() -> scad.Assembly:
         assembly = scad.make_assembly_rassembly(assembly_id="durable_nested_bearing")
@@ -319,7 +308,6 @@ def test_nested_occurrence_placements_survive_materialization_and_replay(
     @scad.assemble(
         id="durable_nested_fixture",
         definitions=(bearing, ring),
-        cache=policy,
     )
     def build_fixture() -> scad.Assembly:
         assembly = scad.make_assembly_rassembly(assembly_id="durable_nested_fixture")
@@ -375,11 +363,9 @@ def test_nested_occurrence_placements_survive_materialization_and_replay(
         )
 
     fixture = build_fixture()
-    warm = build_fixture()
-    assert (warm.solve_report.component_hits, warm.solve_report.component_misses) == (
-        1,
-        0,
-    )
+    rebuilt_fixture = build_fixture()
+    assert rebuilt_fixture.value is not fixture.value
+    assert rebuilt_fixture.definition.content_hash == fixture.definition.content_hash
     occurrence_placements = {
         tuple(record["component_path"]): record["placement"]
         for record in fixture.definition.solved_snapshot["occurrence_placements"]
@@ -391,7 +377,7 @@ def test_nested_occurrence_placements_survive_materialization_and_replay(
 
     for restored in (
         fixture.value,
-        warm.value,
+        rebuilt_fixture.value,
         scad.materialize_definition(fixture.definition),
         fixture.replay(),
     ):
@@ -404,10 +390,8 @@ def test_nested_occurrence_placements_survive_materialization_and_replay(
         assert scad.inspect_assembly_constraints_rconstraintreport(restored).solved
 
 
-def test_assemble_rejects_undeclared_and_wrong_runtime_definition_identity(
-    tmp_path: Path,
-) -> None:
-    @scad.part(id="declared_part", cache=_policy(tmp_path / "cache"))
+def test_assemble_rejects_undeclared_and_wrong_runtime_definition_identity() -> None:
+    @scad.part(id="declared_part")
     def declared(width: float = 1.0) -> scad.Part:
         body = scad.make_box_rsolid(width=width, height=1.0, depth=1.0)
         return scad.make_part_rpart(part_id="declared_part", body=body)
@@ -441,10 +425,8 @@ def test_assemble_rejects_undeclared_and_wrong_runtime_definition_identity(
         build_undeclared()
 
 
-def test_assembly_graph_validation_rejects_hash_and_connector_mismatches(
-    tmp_path: Path,
-) -> None:
-    _base, _gear, train, _pair = _build_nested_gear_train(tmp_path)
+def test_assembly_graph_validation_rejects_hash_and_connector_mismatches() -> None:
+    _base, _gear, train, _pair = _build_nested_gear_train()
     definition = train.definition
 
     first_ref = definition.definition_refs[0]
@@ -551,12 +533,8 @@ def test_assembly_loader_reports_cycle_with_instance_path(tmp_path: Path) -> Non
     assert "child" in error.value.message
 
 
-def test_assemble_rejects_dependency_tolerance_profile_conflict(tmp_path: Path) -> None:
-    @scad.part(
-        id="profile_part",
-        cache=_policy(tmp_path / "cache"),
-        tolerance_profile="alternate-profile",
-    )
+def test_assemble_rejects_dependency_tolerance_profile_conflict() -> None:
+    @scad.part(id="profile_part", tolerance_profile="alternate-profile")
     def build_part() -> scad.Solid:
         return scad.make_box_rsolid(width=1.0, height=1.0, depth=1.0)
 
@@ -569,13 +547,11 @@ def test_assemble_rejects_dependency_tolerance_profile_conflict(tmp_path: Path) 
             return scad.make_assembly_rassembly("profile_conflict")
 
 
-def test_assemble_reuses_independent_constraint_components(tmp_path: Path) -> None:
-    policy = _policy(tmp_path / "cache")
-
-    @scad.part(id="incremental_base", cache=policy)
+def test_assemble_resolves_every_call_and_follows_child_connector_edits() -> None:
+    @scad.part(id="pair_base")
     def build_base() -> scad.Part:
         part = scad.make_part_rpart(
-            "incremental_base",
+            "pair_base",
             scad.make_box_rsolid(width=2.0, height=2.0, depth=2.0),
         )
         return scad.add_connector_rpart(
@@ -586,10 +562,10 @@ def test_assemble_reuses_independent_constraint_components(tmp_path: Path) -> No
             ),
         )
 
-    @scad.part(id="incremental_tool_a", cache=policy)
+    @scad.part(id="pair_tool_a")
     def build_tool_a(connector_x: float) -> scad.Part:
         part = scad.make_part_rpart(
-            "incremental_tool_a",
+            "pair_tool_a",
             scad.make_box_rsolid(width=1.0, height=1.0, depth=1.0),
         )
         return scad.add_connector_rpart(
@@ -600,10 +576,10 @@ def test_assemble_reuses_independent_constraint_components(tmp_path: Path) -> No
             ),
         )
 
-    @scad.part(id="incremental_tool_b", cache=policy)
+    @scad.part(id="pair_tool_b")
     def build_tool_b() -> scad.Part:
         part = scad.make_part_rpart(
-            "incremental_tool_b",
+            "pair_tool_b",
             scad.make_box_rsolid(width=1.0, height=1.0, depth=1.0),
         )
         return scad.add_connector_rpart(
@@ -619,12 +595,11 @@ def test_assemble_reuses_independent_constraint_components(tmp_path: Path) -> No
 
     def assembly_builder(tool_a: scad.PartBuildResult):
         @scad.assemble(
-            id="incremental_pair",
+            id="pair_assembly",
             definitions=(base, tool_a, tool_b),
-            cache=policy,
         )
         def build_pair() -> scad.Assembly:
-            assembly = scad.make_assembly_rassembly("incremental_pair")
+            assembly = scad.make_assembly_rassembly("pair_assembly")
             for component_id, item, origin in (
                 ("base_a", base.value, (0.0, 0.0, 0.0)),
                 ("tool_a", tool_a.value, (4.0, 0.0, 0.0)),
@@ -655,36 +630,28 @@ def test_assemble_reuses_independent_constraint_components(tmp_path: Path) -> No
         return build_pair
 
     initial_builder = assembly_builder(build_tool_a(0.0))
-    cold = initial_builder()
-    warm = initial_builder()
+    first = initial_builder()
+    again = initial_builder()
     changed = assembly_builder(build_tool_a(2.0))()
 
-    assert (cold.solve_report.component_hits, cold.solve_report.component_misses) == (
-        0,
-        2,
-    )
-    assert (warm.solve_report.component_hits, warm.solve_report.component_misses) == (
-        2,
-        0,
-    )
-    assert warm.solve_report.hit
-    assert (
-        changed.solve_report.component_hits,
-        changed.solve_report.component_misses,
-    ) == (1, 1)
-    assert changed.solve_report.dirty_connectors == ("tool_a.mate",)
-    assert changed.solve_report.dirty_relations == ("constraint_a",)
-    assert len(changed.solve_report.dirty_components) == 1
-    assert sum(item.cache_hit for item in changed.solve_report.component_results) == 1
+    def origin(result: scad.AssemblyBuildResult, component_id: str):
+        return tuple(result.value.get_component(component_id).placement.origin)
+
+    # Nothing is reused: every call solves again and yields the same definition.
+    assert again.value is not first.value
+    assert again.definition.content_hash == first.definition.content_hash
+
+    # Moving tool_a's connector moves tool_a and changes the definition;
+    # the independent tool_b pair solves to the same place.
+    assert changed.definition.content_hash != first.definition.content_hash
+    assert origin(first, "tool_a") == pytest.approx((0.0, 0.0, 0.0))
+    assert origin(changed, "tool_a") == pytest.approx((-2.0, 0.0, 0.0))
+    assert origin(changed, "tool_b") == pytest.approx(origin(first, "tool_b"))
     assert scad.inspect_assembly_constraints_rconstraintreport(changed.value).solved
 
 
-def test_nested_public_connector_change_invalidates_parent_component(
-    tmp_path: Path,
-) -> None:
-    policy = _policy(tmp_path / "cache")
-
-    @scad.part(id="nested_connector_part", cache=policy)
+def test_nested_public_connector_change_reaches_the_parent_definition() -> None:
+    @scad.part(id="nested_connector_part")
     def build_child(connector_x: float) -> scad.Part:
         part = scad.make_part_rpart(
             "nested_connector_part",
@@ -702,7 +669,6 @@ def test_nested_public_connector_change_invalidates_parent_component(
         @scad.assemble(
             id="nested_connector_stage",
             definitions=(child,),
-            cache=policy,
         )
         def stage() -> scad.Assembly:
             assembly = scad.make_assembly_rassembly("nested_connector_stage")
@@ -725,7 +691,6 @@ def test_nested_public_connector_change_invalidates_parent_component(
         @scad.assemble(
             id="nested_connector_parent",
             definitions=(stage,),
-            cache=policy,
         )
         def parent() -> scad.Assembly:
             assembly = scad.make_assembly_rassembly("nested_connector_parent")
@@ -753,35 +718,22 @@ def test_nested_public_connector_change_invalidates_parent_component(
 
     initial_stage = build_stage(build_child(0.0))
     initial_parent_builder = parent_builder(initial_stage)
-    cold = initial_parent_builder()
-    warm = initial_parent_builder()
+    first = initial_parent_builder()
+    again = initial_parent_builder()
     changed_stage = build_stage(build_child(3.0))
     changed = parent_builder(changed_stage)()
 
-    assert (cold.solve_report.component_hits, cold.solve_report.component_misses) == (
-        0,
-        1,
-    )
-    assert (warm.solve_report.component_hits, warm.solve_report.component_misses) == (
-        1,
-        0,
-    )
-    assert (
-        changed.solve_report.component_hits,
-        changed.solve_report.component_misses,
-    ) == (0, 1)
-    assert changed.solve_report.dirty_connectors == (
-        "grounded.output",
-        "moving.output",
-    )
-    assert changed.solve_report.dirty_relations == ("nested_fixed",)
+    assert again.definition.content_hash == first.definition.content_hash
+    # A connector edit two levels down changes the parent through its
+    # reference to the rebuilt stage definition.
+    assert changed.definition.content_hash != first.definition.content_hash
+    (stage_ref,) = changed.definition.definition_refs
+    assert stage_ref.content_hash == changed_stage.definition.content_hash
     assert scad.inspect_assembly_constraints_rconstraintreport(changed.value).solved
 
 
-def test_assemble_owns_replayable_deterministic_feature_graph(tmp_path: Path) -> None:
-    policy = _policy(tmp_path / "cache")
-
-    @scad.part(id="graph_child", cache=policy)
+def test_assemble_owns_replayable_deterministic_feature_graph() -> None:
+    @scad.part(id="graph_child")
     def build_child() -> scad.Part:
         return scad.make_part_rpart(
             part_id="graph_child",
@@ -790,7 +742,7 @@ def test_assemble_owns_replayable_deterministic_feature_graph(tmp_path: Path) ->
 
     child = build_child()
 
-    @scad.assemble(id="graph_parent", definitions=(child,), cache=policy)
+    @scad.assemble(id="graph_parent", definitions=(child,))
     def build_parent() -> scad.Assembly:
         assembly = scad.make_assembly_rassembly(assembly_id="graph_parent")
         return scad.add_component_rassembly(
@@ -800,17 +752,17 @@ def test_assemble_owns_replayable_deterministic_feature_graph(tmp_path: Path) ->
             placement=scad.identity_placement_rplacement(),
         )
 
-    cold = build_parent()
-    warm = build_parent()
-    nodes = list(cold.feature_graph.graph["nodes"])
+    first = build_parent()
+    again = build_parent()
+    nodes = list(first.feature_graph.graph["nodes"])
     reference_nodes = [item for item in nodes if item["op"] == "reference_definition"]
     terminal_nodes = [
         item for item in nodes if item["op"] == "evaluate_assembly_definition"
     ]
 
-    assert cold.feature_graph.owner_definition_kind == "assembly"
-    assert cold.feature_graph.owner_definition_id == "graph_parent"
-    assert cold.feature_graph.external_definitions == (
+    assert first.feature_graph.owner_definition_kind == "assembly"
+    assert first.feature_graph.owner_definition_id == "graph_parent"
+    assert first.feature_graph.external_definitions == (
         {
             "definition_kind": child.definition.definition_kind,
             "definition_id": child.definition.definition_id,
@@ -821,22 +773,20 @@ def test_assemble_owns_replayable_deterministic_feature_graph(tmp_path: Path) ->
     assert len(reference_nodes) == 1
     assert reference_nodes[0]["params"]["definition_id"] == "graph_child"
     assert len(terminal_nodes) == 1
-    assert cold.feature_graph.result_node_ids == (terminal_nodes[0]["node_id"],)
-    assert cold.feature_graph.canonical_bytes == warm.feature_graph.canonical_bytes
+    assert first.feature_graph.result_node_ids == (terminal_nodes[0]["node_id"],)
+    assert first.feature_graph.canonical_bytes == again.feature_graph.canonical_bytes
 
     archived = scad.load_feature_graph_artifact(
-        cold.definition.blobs[cold.definition.feature_graph_ref.path]
+        first.definition.blobs[first.definition.feature_graph_ref.path]
     )
-    assert archived.canonical_bytes == cold.feature_graph.canonical_bytes
-    replayed = cold.replay()
+    assert archived.canonical_bytes == first.feature_graph.canonical_bytes
+    replayed = first.replay()
     assert replayed.component_ids() == ("child",)
     assert replayed.get_component("child").item.part_id == "graph_child"
 
 
-def test_assembly_feature_replay_tolerates_only_solver_scale_residual_drift(
-    tmp_path: Path,
-) -> None:
-    _base, _gear, train, _pair = _build_nested_gear_train(tmp_path)
+def test_assembly_feature_replay_tolerates_only_solver_scale_residual_drift() -> None:
+    _base, _gear, train, _pair = _build_nested_gear_train()
     external_definitions = train.definition.resolved_definitions
 
     def with_translation_drift(drift: float):
@@ -858,3 +808,33 @@ def test_assembly_feature_replay_tolerates_only_solver_scale_residual_drift(
 
     with pytest.raises(ValueError, match="residual report differs"):
         with_translation_drift(2.0e-7).replay(external_definitions=external_definitions)
+
+
+def test_assemble_runs_in_its_own_session_when_called_inside_a_recording() -> None:
+    @scad.part(id="hosted_child")
+    def build_child() -> scad.Solid:
+        return scad.make_box_rsolid(width=1.0, height=1.0, depth=1.0)
+
+    child = build_child()
+
+    @scad.assemble(id="hosted_parent", definitions=(child,))
+    def build_parent() -> scad.Assembly:
+        assembly = scad.make_assembly_rassembly(assembly_id="hosted_parent")
+        return scad.add_component_rassembly(
+            assembly=assembly,
+            item=child.value,
+            component_id="child",
+            placement=scad.identity_placement_rplacement(),
+        )
+
+    standalone = build_parent()
+    outer = scad.GraphSession(graph_id="host", allow_external_definitions=True)
+    with outer:
+        nodes_before = len(outer.graph.nodes)
+        with scad.SimpleWorkplane(origin=(0.0, 0.0, 7.0)):
+            hosted = build_parent()
+        # The build neither recorded into the caller nor inherited its frame.
+        assert scad.get_active_session() is outer
+        assert len(outer.graph.nodes) == nodes_before
+
+    assert hosted.definition.content_hash == standalone.definition.content_hash

@@ -56,6 +56,29 @@ def _qvec(values: Any, tolerance: float) -> tuple[int, ...]:
     return tuple(_q(float(value), tolerance) for value in values)
 
 
+_JSON_SAFE_INT = 9_007_199_254_740_991
+
+
+def _json_safe(value: Any) -> Any:
+    """Quantized ints of large bodies (a 36 m slab's volume / 1e-7) pass the JSON safe range; hash them as
+    decimal strings. Labels stay ints until here, so sorting and in-range hashes are unchanged."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return f"int:{value}" if abs(value) > _JSON_SAFE_INT else value
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return tuple(_json_safe(item) for item in value)
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    return value
+
+
+def _hash(payload: Any) -> str:
+    return content_hash(_json_safe(payload), omit=())
+
+
 def _raw_direction(values: Any, tolerance: float) -> list[float]:
     vector = [float(value) for value in values]
     magnitude = math.sqrt(sum(value * value for value in vector))
@@ -194,7 +217,7 @@ def _surface_definition_hash(
                 for index in range(1, surface.NbVKnots() + 1)
             ],
         )
-    return content_hash(payload, omit=())
+    return _hash(payload)
 
 
 def _curve_definition_hash(
@@ -230,7 +253,7 @@ def _curve_definition_hash(
                 for index in range(1, curve.NbKnots() + 1)
             ],
         )
-    return content_hash(payload, omit=())
+    return _hash(payload)
 
 
 def _surface_samples(adaptor: BRepAdaptor_Surface, tolerance: float) -> tuple[Any, ...]:
@@ -515,13 +538,12 @@ def stable_topology_entity_hash(
         geometry = _geometry_label(normalized_kind, shape, tolerance)
     else:
         raise ValueError(f"unsupported topology entity kind: {kind}")
-    return content_hash(
+    return _hash(
         {
             "profile": "simplecad-topology-entity-1",
             "kind": normalized_kind,
             "geometry": geometry,
-        },
-        omit=(),
+        }
     )
 
 
@@ -584,10 +606,7 @@ def geometry_interface_descriptor(
             )
 
     refined: dict[tuple[str, int], str] = {
-        key: content_hash(
-            {"kind": value["kind"], "geometry": value["label"]},
-            omit=(),
-        )
+        key: _hash({"kind": value["kind"], "geometry": value["label"]})
         for key, value in nodes.items()
     }
     for _ in range(4):
@@ -610,7 +629,7 @@ def geometry_interface_descriptor(
     node_records = [
         {
             "kind": value["kind"],
-            "geometry": value["label"],
+            "geometry": _json_safe(value["label"]),
             "refined": refined[key],
             "incidence_count": sum(adjacency[key].values()),
         }
@@ -620,7 +639,7 @@ def geometry_interface_descriptor(
     counts = Counter(value["kind"] for value in nodes.values())
     volume, centroid = _mass(shape, "volume")
     surface_area, _ = _mass(shape, "area")
-    return {
+    return _json_safe({
         "profile": _GEOMETRY_INTERFACE_PROFILE,
         "tolerance_profile": tolerance_profile,
         "tolerance": tolerance,
@@ -633,7 +652,7 @@ def geometry_interface_descriptor(
         "surface_area": _q(surface_area, tolerance),
         "centroid": _qvec(centroid, tolerance),
         "nodes": node_records,
-    }
+    })
 
 
 def geometry_interface_fingerprint(
@@ -647,7 +666,7 @@ def geometry_interface_fingerprint(
         solid,
         tolerance_profile=tolerance_profile,
     )
-    return content_hash(descriptor, omit=())
+    return _hash(descriptor)
 
 
 __all__ = [

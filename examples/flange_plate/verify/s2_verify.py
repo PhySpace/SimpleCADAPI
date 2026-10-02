@@ -1,29 +1,24 @@
-"""S2 verifier: bolt pattern + double fillet (final 6-hole form at this stage).
+"""Final geometry acceptance: bolt pattern + double fillet on the 8-hole flange.
 
-Run AFTER flange_plate.py contains the S2 features:
     uv run python examples/flange_plate/verify/s2_verify.py
 
-Criteria (BUILD_PLAN S2 contract, hypothesis-proven in s2_hypothesis.py):
+Criteria (BUILD_PLAN S2 contract; values read from the notebook's parameters):
   D1 single Solid + final volume in Pappus bracket +-1.5%
   D2 bolt_count hole walls: CYLINDER area pi*bolt_d*flange_t, axis-distance = PCD/2
   D3 phase: first hole at 0 deg; adjacent spacing = 360/n (>=2 units measured)
   D4 tori: root TORUS n=1 (area Pappus arc-centroid formula, z > flange_t);
            edge TORUS n=2 (same-radius formula, z <= flange_t)
   D5 S1 regression: bbox unchanged (x/y in +-od/2, z in [0, top]); boss top
-     annulus / bore wall cards still resolve exactly 1
-  D6 pattern tool count == bolt_count and prototype validated before patterning
-     (source evidence: fact cards in run log; re-check hole wall count here)
+     annulus and bore wall cards still resolve exactly 1
 """
 import math
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-import flange_plate as fp  # noqa: E402
-from simplecadapi import ql  # noqa: E402
-from OCP.Bnd import Bnd_Box  # noqa: E402
-from OCP.BRepBndLib import BRepBndLib  # noqa: E402
+from OCP.Bnd import Bnd_Box
+from OCP.BRepBndLib import BRepBndLib
+from simplecadapi import ql
+from simplecadapi.runtime import run_notebook
 
 failures = []
 
@@ -34,13 +29,15 @@ def check(name, ok, detail=""):
         failures.append(name)
 
 
-p = fp.params()
-od, t = p["flange_od"], p["flange_t"]
-boss_od, top, bore = p["boss_od"], p["boss_top_z"], p["bore_d"]
-bolt_d, pcd, n = p["bolt_d"], p["bolt_pcd"], p["bolt_count"]
-r_root, r_edge = p["boss_fillet_r"], p["edge_fillet_r"]
-
-body = fp.build_solid()
+run = run_notebook(Path(__file__).resolve().parents[1] / "flange_plate.py")
+body = run.product.body
+p = {name: float(run.values[name]) for name in (
+    "FLANGE_OD", "FLANGE_T", "BOSS_OD", "BOSS_TOP_Z", "BORE_D",
+    "BOLT_D", "BOLT_PCD", "BOLT_COUNT", "BOSS_FILLET_R", "EDGE_FILLET_R")}
+od, t = p["FLANGE_OD"], p["FLANGE_T"]
+boss_od, top, bore = p["BOSS_OD"], p["BOSS_TOP_Z"], p["BORE_D"]
+bolt_d, pcd, n = p["BOLT_D"], p["BOLT_PCD"], int(p["BOLT_COUNT"])
+r_root, r_edge = p["BOSS_FILLET_R"], p["EDGE_FILLET_R"]
 
 # D1 volume bracket
 v_base = math.pi / 4 * (od * od * t + boss_od * boss_od * (top - t) - bore * bore * top)
@@ -96,11 +93,16 @@ boss_top = ql.faces().where(ql.and_(
     ql.prop("geom.center.z", ">=", top - 0.1), ql.prop("geom.center.z", "<=", top + 0.1),
     ql.prop("geom.area", ">=", a_top - 1.0), ql.prop("geom.area", "<=", a_top + 1.0),
 )).resolve(body)
+a_bore = math.pi * bore * top
+bore_wall = ql.faces().where(ql.and_(
+    ql.prop("geom.type", "==", "CYLINDER"),
+    ql.prop("geom.area", ">=", a_bore - 1.0), ql.prop("geom.area", "<=", a_bore + 1.0),
+)).resolve(body)
 wants = ((xmin, -od / 2), (xmax, od / 2), (ymin, -od / 2), (ymax, od / 2), (zmin, 0.0), (zmax, top))
-check("D5 S1 regression (bbox+boss top card)",
-      all(abs(g - w) < 0.05 for g, w in wants) and len(boss_top) == 1,
+check("D5 S1 regression (bbox+boss top+bore wall cards)",
+      all(abs(g - w) < 0.05 for g, w in wants) and len(boss_top) == 1 and len(bore_wall) == 1,
       f"bbox x[{xmin:.2f},{xmax:.2f}] y[{ymin:.2f},{ymax:.2f}] z[{zmin:.2f},{zmax:.2f}] "
-      f"boss_top n={len(boss_top)}")
+      f"boss_top n={len(boss_top)} bore_wall n={len(bore_wall)}")
 
 print(f"S2 verifier: {'ALL PASS' if not failures else 'FAILED ' + str(failures)}")
 sys.exit(1 if failures else 0)

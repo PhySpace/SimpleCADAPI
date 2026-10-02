@@ -1,12 +1,36 @@
-"""Shared construction and grounding helpers for the reducer example."""
+"""Shared construction helpers for the reducer part notebooks.
+
+A plain module (no cells): the notebooks import these helpers, so the
+helpers' code is part of every importing notebook's dependency digest.
+"""
 
 from __future__ import annotations
 
 import math
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 import simplecadapi as scad
 from simplecadapi import ql
+
+from dimensions import GEAR_HEIGHT
+
+
+@dataclass(frozen=True)
+class AxialFace:
+    """A face connector on the axial (+Z or -Z facing) face nearest a point.
+
+    The face is picked by its center: the face whose normal points along
+    ``normal_z`` and whose center is closest to ``(*center_xy, target_z)``,
+    axial distance weighted far above radial distance.
+    """
+
+    connector_id: str
+    target_z: float
+    normal_z: float
+    center_xy: tuple[float, float] = (0.0, 0.0)
+    name: str | None = None
+    flip: bool = False
 
 
 def make_z_rotation_rplacement(*,
@@ -52,61 +76,30 @@ tag: str,) -> scad.Solid:
         result_tag=f"solid.{tag_prefix}.bore.cutter",
     )
     annular = scad.cut_rsolid(outer, bore, skip_non_intersecting=False)
-    annular = scad.apply_tag(shape=annular, tag=tag)
-    _ground_solid(label=tag, solid=annular)
-    return annular
-
-
-def make_axis_connector_rconnector(*,
-connector_id: str,
-solid: scad.Solid,
-center_xy: tuple[float, float],
-target_z: float,
-normal_z: float,
-name: str | None = None,
-flip: bool = False,) -> scad.Connector:
-    """Create a face connector on the axial face nearest the requested center."""
-
-    face = _axis_face(
-        label=connector_id,
-        solid=solid,
-        center_xy=center_xy,
-        target_z=target_z,
-        normal_z=normal_z,
-    )
-    return scad.make_face_connector_rconnector(
-        connector_id=connector_id,
-        face=face,
-        name=name,
-        flip=flip,
-    )
+    return scad.apply_tag(shape=annular, tag=tag)
 
 
 def make_axis_part_rpart(*,
 part_id: str,
 solid: scad.Solid,
 name: str,
-connector_specs: Iterable[dict[str, object]],
+faces: Iterable[AxialFace],
 material: scad.Material | None = None,) -> scad.Part:
-    """Wrap a solid as a Part and attach axial face connectors."""
+    """Wrap a solid as a Part and attach one face connector per ``AxialFace``."""
 
     part = scad.make_part_rpart(part_id=part_id, body=solid, name=name)
     if material is not None:
         part = scad.assign_material_rpart(part=part, material=material)
-    for spec in connector_specs:
+    for spec in faces:
         part = scad.add_connector_rpart(
             part=part,
-            connector=make_axis_connector_rconnector(
-                connector_id=str(spec["connector_id"]),
-                solid=solid,
-                center_xy=spec["center_xy"],  # type: ignore[arg-type]
-                target_z=float(spec["target_z"]),
-                normal_z=float(spec["normal_z"]),
-                name=spec.get("name"),  # type: ignore[arg-type]
-                flip=bool(spec.get("flip", False)),
+            connector=scad.make_face_connector_rconnector(
+                connector_id=spec.connector_id,
+                face=_axis_face(solid=solid, spec=spec),
+                name=spec.name,
+                flip=spec.flip,
             ),
         )
-    print(f"part_{part_id}: connectors={len(part.connectors)} material={bool(material)}")
     return part
 
 
@@ -125,7 +118,31 @@ name: str | None = None,) -> scad.Part:
     return scad.add_connector_rpart(part=part, connector=connector)
 
 
-def _apply_tags(shape: scad.Solid, tags: Iterable[str]) -> scad.Solid:
+def cut_gear_bore_rsolid(*,
+solid: scad.Solid,
+bore_radius: float,
+tag_prefix: str,
+label: str,) -> scad.Solid:
+    """Cut a through bore along Z into a gear blank sitting on z = 0."""
+
+    cutter = scad.make_cylinder_rsolid(
+        radius=bore_radius,
+        height=GEAR_HEIGHT + 2.0,
+        bottom_face_center=(0.0, 0.0, -1.0),
+        axis=(0.0, 0.0, 1.0),
+        tag_prefix=tag_prefix,
+        result_tag=f"solid.{tag_prefix}.cutter",
+    )
+    bored = scad.cut_rsolid(
+        solid,
+        cutter,
+        skip_non_intersecting=False,
+        tracking_policy=scad.TrackingPolicy.GRAPH,
+    )
+    return scad.apply_tag(shape=bored, tag=f"solid.cut.{label}")
+
+
+def apply_tags(shape: scad.Solid, tags: Iterable[str]) -> scad.Solid:
     """Apply normalized tags through the public SimpleCAD tag API."""
 
     tagged = shape
@@ -134,54 +151,19 @@ def _apply_tags(shape: scad.Solid, tags: Iterable[str]) -> scad.Solid:
     return tagged
 
 
-def _axis_face(
-    *,
-    label: str,
-    solid: scad.Solid,
-    center_xy: tuple[float, float],
-    target_z: float,
-    normal_z: float,
-) -> scad.Face:
+def _axis_face(*, solid: scad.Solid, spec: AxialFace) -> scad.Face:
     candidates = []
     for face in ql.faces().resolve(solid):
         normal = face.get_normal_at()
-        if normal_z > 0.0 and normal.z < 0.65:
+        if spec.normal_z > 0.0 and normal.z < 0.65:
             continue
-        if normal_z < 0.0 and normal.z > -0.65:
+        if spec.normal_z < 0.0 and normal.z > -0.65:
             continue
         center = face.get_center()
-        xy_error = math.hypot(center.x - center_xy[0], center.y - center_xy[1])
-        z_error = abs(center.z - target_z)
-        candidates.append((z_error * 1000.0 + xy_error, face, center, normal))
+        xy_error = math.hypot(center.x - spec.center_xy[0], center.y - spec.center_xy[1])
+        z_error = abs(center.z - spec.target_z)
+        candidates.append((z_error * 1000.0 + xy_error, face))
 
     if not candidates:
-        raise ValueError(f"no axial connector face found for {label}")
-
-    _score, face, center, normal = min(candidates, key=lambda item: item[0])
-    print(
-        f"connector_{label}: center=({center.x:.3f},{center.y:.3f},{center.z:.3f}) "
-        f"normal=({normal.x:.2f},{normal.y:.2f},{normal.z:.2f}) area={face.get_area():.3f}"
-    )
-    return face
-
-
-def _ground_solid(*, label: str, solid: scad.Solid) -> None:
-    faces = ql.faces().resolve(solid)
-    local_roles = [
-        tag
-        for tag in scad.list_tags(shape=solid, scope="local")
-        if tag.startswith("role.")
-    ]
-    print(
-        f"{label}: faces={len(faces)} local_roles={len(local_roles)} "
-        f"volume={solid.get_volume():.3f} tags={','.join(scad.list_tags(shape=solid))}"
-    )
-
-
-def _ground_compound(*, label: str, compound: scad.Compound) -> None:
-    """Print a compact QL-backed summary of an assembly preview compound."""
-
-    solids = ql.solids().resolve(compound)
-    face_count = sum(len(ql.faces().resolve(solid)) for solid in solids)
-    volume = sum(solid.get_volume() for solid in solids)
-    print(f"{label}: solids={len(solids)} faces={face_count} volume={volume:.3f}")
+        raise ValueError(f"no axial connector face found for {spec.connector_id}")
+    return min(candidates, key=lambda item: item[0])[1]

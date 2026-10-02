@@ -1,22 +1,17 @@
-"""Shared construction, tagging, connector, and grounding helpers."""
+"""Shared construction, tagging, and connector helpers for the actuator notebooks.
+
+A plain module (no cells): the notebooks import these helpers, so the
+helpers' code is part of every importing notebook's dependency digest.
+"""
+
+from __future__ import annotations
 
 import math
-from collections.abc import Iterable
-from pathlib import Path
+from collections.abc import Iterable, Iterator
 
 import simplecadapi as scad
-from simplecadapi import ql
 
-
-CACHE = scad.CachePolicy(root=Path(__file__).resolve().parent / "out" / ".cache")
-PART_INPUTS = tuple(
-    scad.file_input(path)
-    for path in (
-        "common.py",
-        "dimensions.py",
-        "materials.py",
-    )
-)
+from dimensions import MOSFET_ANGLES, MOSFET_CENTER_RADIUS, PLANET_COUNT, StageSpec
 
 
 def apply_tags(*, shape: scad.Solid, tags: Iterable[str]) -> scad.Solid:
@@ -67,7 +62,6 @@ connectors: Iterable[tuple[str, tuple[float, float, float], str]],) -> scad.Part
 
     part = scad.make_part_rpart(part_id=part_id, body=body, name=name)
     part = scad.assign_material_rpart(part=part, material=material)
-    connector_count = 0
     for connector_id, origin, connector_name in connectors:
         connector = scad.make_placement_connector_rconnector(
             connector_id=connector_id,
@@ -75,19 +69,12 @@ connectors: Iterable[tuple[str, tuple[float, float, float], str]],) -> scad.Part
             name=connector_name,
         )
         part = scad.add_connector_rpart(part=part, connector=connector)
-        connector_count += 1
-    ground_solid(label=part_id, solid=body)
-    print(
-        f"part_{part_id}: connectors={connector_count} material={material.material_id}"
-    )
     return part
 
 
-def z_rotation_placement(
-    *,
-    origin: tuple[float, float, float],
-    angle_degrees: float,
-) -> scad.Placement:
+def z_rotation_placement(*,
+origin: tuple[float, float, float],
+angle_degrees: float,) -> scad.Placement:
     """Return a right-handed placement rotated about Z."""
 
     angle = math.radians(angle_degrees)
@@ -98,21 +85,33 @@ def z_rotation_placement(
     )
 
 
-def make_z_rotation_rplacement(*,
-origin: tuple[float, float, float],
-angle_degrees: float,) -> scad.Placement:
-    """Build a replayable Z rotation in the caller's graph session."""
-
-    return z_rotation_placement(origin=origin, angle_degrees=angle_degrees)
-
-
-def radial_centers(*, count: int, radius: float, angle_offset: float = 0.0):
+def radial_centers(*,
+count: int,
+radius: float,
+angle_offset: float = 0.0,) -> Iterator[tuple[int, float, tuple[float, float]]]:
     """Yield index, angle in degrees, and XY center on a bolt/pole circle."""
 
     for index in range(count):
         angle_degrees = angle_offset + 360.0 * index / count
         angle = math.radians(angle_degrees)
         yield index, angle_degrees, (radius * math.cos(angle), radius * math.sin(angle))
+
+
+def planet_center_xy(*, stage: StageSpec, index: int) -> tuple[float, float]:
+    """Return one equally spaced planet pitch center."""
+
+    angle = math.radians(360.0 * index / PLANET_COUNT)
+    return (
+        stage.planet_center_radius * math.cos(angle),
+        stage.planet_center_radius * math.sin(angle),
+    )
+
+
+def mosfet_center_xy(*, index: int) -> tuple[float, float]:
+    """Return one power MOSFET's XY center on the controller PCB."""
+
+    angle = math.radians(MOSFET_ANGLES[index])
+    return (MOSFET_CENTER_RADIUS * math.cos(angle), MOSFET_CENTER_RADIUS * math.sin(angle))
 
 
 def make_axial_hole_cutters_rsolids(*,
@@ -125,47 +124,108 @@ tag_prefix: str,
 angle_offset: float = 0.0,) -> list[scad.Solid]:
     """Create equally spaced axial hole cutters."""
 
-    cutters = []
-    for index, _angle, center in radial_centers(
-        count=count,
-        radius=pcd / 2.0,
-        angle_offset=angle_offset,
-    ):
-        cutters.append(
-            scad.make_cylinder_rsolid(
-                radius=hole_radius,
-                height=height,
-                bottom_face_center=(center[0], center[1], bottom_z),
+    return [
+        scad.make_cylinder_rsolid(
+            radius=hole_radius,
+            height=height,
+            bottom_face_center=(center[0], center[1], bottom_z),
+            axis=(0.0, 0.0, 1.0),
+            tag_prefix=f"{tag_prefix}.hole{index + 1}",
+            result_tag=f"tool.{tag_prefix}.hole{index + 1}",
+        )
+        for index, _angle, center in radial_centers(
+            count=count,
+            radius=pcd / 2.0,
+            angle_offset=angle_offset,
+        )
+    ]
+
+
+def make_carrier_body_rsolid(*,
+stage: StageSpec,
+plate_bottom_z: float,
+plate_thickness: float,
+pin_bottom_z: float,
+pin_radius: float,
+hub_radius: float,
+arm_width: float,
+pad_radius: float,) -> scad.Solid:
+    """Three-arm planet carrier plate: hub, arms, planet pads, and bearing pins."""
+
+    sid = stage.stage_id
+    hub = scad.make_cylinder_rsolid(
+        radius=hub_radius,
+        height=plate_thickness,
+        bottom_face_center=(0.0, 0.0, plate_bottom_z),
+        axis=(0.0, 0.0, 1.0),
+        tag_prefix=f"reducer.{sid}.carrier.hub",
+        result_tag=f"feature.reducer.{sid}.carrier.hub",
+    )
+    solids: list[scad.Solid] = [hub]
+    pin_height = plate_bottom_z + plate_thickness - pin_bottom_z
+    arm_inner_radius = hub_radius - 1.25
+    arm_outer_radius = stage.planet_center_radius + pad_radius - 0.25
+    arm_length = arm_outer_radius - arm_inner_radius
+    arm_center_radius = (arm_inner_radius + arm_outer_radius) / 2.0
+    for index in range(PLANET_COUNT):
+        center = planet_center_xy(stage=stage, index=index)
+        arm = scad.make_box_rsolid(
+            width=arm_length,
+            height=arm_width,
+            depth=plate_thickness,
+            bottom_face_center=(arm_center_radius, 0.0, plate_bottom_z),
+            tag_prefix=f"reducer.{sid}.carrier.arm{index + 1}",
+            result_tag=f"feature.reducer.{sid}.carrier.arm{index + 1}",
+        )
+        solids.append(
+            scad.rotate_shape(
+                shape=arm,
+                angle=360.0 * index / PLANET_COUNT,
                 axis=(0.0, 0.0, 1.0),
-                tag_prefix=f"{tag_prefix}.hole{index + 1}",
-                result_tag=f"tool.{tag_prefix}.hole{index + 1}",
+                origin=(0.0, 0.0, 0.0),
             )
         )
-    return cutters
+        solids.append(
+            scad.make_cylinder_rsolid(
+                radius=pad_radius,
+                height=plate_thickness,
+                bottom_face_center=(center[0], center[1], plate_bottom_z),
+                axis=(0.0, 0.0, 1.0),
+                tag_prefix=f"reducer.{sid}.carrier.pad{index + 1}",
+                result_tag=f"feature.reducer.{sid}.carrier.pad{index + 1}",
+            )
+        )
+        solids.append(
+            scad.make_cylinder_rsolid(
+                radius=pin_radius,
+                height=pin_height,
+                bottom_face_center=(center[0], center[1], pin_bottom_z),
+                axis=(0.0, 0.0, 1.0),
+                tag_prefix=f"reducer.{sid}.carrier.pin{index + 1}",
+                result_tag=f"feature.reducer.{sid}.carrier.pin{index + 1}",
+            )
+        )
+    return scad.union_rsolid(solids, glue=False)
 
 
-def ground_solid(*, label: str, solid: scad.Solid) -> None:
-    """Print a concise QL-backed solid summary."""
+def planet_connectors(*,
+stage: StageSpec,) -> list[tuple[str, tuple[float, float, float], str]]:
+    """Per-planet spin-axis and bearing-pin datums for a carrier part."""
 
-    faces = ql.faces().resolve(solid)
-    local_roles = [
-        tag
-        for tag in scad.list_tags(shape=solid, scope="local")
-        if tag.startswith("role.")
-    ]
-    print(
-        f"{label}: faces={len(faces)} local_roles={len(local_roles)} "
-        f"volume={solid.get_volume():.3f} tags={','.join(scad.list_tags(shape=solid))}"
-    )
-
-
-def ground_compound(*, label: str, compound: scad.Compound) -> None:
-    """Print a concise QL-backed assembly projection summary."""
-
-    solids = ql.solids().resolve(compound)
-    faces = sum(len(ql.faces().resolve(solid)) for solid in solids)
-    volume = sum(solid.get_volume() for solid in solids)
-    print(f"{label}: solids={len(solids)} faces={faces} volume={volume:.3f}")
+    connectors: list[tuple[str, tuple[float, float, float], str]] = []
+    for index in range(PLANET_COUNT):
+        center = planet_center_xy(stage=stage, index=index)
+        connectors.extend(
+            (
+                (f"planet_{index + 1}_axis", (*center, stage.mid_z), f"{stage.label} planet {index + 1} axis"),
+                (
+                    f"planet_{index + 1}_bearing_axis",
+                    (*center, stage.mid_z),
+                    f"{stage.label} planet {index + 1} bearing pin",
+                ),
+            )
+        )
+    return connectors
 
 
 def connector_ref(*, component_id: str, connector_id: str) -> scad.ConnectorRef:
@@ -174,21 +234,4 @@ def connector_ref(*, component_id: str, connector_id: str) -> scad.ConnectorRef:
     return scad.make_connector_ref_rconnectorref(
         component_id=component_id,
         connector_id=connector_id,
-    )
-
-
-def ground_constraint_report(*, label: str, assembly: scad.Assembly) -> None:
-    """Print solved state and only non-zero residual facts."""
-
-    report = scad.inspect_assembly_constraints_rconstraintreport(assembly=assembly)
-    worst_translation = max(
-        (item.translation_error for item in report.residuals), default=0.0
-    )
-    worst_angle = max(
-        (item.angular_error_degrees for item in report.residuals), default=0.0
-    )
-    print(
-        f"{label}_constraints: solved={report.solved} components={len(assembly.component_ids())} "
-        f"constraints={len(assembly.constraint_ids())} unsolved={len(report.unsolved_component_ids)} "
-        f"max_translation={worst_translation:.6g} max_angle={worst_angle:.6g}"
     )

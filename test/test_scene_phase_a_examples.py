@@ -18,22 +18,19 @@ RUN_SLOW_EXAMPLES = os.environ.get("SIMPLECADAPI_RUN_SLOW_SCENE_EXAMPLES") == "1
 
 EXAMPLE_CASES = (
     (
-        "10_part_assembly.py",
-        "build_hydraulic_rod_assembly",
+        "hydraulic_rod_assembly/hydraulic_rod_assembly.py",
         3,
         3,
         2,
     ),
     (
-        "16_compact_two_stage_planetary_reducer/main.py",
-        "_build_compact_two_stage_planetary_reducer",
+        "compact_two_stage_planetary_reducer/compact_two_stage_planetary_reducer.py",
         116,
         17,
         15,
     ),
     (
-        "20_integrated_bldc_joint_actuator/main.py",
-        "build_integrated_bldc_joint_actuator",
+        "integrated_bldc_joint_actuator/integrated_bldc_joint_actuator.py",
         89,
         38,
         29,
@@ -41,31 +38,19 @@ EXAMPLE_CASES = (
 )
 
 _PROBE = r"""
-import importlib.util
 import json
 from pathlib import Path
 import sys
 
 import simplecadapi as scad
 from simplecadapi.product.assembly import Assembly
+from simplecadapi.runtime import run_notebook
 
 path = Path(sys.argv[1]).resolve()
-builder_name = sys.argv[2]
-print(
-    f"SCENE_PHASE_A_START={path.name}:{builder_name}",
-    flush=True,
-)
-sys.path.insert(0, str(path.parent))
-spec = importlib.util.spec_from_file_location("phase_a_example_probe", path)
-if spec is None or spec.loader is None:
-    raise RuntimeError(f"could not load example: {path}")
-module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
-result = getattr(module, builder_name)()
-value = result.value
-assembly = value[0] if isinstance(value, tuple) else value
+print(f"SCENE_PHASE_A_START={path.name}", flush=True)
+assembly = run_notebook(path).product
 if not isinstance(assembly, Assembly):
-    raise TypeError(f"{builder_name} did not return an Assembly product")
+    raise TypeError(f"{path.name} did not produce an Assembly product")
 
 nodes = []
 def walk(item):
@@ -87,7 +72,7 @@ part_definitions = {
     if not isinstance(item, Assembly)
 }
 face_naming = {}
-if path.name == "10_part_assembly.py":
+if path.name == "hydraulic_rod_assembly.py":
     naming_contract = {
         "outer_sleeve": ("sleeve.", "sleeve.gland.face.mount"),
         "piston_rod": ("rod.", "rod.piston.land.left.face.rear"),
@@ -133,17 +118,15 @@ print("SCENE_PHASE_A_FACTS=" + json.dumps({
 @pytest.mark.parametrize(
     (
         "relative_path",
-        "builder_name",
         "expected_nodes",
         "expected_definitions",
         "expected_meshes",
     ),
     EXAMPLE_CASES,
-    ids=("example_10", "example_16", "example_20"),
+    ids=("hydraulic_rod_assembly", "planetary_reducer", "bldc_joint_actuator"),
 )
 def test_allowlisted_example_product_hierarchy_in_fresh_process(
     relative_path: str,
-    builder_name: str,
     expected_nodes: int,
     expected_definitions: int,
     expected_meshes: int,
@@ -151,7 +134,7 @@ def test_allowlisted_example_product_hierarchy_in_fresh_process(
     path = ROOT / "examples" / relative_path
     environment = dict(os.environ)
     environment["PYTHONHASHSEED"] = "0"
-    label = f"{relative_path}:{builder_name}"
+    label = relative_path
     print(
         f"\n[scene-example] starting {label}; "
         f"expected nodes={expected_nodes}, definitions={expected_definitions}, "
@@ -160,7 +143,7 @@ def test_allowlisted_example_product_hierarchy_in_fresh_process(
     )
     started = time.monotonic()
     process = subprocess.Popen(
-        [sys.executable, "-c", _PROBE, str(path), builder_name],
+        [sys.executable, "-c", _PROBE, str(path)],
         cwd=ROOT,
         env=environment,
         stdout=subprocess.PIPE,
@@ -222,7 +205,7 @@ def test_allowlisted_example_product_hierarchy_in_fresh_process(
             {
                 "outer_sleeve": {
                     "connector_face_count": 1,
-                    "face_count": 31,
+                    "face_count": 29,
                     "unnamed_indices": [],
                 },
                 "piston_rod": {
@@ -231,7 +214,7 @@ def test_allowlisted_example_product_hierarchy_in_fresh_process(
                     "unnamed_indices": [],
                 },
             }
-            if relative_path == "10_part_assembly.py"
+            if relative_path.startswith("hydraulic_rod_assembly/")
             else {}
         ),
         "product_node_count": expected_nodes,

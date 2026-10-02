@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Tuple, cast
 
@@ -188,7 +189,7 @@ def _validate_connectors(connectors: Iterable[Connector]) -> Tuple[Connector, ..
         if not isinstance(connector, Connector):
             raise TypeError("connectors must contain Connector values")
     ids = [connector.connector_id for connector in result]
-    duplicates = sorted({connector_id for connector_id in ids if ids.count(connector_id) > 1})
+    duplicates = sorted(connector_id for connector_id, count in Counter(ids).items() if count > 1)
     if duplicates:
         raise ValueError("duplicate connector_id: " + ", ".join(duplicates))
     return result

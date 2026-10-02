@@ -46,12 +46,11 @@ DEFAULT_SOURCE_FILENAMES: tuple[str, ...] = (
     "dxf_engine/render.py",
     "build/assembly_builder.py",
     "build/dependencies.py",
-    "build/incremental_solver.py",
     "build/part_builder.py",
     "build/results.py",
-    "cache/policy.py",
-    "cache/records.py",
-    "cache/store.py",
+    "runtime/config.py",
+    "runtime/executor.py",
+    "runtime/runner.py",
     "inverse_engineer/brep/evaluation.py",
     "inspect/brep/compare.py",
     "inspect/brep/diagnostics.py",
@@ -118,7 +117,6 @@ EXPORTED_FUNCTION_MODULES = frozenset(
         "build/assembly_builder.py",
         "build/dependencies.py",
         "build/part_builder.py",
-        "cache/policy.py",
         "inverse_engineer/brep/evaluation.py",
         "inspect/brep/compare.py",
         "inspect/brep/diagnostics.py",
@@ -167,6 +165,13 @@ EXPORTED_CALLABLE_MODULES = frozenset(
         "product/part.py",
         "product/assembly.py",
     }
+)
+
+# The notebook runtime's public surface (``simplecadapi.runtime.__all__``
+# minus the error types); ``use`` and ``notebook_id`` are also exported at
+# the top level.
+RUNTIME_EXPORTS = frozenset(
+    {"CellReport", "NotebookConfig", "NotebookRun", "notebook_id", "run_notebook", "use"}
 )
 
 MISSING = object()
@@ -432,6 +437,8 @@ class APIDocumentGenerator:
             }
         if module_name.startswith("dxf_engine/"):
             return name in {"render_plan"}
+        if module_name.startswith("runtime/"):
+            return name in RUNTIME_EXPORTS
         if module_name in EXPORTED_FUNCTION_MODULES:
             if not exported_names:
                 return True
@@ -473,6 +480,8 @@ class APIDocumentGenerator:
             }
         if module_name == "inverse_engineer/brep/evaluation.py":
             return name in {"EvaluationConfig", "SectionEvaluationConfig"}
+        if module_name.startswith("runtime/"):
+            return name in RUNTIME_EXPORTS
         if module_name.startswith("dxf_engine/"):
             return name in {
                 "SheetDecl",
@@ -558,6 +567,9 @@ class APIDocumentGenerator:
                 "drawing namespace: "
                 f"`from simplecadapi.dxf_engine import {name}`"
             )
+
+        if module_name.startswith("runtime/"):
+            return f"notebook runtime: `from simplecadapi.runtime import {name}`"
 
         module_stem = module_name.removesuffix(".py")
         if module_stem in {"field", "ql"}:
@@ -723,7 +735,8 @@ class APIDocumentGenerator:
             "Advanced Features": [],
             "STEP/BREP Inspection": [],
             "Drawing Inspection": [],
-            "Product Build and Cache": [],
+            "Product Build": [],
+            "Notebook Runtime": [],
             "Reconstruction Evaluation": [],
             "Engineering Drawings": [],
             "Other": [],
@@ -738,8 +751,11 @@ class APIDocumentGenerator:
             if api.source_file.startswith("inspect/drawing/"):
                 categories["Drawing Inspection"].append(api)
                 continue
-            if api.source_file.startswith(("build/", "cache/")):
-                categories["Product Build and Cache"].append(api)
+            if api.source_file.startswith("build/"):
+                categories["Product Build"].append(api)
+                continue
+            if api.source_file.startswith("runtime/"):
+                categories["Notebook Runtime"].append(api)
                 continue
 
             if api.source_file == "inverse_engineer/brep/evaluation.py":
@@ -799,7 +815,7 @@ class APIDocumentGenerator:
         md_lines: List[str] = [
             "# SimpleCAD API Index",
             "",
-            "This index includes generated docs for the public SimpleCAD API surface, including geometry operations, graph/model JSON workflows, durable product builds, persistent cache controls, inspection tools, expressions, QL, and export helpers.",
+            "This index includes generated docs for the public SimpleCAD API surface, including geometry operations, graph/model JSON workflows, durable product builds, the notebook runtime, inspection tools, expressions, QL, and export helpers.",
             "",
             "## Import Surfaces",
             "",
@@ -831,6 +847,8 @@ class APIDocumentGenerator:
                     surface_info = " `translator backend`"
                 elif api.source_file == "inverse_engineer/brep/evaluation.py":
                     surface_info = " `reverse-engineering evaluator`"
+                elif api.source_file.startswith("runtime/"):
+                    surface_info = " `notebook runtime`"
                 else:
                     surface_info = f" `submodule:{api.source_file.removesuffix('.py')}`"
                 doc_filename = api.doc_filename or f"{api.name}.md"

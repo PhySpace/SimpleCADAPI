@@ -25,14 +25,6 @@ from .geometry_interface import (
     geometry_interface_descriptor,
     geometry_interface_fingerprint,
 )
-from .interface import (
-    PartInterfaceDiff,
-    PartInterfaceSnapshot,
-    diff_part_interfaces,
-    load_latest_part_state,
-    update_latest_part_state,
-    write_latest_part_state,
-)
 from .part_definition import PartDefinition
 from .part_io import (
     encode_part_definition,
@@ -55,12 +47,10 @@ __all__ = [
     "ArtifactValidationError",
     "AssemblyDefinition",
     "BlobRef",
-    "PartInterfaceDiff",
     "FeatureGraphArtifact",
     "SourceFileSnapshot",
     "encode_feature_graph_artifact",
     "load_feature_graph_artifact",
-    "PartInterfaceSnapshot",
     "decode_assembly_definition",
     "encode_assembly_definition",
     "export_assembly_definition",
@@ -71,12 +61,8 @@ __all__ = [
     "encode_part_definition",
     "export_part_definition",
     "load_part_definition",
-    "diff_part_interfaces",
     "geometry_interface_descriptor",
     "geometry_interface_fingerprint",
-    "load_latest_part_state",
-    "update_latest_part_state",
-    "write_latest_part_state",
     "DEFAULT_ARTIFACT_LIMITS",
     "FileInputSnapshot",
     "InterfaceHashes",

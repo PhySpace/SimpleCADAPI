@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Dict, Mapping, Optional, Sequence, Tuple, Union
 
@@ -139,7 +140,7 @@ class Assembly(SemanticValueMixin):
         object.__setattr__(self, "components", components)
         ids = [component.component_id for component in components]
         duplicates = sorted(
-            {component_id for component_id in ids if ids.count(component_id) > 1}
+            component_id for component_id, count in Counter(ids).items() if count > 1
         )
         if duplicates:
             raise ValueError(
@@ -153,11 +154,7 @@ class Assembly(SemanticValueMixin):
                 )
         public_ids = [public.public_connector_id for public in public_connectors]
         duplicates = sorted(
-            {
-                public_id
-                for public_id in public_ids
-                if public_ids.count(public_id) > 1
-            }
+            public_id for public_id, count in Counter(public_ids).items() if count > 1
         )
         if duplicates:
             raise ValueError(

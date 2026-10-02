@@ -107,13 +107,11 @@ def test_identical_failure_renders_evidence_only_once(tmp_path, monkeypatch):
     assert "min_gap: 14 mm" in str(retry.value)
 
 
-def test_diagnostics_dir_follows_cache_root(tmp_path, monkeypatch):
+def test_diagnostics_dir_is_under_the_working_directory(tmp_path, monkeypatch):
     from simplecadapi.operators._diagnostics import diagnostics_dir
 
-    monkeypatch.setenv("SIMPLECAD_CACHE_DIR", str(tmp_path / "custom-cache"))
-    resolved = diagnostics_dir()
-    # Diagnostics sit next to the cache directory, whatever its root.
-    assert resolved == tmp_path / "diagnostics"
+    monkeypatch.chdir(tmp_path)
+    assert diagnostics_dir() == tmp_path / ".simplecad" / "diagnostics"
 
 
 def test_union_edge_contact_reports_non_manifold_contact():

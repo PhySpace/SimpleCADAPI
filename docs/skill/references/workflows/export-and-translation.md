@@ -124,4 +124,8 @@ backends, and checks not run.
 **Required reading before authoring or editing any part source in this
 workflow:** `discipline/feature-tree-convention.md` — the block-structured
 sketch → basic body op → bool → modifier convention, its mandatory boundary
-comments, and the sketch/geometry/primitive tier rules.
+comments, and the sketch/geometry/primitive tier rules. Every part source
+is a marimo notebook, one block per cell
+(`references/docs/guides/notebook-runtime.md`): run it with `sca run`, and
+load its product from verification scripts with
+`simplecadapi.runtime.run_notebook(...)`.

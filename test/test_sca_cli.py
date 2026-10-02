@@ -42,14 +42,11 @@ def test_addon_group_dispatches(tmp_path):
     assert report["addons"] == []
 
 
-def test_cache_group_dispatches(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    report, code, printer = run(
-        ["cache", "--cache-dir", str(tmp_path / "cache"), "status"]
-    )
-    assert code == 0
-    assert isinstance(report, dict)
-    assert callable(printer)
+def test_cache_group_is_gone():
+    # The part cache was removed; code is the only source of truth.
+    with pytest.raises(SystemExit) as excinfo:
+        run(["cache", "status"])
+    assert excinfo.value.code == 2
 
 
 def test_export_group_dispatches(tmp_path, monkeypatch):

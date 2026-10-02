@@ -51,19 +51,18 @@ Read `references/docs/stdlib/README.md` for the index and the exact page
 - Cycloidal discs: `make_cycloidal_disc_rsolid`.
 - Bearings: `make_ball_bearing_rassembly` returns a product `Assembly`;
   `build_ball_bearing` is the durable sub-assembly builder (keyword-only
-  parameters, plus `revision`, `ground`, `cache` — default
-  `ground="outer_ring"`, `cache="off"`) for `@scad.assemble` definitions with
-  explicit bearing instances.
+  parameters, plus `revision` and `ground` — default `ground="outer_ring"`)
+  for `@scad.assemble` definitions with explicit bearing instances.
 
 ## Integration rules
 
 - Standard parts return normal shapes or product assemblies: transform, tag,
-  assemble, cache, and export them like any other geometry.
+  assemble, and export them like any other geometry.
 - Mesh discipline: for a gear/ring pair, consistent `module`, center distance
   derived from tooth counts, and explicit `backlash` (typical starting point
   `0.05-0.1 * module`) are part of the design, not afterthoughts.
 - Prefer `build_ball_bearing` over rebuilding bearings by hand inside product
-  definitions; it participates in incremental solves as one definition.
+  definitions; a parent assembly references it as one nested definition.
 
 ## Validation gates
 

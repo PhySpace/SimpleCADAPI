@@ -525,7 +525,8 @@ can satisfy geometry, but cannot certify an absent or incorrect output expressio
 ## Role 5 — Exporter
 
 Read the export rows from `REQUIREMENTS.md`. Durable canonical delivery is
-`capture(result, "out/<part>.scadpkg")`; external formats through
+`sca run <part>.py --out out/<part>.scadpkg` (or
+`capture(run.definition, ...)` after `run_notebook`); external formats through
 `domains/export-and-translation.md`. Post-export gate: re-open the package
 in a fresh process and confirm definition/solid counts; list every produced
 file with size.
@@ -566,7 +567,7 @@ rejection routes back through the role map to the owning artifact.
 - Repeated dead ends → `discipline/failure-and-repair.md`; reconsider the
   stage plan.
 
-Part source files; `REQUIREMENTS.md`; `drawing_work/report_A.md`,
+Part notebooks; `REQUIREMENTS.md`; `drawing_work/report_A.md`,
 `report_B.md`, and the diff table; `BUILD_PLAN.md` with stage boundaries,
 hypotheses, and verifier contracts; executable verification scripts;
 calibration records and provenance viewports; section renders and pair
@@ -578,4 +579,8 @@ checks not run.
 workflow:** `domains/drawing-inspection.md` (Role 1), and
 `discipline/feature-tree-convention.md` — the block-structured
 sketch → basic body op → bool → modifier convention, its mandatory boundary
-comments, and the sketch/geometry/primitive tier rules.
+comments, and the sketch/geometry/primitive tier rules. Every part source
+is a marimo notebook, one block per cell
+(`references/docs/guides/notebook-runtime.md`): run it with `sca run`, and
+load its product from verification scripts with
+`simplecadapi.runtime.run_notebook(...)`.

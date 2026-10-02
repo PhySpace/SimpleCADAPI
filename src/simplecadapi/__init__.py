@@ -1,13 +1,20 @@
 """SimpleCAD API: a simplified OCP-native Python CAD modeling API."""
 
 import sys
+from pathlib import Path
+from typing import Any
 
+from ._internal.mapping_pickle import install_mapping_proxy_pickle
 from ._internal.os_compat import harden_console_streams
 
 # Non-UTF consoles must escape unencodable diagnostic text instead of
 # raising UnicodeEncodeError inside error handlers, where it would mask
 # the real failure.
 harden_console_streams((sys.stdout, sys.stderr))
+
+# Definitions freeze their mappings, and the notebook runtime pickles them
+# with the products that carry them.
+install_mapping_proxy_pickle()
 
 from . import exporter, inspect, math, ql, std, surface, translator
 from .artifacts import (
@@ -22,12 +29,9 @@ from .artifacts import (
     MaterialRef,
     PartDefinition,
     PartInstance,
-    PartInterfaceDiff,
-    PartInterfaceSnapshot,
     SourceFileSnapshot,
     PartRef,
     decode_assembly_definition,
-    diff_part_interfaces,
     encode_assembly_definition,
     encode_part_definition,
     encode_feature_graph_artifact,
@@ -36,34 +40,18 @@ from .artifacts import (
     geometry_interface_descriptor,
     geometry_interface_fingerprint,
     load_assembly_definition,
-    load_latest_part_state,
     load_feature_graph_artifact,
     load_part_definition,
     materialize_definition,
-    update_latest_part_state,
     validate_assembly_definition_graph,
-    write_latest_part_state,
 )
 from .build import (
     AssemblyBuildResult,
-    AssemblySolveReport,
-    CacheReport,
-    ComponentSolveResult,
     FileInput,
     PartBuildResult,
     assemble,
     file_input,
     part,
-)
-from .cache import (
-    CacheEntry,
-    CacheLockTimeout,
-    CacheMode,
-    CachePolicy,
-    CacheRecord,
-    CacheStats,
-    ContentAddressedStore,
-    resolve_cache_policy,
 )
 from .core import (
     WORLD_CS,
@@ -420,6 +408,30 @@ intersect = intersect_rsolid
 union = union_rsolid
 
 
+def use(path: str | Path, /, *, id: str | None = None, **overrides: Any) -> Part | Assembly:
+    """Run the SimpleCAD notebook at *path* and return its product.
+
+    See :func:`simplecadapi.runtime.use`.  The runtime (and marimo) is
+    imported on first use, so ``import simplecadapi`` stays light.
+    """
+
+    from .runtime import use as run_and_use
+
+    return run_and_use(path, id=id, **overrides)
+
+
+def notebook_id() -> str:
+    """Return the id of the notebook run the calling cell belongs to.
+
+    See :func:`simplecadapi.runtime.notebook_id`; name a part family's
+    product with it, ``scad.Part(part_id=scad.notebook_id(), ...)``.
+    """
+
+    from .runtime import notebook_id as running_notebook_id
+
+    return running_notebook_id()
+
+
 __all__ = [
     "exporter",
     # 核心类
@@ -602,12 +614,11 @@ __all__ = [
     "get_active_session",
     "assemble",
     "AssemblyBuildResult",
-    "AssemblySolveReport",
-    "ComponentSolveResult",
     "part",
+    "use",
+    "notebook_id",
     "file_input",
     "PartBuildResult",
-    "CacheReport",
     "suspend_graph_recording",
     "export_graph_json",
     "import_graph_json",
@@ -638,12 +649,9 @@ __all__ = [
     "encode_feature_graph_artifact",
     "load_feature_graph_artifact",
     "MaterialRef",
-    "PartInterfaceDiff",
-    "PartInterfaceSnapshot",
     "PartDefinition",
     "PartInstance",
     "PartRef",
-    "CacheEntry",
     "decode_assembly_definition",
     "encode_assembly_definition",
     "export_assembly_definition",
@@ -653,19 +661,8 @@ __all__ = [
     "encode_part_definition",
     "export_part_definition",
     "load_part_definition",
-    "diff_part_interfaces",
     "geometry_interface_descriptor",
     "geometry_interface_fingerprint",
-    "load_latest_part_state",
-    "update_latest_part_state",
-    "write_latest_part_state",
-    "CacheLockTimeout",
-    "CacheMode",
-    "CachePolicy",
-    "CacheRecord",
-    "CacheStats",
-    "ContentAddressedStore",
-    "resolve_cache_policy",
     "import_model_json",
     "Expr",
     "Var",

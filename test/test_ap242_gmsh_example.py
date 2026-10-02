@@ -11,7 +11,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_DIR = ROOT / "examples" / "ap242_gmsh_volume_mesh"
-MODEL_EXAMPLE = EXAMPLE_DIR / "model.py"
+NOTEBOOK_EXAMPLE = EXAMPLE_DIR / "bracket.py"
+PACKAGE_EXAMPLE = EXAMPLE_DIR / "bracket_package.py"
 DOWNSTREAM_EXAMPLES = {
     "fcstd": EXAMPLE_DIR / "export_fcstd.py",
     "step": EXAMPLE_DIR / "export_step.py",
@@ -28,11 +29,14 @@ CONVERGENCE_EXAMPLE = EXAMPLE_DIR / "study_mesh_convergence.py"
 
 
 def _load_example(path: Path, module_name: str):
+    import sys
+
+    # The export scripts import bracket_package from their own directory.
+    if str(EXAMPLE_DIR) not in sys.path:
+        sys.path.insert(0, str(EXAMPLE_DIR))
     spec = importlib.util.spec_from_file_location(module_name, path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    import sys
-
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
@@ -192,7 +196,10 @@ class _CalculiXGmsh:
 
 class TestAP242GmshExample(unittest.TestCase):
     def test_split_example_modules_have_one_responsibility(self):
-        model = _load_example(MODEL_EXAMPLE, "ap242_model_example")
+        from simplecadapi.runtime.config import read_notebook_config
+
+        config = read_notebook_config(NOTEBOOK_EXAMPLE)
+        package = _load_example(PACKAGE_EXAMPLE, "ap242_package_example")
         downstream = {
             name: _load_example(path, f"ap242_{name}_example")
             for name, path in DOWNSTREAM_EXAMPLES.items()
@@ -204,17 +211,20 @@ class TestAP242GmshExample(unittest.TestCase):
             "ap242_calculix_visualization_example",
         )
 
-        self.assertTrue(callable(model.build_bracket))
-        self.assertFalse(hasattr(model, "mesh_step_with_gmsh"))
+        self.assertIsNotNone(config)
+        assert config is not None
+        self.assertEqual(config.id, "ap242_gmsh_bracket")
+        self.assertTrue(callable(package.capture_bracket))
+        self.assertFalse(hasattr(package, "mesh_step_with_gmsh"))
         self.assertTrue(all(callable(module.main) for module in downstream.values()))
         self.assertTrue(callable(mesh.mesh_step_with_gmsh))
         self.assertTrue(callable(calculix.build_calculix_input))
         self.assertTrue(callable(calculix.run_calculix_static))
         self.assertTrue(callable(visualization.visualize_calculix_result))
-        self.assertFalse(hasattr(mesh, "build_bracket"))
+        self.assertFalse(hasattr(mesh, "capture_bracket"))
         self.assertEqual(
             {
-                model.OUT_DIR,
+                package.OUT_DIR,
                 mesh.OUT_DIR,
                 *(module.OUT_DIR for module in downstream.values()),
             },

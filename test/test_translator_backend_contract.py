@@ -100,9 +100,7 @@ class TestTranslatorBackendContract(unittest.TestCase):
         compile(runtime_source, "<freecad-runtime>", "exec")
 
     def test_all_translators_are_reusable_for_product_packages(self):
-        cache = scad.CachePolicy(mode="off")
-
-        @scad.part(id="contract_part", cache=cache)
+        @scad.part(id="contract_part")
         def build_part() -> scad.Part:
             body = scad.make_box_rsolid(1.0, 2.0, 3.0)
             return scad.make_part_rpart("contract_part", body)

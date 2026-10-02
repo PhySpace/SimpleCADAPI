@@ -361,23 +361,25 @@ APIs are actually implemented.
 
 ## Example: Hydraulic Rod Assembly
 
-`examples/hydraulic_rod_assembly/model.py` builds a hydraulic rod/cylinder assembly that uses
+`examples/hydraulic_rod_assembly/` builds a hydraulic rod/cylinder assembly that uses
 implemented geometry, QL, Part, Material, Placement, Assembly, projection, STEP,
-and FCStd translation APIs.
+and FCStd translation APIs. Each part is a notebook (`outer_sleeve.py`,
+`piston_rod.py`); the `hydraulic_rod_assembly.py` notebook composes them with
+`scad.use`, and `export.py` loads the product with `run_notebook`.
 
 The example intentionally keeps product structure separate from geometry
 projection:
 
 - The outer sleeve is one single-body `Part` with a barrel, gland flange, bolt-hole details, rear eye, and pin hole.
 - The inner piston rod is another single-body `Part` with piston lands, a seal groove, chrome rod, rod-eye neck, and rod-eye pin hole.
-- The final `Assembly` instantiates both parts with component placement.
+- The assembly notebook instantiates both parts with component placement.
 - `make_compound_from_assembly_rcompound(...)` produces the flattened preview projection; `scad.exporter.export_product_package_to_step(...)` writes the package STEP projection.
 - `scad.translator.freecad_translator.translate_product_package_to_fcstd(...)` writes a native FreeCAD Assembly Workbench document where the assembly tree remains visible and editable.
 
 Run it from the source checkout:
 
 ```bash
-uv run python examples/hydraulic_rod_assembly/model.py
+uv run python examples/hydraulic_rod_assembly/export.py
 ```
 
 ## Boiling Lake Implementation Plan

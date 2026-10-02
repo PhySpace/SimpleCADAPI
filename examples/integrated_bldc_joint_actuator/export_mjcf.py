@@ -1,25 +1,26 @@
-"""Export the integrated BLDC actuator product package as MuJoCo MJCF."""
+"""Export the integrated BLDC actuator as MuJoCo MJCF with its mapping.
 
-from __future__ import annotations
+    uv run python examples/integrated_bldc_joint_actuator/export_mjcf.py [--reuse-package]
 
-from pathlib import Path
+Captures the product package first (``export.capture_package``) unless
+``--reuse-package`` says it is already current (``export_all.py`` does that).
+"""
+
+import sys
 
 import simplecadapi as scad
 
+from export import OUT_DIR, PACKAGE_PATH, capture_package
 
-OUT_DIR = Path(__file__).resolve().parent / "out"
-PACKAGE_PATH = OUT_DIR / "integrated_bldc_joint_actuator.scadpkg"
 MJCF_PATH = OUT_DIR / "integrated_bldc_joint_actuator.xml"
 MAPPING_PATH = OUT_DIR / "integrated_bldc_joint_actuator.mapping.json"
 MESH_DIR = OUT_DIR / "integrated_bldc_joint_actuator_meshes"
 DEFAULT_DENSITY_KG_M3 = 7850.0
 
 
-def main() -> None:
-    """Compile the captured .scadpkg into an MJCF model with mapping."""
-
-    if not PACKAGE_PATH.is_file():
-        raise FileNotFoundError(f"Run main.py first: {PACKAGE_PATH}")
+def main(*, capture: bool = True) -> None:
+    if capture:
+        capture_package()
     report = scad.exporter.export_product_package_to_mjcf(
         data=PACKAGE_PATH,
         output_path=MJCF_PATH,
@@ -40,4 +41,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(capture="--reuse-package" not in sys.argv[1:])

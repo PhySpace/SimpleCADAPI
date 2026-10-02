@@ -23,7 +23,7 @@ Choose the downstream target from the consumer contract:
 
 | Target | Use when | Preserved contract | Boundary |
 | --- | --- | --- | --- |
-| `.scadpkg` | Rebuild, replay, cache, or further SimpleCAD editing | Definition closure, occurrence graph, feature graphs, source snapshots, topology, connectors, constraints, materials | SimpleCAD-specific archive |
+| `.scadpkg` | Rebuild, replay, or further SimpleCAD tooling | Definition closure, occurrence graph, feature graphs, source snapshots, topology, connectors, constraints, materials | SimpleCAD-specific archive |
 | `.FCStd` | A FreeCAD user needs an editable native document | Definition-owned dependency-first feature graphs, repeated instances, nested assemblies, names, solved placements, materials, connectors, constraints, grounding, revision, content hashes | Requires FreeCAD/FreeCADCmd |
 | AP242 `.step` | Neutral CAD exchange or OpenCASCADE tooling | Evaluated BREP, product hierarchy, shared definitions, occurrence names/placements, materials, colors, density, named property payloads | Feature history is not reconstructed as AP242 features |
 | `.obj` | Surface inspection or DCC exchange | Direct OpenCASCADE tessellation, shared vertices, oriented triangles | Evaluated surface mesh only |

@@ -8,13 +8,14 @@ Views (BUILD_PLAN S3 visual contract):
 """
 from pathlib import Path
 
-import flange_plate as fp
 import simplecadapi as scad
+from simplecadapi.runtime import run_notebook
 
-OUT = Path(__file__).resolve().parent / "out"
+HERE = Path(__file__).resolve().parent
+OUT = HERE / "out"
 OUT.mkdir(parents=True, exist_ok=True)
 
-body = fp.build_solid()
+body = run_notebook(HERE / "flange_plate.py").product.body
 
 views = {
     "render_iso.png": dict(view=(30.0, 45.0), zoom=4.0),

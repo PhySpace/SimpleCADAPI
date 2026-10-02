@@ -61,6 +61,9 @@ tools/research/cadqueryftc/out/
 img/capability/*.mov
 img/capability/逆向工具mvp.mp4
 
+# marimo notebook state and cell cache (rebuilt on the next run)
+__marimo__/
+
 # Per-example generated artifacts (each example exports to its own out/)
 examples/*/out/
 examples/bowl_connector/re_work/
