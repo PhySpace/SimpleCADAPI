@@ -19,8 +19,6 @@ _NON_NOTEBOOK_EXAMPLES = frozenset(
     {
         "histcad_demo",
         "demo_kit",
-        "error_feedback_demos",
-        "marimo_interactive",
         "pcg_facade_tower",
     }
 )
