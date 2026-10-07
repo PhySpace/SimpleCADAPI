@@ -107,7 +107,9 @@ def surface_area(face: TopoDS_Face) -> float:
 
 def volume(solid: TopoDS_Solid) -> float:
     props = GProp_GProps()
-    BRepGProp.VolumeProperties_s(solid, props)
+    # Integrate NURBS by knot spans. The fixed-order routine both loses
+    # precision on rational curves and can crash on affine transformed trims.
+    BRepGProp.VolumePropertiesGK_s(solid, props, 1e-9, True, True)
     return float(props.Mass())
 
 
@@ -146,7 +148,7 @@ def center_of_mass(shape: TopoDS_Shape) -> Vec3:
     if kind in (TopAbs_SOLID, TopAbs_COMPSOLID, TopAbs_COMPOUND):
         props = GProp_GProps()
         try:
-            BRepGProp.VolumeProperties_s(shape, props)
+            BRepGProp.VolumePropertiesGK_s(shape, props, 1e-9, True, True)
             point = _props_mass_point(props)
             if point is not None:
                 return point

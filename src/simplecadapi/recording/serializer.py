@@ -421,6 +421,13 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
     },
     "translate_shape": {"status": "replayable", "op": "make_translate_rshape"},
     "rotate_shape": {"status": "replayable", "op": "make_rotate_rshape"},
+    "scale_rsolid": {"status": "replayable", "op": "make_scale_rsolid"},
+    "transform_rsolid": {"status": "replayable", "op": "make_transform_rsolid"},
+    "offset_rsolid": {"status": "replayable", "op": "make_offset_rsolid"},
+    "extrude_taper_rsolid": {"status": "replayable", "op": "make_extrude_taper_rsolid"},
+    "sweep_multisection_rsolid": {"status": "replayable", "op": "make_sweep_multisection_rsolid"},
+    "extrude_until_rsolid": {"status": "replayable", "op": "make_extrude_until_rsolid"},
+    "draft_rsolid": {"status": "replayable", "op": "make_draft_rsolid"},
     "mirror_shape": {"status": "replayable", "op": "make_mirror_rshape"},
     "extrude_rsolid": {"status": "replayable", "op": "make_extrude_rsolid"},
     "revolve_rsolid": {"status": "replayable", "op": "make_revolve_rsolid"},
@@ -597,6 +604,13 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "make_twisted_sweep_rsolid",
     "make_translate_rshape",
     "make_rotate_rshape",
+    "make_scale_rsolid",
+    "make_transform_rsolid",
+    "make_offset_rsolid",
+    "make_extrude_taper_rsolid",
+    "make_sweep_multisection_rsolid",
+    "make_extrude_until_rsolid",
+    "make_draft_rsolid",
     "make_mirror_rshape",
     "make_cut_rsolid",
     "make_union_rsolid",
@@ -3892,6 +3906,78 @@ def _execute_graph(
                                 axis=cast(Any, tuple(params["axis"])),
                                 origin=cast(Any, tuple(params["origin"])),
                             )
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "make_draft_rsolid":
+                        ctx.require_params(node.node_id, op_name, params, ("angle", "selected_face_count", "plane_origin", "plane_normal"))
+                        values = _input_outputs(ctx, outputs, node, 0)
+                        if values:
+                            solid = values[0]
+                            faces = _resolve_feature_selection(ctx, node=node, solid=solid,
+                                params=params, kind="face", outputs=outputs)
+                            if ctx.strict and len(faces) != params["selected_face_count"]:
+                                ctx.fail(f"Graph node '{node.node_id}' expected {params['selected_face_count']} draft faces, got {len(faces)}")
+                            result = ops.draft_rsolid(solid=solid, faces_to_draft=faces, angle=params["angle"],
+                                plane_origin=params["plane_origin"], plane_normal=params["plane_normal"])
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "make_extrude_until_rsolid":
+                        ctx.require_params(node.node_id, op_name, params, ("direction", "until", "target_count"))
+                        count = int(params["target_count"])
+                        values = [_input_outputs(ctx, outputs, node, i)[0] for i in range(count + 1)]
+                        result = ops.extrude_until_rsolid(profile=values[0], target=values[1:],
+                            direction=params["direction"], until=params["until"])
+                        _store_outputs(node, result)
+                        continue
+
+                    if op_name == "make_extrude_taper_rsolid":
+                        ctx.require_params(node.node_id, op_name, params, ("vector", "taper"))
+                        input_values = _input_outputs(ctx, outputs, node, 0)
+                        if input_values:
+                            result = ops.extrude_taper_rsolid(profile=input_values[0], vector=params["vector"],
+                                taper=params["taper"], flip_inner=params.get("flip_inner", True))
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "make_sweep_multisection_rsolid":
+                        ctx.require_params(node.node_id, op_name, params, ("profile_count", "is_frenet"))
+                        count = int(params["profile_count"])
+                        values = [_input_outputs(ctx, outputs, node, i)[0] for i in range(count + 1)]
+                        binormal = _input_outputs(ctx, outputs, node, count + 1)[0] if params.get("binormal_is_wire") else params.get("binormal")
+                        result = ops.sweep_multisection_rsolid(profiles=values[:count], path=values[count],
+                            is_frenet=params["is_frenet"], binormal=binormal)
+                        _store_outputs(node, result)
+                        continue
+
+                    if op_name == "make_transform_rsolid":
+                        ctx.require_params(node.node_id, op_name, params, ("matrix",))
+                        inputs = _input_outputs(ctx, outputs, node, 0)
+                        if inputs:
+                            result = ops.transform_rsolid(solid=inputs[0], matrix=params["matrix"])
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "make_scale_rsolid":
+                        ctx.require_params(node.node_id, op_name, params, ("factors", "center"))
+                        inputs = _input_outputs(ctx, outputs, node, 0)
+                        if inputs:
+                            result = ops.scale_rsolid(solid=inputs[0], factors=params["factors"], center=params["center"])
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "make_offset_rsolid":
+                        ctx.require_params(node.node_id, op_name, params, ("amount", "removed_face_count"))
+                        inputs = _input_outputs(ctx, outputs, node, 0)
+                        if inputs:
+                            solid = inputs[0]
+                            faces = _resolve_feature_selection(ctx, node=node, solid=solid,
+                                params=params, kind="face", outputs=outputs) if params["removed_face_count"] else []
+                            if ctx.strict and len(faces) != params["removed_face_count"]:
+                                ctx.fail(f"Graph node '{node.node_id}' expected {params['removed_face_count']} opening faces, got {len(faces)}")
+                            result = ops.offset_rsolid(solid=solid, amount=params["amount"], openings=faces,
+                                tolerance=params.get("tolerance", 1e-4), kind=params.get("kind", "ARC"))
                             _store_outputs(node, result)
                         continue
 
