@@ -55,6 +55,7 @@ tools/research/out/
 tools/research/histjson/out/
 tools/research/whucad/out/
 tools/research/cadqueryftc/out/
+tools/research/build123dftc/out/
 .venv-cq/
 
 # Source screen recordings stay local; compressed MP4/GIF derivatives are tracked
