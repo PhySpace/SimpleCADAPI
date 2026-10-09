@@ -9,9 +9,9 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 ### Changed
 
 - pymupdf is no longer a default-install dependency: it is optional under
-  the new `drawing` extra. Engineering-drawing inspection (vector-PDF
-  measuring, sectioning, rendering of DXF/PDF drawings) is the only family
-  that uses it; `import simplecadapi`, modeling, STEP export, and VTK
+  the new `drawing` extra. The engineering-drawing family is the only user:
+  vector-PDF drawing inspection, and DXF -> PNG rendering (via ezdxf's
+  drawing backend). `import simplecadapi`, modeling, STEP export, and VTK
   rendering all work without it. Drawing functions without pymupdf raise an
   ImportError naming the extra: `pip install 'simplecadapi[drawing]'`.
 
