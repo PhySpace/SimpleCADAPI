@@ -13,7 +13,7 @@ Each bad case must fire (at least) the listed gates; the clean ones none.
   KB7 a panel turned inside out (x = -t)               -> A1
   KB8 a corner piece with the wrong turn               -> A0 + V1
   KB9 lobby upper row dropped 30 mm (joint is 20)      -> A1 + V1 (z span, row joint) + V2
-  KB10 a rebuild still reporting a dirty instance      -> A2
+  KB10 a warm rebuild of a different design            -> A2
 """
 import sys
 
@@ -95,11 +95,10 @@ def band_case(band, **kw) -> list[str]:
 
 
 def solve_case() -> list[str]:
-    """A rebuild whose report still lists a dirty instance (what a cold build reports) passed off as warm."""
-    from dataclasses import replace
-    warm = F.make_band_assembly(sched, "parapet0")
-    fake = replace(warm, solve_report=replace(warm.solve_report, dirty_instances=("r0-e0-s0",)))
-    return check_solve("parapet0", warm, fake)
+    """A warm rebuild that is not the same design (different band) must not pass A2."""
+    cold = F.make_band_assembly(sched, "parapet0")
+    warm = F.make_band_assembly(sched, "lobby")
+    return check_solve("parapet0", cold, warm)
 
 
 cases = {
@@ -117,7 +116,7 @@ cases = {
     "KB7 panel inside out": (lambda: band_case(FLOOR, edit=flip("r0-e0-s6")), {"A1"}),
     "KB8 corner wrong turn": (lambda: band_case(FLOOR, edit=retype("r0-v0", other_turn)), {"A0", "V1"}),
     "KB9 lobby row 1 -30 mm": (lambda: band_case(LOBBY, edit=shift("r1-*", 0.0, dz=-30.0)), {"A1", "V1", "V2"}),
-    "KB10 dirty warm rebuild": (solve_case, {"A2"}),
+    "KB10 warm rebuild, different design": (solve_case, {"A2"}),
 }
 wrong = []
 for name, (run, gates) in cases.items():

@@ -204,6 +204,6 @@ def builder_args(spec: dict, p: L.FacadeParams) -> tuple:
 
 
 def make_panel_part(type_id: str, spec: dict, p: L.FacadeParams):
-    """Part factory: part id == type id, so equal parameters hit the cache under the same identity."""
+    """Part factory: part id == type id — equal parameters are the same part identity, rebuilt identically."""
     builder, kwargs = builder_args(spec, p)
     return scad.part(id=type_id, revision="1.0.0", project_root=ROOT)(builder)(**kwargs)

@@ -9,7 +9,6 @@
   P6 fin (V5)    side-face normals measure the bin angle +/- 0.05 deg; side planes fin_t apart; root flush on z = 0
                  with width fin_t / cos(a); tip z <= fin_depth + 1 (building line: frame_d + fin_depth + 1);
                  y span [j/2, h - j/2]; volume fin_t * fin_depth * (h - j)
-  P7 cache       rebuilding every type through the Part factory hits
 
     ../../../.venv/bin/python s2_verify.py
 """
@@ -176,9 +175,6 @@ def main() -> int:
     for spec in types.values():
         fams[spec["family"]] = fams.get(spec["family"], 0) + 1
     print(f"-- checked {len(types)} types {fams}")
-    misses = [tid for tid, spec in types.items() if not P.make_panel_part(tid, spec, p).cache_report.hit]
-    if misses:
-        failures.append(f"P7 warm rebuild missed {misses}")
     return report("S2 panels", failures)
 
 

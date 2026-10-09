@@ -13,7 +13,7 @@ against the unchanged schedule. Each bad case must fire (at least) the listed ga
   KB7 floor20 not grounded                                   -> T0
   KB8 slab under floor2 pushed 40 mm east (slab_gap is 30)   -> T1 + V2
   KB9 floor3 turned 90 degrees about its centre              -> T1 + V1 + V5
-  KB10 a rebuild still reporting a dirty instance            -> A2
+  KB10 a warm rebuild of a different design               -> A2
 """
 import math
 import sys
@@ -75,10 +75,10 @@ def tower_case(**kw) -> list[str]:
 
 
 def solve_case() -> list[str]:
-    from dataclasses import replace
-    warm = make_tower(sched)
-    fake = replace(warm, solve_report=replace(warm.solve_report, dirty_instances=("floor1",)))
-    return check_solve("tower", warm, fake)
+    """A warm rebuild that is not the same design (edited schedule) must not pass A2."""
+    cold = make_tower(sched)
+    warm = make_tower(L.build_schedule(L.default_params(n_floors=35)))
+    return check_solve("tower", cold, warm)
 
 
 first13 = _find(COMPS, "floor13")
@@ -101,7 +101,7 @@ cases = {
     "KB7 floor20 ungrounded": (lambda: tower_case(unground=("floor20",)), {"T0"}),
     "KB8 slab-floor2 +40 mm E": (lambda: tower_case(edit=change("slab-floor2", xy=(40.0, 0.0))), {"T1", "V2"}),
     "KB9 floor3 turned 90": (lambda: tower_case(edit=change("floor3", rot=90.0, centre=centre)), {"T1", "V1", "V5"}),
-    "KB10 dirty warm rebuild": (solve_case, {"A2"}),
+    "KB10 warm rebuild, different design": (solve_case, {"A2"}),
 }
 assert first13["ref"][1].startswith("tier1-"), first13
 only = sys.argv[1:]

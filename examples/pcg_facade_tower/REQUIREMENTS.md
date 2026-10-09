@@ -1,5 +1,9 @@
 # REQUIREMENTS: pcg_facade_tower
 
+> 时点说明（2026-10-09）：本文写于 SDK 移除 part cache（dev PR #17，notebook runtime 取代）之前。
+> 第 9 条与 V9 的「增量重建 / 命中 / solve 报告」需求描述的是旧设计；dev 上 S7 已改为全量重建计时报告，
+> 装配层 A2 检查改为两次构建 definition hash 一致。其余几何 / 布局 / 有效性需求不受影响。
+
 PCG 单元式幕墙塔楼：同一份代码，任意平面轮廓 / 层数 / 退台，自动生成**可加工**的外立面。
 论点：参数化的是**实例化**（少量板型 Part × 大量 placement），不是几何堆砌；GN 网格没有"板型"。
 

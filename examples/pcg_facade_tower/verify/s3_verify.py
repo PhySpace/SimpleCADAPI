@@ -17,7 +17,6 @@ Fit checks (placed in world through the layout frames, per plan, one band of eac
                 slab <-> same-level panels / corners == slab_gap (roof: the top floor's); terrace: roof k-1 <->
                 tier k first-floor panels / corners / fins == joint/2 (the panels stand j/2 above it)
   K7 canopy     min distance canopy <-> south lobby panels == joint (the standoff)
-  K8 cache      a warm rebuild of every corner / slab / canopy part hits
 
     ../../../.venv/bin/python s3_verify.py
 """
@@ -137,7 +136,7 @@ def check_canopy(sched: L.FacadeSchedule, part) -> list[str]:
 
 
 class Parts:
-    """Memoized Part bodies by type id (the factory is content-cached; this just avoids re-reading)."""
+    """Part bodies by type id, memoized here to avoid rebuilding within one gate."""
 
     def __init__(self, sched: L.FacadeSchedule):
         self.sched, self.bodies = sched, {}
@@ -284,7 +283,6 @@ def main() -> int:
         failures += check_corner(tid, spec, C.make_corner_part(tid, spec, p0).value, p0)
     turns = sorted({s["turn"] for s in ctypes.values()})
     print(f"-- {len(ctypes)} corner types, turns {turns}")
-    warm_miss = [tid for tid, spec in ctypes.items() if not C.make_corner_part(tid, spec, p0).cache_report.hit]
 
     for kind in L.PlanKind:
         sched = L.build_schedule(L.default_params(plan_kind=kind))
@@ -294,8 +292,6 @@ def main() -> int:
             part = S.make_slab_part(sched, k).value
             failures += check_slab(sched, k, part)
             slab_bodies[k] = part.body
-            if not S.make_slab_part(sched, k).cache_report.hit:
-                warm_miss.append(f"{kind.value}:{S.slab_type_id(k)}")
         n_fit = 0
         for band in fit_bands(sched):
             for rec in band["corners"]:
@@ -304,12 +300,8 @@ def main() -> int:
         failures += check_slab_fit(parts, slab_bodies)
         canopy = S.make_canopy_part(sched).value
         failures += check_canopy(sched, canopy) + check_canopy_fit(parts, canopy.body)
-        if not S.make_canopy_part(sched).cache_report.hit:
-            warm_miss.append(f"{kind.value}:{S.CANOPY_ID}")
         print(f"-- {kind.value}: {len(sched.tiers)} slab types, {len(L.slab_instances(sched))} slab instances, "
               f"{n_fit} corner fits, canopy {L.canopy_box(sched)['modules']} modules")
-    if warm_miss:
-        failures.append(f"K8 warm rebuild missed {warm_miss}")
     return report("S3 corners / slabs / canopy", failures)
 
 

@@ -1,5 +1,8 @@
 # BUILD_PLAN: pcg_facade_tower
 
+> 时点说明（2026-10-09）：本文「同参数同 id 命中缓存」与 S7 增量重建条目写于 part cache 移除前
+> （dev PR #17）；dev 上同参数为同一 Part 身份、全量重建，S7 改为计时报告。几何 / 布局策略部分不受影响。
+
 Datum: 原点 = 地坪 ∩ 平面参考点（RECT/CHAMFER/L_SHAPE 的 SW 角），Z up，+X 东 +Y 北；平面多边形 CCW，
 边 i 自顶点 i → i+1，切向 t_i，外法向 n_i = (t_y, −t_x)。building line = tier 多边形。
 板件局部系：x 沿边（0 = 板左端缝中线），y 向上（0 = 楼层标高），z 外法向（0 = building line）。

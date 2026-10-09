@@ -36,7 +36,7 @@ def band_components(sched: L.FacadeSchedule, band: dict) -> list[dict]:
 
 
 def type_parts(sched: L.FacadeSchedule, type_ids) -> dict:
-    """type id -> PartBuildResult (content-cached Part factories)."""
+    """type id -> PartBuildResult (one part per type id; identical parameters rebuild identically)."""
     out = {}
     for tid in sorted(set(type_ids)):
         spec = sched.types[tid]
