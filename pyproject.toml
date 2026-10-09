@@ -33,7 +33,6 @@ dependencies = [
     "py-slvs==1.0.6",
     "ocp-gordon>=0.2,<0.3",
     "ezdxf>=1.4.4",
-    "pymupdf>=1.28.2",
     "marimo>=0.25.0",
     "plotly>=7.1.0",
 ]
@@ -45,6 +44,10 @@ dev = [
   "mypy>=1.0",
   "black>=23.0",
   "isort>=5.0",
+  "pymupdf>=1.28.2",
+]
+drawing = [
+    "pymupdf>=1.28.2",
 ]
 editor = []
 inspect = [
