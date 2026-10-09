@@ -13,9 +13,13 @@ import json
 import math
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
-import pymupdf
+if TYPE_CHECKING:
+    import pymupdf
+else:
+    from ._pymupdf import pymupdf
+
 import numpy as np
 
 from ._provenance import digest, model_metadata, pixel_transform, file_hash

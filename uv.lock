@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.10, <3.14"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -3239,7 +3239,6 @@ dependencies = [
     { name = "ocp-gordon" },
     { name = "plotly" },
     { name = "py-slvs" },
-    { name = "pymupdf" },
     { name = "rfc8785" },
     { name = "rich" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
@@ -3251,8 +3250,12 @@ dev = [
     { name = "black" },
     { name = "isort" },
     { name = "mypy" },
+    { name = "pymupdf" },
     { name = "pytest" },
     { name = "pytest-cov" },
+]
+drawing = [
+    { name = "pymupdf" },
 ]
 fem = [
     { name = "ccx2paraview", extra = ["vtk"] },
@@ -3299,7 +3302,8 @@ requires-dist = [
     { name = "ocp-gordon", specifier = ">=0.2,<0.3" },
     { name = "plotly", specifier = ">=7.1.0" },
     { name = "py-slvs", specifier = "==1.0.6" },
-    { name = "pymupdf", specifier = ">=1.28.2" },
+    { name = "pymupdf", marker = "extra == 'dev'", specifier = ">=1.28.2" },
+    { name = "pymupdf", marker = "extra == 'drawing'", specifier = ">=1.28.2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
     { name = "rfc8785", specifier = ">=0.1.4,<0.2.0" },
@@ -3307,7 +3311,7 @@ requires-dist = [
     { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0,<3" },
     { name = "typing-extensions", specifier = ">=4.12,<5" },
 ]
-provides-extras = ["dev", "editor", "inspect", "whucad", "gmsh", "fem"]
+provides-extras = ["dev", "drawing", "editor", "inspect", "whucad", "gmsh", "fem"]
 
 [package.metadata.requires-dev]
 dev = [

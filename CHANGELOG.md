@@ -4,6 +4,17 @@ All notable changes to SimpleCADAPI are documented here. Per-version
 user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 中文).
 
+## Unreleased
+
+### Changed
+
+- pymupdf is no longer a default-install dependency: it is optional under
+  the new `drawing` extra. Engineering-drawing inspection (vector-PDF
+  measuring, sectioning, rendering of DXF/PDF drawings) is the only family
+  that uses it; `import simplecadapi`, modeling, STEP export, and VTK
+  rendering all work without it. Drawing functions without pymupdf raise an
+  ImportError naming the extra: `pip install 'simplecadapi[drawing]'`.
+
 ## 2.1.3 — 2026-09-18
 
 The addon ecosystem leaves the beta line: one stable `sca` CLI, addon
