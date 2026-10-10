@@ -8,6 +8,7 @@ Groups, each owned by its module and registered here at parser level so
     sca skill targets|install
     sca export <package.scadpkg> [--format ...]
     sca run <notebook.py> [--set NAME=VALUE] [--out ...]
+    sca ls [DIR]  |  sca params <notebook.py>
 
 Shared contract: group handlers return ``(report, exit_code)`` and are
 followed by the group's own printer (human-readable for init/addon, JSON

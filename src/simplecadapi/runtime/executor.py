@@ -43,6 +43,7 @@ from ._marimo import (
 )
 from .cells import NotebookCells, bound_requirements
 from .config import NotebookConfig, read_notebook_config
+from .params import apply_saved_params
 
 
 class UnboundRequirementError(RuntimeError):
@@ -102,14 +103,26 @@ class SimpleCadExecutor:
         if scope is None:
             return self._delegate.execute_cell(cell, glbls)
         with _cell_recording(scope, cell, glbls):
-            return self._delegate.execute_cell(cell, glbls)
+            result = self._delegate.execute_cell(cell, glbls)
+            self._apply_saved(scope, cell, glbls)
+            return result
 
     async def execute_cell_async(self, cell: CellImpl, glbls: MutableGlobals) -> Any:
         scope = self._scope or _context_scope()
         if scope is None:
             return await self._delegate.execute_cell_async(cell, glbls)
         with _cell_recording(scope, cell, glbls):
-            return await self._delegate.execute_cell_async(cell, glbls)
+            result = await self._delegate.execute_cell_async(cell, glbls)
+            self._apply_saved(scope, cell, glbls)
+            return result
+
+    def _apply_saved(
+        self, scope: NotebookScope, cell: CellImpl, glbls: MutableGlobals
+    ) -> None:
+        # Only the editor kernel (no scope given) takes the values an editor
+        # saved; a headless run takes the overrides it is passed (see params).
+        if self._scope is None:
+            apply_saved_params(scope.config, set(cell.defs), glbls)
 
 
 def executor_factory() -> Executor:
