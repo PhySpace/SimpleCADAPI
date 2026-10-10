@@ -14,6 +14,7 @@ marimo's own dataflow reruns exactly the cells that read them.
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import json
 import sys
@@ -377,7 +378,19 @@ class WorkspaceState:
             action = lambda: kernel.delete_cell(cell)  # noqa: E731
         elif kind == "code.edit":
             code = _module_code(str(message.get("code", "")))
-            action = lambda: kernel.edit_cell(cell, code)  # noqa: E731
+            current = next((c["code"] for c in self.cells if c["id"] == cell), None)
+            if current is not None and code.strip() != _module_code(current).strip() and _is_function_cell(current):
+                # marimo's code mode would turn an @app.function into a plain
+                # cell; edit those in the file or in marimo's own editor.
+                return {
+                    "type": "error",
+                    "message": "this cell is an @app.function; edit it in the file or in the marimo editor",
+                }
+            if current is not None and code.strip() == _module_code(current).strip():
+                # Nothing to change: run the cell, never rewrite the notebook file.
+                action = lambda: kernel.run_cells([cell])  # noqa: E731
+            else:
+                action = lambda: kernel.edit_cell(cell, code)  # noqa: E731
         else:
             return {"type": "error", "message": f"unknown command: {kind}"}
 
@@ -531,21 +544,42 @@ class WorkspaceState:
 
 
 def _module_code(code: str) -> str:
-    """marimo's code_mode compiles cell code as a MODULE: a top-level
-    ``return`` (normal in marimo's file format) is a SyntaxError there.
-    Strip it — the returned expression stays in place and becomes the cell
-    output, which is semantically equivalent."""
-    lines: list[str] = []
-    for line in code.splitlines():
-        stripped = line.lstrip()
-        indent = line[: len(line) - len(stripped)]
-        if stripped == "return":
-            lines.append(f"{indent}pass")
-        elif stripped.startswith("return "):
-            lines.append(f"{indent}{stripped[len('return '):].strip()}")
-        else:
-            lines.append(line)
+    """marimo's code_mode compiles cell code as a MODULE: a ``return`` in the
+    cell's own scope (normal in marimo's file format) is a SyntaxError there.
+    Strip those — the returned expression stays in place and becomes the cell
+    output — and nothing else: a ``return`` inside a function or class the
+    cell defines (an ``@app.function`` cell is one) is code, not syntax.
+    """
+    try:
+        tree = ast.parse(code)
+    except (SyntaxError, ValueError):
+        return code
+    returns: list[ast.Return] = []
+
+    def visit(node: ast.AST) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+                continue  # their returns are their own
+            if isinstance(child, ast.Return):
+                returns.append(child)
+            visit(child)
+
+    visit(tree)
+    lines = code.splitlines()
+    for node in sorted(returns, key=lambda r: (r.lineno, r.col_offset), reverse=True):
+        line = lines[node.lineno - 1]
+        before, after = line[: node.col_offset], line[node.col_offset + len("return"):]
+        lines[node.lineno - 1] = before + ("pass" if node.value is None else after.lstrip())
     return "\n".join(lines)
+
+
+def _is_function_cell(code: str) -> bool:
+    """Whether the cell is one ``def``/``class`` (an ``@app.function`` cell)."""
+    try:
+        body = ast.parse(code).body
+    except (SyntaxError, ValueError):
+        return False
+    return len(body) == 1 and isinstance(body[0], (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
 
 
 def create_app(state: WorkspaceState) -> Starlette:

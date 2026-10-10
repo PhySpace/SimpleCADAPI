@@ -18,7 +18,7 @@ import pytest
 
 pytest.importorskip("starlette")
 
-from simplecadapi.editor.server import WorkspaceState, _module_code, pick_notebook
+from simplecadapi.editor.server import WorkspaceState, _is_function_cell, _module_code, pick_notebook
 from simplecadapi.editor.templates import create_notebook, render_notebook
 from simplecadapi.runtime import run_notebook
 from simplecadapi.runtime.params import ParamSpec, parameters_in_cell
@@ -102,6 +102,41 @@ class ModuleCodeTest(unittest.TestCase):
     def test_top_level_return_is_stripped_for_code_mode(self) -> None:
         code = "x = 1\nif x:\n    return\nreturn (x,)"
         self.assertEqual(_module_code(code), "x = 1\nif x:\n    pass\n(x,)")
+
+    def test_returns_inside_functions_and_classes_are_code(self) -> None:
+        code = (
+            "def f(x):\n    if x:\n        return 1\n    return\n"
+            "class C:\n    def g(self):\n        return self\n"
+            "g = lambda: 1\n"
+        )
+        self.assertEqual(_module_code(code), code.rstrip("\n"))
+
+    def test_only_the_cells_own_return_goes_and_comments_stay(self) -> None:
+        code = "def f():\n    return 2  # keep\ny = f()  # call\nreturn (y,)  # export"
+        self.assertEqual(
+            _module_code(code),
+            "def f():\n    return 2  # keep\ny = f()  # call\n(y,)  # export",
+        )
+
+
+class FunctionCellTest(unittest.TestCase):
+    def test_a_function_cell_is_one_def_or_class(self) -> None:
+        self.assertTrue(_is_function_cell("def f(x):\n    return x"))
+        self.assertTrue(_is_function_cell("class C:\n    pass"))
+        self.assertFalse(_is_function_cell("def f():\n    pass\nf()"))
+        self.assertFalse(_is_function_cell("x = 1"))
+        self.assertFalse(_is_function_cell("def broken("))
+
+    def test_editing_one_is_refused_and_unchanged_code_is_not(self) -> None:
+        state = WorkspaceState(Path(tempfile.gettempdir()))
+        state.kernel = type("K", (), {"run_cells": lambda self, ids: {}, "wait_idle": lambda self: True})()  # type: ignore[assignment]
+        state.cells = [{"id": "f1", "code": "def f():\n    return 1"}]
+        state.schedule_settle = lambda: None  # type: ignore[method-assign]
+        refused = state.dispatch_command({"type": "code.edit", "cell": "f1", "code": "def f():\n    return 2"})
+        self.assertEqual(refused["type"], "error")
+        self.assertIn("@app.function", refused["message"])
+        accepted = state.dispatch_command({"type": "code.edit", "cell": "f1", "code": "def f():\n    return 1"})
+        self.assertEqual(accepted["type"], "ack")
 
 
 @unittest.skipUnless(os.environ.get("SCA_EDITOR_E2E"), "set SCA_EDITOR_E2E=1 to boot a marimo kernel")
