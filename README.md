@@ -342,7 +342,13 @@ marimo edit bracket.py                                    # reactive editor
 sca run bracket.py                                        # run, print a JSON report
 sca run bracket.py --set width=80 --out out/bracket.scadpkg
 sca export out/bracket.scadpkg --output-dir out/exports   # AP242 STEP, STL, OBJ
+sca edit .                                                # web editor over this directory of notebooks
 ```
+
+`sca edit` (`pip install "simplecadapi[editor]"`) is a code-first editor: the
+notebook's cells on the left, the live model on the right, and a slider or
+toggle for every parameter (`# ---- params ----` cells; a `# ui:` comment on
+the line picks the control). See `docs/skill/references/docs/guides/notebook-runtime.md`.
 
 ## Notebook Runtime
 

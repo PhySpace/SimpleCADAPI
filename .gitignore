@@ -70,3 +70,8 @@ examples/bowl_connector/re_work/
 examples/bowl_connector/__pycache__/
 examples/bowl_connector/.re_server.lock
 session-audit-*.md
+
+# Editor web UI (built into the package: `cd editor-web && npm run build`)
+editor-web/node_modules/
+editor-web/dist/
+src/simplecadapi/editor/webui/

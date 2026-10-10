@@ -3257,6 +3257,12 @@ dev = [
 drawing = [
     { name = "pymupdf" },
 ]
+editor = [
+    { name = "starlette" },
+    { name = "uvicorn" },
+    { name = "websockets", version = "16.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "websockets", version = "17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
 fem = [
     { name = "ccx2paraview", extra = ["vtk"] },
     { name = "gmsh" },
@@ -3308,8 +3314,11 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
     { name = "rfc8785", specifier = ">=0.1.4,<0.2.0" },
     { name = "rich", specifier = ">=14.0.0" },
+    { name = "starlette", marker = "extra == 'editor'", specifier = ">=1.7.0" },
     { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0,<3" },
     { name = "typing-extensions", specifier = ">=4.12,<5" },
+    { name = "uvicorn", marker = "extra == 'editor'", specifier = ">=0.54.0" },
+    { name = "websockets", marker = "extra == 'editor'", specifier = ">=16.1.1" },
 ]
 provides-extras = ["dev", "drawing", "editor", "inspect", "whucad", "gmsh", "fem"]
 

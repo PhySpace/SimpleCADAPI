@@ -142,6 +142,45 @@ run.values["width"]    # any top-level variable
 
 Errors raised by a cell propagate unchanged.
 
+## Parameters and the editor
+
+A **parameter** is a top-level variable a cell assigns a number, a bool, or a
+`scad.var`, in a cell headed `# ---- params ----` (or `# ---- params: <group> ----`).
+No change to a notebook is needed for an editor to list them. A trailing
+`# ui:` comment on the line says which control to offer:
+
+```python
+# ---- params ----
+OUTER_D = scad.var("outer_d", 100.0, unit="mm")  # ui: slider(50, 200, step=1, label="Outer diameter")
+BOLTS = 6                                        # ui: number(3, 12, step=1)
+CHAMFER = True                                   # no comment: a toggle, inferred
+```
+
+`slider(min, max, step=)`, `number(min=, max=, step=)` and `toggle()` take
+`unit=` and `label=`. Without the comment a number gets a number box and a
+bool a toggle. A bad comment is reported (`sca params`) and the inferred
+control is used. A `scad.var`'s `unit` and `comment` show up in the editor.
+
+```bash
+sca params bracket.py        # features (# ---- feature: ... ---- headers) and parameters, from the file
+sca ls [DIR]                 # the notebooks under DIR: id, part or assembly, the notebooks each uses
+```
+
+A **workspace** is any directory tree: its models are the notebooks whose
+header has `[tool.simplecadapi]`, wherever they are. There is no manifest.
+
+`sca edit [WORKSPACE]` (needs `pip install "simplecadapi[editor]"`) opens a
+code-first editor on a workspace. The notebooks run in a marimo kernel with
+this runtime's executor, so a model gives the same product in the editor as
+under `sca run`; marimo's dataflow decides what reruns. A slider does not
+edit the file: the editor saves the value (`params.json` in the notebook's
+state directory), the kernel executor applies it as the declaring cell
+finishes, and marimo reruns the cells that read it. **Write to source**
+commits the saved values into the notebook; **revert** drops them. A headless
+run takes only the overrides it is given, never the saved values, and the
+notebook an assembly `use`s is run from its file: tune a part by opening it
+and writing the value to source.
+
 ## Composing notebooks
 
 `scad.use(path, **overrides)` runs another notebook and returns its product,

@@ -1,0 +1,82 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Studio is dark-first: the :root block IS the dark theme. */
+:root {
+  --radius: 0.5rem;
+  --background: oklch(0.16 0.014 260);
+  --foreground: oklch(0.93 0.006 260);
+  --card: oklch(0.2 0.016 260);
+  --card-foreground: oklch(0.93 0.006 260);
+  --popover: oklch(0.2 0.016 260);
+  --popover-foreground: oklch(0.93 0.006 260);
+  --primary: oklch(0.85 0.18 130);
+  --primary-foreground: oklch(0.18 0.03 130);
+  --secondary: oklch(0.26 0.02 260);
+  --secondary-foreground: oklch(0.93 0.006 260);
+  --muted: oklch(0.26 0.02 260);
+  --muted-foreground: oklch(0.68 0.015 260);
+  --accent: oklch(0.3 0.03 260);
+  --accent-foreground: oklch(0.95 0.005 260);
+  --destructive: oklch(0.62 0.2 25);
+  --destructive-foreground: oklch(0.97 0.01 25);
+  --border: oklch(0.3 0.02 260);
+  --input: oklch(0.3 0.02 260);
+  --ring: oklch(0.85 0.18 130);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  /* Code hosts and CAD readouts get the mono face. */
+  .font-mono,
+  code,
+  pre {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  /* Notebook cells: the editor fills its card and adapts to the resizable
+   * panel; long lines scroll inside instead of stretching the card. */
+  .cm-editor {
+    width: 100%;
+  }
+  .cm-editor .cm-scroller {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .cm-editor.cm-focused {
+    outline: none;
+  }
+}

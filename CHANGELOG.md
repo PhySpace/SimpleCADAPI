@@ -6,6 +6,29 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+### Added
+
+- `sca edit [WORKSPACE]`: the web editor, now part of the SDK
+  (`simplecadapi.editor`, UI sources in `editor-web/`; needs the `editor`
+  extra). It runs a workspace's notebooks in a marimo kernel with the SDK's
+  own cell executor, so the editor, `sca run` and `run_notebook` share one
+  runtime, and marimo's dataflow decides what a parameter change reruns.
+- Notebook parameters: the numbers, bools and `scad.var`s of a
+  `# ---- params ----` cell are discoverable (`sca params`,
+  `simplecadapi.runtime.params.list_parameters`) with an optional trailing
+  `# ui: slider(min, max, step=, unit=, label=)` comment to pick the control.
+  Existing notebooks need no change.
+- `sca ls [DIR]` lists the SimpleCAD notebooks under a directory (id, part or
+  assembly, the notebooks each uses); `simplecadapi.runtime.workspace` also
+  parses `# ---- feature: ... ----` headers.
+- `simplecadapi.runtime.live`: project the running kernel's product to a
+  `.scadpkg` (`live_package`, `publish_live`).
+
+### Fixed
+
+- The notebook executor no longer fails on cells that are not part of the
+  notebook (the editor's scratch cell raised `KeyError`).
+
 ### Changed
 
 - pymupdf is no longer a default-install dependency: it is optional under

@@ -49,7 +49,11 @@ dev = [
 drawing = [
     "pymupdf>=1.28.2",
 ]
-editor = []
+editor = [
+    "starlette>=1.7.0",
+    "uvicorn>=0.54.0",
+    "websockets>=16.1.1",
+]
 inspect = [
     "matplotlib>=3.7.0",
 ]
@@ -81,6 +85,9 @@ core-metadata-version = "2.4"
 # Ship harness-neutral source; sca skill compiles it on the user's machine.
 packages = ["src/simplecadapi"]
 include = ["src/**/*"]
+# The built webui (`cd editor-web && npm run build`) is git-ignored; ship it
+# with `sca edit` when it has been built.
+artifacts = ["src/simplecadapi/editor/webui/**"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "docs/skill" = "simplecadapi/skill/resources/docs/skill"
