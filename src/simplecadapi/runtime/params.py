@@ -445,9 +445,67 @@ def _replace(current: Any, saved: float | int | bool) -> Any:
     return _NO_REPLACEMENT
 
 
+# ---------------------------------------------------------------------------
+# Committing a value to the source
+# ---------------------------------------------------------------------------
+
+
+def commit_value(code: str, name: str, value: float | int | bool) -> str | None:
+    """Return *code* with the declaration of parameter *name* set to *value*.
+
+    The literal (or the default argument of a ``scad.var``) is replaced in
+    place; the rest of the line, a ``# ui:`` comment included, is kept.
+    Returns ``None`` if the cell does not declare *name* as a parameter or
+    *value* does not fit its kind.
+    """
+
+    try:
+        tree = ast.parse(code)
+    except (SyntaxError, ValueError):
+        return None
+    for statement in tree.body:
+        if not (
+            isinstance(statement, ast.Assign)
+            and len(statement.targets) == 1
+            and isinstance(statement.targets[0], ast.Name)
+            and statement.targets[0].id == name
+        ):
+            continue
+        declared = _read_value(statement.value)
+        if declared is None:
+            return None
+        node = statement.value
+        if declared.declared == "var":
+            assert isinstance(node, ast.Call)
+            node = node.args[1]
+        text = _format_value(declared.default, value)
+        if text is None or node.end_lineno != node.lineno:
+            return None
+        lines = code.splitlines(keepends=True)
+        line = lines[node.lineno - 1].encode("utf-8")
+        # ast offsets count UTF-8 bytes.
+        replaced = line[: node.col_offset] + text.encode("utf-8") + line[node.end_col_offset :]
+        lines[node.lineno - 1] = replaced.decode("utf-8")
+        return "".join(lines)
+    return None
+
+
+def _format_value(
+    current: float | int | bool, value: float | int | bool
+) -> str | None:
+    if isinstance(current, bool):
+        return repr(value) if isinstance(value, bool) else None
+    if isinstance(value, bool):
+        return None
+    if isinstance(current, int) and float(value).is_integer():
+        return str(int(value))
+    return repr(float(value))
+
+
 __all__ = [
     "ParamSpec",
     "apply_saved_params",
+    "commit_value",
     "list_parameters",
     "parameters_in_cell",
     "read_saved_params",

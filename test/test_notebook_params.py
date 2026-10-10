@@ -12,6 +12,7 @@ import simplecadapi as scad
 from simplecadapi.runtime.config import read_notebook_config
 from simplecadapi.runtime.params import (
     apply_saved_params,
+    commit_value,
     list_parameters,
     parameters_in_cell,
     read_saved_params,
@@ -89,6 +90,37 @@ class ParameterCommentTest(unittest.TestCase):
             self.assertTrue(specs[0].cell.startswith("c"))
 
 
+class CommitValueTest(unittest.TestCase):
+    CODE = (
+        "# ---- params ----\n"
+        'W = 20.0  # ui: slider(10, 40)\n'
+        "N = 4\n"
+        "F = False\n"
+        'OD = scad.var("od", 100.0, comment="é", unit="mm")  # 外径\n'
+        "T = scad.var(\n    't', 3.0)\n"
+    )
+
+    def test_literals_keep_the_rest_of_the_line(self) -> None:
+        out = commit_value(self.CODE, "W", 25)
+        assert out is not None
+        self.assertIn("W = 25.0  # ui: slider(10, 40)", out)
+        self.assertIn("N = 7", commit_value(self.CODE, "N", 7.0) or "")
+        self.assertIn("F = True", commit_value(self.CODE, "F", True) or "")
+
+    def test_var_default_is_replaced_not_the_name(self) -> None:
+        out = commit_value(self.CODE, "OD", 120)
+        assert out is not None
+        self.assertIn('OD = scad.var("od", 120.0, comment="é", unit="mm")  # 外径', out)
+
+    def test_refuses_what_does_not_fit(self) -> None:
+        self.assertIsNone(commit_value(self.CODE, "MISSING", 1))
+        self.assertIsNone(commit_value(self.CODE, "F", 1.0))
+        self.assertIsNone(commit_value(self.CODE, "W", True))
+
+    def test_a_declaration_spanning_lines_is_edited_where_the_value_is(self) -> None:
+        self.assertIn("'t', 4.0)", commit_value(self.CODE, "T", 4.0) or "")
+
+
 class FeatureHeaderTest(unittest.TestCase):
     def test_header_parts(self) -> None:
         (feature,) = features_in_cell(
@@ -150,6 +182,14 @@ class SavedParamsTest(unittest.TestCase):
         self.assertIs(glbls["F"], True)
         self.assertEqual(glbls["S"], 1.5)
         self.assertEqual(glbls["OTHER"], 1.0)  # not defined by the cell
+
+
+class ScratchCellTest(unittest.TestCase):
+    def test_scratch_cells_are_not_recorded(self) -> None:
+        from simplecadapi.runtime.cells import NotebookCells
+
+        cells = NotebookCells(Path("m.py"), [])
+        self.assertNotIn("__scratch__", cells)
 
 
 class WorkspaceScanTest(unittest.TestCase):

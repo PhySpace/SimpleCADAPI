@@ -301,6 +301,20 @@ that surfaced it is in brackets.
   it without the cache), or treat a failed state write as a warning; optionally
   let the state directory be relocated (e.g. an env var or a `--state-dir`).
 
+## 19. The executor raised on any cell that is not in the notebook [editor]
+
+- **Symptom:** in the editor kernel, every scratch snippet (the bridge's
+  `execute`) failed with `KeyError: '__scratch__'`.
+- **Trigger:** a notebook with `[tool.simplecadapi]` running under marimo's
+  editor, then any cell marimo runs that the notebook does not contain.
+- **Root cause:** `SimpleCadExecutor` looked the cell's key up in the notebook
+  cells without checking that the cell belongs to the notebook.
+- **Status:** fixed. `NotebookCells.__contains__`; the executor delegates such
+  cells to marimo's default executor. Test:
+  `test_scratch_cells_are_not_recorded`.
+- **Fix direction:** done. The headless runner only ever runs notebook cells, so
+  only the editor kernel could hit it; test in a kernel, not only headlessly.
+
 ## Heuristics
 
 - Run every notebook three times: fresh, all cached, `--no-cache`. The three

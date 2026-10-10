@@ -100,7 +100,7 @@ class SimpleCadExecutor:
 
     def execute_cell(self, cell: CellImpl, glbls: MutableGlobals) -> Any:
         scope = self._scope or _context_scope()
-        if scope is None:
+        if scope is None or cell.cell_id not in scope.cells:
             return self._delegate.execute_cell(cell, glbls)
         with _cell_recording(scope, cell, glbls):
             result = self._delegate.execute_cell(cell, glbls)
@@ -109,7 +109,7 @@ class SimpleCadExecutor:
 
     async def execute_cell_async(self, cell: CellImpl, glbls: MutableGlobals) -> Any:
         scope = self._scope or _context_scope()
-        if scope is None:
+        if scope is None or cell.cell_id not in scope.cells:
             return await self._delegate.execute_cell_async(cell, glbls)
         with _cell_recording(scope, cell, glbls):
             result = await self._delegate.execute_cell_async(cell, glbls)
