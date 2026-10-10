@@ -13,6 +13,11 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   extra). It runs a workspace's notebooks in a marimo kernel with the SDK's
   own cell executor, so the editor, `sca run` and `run_notebook` share one
   runtime, and marimo's dataflow decides what a parameter change reruns.
+- Editor: picking in the viewport writes a selection cell of `scad.ql`
+  selectors (`selected_<kind>[_<i>]`, `selected_item`); edits autosave to the
+  notebook file; `sca snapshot` and `.sca-editor/snapshot.json` + `viewport.png`
+  tell a coding agent what is selected and shown. Ground grid and axis gizmo in
+  a Z-up CAD frame; cells fold to their step name and can run all cells above.
 - Notebook parameters: the numbers, bools and `scad.var`s of a
   `# ---- params ----` cell are discoverable (`sca params`,
   `simplecadapi.runtime.params.list_parameters`) with an optional trailing
@@ -26,6 +31,10 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ### Fixed
 
+- `ql.vertices()` resolves through solids, faces and wires (it found nothing
+  unless the scope was an edge).
+- The editor no longer rewrites a notebook when a cell is run unchanged, and
+  keeps `return` statements inside the functions a cell defines.
 - The notebook executor no longer fails on cells that are not part of the
   notebook (the editor's scratch cell raised `KeyError`).
 

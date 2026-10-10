@@ -181,6 +181,24 @@ run takes only the overrides it is given, never the saved values, and the
 notebook an assembly `use`s is run from its file: tune a part by opening it
 and writing the value to source.
 
+The editor and a coding agent share the notebook file:
+
+- Every edit in a cell is **autosaved** to the file (it is not run; the cell
+  shows `stale` until it is).
+- **Picking in the viewport writes a selection cell**: each picked solid, face,
+  edge or vertex becomes a `scad.ql` selector built from its geometry and
+  is assigned to `selected_<kind>` (`selected_<kind>_<i>` when several of a
+  kind are picked); `selected_item` lists them all. Ctrl/Cmd+click adds to the
+  selection. The agent reads the cell from the file and builds on it, e.g.
+  `scad.chamfer_rsolid(solid=body, edges=selected_edge_1, ...)`.
+- `sca snapshot [WORKSPACE]` prints what the person is looking at as JSON: the
+  selection, each cell's state and errors, the parameter values, and the path
+  of the viewport image (`.sca-editor/viewport.png`) the agent can look at. The
+  editor keeps `.sca-editor/snapshot.json` current while it runs.
+- A cell folds to its name (its feature slug, params header or first variable)
+  and can run everything above it; `@app.function` cells are shown read-only
+  (edit them in the file).
+
 ## Composing notebooks
 
 `scad.use(path, **overrides)` runs another notebook and returns its product,
