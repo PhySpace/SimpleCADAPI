@@ -1307,12 +1307,11 @@ def _boundary_items(scope: Any, target_kind: str) -> List[Any]:
                 for child in scope.get_children()
                 if child.__class__.__name__ == "Vertex"
             ]
-        if target_kind == "vertex" and hasattr(scope, "get_edges"):
-            vertices = []
-            for edge in _boundary_items(scope, "edge"):
-                vertices.extend(_boundary_items(edge, "vertex"))
-            return _dedupe_items(vertices)
-        return []
+        # Any scope with edges to walk: a wire, a face, a solid.
+        vertices = []
+        for edge in _boundary_items(scope, "edge"):
+            vertices.extend(_boundary_items(edge, "vertex"))
+        return _dedupe_items(vertices)
 
     if target_kind == "solid":
         if cls_name == "Compound" and hasattr(scope, "get_solids"):
@@ -1712,11 +1711,17 @@ def _resolve_scope_items(scope: Any, target_kind: str) -> List[Any]:
             ]
     if target_kind == "vertex":
         if hasattr(scope, "get_children"):
-            return [
+            vertices = [
                 child
                 for child in scope.get_children()
                 if child.__class__.__name__ == "Vertex"
             ]
+            if vertices:
+                return vertices
+        # A wire, face or solid has vertices only through its edges.
+        vertices = _boundary_items(scope, "vertex")
+        if vertices:
+            return vertices
     if isinstance(scope, Iterable) and not isinstance(scope, (str, bytes, dict)):
         return list(scope)
     raise TypeError(f"cannot resolve QL selector scope for target_kind={target_kind}")

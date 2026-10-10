@@ -75,3 +75,6 @@ session-audit-*.md
 editor-web/node_modules/
 editor-web/dist/
 src/simplecadapi/editor/webui/
+
+# The editor's per-workspace state (kernel log, snapshot, viewport image)
+.sca-editor/

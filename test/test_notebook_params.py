@@ -228,3 +228,13 @@ class WorkspaceScanTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VertexScopeTest(unittest.TestCase):
+    def test_vertices_resolve_through_a_solid_and_a_face(self) -> None:
+        import simplecadapi as scad
+
+        solid = scad.make_box_rsolid(10.0, 20.0, 30.0)
+        self.assertEqual(len(scad.ql.vertices().resolve(solid)), 8)
+        face = scad.ql.faces().where(scad.ql.prop("geom.center.z", "<=", 0.01)).exactly(1).resolve(solid)[0]
+        self.assertEqual(len(scad.ql.vertices().resolve(face)), 4)

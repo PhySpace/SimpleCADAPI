@@ -1,30 +1,31 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CellEditor, type NotebookCell, type NotebookFeature, type ParamMeta } from "@/components/CellEditor";
 import { Header } from "@/components/Header";
-import { Inspector, type FederatedNode } from "@/components/Inspector";
+import { Inspector } from "@/components/Inspector";
 import { NotebookList } from "@/components/NotebookList";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  fetchPackage,
-  getWorkspace,
-  newNotebook,
-  openNotebook,
-  select as publishSelection,
-  type NotebookRow,
-} from "@/lib/api";
+import { fetchPackage, getWorkspace, openNotebook, postViewport, type NotebookRow } from "@/lib/api";
 import { EnvelopeSocket, type Envelope } from "@/lib/envelope";
+import { selectionPayload, variableNames, type SelectionItem } from "@/lib/selection";
+import { cn } from "@/lib/utils";
 import { Viewport, type PickResult, type SelectionMode } from "@/scene/Viewport";
 import { openCadPackage } from "@/scene/product-package";
-import { buildFederatedFeatureModel } from "@/scene/scene2";
 import type { SceneView } from "@/scene/scene-view";
 
-type FederatedModel = ReturnType<typeof buildFederatedFeatureModel>["model"];
+const MODES: { mode: SelectionMode; label: string }[] = [
+  { mode: "component", label: "comp" },
+  { mode: "solid", label: "solid" },
+  { mode: "face", label: "face" },
+  { mode: "edge", label: "edge" },
+  { mode: "vertex", label: "vert" },
+];
 
-/** Editor application: left = workspace + notebook editing, right = live
- * model preview driven by the in-memory scadpkg stream (architecture rule 4).
- */
+/** Editor application: left = notebook (cells, workspace), middle = the live
+ * model, right = the selection. The model is the in-memory scadpkg the kernel
+ * publishes whenever the cells settle; picking in the viewport writes the
+ * selection into the notebook (see `selection.set`). */
 export function App() {
   const viewRef = useRef<SceneView | null>(null);
   const socketRef = useRef<EnvelopeSocket | null>(null);
@@ -39,23 +40,21 @@ export function App() {
   const [params, setParams] = useState<ParamMeta[]>([]);
   const [cells, setCells] = useState<NotebookCell[]>([]);
   const [features, setFeatures] = useState<NotebookFeature[]>([]);
-  const [federated, setFederated] = useState<FederatedNode[]>([]);
-  const [pick, setPick] = useState<PickResult | null>(null);
+  const [picked, setPicked] = useState<Omit<SelectionItem, "variable">[]>([]);
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("solid");
-  const [packageInfo, setPackageInfo] = useState<{
-    name: string | null;
-    revision: number;
-    occurrences: number;
-    assets: number;
-    exported: string | null;
-  } | null>(null);
+  const [sceneVersion, setSceneVersion] = useState(0);
 
-  // -- package → viewport (the UI update path) --------------------------------
+  const selection: SelectionItem[] = useMemo(() => {
+    const names = variableNames(picked);
+    return picked.map((item, index) => ({ ...item, variable: names[index] }));
+  }, [picked]);
+
+  // -- package → viewport -------------------------------------------------------
 
   // Camera framing is disruptive during slider drags; frame once per notebook.
   const framedNotebook = useRef<string | null>(null);
 
-  const loadPackageBytes = useCallback(async (bytes: Uint8Array, revision: number, name: string | null) => {
+  const loadPackageBytes = useCallback(async (bytes: Uint8Array, name: string | null) => {
     const view = viewRef.current;
     if (!view) return;
     try {
@@ -63,48 +62,49 @@ export function App() {
       await view.loadScene(opened.files);
       const manifest = view.engine.manifest;
       if (!manifest) throw new Error("scene manifest missing");
-      const federatedModel = buildFederatedFeatureModel(manifest, opened.files);
-      setFederated(
-        federatedModel.model.graph.nodes.map((node) => ({
-          id: node.node_id,
-          label: node.display?.label ?? node.op,
-          kind: node.op,
-        })),
-      );
-      setPackageInfo({
-        name,
-        revision,
-        occurrences: manifest.nodes.length,
-        assets: manifest.geometry_assets.length,
-        exported: null,
-      });
-      setStatus(
-        `${manifest.nodes.length} occurrences · ${manifest.geometry_assets.length} geometry assets · ${federatedModel.model.graph.nodes.length} features`,
-      );
+      setStatus(`${manifest.nodes.length} occurrences · ${manifest.geometry_assets.length} geometry assets`);
       if (framedNotebook.current !== name) {
         view.frame();
         framedNotebook.current = name;
       }
+      setSceneVersion((version) => version + 1);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Unable to open package");
+      setStatus(error instanceof Error ? `error: ${error.message}` : "error: unable to open package");
     }
   }, []);
 
-  // -- socket + lifecycle ------------------------------------------------------
+  // -- socket + lifecycle --------------------------------------------------------
 
   useEffect(() => {
     const socket = new EnvelopeSocket(`ws://${window.location.host}/ws`);
     socketRef.current = socket;
 
+    const refreshWorkspace = () =>
+      void getWorkspace().then((data) => {
+        setNotebooks(data.notebooks);
+        setKind(data.notebooks.find((row) => row.current)?.kind ?? null);
+      });
+
     socket.on("hello", (envelope) => {
       setNotebook((envelope["notebook"] as string) ?? null);
       setKernelAlive(Boolean(envelope["kernel"]));
       setMarimoUrl((envelope["marimo_url"] as string) ?? null);
-      void getWorkspace().then((data) => {
-        setNotebooks(data.notebooks);
-        const current = data.notebooks.find((row) => row.current);
-        if (current) setKind(current.kind);
-      });
+      refreshWorkspace();
+    });
+
+    // Another notebook is being opened: drop the old model and its state now,
+    // the kernel takes a few seconds to boot and publish the new one.
+    socket.on("opening", (envelope) => {
+      viewRef.current?.clearScene();
+      framedNotebook.current = null;
+      setCells([]);
+      setParams([]);
+      setFeatures([]);
+      setPicked([]);
+      setNotebook(String(envelope["notebook"] ?? ""));
+      setStatus(`opening ${envelope["notebook"]}…`);
+      setSceneVersion((version) => version + 1);
+      refreshWorkspace();
     });
 
     socket.on("params.schema", (envelope) => {
@@ -123,63 +123,74 @@ export function App() {
     socket.on("notebook.features", (envelope) => setFeatures((envelope["features"] as NotebookFeature[]) ?? []));
 
     socket.on("package", (envelope) => {
-      const revision = Number(envelope["revision"] ?? 0);
-      void fetchPackage().then((bytes) =>
-        loadPackageBytes(bytes, revision, (envelope["name"] as string) ?? null),
-      );
+      void fetchPackage().then((bytes) => loadPackageBytes(bytes, (envelope["name"] as string) ?? null));
     });
 
     socket.on("status", (envelope) => {
       // An empty error means "the model is fine again": keep the package line.
       if (typeof envelope["error"] === "string") {
         if (envelope["error"]) setStatus(`error: ${envelope["error"]}`);
-      }
-      else if (typeof envelope["exported"] === "string") {
-        setStatus(`exported ${envelope["exported"]}`);
-        setPackageInfo((previous) => (previous ? { ...previous, exported: envelope["exported"] as string } : previous));
-      } else if (typeof envelope["created"] === "string") setStatus(`created ${envelope["created"]}`);
+      } else if (typeof envelope["exported"] === "string") setStatus(`exported ${envelope["exported"]}`);
+      else if (typeof envelope["created"] === "string") setStatus(`created ${envelope["created"]}`);
     });
 
     socket.connect();
     return () => socket.close();
   }, [loadPackageBytes]);
 
-  // -- actions ------------------------------------------------------------------
+  // -- selection -------------------------------------------------------------------
 
   const handlePick = useCallback((result: PickResult) => {
-    setPick(result);
-    // Publish for agents (GET /api/studio/selected), including a compact
-    // entity payload so the agent sees what the human sees.
-    void publishSelection({
-      notebook: notebook,
-      node_id: result.nodeId,
-      entity_id: result.entityId,
-      mode: result.mode,
-      entity: result.entity
-        ? { kind: result.entity.kind, id: result.entity.entity_id, data: result.entity.properties ?? null }
-        : null,
-    }).catch(() => undefined);
-  }, [notebook]);
-
-  const refreshWorkspace = useCallback(() => {
-    void getWorkspace().then((data) => {
-      setNotebooks(data.notebooks);
-      const current = data.notebooks.find((row) => row.current);
-      setKind(current?.kind ?? null);
+    const view = viewRef.current;
+    const node = view?.nodes.find((item) => item.node_id === result.nodeId);
+    const entity = result.entity;
+    const item: Omit<SelectionItem, "variable"> = {
+      key: `${result.nodeId}::${result.entityId ?? "component"}`,
+      kind: result.mode === "component" ? "component" : ((entity?.kind ?? result.mode) as SelectionItem["kind"]),
+      nodeId: result.nodeId,
+      entityId: result.entityId,
+      definitionId: node?.definition_id ?? null,
+      properties: entity?.properties ?? null,
+      geometry: entity?.geometry ?? null,
+      tags: entity?.tags ?? null,
+    };
+    setPicked((previous) => {
+      if (!result.additive) return [item];
+      return previous.some((other) => other.key === item.key)
+        ? previous.filter((other) => other.key !== item.key)
+        : [...previous, item];
     });
   }, []);
 
+  const handleClear = useCallback(() => setPicked((previous) => (previous.length ? [] : previous)), []);
+
+  // The notebook follows the selection: the server writes it as ql code into
+  // the selection cell, and the viewport image is saved for coding agents.
+  const firstSelection = useRef(true);
+  useEffect(() => {
+    if (firstSelection.current) {
+      firstSelection.current = false;
+      return;
+    }
+    const send = window.setTimeout(
+      () => socketRef.current?.send({ type: "selection.set", items: selectionPayload(selection) }),
+      120,
+    );
+    const snapshot = window.setTimeout(() => {
+      const png = viewRef.current?.snapshotPng();
+      if (png) void postViewport(png).catch(() => undefined);
+    }, 600);
+    return () => {
+      window.clearTimeout(send);
+      window.clearTimeout(snapshot);
+    };
+  }, [selection]);
+
+  // -- actions -----------------------------------------------------------------------
+
   const handleOpen = (path: string) => {
     setStatus(`opening ${path}…`);
-    openNotebook(path)
-      .then(refreshWorkspace)
-      .catch((error) => setStatus(`open failed: ${error.message}`));
-  };
-
-  const handleNew = (name: string, newKind: "part" | "assembly") => {
-    newNotebook(name, newKind)
-      .then(refreshWorkspace)
-      .catch((error) => setStatus(`create failed: ${error.message}`));
+    openNotebook(path).catch((error) => setStatus(`error: open failed: ${error.message}`));
   };
 
   return (
@@ -190,58 +201,73 @@ export function App() {
         kernelAlive={kernelAlive}
         status={status}
         marimoUrl={marimoUrl}
-        onExport={() => socketRef.current?.send({ type: "export.request" })}
-        onRerun={() => socketRef.current?.send({ type: "rerun.request" })}
-        onNewNotebook={handleNew}
+        onRunAll={() => socketRef.current?.send({ type: "rerun.request" })}
       />
       <ResizablePanelGroup className="min-h-0 flex-1">
-        <ResizablePanel defaultSize={30} minSize={18} className="min-w-0">
+        <ResizablePanel defaultSize={32} minSize={18} className="min-w-0">
           <Tabs defaultValue="notebook" className="h-full">
-            <TabsList className="mx-2 mt-2">
+            <TabsList>
               <TabsTrigger value="notebook">notebook</TabsTrigger>
               <TabsTrigger value="workspace">workspace</TabsTrigger>
             </TabsList>
-            <TabsContent value="notebook" className="h-[calc(100%-3rem)]">
-              <CellEditor cells={cells} features={features} params={params} socket={socketRef.current} />
+            <TabsContent value="notebook" className="min-h-0">
+              <CellEditor
+                cells={cells}
+                features={features}
+                params={params}
+                socket={socketRef.current}
+                notebook={notebook}
+              />
             </TabsContent>
-            <TabsContent value="workspace" className="h-[calc(100%-3rem)]">
+            <TabsContent value="workspace" className="min-h-0">
               <NotebookList notebooks={notebooks} onOpen={handleOpen} />
             </TabsContent>
           </Tabs>
         </ResizablePanel>
         <ResizableHandle />
-        <ResizablePanel defaultSize={48} minSize={30} className="min-w-0">
+        <ResizablePanel defaultSize={46} minSize={30} className="min-w-0">
           <div className="flex h-full flex-col">
-            <div className="flex items-center gap-1.5 border-b px-2 py-1">
-              {(["solid", "face", "edge"] as SelectionMode[]).map((mode) => (
+            <div className="flex h-9 shrink-0 items-center gap-1 border-b-2 border-border px-2">
+              {MODES.map(({ mode, label }) => (
                 <button
                   key={mode}
                   type="button"
-                  className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                    selectionMode === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
-                  }`}
+                  className={cn(
+                    "border-2 px-2 py-px text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors",
+                    selectionMode === mode
+                      ? "border-white bg-white text-black"
+                      : "border-transparent text-muted-foreground hover:border-input hover:text-foreground",
+                  )}
                   onClick={() => setSelectionMode(mode)}
                 >
-                  {mode}
+                  {label}
                 </button>
               ))}
               <span className="flex-1" />
+              <span className="label hidden xl:inline">ctrl+click: add</span>
               <button
                 type="button"
-                className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground hover:bg-accent"
+                className="border-2 border-transparent px-2 py-px text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground hover:border-input hover:text-foreground"
                 onClick={() => viewRef.current?.frame()}
               >
                 fit
               </button>
             </div>
             <div className="min-h-0 flex-1">
-              <Viewport viewRef={viewRef} selectionMode={selectionMode} onPick={handlePick} />
+              <Viewport
+                viewRef={viewRef}
+                selectionMode={selectionMode}
+                selection={selection}
+                sceneVersion={sceneVersion}
+                onPick={handlePick}
+                onClear={handleClear}
+              />
             </div>
           </div>
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel defaultSize={22} minSize={14} className="min-w-0">
-          <Inspector pick={pick} features={federated} packageInfo={packageInfo} />
+          <Inspector selection={selection} />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

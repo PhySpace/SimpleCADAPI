@@ -10,6 +10,7 @@ Groups, each owned by its module and registered here at parser level so
     sca run <notebook.py> [--set NAME=VALUE] [--out ...]
     sca ls [DIR]  |  sca params <notebook.py>
     sca edit [WORKSPACE]          # the web editor (needs the 'editor' extra)
+    sca snapshot [WORKSPACE]      # what the editor user has selected / sees
 
 Shared contract: group handlers return ``(report, exit_code)`` and are
 followed by the group's own printer (human-readable for init/addon, JSON

@@ -300,6 +300,42 @@ class MarimoKernel:
             + _driver(f"    ctx.edit_cell({cell_id!r}, code=__code)\n    ctx.run_cell({cell_id!r})")
         )
 
+    def save_cell(self, cell_id: str, code: str) -> dict:
+        """Replace a cell's code (persisted to the file) without running it."""
+        return self.execute(
+            "import json as _json\n"
+            f"__code = _json.loads({json.dumps(json.dumps(code))})\n"
+            + _driver(f"    ctx.edit_cell({cell_id!r}, code=__code)")
+        )
+
+    def put_cell(self, code: str, *, cell_id: str | None, run: bool = True) -> str | None:
+        """Write *code* into cell *cell_id*, or append a new cell holding it.
+
+        Returns the id of the cell, or ``None`` if the kernel did not answer.
+        The cell is run unless *run* is false.
+        """
+        run_line = "    ctx.run_cell(__id)\n" if run else ""
+        if cell_id is not None:
+            body = f"    __id = {cell_id!r}\n    ctx.edit_cell(__id, code=__code)\n" + run_line
+        else:
+            body = (
+                "    __last = [c.id for c in ctx.cells]\n"
+                "    if __last:\n"
+                "        __id = ctx.create_cell(__code, after=__last[-1])\n"
+                "    else:\n"
+                "        __id = ctx.create_cell(__code)\n" + run_line
+            )
+        result = self.execute(
+            "import json as _json\n"
+            f"__code = _json.loads({json.dumps(json.dumps(code))})\n"
+            + _driver(body)
+            + "print('SCA-CELL', __id)\n"
+        )
+        for line in (result.get("log") or "").splitlines():
+            if line.startswith("SCA-CELL "):
+                return line[len("SCA-CELL "):].strip()
+        return None
+
     def delete_cell(self, cell_id: str) -> dict:
         return self.execute(_driver(f"    ctx.delete_cell({cell_id!r})"))
 

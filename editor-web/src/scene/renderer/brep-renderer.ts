@@ -104,6 +104,9 @@ export class BRepRenderer {
   private observer: ResizeObserver;
   private pendingFrame = true;
   private disposed = false;
+  private grid: THREE.LineSegments | null = null;
+  private readonly gizmoScene = new THREE.Scene();
+  private readonly gizmoCamera = new THREE.OrthographicCamera(-1.5, 1.5, 1.5, -1.5, 0.1, 20);
 
   constructor(host: HTMLElement, options: BRepRendererOptions = {}) {
     this.host = host;
@@ -174,7 +177,12 @@ export class BRepRenderer {
       true,
     );
     this.modelRoot.name = 'scene-root';
+    // Package geometry is glTF (Y up, CAD z -> y, CAD y -> -z). Rotate it back
+    // so the world is the CAD frame: x, y, z in meters and +Z up, which is
+    // what the camera's up vector, the ground grid and the axis gizmo assume.
+    this.modelRoot.rotation.x = Math.PI / 2;
     this.threeScene.add(this.modelRoot);
+    this.buildGizmo();
     this.setupLighting();
     this.setupPostprocessing();
     this.observer = new ResizeObserver(() => this.resize());
@@ -326,6 +334,109 @@ export class BRepRenderer {
     this.renderer.setRenderTarget(previousTarget);
     this.renderer.autoClear = previousAutoClear;
     this.blit(this.presentMaterial!);
+    this.renderGizmo();
+  }
+
+  // -- ground grid + axis gizmo ---------------------------------------------------
+
+  /** A gray grid on the XY plane (z = 0), sized to the model. */
+  private updateGrid(): void {
+    if (this.grid) {
+      this.threeScene.remove(this.grid);
+      this.grid.geometry.dispose();
+      (this.grid.material as THREE.Material).dispose();
+      this.grid = null;
+    }
+    this.modelRoot.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(this.modelRoot);
+    if (box.isEmpty()) return;
+    const reach = Math.max(Math.abs(box.min.x), Math.abs(box.max.x), Math.abs(box.min.y), Math.abs(box.max.y), 0.02) * 1.5;
+    // 1-2-5 step, about eight cells from the origin to the edge
+    const raw = reach / 8;
+    const decade = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = decade * ([1, 2, 5, 10].find((factor) => factor * decade >= raw) ?? 10);
+    const count = Math.ceil(reach / step);
+    const extent = count * step;
+    const positions: number[] = [];
+    const colors: number[] = [];
+    const minor = new THREE.Color('#262626');
+    const major = new THREE.Color('#444444');
+    for (let index = -count; index <= count; index += 1) {
+      const color = index % 5 === 0 ? major : minor;
+      const at = index * step;
+      positions.push(at, -extent, 0, at, extent, 0, -extent, at, 0, extent, at, 0);
+      for (let vertex = 0; vertex < 4; vertex += 1) colors.push(color.r, color.g, color.b);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    const grid = new THREE.LineSegments(
+      geometry,
+      new THREE.LineBasicMaterial({ vertexColors: true, depthWrite: false, toneMapped: false }),
+    );
+    grid.name = 'ground-grid';
+    grid.userData.pickable = false;
+    grid.layers.set(EDGE_LAYER); // composited after AO, depth-tested against the model
+    grid.renderOrder = -1;
+    this.threeScene.add(grid);
+    this.grid = grid;
+    this.needsRender = true;
+  }
+
+  /** The three axes as blocks and letters; drawn in a corner of the canvas. */
+  private buildGizmo(): void {
+    const axes: { dir: THREE.Vector3; color: string; label: string }[] = [
+      { dir: new THREE.Vector3(1, 0, 0), color: '#ff4d5e', label: 'X' },
+      { dir: new THREE.Vector3(0, 1, 0), color: '#3ddc84', label: 'Y' },
+      { dir: new THREE.Vector3(0, 0, 1), color: '#4aa3ff', label: 'Z' },
+    ];
+    const basic = (color: string) => new THREE.MeshBasicMaterial({ color, toneMapped: false });
+    for (const { dir, color, label } of axes) {
+      const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 1), basic(color));
+      shaft.position.copy(dir).multiplyScalar(0.5);
+      shaft.lookAt(dir);
+      const tip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), basic(color));
+      tip.position.copy(dir);
+      const tail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), basic('#555555'));
+      tail.position.copy(dir).multiplyScalar(-1);
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 64;
+      const context = canvas.getContext('2d')!;
+      context.font = '700 44px ui-monospace, SFMono-Regular, Menlo, monospace';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillStyle = color;
+      context.fillText(label, 32, 34);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: texture, depthTest: false, toneMapped: false, transparent: true }),
+      );
+      sprite.scale.set(0.42, 0.42, 1);
+      sprite.position.copy(dir).multiplyScalar(1.38);
+      this.gizmoScene.add(shaft, tip, tail, sprite);
+    }
+  }
+
+  private renderGizmo(): void {
+    const size = this.renderer.getSize(new THREE.Vector2());
+    const side = 108;
+    const margin = 12;
+    const offset = this.camera.position.clone().sub(this.controls.target).normalize().multiplyScalar(6);
+    this.gizmoCamera.position.copy(offset);
+    this.gizmoCamera.up.copy(this.camera.up);
+    this.gizmoCamera.lookAt(0, 0, 0);
+    const previousAutoClear = this.renderer.autoClear;
+    this.renderer.autoClear = false;
+    this.renderer.setRenderTarget(null);
+    this.renderer.setScissorTest(true);
+    this.renderer.setViewport(size.x - side - margin, margin, side, side);
+    this.renderer.setScissor(size.x - side - margin, margin, side, side);
+    this.renderer.clearDepth();
+    this.renderer.render(this.gizmoScene, this.gizmoCamera);
+    this.renderer.setScissorTest(false);
+    this.renderer.setViewport(0, 0, size.x, size.y);
+    this.renderer.autoClear = previousAutoClear;
   }
 
   // -- scene loading -------------------------------------------------------
@@ -395,6 +506,7 @@ export class BRepRenderer {
     // Re-frame only on the FIRST load; watched reloads (Studio live view,
     // agent artifact iterations) must keep the user's camera pose and zoom.
     if (!hadScene) this.pendingFrame = true;
+    this.updateGrid();
     this.resize();
   }
 
@@ -420,6 +532,7 @@ export class BRepRenderer {
     group.add(this.edgeLineVisual(payload.edge_positions, 'live-edges'));
     this.modelRoot.add(group);
     if (!hadScene) this.pendingFrame = true;
+    this.updateGrid();
     this.resize();
   }
 
@@ -623,7 +736,12 @@ export class BRepRenderer {
     this.camera.up.set(0, 0, 1);
     // 2.3 (not the textbook ~2.8, nor 2.05): the bounding sphere over-covers
     // flat parts, but 2.05 read as slightly too large in review.
-    this.camera.position.copy(center).add(new THREE.Vector3(1, 0.78, 1).normalize().multiplyScalar(radius * 2.3));
+    // Fit the bounding sphere in the narrower of the two view angles, so a
+    // tall, narrow viewport frames the model as well as a wide one.
+    const verticalFov = THREE.MathUtils.degToRad(this.camera.fov);
+    const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * this.camera.aspect);
+    const distance = (radius / Math.sin(Math.min(verticalFov, horizontalFov) / 2)) * 0.82;
+    this.camera.position.copy(center).add(new THREE.Vector3(1, 0.78, 1).normalize().multiplyScalar(distance));
     this.camera.near = Math.max(radius / 100, 1e-5);
     this.camera.far = Math.max(radius * 100, 0.5);
     this.camera.updateProjectionMatrix();
@@ -702,6 +820,15 @@ export class BRepRenderer {
     this.observer.disconnect();
     this.renderer.setAnimationLoop(null);
     this.clearScene();
+    if (this.grid) {
+      this.grid.geometry.dispose();
+      (this.grid.material as THREE.Material).dispose();
+    }
+    this.gizmoScene.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      mesh.geometry?.dispose?.();
+      (mesh.material as THREE.Material | undefined)?.dispose?.();
+    });
     this.controls.dispose();
     this.faceRT?.dispose();
     this.beautyRT?.dispose();

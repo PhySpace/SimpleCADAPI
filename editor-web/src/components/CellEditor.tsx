@@ -1,12 +1,22 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
-import { oneDark } from "@codemirror/theme-one-dark";
-import { Loader2, Play, Plus, RotateCcw } from "lucide-react";
+import { EditorView } from "@codemirror/view";
+import {
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUp,
+  ChevronsUpDown,
+  Loader2,
+  Play,
+  Plus,
+  Trash2,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Slider } from "@/components/ui/slider";
+import { cadTheme } from "@/lib/cm-theme";
 import { cn } from "@/lib/utils";
 
 export type NotebookCell = {
@@ -19,6 +29,10 @@ export type NotebookCell = {
   console?: string[];
   /** Slug of the cell's `# ---- feature: ... ----` header, if it has one. */
   feature?: string | null;
+  /** The step's name: feature slug, params header, or the first variable it defines. */
+  title?: string;
+  /** An @app.function cell: edited in the file, not here. */
+  readonly?: boolean;
 };
 /** One feature header; `cell` is the id of the cell it opens. */
 export type NotebookFeature = { cell: string; label: string; kind?: string };
@@ -45,53 +59,104 @@ export type ParamMeta = {
 
 type SocketLike = { send: (message: Record<string, unknown>) => void } | null;
 
-/** The notebook document, laid out like marimo's own webui:
- *
- *   [① gutter] [ code editor            ]
- *   [    ]      [ output / ui elements  ]   ← params sliders live here
- *   [    ]      [ console (dimmer)      ]
- *
- * Hovering the gap between cells reveals a "+" (insert cell). The gutter
- * circle is the run control; the smaller circle below it is the two-stage
- * rollback (delete the cell and restore the state before it). Ctrl+Enter or
- * the gutter runs the cell via `code.edit`; the package event refreshes
- * everything else.
- */
+const AUTOSAVE_MS = 700;
+const EXTENSIONS = [python(), EditorView.lineWrapping];
+
+function loadCollapsed(notebook: string | null): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(`sca-collapsed:${notebook}`);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/** The notebook: one block per cell. A block's header is its handle — the
+ * step's name — and folds the cell away; the buttons run it, run everything
+ * above it, or delete it. Every edit is autosaved to the notebook file, so a
+ * coding agent reading the file sees what is on screen. */
 export function CellEditor({
   cells,
   features,
   params,
   socket,
+  notebook,
 }: {
   cells: NotebookCell[];
   features: NotebookFeature[];
   params: ParamMeta[];
   socket: SocketLike;
+  notebook: string | null;
 }) {
   const [drafts, setDrafts] = useState<Map<string, string>>(new Map());
   const [running, setRunning] = useState<string | null>(null);
-  // Two-stage rollback: arm on the first gutter click (button red, cell
-  // dimmed), confirm on the second; any click elsewhere disarms.
-  const [armedRollback, setArmedRollback] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => loadCollapsed(notebook));
+  // Two-stage delete: arm on the first click (button turns red), confirm on
+  // the second; any click elsewhere disarms.
+  const [armed, setArmed] = useState<string | null>(null);
+  const saveTimers = useRef(new Map<string, number>());
 
-  const featureByCell = new Map(features.map((feature) => [feature.cell, feature]));
+  const featureByCell = useMemo(() => new Map(features.map((feature) => [feature.cell, feature])), [features]);
 
-  // Differential semantics: the server rolls the runtime back to cell-1,
-  // runs this cell, and leaves the suffix stale.
+  useEffect(() => {
+    setCollapsed(loadCollapsed(notebook));
+    setDrafts(new Map());
+  }, [notebook]);
+
+  const remember = (next: Set<string>) => {
+    setCollapsed(next);
+    try {
+      window.localStorage.setItem(`sca-collapsed:${notebook}`, JSON.stringify([...next]));
+    } catch {
+      /* private mode: folding just does not persist */
+    }
+  };
+  const toggle = (id: string) => {
+    const next = new Set(collapsed);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    remember(next);
+  };
+
+  const cancelSave = (id: string) => {
+    const timer = saveTimers.current.get(id);
+    if (timer !== undefined) window.clearTimeout(timer);
+    saveTimers.current.delete(id);
+  };
+
   const run = (cell: NotebookCell) => {
+    cancelSave(cell.id);
     const code = drafts.get(cell.id) ?? cell.code;
     setRunning(cell.id);
     socket?.send({ type: "code.edit", cell: cell.id, code });
     window.setTimeout(() => setRunning((current) => (current === cell.id ? null : current)), 2500);
   };
 
-  const rollback = (cell: NotebookCell) => {
-    setArmedRollback(null);
+  const runAbove = (cell: NotebookCell) => {
+    setRunning(cell.id);
+    socket?.send({ type: "rerun.request", cell: cell.id, above: true });
+    window.setTimeout(() => setRunning((current) => (current === cell.id ? null : current)), 2500);
+  };
+
+  const remove = (cell: NotebookCell) => {
+    setArmed(null);
+    cancelSave(cell.id);
     socket?.send({ type: "rollback.request", cell: cell.id });
   };
 
-  const insert = (after: string | null) => {
-    socket?.send({ type: "insert.request", after });
+  const insert = (after: string | null) => socket?.send({ type: "insert.request", after });
+
+  const edit = (cell: NotebookCell, value: string) => {
+    setDrafts((previous) => new Map(previous).set(cell.id, value));
+    if (cell.readonly) return;
+    cancelSave(cell.id);
+    saveTimers.current.set(
+      cell.id,
+      window.setTimeout(() => {
+        saveTimers.current.delete(cell.id);
+        socket?.send({ type: "cell.save", cell: cell.id, code: value });
+      }, AUTOSAVE_MS),
+    );
   };
 
   // Forward slider bursts; the server coalesces (latest-wins rebuild).
@@ -107,69 +172,76 @@ export function CellEditor({
     }, 60);
   };
 
-  // Disarm rollback when clicking anywhere outside the armed button.
+  // Disarm delete when clicking anywhere outside the armed button.
   useEffect(() => {
-    if (!armedRollback) return;
+    if (!armed) return;
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as HTMLElement | null;
-      if (!target?.closest(`[data-rollback-armed="${CSS.escape(armedRollback)}"]`)) {
-        setArmedRollback(null);
-      }
+      if (!target?.closest(`[data-delete-armed="${CSS.escape(armed)}"]`)) setArmed(null);
     };
     window.addEventListener("pointerdown", onPointerDown, true);
     return () => window.removeEventListener("pointerdown", onPointerDown, true);
-  }, [armedRollback]);
+  }, [armed]);
 
   if (cells.length === 0) {
-    return <p className="p-3 text-xs text-muted-foreground">Waiting for the kernel to publish cells…</p>;
+    return <p className="p-3 text-[11px] text-muted-foreground">Waiting for the kernel to publish cells…</p>;
   }
-  // marimo-style insertion affordance: hover the gap between cells.
-  const gaps: (string | null)[] = [null, ...cells.map((c) => c.id)];
+
+  const allCollapsed = cells.every((cell) => collapsed.has(cell.id));
   return (
-    <ScrollArea className="h-full">
-      <div className="px-2 py-2">
-        {cells.map((cell, index) => (
-          <div key={cell.id}>
-            <CellGap after={gaps[index]} onInsert={insert} />
-            <CellCard
-              cell={cell}
-              index={index}
-              feature={featureByCell.get(cell.id)}
-              params={params.filter((param) => param.cell === cell.id)}
-              draft={drafts.get(cell.id)}
-              dirty={drafts.get(cell.id) !== undefined && drafts.get(cell.id) !== cell.code}
-              runningName={running}
-              socket={socket}
-              forwardParam={forwardParam}
-              onRun={run}
-              onRollback={rollback}
-              onDraftChange={(value) =>
-                setDrafts((previous) => {
-                  const next = new Map(previous);
-                  next.set(cell.id, value);
-                  return next;
-                })
-              }
-              armed={armedRollback === cell.id}
-              onArm={() => setArmedRollback((current) => (current === cell.id ? null : cell.id))}
-            />
-          </div>
-        ))}
-        <CellGap after={cells[cells.length - 1].id} onInsert={insert} />
+    <div className="flex h-full flex-col">
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-3">
+        <span className="label">{cells.length} cells</span>
+        <button
+          type="button"
+          className="label flex items-center gap-1 hover:text-foreground"
+          title={allCollapsed ? "Unfold every cell" : "Fold every cell to its name"}
+          onClick={() => remember(allCollapsed ? new Set() : new Set(cells.map((cell) => cell.id)))}
+        >
+          {allCollapsed ? <ChevronsUpDown className="h-3 w-3" /> : <ChevronsDownUp className="h-3 w-3" />}
+          {allCollapsed ? "unfold all" : "fold all"}
+        </button>
       </div>
-    </ScrollArea>
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="px-2 pb-6">
+          <CellGap after={null} onInsert={insert} />
+          {cells.map((cell, index) => (
+            <div key={cell.id}>
+              <CellBlock
+                cell={cell}
+                index={index}
+                role={featureByCell.get(cell.id)?.kind}
+                params={params.filter((param) => param.cell === cell.id)}
+                draft={drafts.get(cell.id)}
+                folded={collapsed.has(cell.id)}
+                busy={running === cell.id || cell.status === "running" || cell.status === "queued"}
+                armed={armed === cell.id}
+                socket={socket}
+                forwardParam={forwardParam}
+                onToggle={() => toggle(cell.id)}
+                onRun={() => run(cell)}
+                onRunAbove={() => runAbove(cell)}
+                onDelete={() => (armed === cell.id ? remove(cell) : setArmed(cell.id))}
+                onEdit={(value) => edit(cell, value)}
+              />
+              <CellGap after={cell.id} onInsert={insert} />
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
   );
 }
 
 /** Hover divider between cells with a "+" insertion button. */
 function CellGap({ after, onInsert }: { after: string | null; onInsert: (after: string | null) => void }) {
   return (
-    <div className="group/gap relative flex h-4 items-center justify-start">
-      <div className="absolute inset-x-4 h-px bg-transparent transition-colors group-hover/gap:bg-border" />
+    <div className="group/gap relative flex h-3 items-center justify-center">
+      <div className="absolute inset-x-0 h-[2px] bg-transparent transition-colors group-hover/gap:bg-border" />
       <button
         type="button"
-        title="Insert cell here"
-        className="z-10 ml-10 flex h-5 w-5 items-center justify-center rounded-full border bg-card text-muted-foreground opacity-0 shadow-sm transition-opacity hover:border-primary/50 hover:text-foreground group-hover/gap:opacity-100"
+        title="Insert a cell here"
+        className="z-10 flex h-4 w-4 items-center justify-center border-2 border-input bg-black text-muted-foreground opacity-0 transition-opacity hover:border-focus hover:text-focus group-hover/gap:opacity-100"
         onClick={(event) => {
           event.stopPropagation();
           onInsert(after);
@@ -181,205 +253,200 @@ function CellGap({ after, onInsert }: { after: string | null; onInsert: (after: 
   );
 }
 
-/** One cell document: gutter controls + code + output + console. */
-function CellCard({
+function IconButton({
+  title,
+  onClick,
+  disabled,
+  className,
+  children,
+  ...rest
+}: {
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+  className?: string;
+  children: React.ReactNode;
+} & Record<string, unknown>) {
+  return (
+    <button
+      type="button"
+      title={title}
+      disabled={disabled}
+      className={cn(
+        "flex h-6 w-6 shrink-0 items-center justify-center border-2 border-transparent text-muted-foreground transition-colors hover:border-input hover:text-foreground disabled:pointer-events-none disabled:opacity-30",
+        className,
+      )}
+      onClick={onClick}
+      {...rest}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** One cell: header handle + (when open) code, errors, output, console. */
+function CellBlock({
   cell,
   index,
-  feature,
+  role,
   params,
   draft,
-  dirty,
-  runningName,
+  folded,
+  busy,
+  armed,
   socket,
   forwardParam,
+  onToggle,
   onRun,
-  onRollback,
-  onDraftChange,
-  armed,
-  onArm,
+  onRunAbove,
+  onDelete,
+  onEdit,
 }: {
   cell: NotebookCell;
   index: number;
-  feature?: NotebookFeature;
+  role?: string;
   params: ParamMeta[];
   draft: string | undefined;
-  dirty: boolean;
-  runningName: string | null;
+  folded: boolean;
+  busy: boolean;
+  armed: boolean;
   socket: SocketLike;
   forwardParam: (id: string, value: ParamValue) => void;
-  onRun: (cell: NotebookCell) => void;
-  onRollback: (cell: NotebookCell) => void;
-  onDraftChange: (value: string) => void;
-  armed: boolean;
-  onArm: () => void;
+  onToggle: () => void;
+  onRun: () => void;
+  onRunAbove: () => void;
+  onDelete: () => void;
+  onEdit: (value: string) => void;
 }) {
-  const failed = cell.status === "exception" || cell.status === "error";
+  const failed = cell.status === "exception" || cell.status === "error" || (cell.errors?.length ?? 0) > 0;
   const stale = cell.status === "stale";
-  const isRunning = runningName === cell.id || cell.status === "running";
-  const hasOutput =
-    Boolean(cell.output) || (cell.console?.length ?? 0) > 0 || params.length > 0;
+  const dirty = draft !== undefined && draft !== cell.code;
+  const isSelection = cell.title === "selection";
+  const title = cell.title || cell.name;
+  const hasOutput = Boolean(cell.output) || params.length > 0;
   return (
-    // marimo cells are open documents: spacing + hover outline, not cards.
     <section
       className={cn(
-        "group relative flex gap-1 rounded-md py-0.5 transition-colors hover:bg-white/[0.02]",
-        stale && "opacity-55",
+        "border-2 bg-black transition-colors",
+        isSelection ? "border-focus/60" : failed ? "border-fail/70" : "border-border",
+        stale && !failed && "border-dashed",
+        armed && "border-fail",
       )}
     >
-      {/* gutter: run control + state, rollback below it */}
-      <div className="flex shrink-0 flex-col items-center gap-1 pt-1">
+      <header className="flex h-8 items-center gap-1 pr-1">
         <button
           type="button"
-          title={failed ? "cell failed — click to rerun" : `run ${cell.feature ?? cell.name}`}
-          className={cn(
-            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold",
-            isRunning
-              ? "border-primary/40 text-primary"
-              : failed
-                ? "border-destructive/60 bg-destructive/15 text-destructive"
-                : dirty
-                  ? "border-amber-500/50 text-amber-400 hover:bg-accent"
-                  : "border-transparent text-muted-foreground/60 group-hover:border-border group-hover:text-muted-foreground",
-          )}
-          onClick={() => onRun(cell)}
+          className="flex min-w-0 flex-1 items-center gap-1.5 self-stretch pl-1.5 text-left"
+          onClick={onToggle}
+          title={folded ? "Unfold" : "Fold to its name"}
         >
-          {isRunning ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : failed ? (
-            <span className="h-2 w-2 rounded-full bg-destructive" />
-          ) : dirty ? (
-            <span className="h-2 w-2 rounded-full bg-amber-400" />
-          ) : (
-            <>
-              <span className="group-hover:hidden">{index + 1}</span>
-              <Play className="hidden h-3 w-3 group-hover:block" />
-            </>
-          )}
+          <ChevronRight className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform", !folded && "rotate-90")} />
+          <span className="w-5 shrink-0 text-[10px] text-muted-foreground">{String(index + 1).padStart(2, "0")}</span>
+          <span className={cn("truncate font-semibold", isSelection ? "text-focus" : "text-name")}>{title}</span>
+          {role && <span className="label shrink-0">{role}</span>}
         </button>
-        {/* rollback: first click arms (button turns solid red, content
-            dims); second click on it confirms; any click elsewhere disarms. */}
-        <button
-          type="button"
-          data-rollback-armed={cell.id}
-          title={
-            armed
-              ? "Click again to delete this cell and roll back"
-              : "Rollback: delete this cell and restore the state before it"
-          }
-          className={cn(
-            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold",
-            armed
-              ? "border-destructive bg-destructive text-destructive-foreground opacity-100"
-              : "border-transparent text-muted-foreground/60 opacity-0 group-hover:border-border group-hover:text-muted-foreground group-hover:opacity-100",
-          )}
-          onClick={() => {
-            if (armed) {
-              onArm();
-              onRollback(cell);
-            } else {
-              onArm();
-            }
-          }}
+        {dirty && <span className="h-2 w-2 shrink-0 bg-focus" title="saving…" />}
+        {failed && <Badge variant="fail">failed</Badge>}
+        {stale && !failed && <Badge variant="focus">stale</Badge>}
+        {cell.readonly && <Badge variant="secondary">function</Badge>}
+        <IconButton title="Run every cell above this one" onClick={onRunAbove} disabled={index === 0}>
+          <ChevronsUp className="h-3.5 w-3.5" />
+        </IconButton>
+        <IconButton title={failed ? "Cell failed — run again (Ctrl+Enter)" : "Run this cell (Ctrl+Enter)"} onClick={onRun}>
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin text-focus" /> : <Play className="h-3.5 w-3.5" />}
+        </IconButton>
+        <IconButton
+          title={armed ? "Click again to delete this cell" : "Delete this cell"}
+          onClick={onDelete}
+          data-delete-armed={cell.id}
+          className={armed ? "border-fail bg-fail text-black hover:border-fail hover:text-black" : "hover:text-fail"}
         >
-          <RotateCcw className="h-3 w-3" />
-        </button>
-      </div>
-      <div className={cn("min-w-0 flex-1", armed && "opacity-40 grayscale")}>
-        <div className="relative">
+          <Trash2 className="h-3.5 w-3.5" />
+        </IconButton>
+      </header>
+      {!folded && (
+        <div className="border-t-2 border-border">
           <CodeMirror
             value={draft ?? cell.code}
             height="auto"
-            extensions={[python()]}
-            theme={oneDark}
+            extensions={EXTENSIONS}
+            theme={cadTheme}
+            editable={!cell.readonly}
             basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: false }}
-            onChange={onDraftChange}
+            onChange={onEdit}
             onKeyDown={(event) => {
               if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
                 event.preventDefault();
-                onRun(cell);
+                onRun();
               }
             }}
           />
-          {/* identity chips float over the editor's top-right corner */}
-          <span className="pointer-events-none absolute right-2 top-1 z-10 flex items-center gap-1.5">
-            {feature && (
-              <Badge variant="secondary" className="normal-case">
-                {feature.label}
-                {feature.kind ? ` · ${feature.kind}` : ""}
-              </Badge>
-            )}
-            {stale && (
-              <Badge variant="outline" className="text-amber-400">
-                stale
-              </Badge>
-            )}
-            <span className="font-mono text-[10px] text-muted-foreground">{cell.name === "_" ? "" : cell.name}</span>
-          </span>
-        </div>
-        {/* errors: marimo puts the exception box under the code */}
-        {(cell.errors?.length ?? 0) > 0 && (
-          <div className="mx-2 my-1 rounded border border-destructive/40 bg-destructive/10 px-2 py-1">
-            {cell.errors?.map((message, errorIndex) => (
-              <pre key={errorIndex} className="whitespace-pre-wrap text-[11px] text-destructive">
-                {message}
-              </pre>
-            ))}
-          </div>
-        )}
-        {/* output zone: ui elements (params) first, then rich output */}
-        {hasOutput && (
-          <div className="px-2 py-1">
-            {params.length > 0 && (
-              <div className="pb-1">
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                  {params.map((param) => (
-                    <ParamControl key={param.id} param={param} forwardParam={forwardParam} />
-                  ))}
-                </div>
-                {params.some((param) => param.modified) && (
-                  <div className="flex justify-end gap-2 pt-1 text-[10px] uppercase">
-                    <button
-                      type="button"
-                      className="text-muted-foreground hover:text-foreground"
-                      title="Drop the edited values; back to what the source says"
-                      onClick={() => socket?.send({ type: "param.revert", names: params.filter((p) => p.modified).map((p) => p.id) })}
-                    >
-                      revert
-                    </button>
-                    <button
-                      type="button"
-                      className="text-primary hover:text-primary/80"
-                      title="Write the edited values into the notebook source"
-                      onClick={() => socket?.send({ type: "param.commit", names: params.filter((p) => p.modified).map((p) => p.id) })}
-                    >
-                      write to source
-                    </button>
+          {(cell.errors?.length ?? 0) > 0 && (
+            <div className="border-t-2 border-fail/60 bg-fail/10 px-2.5 py-1.5">
+              {cell.errors?.map((message, errorIndex) => (
+                <pre key={errorIndex} className="whitespace-pre-wrap text-[11px] text-fail">
+                  {message}
+                </pre>
+              ))}
+            </div>
+          )}
+          {hasOutput && (
+            <div className="border-t-2 border-border px-2.5 py-2">
+              {params.length > 0 && (
+                <div>
+                  <div className="grid grid-cols-2 gap-x-5 gap-y-2.5">
+                    {params.map((param) => (
+                      <ParamControl key={param.id} param={param} forwardParam={forwardParam} />
+                    ))}
                   </div>
-                )}
-              </div>
-            )}
-            {cell.output && (
-              <pre className="max-h-44 overflow-auto whitespace-pre-wrap text-xs text-foreground/90">{cell.output}</pre>
-            )}
-          </div>
-        )}
-        {/* console: stdout/stderr under the output, marimo-style */}
-        {(cell.console?.length ?? 0) > 0 && (
-          <div className="max-h-44 overflow-auto border-l-2 border-border px-2 py-0.5">
-            {cell.console?.map((line, lineIndex) => (
-              <pre
-                key={lineIndex}
-                className={cn(
-                  "whitespace-pre-wrap text-[11px]",
-                  /error|traceback|failed/i.test(line) ? "text-destructive" : "text-muted-foreground",
-                )}
-              >
-                {line}
-              </pre>
-            ))}
-          </div>
-        )}
-      </div>
+                  {params.some((param) => param.modified) && (
+                    <div className="flex justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        className="label hover:text-foreground"
+                        title="Drop the edited values; back to what the source says"
+                        onClick={() =>
+                          socket?.send({ type: "param.revert", names: params.filter((p) => p.modified).map((p) => p.id) })
+                        }
+                      >
+                        revert
+                      </button>
+                      <button
+                        type="button"
+                        className="label text-focus hover:text-foreground"
+                        title="Write the edited values into the notebook source"
+                        onClick={() =>
+                          socket?.send({ type: "param.commit", names: params.filter((p) => p.modified).map((p) => p.id) })
+                        }
+                      >
+                        write to source
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              {cell.output && (
+                <pre className="max-h-44 overflow-auto whitespace-pre-wrap text-[11px] text-foreground/90">{cell.output}</pre>
+              )}
+            </div>
+          )}
+          {(cell.console?.length ?? 0) > 0 && (
+            <div className="max-h-44 overflow-auto border-t-2 border-border px-2.5 py-1">
+              {cell.console?.map((line, lineIndex) => (
+                <pre
+                  key={lineIndex}
+                  className={cn(
+                    "whitespace-pre-wrap text-[11px]",
+                    /error|traceback|failed/i.test(line) ? "text-fail" : "text-muted-foreground",
+                  )}
+                >
+                  {line}
+                </pre>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -394,46 +461,54 @@ function ParamControl({
 }) {
   const label = param.label || param.id;
   const title = [param.comment, ...(param.issues ?? [])].filter(Boolean).join("\n") || undefined;
+  const ink = param.modified ? "text-focus" : "text-name";
   if (param.control === "toggle") {
+    const on = Boolean(param.value);
     return (
-      <label className="flex items-center justify-between text-[11px]" title={title}>
-        <span className={cn("text-muted-foreground", param.modified && "text-amber-400")}>{label}</span>
-        <input
-          type="checkbox"
-          checked={Boolean(param.value)}
-          onChange={(event) => forwardParam(param.id, event.target.checked)}
-        />
-      </label>
+      <button
+        type="button"
+        className="flex items-center justify-between gap-2 text-left text-[11px]"
+        title={title}
+        onClick={() => forwardParam(param.id, !on)}
+      >
+        <span className={ink}>{label}</span>
+        <span className={cn("border-2 px-1.5 text-[10px] font-bold uppercase", on ? "border-white bg-white text-black" : "border-input text-muted-foreground")}>
+          {on ? "on" : "off"}
+        </span>
+      </button>
     );
   }
   const value = Number(param.value);
   return (
     <div title={title}>
-      <div className="mb-0.5 flex items-baseline justify-between text-[11px]">
-        <label className={cn("text-muted-foreground", param.modified && "text-amber-400")}>{label}</label>
-        {param.control === "number" ? (
-          <input
-            type="number"
-            className="w-20 rounded border bg-transparent px-1 text-right font-mono"
-            value={value}
-            min={param.min ?? undefined}
-            max={param.max ?? undefined}
-            step={param.step ?? (param.kind === "int" ? 1 : "any")}
-            onChange={(event) => {
-              const next = event.target.valueAsNumber;
-              if (Number.isFinite(next)) forwardParam(param.id, next);
-            }}
-          />
-        ) : (
-          <span className="font-mono">{value}</span>
-        )}
-        {param.unit && <span className="ml-1 text-muted-foreground">{param.unit}</span>}
+      <div className="mb-1 flex items-baseline justify-between gap-2 text-[11px]">
+        <span className={cn("truncate", ink)}>{label}</span>
+        <span className="flex shrink-0 items-baseline gap-1">
+          {param.control === "number" ? (
+            <input
+              type="number"
+              className="w-16 border-b-2 border-input bg-transparent text-right focus:border-focus focus:outline-none"
+              value={value}
+              min={param.min ?? undefined}
+              max={param.max ?? undefined}
+              step={param.step ?? (param.kind === "int" ? 1 : "any")}
+              onChange={(event) => {
+                const next = event.target.valueAsNumber;
+                if (Number.isFinite(next)) forwardParam(param.id, next);
+              }}
+            />
+          ) : (
+            <span>{value}</span>
+          )}
+          {param.unit && <span className="text-[10px] text-muted-foreground">{param.unit}</span>}
+        </span>
       </div>
       {param.control === "slider" && param.min !== null && param.max !== null && (
         <Slider
           value={[value]}
           min={param.min}
           max={param.max}
+          modified={param.modified}
           step={param.step ?? (param.kind === "int" ? 1 : (param.max - param.min) / 200)}
           onValueChange={([next]) => forwardParam(param.id, next)}
         />

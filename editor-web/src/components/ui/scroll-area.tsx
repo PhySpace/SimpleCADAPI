@@ -3,15 +3,14 @@ import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 
 import { cn } from "@/lib/utils";
 
+/** Scrolls without a visible bar until the pointer is over it. */
 function ScrollArea({ className, children, ...props }: React.ComponentProps<typeof ScrollAreaPrimitive.Root>) {
   return (
-    <ScrollAreaPrimitive.Root className={cn("relative overflow-hidden", className)} {...props}>
+    <ScrollAreaPrimitive.Root type="hover" scrollHideDelay={400} className={cn("relative overflow-hidden", className)} {...props}>
       {/* Radix sets `display: table` inline on the viewport, which lets wide
           children (code editors) stretch the panel. Force block + full width
           so inner scrollers own the overflow instead. */}
-      <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit] [&>div]:!block">
-        {children}
-      </ScrollAreaPrimitive.Viewport>
+      <ScrollAreaPrimitive.Viewport className="h-full w-full [&>div]:!block">{children}</ScrollAreaPrimitive.Viewport>
       <ScrollBar />
       <ScrollAreaPrimitive.Corner />
     </ScrollAreaPrimitive.Root>
@@ -22,10 +21,10 @@ function ScrollBar({ className, ...props }: React.ComponentProps<typeof ScrollAr
   return (
     <ScrollAreaPrimitive.ScrollAreaScrollbar
       orientation="vertical"
-      className={cn("flex touch-none select-none transition-colors w-2 border-l border-l-transparent p-[1px]", className)}
+      className={cn("flex w-[6px] touch-none select-none border-l border-transparent p-0 transition-opacity", className)}
       {...props}
     >
-      <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" />
+      <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 bg-[#444] hover:bg-[#888]" />
     </ScrollAreaPrimitive.ScrollAreaScrollbar>
   );
 }

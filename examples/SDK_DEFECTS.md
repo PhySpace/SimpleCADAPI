@@ -315,6 +315,19 @@ that surfaced it is in brackets.
 - **Fix direction:** done. The headless runner only ever runs notebook cells, so
   only the editor kernel could hit it; test in a kernel, not only headlessly.
 
+## 20. `ql.vertices()` found nothing on a solid or a face [editor]
+
+- **Symptom:** `scad.ql.vertices().resolve(solid)` returned no vertices, so a
+  selector for a picked vertex raised "expected exactly 1 vertex(s), got 0".
+- **Trigger:** resolving `ql.vertices()` against a Solid, Face or Wire; only an
+  Edge scope worked.
+- **Root cause:** `_resolve_scope_items` looked only at the scope's direct
+  children for vertices, and a solid's children are shells.
+- **Status:** fixed. It falls back to the vertices of the scope's edges
+  (`_boundary_items`); test `test_vertices_resolve_through_a_solid_and_a_face`.
+- **Fix direction:** done. Every `ql` factory should resolve against any scope
+  that contains its kind; check each (kind, scope) pair when adding a factory.
+
 ## Heuristics
 
 - Run every notebook three times: fresh, all cached, `--no-cache`. The three

@@ -185,3 +185,132 @@ class EditorEndToEndTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# Selection as notebook code, the step titles, the agent snapshot
+# ---------------------------------------------------------------------------
+
+from simplecadapi.editor.selection import (
+    MARKER,
+    selection_cell_code,
+    selector_expression,
+    variable_names,
+)
+from simplecadapi.editor.server import cell_title
+
+FACE = {"centroid": [1.0, 2.0, 3.0], "area": 100.0}
+EDGE = {"centroid": [0.0, 0.0, 5.0], "length": 12.5}
+
+
+class SelectionCodeTest(unittest.TestCase):
+    def test_a_face_is_selected_by_type_place_and_size(self) -> None:
+        expression = selector_expression("face", FACE, {"type": "plane"})
+        assert expression is not None
+        self.assertTrue(expression.startswith("scad.ql.faces().where(scad.ql.and_("))
+        self.assertTrue(expression.endswith(".exactly(1)"))
+        for part in ('"geom.type", "==", "PLANE"', '"geom.center.x", ">=", 0.9', '"geom.area", "<=", 101'):
+            self.assertIn(part, expression)
+
+    def test_a_solid_is_selected_by_volume_only(self) -> None:
+        expression = selector_expression("solid", {"centroid": [1, 2, 3], "volume": 50.0}, {"type": "brep_solid"})
+        assert expression is not None
+        self.assertIn("geom.volume", expression)
+        self.assertNotIn("geom.center", expression)
+
+    def test_nothing_to_select_by_gives_none(self) -> None:
+        self.assertIsNone(selector_expression("face", {}, {}))
+        self.assertIsNone(selector_expression("gadget", FACE, {}))
+
+    def test_one_item_per_kind_is_named_by_its_kind(self) -> None:
+        code = selection_cell_code([{"kind": "face", "properties": FACE, "geometry": {"type": "plane"}}])
+        self.assertTrue(code.startswith(MARKER))
+        self.assertIn("selected_face = scad.ql.faces()", code)
+        self.assertTrue(code.endswith("selected_item = [selected_face]"))
+        compile(code, "<selection>", "exec")
+
+    def test_several_items_are_numbered_per_kind_and_listed(self) -> None:
+        items = [
+            {"kind": "edge", "properties": EDGE, "geometry": {"type": "line"}},
+            {"kind": "face", "properties": FACE, "geometry": {"type": "plane"}},
+            {"kind": "edge", "properties": EDGE, "geometry": {"type": "circle"}},
+        ]
+        self.assertEqual(variable_names(items), ["selected_edge_1", "selected_face", "selected_edge_2"])
+        code = selection_cell_code(items)
+        self.assertTrue(code.endswith("selected_item = [selected_edge_1, selected_face, selected_edge_2]"))
+        compile(code, "<selection>", "exec")
+
+    def test_an_empty_selection_is_an_empty_list(self) -> None:
+        self.assertEqual(selection_cell_code([]), f"{MARKER}\nselected_item = []")
+
+    def test_a_component_is_its_node_id(self) -> None:
+        code = selection_cell_code([{"kind": "component", "node_id": "node/asm/shell"}])
+        self.assertIn("selected_component = 'node/asm/shell'", code)
+
+    def test_the_generated_selectors_find_the_picked_entities(self) -> None:
+        import simplecadapi as scad
+
+        body = scad.make_box_rsolid(10.0, 20.0, 30.0)
+        for kind, entity in (
+            ("solid", {"properties": {"volume": body.get_volume()}, "geometry": {"type": "brep_solid"}}),
+            ("face", {"properties": {"centroid": [0.0, 0.0, 0.0], "area": 200.0}, "geometry": {"type": "plane"}}),
+            ("vertex", {"properties": {"position": [-5.0, -10.0, 0.0]}, "geometry": {"type": "point"}}),
+        ):
+            expression = selector_expression(kind, entity["properties"], entity["geometry"])
+            assert expression is not None
+            found = eval(expression, {"scad": scad}).resolve(body)  # noqa: S307
+            self.assertEqual(len(found), 1, kind)
+
+
+class CellTitleTest(unittest.TestCase):
+    def test_the_name_comes_from_the_most_specific_source(self) -> None:
+        self.assertEqual(cell_title("x = 1", "base-plate"), "base-plate")
+        self.assertEqual(cell_title(f"{MARKER}\nselected_item = []", None), "selection")
+        self.assertEqual(cell_title("# ---- params ----\nA = 1", None), "params")
+        self.assertEqual(cell_title("# ---- params: disc ----\nA = 1", None), "params: disc")
+        self.assertEqual(cell_title("_t = 1\nbody = _t", None), "body")
+        self.assertEqual(cell_title("def mount(x):\n    return x", None), "mount")
+        self.assertEqual(cell_title("# only a comment", None), "only a comment")
+        self.assertEqual(cell_title("print(1)", None), "cell")
+
+
+class SnapshotTest(unittest.TestCase):
+    def test_the_snapshot_is_written_and_read_back_by_the_cli(self) -> None:
+        from simplecadapi import cli as sca_cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = WorkspaceState(root)
+            state.cells = [{"id": "a", "code": "x = 1", "title": "x", "status": "idle", "errors": []}]
+            state.selection_items = [{"kind": "face", "entity_id": "e/1", "node_id": "n/1", "definition_id": "d"}]
+            state.write_snapshot()
+            data = json.loads((root / ".sca-editor" / "snapshot.json").read_text())
+            self.assertEqual(data["selection"]["items"][0]["variable"], "selected_face")
+            self.assertEqual(data["cells"][0]["title"], "x")
+            report, code, _printer = sca_cli.run(["snapshot", str(root)])
+            self.assertEqual((code, report["selection"]["items"][0]["entity_id"]), (0, "e/1"))
+            png = b"\x89PNG\r\n\x1a\nrest"
+            state.save_viewport(png)
+            self.assertEqual((root / ".sca-editor" / "viewport.png").read_bytes(), png)
+            self.assertTrue(state.snapshot()["viewport_png"].endswith("viewport.png"))
+            with self.assertRaises(ValueError):
+                sca_cli.run(["snapshot", str(root / "nowhere")])
+
+
+class RunAboveTest(unittest.TestCase):
+    def test_run_above_runs_the_cells_before_this_one_in_order(self) -> None:
+        ran: list[list[str]] = []
+        state = WorkspaceState(Path(tempfile.gettempdir()))
+        state.kernel = type(  # type: ignore[assignment]
+            "K", (), {"run_cells": lambda self, ids: ran.append(list(ids)) or {}, "wait_idle": lambda self: True}
+        )()
+        state.cells = [{"id": name, "code": ""} for name in ("a", "b", "c")]
+        state.schedule_settle = lambda: None  # type: ignore[method-assign]
+        for _ in range(2):
+            state.dispatch_command({"type": "rerun.request", "cell": "c", "above": True})
+        state.dispatch_command({"type": "rerun.request", "cell": "a", "above": True})
+        deadline = time.monotonic() + 3
+        while len(ran) < 2 and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertEqual(ran[:2], [["a", "b"], ["a", "b"]])
+        self.assertEqual(len(ran), 2)  # nothing is above the first cell

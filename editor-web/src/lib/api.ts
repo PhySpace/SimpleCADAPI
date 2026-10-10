@@ -53,6 +53,12 @@ export function newNotebook(name: string, kind: "part" | "assembly"): Promise<{ 
   }).then((response) => json<{ created: string }>(response));
 }
 
+/** What the viewport shows (PNG data URL), for coding agents to look at. */
+export async function postViewport(dataUrl: string): Promise<void> {
+  const blob = await (await fetch(dataUrl)).blob();
+  await fetch("/api/studio/viewport", { method: "POST", headers: { "Content-Type": "image/png" }, body: blob });
+}
+
 /** Latest in-memory scadpkg bytes (rule 4: never a disk read). */
 export async function fetchPackage(): Promise<Uint8Array> {
   const response = await fetch("/api/package/latest");

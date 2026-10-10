@@ -17,6 +17,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import json
+import re
 import sys
 import threading
 import time
@@ -43,6 +44,7 @@ from ..runtime.params import (
 )
 from ..runtime.workspace import features_in_cell, scan_workspace
 from .kernel import MarimoKernel
+from .selection import MARKER, selection_cell_code, variable_names
 from .templates import create_notebook
 from .ws import WsHub
 
@@ -106,6 +108,8 @@ class WorkspaceState:
         self.latest_package_bytes: bytes | None = None
         self.package_revision = 0
         self.selection: dict = {}
+        self.selection_items: list[dict] = []
+        self.viewport_png: bytes | None = None
         self.cells: list[dict] = []
         self.specs: dict[str, ParamSpec] = {}
         self._pending_params: dict[str, float | int | bool] = {}
@@ -136,6 +140,10 @@ class WorkspaceState:
             raise ValueError(f"notebook outside workspace: {rel_path}")
         if read_notebook_config(target) is None:
             raise ValueError(f"not a SimpleCAD notebook (no [tool.simplecadapi]): {rel_path}")
+        # The kernel takes seconds to boot: let the webuis drop the old model now.
+        self.latest.clear()
+        self.latest_package_bytes = None
+        self.hub.broadcast({"type": "opening", "notebook": target.name, "path": rel_path})
         self.start_kernel(target)
 
     def start_kernel(self, notebook: Path) -> None:
@@ -157,6 +165,8 @@ class WorkspaceState:
         self.latest.clear()
         self.latest_package_bytes = None
         self.selection = {}
+        self.selection_items = []
+        self.viewport_png = None
         self.cells = []
         self.specs = {}
         self._last_publish_error = ""
@@ -317,6 +327,9 @@ class WorkspaceState:
             cell["key"] = key
             found = features_in_cell(cell["code"], key)
             cell["feature"] = found[0].slug if found else None
+            cell["title"] = cell_title(cell["code"], cell["feature"])
+            # code mode would turn an @app.function into a plain cell
+            cell["readonly"] = _is_function_cell(cell["code"])
             features.extend(
                 {"cell": cell["id"], "label": feature.slug, "kind": feature.role or "feature"}
                 for feature in found
@@ -330,6 +343,7 @@ class WorkspaceState:
         self.emit({"type": "notebook.cells", "cells": cells})
         self.emit({"type": "notebook.features", "features": features})
         self.emit_params()
+        self.write_snapshot()
 
     def emit_params(self) -> None:
         config = self.config
@@ -363,11 +377,40 @@ class WorkspaceState:
             self._in_thread(lambda: self._commit(kernel, names, revert=kind == "param.revert"))
             return {"type": "ack", "command": kind}
 
+        if kind == "selection.set":
+            items = [item for item in message.get("items", []) if isinstance(item, dict)]
+            self._in_thread(lambda: self._set_selection(kernel, items))
+            return {"type": "ack", "command": kind}
+
         cell = str(message.get("cell") or "")
+        if kind == "cell.save":
+            # Autosave: write the edit to the notebook file, do not run it.
+            code = _module_code(str(message.get("code", "")))
+            current = next((c["code"] for c in self.cells if c["id"] == cell), None)
+            if current is None or code.strip() == _module_code(current).strip():
+                return {"type": "ack", "command": kind}
+            if _is_function_cell(current):
+                return {
+                    "type": "error",
+                    "message": "this cell is an @app.function; edit it in the file or in the marimo editor",
+                }
+
+            def save() -> None:
+                kernel.save_cell(cell, code)
+                self.push_cells()
+
+            self._in_thread(save)
+            return {"type": "ack", "command": kind}
         if kind == "rerun.request":
             # Header rerun (no cell) refreshes the whole notebook; a per-cell
             # rerun runs that cell and leaves its dependents stale.
             ids = [cell] if cell else [c["id"] for c in self.cells]
+            if message.get("above"):
+                # Every cell above this one, in notebook order (not itself).
+                order = [c["id"] for c in self.cells]
+                ids = order[: order.index(cell)] if cell in order else []
+                if not ids:
+                    return {"type": "ack", "command": kind}
             action = lambda: kernel.run_cells(ids)  # noqa: E731
         elif kind == "insert.request":
             after = message.get("after")
@@ -530,6 +573,93 @@ class WorkspaceState:
             kernel.run_until_settled([self.specs[name].cell for name in names if name in self.specs])
         self.schedule_settle()
 
+    # -- selection and the agent snapshot ----------------------------------------
+
+    def _set_selection(self, kernel: MarimoKernel, items: list[dict]) -> None:
+        """Write the viewport selection into the notebook's selection cell."""
+        keep = ("kind", "entity_id", "node_id", "definition_id", "properties", "geometry")
+        self.selection_items = [{key: item.get(key) for key in keep if key in item} for item in items]
+        cell = next((c for c in self.cells if c["code"].lstrip().startswith(MARKER)), None)
+        if cell is None and not items:
+            self.write_snapshot()
+            return
+        code = selection_cell_code(self.selection_items)
+        if cell is not None and code.strip() == cell["code"].strip():
+            self.write_snapshot()
+            return
+        kernel.put_cell(code, cell_id=cell["id"] if cell else None)
+        kernel.wait_idle()
+        self.push_cells()
+        self.emit({"type": "selection", "items": self._selection_summary(), "variables": variable_names(self.selection_items)})
+
+    def _selection_summary(self) -> list[dict]:
+        names = variable_names(self.selection_items)
+        return [
+            {
+                "variable": name,
+                "kind": item.get("kind"),
+                "entity_id": item.get("entity_id"),
+                "node_id": item.get("node_id"),
+                "definition_id": item.get("definition_id"),
+            }
+            for name, item in zip(names, self.selection_items)
+        ]
+
+    @property
+    def snapshot_dir(self) -> Path:
+        return self.workspace / ".sca-editor"
+
+    def snapshot(self) -> dict:
+        """What the person is looking at, as plain data for a coding agent."""
+        selection_cell = next((c for c in self.cells if c["code"].lstrip().startswith(MARKER)), None)
+        config = self.config
+        saved = read_saved_params(config) if config is not None else {}
+        png = self.snapshot_dir / "viewport.png"
+        return {
+            "workspace": str(self.workspace),
+            "notebook": str(self.notebook) if self.notebook else None,
+            "updated": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+            "selection": {
+                "items": self._selection_summary(),
+                "cell": {"id": selection_cell["id"], "code": selection_cell["code"]} if selection_cell else None,
+                "note": "the selection cell is saved in the notebook file; read it there",
+            },
+            "viewport_png": str(png) if png.is_file() else None,
+            "cells": [
+                {
+                    "id": c["id"],
+                    "title": c.get("title"),
+                    "status": c.get("status"),
+                    "errors": c.get("errors") or [],
+                }
+                for c in self.cells
+            ],
+            "parameters": {
+                name: saved.get(name, spec.default) for name, spec in self.specs.items()
+            },
+            "modified_parameters": sorted(saved),
+            "package_revision": self.package_revision,
+        }
+
+    def write_snapshot(self) -> None:
+        """Keep ``.sca-editor/snapshot.json`` current; ``sca snapshot`` reads it."""
+        try:
+            self.snapshot_dir.mkdir(parents=True, exist_ok=True)
+            (self.snapshot_dir / "snapshot.json").write_text(
+                json.dumps(self.snapshot(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+            )
+        except OSError as error:
+            print(f"[sca edit] could not write the snapshot: {error}", file=sys.stderr)
+
+    def save_viewport(self, png: bytes) -> None:
+        self.viewport_png = png
+        try:
+            self.snapshot_dir.mkdir(parents=True, exist_ok=True)
+            (self.snapshot_dir / "viewport.png").write_bytes(png)
+        except OSError as error:
+            print(f"[sca edit] could not write the viewport image: {error}", file=sys.stderr)
+        self.write_snapshot()
+
     # -- export ------------------------------------------------------------------
 
     def _export(self) -> None:
@@ -571,6 +701,40 @@ def _module_code(code: str) -> str:
         before, after = line[: node.col_offset], line[node.col_offset + len("return"):]
         lines[node.lineno - 1] = before + ("pass" if node.value is None else after.lstrip())
     return "\n".join(lines)
+
+
+_PARAMS_HEADER = re.compile(r"^#\s*-{2,}\s*params(?::\s*(.*?))?\s*-*\s*$", re.MULTILINE)
+
+
+def cell_title(code: str, feature: str | None) -> str:
+    """The step's name: its feature slug, its params header, else what it defines."""
+    if feature:
+        return feature
+    if code.lstrip().startswith(MARKER):
+        return "selection"
+    header = _PARAMS_HEADER.search(code)
+    if header:
+        return f"params: {header.group(1)}" if header.group(1) else "params"
+    try:
+        body = ast.parse(code).body
+    except (SyntaxError, ValueError):
+        body = []
+    for statement in body:
+        if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            return statement.name
+        targets = (
+            statement.targets if isinstance(statement, ast.Assign)
+            else [statement.target] if isinstance(statement, ast.AnnAssign) else []
+        )
+        for target in targets:
+            if isinstance(target, ast.Name) and not target.id.startswith("_"):
+                return target.id
+    for line in code.splitlines():
+        if line.strip().startswith("#"):
+            text = line.strip().lstrip("#").strip(" -")
+            if text:
+                return text[:40]
+    return "cell"
 
 
 def _is_function_cell(code: str) -> bool:
@@ -617,6 +781,7 @@ def create_app(state: WorkspaceState) -> Starlette:
         )
         # The model is fine again: clear a stale "no product yet" message.
         hub.broadcast({"type": "status", "error": ""})
+        await asyncio.to_thread(state.write_snapshot)
         return JSONResponse({"ok": True, "revision": state.package_revision})
 
     async def latest_package(request: Request) -> Response:
@@ -695,6 +860,18 @@ def create_app(state: WorkspaceState) -> Starlette:
         state.emit({"type": "selection", **state.selection})
         return JSONResponse({"ok": True})
 
+    async def viewport_image(request: Request) -> JSONResponse:
+        """The webui posts what the viewport shows (PNG) when the selection changes."""
+        body = await request.body()
+        if not body.startswith(b"\x89PNG"):
+            return JSONResponse({"ok": False, "error": "body must be a PNG"}, status_code=400)
+        await asyncio.to_thread(state.save_viewport, bytes(body))
+        return JSONResponse({"ok": True})
+
+    async def snapshot(request: Request) -> JSONResponse:
+        """Agent-facing: the selection (as ql code in the notebook), the cells' state, the viewport image path."""
+        return JSONResponse(state.snapshot())
+
     async def studio_selected(request: Request) -> JSONResponse:
         """Agent-facing read: what does the human have selected right now?"""
         return JSONResponse({"selected": state.selection, "notebook": state.notebook.name if state.notebook else None})
@@ -709,7 +886,7 @@ def create_app(state: WorkspaceState) -> Starlette:
                 message = await websocket.receive_json()
                 try:
                     if isinstance(message, dict) and str(message.get("type", "")).endswith(
-                        (".set", ".request", ".edit", ".commit", ".revert")
+                        (".set", ".request", ".edit", ".commit", ".revert", ".save")
                     ):
                         ack = await asyncio.to_thread(state.dispatch_command, message)
                         await websocket.send_json(ack)
@@ -729,6 +906,8 @@ def create_app(state: WorkspaceState) -> Starlette:
         Route("/api/workspace/new", workspace_new, methods=["POST"]),
         Route("/api/studio/select", studio_select, methods=["POST"]),
         Route("/api/studio/selected", studio_selected, methods=["GET"]),
+        Route("/api/studio/viewport", viewport_image, methods=["POST"]),
+        Route("/api/snapshot", snapshot, methods=["GET"]),
         WebSocketRoute("/ws", ws_endpoint),
     ]
     app = Starlette(routes=routes)

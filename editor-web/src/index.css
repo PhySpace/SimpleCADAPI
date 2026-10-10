@@ -3,28 +3,36 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Studio is dark-first: the :root block IS the dark theme. */
+/* Black and white, square, hard 2px rules (after the SimpleCAD landing page).
+ * Color is reserved for meaning: focus (selection, what is being edited),
+ * pass, fail, name (the names of steps and parameters). */
 :root {
-  --radius: 0.5rem;
-  --background: oklch(0.16 0.014 260);
-  --foreground: oklch(0.93 0.006 260);
-  --card: oklch(0.2 0.016 260);
-  --card-foreground: oklch(0.93 0.006 260);
-  --popover: oklch(0.2 0.016 260);
-  --popover-foreground: oklch(0.93 0.006 260);
-  --primary: oklch(0.85 0.18 130);
-  --primary-foreground: oklch(0.18 0.03 130);
-  --secondary: oklch(0.26 0.02 260);
-  --secondary-foreground: oklch(0.93 0.006 260);
-  --muted: oklch(0.26 0.02 260);
-  --muted-foreground: oklch(0.68 0.015 260);
-  --accent: oklch(0.3 0.03 260);
-  --accent-foreground: oklch(0.95 0.005 260);
-  --destructive: oklch(0.62 0.2 25);
-  --destructive-foreground: oklch(0.97 0.01 25);
-  --border: oklch(0.3 0.02 260);
-  --input: oklch(0.3 0.02 260);
-  --ring: oklch(0.85 0.18 130);
+  --radius: 0px;
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #050505;
+  --card-foreground: #ffffff;
+  --popover: #000000;
+  --popover-foreground: #ffffff;
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --secondary: #111111;
+  --secondary-foreground: #ffffff;
+  --muted: #111111;
+  --muted-foreground: #a8a8a8;
+  --accent: #1c1c1c;
+  --accent-foreground: #ffffff;
+  --destructive: #ff4d5e;
+  --destructive-foreground: #000000;
+  --border: #262626;
+  --input: #3a3a3a;
+  --ring: #ff9a2e;
+  --focus: #ff9a2e;
+  --pass: #3ddc84;
+  --fail: #ff4d5e;
+  --name: #4aa3ff;
+  --rule: 2px;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 }
 
 @theme inline {
@@ -47,36 +55,86 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --color-focus: var(--focus);
+  --color-pass: var(--pass);
+  --color-fail: var(--fail);
+  --color-name: var(--name);
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --font-mono: var(--mono);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    border-radius: 0;
+    /* Thin, square scrollbars everywhere; the thumb shows on hover. */
+    scrollbar-width: thin;
+    scrollbar-color: #333 transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #333;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: #777;
+  }
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  html,
+  body {
+    background: #000;
   }
   body {
     @apply bg-background text-foreground;
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
   }
-  /* Code hosts and CAD readouts get the mono face. */
+  ::selection {
+    background: #fff;
+    color: #000;
+  }
   .font-mono,
   code,
   pre {
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-family: var(--mono);
   }
-  /* Notebook cells: the editor fills its card and adapts to the resizable
-   * panel; long lines scroll inside instead of stretching the card. */
+  button {
+    cursor: pointer;
+  }
+  /* Notebook cells: the editor fills its block and wraps long lines, so a
+   * cell never shows a horizontal scrollbar. */
   .cm-editor {
     width: 100%;
+    background: transparent !important;
   }
   .cm-editor .cm-scroller {
-    overflow-x: auto;
+    overflow-x: hidden;
     overflow-y: hidden;
+    scrollbar-width: none;
+    font-family: var(--mono);
+  }
+  .cm-editor .cm-scroller::-webkit-scrollbar {
+    display: none;
   }
   .cm-editor.cm-focused {
     outline: none;
   }
+}
+
+/* Small caps label used for section titles and badges. */
+.label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
 }

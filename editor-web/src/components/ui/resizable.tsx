@@ -20,7 +20,7 @@ function ResizableHandle({
   return (
     <Separator
       className={cn(
-        "relative w-[3px] shrink-0 bg-border transition-colors hover:bg-primary/50",
+        "relative w-[2px] shrink-0 bg-border transition-colors hover:bg-focus data-[separator=active]:bg-focus",
         className,
       )}
       {...props}

@@ -1,114 +1,70 @@
+import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { PickResult } from "@/scene/Viewport";
+import { JsonTree } from "@/components/JsonTree";
+import type { SelectionItem } from "@/lib/selection";
 
-export type FederatedNode = { id: string; label: string; kind: string };
-
-/** Right-hand inspector: current selection, feature DAG, package meta. */
-export function Inspector({
-  pick,
-  features,
-  packageInfo,
-}: {
-  pick: PickResult | null;
-  features: FederatedNode[];
-  packageInfo: { name: string | null; revision: number; occurrences: number; assets: number; exported: string | null } | null;
-}) {
+/** Right-hand inspector: what is selected in the viewport, each item with
+ * the variable the selection cell assigns it to and its data as a tree. */
+export function Inspector({ selection }: { selection: SelectionItem[] }) {
   return (
-    <Tabs defaultValue="selection" className="h-full">
-      <TabsList className="mx-2 mt-2">
-        <TabsTrigger value="selection">selection</TabsTrigger>
-        <TabsTrigger value="features">features</TabsTrigger>
-        <TabsTrigger value="package">package</TabsTrigger>
-      </TabsList>
-      <TabsContent value="selection" className="h-[calc(100%-3rem)]">
-        <ScrollArea className="h-full px-3">
-          {pick ? (
-            <div className="space-y-2 text-xs">
-              <dl className="space-y-1.5">
-                <Row label="mode" value={pick.mode} />
-                <Row label="node" value={pick.nodeId} mono />
-                <Row label="entity" value={pick.entityId ?? "—"} mono />
-                {pick.entity?.kind && <Row label="entity kind" value={String(pick.entity.kind)} />}
-              </dl>
-              <Separator className="my-2" />
-              {pick.entity?.properties && (
-                <Section title="properties" body={pretty(pick.entity.properties)} />
-              )}
-              {pick.entity?.geometry && (
-                <Section title="geometry" body={pretty(pick.entity.geometry)} />
-              )}
-              <p className="pt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                Agents read this via GET /api/studio/selected
-              </p>
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">Click a solid, face, or edge in the viewport.</p>
-          )}
-        </ScrollArea>
-      </TabsContent>
-      <TabsContent value="features" className="h-[calc(100%-3rem)]">
-        <ScrollArea className="h-full px-3">
-          <ul className="space-y-1 text-xs">
-            {features.map((feature) => (
-              <li key={feature.id} className="flex items-center gap-2">
-                <span className="font-mono text-muted-foreground">{feature.kind}</span>
-                <span>{feature.label}</span>
+    <div className="flex h-full flex-col">
+      <div className="flex h-9 shrink-0 items-center justify-between border-b-2 border-border px-3">
+        <span className="label text-foreground">selection</span>
+        {selection.length > 0 && <span className="label">{selection.length}</span>}
+      </div>
+      <ScrollArea className="min-h-0 flex-1">
+        {selection.length === 0 ? (
+          <p className="p-3 text-[11px] text-muted-foreground">
+            Click a solid, face, edge or vertex in the viewport. Ctrl/Cmd+click adds to the selection; the selection
+            is written to the notebook as <span className="text-name">selected_item</span>.
+          </p>
+        ) : (
+          <ul>
+            {selection.map((item) => (
+              <li key={item.key} className="border-b-2 border-border">
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <Badge variant="focus">{item.kind}</Badge>
+                  <span className="min-w-0 flex-1 truncate text-name" title={item.variable}>
+                    {item.variable}
+                  </span>
+                </div>
+                <dl className="space-y-0.5 px-3 pb-2 text-[11px]">
+                  <Line label="entity" value={item.entityId ?? "—"} />
+                  <Line label="node" value={item.nodeId} />
+                  {item.definitionId && <Line label="definition" value={item.definitionId} />}
+                </dl>
+                {(item.properties || item.geometry) && (
+                  <div className="space-y-2 border-t border-border px-3 py-2">
+                    {item.properties && <Group title="properties" value={item.properties} />}
+                    {item.geometry && <Group title="geometry" value={item.geometry} />}
+                    {item.tags && item.tags.length > 0 && <Group title="tags" value={item.tags} />}
+                  </div>
+                )}
               </li>
             ))}
-            {features.length === 0 && (
-              <li className="text-xs text-muted-foreground">No features yet — run the notebook.</li>
-            )}
           </ul>
-        </ScrollArea>
-      </TabsContent>
-      <TabsContent value="package" className="h-[calc(100%-3rem)]">
-        <ScrollArea className="h-full px-3">
-          {packageInfo ? (
-            <dl className="space-y-1.5 text-xs">
-              <Row label="entry" value={packageInfo.name ?? "—"} mono />
-              <Row label="revision" value={`#${packageInfo.revision}`} mono />
-              <Row label="occurrences" value={String(packageInfo.occurrences)} />
-              <Row label="geometry assets" value={String(packageInfo.assets)} />
-              <Row label="exported to" value={packageInfo.exported ?? "not exported"} mono />
-            </dl>
-          ) : (
-            <p className="text-xs text-muted-foreground">No package received yet.</p>
-          )}
-        </ScrollArea>
-      </TabsContent>
-    </Tabs>
+        )}
+      </ScrollArea>
+    </div>
   );
 }
 
-function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function Line({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-2">
-      <dt className="shrink-0 text-muted-foreground">{label}</dt>
-      <dd className={mono ? "truncate font-mono" : "truncate"} title={value}>
+    <div className="flex items-baseline gap-2">
+      <dt className="w-16 shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 flex-1 break-all" title={value}>
         {value}
       </dd>
     </div>
   );
 }
 
-/** Compact JSON for inspector readouts (objects only; scalars inlined). */
-function pretty(value: Record<string, unknown>): string {
-  try {
-    return JSON.stringify(value, (_key, item) => (typeof item === "number" ? Number(item.toFixed(3)) : item), 1);
-  } catch {
-    return String(value);
-  }
-}
-
-function Section({ title, body }: { title: string; body: string }) {
+function Group({ title, value }: { title: string; value: unknown }) {
   return (
     <div>
-      <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
-      <pre className="max-h-48 overflow-auto rounded bg-background/60 p-1.5 font-mono text-[10px] leading-relaxed text-foreground/85">
-        {body}
-      </pre>
+      <p className="label mb-1">{title}</p>
+      <JsonTree value={value} openDepth={2} />
     </div>
   );
 }

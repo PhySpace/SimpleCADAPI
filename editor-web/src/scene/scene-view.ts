@@ -17,13 +17,22 @@ import type { PackageFiles } from './product-package';
 import type { Entity, EntitySidecar, FaceGroup, SceneNode } from './scene2';
 
 export type SelectionMode = 'component' | 'solid' | 'face' | 'edge' | 'vertex';
-export type PickResult = { nodeId: string; entityId: string | null; mode: SelectionMode; entity: Entity | null };
+export type PickResult = {
+  nodeId: string;
+  entityId: string | null;
+  mode: SelectionMode;
+  entity: Entity | null;
+  /** Ctrl/Cmd was held: add to (or toggle in) the selection instead of replacing it. */
+  additive?: boolean;
+};
 export type { CameraState };
 
 export const MARK_COLORS = ['#ff5c5c', '#ffd23f', '#4ade80', '#60a5fa', '#c084fc', '#fb923c', '#f472b6', '#34d399'];
 
 export type SceneViewOptions = {
   onPick?: (result: PickResult) => void;
+  /** A click that hit nothing. */
+  onClear?: () => void;
   selectionMode?: SelectionMode;
   background?: string;
   interactive?: boolean;
@@ -38,6 +47,7 @@ type Mark = { key: string; color: string; overlays: THREE.Object3D[] };
 export class SceneView {
   readonly engine: BRepRenderer;
   onPick: ((result: PickResult) => void) | null;
+  onClear: (() => void) | null;
 
   private raycaster = new THREE.Raycaster();
   private pointer = new THREE.Vector2();
@@ -48,6 +58,7 @@ export class SceneView {
 
   constructor(host: HTMLElement, options: SceneViewOptions = {}) {
     this.onPick = options.onPick ?? null;
+    this.onClear = options.onClear ?? null;
     this.selectionMode = options.selectionMode ?? 'face';
     this.engine = new BRepRenderer(host, { background: options.background, ssao: options.ssao, seams: options.seams });
     if (options.interactive !== false) {
@@ -57,7 +68,8 @@ export class SceneView {
         controls: this.engine.controls,
         onClick: (event) => {
           const result = this.pick(event);
-          if (result) this.onPick?.(result);
+          if (result) this.onPick?.({ ...result, additive: event.ctrlKey || event.metaKey });
+          else if (!(event.ctrlKey || event.metaKey)) this.onClear?.();
         },
       });
     }
