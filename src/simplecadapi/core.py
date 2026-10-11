@@ -1441,12 +1441,9 @@ class Solid(TaggedMixin, TopoMixein):
             TopoMixein.__init__(self, level=4, self_shape_ref=self)
             for face in faces_of(self.wrapped):
                 self.add_child(Face(face, cache=self._topology_cache))
-            try:
-                from ._internal.mesh import attach_default_mesh
-
-                attach_default_mesh(self)
-            except Exception as mesh_error:
-                self._set_runtime("mesh.error", str(mesh_error))
+            # No mesh is built here: every intermediate solid of a feature chain
+            # would pay for one nobody reads.  ``_internal.mesh.cached_mesh``
+            # builds it on first use (a preview, a package) and keeps it.
         except Exception as e:
             raise ValueError(f"初始化实体失败: {e}. 请检查输入的实体对象是否有效。")
 

@@ -1,8 +1,9 @@
 """Internal mesh companion data for SimpleCAD geometry.
 
-This module intentionally stays out of the public API. Users should not need to
-extract or manage meshes directly; future structural checks will consume this
-cache internally.
+This module intentionally stays out of the public API. A solid's mesh is built
+on first use by :func:`cached_mesh` and kept on the solid per tolerance; it is
+derived data (never pickled, never copied) and nothing builds one while a model
+is being made.
 """
 
 from __future__ import annotations
@@ -142,19 +143,6 @@ def build_solid_trimesh(
         angular_tolerance=float(angular_tolerance),
         corner_normals=np.asarray(all_corner_normals, dtype=float).reshape((-1, 3, 3)),
     )
-
-
-def attach_default_mesh(solid: Any) -> None:
-    """Attach the default internal mesh cache to a Solid wrapper if possible."""
-
-    try:
-        mesh = build_solid_trimesh(solid)
-    except Exception as exc:
-        _set_runtime(solid, MESH_ERROR_RUNTIME_KEY, str(exc))
-        return
-
-    _set_runtime(solid, MESH_RUNTIME_KEY, mesh)
-    _set_runtime(solid, MESH_ERROR_RUNTIME_KEY, None)
 
 
 def cached_mesh(
