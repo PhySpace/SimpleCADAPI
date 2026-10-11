@@ -314,3 +314,26 @@ class RunAboveTest(unittest.TestCase):
             time.sleep(0.05)
         self.assertEqual(ran[:2], [["a", "b"], ["a", "b"]])
         self.assertEqual(len(ran), 2)  # nothing is above the first cell
+
+
+class CellLinesTest(unittest.TestCase):
+    NOTEBOOK = (
+        "import marimo\n\napp = marimo.App()\n\nwith app.setup:\n    import simplecadapi as scad\n\n\n"
+        "@app.cell\ndef _():\n    a = 1\n    b = 2\n    return a, b\n\n\n"
+        "@app.cell\ndef _(a):\n    c = a\n    return (c,)\n"
+    )
+
+    def test_cells_are_located_in_the_file_by_order(self) -> None:
+        from simplecadapi.editor.server import file_line_ranges
+
+        lines = self.NOTEBOOK.splitlines()
+        ranges = file_line_ranges(self.NOTEBOOK, ["a = 1\nb = 2", "c = a"])
+        self.assertEqual(lines[ranges[0][0] - 1].strip(), "a = 1")
+        self.assertEqual(lines[ranges[0][1] - 1].strip(), "b = 2")
+        self.assertEqual(lines[ranges[1][0] - 1].strip(), "c = a")
+
+    def test_an_unsaved_cell_has_no_location(self) -> None:
+        from simplecadapi.editor.server import file_line_ranges
+
+        self.assertEqual(file_line_ranges(self.NOTEBOOK, ["a = 1\nb = 2", "c = 99"])[1], None)
+        self.assertEqual(file_line_ranges("def broken(", ["x"]), [None])

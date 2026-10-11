@@ -338,6 +338,14 @@ class WorkspaceState:
                 ParamSpec(**{**spec.__dict__, "cell": cell["id"]})
                 for spec in parameters_in_cell(cell["code"], key)
             )
+        try:
+            text = self.notebook.read_text(encoding="utf-8") if self.notebook else ""
+        except OSError:
+            text = ""
+        for number, (cell, lines) in enumerate(zip(cells, file_line_ranges(text, [c["code"] for c in cells])), start=1):
+            where = f"{self.notebook}:L{lines[0]}-L{lines[1]}" if lines and self.notebook else str(self.notebook)
+            cell["lines"] = list(lines) if lines else None
+            cell["ref"] = f"{where} (cell {number:02d} `{cell['title']}`)"
         self.cells = cells
         self.specs = {spec.name: spec for spec in specs}
         self.emit({"type": "notebook.cells", "cells": cells})
@@ -701,6 +709,35 @@ def _module_code(code: str) -> str:
         before, after = line[: node.col_offset], line[node.col_offset + len("return"):]
         lines[node.lineno - 1] = before + ("pass" if node.value is None else after.lstrip())
     return "\n".join(lines)
+
+
+def file_line_ranges(text: str, codes: list[str]) -> list[tuple[int, int] | None]:
+    """Where each cell's code is in the notebook file (1-based, inclusive).
+
+    *codes* are the cells' code in notebook order; they are matched to the
+    cells of the file in order, so a cell whose edit is not saved yet (or a
+    function cell the file spells differently) gets ``None``.
+    """
+    from ..runtime._marimo import parse_notebook
+
+    try:
+        notebook = parse_notebook(text)
+    except SyntaxError:
+        return [None] * len(codes)
+    if notebook is None:
+        return [None] * len(codes)
+    saved = [(cell.code.strip(), cell.lineno + 1, cell.lineno + max(1, len(cell.code.splitlines()))) for cell in notebook.cells]
+    ranges: list[tuple[int, int] | None] = []
+    cursor = 0
+    for code in codes:
+        found = None
+        for index in range(cursor, len(saved)):
+            if saved[index][0] == code.strip():
+                found = (saved[index][1], saved[index][2])
+                cursor = index + 1
+                break
+        ranges.append(found)
+    return ranges
 
 
 _PARAMS_HEADER = re.compile(r"^#\s*-{2,}\s*params(?::\s*(.*?))?\s*-*\s*$", re.MULTILINE)

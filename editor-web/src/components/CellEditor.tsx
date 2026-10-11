@@ -7,6 +7,8 @@ import {
   ChevronsDownUp,
   ChevronsUp,
   ChevronsUpDown,
+  Check,
+  Copy,
   Loader2,
   Play,
   Plus,
@@ -33,6 +35,9 @@ export type NotebookCell = {
   title?: string;
   /** An @app.function cell: edited in the file, not here. */
   readonly?: boolean;
+  /** Where the cell is in the notebook file, for pasting to a coding agent:
+   * `<path>:L<first>-L<last> (cell 03 \`name\`)`. */
+  ref?: string;
 };
 /** One feature header; `cell` is the id of the cell it opens. */
 export type NotebookFeature = { cell: string; label: string; kind?: string };
@@ -324,6 +329,17 @@ function CellBlock({
   const isSelection = cell.title === "selection";
   const title = cell.title || cell.name;
   const hasOutput = Boolean(cell.output) || params.length > 0;
+  const [copied, setCopied] = useState(false);
+  // Click: a reference an agent can find in the file. Alt/Shift+click: the
+  // reference and the cell's code.
+  const copyReference = (withCode: boolean) => {
+    const reference = cell.ref ?? title;
+    const text = withCode ? `${reference}\n\`\`\`python\n${draft ?? cell.code}\n\`\`\`` : reference;
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    });
+  };
   return (
     <section
       className={cn(
@@ -349,6 +365,14 @@ function CellBlock({
         {failed && <Badge variant="fail">failed</Badge>}
         {stale && !failed && <Badge variant="focus">stale</Badge>}
         {cell.readonly && <Badge variant="secondary">function</Badge>}
+        <button
+          type="button"
+          title="Copy a reference to this cell for a coding agent (Alt/Shift+click: with its code)"
+          className="flex h-6 w-6 shrink-0 items-center justify-center border-2 border-transparent text-muted-foreground transition-colors hover:border-input hover:text-foreground"
+          onClick={(event) => copyReference(event.altKey || event.shiftKey)}
+        >
+          {copied ? <Check className="h-3.5 w-3.5 text-pass" /> : <Copy className="h-3.5 w-3.5" />}
+        </button>
         <IconButton title="Run every cell above this one" onClick={onRunAbove} disabled={index === 0}>
           <ChevronsUp className="h-3.5 w-3.5" />
         </IconButton>
