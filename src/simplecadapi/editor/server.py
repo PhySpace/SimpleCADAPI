@@ -193,8 +193,8 @@ class WorkspaceState:
     def watch_kernel(self) -> None:
         """Auto-heal: the marimo python session can die on crashes or
         external file edits while the marimo SERVER process stays alive
-        (`kernel.alive` is blind to that).  Probe the session with scratch
-        pings; two consecutive failures mean the session is gone — restart.
+        (`kernel.alive` is blind to that).  Ask marimo whether it still has our
+        session; two consecutive misses mean it is gone — restart.
         """
         failures = 0
         while True:
@@ -205,11 +205,9 @@ class WorkspaceState:
             if not kernel.alive:
                 self.hub.broadcast({"type": "status", "error": "marimo server exited — restarting kernel"})
                 break
-            try:
-                result = kernel.execute("print('sca-ping')", timeout=10)
-                failures = failures + 1 if result.get("success") is False else 0
-            except Exception:
-                failures += 1
+            # Not a scratch snippet: one queued behind a long cell and given
+            # up on interrupts the kernel (see MarimoKernel.execute).
+            failures = 0 if kernel.session_exists() else failures + 1
             if failures >= 2:
                 self.hub.broadcast({"type": "status", "error": "kernel session lost — restarting"})
                 break

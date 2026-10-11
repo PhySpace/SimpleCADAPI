@@ -195,6 +195,18 @@ class MarimoKernel:
         self._ws_thread.start()
         time.sleep(1.0)
 
+    def session_exists(self) -> bool:
+        """Whether marimo still has this bridge's session.
+
+        Unlike a scratch snippet this never touches the kernel, so it can be
+        asked while a cell runs.
+        """
+        try:
+            with urllib.request.urlopen(f"{self.marimo_url}/api/sessions", timeout=5) as response:
+                return SESSION_ID in json.loads(response.read())
+        except (urllib.error.URLError, OSError, ValueError):
+            return False
+
     def _on_message(self, message: str | bytes) -> None:
         try:
             data = json.loads(message)
@@ -389,7 +401,6 @@ class MarimoKernel:
         )
         return self.execute(
             _driver("    for __c in ctx.cells:\n        ctx.run_cell(__c.id)\n    ctx.run_cell('setup')"),
-            timeout=300,
         )
 
     def stale_cells(self) -> list[str]:
@@ -427,7 +438,7 @@ class MarimoKernel:
         )
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            if "SCA-IDLE" in (self.execute(probe, timeout=15).get("log") or ""):
+            if "SCA-IDLE" in (self.execute(probe).get("log") or ""):
                 return True
             time.sleep(0.2)
         return False
@@ -462,7 +473,6 @@ class MarimoKernel:
             "    print('SCA-PUBLISHED', _p.definition_id, _p.definition_kind)\n"
             "except Exception as _e:\n"
             "    print('SCA-PUBLISH-ERROR', type(_e).__name__ + ':', str(_e).splitlines()[0] if str(_e) else '')\n",
-            timeout=180,
         )
         for line in (result.get("log") or "").splitlines():
             if line.startswith("SCA-PUBLISHED "):
@@ -474,8 +484,16 @@ class MarimoKernel:
 
     # -- driving --------------------------------------------------------------------
 
-    def execute(self, code: str, timeout: float = 120.0) -> dict:
-        """Run a scratch snippet in the kernel; returns {success, output, log}."""
+    def execute(self, code: str, timeout: float | None = None) -> dict:
+        """Run a scratch snippet in the kernel; returns {success, output, log}.
+
+        The snippet queues behind whatever the kernel is running, and the call
+        waits for it.  There is deliberately no client-side timeout by default:
+        marimo interrupts the KERNEL when the client of ``/api/kernel/execute``
+        disconnects, whatever the kernel is running at that moment, so a call
+        that gave up after 10 s killed any cell that ran longer (a ``use`` of a
+        child notebook, a big rebuild).
+        """
         self._own_calls += 1
         started = time.monotonic()
         try:
@@ -487,7 +505,7 @@ class MarimoKernel:
                 first = next((line for line in code.splitlines() if line.strip()), "")[:70]
                 print(f"[sca edit] {time.strftime('%H:%M:%S')}.{int(time.time() * 1000) % 1000:03d} kernel {self._own_ended - started:6.2f}s  {first}", file=sys.stderr, flush=True)
 
-    def _execute(self, code: str, timeout: float) -> dict:
+    def _execute(self, code: str, timeout: float | None) -> dict:
         body = json.dumps({"code": code}).encode("utf-8")
         request = urllib.request.Request(
             f"{self.marimo_url}/api/kernel/execute",

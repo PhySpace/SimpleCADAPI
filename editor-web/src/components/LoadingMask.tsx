@@ -7,8 +7,12 @@ const RING = [0, 1, 2, 5, 8, 7, 6, 3];
 
 const STEP = 8; // dot pitch, CSS px
 const DOT = 2; // dot size, CSS px
-/** Dot brightness in four steps (a 2-bit look), and the colour of the crest. */
-const LEVELS = [0.05, 0.14, 0.3, 0.6];
+/** Dot brightness in four steps (a 2-bit look), kept low: the veil should sit
+ * behind the window, not compete with it. The brightest step is the crest. */
+const LEVELS = [0.03, 0.075, 0.13, 0.22];
+/** One long swell: wavelength 2π/WAVE_NUMBER ≈ 780 px, a period of ≈ 7 s. */
+const WAVE_NUMBER = 0.008;
+const WAVE_SPEED = 0.0009;
 
 /** A gray veil over the whole workspace while the model is being made: a
  * dot-matrix with a ripple that spreads from the middle, and a small retro
@@ -41,11 +45,11 @@ export function LoadingMask({ active, message }: { active: boolean; message: str
     <div
       role="status"
       aria-live="polite"
-      className="absolute inset-0 z-50 flex cursor-progress items-center justify-center bg-[#1b1b1b]/80"
+      className="absolute inset-0 z-50 flex cursor-progress items-center justify-center bg-[#1b1b1b]/75"
     >
       <Ripple />
-      <div className="relative w-[280px] border-2 border-white bg-black shadow-[6px_6px_0_0_rgba(255,255,255,0.18)]">
-        <div className="flex h-6 items-center justify-between bg-white px-2 text-[11px] font-bold uppercase tracking-[0.18em] text-black">
+      <div className="relative w-[280px] border-2 border-white/80 bg-black shadow-[6px_6px_0_0_rgba(255,255,255,0.1)]">
+        <div className="flex h-6 items-center justify-between bg-white/85 px-2 text-[11px] font-bold uppercase tracking-[0.18em] text-black">
           <span>loading</span>
           <span className="tabular-nums">
             {minutes}:{seconds}
@@ -130,10 +134,10 @@ function Ripple() {
       for (let y = STEP / 2; y < height; y += STEP) {
         for (let x = STEP / 2; x < width; x += STEP) {
           const distance = Math.hypot(x - cx, y - cy);
-          // rings spreading outwards, fading with distance
-          const wave = (Math.sin(distance * 0.05 - time * 0.0035) + 1) / 2;
-          const strength = wave * (1 - 0.65 * Math.min(distance / reach, 1));
-          const level = Math.min(LEVELS.length - 1, Math.floor(strength * LEVELS.length * 1.15));
+          // a long swell spreading outwards, fading gently with distance
+          const wave = (Math.sin(distance * WAVE_NUMBER - time * WAVE_SPEED) + 1) / 2;
+          const strength = wave * (1 - 0.4 * Math.min(distance / reach, 1));
+          const level = Math.min(LEVELS.length - 1, Math.floor(strength * LEVELS.length));
           paths[level].rect(x - DOT / 2, y - DOT / 2, DOT, DOT);
         }
       }

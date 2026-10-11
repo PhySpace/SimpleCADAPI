@@ -523,3 +523,45 @@ class WatchedFilesTest(unittest.TestCase):
             self.assertIn(root / "data" / "profile.dxf", mtimes)
             self.assertIn(root / "data" / "child.csv", mtimes)  # a child's data: its cells rerun
             self.assertIn(root / "child.py", mtimes)
+
+
+@unittest.skipUnless(os.environ.get("SCA_EDITOR_E2E"), "set SCA_EDITOR_E2E=1 to boot a marimo kernel")
+class LongCellTest(unittest.TestCase):
+    """A cell that runs longer than the bridge's probes must not be interrupted by them."""
+
+    def test_a_long_cell_survives_the_bridge_polling_the_kernel(self) -> None:
+        import threading
+
+        import uvicorn
+
+        from simplecadapi.editor.server import create_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            path = root / "slow.py"
+            path.write_text(
+                "# /// script\n# [tool.simplecadapi]\n# id = \"slow\"\n# ///\n"
+                "import marimo\n\napp = marimo.App()\n\nwith app.setup:\n    import simplecadapi as scad\n\n\n"
+                "@app.cell\ndef _():\n    import time\n    time.sleep(22)\n    done = 1\n    return (done,)\n"
+            )
+            state = WorkspaceState(root)
+            state.port = 17735
+            app = create_app(state)
+            server = uvicorn.Server(uvicorn.Config(app, port=state.port, log_level="error"))
+            threading.Thread(target=server.run, daemon=True).start()
+            state.hub.attach_loop(__import__("asyncio").new_event_loop())
+            try:
+                # start_kernel waits for the notebook to go idle with scratch probes while the
+                # cell sleeps: they used to time out after 15 s and interrupt the cell.
+                state.start_kernel(path)
+                kernel = state.kernel
+                assert kernel is not None
+                self.assertTrue(kernel.session_exists())
+                cell = next(c for c in kernel.list_cells() if "time.sleep" in c["code"])
+                self.assertEqual(cell["status"], "idle")
+                self.assertEqual(cell["errors"], [])
+                self.assertIn("DONE 1", kernel.execute("print('DONE', done)").get("log", "").upper())
+            finally:
+                if state.kernel is not None:
+                    state.kernel.stop()
+                server.should_exit = True
