@@ -138,3 +138,43 @@
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
+
+/* Loading mask: the spinner's chase, the progress strip, the blinking cursor. */
+@keyframes sca-chase {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.12;
+  }
+}
+@keyframes sca-bar {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes sca-blink {
+  50% {
+    opacity: 0;
+  }
+}
+.sca-chase {
+  animation: sca-chase 0.8s steps(5, end) infinite;
+}
+.sca-bar {
+  animation: sca-bar 1.4s steps(4, end) infinite;
+}
+.sca-blink {
+  animation: sca-blink 1s steps(1, end) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sca-chase,
+  .sca-bar,
+  .sca-blink {
+    animation: none;
+  }
+}

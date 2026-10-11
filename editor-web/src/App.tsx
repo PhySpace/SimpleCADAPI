@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CellEditor, type NotebookCell, type NotebookFeature, type ParamMeta } from "@/components/CellEditor";
 import { Header } from "@/components/Header";
 import { Inspector } from "@/components/Inspector";
+import { LoadingMask } from "@/components/LoadingMask";
 import { ModuleView, type ModuleState } from "@/components/ModuleView";
 import { NotebookList } from "@/components/NotebookList";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -47,6 +48,11 @@ export function App() {
   const [picked, setPicked] = useState<Omit<SelectionItem, "variable">[]>([]);
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("solid");
   const [sceneVersion, setSceneVersion] = useState(0);
+  // The workspace is veiled while a model is being made: the kernel starting, a
+  // notebook opening, a module reloading, every cell running.  It ends when the
+  // model arrives (`package`) or the work fails.  Interactive rebuilds (a
+  // slider, one cell) are not veiled.
+  const [loading, setLoading] = useState<string | null>("connecting");
 
   const selection: SelectionItem[] = useMemo(() => {
     const names = variableNames(picked);
@@ -93,6 +99,10 @@ export function App() {
     socket.on("hello", (envelope) => {
       setNotebook((envelope["notebook"] as string) ?? null);
       setKernelAlive(Boolean(envelope["kernel"]));
+      // No notebook: nothing to wait for. Else the model is on its way.
+      const stage = envelope["notebook"] ? (envelope["kernel"] ? "building the model" : "starting the kernel") : null;
+      setLoading(stage);
+      if (stage) setStatus(`${stage[0].toUpperCase()}${stage.slice(1)}…`);
       setMarimoUrl((envelope["marimo_url"] as string) ?? null);
       refreshWorkspace();
     });
@@ -108,6 +118,7 @@ export function App() {
       setPicked([]);
       setNotebook(String(envelope["notebook"] ?? ""));
       setStatus(`opening ${envelope["notebook"]}…`);
+      setLoading(`opening ${envelope["notebook"]}`);
       setSceneVersion((version) => version + 1);
       refreshWorkspace();
     });
@@ -139,14 +150,21 @@ export function App() {
     socket.on("notebook.features", (envelope) => setFeatures((envelope["features"] as NotebookFeature[]) ?? []));
 
     socket.on("package", (envelope) => {
+      setLoading(null);
       void fetchPackage().then((bytes) => loadPackageBytes(bytes, (envelope["name"] as string) ?? null));
     });
 
     socket.on("status", (envelope) => {
       // An empty error means "the model is fine again": keep the package line.
       if (typeof envelope["error"] === "string") {
-        if (envelope["error"]) setStatus(`error: ${envelope["error"]}`);
-      } else if (typeof envelope["working"] === "string") setStatus(envelope["working"]);
+        if (envelope["error"]) {
+          setStatus(`error: ${envelope["error"]}`);
+          setLoading(null);
+        }
+      } else if (typeof envelope["working"] === "string") {
+        setStatus(envelope["working"]);
+        setLoading(envelope["working"].replace(/…$/, ""));
+      }
       else if (typeof envelope["exported"] === "string") setStatus(`exported ${envelope["exported"]}`);
       else if (typeof envelope["created"] === "string") setStatus(`created ${envelope["created"]}`);
     });
@@ -203,11 +221,21 @@ export function App() {
     };
   }, [selection]);
 
+  // Never veil for ever: whatever failed to say so ends it after three minutes.
+  useEffect(() => {
+    if (loading === null) return;
+    const timer = window.setTimeout(() => setLoading(null), 180_000);
+    return () => window.clearTimeout(timer);
+  }, [loading]);
+
   // -- actions -----------------------------------------------------------------------
 
   const handleOpen = (path: string) => {
     setStatus(`opening ${path}…`);
-    openNotebook(path).catch((error) => setStatus(`error: open failed: ${error.message}`));
+    openNotebook(path).catch((error) => {
+      setStatus(`error: open failed: ${error.message}`);
+      setLoading(null);
+    });
   };
 
   return (
@@ -218,91 +246,97 @@ export function App() {
         kernelAlive={kernelAlive}
         status={status}
         marimoUrl={marimoUrl}
-        onRunAll={() => socketRef.current?.send({ type: "rerun.request" })}
+        onRunAll={() => {
+          setLoading("running all cells");
+          socketRef.current?.send({ type: "rerun.request" });
+        }}
       />
-      <ResizablePanelGroup className="min-h-0 flex-1">
-        <ResizablePanel defaultSize={32} minSize={18} className="min-w-0">
-          <Tabs value={leftTab} onValueChange={setLeftTab} className="h-full">
-            <TabsList>
-              <TabsTrigger value="notebook">notebook</TabsTrigger>
-              <TabsTrigger value="workspace">workspace</TabsTrigger>
-              {moduleView && <TabsTrigger value="module">{moduleView.name}</TabsTrigger>}
-            </TabsList>
-            <TabsContent value="notebook" className="min-h-0">
-              <CellEditor
-                cells={cells}
-                features={features}
-                params={params}
-                socket={socketRef.current}
-                notebook={notebook}
-              />
-            </TabsContent>
-            <TabsContent value="workspace" className="min-h-0">
-              <NotebookList
-                notebooks={notebooks}
-                modules={modules}
-                openModule={moduleView?.path ?? null}
-                onOpen={handleOpen}
-                onOpenModule={(path) => socketRef.current?.send({ type: "module.open", path })}
-              />
-            </TabsContent>
-            {moduleView && (
-              <TabsContent value="module" className="min-h-0">
-                <ModuleView
-                  module={moduleView}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <ResizablePanelGroup className="min-h-0 flex-1">
+          <ResizablePanel defaultSize={32} minSize={18} className="min-w-0">
+            <Tabs value={leftTab} onValueChange={setLeftTab} className="h-full">
+              <TabsList>
+                <TabsTrigger value="notebook">notebook</TabsTrigger>
+                <TabsTrigger value="workspace">workspace</TabsTrigger>
+                {moduleView && <TabsTrigger value="module">{moduleView.name}</TabsTrigger>}
+              </TabsList>
+              <TabsContent value="notebook" className="min-h-0">
+                <CellEditor
+                  cells={cells}
+                  features={features}
+                  params={params}
                   socket={socketRef.current}
-                  onClose={() => socketRef.current?.send({ type: "module.close" })}
+                  notebook={notebook}
                 />
               </TabsContent>
-            )}
-          </Tabs>
-        </ResizablePanel>
-        <ResizableHandle />
-        <ResizablePanel defaultSize={46} minSize={30} className="min-w-0">
-          <div className="flex h-full flex-col">
-            <div className="flex h-9 shrink-0 items-center gap-1 border-b-2 border-border px-2">
-              {MODES.map(({ mode, label }) => (
+              <TabsContent value="workspace" className="min-h-0">
+                <NotebookList
+                  notebooks={notebooks}
+                  modules={modules}
+                  openModule={moduleView?.path ?? null}
+                  onOpen={handleOpen}
+                  onOpenModule={(path) => socketRef.current?.send({ type: "module.open", path })}
+                />
+              </TabsContent>
+              {moduleView && (
+                <TabsContent value="module" className="min-h-0">
+                  <ModuleView
+                    module={moduleView}
+                    socket={socketRef.current}
+                    onClose={() => socketRef.current?.send({ type: "module.close" })}
+                  />
+                </TabsContent>
+              )}
+            </Tabs>
+          </ResizablePanel>
+          <ResizableHandle />
+          <ResizablePanel defaultSize={46} minSize={30} className="min-w-0">
+            <div className="flex h-full flex-col">
+              <div className="flex h-9 shrink-0 items-center gap-1 border-b-2 border-border px-2">
+                {MODES.map(({ mode, label }) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={cn(
+                      "border-2 px-2 py-px text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors",
+                      selectionMode === mode
+                        ? "border-white bg-white text-black"
+                        : "border-transparent text-muted-foreground hover:border-input hover:text-foreground",
+                    )}
+                    onClick={() => setSelectionMode(mode)}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <span className="flex-1" />
+                <span className="label hidden xl:inline">ctrl+click: add</span>
                 <button
-                  key={mode}
                   type="button"
-                  className={cn(
-                    "border-2 px-2 py-px text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors",
-                    selectionMode === mode
-                      ? "border-white bg-white text-black"
-                      : "border-transparent text-muted-foreground hover:border-input hover:text-foreground",
-                  )}
-                  onClick={() => setSelectionMode(mode)}
+                  className="border-2 border-transparent px-2 py-px text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground hover:border-input hover:text-foreground"
+                  onClick={() => viewRef.current?.frame()}
                 >
-                  {label}
+                  fit
                 </button>
-              ))}
-              <span className="flex-1" />
-              <span className="label hidden xl:inline">ctrl+click: add</span>
-              <button
-                type="button"
-                className="border-2 border-transparent px-2 py-px text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground hover:border-input hover:text-foreground"
-                onClick={() => viewRef.current?.frame()}
-              >
-                fit
-              </button>
+              </div>
+              <div className="min-h-0 flex-1">
+                <Viewport
+                  viewRef={viewRef}
+                  selectionMode={selectionMode}
+                  selection={selection}
+                  sceneVersion={sceneVersion}
+                  onPick={handlePick}
+                  onClear={handleClear}
+                />
+              </div>
             </div>
-            <div className="min-h-0 flex-1">
-              <Viewport
-                viewRef={viewRef}
-                selectionMode={selectionMode}
-                selection={selection}
-                sceneVersion={sceneVersion}
-                onPick={handlePick}
-                onClear={handleClear}
-              />
-            </div>
-          </div>
-        </ResizablePanel>
-        <ResizableHandle />
-        <ResizablePanel defaultSize={22} minSize={14} className="min-w-0">
-          <Inspector selection={selection} />
-        </ResizablePanel>
-      </ResizablePanelGroup>
+          </ResizablePanel>
+          <ResizableHandle />
+          <ResizablePanel defaultSize={22} minSize={14} className="min-w-0">
+            <Inspector selection={selection} />
+          </ResizablePanel>
+        </ResizablePanelGroup>
+        <LoadingMask active={loading !== null} message={loading ?? ""} />
+      </div>
     </div>
   );
 }
