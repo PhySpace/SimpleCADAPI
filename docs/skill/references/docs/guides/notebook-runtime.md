@@ -264,20 +264,28 @@ named in its header.
 
 ## The cell cache
 
-Headless runs cache every cell except the setup cell. marimo keys a cell's
-entry by its code and the values it reads; SimpleCAD adds one digest, *D*, of
-what the cells cannot show:
+Every cell except the setup cell is cached, in headless runs and in the
+editor's kernel alike (what one computed the other restores). marimo keys a
+cell's entry by its code and what it reads; SimpleCAD adds a digest of what
+the cells cannot show, **per cell**, over the files *that cell* depends on:
 
-- **local modules** — Python files under the notebook's directory that the
-  cells import, and the local modules those import in turn, found from the
-  `import` statements;
-- **child notebooks** run with `scad.use`, with everything they depend on;
-- the files listed in `inputs`;
+- **local modules** — Python files under the notebook's directory, found from
+  the `import` statements (setup cell included), and the local modules those
+  import in turn. A cell depends on a module when it reads a name an `import`
+  bound to it, or calls a function the notebook defines (an `@app.function`
+  cell, a `def` in the setup cell) that does;
+- **everything the cells it reads from depend on**: marimo keys a cell that
+  reads an object (a solid, a part) by the code of the cells that made it, so
+  it cannot see a module that changed upstream;
+- **child notebooks** run with `scad.use` (and what they depend on), for the
+  cells that call `use` and those that read what they make;
+- the files listed in `inputs`, for every cell;
 - the SimpleCAD, OpenCASCADE, and marimo versions.
 
-A run reads and writes only the cache stored under the current *D*, so any
-change to any of these files invalidates the notebook's whole cache: coarse,
-but never stale. Local modules are imported afresh when their files changed
+So editing `dimensions.py` recomputes the cells that read the dimensions (and
+what is made from them) and restores the rest, and going back to an earlier
+value restores everything. A run keeps the entries of its own digests and of
+the previous run's. Local modules are imported afresh when their files changed
 since the last run in the same process.
 
 - Imports through `importlib` or `__import__` are not seen; import local
@@ -285,16 +293,20 @@ since the last run in the same process.
 - Values that cannot be pickled cannot be restored: the run then executes the
   whole notebook without the cache. Keep such values (locks, open files,
   handles) out of top-level variables.
+- The editor kernel does not cache the cells that run child notebooks (only a
+  headless run records what they depend on; the children themselves are
+  cached), and keys the cells downstream of a value an editor saved by that
+  value. `SCA_NO_KERNEL_CACHE=1` turns the kernel's cache off.
 - The state lives in `__marimo__/simplecad/<notebook file name>/<id>/`
-  (`deps.json` and `cache/<D>/`), one directory per part-family member. It is generated state: do not commit
-  `__marimo__/`. Entries are unsigned unless the `cryptography` package is
-  installed; treat the directory as trusted local files.
+  (`deps.json` and `cache/<digest>/`), one directory per part-family member. It
+  is generated state: do not commit `__marimo__/`. Entries are unsigned unless
+  the `cryptography` package is installed; treat the directory as trusted local
+  files.
 
 **In the marimo editor, leave `[tool.marimo.runtime] cache_cells` off.** That
-is marimo's own cache: it does not know *D*, so after a local module or child
-notebook changes it would restore stale values. The editor re-runs cells
-reactively; set `[tool.marimo.runtime] auto_reload` to pick up edited local
-modules.
+is marimo's own cache: it does not know these digests, so after a local module
+or child notebook changes it would restore stale values. Under `sca edit` the
+SimpleCAD cache above is already in use.
 
 ## Library parts: `@scad.part` and `@scad.assemble`
 

@@ -29,9 +29,11 @@ import json
 import os
 import sys
 import threading
-from collections.abc import Iterable, Iterator, Mapping
+import time
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
+from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 
@@ -130,11 +132,19 @@ def local_modules(config: NotebookConfig, codes: Iterable[str]) -> dict[str, Pat
     and marimo's output directory never count.
     """
 
-    root = config.directory
-    output = notebook_output_dir(config.path)
     found: dict[str, Path] = {}
     # (source, package its relative imports resolve against)
-    pending: list[tuple[str, str]] = [(code, "") for code in codes]
+    _follow_imports(config, [(code, "") for code in codes], found)
+    return found
+
+
+def _follow_imports(
+    config: NotebookConfig, pending: list[tuple[str, str]], found: dict[str, Path]
+) -> None:
+    """Add to *found* every local module the imports in *pending* sources reach."""
+
+    root = config.directory
+    output = notebook_output_dir(config.path)
     while pending:
         source, package = pending.pop()
         for imported in _imported_names(source, package):
@@ -148,7 +158,6 @@ def local_modules(config: NotebookConfig, codes: Iterable[str]) -> dict[str, Pat
                     continue  # still a dependency; its imports are unknown
                 is_package = path.name == "__init__.py"
                 pending.append((text, name if is_package else name.rpartition(".")[0]))
-    return found
 
 
 _loaded: dict[str, tuple[Path, str | None]] = {}
@@ -264,6 +273,234 @@ def _module_files(root: Path, name: str) -> list[tuple[str, Path]]:
 
 
 # ---------------------------------------------------------------------------
+# What each cell depends on
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class CellSource:
+    """A cell as the dependency analysis needs it."""
+
+    key: str
+    code: str
+    refs: frozenset[str]
+    """The names the cell reads (marimo's ``cell.refs``)."""
+    defs: frozenset[str]
+    """The names the cell defines (marimo's ``cell.defs``)."""
+
+
+def cell_module_files(
+    config: NotebookConfig,
+    setup: str | None,
+    cells: Sequence[CellSource],
+    recorded: Iterable[Path] = (),
+) -> dict[str, frozenset[Path]]:
+    """Return, per cell key, the local files whose content its result depends on.
+
+    A cell depends on a local module when it reads a name that an ``import``
+    in the notebook (the setup cell, or any cell) bound to that module, or
+    calls a function the notebook defines (an ``@app.function`` cell, a
+    ``def`` in the setup cell) that reads such a name; and on every local
+    module that module imports in turn.  It also depends on whatever the cells
+    it reads from depend on: marimo keys a cell that reads an object (a solid,
+    a part) by the code of the cells that made it, not by its value, so it
+    cannot see a module that changed upstream.  A cell that calls ``use`` also
+    depends on everything the last run recorded (the child notebooks, which
+    only a run can name, and what they depend on): *recorded*.
+
+    Reading a name never imported (a standard-library or installed module) adds
+    nothing: those are pinned by the software versions in the digest.
+    """
+
+    root = config.directory
+    sources = ([setup] if setup else []) + [cell.code for cell in cells]
+    bound: dict[str, set[tuple[str, Path]]] = {}
+    for source in sources:
+        for name, modules in _import_bindings(root, source).items():
+            bound.setdefault(name, set()).update(modules)
+    star = bound.pop("*", set())
+
+    closures: dict[tuple[str, Path], frozenset[Path]] = {}
+
+    def closure(module: tuple[str, Path]) -> frozenset[Path]:
+        if module not in closures:
+            name, path = module
+            found: dict[str, Path] = {name: path}
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeError):
+                text = ""
+            package = name if path.name == "__init__.py" else name.rpartition(".")[0]
+            _follow_imports(config, [(text, package)], found)
+            closures[module] = frozenset(found.values())
+        return closures[module]
+
+    # Names each function or class of the notebook reads.
+    reads: dict[str, set[str]] = {}
+    for source in sources:
+        for name, loaded in _definitions(source).items():
+            reads.setdefault(name, set()).update(loaded)
+
+    def reach(name: str, seen: set[str]) -> set[str]:
+        """The imported names the notebook function *name* reads, through other functions too."""
+        if name in seen:
+            return set()
+        seen.add(name)
+        imported: set[str] = set()
+        for read in reads.get(name, ()):
+            if read in bound:
+                imported.add(read)
+            elif read in reads:
+                imported |= reach(read, seen)
+        return imported
+
+    star_files = frozenset(path for module in star for path in closure(module))
+    recorded_files = frozenset(recorded)
+    result: dict[str, frozenset[Path]] = {}
+    for cell in cells:
+        names = set(cell.refs) | (cell.defs & bound.keys()) | _loaded_names(cell.code)
+        needed: set[str] = set()
+        for name in names:
+            if name in bound:
+                needed.add(name)
+            if name in reads:
+                needed |= reach(name, set())
+        for name in cell.defs & reads.keys():
+            needed |= reach(name, set())
+        files: set[Path] = set(star_files)
+        for name in needed:
+            for module in bound.get(name, ()):
+                files |= closure(module)
+        if calls_use(cell.code):
+            files |= recorded_files
+        result[cell.key] = frozenset(files)
+
+    # marimo keys a cell that reads an object (a solid, a part) by the code of
+    # the cells that made it, not by its value: a file an ancestor depends on
+    # is one this cell depends on.
+    reached = ancestors(cells)
+    return {
+        cell.key: frozenset(result[cell.key].union(*(result[key] for key in reached[cell.key])))
+        for cell in cells
+    }
+
+
+def ancestors(cells: Sequence[CellSource]) -> dict[str, frozenset[str]]:
+    """Per cell key, the keys of every cell it reads from, directly or not."""
+
+    producers = {name: cell.key for cell in cells for name in cell.defs}
+    parents = {
+        cell.key: {producers[name] for name in cell.refs if name in producers} - {cell.key}
+        for cell in cells
+    }
+    found: dict[str, frozenset[str]] = {}
+
+    def of(key: str, stack: frozenset[str] = frozenset()) -> frozenset[str]:
+        if key not in found:
+            reached: set[str] = set()
+            for parent in parents[key] - stack - {key}:
+                reached.add(parent)
+                reached |= of(parent, stack | {key})
+            found[key] = frozenset(reached)
+        return found[key]
+
+    return {cell.key: of(cell.key) for cell in cells}
+
+
+def recorded_dependents(cells: Sequence[CellSource]) -> frozenset[str]:
+    """The keys of the cells that depend on the files a run records.
+
+    Those are the cells that call ``use`` and every cell that reads, however
+    indirectly, what such a cell makes (see :func:`cell_module_files`).
+    """
+
+    direct = {cell.key for cell in cells if calls_use(cell.code)}
+    reached = ancestors(cells)
+    return frozenset(key for key in reached if key in direct or reached[key] & direct)
+
+
+def _import_bindings(root: Path, source: str) -> dict[str, set[tuple[str, Path]]]:
+    """The local modules each name an ``import`` in *source* binds comes from.
+
+    ``from m import a`` binds ``a`` to ``m`` (and to ``m.a`` when that is a
+    submodule); ``import m.n`` binds ``m``; a star import binds an unknown set
+    of names, recorded under ``"*"``.
+    """
+
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return {}
+    bindings: dict[str, set[tuple[str, Path]]] = {}
+
+    def bind(name: str, modules: Iterable[tuple[str, Path]]) -> None:
+        found = set(modules)
+        if found:
+            bindings.setdefault(name, set()).update(found)
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                bind(alias.asname or alias.name.split(".")[0], _module_files(root, alias.name))
+        elif isinstance(node, ast.ImportFrom):
+            base = _absolute(node.module, node.level, "")
+            if base is None:
+                continue
+            for alias in node.names:
+                modules = list(_module_files(root, base))
+                if alias.name == "*":
+                    bind("*", modules)
+                else:
+                    modules += _module_files(root, f"{base}.{alias.name}")
+                    bind(alias.asname or alias.name, modules)
+    return bindings
+
+
+def _definitions(source: str) -> dict[str, set[str]]:
+    """The names each top-level function and class in *source* reads."""
+
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return {}
+    return {
+        node.name: _loaded_names_of(node)
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+    }
+
+
+def _loaded_names(source: str) -> set[str]:
+    try:
+        return _loaded_names_of(ast.parse(source))
+    except (SyntaxError, ValueError):
+        return set()
+
+
+def _loaded_names_of(node: ast.AST) -> set[str]:
+    return {
+        child.id
+        for child in ast.walk(node)
+        if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Load)
+    }
+
+
+def calls_use(source: str) -> bool:
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return True  # cannot tell: depend on everything
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            function = node.func
+            if (isinstance(function, ast.Name) and function.id == "use") or (
+                isinstance(function, ast.Attribute) and function.attr == "use"
+            ):
+                return True
+    return False
+
+
+# ---------------------------------------------------------------------------
 # The digest
 # ---------------------------------------------------------------------------
 
@@ -272,10 +509,11 @@ def input_files(config: NotebookConfig) -> frozenset[Path]:
     return frozenset((config.directory / item.path).resolve() for item in config.inputs)
 
 
-def dependency_digest(config: NotebookConfig, files: Iterable[Path]) -> str:
+def dependency_digest(config: NotebookConfig, files: Iterable[Path], *, tag: str = "") -> str:
     """Return *D* for *files* and the inputs as they are now: 16 hex digits.
 
-    A missing file digests as missing, so deleting one invalidates too.
+    A missing file digests as missing, so deleting one invalidates too.  A
+    *tag* keeps digests of different kinds of cell apart.
     """
 
     contents = {
@@ -288,14 +526,51 @@ def dependency_digest(config: NotebookConfig, files: Iterable[Path]) -> str:
         "marimo": marimo.__version__,
         "files": contents,
     }
+    if tag:
+        payload["tag"] = tag
     return hashlib.sha256(canonical_bytes(payload)).hexdigest()[:16]
 
 
+def cell_digest(config: NotebookConfig, files: Iterable[Path], *, tag: str = "") -> str:
+    """The digest a cell's cache entries are stored under: 16 hex digits.
+
+    Like :func:`dependency_digest`, but over the files one cell depends on (see
+    :func:`cell_module_files`); the project inputs are every cell's.
+    """
+
+    return dependency_digest(config, files, tag=tag)
+
+
+_digests: dict[Path, tuple[int, int, str | None]] = {}
+_digests_lock = threading.Lock()
+
+
 def _file_digest(path: Path) -> str | None:
+    """The content digest of *path*; ``None`` if it cannot be read.
+
+    Remembered per (mtime, size): the editor kernel asks for the digests of
+    the same few files for every cell it runs.
+    """
+
     try:
-        return hashlib.sha256(path.read_bytes()).hexdigest()
+        stat = path.stat()
     except OSError:
         return None
+    signature = (stat.st_mtime_ns, stat.st_size)
+    # A file touched a moment ago may be edited again within the clock's
+    # resolution without its (mtime, size) changing: read those every time.
+    settled = time.time_ns() - stat.st_mtime_ns > 2_000_000_000
+    with _digests_lock:
+        known = _digests.get(path)
+        if settled and known is not None and known[:2] == signature:
+            return known[2]
+    try:
+        digest: str | None = hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        digest = None
+    with _digests_lock:
+        _digests[path] = (*signature, digest)
+    return digest
 
 
 def _display(config: NotebookConfig, path: Path) -> str:
@@ -308,7 +583,13 @@ def _display(config: NotebookConfig, path: Path) -> str:
 
 
 __all__ = [
+    "CellSource",
+    "ancestors",
+    "calls_use",
+    "cell_digest",
+    "cell_module_files",
     "dependency_digest",
+    "recorded_dependents",
     "deps_file",
     "input_files",
     "local_modules",

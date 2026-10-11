@@ -44,6 +44,7 @@ from ..runtime.params import (
     read_saved_params,
     write_saved_params,
 )
+from ..runtime.deps import input_files
 from ..runtime.workspace import features_in_cell, notebook_modules, scan_modules, scan_workspace
 from .kernel import MarimoKernel
 from .selection import MARKER, selection_cell_code, variable_names
@@ -221,12 +222,15 @@ class WorkspaceState:
 
     # -- child notebooks ---------------------------------------------------------
 
-    def _watched_files(self) -> tuple[dict[Path, int], set[Path]]:
+    def _watched_files(self) -> tuple[dict[Path, int], set[Path], set[Path]]:
         """The files whose edit changes the open notebook, with their mtimes.
 
-        Returns ``(mtimes, own_modules)``.  *own_modules* are the local modules
-        the notebook itself imports: the kernel has them loaded, so a change
-        needs a reload and a rerun of every cell.  The rest are the notebooks
+        Returns ``(mtimes, own_modules, own_inputs)``.  *own_modules* are the
+        local modules the notebook itself imports: the kernel has them loaded,
+        so a change needs a reload and a rerun of every cell.  *own_inputs* are
+        the project files its header lists (``inputs``, data the cells read):
+        nothing to reload, but any cell may read them, so every cell reruns.
+        The rest are the notebooks
         it runs with ``use`` (and the modules those import) and the module open
         in the module view: ``use`` runs a child headless, outside the
         kernel's dataflow, so marimo never sees an edit to it; the editor does
@@ -235,11 +239,14 @@ class WorkspaceState:
         """
         files: set[Path] = set()
         own: set[Path] = set()
+        inputs: set[Path] = set()
         if self.notebook is not None:
             entries = {entry.path: entry for entry in scan_workspace(self.workspace)}
             start = self.notebook.relative_to(self.workspace).as_posix()
             own = set(notebook_modules(self.notebook).values())
-            files |= own
+            config = read_notebook_config(self.notebook)
+            inputs = set(input_files(config)) if config is not None else set()
+            files |= own | inputs
             seen: set[str] = set()
             pending = list(entries[start].uses) if start in entries else []
             while pending:
@@ -250,6 +257,9 @@ class WorkspaceState:
                 if path in entries:
                     pending.extend(entries[path].uses)
                     files.update(self.workspace / module for module in entries[path].modules)
+                    child = read_notebook_config(self.workspace / path)
+                    if child is not None:
+                        files |= set(input_files(child))
             files |= {self.workspace / path for path in seen}
         if self.module_path is not None:
             files.add(self.module_path)
@@ -259,7 +269,7 @@ class WorkspaceState:
                 mtimes[path] = path.stat().st_mtime_ns
             except OSError:
                 mtimes[path] = 0
-        return mtimes, own
+        return mtimes, own, inputs
 
     def _watch_files(self, kernel: MarimoKernel) -> None:
         while not kernel._stop.is_set():
@@ -267,7 +277,7 @@ class WorkspaceState:
             if self.kernel is not kernel:
                 return
             try:
-                current, _own = self._watched_files()
+                current, _own, _inputs = self._watched_files()
                 changed = {path for path, mtime in current.items() if self._watched.get(path) != mtime}
                 changed |= {path for path in self._watched if path not in current}
                 self._watched = current
@@ -300,11 +310,16 @@ class WorkspaceState:
                 if kernel is None:
                     continue
                 own_names = self._own_module_names()
+                _mtimes, _own, own_inputs = self._watched_files()
                 if any(file in paths for file in own_names.values()):
                     shown = ", ".join(Path(path).name for path in sorted(paths))
                     self.hub.broadcast({"type": "status", "working": f"reloading {shown}…"})
                     kernel.reload_modules(list(own_names))
                     kernel.wait_idle(300)
+                elif any(file in paths for file in own_inputs):
+                    shown = ", ".join(Path(path).name for path in sorted(paths & own_inputs))
+                    self.hub.broadcast({"type": "status", "working": f"{shown} changed: rerunning…"})
+                    kernel.run_until_settled([cell["id"] for cell in self.cells])
                 else:
                     uses = [cell["id"] for cell in self.cells if "use(" in cell["code"]]
                     if not uses:

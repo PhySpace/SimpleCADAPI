@@ -436,3 +436,90 @@ class SelectionLatencyTest(unittest.TestCase):
         self.assertEqual(len(written), 2)  # the first, then the newest
         self.assertIn("selected_edge = ", written[-1])
         self.assertNotIn("selected_face", written[-1])
+
+
+@unittest.skipUnless(os.environ.get("SCA_EDITOR_E2E"), "set SCA_EDITOR_E2E=1 to boot a marimo kernel")
+class KernelCacheTest(unittest.TestCase):
+    """The editor kernel shares the cell cache: a changed module recomputes only what reads it."""
+
+    NOTEBOOK = (
+        "# /// script\n# [tool.simplecadapi]\n# id = \"two\"\n# ///\n"
+        "import marimo\n\napp = marimo.App()\n\nwith app.setup:\n    import simplecadapi as scad\n\n\n"
+        "@app.cell\ndef _():\n    from lib.alpha import A\n"
+        "    open('/tmp/_sca_cache_log.txt', 'a').write('A')\n    return (A,)\n\n\n"
+        "@app.cell\ndef _():\n    from lib.beta import B\n"
+        "    open('/tmp/_sca_cache_log.txt', 'a').write('B')\n    return (B,)\n\n\n"
+        "@app.cell\ndef _(A, B):\n    part = scad.Part(part_id='two', body=scad.make_box_rsolid(A, B, 1.0))\n"
+        "    open('/tmp/_sca_cache_log.txt', 'a').write('P')\n    return (part,)\n"
+    )
+
+    def test_only_the_cells_that_read_a_changed_module_run_again(self) -> None:
+        import threading
+
+        import uvicorn
+
+        from simplecadapi.editor.server import create_app
+
+        log = Path("/tmp/_sca_cache_log.txt")
+        log.unlink(missing_ok=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / "lib").mkdir()
+            (root / "lib" / "alpha.py").write_text("A = 10.0\n")
+            (root / "lib" / "beta.py").write_text("B = 6.0\n")
+            path = root / "two.py"
+            path.write_text(self.NOTEBOOK)
+            state = WorkspaceState(root)
+            state.port = 17733
+            app = create_app(state)
+            server = uvicorn.Server(uvicorn.Config(app, port=state.port, log_level="error"))
+            threading.Thread(target=server.run, daemon=True).start()
+            state.hub.attach_loop(__import__("asyncio").new_event_loop())
+            try:
+                state.start_kernel(path)
+                first = log.read_text()
+                self.assertEqual(sorted(first), ["A", "B", "P"])  # everything ran once
+                (root / "lib" / "alpha.py").write_text("A = 12.0\n")
+                kernel = state.kernel
+                assert kernel is not None
+                kernel.reload_modules(["lib", "lib.alpha", "lib.beta"])
+                kernel.wait_idle(120)
+                again = log.read_text()[len(first):]
+                # alpha changed: the cell that reads it and the part rerun; beta's cell is restored.
+                self.assertEqual(sorted(again), ["A", "P"])
+                # going back is restored for both
+                (root / "lib" / "alpha.py").write_text("A = 10.0\n")
+                before = log.read_text()
+                kernel.reload_modules(["lib", "lib.alpha", "lib.beta"])
+                kernel.wait_idle(120)
+                self.assertEqual(log.read_text()[len(before):], "")
+            finally:
+                if state.kernel is not None:
+                    state.kernel.stop()
+                server.should_exit = True
+                log.unlink(missing_ok=True)
+
+
+class WatchedFilesTest(unittest.TestCase):
+    """What the editor watches: modules, child notebooks, and the data files a header lists."""
+
+    def test_input_files_of_the_notebook_and_its_children_are_watched(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / "data").mkdir()
+            (root / "data" / "profile.dxf").write_text("0\nEOF\n")
+            (root / "data" / "child.csv").write_text("1,2\n")
+            header = '# /// script\n# [tool.simplecadapi]\n# id = "{id}"\n# inputs = ["{inputs}"]\n# ///\n'
+            body = "import marimo\n\napp = marimo.App()\n\nwith app.setup:\n    import simplecadapi as scad\n"
+            (root / "child.py").write_text(header.format(id="child", inputs="data/child.csv") + body)
+            (root / "top.py").write_text(
+                header.format(id="top", inputs="data/profile.dxf")
+                + body
+                + '\n\n@app.cell\ndef _():\n    c = scad.use("child.py")\n    return (c,)\n'
+            )
+            state = WorkspaceState(root, root / "top.py")
+            mtimes, _own, inputs = state._watched_files()
+            self.assertEqual(inputs, {root / "data" / "profile.dxf"})
+            self.assertIn(root / "data" / "profile.dxf", mtimes)
+            self.assertIn(root / "data" / "child.csv", mtimes)  # a child's data: its cells rerun
+            self.assertIn(root / "child.py", mtimes)

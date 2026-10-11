@@ -36,6 +36,20 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 - `simplecadapi.runtime.live`: project the running kernel's product to a
   `.scadpkg` (`live_package`, `publish_live`).
 
+### Changed
+
+- The cell cache is per cell: an entry is stored under a digest of the local
+  modules, child notebooks and input files *that cell* depends on (and what the
+  cells it reads from depend on), no longer one digest for the whole notebook. A
+  changed module recomputes the cells that read it and restores the rest; going
+  back to an earlier value restores everything. The editor kernel uses the same
+  cache. `sca run` reports the same cell statuses; caches written by earlier
+  versions are ignored and removed.
+- Building a package is about twice as fast: the render mesh of a face is
+  computed with numpy in the profile's fixed operation order (the bytes, and so
+  every content hash, are unchanged).
+- Editor: parameters of local modules and `inputs` data files are watched.
+
 ### Fixed
 
 - `ql.vertices()` resolves through solids, faces and wires (it found nothing

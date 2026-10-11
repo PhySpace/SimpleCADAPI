@@ -21,6 +21,7 @@ from ..product.packages import build_product_package, encode_product_package
 from ._marimo import safe_get_context
 from .cells import NotebookCells
 from .config import read_notebook_config
+from .executor import finish_kernel_cache
 from .projection import find_product, project_product
 
 PACKAGE_MEDIA_TYPE = "application/vnd.simplecad.scadpkg"
@@ -56,6 +57,7 @@ def live_package(*, validate: bool = False) -> LivePackage:
         raise LiveUnavailableError(
             f"{context.filename}: not a SimpleCAD notebook (no [tool.simplecadapi])"
         )
+    finish_kernel_cache(config)  # the product is modified below: let the cache finish pickling it
     glbls = context.globals
     ordered = list(context.graph.cells.values())
     cells = NotebookCells(config.path, ordered)

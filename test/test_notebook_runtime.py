@@ -348,11 +348,15 @@ class TestRunNotebook(NotebookTestCase):
         first = run_notebook(self.bracket)
         self.write("lib/dims.py", "HOLE_RADIUS = 2.0\n")
         changed = run_notebook(self.bracket)
-        self.assertEqual(self.statuses(changed), ["ran"] * 4)
+        # `width` reads no module: it is restored; the cell that imports the
+        # module, and the part made from its result, are computed again.
+        self.assertEqual(self.statuses(changed), ["ran", "cached", "ran", "ran"])
         self.assertNotEqual(first.definition.content_hash, changed.definition.content_hash)
         self.assertEqual(self.statuses(run_notebook(self.bracket))[1:], ["cached"] * 3)
-        # Only the cache for the current dependencies is kept.
-        self.assertEqual(len(list((state_dir(first.config) / "cache").iterdir())), 1)
+        # The caches of the current dependencies and of the previous run are kept.
+        self.assertEqual(
+            len([d for d in (state_dir(first.config) / "cache").iterdir() if d.is_dir()]), 2
+        )
 
     def test_sources_are_positions_in_the_notebook_file(self) -> None:
         lines = BRACKET.splitlines()
@@ -560,8 +564,81 @@ class TestUse(NotebookTestCase):
         first = run_notebook(self.rig)
         self.write("bracket.py", BRACKET.replace("10.0, 5.0)", "12.0, 5.0)"))
         changed = run_notebook(self.rig)
-        self.assertEqual(self.statuses(changed), ["ran"] * 4)
+        # The pin does not depend on the child: it is restored.
+        self.assertEqual(self.statuses(changed), ["ran", "ran", "cached", "ran"])
         self.assertNotEqual(first.definition.content_hash, changed.definition.content_hash)
+
+
+TWO_MODULES = notebook_text(
+    cell("from lib.alpha import A", returns="A"),
+    cell("from lib.beta import B", returns="B"),
+    cell("box = scad.make_box_rsolid(A, 4.0, 4.0)", reads="A", returns="box"),
+    cell("plate = scad.make_box_rsolid(B, B, 1.0)", reads="B", returns="plate"),
+    cell("part = scad.Part(part_id='two', body=scad.union_rsolid(box, plate))", reads="box, plate", returns="part"),
+    table='id = "two"',
+)
+
+
+class TestCellLevelDependencies(NotebookTestCase):
+    """A changed file recomputes the cells that read it, and nothing stale survives."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.write("lib/alpha.py", "A = 10.0\n")
+        self.write("lib/beta.py", "B = 6.0\n")
+        self.two = self.write("two.py", TWO_MODULES)
+
+    def test_only_the_cells_that_read_a_module_and_their_dependents_rerun(self) -> None:
+        first = run_notebook(self.two)
+        self.assertEqual(self.statuses(first), ["ran"] * 6)
+        self.write("lib/alpha.py", "A = 12.0\n")
+        changed = run_notebook(self.two)
+        # setup, A (reads alpha), B (beta: untouched), box (made from A),
+        # plate (made from B: untouched), part (reads both products).
+        self.assertEqual(self.statuses(changed), ["ran", "ran", "cached", "ran", "cached", "ran"])
+
+    def test_the_result_is_what_a_fresh_run_gives_after_any_change(self) -> None:
+        run_notebook(self.two)
+        for name, text in (
+            ("lib/alpha.py", "A = 12.0\n"),
+            ("lib/beta.py", "B = 8.0\n"),
+            ("lib/alpha.py", "A = 10.0\n"),  # back to an earlier state
+            ("lib/beta.py", "B = 6.0\n"),
+        ):
+            self.write(name, text)
+            cached = run_notebook(self.two)
+            fresh = run_notebook(self.two, cache=False)
+            self.assertEqual(cached.definition.content_hash, fresh.definition.content_hash, name)
+
+    def test_going_back_to_an_earlier_value_is_restored(self) -> None:
+        run_notebook(self.two)
+        self.write("lib/alpha.py", "A = 12.0\n")
+        run_notebook(self.two)
+        self.write("lib/alpha.py", "A = 10.0\n")
+        back = run_notebook(self.two)
+        self.assertEqual(self.statuses(back), ["ran", "cached", "cached", "cached", "cached", "cached"])
+
+    def test_a_function_defined_in_the_notebook_carries_the_dependency(self) -> None:
+        self.write("lib/size.py", "SIZE = 3.0\n")
+        text = notebook_text(
+            cell("side = 5.0", returns="side"),
+            cell("block = scad.make_box_rsolid(edge(), side, side)", reads="side", returns="block"),
+            cell("part = scad.Part(part_id='f', body=block)", reads="block", returns="part"),
+            table='id = "f"',
+        ).replace(
+            "with app.setup:\n    import simplecadapi as scad\n",
+            "with app.setup:\n    import simplecadapi as scad\n    from lib.size import SIZE\n\n\n"
+            "    def edge():\n        return SIZE\n",
+        )
+        path = self.write("f.py", text)
+        run_notebook(path)
+        self.write("lib/size.py", "SIZE = 4.0\n")
+        changed = run_notebook(path)
+        # `side` reads nothing; the block calls edge(), which reads the imported SIZE.
+        self.assertEqual(self.statuses(changed), ["ran", "cached", "ran", "ran"])
+        self.assertEqual(
+            changed.definition.content_hash, run_notebook(path, cache=False).definition.content_hash
+        )
 
 
 LINK = notebook_text(
