@@ -485,7 +485,7 @@ class MarimoKernel:
             self._own_calls -= 1
             if _TRACE:
                 first = next((line for line in code.splitlines() if line.strip()), "")[:70]
-                print(f"[sca edit] kernel {self._own_ended - started:6.2f}s  {first}", file=sys.stderr, flush=True)
+                print(f"[sca edit] {time.strftime('%H:%M:%S')}.{int(time.time() * 1000) % 1000:03d} kernel {self._own_ended - started:6.2f}s  {first}", file=sys.stderr, flush=True)
 
     def _execute(self, code: str, timeout: float) -> dict:
         body = json.dumps({"code": code}).encode("utf-8")
