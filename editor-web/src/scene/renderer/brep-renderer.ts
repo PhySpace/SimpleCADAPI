@@ -25,6 +25,7 @@ import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js
 import { strFromU8 } from 'fflate';
 import { DEFAULT_BASE_COLOR, CAD_EDGE_COLOR, CAD_EDGE_LINE_WIDTH, cadPointToGltf, disposeObject, materialFor, placementMatrix } from '../cad-three';
 import type { PackageFiles } from '../product-package';
+import type { PreviewData, PreviewPart } from '../../lib/preview';
 import type { Entity, EntitySidecar, FaceGroup, SceneManifest, SceneNode, Vec3 } from '../scene2';
 
 /** Render layers: faces (0, default) go through lighting + AO; edges (1) and
@@ -105,6 +106,9 @@ export class BRepRenderer {
   private pendingFrame = true;
   private disposed = false;
   private grid: THREE.LineSegments | null = null;
+  /** Entity sidecars of the preview's parts, by node id (a preview has no package). */
+  private previewSidecars = new Map<string, EntitySidecar>();
+  private previewGeometries: THREE.BufferGeometry[] = [];
   private readonly gizmoScene = new THREE.Scene();
   private readonly gizmoCamera = new THREE.OrthographicCamera(-1.5, 1.5, 1.5, -1.5, 0.1, 20);
 
@@ -459,6 +463,8 @@ export class BRepRenderer {
   }
 
   sidecarFor(node: SceneNode | undefined): EntitySidecar | null {
+    const previewed = node ? this.previewSidecars.get(node.node_id) : undefined;
+    if (previewed) return previewed;
     if (!this.manifest || !this.files || !node?.entity_asset_id) return null;
     const asset = this.manifest.entity_assets.find((item) => item.asset_id === node.entity_asset_id);
     if (!asset) return null;
@@ -534,6 +540,130 @@ export class BRepRenderer {
     if (!hadScene) this.pendingFrame = true;
     this.updateGrid();
     this.resize();
+  }
+
+  /** Build the scene from a preview (see `lib/preview.ts`): no package, no
+   * sidecar files. Each part's geometry is built once and shared by its
+   * instances; picking and highlighting use the same face and edge groups the
+   * package path has. Entity details are not part of a preview: a pick returns
+   * the entity without properties and the caller asks for them. */
+  loadPreview(preview: PreviewData): void {
+    this.needsRender = true;
+    const hadScene = this.modelRoot.children.length > 0;
+    this.clearScene();
+    this.files = {};
+    const nodes: SceneNode[] = [];
+    const built = new Map<string, { faces: THREE.BufferGeometry; pick: THREE.BufferGeometry; edges: LineSegmentsGeometry; vertices: THREE.BufferGeometry | null; sidecar: EntitySidecar }>();
+    const material = (part: PreviewPart) => part && materialFor({ material_id: null } as SceneNode);
+    const buildPart = (part: PreviewPart) => {
+      const faces = new THREE.BufferGeometry();
+      faces.setAttribute('position', new THREE.BufferAttribute(part.positions, 3));
+      faces.setAttribute('normal', new THREE.BufferAttribute(part.normals, 3));
+      faces.setIndex(new THREE.BufferAttribute(part.indices, 1));
+      faces.computeBoundingSphere();
+      const pick = new THREE.BufferGeometry();
+      pick.setAttribute('position', new THREE.BufferAttribute(part.edgePositions, 3));
+      pick.setIndex(new THREE.BufferAttribute(part.edgeIndices, 1));
+      const segments: number[] = [];
+      for (let offset = 0; offset + 1 < part.edgeIndices.length; offset += 2) {
+        const a = part.edgeIndices[offset] * 3;
+        const b = part.edgeIndices[offset + 1] * 3;
+        segments.push(
+          part.edgePositions[a], part.edgePositions[a + 1], part.edgePositions[a + 2],
+          part.edgePositions[b], part.edgePositions[b + 1], part.edgePositions[b + 2],
+        );
+      }
+      const edges = new LineSegmentsGeometry();
+      if (segments.length) edges.setPositions(segments);
+      let vertices: THREE.BufferGeometry | null = null;
+      if (part.vertexIds.length) {
+        vertices = new THREE.BufferGeometry();
+        vertices.setAttribute('position', new THREE.BufferAttribute(part.vertexPositions, 3));
+      }
+      const empty = { properties: {}, geometry: {}, tags: [] as string[], parent_entity_ids: [] as string[], child_entity_ids: [] as string[], source: { kind: 'preview' } };
+      const entity = (id: string, kind: 'solid' | 'face' | 'edge' | 'vertex') => ({ entity_id: id, kind, topo_id: id.split('/').pop() ?? id, ...empty });
+      const sidecar: EntitySidecar = {
+        schema_version: '2.0',
+        definition_id: part.definitionId,
+        geometry_asset_id: '',
+        edge_asset_id: '',
+        entities: [
+          entity(part.solidEntityId, 'solid'),
+          ...part.faceGroups.map((group) => entity(group.entity_id, 'face')),
+          ...part.edgeGroups.map((group) => entity(group.entity_id, 'edge')),
+          ...part.vertexIds.map((id) => entity(id, 'vertex')),
+        ],
+        face_groups: part.faceGroups,
+        edge_groups: part.edgeGroups,
+      };
+      this.previewGeometries.push(faces, pick, edges, ...(vertices ? [vertices] : []));
+      return { faces, pick, edges, vertices, sidecar };
+    };
+    const edgeMaterial = new LineMaterial({ color: CAD_EDGE_COLOR, linewidth: CAD_EDGE_LINE_WIDTH, worldUnits: false, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const size = this.resolution();
+    edgeMaterial.resolution.set(Math.max(size.width, 1), Math.max(size.height, 1));
+    for (const item of preview.nodes) {
+      const part = preview.parts.get(item.partKey);
+      if (!part) continue;
+      let geometry = built.get(part.key);
+      if (!geometry) {
+        geometry = buildPart(part);
+        built.set(part.key, geometry);
+      }
+      const node = {
+        node_id: item.nodeId, parent_node_id: null, display_name: item.displayName, node_kind: 'part', definition_id: item.definitionId,
+        definition_kind: 'single_solid', component_id: null, instance_id: null, transform: item.transform, geometry_asset_id: null,
+        entity_asset_id: null, material_id: null, properties: {},
+      } as SceneNode;
+      nodes.push(node);
+      this.previewSidecars.set(item.nodeId, geometry.sidecar);
+      const object = new THREE.Group();
+      object.name = item.nodeId;
+      object.matrixAutoUpdate = false;
+      object.matrix.copy(placementMatrix(item.transform));
+      object.userData.nodeId = item.nodeId;
+      object.userData.definitionId = item.definitionId;
+      const group = new THREE.Group();
+      group.name = item.displayName;
+      const faces = new THREE.Mesh(geometry.faces, material(part));
+      faces.layers.set(FACE_LAYER);
+      group.add(faces);
+      // the invisible indexed line set is what edge picking hits; the visual hangs off it
+      const pickEdges = new THREE.LineSegments(geometry.pick, new THREE.LineBasicMaterial({ visible: false }));
+      if (geometry.edges.attributes.instanceStart) {
+        const visual = new LineSegments2(geometry.edges, edgeMaterial);
+        visual.name = 'cad-edge-visual';
+        visual.layers.set(EDGE_LAYER);
+        visual.userData.pickable = false;
+        pickEdges.add(visual);
+      }
+      group.add(pickEdges);
+      if (geometry.vertices) {
+        const points = new THREE.Points(geometry.vertices, new THREE.PointsMaterial({ color: '#d8ff83', size: 7, sizeAttenuation: false, depthWrite: false, transparent: true, opacity: 0.48 }));
+        points.visible = false;
+        points.userData.pickRole = 'vertex';
+        points.userData.pickable = true;
+        points.userData.vertexEntityIds = part.vertexIds;
+        group.add(points);
+      }
+      group.traverse((child: THREE.Object3D) => {
+        child.userData.nodeId = item.nodeId;
+        child.userData.definitionId = item.definitionId;
+      });
+      object.add(group);
+      this.nodeObjects.set(item.nodeId, object);
+      this.modelRoot.add(object);
+    }
+    this.manifest = { schema_version: '2.0', nodes } as unknown as SceneManifest;
+    this.setVertexCloudsVisible(false);
+    if (!hadScene) this.pendingFrame = true;
+    this.updateGrid();
+    this.resize();
+  }
+
+  /** True while the scene on screen is a preview (entity details are asked for, not read). */
+  get isPreview(): boolean {
+    return this.previewSidecars.size > 0;
   }
 
   private async instantiateNode(node: SceneNode): Promise<THREE.Group> {
@@ -648,6 +778,9 @@ export class BRepRenderer {
       disposeObject(child);
       this.modelRoot.remove(child);
     }
+    for (const geometry of this.previewGeometries) geometry.dispose();
+    this.previewGeometries = [];
+    this.previewSidecars.clear();
     this.nodeObjects.clear();
     this.nodeVisibility.clear();
     this.edgeCache.clear();

@@ -91,7 +91,7 @@ class WorkspaceState:
     with the merged latest values ("latest wins").
     """
 
-    # Envelope types worth replaying, in replay order.  "package" is a light
+    # Envelope types worth replaying, in replay order.  "preview" is a light
     # revision event; the bytes themselves live on /api/package/latest.
     _REPLAYED = (
         "module",
@@ -99,7 +99,7 @@ class WorkspaceState:
         "notebook.features",
         "params.schema",
         "params.values",
-        "package",
+        "preview",
         "selection",
     )
 
@@ -111,8 +111,10 @@ class WorkspaceState:
         self.port = 0
         self.lock = threading.Lock()
         self.latest: dict[str, dict] = {}
-        self.latest_package_bytes: bytes | None = None
-        self.package_revision = 0
+        self.latest_package_bytes: bytes | None = None  # a full package, made on demand (export)
+        self.latest_preview_bytes: bytes | None = None
+        self.preview_revision = 0
+        self._package_event = threading.Event()
         self.selection: dict = {}
         self.selection_items: list[dict] = []
         self.viewport_png: bytes | None = None
@@ -161,7 +163,7 @@ class WorkspaceState:
             raise ValueError(f"not a SimpleCAD notebook (no [tool.simplecadapi]): {rel_path}")
         # Let the webuis drop the old model now; commands have no kernel until the new one is up.
         self.latest.clear()
-        self.latest_package_bytes = None
+        self.latest_preview_bytes = None
         self.hub.broadcast({"type": "opening", "notebook": target.name, "path": rel_path})
         self._drop_kernel()
         restored = self._restore(target)
@@ -199,7 +201,7 @@ class WorkspaceState:
         self._last_publish_error = ""
         if not restored:
             self.latest.clear()
-            self.latest_package_bytes = None
+            self.latest_preview_bytes = None
             self.cells = []
             self.specs = {}
         self._watched = self._watched_files()[0]
@@ -235,33 +237,33 @@ class WorkspaceState:
         }
         return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
 
-    def _package_file(self, notebook: Path) -> Path:
+    def _model_file(self, notebook: Path) -> Path:
         name = notebook.relative_to(self.workspace).as_posix().replace("/", "__")
-        return self.snapshot_dir / "packages" / f"{name}.scadpkg"
+        return self.snapshot_dir / "models" / f"{name}.scapreview"
 
-    def remember_package(self, notebook: Path, signature: str, data: bytes) -> None:
-        """Keep *data* as the model of *notebook* for *signature* (in memory and on disk)."""
+    def remember_model(self, notebook: Path, signature: str, data: bytes) -> None:
+        """Keep *data* (a preview) as the model of *notebook* for *signature*, in memory and on disk."""
         key = notebook.relative_to(self.workspace).as_posix()
         self._packages[key] = (signature, data)
         self._packages.move_to_end(key)
         while len(self._packages) > 6:
             self._packages.popitem(last=False)
         try:
-            target = self._package_file(notebook)
+            target = self._model_file(notebook)
             target.parent.mkdir(parents=True, exist_ok=True)
             target.with_suffix(".sig").write_text(signature, encoding="utf-8")
             temporary = target.with_suffix(".tmp")
             temporary.write_bytes(data)
             temporary.replace(target)
         except OSError as error:
-            print(f"[sca edit] could not keep the package: {error}", file=sys.stderr)
+            print(f"[sca edit] could not keep the model: {error}", file=sys.stderr)
 
-    def _recall_package(self, notebook: Path, signature: str) -> bytes | None:
+    def _recall_model(self, notebook: Path, signature: str) -> bytes | None:
         key = notebook.relative_to(self.workspace).as_posix()
         known = self._packages.get(key)
         if known is not None and known[0] == signature:
             return known[1]
-        target = self._package_file(notebook)
+        target = self._model_file(notebook)
         try:
             if target.with_suffix(".sig").read_text(encoding="utf-8") == signature:
                 return target.read_bytes()
@@ -277,19 +279,19 @@ class WorkspaceState:
         only if it differs.
         """
         try:
-            data = self._recall_package(notebook, self._signature(notebook))
+            data = self._recall_model(notebook, self._signature(notebook))
         except (OSError, ValueError):
             data = None
         if data is None:
             return False
         self.notebook = notebook
         self._publish_cells(_static_cells(notebook))
-        self.latest_package_bytes = data
-        self.package_revision += 1
+        self.latest_preview_bytes = data
+        self.preview_revision += 1
         self.emit(
             {
-                "type": "package",
-                "revision": self.package_revision,
+                "type": "preview",
+                "revision": self.preview_revision,
                 "step": notebook.stem,
                 "name": notebook.stem,
                 "size": len(data),
@@ -585,7 +587,7 @@ class WorkspaceState:
                 self._publish_signature = self._signature(self.notebook) if self.notebook else None
             except (OSError, ValueError):
                 self._publish_signature = None
-            result = kernel.publish(self.package_url, step=self.notebook.stem if self.notebook else "")
+            result = kernel.publish_preview(self.preview_url, step=self.notebook.stem if self.notebook else "")
             if result.get("ok"):
                 self._last_publish_error = ""
                 self._stopped = False
@@ -601,6 +603,10 @@ class WorkspaceState:
             if message != self._last_publish_error:
                 self._last_publish_error = message
                 self.hub.broadcast({"type": "status", "error": message[-300:]})
+
+    @property
+    def preview_url(self) -> str:
+        return f"http://127.0.0.1:{self.port}/api/runtime/preview"
 
     @property
     def package_url(self) -> str:
@@ -686,6 +692,18 @@ class WorkspaceState:
         kernel = self.kernel
         if kernel is None:
             return {"type": "error", "message": "no kernel"}
+        if kind == "entity.info":
+            entity_id = str(message.get("entity_id", ""))
+            node_id = message.get("node_id")
+
+            def lookup() -> None:
+                info = kernel.entity_info(entity_id)
+                self.hub.broadcast(
+                    {"type": "entity.info", "entity_id": entity_id, "node_id": node_id, "entity": info}
+                )
+
+            self._in_thread(lookup)
+            return {"type": "ack", "command": kind}
         if kind == "interrupt.request":
             self._stopped = True
             self._in_thread(kernel.interrupt)
@@ -1015,7 +1033,7 @@ class WorkspaceState:
                 name: saved.get(name, spec.default) for name, spec in self.specs.items()
             },
             "modified_parameters": sorted(saved),
-            "package_revision": self.package_revision,
+            "model_revision": self.preview_revision,
         }
 
     def write_snapshot(self) -> None:
@@ -1040,9 +1058,20 @@ class WorkspaceState:
     # -- export ------------------------------------------------------------------
 
     def _export(self) -> None:
-        """Write the latest package next to the notebook: ``out/<stem>.scadpkg``."""
-        if not self.latest_package_bytes or self.notebook is None:
+        """Write a product package next to the notebook: ``out/<stem>.scadpkg``.
+
+        The editor shows previews; a package (the durable form, with the definition
+        and the feature graph) takes seconds to make, so it is made when asked for.
+        """
+        kernel = self.kernel
+        if kernel is None or self.notebook is None:
             self.hub.broadcast({"type": "status", "error": "nothing to export yet"})
+            return
+        self.hub.broadcast({"type": "status", "working": "building the package"})
+        self._package_event.clear()
+        result = kernel.publish(self.package_url, step=self.notebook.stem)
+        if not result.get("ok") or not self._package_event.wait(30) or self.latest_package_bytes is None:
+            self.hub.broadcast({"type": "status", "error": str(result.get("error", "the package was not made"))[-300:]})
             return
         target = self.notebook.parent / "out" / f"{self.notebook.stem}.scadpkg"
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -1198,22 +1227,22 @@ def create_app(state: WorkspaceState) -> Starlette:
             }
         )
 
-    async def push_package(request: Request) -> JSONResponse:
-        """The kernel hands over the fresh in-memory scadpkg bytes.
+    async def push_preview(request: Request) -> JSONResponse:
+        """The kernel hands over the preview of the model it just built.
 
-        The bytes are cached for late webuis and agents; webuis only get a
-        lightweight revision event and fetch bytes on demand.
+        The bytes are cached for late webuis; webuis only get a lightweight
+        revision event and fetch the bytes on demand.
         """
         body = await request.body()
         if not body:
-            return JSONResponse({"ok": False, "error": "empty package"}, status_code=400)
-        unchanged = state.latest_package_bytes == body
-        state.latest_package_bytes = bytes(body)
-        state.package_revision += 1
+            return JSONResponse({"ok": False, "error": "empty preview"}, status_code=400)
+        unchanged = state.latest_preview_bytes == body
+        state.latest_preview_bytes = bytes(body)
+        state.preview_revision += 1
         state.emit(
             {
-                "type": "package",
-                "revision": state.package_revision,
+                "type": "preview",
+                "revision": state.preview_revision,
                 "step": request.headers.get("X-Live-Step", ""),
                 "name": state.notebook.stem if state.notebook else None,
                 "size": len(body),
@@ -1222,21 +1251,36 @@ def create_app(state: WorkspaceState) -> Starlette:
             }
         )
         if state.notebook is not None and state._publish_signature is not None:
-            await asyncio.to_thread(state.remember_package, state.notebook, state._publish_signature, bytes(body))
+            await asyncio.to_thread(state.remember_model, state.notebook, state._publish_signature, bytes(body))
         # The model is fine again: clear a stale "no product yet" message.
         hub.broadcast({"type": "status", "error": ""})
         await asyncio.to_thread(state.write_snapshot)
-        return JSONResponse({"ok": True, "revision": state.package_revision})
+        return JSONResponse({"ok": True, "revision": state.preview_revision})
+
+    async def latest_preview(request: Request) -> Response:
+        """The freshest preview bytes."""
+        if state.latest_preview_bytes:
+            return Response(content=state.latest_preview_bytes, media_type="application/vnd.simplecad.preview")
+        return JSONResponse({"error": "no preview published yet"}, status_code=404)
+
+    async def push_package(request: Request) -> JSONResponse:
+        """The kernel hands over a full package, made because an export asked for it."""
+        body = await request.body()
+        if not body:
+            return JSONResponse({"ok": False, "error": "empty package"}, status_code=400)
+        state.latest_package_bytes = bytes(body)
+        state._package_event.set()
+        return JSONResponse({"ok": True})
 
     async def latest_package(request: Request) -> Response:
-        """The freshest scadpkg bytes."""
+        """The package last made for an export."""
         if state.latest_package_bytes:
             return Response(
                 content=state.latest_package_bytes,
                 media_type="application/vnd.simplecad.scadpkg",
                 headers={"Content-Disposition": 'inline; filename="latest.scadpkg"'},
             )
-        return JSONResponse({"error": "no package published yet"}, status_code=404)
+        return JSONResponse({"error": "no package made yet"}, status_code=404)
 
     async def workspace_list(request: Request) -> JSONResponse:
         """The SimpleCAD notebooks of the workspace."""
@@ -1330,7 +1374,7 @@ def create_app(state: WorkspaceState) -> Starlette:
                 message = await websocket.receive_json()
                 try:
                     if isinstance(message, dict) and str(message.get("type", "")).endswith(
-                        (".set", ".request", ".edit", ".commit", ".revert", ".save", ".open", ".close", ".param")
+                        (".set", ".request", ".edit", ".commit", ".revert", ".save", ".open", ".close", ".param", ".info")
                     ):
                         ack = await asyncio.to_thread(state.dispatch_command, message)
                         await websocket.send_json(ack)
@@ -1343,6 +1387,8 @@ def create_app(state: WorkspaceState) -> Starlette:
 
     routes = [
         Route("/api/health", health),
+        Route("/api/runtime/preview", push_preview, methods=["POST"]),
+        Route("/api/preview/latest", latest_preview, methods=["GET"]),
         Route("/api/runtime/package", push_package, methods=["POST"]),
         Route("/api/package/latest", latest_package, methods=["GET"]),
         Route("/api/workspace", workspace_list, methods=["GET"]),

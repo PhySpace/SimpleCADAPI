@@ -161,13 +161,13 @@ class EditorEndToEndTest(unittest.TestCase):
             try:
                 state.start_kernel(path)
                 self.assertIn("RADIUS", state.specs)
-                first = state.latest_package_bytes
+                first = state.latest_preview_bytes
                 self.assertTrue(first)
                 state.dispatch_command({"type": "param.set", "values": {"RADIUS": 40}})
                 deadline = time.monotonic() + 90
-                while state.latest_package_bytes == first and time.monotonic() < deadline:
+                while state.latest_preview_bytes == first and time.monotonic() < deadline:
                     time.sleep(0.5)
-                self.assertNotEqual(state.latest_package_bytes, first)
+                self.assertNotEqual(state.latest_preview_bytes, first)
                 self.assertEqual(read_saved_params(state.config), {"RADIUS": 40.0})
                 state.dispatch_command({"type": "param.commit", "names": ["RADIUS"]})
                 deadline = time.monotonic() + 60
@@ -595,12 +595,12 @@ class RestoreTest(unittest.TestCase):
             root = Path(tmp).resolve()
             path = self._workspace(root)
             state = WorkspaceState(root, path)
-            state.remember_package(path, "sig-1", b"PKG")
-            self.assertEqual(state._recall_package(path, "sig-1"), b"PKG")
-            self.assertIsNone(state._recall_package(path, "sig-2"))
+            state.remember_model(path, "sig-1", b"PKG")
+            self.assertEqual(state._recall_model(path, "sig-1"), b"PKG")
+            self.assertIsNone(state._recall_model(path, "sig-2"))
             fresh = WorkspaceState(root, path)  # a new server: only the disk remembers
-            self.assertEqual(fresh._recall_package(path, "sig-1"), b"PKG")
-            self.assertIsNone(fresh._recall_package(path, "sig-2"))
+            self.assertEqual(fresh._recall_model(path, "sig-1"), b"PKG")
+            self.assertIsNone(fresh._recall_model(path, "sig-2"))
 
     def test_restoring_shows_the_cells_and_the_model_before_any_kernel(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -611,11 +611,11 @@ class RestoreTest(unittest.TestCase):
             state.emit = sent.append  # type: ignore[method-assign]
             state.hub.broadcast = lambda message: None  # type: ignore[method-assign]
             self.assertFalse(state._restore(path))  # nothing published yet
-            state.remember_package(path, state._signature(path), b"PKG")
+            state.remember_model(path, state._signature(path), b"PKG")
             self.assertTrue(state._restore(path))
-            package = next(m for m in sent if m["type"] == "package")
+            package = next(m for m in sent if m["type"] == "preview")
             self.assertEqual((package["cached"], package["size"]), (True, 3))
-            self.assertEqual(state.latest_package_bytes, b"PKG")
+            self.assertEqual(state.latest_preview_bytes, b"PKG")
             cells = next(m for m in sent if m["type"] == "notebook.cells")["cells"]
             self.assertEqual([c["title"] for c in cells], ["params", "base", "part"])
             self.assertTrue(all(c["readonly"] for c in cells))  # not editable until a kernel has them

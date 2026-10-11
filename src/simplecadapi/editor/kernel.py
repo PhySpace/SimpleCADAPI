@@ -481,6 +481,44 @@ class MarimoKernel:
             self.run_cells(stale)
             self.wait_idle()
 
+    def publish_preview(self, url: str, step: str = "") -> dict:
+        """Have the kernel preview its product and POST the bytes to *url*.
+
+        Returns ``{"ok": True, ...}`` or ``{"ok": False, "error"}``; a notebook that
+        has not produced its product yet is an error value, not an exception.
+        """
+        result = self.execute(
+            "from simplecadapi.runtime.live import publish_preview as _preview\n"
+            "try:\n"
+            f"    _p = _preview({url!r}, step={step!r})\n"
+            "    print('SCA-PREVIEWED', _p['nodes'], _p['parts'], _p['bytes'])\n"
+            "except Exception as _e:\n"
+            "    print('SCA-PREVIEW-ERROR', type(_e).__name__ + ':', str(_e).splitlines()[0] if str(_e) else '')\n",
+        )
+        for line in (result.get("log") or "").splitlines():
+            if line.startswith("SCA-PREVIEWED "):
+                _, nodes, parts, size = line.split(" ")
+                return {"ok": True, "nodes": int(nodes), "parts": int(parts), "bytes": int(size)}
+            if line.startswith("SCA-PREVIEW-ERROR "):
+                return {"ok": False, "error": line[len("SCA-PREVIEW-ERROR "):]}
+        return {"ok": False, "error": (result.get("log") or "preview failed").strip()[-300:]}
+
+    def entity_info(self, entity_id: str) -> dict | None:
+        """The properties of one entity of the scene last previewed (``None`` if unknown)."""
+        result = self.execute(
+            "import json as _json\n"
+            "from simplecadapi.runtime.live import preview_entity_info as _info\n"
+            f"_i = _info({entity_id!r})\n"
+            "print('SCA-ENTITY', _json.dumps(_i))\n"
+        )
+        for line in (result.get("log") or "").splitlines():
+            if line.startswith("SCA-ENTITY "):
+                try:
+                    return json.loads(line[len("SCA-ENTITY "):])
+                except json.JSONDecodeError:
+                    return None
+        return None
+
     def publish(self, url: str, step: str = "") -> dict:
         """Have the kernel project its product and POST the package to *url*.
 

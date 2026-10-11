@@ -8,12 +8,12 @@ import { ModuleView, type ModuleState } from "@/components/ModuleView";
 import { NotebookList } from "@/components/NotebookList";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { fetchPackage, getWorkspace, openNotebook, postViewport, type ModuleRow, type NotebookRow } from "@/lib/api";
+import { fetchPreview, getWorkspace, openNotebook, postViewport, type ModuleRow, type NotebookRow } from "@/lib/api";
+import { parsePreview } from "@/lib/preview";
 import { EnvelopeSocket, type Envelope } from "@/lib/envelope";
 import { selectionPayload, variableNames, type SelectionItem } from "@/lib/selection";
 import { cn } from "@/lib/utils";
 import { Viewport, type PickResult, type SelectionMode } from "@/scene/Viewport";
-import { openCadPackage } from "@/scene/product-package";
 import type { SceneView } from "@/scene/scene-view";
 
 const MODES: { mode: SelectionMode; label: string }[] = [
@@ -73,22 +73,20 @@ export function App() {
   // Camera framing is disruptive during slider drags; frame once per notebook.
   const framedNotebook = useRef<string | null>(null);
 
-  const loadPackageBytes = useCallback(async (bytes: Uint8Array, name: string | null) => {
+  const loadPreviewBytes = useCallback(async (buffer: ArrayBuffer, name: string | null) => {
     const view = viewRef.current;
     if (!view) return;
     try {
-      const opened = await openCadPackage(bytes);
-      await view.loadScene(opened.files);
-      const manifest = view.engine.manifest;
-      if (!manifest) throw new Error("scene manifest missing");
-      setStatus(`${manifest.nodes.length} occurrences · ${manifest.geometry_assets.length} geometry assets`);
+      const preview = parsePreview(buffer);
+      view.loadPreview(preview);
+      setStatus(`${preview.nodes.length} ${preview.nodes.length === 1 ? "part" : "parts"} · ${preview.parts.size} distinct`);
       if (framedNotebook.current !== name) {
         view.frame();
         framedNotebook.current = name;
       }
       setSceneVersion((version) => version + 1);
     } catch (error) {
-      setStatus(error instanceof Error ? `error: ${error.message}` : "error: unable to open package");
+      setStatus(error instanceof Error ? `error: ${error.message}` : "error: unable to open the preview");
     }
   }, []);
 
@@ -167,12 +165,25 @@ export function App() {
     socket.on("notebook.cells", (envelope) => setCells((envelope["cells"] as NotebookCell[]) ?? []));
     socket.on("notebook.features", (envelope) => setFeatures((envelope["features"] as NotebookFeature[]) ?? []));
 
-    socket.on("package", (envelope) => {
+    socket.on("preview", (envelope) => {
       setLoading(null);
       hasModel.current = true;
       // The kernel published the model that is already on screen: nothing to reload.
       if (envelope["unchanged"]) return;
-      void fetchPackage().then((bytes) => loadPackageBytes(bytes, (envelope["name"] as string) ?? null));
+      void fetchPreview().then((buffer) => loadPreviewBytes(buffer, (envelope["name"] as string) ?? null));
+    });
+
+    // The details of a picked entity (a preview carries none), asked for when it was picked.
+    socket.on("entity.info", (envelope) => {
+      const entityId = String(envelope["entity_id"]);
+      const entity = envelope["entity"] as { properties?: Record<string, unknown>; geometry?: Record<string, unknown>; tags?: string[] } | null;
+      setPicked((previous) =>
+        previous.map((item) =>
+          item.entityId === entityId
+            ? { ...item, pending: false, properties: entity?.properties ?? item.properties ?? {}, geometry: entity?.geometry ?? item.geometry ?? {}, tags: entity?.tags ?? item.tags }
+            : item,
+        ),
+      );
     });
 
     socket.on("status", (envelope) => {
@@ -194,7 +205,7 @@ export function App() {
 
     socket.connect();
     return () => socket.close();
-  }, [loadPackageBytes]);
+  }, [loadPreviewBytes]);
 
   // -- selection -------------------------------------------------------------------
 
@@ -212,6 +223,12 @@ export function App() {
       geometry: entity?.geometry ?? null,
       tags: entity?.tags ?? null,
     };
+    // A preview carries no entity details: ask the kernel for them.
+    const needsDetails = Boolean(view?.isPreview) && Boolean(item.entityId) && Object.keys(item.properties ?? {}).length === 0;
+    if (needsDetails && item.entityId) {
+      item.pending = true;
+      socketRef.current?.send({ type: "entity.info", entity_id: item.entityId, node_id: item.nodeId });
+    }
     setPicked((previous) => {
       if (!result.additive) return [item];
       return previous.some((other) => other.key === item.key)
@@ -230,10 +247,11 @@ export function App() {
       firstSelection.current = false;
       return;
     }
-    const send = window.setTimeout(
-      () => socketRef.current?.send({ type: "selection.set", items: selectionPayload(selection) }),
-      40,
-    );
+    // The notebook gets the selection when every picked entity is described.
+    const waiting = selection.some((item) => item.pending);
+    const send = window.setTimeout(() => {
+      if (!waiting) socketRef.current?.send({ type: "selection.set", items: selectionPayload(selection) });
+    }, 40);
     const snapshot = window.setTimeout(() => {
       const png = viewRef.current?.snapshotPng();
       if (png) void postViewport(png).catch(() => undefined);

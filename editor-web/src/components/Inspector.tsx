@@ -33,6 +33,7 @@ export function Inspector({ selection }: { selection: SelectionItem[] }) {
                   <Line label="node" value={item.nodeId} />
                   {item.definitionId && <Line label="definition" value={item.definitionId} />}
                 </dl>
+                {item.pending && <p className="label px-3 pb-2">loading details…</p>}
                 {(item.properties || item.geometry) && (
                   <div className="space-y-2 border-t border-border px-3 py-2">
                     {item.properties && <Group title="properties" value={item.properties} />}

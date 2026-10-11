@@ -12,6 +12,8 @@ export type SelectionItem = {
   tags: string[] | null;
   /** The `selected_*` variable the notebook assigns it to (set by the server). */
   variable: string;
+  /** Its properties are being asked for (a preview carries none). */
+  pending?: boolean;
 };
 
 /** The names the server gives the items, mirrored for the inspector:

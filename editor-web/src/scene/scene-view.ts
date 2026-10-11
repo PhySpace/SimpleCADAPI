@@ -14,6 +14,7 @@ import { BRepRenderer, OVERLAY_LAYER, type CameraState, type LiveGeometryPayload
 
 export type { LiveGeometryPayload };
 import type { PackageFiles } from './product-package';
+import type { PreviewData } from '../lib/preview';
 import type { Entity, EntitySidecar, FaceGroup, SceneNode } from './scene2';
 
 export type SelectionMode = 'component' | 'solid' | 'face' | 'edge' | 'vertex';
@@ -81,6 +82,16 @@ export class SceneView {
     this.clearMarks();
     await this.engine.loadScene(files);
     this.applySelectionModeVisibility();
+  }
+
+  loadPreview(preview: PreviewData): void {
+    this.clearMarks();
+    this.engine.loadPreview(preview);
+    this.applySelectionModeVisibility();
+  }
+
+  get isPreview(): boolean {
+    return this.engine.isPreview;
   }
 
   loadLiveGeometry(payload: LiveGeometryPayload): void {

@@ -62,6 +62,13 @@ export async function postViewport(dataUrl: string): Promise<void> {
   await fetch("/api/studio/viewport", { method: "POST", headers: { "Content-Type": "image/png" }, body: blob });
 }
 
+/** The latest preview of the model (`simplecadapi.scene.preview`). */
+export async function fetchPreview(): Promise<ArrayBuffer> {
+  const response = await fetch("/api/preview/latest");
+  if (!response.ok) throw new Error("no preview published yet");
+  return response.arrayBuffer();
+}
+
 /** Latest in-memory scadpkg bytes (rule 4: never a disk read). */
 export async function fetchPackage(): Promise<Uint8Array> {
   const response = await fetch("/api/package/latest");
