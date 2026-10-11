@@ -565,3 +565,147 @@ class LongCellTest(unittest.TestCase):
                 if state.kernel is not None:
                     state.kernel.stop()
                 server.should_exit = True
+
+
+class RestoreTest(unittest.TestCase):
+    """Switching back to a notebook shows its last model at once, if nothing it depends on changed."""
+
+    def _workspace(self, root: Path) -> Path:
+        (root / "dims.py").write_text("L = 10.0\n")
+        path = create_notebook(root, "part", "part")
+        path.write_text(path.read_text().replace("import simplecadapi as scad\n", "import simplecadapi as scad\n    import dims\n", 1))
+        return path
+
+    def test_the_signature_follows_what_the_model_depends_on(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            path = self._workspace(root)
+            state = WorkspaceState(root, path)
+            first = state._signature(path)
+            self.assertEqual(first, state._signature(path))
+            time.sleep(2.1)  # file digests are remembered per (mtime, size) once settled
+            (root / "dims.py").write_text("L = 11.0\n")
+            changed = state._signature(path)
+            self.assertNotEqual(first, changed)  # a module it imports
+            path.write_text(path.read_text() + "\n# edited\n")
+            self.assertNotEqual(changed, state._signature(path))  # the notebook itself
+
+    def test_a_package_is_recalled_from_memory_and_from_disk_for_its_signature_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            path = self._workspace(root)
+            state = WorkspaceState(root, path)
+            state.remember_package(path, "sig-1", b"PKG")
+            self.assertEqual(state._recall_package(path, "sig-1"), b"PKG")
+            self.assertIsNone(state._recall_package(path, "sig-2"))
+            fresh = WorkspaceState(root, path)  # a new server: only the disk remembers
+            self.assertEqual(fresh._recall_package(path, "sig-1"), b"PKG")
+            self.assertIsNone(fresh._recall_package(path, "sig-2"))
+
+    def test_restoring_shows_the_cells_and_the_model_before_any_kernel(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            path = self._workspace(root)
+            state = WorkspaceState(root, path)
+            sent: list[dict] = []
+            state.emit = sent.append  # type: ignore[method-assign]
+            state.hub.broadcast = lambda message: None  # type: ignore[method-assign]
+            self.assertFalse(state._restore(path))  # nothing published yet
+            state.remember_package(path, state._signature(path), b"PKG")
+            self.assertTrue(state._restore(path))
+            package = next(m for m in sent if m["type"] == "package")
+            self.assertEqual((package["cached"], package["size"]), (True, 3))
+            self.assertEqual(state.latest_package_bytes, b"PKG")
+            cells = next(m for m in sent if m["type"] == "notebook.cells")["cells"]
+            self.assertEqual([c["title"] for c in cells], ["params", "base", "part"])
+            self.assertTrue(all(c["readonly"] for c in cells))  # not editable until a kernel has them
+            self.assertIn("RADIUS", state.specs)
+
+    def test_static_cells_leave_out_the_setup_cell(self) -> None:
+        from simplecadapi.editor.server import _static_cells
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = create_notebook(Path(tmp), "part", "part")
+            names = [cell["name"] for cell in _static_cells(path)]
+            self.assertNotIn("setup", names)
+            self.assertEqual(len(names), 3)
+
+
+class InterruptTest(unittest.TestCase):
+    def test_the_stop_command_interrupts_the_kernel(self) -> None:
+        state = WorkspaceState(Path(tempfile.gettempdir()))
+        stopped: list[bool] = []
+        state.kernel = type("K", (), {"interrupt": lambda self: stopped.append(True)})()  # type: ignore[assignment]
+        self.assertEqual(state.dispatch_command({"type": "interrupt.request"})["type"], "ack")
+        deadline = time.monotonic() + 2
+        while not stopped and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(stopped, [True])
+
+    def test_cell_states_from_marimo_reach_the_webuis(self) -> None:
+        from simplecadapi.editor.kernel import MarimoKernel
+
+        seen: list[tuple[str, str]] = []
+        kernel = MarimoKernel(Path(tempfile.gettempdir()) / "x.py", server_port=40000, on_cell_status=lambda i, s: seen.append((i, s)))
+        kernel._on_message(json.dumps({"op": "cell-op", "data": {"cell_id": "Hbol", "status": "running"}}))
+        kernel._on_message(json.dumps({"op": "cell-op", "data": {"cell_id": "Hbol", "status": None}}))
+        kernel._on_message("not json")
+        self.assertEqual(seen, [("Hbol", "running")])
+        state = WorkspaceState(Path(tempfile.gettempdir()))
+        sent: list[dict] = []
+        state.hub.broadcast = sent.append  # type: ignore[method-assign]
+        state.cells = [{"id": "Hbol", "code": "", "status": "idle"}]
+        state.cell_status("Hbol", "queued")
+        self.assertEqual(state.cells[0]["status"], "queued")
+        self.assertEqual(sent, [{"type": "cell.status", "id": "Hbol", "status": "queued"}])
+
+
+@unittest.skipUnless(os.environ.get("SCA_EDITOR_E2E"), "set SCA_EDITOR_E2E=1 to boot a marimo kernel")
+class InterruptEndToEndTest(unittest.TestCase):
+    def test_a_running_cell_is_stopped_and_the_kernel_stays_usable(self) -> None:
+        import threading
+
+        import uvicorn
+
+        from simplecadapi.editor.server import create_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            path = root / "slow.py"
+            path.write_text(
+                '# /// script\n# [tool.simplecadapi]\n# id = "slow"\n# ///\n'
+                "import marimo\n\napp = marimo.App()\n\nwith app.setup:\n    import simplecadapi as scad\n\n\n"
+                "@app.cell\ndef _():\n    value = 1\n    return (value,)\n\n\n"
+                "@app.cell\ndef _(value):\n    import time\n    time.sleep(60)\n    slow = value\n    return (slow,)\n"
+            )
+            state = WorkspaceState(root)
+            state.port = 17737
+            app = create_app(state)
+            server = uvicorn.Server(uvicorn.Config(app, port=state.port, log_level="error"))
+            threading.Thread(target=server.run, daemon=True).start()
+            state.hub.attach_loop(__import__("asyncio").new_event_loop())
+            statuses: list[tuple[str, str]] = []
+            try:
+                # boot without running the 60 s cell: start the kernel directly and interrupt the run
+                from simplecadapi.editor.kernel import MarimoKernel
+
+                kernel = MarimoKernel(path, server_port=state.port, on_cell_status=lambda i, s: statuses.append((i, s)))
+                state.kernel = kernel
+                state.notebook = path
+                threading.Thread(target=kernel.start, daemon=True).start()
+                deadline = time.monotonic() + 60
+                while not any(s == "running" for _, s in statuses) and time.monotonic() < deadline:
+                    time.sleep(0.2)
+                self.assertTrue(any(s == "running" for _, s in statuses), "the slow cell never started")
+                started = time.monotonic()
+                kernel.interrupt()
+                deadline = time.monotonic() + 20
+                while not any(s == "idle" for _, s in statuses[-3:]) and time.monotonic() < deadline:
+                    time.sleep(0.2)
+                self.assertLess(time.monotonic() - started, 15)  # stopped, not 60 s later
+                self.assertIn("OK", kernel.execute("print('ok')").get("log", "").upper())  # still usable
+            finally:
+                kernel = state.kernel
+                if kernel is not None:
+                    kernel.stop()
+                server.should_exit = True

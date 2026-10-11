@@ -30,6 +30,9 @@ const MODES: { mode: SelectionMode; label: string }[] = [
  * selection into the notebook (see `selection.set`). */
 export function App() {
   const viewRef = useRef<SceneView | null>(null);
+  // Whether a model of the open notebook is on screen (it may be the last run's,
+  // restored while the kernel boots): then nothing is being waited for.
+  const hasModel = useRef(false);
   const socketRef = useRef<EnvelopeSocket | null>(null);
 
   const [notebooks, setNotebooks] = useState<NotebookRow[]>([]);
@@ -53,6 +56,12 @@ export function App() {
   // model arrives (`package`) or the work fails.  Interactive rebuilds (a
   // slider, one cell) are not veiled.
   const [loading, setLoading] = useState<string | null>("connecting");
+
+  const running = cells.some((cell) => cell.status === "running" || cell.status === "queued");
+  const handleStop = useCallback(() => {
+    socketRef.current?.send({ type: "interrupt.request" });
+    setLoading(null);
+  }, []);
 
   const selection: SelectionItem[] = useMemo(() => {
     const names = variableNames(picked);
@@ -100,6 +109,7 @@ export function App() {
       setNotebook((envelope["notebook"] as string) ?? null);
       setKernelAlive(Boolean(envelope["kernel"]));
       // No notebook: nothing to wait for. Else the model is on its way.
+      if (hasModel.current) return;
       const stage = envelope["notebook"] ? (envelope["kernel"] ? "building the model" : "starting the kernel") : null;
       setLoading(stage);
       if (stage) setStatus(`${stage[0].toUpperCase()}${stage.slice(1)}…`);
@@ -110,6 +120,7 @@ export function App() {
     // Another notebook is being opened: drop the old model and its state now,
     // the kernel takes a few seconds to boot and publish the new one.
     socket.on("opening", (envelope) => {
+      hasModel.current = false;
       viewRef.current?.clearScene();
       framedNotebook.current = null;
       setCells([]);
@@ -146,11 +157,21 @@ export function App() {
       if (state.origin === "open") setLeftTab("module");
     });
 
+    // The live state of a cell's run: its button is run or stop by it.
+    socket.on("cell.status", (envelope) => {
+      const id = String(envelope["id"]);
+      const status = String(envelope["status"]);
+      setCells((previous) => previous.map((cell) => (cell.id === id ? { ...cell, status } : cell)));
+    });
+
     socket.on("notebook.cells", (envelope) => setCells((envelope["cells"] as NotebookCell[]) ?? []));
     socket.on("notebook.features", (envelope) => setFeatures((envelope["features"] as NotebookFeature[]) ?? []));
 
     socket.on("package", (envelope) => {
       setLoading(null);
+      hasModel.current = true;
+      // The kernel published the model that is already on screen: nothing to reload.
+      if (envelope["unchanged"]) return;
       void fetchPackage().then((bytes) => loadPackageBytes(bytes, (envelope["name"] as string) ?? null));
     });
 
@@ -161,6 +182,8 @@ export function App() {
           setStatus(`error: ${envelope["error"]}`);
           setLoading(null);
         }
+      } else if (typeof envelope["info"] === "string") {
+        setStatus(envelope["info"]);
       } else if (typeof envelope["working"] === "string") {
         setStatus(envelope["working"]);
         setLoading(envelope["working"].replace(/…$/, ""));
@@ -246,6 +269,8 @@ export function App() {
         kernelAlive={kernelAlive}
         status={status}
         marimoUrl={marimoUrl}
+        running={running}
+        onStop={handleStop}
         onRunAll={() => {
           setLoading("running all cells");
           socketRef.current?.send({ type: "rerun.request" });
@@ -267,6 +292,7 @@ export function App() {
                   params={params}
                   socket={socketRef.current}
                   notebook={notebook}
+                  onInterrupt={handleStop}
                 />
               </TabsContent>
               <TabsContent value="workspace" className="min-h-0">

@@ -50,9 +50,12 @@ class MarimoKernel:
         *,
         server_port: int,
         on_run_complete: Callable[[], None] | None = None,
+        on_cell_status: Callable[[str, str], None] | None = None,
     ) -> None:
         self.notebook = notebook.expanduser().resolve()
         self.on_run_complete = on_run_complete
+        self.on_cell_status = on_cell_status
+        self._interrupted = threading.Event()
         self._own_calls = 0
         self._own_ended = 0.0
         self.workspace = self.notebook.parent
@@ -211,6 +214,13 @@ class MarimoKernel:
         try:
             data = json.loads(message)
         except (TypeError, ValueError):
+            return
+        if isinstance(data, dict) and data.get("op") == "cell-op":
+            # A cell started, finished, was queued...: the live state of its run button.
+            payload = data.get("data") or {}
+            cell_id, status = payload.get("cell_id"), payload.get("status")
+            if cell_id and isinstance(status, str) and self.on_cell_status is not None:
+                self.on_cell_status(str(cell_id), status)
             return
         if not isinstance(data, dict) or data.get("op") != "completed-run":
             return
@@ -443,16 +453,28 @@ class MarimoKernel:
             time.sleep(0.2)
         return False
 
+    def interrupt(self) -> None:
+        """Stop what the kernel is running (the same as marimo's interrupt button).
+
+        Work this bridge has queued behind the running cell (the cells a parameter
+        change made stale) is dropped too.
+        """
+        self._interrupted.set()
+        self._post("/api/kernel/interrupt", {})
+
     def run_until_settled(self, cell_ids: list[str], *, rounds: int = 8) -> None:
         """Run *cell_ids*, then every cell that turned stale, until none is.
 
         Lazy mode marks a run cell's dependents stale instead of running
         them; a parameter change wants the whole chain, so follow up.
         """
+        self._interrupted.clear()
         if cell_ids:
             self.run_cells(cell_ids)
             self.wait_idle()
         for _ in range(rounds):
+            if self._interrupted.is_set():
+                return
             stale = self.stale_cells()
             if not stale:
                 return

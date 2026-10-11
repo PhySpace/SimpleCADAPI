@@ -16,12 +16,14 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import hashlib
 import json
 import re
 import sys
 import threading
 import time
 import webbrowser
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
@@ -44,7 +46,7 @@ from ..runtime.params import (
     read_saved_params,
     write_saved_params,
 )
-from ..runtime.deps import input_files
+from ..runtime.deps import file_digest, input_files
 from ..runtime.workspace import features_in_cell, notebook_modules, scan_modules, scan_workspace
 from .kernel import MarimoKernel
 from .selection import MARKER, selection_cell_code, variable_names
@@ -128,6 +130,9 @@ class WorkspaceState:
         self._module_dirty: set[Path] = set()
         self._module_busy = False
         self._module_lock = threading.Lock()
+        self._packages: OrderedDict[str, tuple[str, bytes]] = OrderedDict()
+        self._publish_signature: str | None = None
+        self._stopped = False
         self._selection_code: str | None = None
         self._selection_busy = False
         self._selection_lock = threading.Lock()
@@ -145,43 +150,58 @@ class WorkspaceState:
         """Switch the active notebook: restart the kernel on it.
 
         Runs synchronously (the caller wraps it in a thread): marimo boot
-        takes seconds.
+        takes seconds.  If nothing the notebook depends on changed since its
+        model was last published, that model and the notebook's cells are shown
+        at once, while the kernel boots.
         """
         target = (self.workspace / rel_path).resolve()
         if not target.is_file() or self.workspace not in target.parents:
             raise ValueError(f"notebook outside workspace: {rel_path}")
         if read_notebook_config(target) is None:
             raise ValueError(f"not a SimpleCAD notebook (no [tool.simplecadapi]): {rel_path}")
-        # The kernel takes seconds to boot: let the webuis drop the old model now.
+        # Let the webuis drop the old model now; commands have no kernel until the new one is up.
         self.latest.clear()
         self.latest_package_bytes = None
         self.hub.broadcast({"type": "opening", "notebook": target.name, "path": rel_path})
-        self.start_kernel(target)
+        self._drop_kernel()
+        restored = self._restore(target)
+        self.start_kernel(target, restored=restored)
 
-    def start_kernel(self, notebook: Path) -> None:
-        """Boot a marimo kernel for *notebook*, adopt it, and publish its product.
-
-        Shared by server boot, open_notebook, and the auto-heal watch.
-        """
+    def _drop_kernel(self) -> None:
         with self.lock:
-            old = self.kernel
-            self.kernel = None
+            old, self.kernel = self.kernel, None
         if old is not None:
             old.stop()
-        kernel = MarimoKernel(notebook, server_port=self.port, on_run_complete=self.schedule_settle)
+
+    def start_kernel(self, notebook: Path, *, restored: bool = False) -> None:
+        """Boot a marimo kernel for *notebook*, adopt it, and publish its product.
+
+        Shared by server boot, open_notebook, and the auto-heal watch.  With
+        *restored* the notebook's last model and cells are already on screen.
+        """
+        self._drop_kernel()
+        if not restored:
+            restored = self._restore(notebook)
+        kernel = MarimoKernel(
+            notebook,
+            server_port=self.port,
+            on_run_complete=self.schedule_settle,
+            on_cell_status=self.cell_status,
+        )
         kernel.start()
         with self.lock:
             self.kernel = kernel
             self.notebook = notebook
         # Envelopes from the previous model must not replay.
-        self.latest.clear()
-        self.latest_package_bytes = None
         self.selection = {}
         self.selection_items = []
         self.viewport_png = None
-        self.cells = []
-        self.specs = {}
         self._last_publish_error = ""
+        if not restored:
+            self.latest.clear()
+            self.latest_package_bytes = None
+            self.cells = []
+            self.specs = {}
         self._watched = self._watched_files()[0]
         self.hub.broadcast(self.hello())
         kernel.wait_idle()
@@ -189,6 +209,95 @@ class WorkspaceState:
         threading.Thread(
             target=self._watch_files, args=(kernel,), name="file-watch", daemon=True
         ).start()
+
+    # -- remembering what was published -----------------------------------------------
+
+    def _signature(self, notebook: Path) -> str:
+        """A digest of everything the notebook's model depends on.
+
+        The notebook, the local modules it imports, the notebooks it runs and what
+        they depend on, the data files they list, the values an editor saved, and the
+        software versions: if it is the same as when a model was published, that
+        model is the model.
+        """
+        import marimo
+
+        from ..build.keys import generator_profile
+
+        files, _own, _inputs = self._dependency_files(notebook)
+        files.add(notebook)
+        config = read_notebook_config(notebook)
+        payload = {
+            "files": {path.as_posix(): file_digest(path) for path in sorted(files)},
+            "saved": read_saved_params(config) if config is not None else {},
+            "generator": dict(generator_profile()),
+            "marimo": marimo.__version__,
+        }
+        return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
+
+    def _package_file(self, notebook: Path) -> Path:
+        name = notebook.relative_to(self.workspace).as_posix().replace("/", "__")
+        return self.snapshot_dir / "packages" / f"{name}.scadpkg"
+
+    def remember_package(self, notebook: Path, signature: str, data: bytes) -> None:
+        """Keep *data* as the model of *notebook* for *signature* (in memory and on disk)."""
+        key = notebook.relative_to(self.workspace).as_posix()
+        self._packages[key] = (signature, data)
+        self._packages.move_to_end(key)
+        while len(self._packages) > 6:
+            self._packages.popitem(last=False)
+        try:
+            target = self._package_file(notebook)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.with_suffix(".sig").write_text(signature, encoding="utf-8")
+            temporary = target.with_suffix(".tmp")
+            temporary.write_bytes(data)
+            temporary.replace(target)
+        except OSError as error:
+            print(f"[sca edit] could not keep the package: {error}", file=sys.stderr)
+
+    def _recall_package(self, notebook: Path, signature: str) -> bytes | None:
+        key = notebook.relative_to(self.workspace).as_posix()
+        known = self._packages.get(key)
+        if known is not None and known[0] == signature:
+            return known[1]
+        target = self._package_file(notebook)
+        try:
+            if target.with_suffix(".sig").read_text(encoding="utf-8") == signature:
+                return target.read_bytes()
+        except OSError:
+            pass
+        return None
+
+    def _restore(self, notebook: Path) -> bool:
+        """Show *notebook* from its last published model, if nothing it depends on changed.
+
+        Its cells appear too, read from the file (not editable until the kernel is
+        up); the kernel's own cells replace them, and its model replaces this one
+        only if it differs.
+        """
+        try:
+            data = self._recall_package(notebook, self._signature(notebook))
+        except (OSError, ValueError):
+            data = None
+        if data is None:
+            return False
+        self.notebook = notebook
+        self._publish_cells(_static_cells(notebook))
+        self.latest_package_bytes = data
+        self.package_revision += 1
+        self.emit(
+            {
+                "type": "package",
+                "revision": self.package_revision,
+                "step": notebook.stem,
+                "name": notebook.stem,
+                "size": len(data),
+                "cached": True,
+            }
+        )
+        self.hub.broadcast({"type": "status", "info": "restored from the last run; the kernel is starting…"})
+        return True
 
     def watch_kernel(self) -> None:
         """Auto-heal: the marimo python session can die on crashes or
@@ -228,37 +337,17 @@ class WorkspaceState:
         so a change needs a reload and a rerun of every cell.  *own_inputs* are
         the project files its header lists (``inputs``, data the cells read):
         nothing to reload, but any cell may read them, so every cell reruns.
-        The rest are the notebooks
-        it runs with ``use`` (and the modules those import) and the module open
-        in the module view: ``use`` runs a child headless, outside the
-        kernel's dataflow, so marimo never sees an edit to it; the editor does
-        and reruns the cells that call ``use`` (the children's own cell cache,
-        keyed by their files, decides what is rebuilt).
+        The rest are the notebooks it runs with ``use`` (and the modules and data
+        those use) and the module open in the module view: ``use`` runs a child
+        headless, outside the kernel's dataflow, so marimo never sees an edit to
+        it; the editor does and reruns the cells that call ``use`` (the children's
+        own cell cache, keyed by their files, decides what is rebuilt).
         """
         files: set[Path] = set()
         own: set[Path] = set()
         inputs: set[Path] = set()
         if self.notebook is not None:
-            entries = {entry.path: entry for entry in scan_workspace(self.workspace)}
-            start = self.notebook.relative_to(self.workspace).as_posix()
-            own = set(notebook_modules(self.notebook).values())
-            config = read_notebook_config(self.notebook)
-            inputs = set(input_files(config)) if config is not None else set()
-            files |= own | inputs
-            seen: set[str] = set()
-            pending = list(entries[start].uses) if start in entries else []
-            while pending:
-                path = pending.pop()
-                if path in seen:
-                    continue
-                seen.add(path)
-                if path in entries:
-                    pending.extend(entries[path].uses)
-                    files.update(self.workspace / module for module in entries[path].modules)
-                    child = read_notebook_config(self.workspace / path)
-                    if child is not None:
-                        files |= set(input_files(child))
-            files |= {self.workspace / path for path in seen}
+            files, own, inputs = self._dependency_files(self.notebook)
         if self.module_path is not None:
             files.add(self.module_path)
         mtimes: dict[Path, int] = {}
@@ -268,6 +357,30 @@ class WorkspaceState:
             except OSError:
                 mtimes[path] = 0
         return mtimes, own, inputs
+
+    def _dependency_files(self, notebook: Path) -> tuple[set[Path], set[Path], set[Path]]:
+        """What *notebook* depends on: ``(files, own_modules, own_inputs)``."""
+        entries = {entry.path: entry for entry in scan_workspace(self.workspace)}
+        start = notebook.relative_to(self.workspace).as_posix()
+        own = set(notebook_modules(notebook).values())
+        config = read_notebook_config(notebook)
+        inputs = set(input_files(config)) if config is not None else set()
+        files = own | inputs
+        seen: set[str] = set()
+        pending = list(entries[start].uses) if start in entries else []
+        while pending:
+            path = pending.pop()
+            if path in seen:
+                continue
+            seen.add(path)
+            if path in entries:
+                pending.extend(entries[path].uses)
+                files.update(self.workspace / module for module in entries[path].modules)
+                child = read_notebook_config(self.workspace / path)
+                if child is not None:
+                    files |= set(input_files(child))
+        files |= {self.workspace / path for path in seen}
+        return files, own, inputs
 
     def _watch_files(self, kernel: MarimoKernel) -> None:
         while not kernel._stop.is_set():
@@ -416,6 +529,13 @@ class WorkspaceState:
         self.emit_module(origin)
         self._files_changed({target}, announce=False)
 
+    def cell_status(self, cell_id: str, status: str) -> None:
+        """A cell's state changed in the kernel: tell the webuis (its run button shows it)."""
+        for cell in self.cells:
+            if cell["id"] == cell_id:
+                cell["status"] = status
+        self.hub.broadcast({"type": "cell.status", "id": cell_id, "status": status})
+
     def remember(self, envelope: dict) -> None:
         if envelope.get("type") in self._REPLAYED:
             self.latest[envelope["type"]] = envelope
@@ -460,11 +580,23 @@ class WorkspaceState:
             return
         with self._settle_lock:
             self.push_cells()
+            # The signature of what is published is taken before it is built.
+            try:
+                self._publish_signature = self._signature(self.notebook) if self.notebook else None
+            except (OSError, ValueError):
+                self._publish_signature = None
             result = kernel.publish(self.package_url, step=self.notebook.stem if self.notebook else "")
             if result.get("ok"):
                 self._last_publish_error = ""
+                self._stopped = False
                 return
             message = str(result.get("error", ""))
+            if self._stopped:
+                # The person stopped the run: its cells have no product, and that is no fault.
+                self._stopped = False
+                self._last_publish_error = ""
+                self.hub.broadcast({"type": "status", "info": "stopped"})
+                return
             # A notebook mid-edit has no product yet; say so once, not per run.
             if message != self._last_publish_error:
                 self._last_publish_error = message
@@ -479,7 +611,9 @@ class WorkspaceState:
         kernel = self.kernel
         if kernel is None:
             return
-        cells = kernel.list_cells()
+        self._publish_cells(kernel.list_cells())
+
+    def _publish_cells(self, cells: list[dict]) -> None:
         keys = cell_keys(cell["code"] for cell in cells)
         features: list[dict] = []
         specs: list[ParamSpec] = []
@@ -489,7 +623,7 @@ class WorkspaceState:
             cell["feature"] = found[0].slug if found else None
             cell["title"] = cell_title(cell["code"], cell["feature"])
             # code mode would turn an @app.function into a plain cell
-            cell["readonly"] = _is_function_cell(cell["code"])
+            cell["readonly"] = cell.get("readonly", False) or _is_function_cell(cell["code"])
             features.extend(
                 {"cell": cell["id"], "label": feature.slug, "kind": feature.role or "feature"}
                 for feature in found
@@ -552,6 +686,10 @@ class WorkspaceState:
         kernel = self.kernel
         if kernel is None:
             return {"type": "error", "message": "no kernel"}
+        if kind == "interrupt.request":
+            self._stopped = True
+            self._in_thread(kernel.interrupt)
+            return {"type": "ack", "command": kind}
         if kind == "param.set":
             self._enqueue_params(kernel, dict(message.get("values", {})))
             return {"type": "ack", "command": kind}
@@ -942,6 +1080,35 @@ def _module_code(code: str) -> str:
     return "\n".join(lines)
 
 
+def _static_cells(notebook: Path) -> list[dict]:
+    """The notebook's cells as the file has them, for showing before a kernel runs them."""
+    from ..runtime._marimo import parse_notebook
+
+    try:
+        parsed = parse_notebook(notebook.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, SyntaxError):
+        return []
+    if parsed is None:
+        return []
+    cells = []
+    for index, cell in enumerate(parsed.cells):
+        if getattr(cell, "name", None) == "setup":
+            continue
+        cells.append(
+            {
+                "id": f"static-{index}",
+                "name": getattr(cell, "name", None) or "_",
+                "code": cell.code,
+                "status": "idle",
+                "errors": [],
+                "output": None,
+                "console": [],
+                "readonly": True,  # not editable until the kernel has the cell
+            }
+        )
+    return cells
+
+
 PENDING_SELECTION_ID = "selection-pending"
 """Id of the selection cell the webuis see before the kernel has created it."""
 
@@ -1040,6 +1207,7 @@ def create_app(state: WorkspaceState) -> Starlette:
         body = await request.body()
         if not body:
             return JSONResponse({"ok": False, "error": "empty package"}, status_code=400)
+        unchanged = state.latest_package_bytes == body
         state.latest_package_bytes = bytes(body)
         state.package_revision += 1
         state.emit(
@@ -1049,8 +1217,12 @@ def create_app(state: WorkspaceState) -> Starlette:
                 "step": request.headers.get("X-Live-Step", ""),
                 "name": state.notebook.stem if state.notebook else None,
                 "size": len(body),
+                # The model on screen is this model: nothing to reload.
+                "unchanged": unchanged,
             }
         )
+        if state.notebook is not None and state._publish_signature is not None:
+            await asyncio.to_thread(state.remember_package, state.notebook, state._publish_signature, bytes(body))
         # The model is fine again: clear a stale "no product yet" message.
         hub.broadcast({"type": "status", "error": ""})
         await asyncio.to_thread(state.write_snapshot)

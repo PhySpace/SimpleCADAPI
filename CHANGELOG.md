@@ -36,6 +36,11 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 - `simplecadapi.runtime.live`: project the running kernel's product to a
   `.scadpkg` (`live_package`, `publish_live`).
 
+- Editor: a cell's run button is a stop button while the kernel runs the cell (the header's run-all too);
+  stopping interrupts the kernel. Switching back to a notebook shows its last model and cells at once
+  when nothing it depends on changed (the editor remembers each notebook's last published package,
+  keyed by a digest of its files), while the kernel boots.
+
 ### Changed
 
 - The cell cache is per cell: an entry is stored under a digest of the local

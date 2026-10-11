@@ -185,7 +185,7 @@ def refresh_local_modules(modules: Mapping[str, Path]) -> None:
 
     with _loaded_lock:
         for name, path in modules.items():
-            state = (path, _file_digest(path))
+            state = (path, file_digest(path))
             module = sys.modules.get(name)
             if module is not None and _loaded.get(name) != state and _replaceable(name, module):
                 for loaded in [item for item in sys.modules if item == name or item.startswith(name + ".")]:
@@ -517,7 +517,7 @@ def dependency_digest(config: NotebookConfig, files: Iterable[Path], *, tag: str
     """
 
     contents = {
-        _display(config, path): _file_digest(path)
+        _display(config, path): file_digest(path)
         for path in set(files) | input_files(config)
     }
     payload = {
@@ -545,7 +545,7 @@ _digests: dict[Path, tuple[int, int, str | None]] = {}
 _digests_lock = threading.Lock()
 
 
-def _file_digest(path: Path) -> str | None:
+def file_digest(path: Path) -> str | None:
     """The content digest of *path*; ``None`` if it cannot be read.
 
     Remembered per (mtime, size): the editor kernel asks for the digests of
@@ -589,6 +589,7 @@ __all__ = [
     "cell_digest",
     "cell_module_files",
     "dependency_digest",
+    "file_digest",
     "recorded_dependents",
     "deps_file",
     "input_files",

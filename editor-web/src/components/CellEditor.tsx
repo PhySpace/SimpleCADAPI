@@ -12,6 +12,7 @@ import {
   Loader2,
   Play,
   Plus,
+  Square,
   Trash2,
 } from "lucide-react";
 
@@ -67,12 +68,14 @@ export function CellEditor({
   params,
   socket,
   notebook,
+  onInterrupt,
 }: {
   cells: NotebookCell[];
   features: NotebookFeature[];
   params: ParamMeta[];
   socket: SocketLike;
   notebook: string | null;
+  onInterrupt: () => void;
 }) {
   const [drafts, setDrafts] = useState<Map<string, string>>(new Map());
   const [running, setRunning] = useState<string | null>(null);
@@ -200,12 +203,14 @@ export function CellEditor({
                 params={params.filter((param) => param.cell === cell.id)}
                 draft={drafts.get(cell.id)}
                 folded={collapsed.has(cell.id)}
-                busy={running === cell.id || cell.status === "running" || cell.status === "queued"}
+                pending={running === cell.id}
+                live={cell.status === "running" || cell.status === "queued"}
                 armed={armed === cell.id}
                 socket={socket}
                 forwardParam={forwardParam}
                 onToggle={() => toggle(cell.id)}
                 onRun={() => run(cell)}
+                onInterrupt={onInterrupt}
                 onRunAbove={() => runAbove(cell)}
                 onDelete={() => (armed === cell.id ? remove(cell) : setArmed(cell.id))}
                 onEdit={(value) => edit(cell, value)}
@@ -278,12 +283,14 @@ function CellBlock({
   params,
   draft,
   folded,
-  busy,
+  pending,
+  live,
   armed,
   socket,
   forwardParam,
   onToggle,
   onRun,
+  onInterrupt,
   onRunAbove,
   onDelete,
   onEdit,
@@ -294,12 +301,16 @@ function CellBlock({
   params: ParamMeta[];
   draft: string | undefined;
   folded: boolean;
-  busy: boolean;
+  /** Run was just asked for; the kernel has not said anything yet. */
+  pending: boolean;
+  /** The kernel is running or has queued the cell. */
+  live: boolean;
   armed: boolean;
   socket: SocketLike;
   forwardParam: (id: string, value: ParamValue) => void;
   onToggle: () => void;
   onRun: () => void;
+  onInterrupt: () => void;
   onRunAbove: () => void;
   onDelete: () => void;
   onEdit: (value: string) => void;
@@ -357,8 +368,25 @@ function CellBlock({
         <IconButton title="Run every cell above this one" onClick={onRunAbove} disabled={index === 0}>
           <ChevronsUp className="h-3.5 w-3.5" />
         </IconButton>
-        <IconButton title={failed ? "Cell failed — run again (Ctrl+Enter)" : "Run this cell (Ctrl+Enter)"} onClick={onRun}>
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin text-focus" /> : <Play className="h-3.5 w-3.5" />}
+        {/* One button, two states: run, and while the kernel is running the cell, stop. */}
+        <IconButton
+          title={
+            live
+              ? "Stop the run (interrupt the kernel)"
+              : failed
+                ? "Cell failed — run again (Ctrl+Enter)"
+                : "Run this cell (Ctrl+Enter)"
+          }
+          onClick={live ? onInterrupt : onRun}
+          className={live ? "border-fail text-fail hover:border-fail hover:text-fail" : undefined}
+        >
+          {live ? (
+            <Square className="h-3 w-3 fill-current" />
+          ) : pending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-focus" />
+          ) : (
+            <Play className="h-3.5 w-3.5" />
+          )}
         </IconButton>
         <IconButton
           title={armed ? "Click again to delete this cell" : "Delete this cell"}

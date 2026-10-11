@@ -1,4 +1,4 @@
-import { ExternalLink, Play } from "lucide-react";
+import { ExternalLink, Play, Square } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ export function Header({
   kernelAlive,
   status,
   onRunAll,
+  running,
+  onStop,
   marimoUrl,
 }: {
   notebook: string | null;
@@ -18,6 +20,9 @@ export function Header({
   kernelAlive: boolean;
   status: string;
   onRunAll: () => void;
+  /** The kernel is running cells: the button stops them instead. */
+  running: boolean;
+  onStop: () => void;
   marimoUrl: string | null;
 }) {
   const failing = status.startsWith("error");
@@ -43,9 +48,15 @@ export function Header({
       >
         {status}
       </span>
-      <Button size="sm" variant="outline" onClick={onRunAll} title="Run every cell">
-        <Play /> run all
-      </Button>
+      {running ? (
+        <Button size="sm" variant="destructive" onClick={onStop} title="Stop the run (interrupt the kernel)">
+          <Square className="fill-current" /> stop
+        </Button>
+      ) : (
+        <Button size="sm" variant="outline" onClick={onRunAll} title="Run every cell">
+          <Play /> run all
+        </Button>
+      )}
       {marimoUrl && (
         <Button size="sm" variant="ghost" asChild>
           <a href={marimoUrl} target="_blank" rel="noreferrer" title="Open the raw marimo editor">
