@@ -98,7 +98,7 @@ class ParamSpec:
             "max": self.max,
             "step": self.step,
             "unit": self.unit,
-            "label": self.label or self.name,
+            "label": self.label or self.name.rsplit(".", 1)[-1],
             "comment": self.comment,
             "issues": list(self.issues),
         }
@@ -348,6 +348,124 @@ def _parse_ui(text: str, issues: list[str]) -> tuple[str, dict[str, Any]] | None
 
 
 # ---------------------------------------------------------------------------
+# Parameters of a plain module: the fields of its dataclasses
+# ---------------------------------------------------------------------------
+
+
+def list_module_parameters(path: str | Path) -> list[ParamSpec]:
+    """Return the parameter fields of the dataclasses in the module at *path*.
+
+    A notebook that imports shared dimensions (``DIMS = ULinkDimensions()``)
+    has no parameter cell; the numbers live in the module.  Every field of a
+    ``@dataclass`` with a literal default (a number or bool) is a parameter,
+    named ``<Class>.<field>``, and so is a top-level constant that carries a
+    ``# ui:`` comment (named as itself, group ``module``); the comment picks
+    the control exactly as it does in a notebook cell.  Editing a value means
+    editing the default in the file (:func:`commit_field_value`,
+    :func:`commit_value`).
+    """
+
+    resolved = Path(path).expanduser().resolve()
+    stat = resolved.stat()
+    return list(_module_version(resolved, stat.st_mtime_ns, stat.st_size))
+
+
+@lru_cache(maxsize=32)
+def _module_version(path: Path, _mtime_ns: int, _size: int) -> tuple[ParamSpec, ...]:
+    try:
+        return tuple(parameters_in_module(path.read_text(encoding="utf-8")))
+    except (OSError, UnicodeError):
+        return ()
+
+
+def parameters_in_module(code: str) -> list[ParamSpec]:
+    try:
+        tree = ast.parse(code)
+    except (SyntaxError, ValueError):
+        return []
+    comments = _line_comments(code)
+    specs: list[ParamSpec] = []
+    for node in tree.body:
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and not node.targets[0].id.startswith("_")
+        ):
+            # A module constant is a parameter only when it says so (`# ui:`):
+            # most are tags and tables, not numbers to tune.
+            literal = _read_value(node.value)
+            ui = _ui_comment(node, comments)
+            if literal is not None and literal.declared == "literal" and ui is not None:
+                specs.append(_spec(node.targets[0].id, "module", "", node.lineno, literal, ui))
+            continue
+        if not (isinstance(node, ast.ClassDef) and _is_dataclass(node)):
+            continue
+        for statement in node.body:
+            if not (
+                isinstance(statement, ast.AnnAssign)
+                and isinstance(statement.target, ast.Name)
+                and statement.value is not None
+                and not statement.target.id.startswith("_")
+            ):
+                continue
+            literal = _read_value(statement.value)
+            if literal is None or literal.declared != "literal":
+                continue
+            ui = _ui_comment(statement, comments)  # type: ignore[arg-type]
+            specs.append(
+                _spec(f"{node.name}.{statement.target.id}", node.name, "", statement.lineno, literal, ui)
+            )
+    return specs
+
+
+def _is_dataclass(node: ast.ClassDef) -> bool:
+    for decorator in node.decorator_list:
+        target = decorator.func if isinstance(decorator, ast.Call) else decorator
+        if _callee(target) == "dataclass":
+            return True
+    return False
+
+
+def commit_field_value(code: str, class_name: str, field: str, value: float | int | bool) -> str | None:
+    """Return *code* with the default of ``<class_name>.<field>`` set to *value*.
+
+    The literal is replaced in place; the rest of the line (type annotation,
+    comments) is kept.  ``None`` if the module has no such dataclass field or
+    *value* does not fit its kind.
+    """
+
+    try:
+        tree = ast.parse(code)
+    except (SyntaxError, ValueError):
+        return None
+    for node in tree.body:
+        if not (isinstance(node, ast.ClassDef) and node.name == class_name and _is_dataclass(node)):
+            continue
+        for statement in node.body:
+            if not (
+                isinstance(statement, ast.AnnAssign)
+                and isinstance(statement.target, ast.Name)
+                and statement.target.id == field
+                and statement.value is not None
+            ):
+                continue
+            declared = _read_value(statement.value)
+            if declared is None or declared.declared != "literal":
+                return None
+            text = _format_value(declared.default, value)
+            target = statement.value
+            if text is None or target.end_lineno != target.lineno:
+                return None
+            lines = code.splitlines(keepends=True)
+            line = lines[target.lineno - 1].encode("utf-8")
+            replaced = line[: target.col_offset] + text.encode("utf-8") + line[target.end_col_offset :]
+            lines[target.lineno - 1] = replaced.decode("utf-8")
+            return "".join(lines)
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Saved values
 # ---------------------------------------------------------------------------
 
@@ -505,9 +623,12 @@ def _format_value(
 __all__ = [
     "ParamSpec",
     "apply_saved_params",
+    "commit_field_value",
     "commit_value",
+    "list_module_parameters",
     "list_parameters",
     "parameters_in_cell",
+    "parameters_in_module",
     "read_saved_params",
     "saved_params_file",
     "write_saved_params",

@@ -37,12 +37,14 @@ from ..runtime.cells import cell_keys
 from ..runtime.config import NotebookConfig, read_notebook_config
 from ..runtime.params import (
     ParamSpec,
+    commit_field_value,
     commit_value,
+    list_module_parameters,
     parameters_in_cell,
     read_saved_params,
     write_saved_params,
 )
-from ..runtime.workspace import features_in_cell, scan_workspace
+from ..runtime.workspace import features_in_cell, notebook_modules, scan_modules, scan_workspace
 from .kernel import MarimoKernel
 from .selection import MARKER, selection_cell_code, variable_names
 from .templates import create_notebook
@@ -89,6 +91,7 @@ class WorkspaceState:
     # Envelope types worth replaying, in replay order.  "package" is a light
     # revision event; the bytes themselves live on /api/package/latest.
     _REPLAYED = (
+        "module",
         "notebook.cells",
         "notebook.features",
         "params.schema",
@@ -118,7 +121,12 @@ class WorkspaceState:
         # One rebuild per interval; later slider batches keep merging.
         self._rebuild_min_interval = 0.35
         self._last_rebuild_at = 0.0
-        self._children: dict[Path, int] = {}
+        self._watched: dict[Path, int] = {}
+        self.module_path: Path | None = None
+        self._pending_modules: dict[tuple[str, str], float | int | bool] = {}
+        self._module_dirty: set[Path] = set()
+        self._module_busy = False
+        self._module_lock = threading.Lock()
         self._settle_timer: threading.Timer | None = None
         self._settle_lock = threading.Lock()
         self._last_publish_error = ""
@@ -170,12 +178,12 @@ class WorkspaceState:
         self.cells = []
         self.specs = {}
         self._last_publish_error = ""
-        self._children = self._child_mtimes()
+        self._watched = self._watched_files()[0]
         self.hub.broadcast(self.hello())
         kernel.wait_idle()
         self.settle()
         threading.Thread(
-            target=self._watch_children, args=(kernel,), name="child-watch", daemon=True
+            target=self._watch_files, args=(kernel,), name="file-watch", daemon=True
         ).start()
 
     def watch_kernel(self) -> None:
@@ -210,51 +218,187 @@ class WorkspaceState:
 
     # -- child notebooks ---------------------------------------------------------
 
-    def _child_mtimes(self) -> dict[Path, int]:
-        """Modification times of the notebooks this one runs with ``use``.
+    def _watched_files(self) -> tuple[dict[Path, int], set[Path]]:
+        """The files whose edit changes the open notebook, with their mtimes.
 
-        ``use`` runs a child headless, outside the kernel's dataflow, so
-        marimo never sees an edit to it; the editor does, and reruns the
-        cells that call ``use`` (the children's own cache, keyed by their
-        files, decides what is rebuilt).
+        Returns ``(mtimes, own_modules)``.  *own_modules* are the local modules
+        the notebook itself imports: the kernel has them loaded, so a change
+        needs a reload and a rerun of every cell.  The rest are the notebooks
+        it runs with ``use`` (and the modules those import) and the module open
+        in the module view: ``use`` runs a child headless, outside the
+        kernel's dataflow, so marimo never sees an edit to it; the editor does
+        and reruns the cells that call ``use`` (the children's own cell cache,
+        keyed by their files, decides what is rebuilt).
         """
-        if self.notebook is None:
-            return {}
-        entries = {entry.path: entry for entry in scan_workspace(self.workspace)}
-        start = self.notebook.relative_to(self.workspace).as_posix()
-        seen: set[str] = set()
-        pending = list(entries[start].uses) if start in entries else []
-        while pending:
-            path = pending.pop()
-            if path in seen:
-                continue
-            seen.add(path)
-            if path in entries:
-                pending.extend(entries[path].uses)
+        files: set[Path] = set()
+        own: set[Path] = set()
+        if self.notebook is not None:
+            entries = {entry.path: entry for entry in scan_workspace(self.workspace)}
+            start = self.notebook.relative_to(self.workspace).as_posix()
+            own = set(notebook_modules(self.notebook).values())
+            files |= own
+            seen: set[str] = set()
+            pending = list(entries[start].uses) if start in entries else []
+            while pending:
+                path = pending.pop()
+                if path in seen:
+                    continue
+                seen.add(path)
+                if path in entries:
+                    pending.extend(entries[path].uses)
+                    files.update(self.workspace / module for module in entries[path].modules)
+            files |= {self.workspace / path for path in seen}
+        if self.module_path is not None:
+            files.add(self.module_path)
         mtimes: dict[Path, int] = {}
-        for path in seen:
+        for path in files:
             try:
-                mtimes[self.workspace / path] = (self.workspace / path).stat().st_mtime_ns
+                mtimes[path] = path.stat().st_mtime_ns
             except OSError:
-                mtimes[self.workspace / path] = 0
-        return mtimes
+                mtimes[path] = 0
+        return mtimes, own
 
-    def _watch_children(self, kernel: MarimoKernel) -> None:
+    def _watch_files(self, kernel: MarimoKernel) -> None:
         while not kernel._stop.is_set():
             time.sleep(1.0)
             if self.kernel is not kernel:
                 return
             try:
-                current = self._child_mtimes()
-                if current == self._children:
-                    continue
-                self._children = current
-                uses = [cell["id"] for cell in self.cells if "use(" in cell["code"]]
-                if uses:
-                    kernel.run_until_settled(uses)
-                    self.schedule_settle()
+                current, _own = self._watched_files()
+                changed = {path for path, mtime in current.items() if self._watched.get(path) != mtime}
+                changed |= {path for path in self._watched if path not in current}
+                self._watched = current
+                if changed:
+                    self._files_changed(changed)
             except Exception as exc:
-                self.hub.broadcast({"type": "status", "error": f"child refresh failed: {str(exc)[-200:]}"})
+                self.hub.broadcast({"type": "status", "error": f"refresh failed: {str(exc)[-200:]}"})
+
+    def _files_changed(self, paths: set[Path], *, announce: bool = True) -> None:
+        """Files the notebook depends on changed: reload / rerun what reads them."""
+        if announce and self.module_path in paths:
+            self.emit_module("external")
+        with self._module_lock:
+            self._module_dirty |= paths
+            if self._module_busy:
+                return
+            self._module_busy = True
+        threading.Thread(target=self._propagate, name="propagate", daemon=True).start()
+
+    def _propagate(self) -> None:
+        """Serialized, coalescing: one reload covers every change that arrived meanwhile."""
+        try:
+            while True:
+                with self._module_lock:
+                    paths, self._module_dirty = self._module_dirty, set()
+                    if not paths:
+                        self._module_busy = False
+                        return
+                kernel = self.kernel
+                if kernel is None:
+                    continue
+                own_names = self._own_module_names()
+                if any(file in paths for file in own_names.values()):
+                    shown = ", ".join(Path(path).name for path in sorted(paths))
+                    self.hub.broadcast({"type": "status", "working": f"reloading {shown}…"})
+                    kernel.reload_modules(list(own_names))
+                    kernel.wait_idle(300)
+                else:
+                    uses = [cell["id"] for cell in self.cells if "use(" in cell["code"]]
+                    if not uses:
+                        continue
+                    kernel.run_until_settled(uses)
+                self.schedule_settle()
+        except Exception as exc:
+            with self._module_lock:
+                self._module_busy = False
+            self.hub.broadcast({"type": "status", "error": f"reload failed: {str(exc)[-300:]}"})
+
+    def _own_module_names(self) -> dict[str, Path]:
+        return notebook_modules(self.notebook) if self.notebook else {}
+
+    # -- the module view -----------------------------------------------------------
+
+    def modules(self) -> list[dict]:
+        return [module.to_dict() for module in scan_modules(self.workspace)]
+
+    def emit_module(self, origin: str) -> None:
+        """Tell the webuis about the module open in the module view."""
+        path = self.module_path
+        if path is None or not path.is_file():
+            self.emit({"type": "module", "path": None})
+            return
+        try:
+            code = path.read_text(encoding="utf-8")
+        except OSError:
+            return
+        relative = path.relative_to(self.workspace).as_posix()
+        used_by = next((m["used_by"] for m in self.modules() if m["path"] == relative), [])
+        params = []
+        for spec in list_module_parameters(path):
+            row = spec.to_dict()
+            row["id"] = spec.name
+            row["value"] = spec.default
+            row["modified"] = False
+            params.append(row)
+        self.emit(
+            {
+                "type": "module",
+                "origin": origin,
+                "path": relative,
+                "name": path.name,
+                "code": code,
+                "used_by": used_by,
+                "params": params,
+            }
+        )
+
+    def open_module(self, rel_path: str) -> None:
+        target = (self.workspace / rel_path).resolve()
+        if self.workspace not in target.parents or not target.is_file() or target.suffix != ".py":
+            raise ValueError(f"not a module of this workspace: {rel_path}")
+        self.module_path = target
+        self._watched = self._watched_files()[0]
+        self.emit_module("open")
+
+    def save_module(self, rel_path: str, code: str) -> None:
+        """Autosave from the module view; the dependents follow."""
+        target = self._module_file(rel_path)
+        if target.read_text(encoding="utf-8") == code:
+            return
+        target.write_text(code, encoding="utf-8")
+        self._after_module_write(target, "save")
+
+    def set_module_params(self, rel_path: str, values: dict[str, float | int | bool]) -> None:
+        """Write parameter values into the dataclass defaults of the module."""
+        target = self._module_file(rel_path)
+        code = target.read_text(encoding="utf-8")
+        for name, value in values.items():
+            class_name, dot, field = name.partition(".")
+            changed = (
+                commit_field_value(code, class_name, field, value) if dot else commit_value(code, name, value)
+            )
+            if changed is None:
+                self.hub.broadcast({"type": "status", "error": f"cannot write {name} into {target.name}"})
+                continue
+            code = changed
+        if code != target.read_text(encoding="utf-8"):
+            target.write_text(code, encoding="utf-8")
+            self._after_module_write(target, "param")
+
+    def _module_file(self, rel_path: str) -> Path:
+        target = (self.workspace / rel_path).resolve()
+        if self.workspace not in target.parents or not target.is_file() or target.suffix != ".py":
+            raise ValueError(f"not a module of this workspace: {rel_path}")
+        return target
+
+    def _after_module_write(self, target: Path, origin: str) -> None:
+        # Our own write: the watcher must not fire a second reload for it.
+        try:
+            self._watched[target] = target.stat().st_mtime_ns
+        except OSError:
+            pass
+        self.emit_module(origin)
+        self._files_changed({target}, announce=False)
 
     def remember(self, envelope: dict) -> None:
         if envelope.get("type") in self._REPLAYED:
@@ -370,10 +514,28 @@ class WorkspaceState:
 
     def dispatch_command(self, message: dict) -> dict:
         """Translate one ui command into kernel operations. Returns an ack."""
+        kind = message.get("type")
+        if kind == "module.open":
+            try:
+                self.open_module(str(message.get("path", "")))
+            except ValueError as error:
+                return {"type": "error", "message": str(error)}
+            return {"type": "ack", "command": kind}
+        if kind == "module.close":
+            self.module_path = None
+            self.emit_module("close")
+            return {"type": "ack", "command": kind}
+        if kind == "module.save":
+            self._in_thread(lambda: self.save_module(str(message.get("path", "")), str(message.get("code", ""))))
+            return {"type": "ack", "command": kind}
+        if kind == "module.param":
+            path = str(message.get("path", ""))
+            values = {str(k): v for k, v in dict(message.get("values", {})).items() if isinstance(v, (int, float, bool))}
+            self._in_thread(lambda: self.set_module_params(path, values))
+            return {"type": "ack", "command": kind}
         kernel = self.kernel
         if kernel is None:
             return {"type": "error", "message": "no kernel"}
-        kind = message.get("type")
         if kind == "param.set":
             self._enqueue_params(kernel, dict(message.get("values", {})))
             return {"type": "ack", "command": kind}
@@ -847,7 +1009,7 @@ def create_app(state: WorkspaceState) -> Starlette:
             }
             for entry in scan_workspace(state.workspace)
         ]
-        return JSONResponse({"notebooks": rows})
+        return JSONResponse({"notebooks": rows, "modules": state.modules()})
 
     async def workspace_open(request: Request) -> JSONResponse:
         """Switch the active notebook (restarts the kernel)."""
@@ -923,7 +1085,7 @@ def create_app(state: WorkspaceState) -> Starlette:
                 message = await websocket.receive_json()
                 try:
                     if isinstance(message, dict) and str(message.get("type", "")).endswith(
-                        (".set", ".request", ".edit", ".commit", ".revert", ".save")
+                        (".set", ".request", ".edit", ".commit", ".revert", ".save", ".open", ".close", ".param")
                     ):
                         ack = await asyncio.to_thread(state.dispatch_command, message)
                         await websocket.send_json(ack)

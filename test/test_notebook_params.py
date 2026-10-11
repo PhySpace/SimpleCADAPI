@@ -230,6 +230,44 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class ModuleParametersTest(unittest.TestCase):
+    CODE = (
+        "from dataclasses import dataclass\n\n"
+        'TAG = "x"\n'
+        "WALL = 2.0  # ui: slider(1, 5, step=0.5, unit=\"mm\")\n"
+        "TABLE = 3\n\n\n"
+        "@dataclass(frozen=True)\n"
+        "class Dims:\n"
+        "    L: float = 80.0  # arm span\n"
+        "    N: int = 4  # ui: slider(2, 8)\n"
+        "    name: str = 'a'\n\n"
+        "    @property\n"
+        "    def r(self) -> float:\n"
+        "        return self.L / 2\n\n\n"
+        "class Plain:\n"
+        "    K: float = 1.0\n"
+    )
+
+    def test_dataclass_fields_and_commented_constants_are_parameters(self) -> None:
+        from simplecadapi.runtime.params import parameters_in_module
+
+        specs = {spec.name: spec for spec in parameters_in_module(self.CODE)}
+        self.assertEqual(sorted(specs), ["Dims.L", "Dims.N", "WALL"])
+        self.assertEqual((specs["WALL"].control, specs["WALL"].unit, specs["WALL"].group), ("slider", "mm", "module"))
+        self.assertEqual((specs["Dims.N"].kind, specs["Dims.N"].control), ("int", "slider"))
+        self.assertEqual(specs["Dims.L"].to_dict()["label"], "L")
+
+    def test_values_are_written_where_they_are_declared(self) -> None:
+        from simplecadapi.runtime.params import commit_field_value
+
+        out = commit_field_value(self.CODE, "Dims", "L", 100)
+        assert out is not None
+        self.assertIn("L: float = 100.0  # arm span", out)
+        self.assertIsNone(commit_field_value(self.CODE, "Plain", "K", 2))  # not a dataclass
+        self.assertIsNone(commit_field_value(self.CODE, "Dims", "name", 2))
+        self.assertIn("WALL = 3.5  # ui:", commit_value(self.CODE, "WALL", 3.5) or "")
+
+
 class VertexScopeTest(unittest.TestCase):
     def test_vertices_resolve_through_a_solid_and_a_face(self) -> None:
         import simplecadapi as scad

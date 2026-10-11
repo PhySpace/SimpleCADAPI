@@ -366,6 +366,31 @@ class MarimoKernel:
             )
         )
 
+    def reload_modules(self, names: list[str]) -> dict:
+        """Forget the local modules *names* and run every cell again.
+
+        The notebook's setup cell imported them once; a changed file is seen
+        only by a fresh import, so the modules (and their bytecode, which
+        Python checks by size and whole-second mtime only) are dropped and
+        every cell, the setup cell included, runs against the new files.
+        """
+        self.execute(
+            "import importlib, os, sys\n"
+            f"__names = {names!r}\n"
+            "for __n in [m for m in sys.modules if m in __names or any(m.startswith(x + '.') for x in __names)]:\n"
+            "    __cached = getattr(sys.modules.pop(__n), '__cached__', None)\n"
+            "    if isinstance(__cached, str):\n"
+            "        try:\n"
+            "            os.unlink(__cached)\n"
+            "        except OSError:\n"
+            "            pass\n"
+            "importlib.invalidate_caches()\n"
+        )
+        return self.execute(
+            _driver("    for __c in ctx.cells:\n        ctx.run_cell(__c.id)\n    ctx.run_cell('setup')"),
+            timeout=300,
+        )
+
     def stale_cells(self) -> list[str]:
         """Ids of the cells that need a run (inputs changed, code edited)."""
         result = self.execute(

@@ -18,6 +18,13 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   notebook file; `sca snapshot` and `.sca-editor/snapshot.json` + `viewport.png`
   tell a coding agent what is selected and shown. Ground grid and axis gizmo in
   a Z-up CAD frame; cells fold to their step name and can run all cells above.
+- Editor: the local modules a notebook imports (shared dimensions, helpers)
+  are listed in the workspace, with the notebooks that use them, and open in a
+  module view: source (autosaved) plus the dataclass fields (and top-level
+  constants with a `# ui:` comment) as parameter controls. Editing a module,
+  there or on disk, reloads it in the kernel and reruns the open notebook; the
+  notebooks it `use`s are rerun from their files. `sca ls` reports each
+  notebook's modules.
 - Notebook parameters: the numbers, bools and `scad.var`s of a
   `# ---- params ----` cell are discoverable (`sca params`,
   `simplecadapi.runtime.params.list_parameters`) with an optional trailing

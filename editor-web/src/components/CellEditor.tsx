@@ -17,7 +17,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Slider } from "@/components/ui/slider";
+import { ParamControl, type ParamMeta, type ParamValue } from "@/components/ParamControl";
 import { cadTheme } from "@/lib/cm-theme";
 import { cn } from "@/lib/utils";
 
@@ -41,26 +41,7 @@ export type NotebookCell = {
 };
 /** One feature header; `cell` is the id of the cell it opens. */
 export type NotebookFeature = { cell: string; label: string; kind?: string };
-export type ParamValue = number | boolean;
-/** A parameter the notebook declares (see `sca params`); `cell` is the id of
- * the declaring cell. `modified`: the value differs from the source. */
-export type ParamMeta = {
-  id: string;
-  label: string;
-  cell: string;
-  group: string;
-  kind: "float" | "int" | "bool";
-  control: "slider" | "number" | "toggle";
-  min: number | null;
-  max: number | null;
-  step: number | null;
-  unit: string | null;
-  default: ParamValue;
-  value: ParamValue;
-  modified?: boolean;
-  comment?: string | null;
-  issues?: string[];
-};
+export type { ParamMeta, ParamValue };
 
 type SocketLike = { send: (message: Record<string, unknown>) => void } | null;
 
@@ -472,71 +453,5 @@ function CellBlock({
         </div>
       )}
     </section>
-  );
-}
-
-/** One parameter: a slider, a number box or a toggle, by its `# ui:` comment. */
-function ParamControl({
-  param,
-  forwardParam,
-}: {
-  param: ParamMeta;
-  forwardParam: (id: string, value: ParamValue) => void;
-}) {
-  const label = param.label || param.id;
-  const title = [param.comment, ...(param.issues ?? [])].filter(Boolean).join("\n") || undefined;
-  const ink = param.modified ? "text-focus" : "text-name";
-  if (param.control === "toggle") {
-    const on = Boolean(param.value);
-    return (
-      <button
-        type="button"
-        className="flex items-center justify-between gap-2 text-left text-[11px]"
-        title={title}
-        onClick={() => forwardParam(param.id, !on)}
-      >
-        <span className={ink}>{label}</span>
-        <span className={cn("border-2 px-1.5 text-[10px] font-bold uppercase", on ? "border-white bg-white text-black" : "border-input text-muted-foreground")}>
-          {on ? "on" : "off"}
-        </span>
-      </button>
-    );
-  }
-  const value = Number(param.value);
-  return (
-    <div title={title}>
-      <div className="mb-1 flex items-baseline justify-between gap-2 text-[11px]">
-        <span className={cn("truncate", ink)}>{label}</span>
-        <span className="flex shrink-0 items-baseline gap-1">
-          {param.control === "number" ? (
-            <input
-              type="number"
-              className="w-16 border-b-2 border-input bg-transparent text-right focus:border-focus focus:outline-none"
-              value={value}
-              min={param.min ?? undefined}
-              max={param.max ?? undefined}
-              step={param.step ?? (param.kind === "int" ? 1 : "any")}
-              onChange={(event) => {
-                const next = event.target.valueAsNumber;
-                if (Number.isFinite(next)) forwardParam(param.id, next);
-              }}
-            />
-          ) : (
-            <span>{value}</span>
-          )}
-          {param.unit && <span className="text-[10px] text-muted-foreground">{param.unit}</span>}
-        </span>
-      </div>
-      {param.control === "slider" && param.min !== null && param.max !== null && (
-        <Slider
-          value={[value]}
-          min={param.min}
-          max={param.max}
-          modified={param.modified}
-          step={param.step ?? (param.kind === "int" ? 1 : (param.max - param.min) / 200)}
-          onValueChange={([next]) => forwardParam(param.id, next)}
-        />
-      )}
-    </div>
   );
 }

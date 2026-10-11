@@ -195,6 +195,13 @@ The editor and a coding agent share the notebook file:
   selection, each cell's state and errors, the parameter values, and the path
   of the viewport image (`.sca-editor/viewport.png`) the agent can look at. The
   editor keeps `.sca-editor/snapshot.json` current while it runs.
+- The local modules a notebook imports (`from dimensions import DIMS`) are
+  listed under *modules* in the workspace tab, with the notebooks that use
+  them. A module opens in a module view: its source, autosaved, and the fields
+  of its dataclasses (and top-level constants with a `# ui:` comment) as
+  controls whose values are written into the file. A change to a module, from
+  the editor or from an agent on disk, reloads it and reruns the open notebook;
+  the notebooks it `use`s are rerun from their files.
 - A cell folds to its name (its feature slug, params header or first variable)
   and can run everything above it; `@app.function` cells are shown read-only
   (edit them in the file).

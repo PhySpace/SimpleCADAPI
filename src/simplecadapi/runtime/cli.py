@@ -23,7 +23,7 @@ from typing import Any, Sequence
 
 from ..product.packages import build_product_package, encode_product_package
 from .runner import run_notebook
-from .workspace import describe_notebook, scan_workspace
+from .workspace import describe_notebook, scan_modules, scan_workspace
 
 
 def configure(subparsers: argparse._SubParsersAction) -> None:
@@ -58,7 +58,8 @@ def configure(subparsers: argparse._SubParsersAction) -> None:
         "ls",
         help="list the SimpleCAD notebooks under a directory",
         description="List the notebooks under DIR whose script header has "
-        "[tool.simplecadapi]: id, kind, the notebooks each uses.",
+        "[tool.simplecadapi]: id, kind, the notebooks each uses, and the local "
+        "modules (shared dimensions, helpers) their cells import.",
     )
     listing.add_argument("directory", type=Path, nargs="?", default=Path.cwd())
     listing.set_defaults(handler=_list, printer=_print_report)
@@ -120,9 +121,11 @@ def _list(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     root = args.directory.expanduser().resolve()
     if not root.is_dir():
         raise ValueError(f"{args.directory}: not a directory")
+    entries = scan_workspace(root)
     return {
         "root": str(root),
-        "notebooks": [entry.to_dict() for entry in scan_workspace(root)],
+        "notebooks": [entry.to_dict() for entry in entries],
+        "modules": [module.to_dict() for module in scan_modules(root, entries)],
     }, 0
 
 

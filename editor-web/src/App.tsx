@@ -3,10 +3,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CellEditor, type NotebookCell, type NotebookFeature, type ParamMeta } from "@/components/CellEditor";
 import { Header } from "@/components/Header";
 import { Inspector } from "@/components/Inspector";
+import { ModuleView, type ModuleState } from "@/components/ModuleView";
 import { NotebookList } from "@/components/NotebookList";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { fetchPackage, getWorkspace, openNotebook, postViewport, type NotebookRow } from "@/lib/api";
+import { fetchPackage, getWorkspace, openNotebook, postViewport, type ModuleRow, type NotebookRow } from "@/lib/api";
 import { EnvelopeSocket, type Envelope } from "@/lib/envelope";
 import { selectionPayload, variableNames, type SelectionItem } from "@/lib/selection";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,9 @@ export function App() {
   const socketRef = useRef<EnvelopeSocket | null>(null);
 
   const [notebooks, setNotebooks] = useState<NotebookRow[]>([]);
+  const [modules, setModules] = useState<ModuleRow[]>([]);
+  const [moduleView, setModuleView] = useState<ModuleState | null>(null);
+  const [leftTab, setLeftTab] = useState("notebook");
   const [notebook, setNotebook] = useState<string | null>(null);
   const [kind, setKind] = useState<string | null>(null);
   const [kernelAlive, setKernelAlive] = useState(false);
@@ -82,6 +86,7 @@ export function App() {
     const refreshWorkspace = () =>
       void getWorkspace().then((data) => {
         setNotebooks(data.notebooks);
+        setModules(data.modules ?? []);
         setKind(data.notebooks.find((row) => row.current)?.kind ?? null);
       });
 
@@ -119,6 +124,17 @@ export function App() {
       );
     });
 
+    socket.on("module", (envelope) => {
+      if (!envelope["path"]) {
+        setModuleView(null);
+        setLeftTab((tab) => (tab === "module" ? "notebook" : tab));
+        return;
+      }
+      const state = envelope as unknown as ModuleState;
+      setModuleView(state);
+      if (state.origin === "open") setLeftTab("module");
+    });
+
     socket.on("notebook.cells", (envelope) => setCells((envelope["cells"] as NotebookCell[]) ?? []));
     socket.on("notebook.features", (envelope) => setFeatures((envelope["features"] as NotebookFeature[]) ?? []));
 
@@ -130,7 +146,8 @@ export function App() {
       // An empty error means "the model is fine again": keep the package line.
       if (typeof envelope["error"] === "string") {
         if (envelope["error"]) setStatus(`error: ${envelope["error"]}`);
-      } else if (typeof envelope["exported"] === "string") setStatus(`exported ${envelope["exported"]}`);
+      } else if (typeof envelope["working"] === "string") setStatus(envelope["working"]);
+      else if (typeof envelope["exported"] === "string") setStatus(`exported ${envelope["exported"]}`);
       else if (typeof envelope["created"] === "string") setStatus(`created ${envelope["created"]}`);
     });
 
@@ -205,10 +222,11 @@ export function App() {
       />
       <ResizablePanelGroup className="min-h-0 flex-1">
         <ResizablePanel defaultSize={32} minSize={18} className="min-w-0">
-          <Tabs defaultValue="notebook" className="h-full">
+          <Tabs value={leftTab} onValueChange={setLeftTab} className="h-full">
             <TabsList>
               <TabsTrigger value="notebook">notebook</TabsTrigger>
               <TabsTrigger value="workspace">workspace</TabsTrigger>
+              {moduleView && <TabsTrigger value="module">{moduleView.name}</TabsTrigger>}
             </TabsList>
             <TabsContent value="notebook" className="min-h-0">
               <CellEditor
@@ -220,8 +238,23 @@ export function App() {
               />
             </TabsContent>
             <TabsContent value="workspace" className="min-h-0">
-              <NotebookList notebooks={notebooks} onOpen={handleOpen} />
+              <NotebookList
+                notebooks={notebooks}
+                modules={modules}
+                openModule={moduleView?.path ?? null}
+                onOpen={handleOpen}
+                onOpenModule={(path) => socketRef.current?.send({ type: "module.open", path })}
+              />
             </TabsContent>
+            {moduleView && (
+              <TabsContent value="module" className="min-h-0">
+                <ModuleView
+                  module={moduleView}
+                  socket={socketRef.current}
+                  onClose={() => socketRef.current?.send({ type: "module.close" })}
+                />
+              </TabsContent>
+            )}
           </Tabs>
         </ResizablePanel>
         <ResizableHandle />

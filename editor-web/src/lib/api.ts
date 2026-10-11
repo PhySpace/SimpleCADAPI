@@ -17,6 +17,9 @@ export type NotebookRow = {
   error?: string | null;
 };
 
+/** A local module some notebook imports (shared dimensions, helpers). */
+export type ModuleRow = { name: string; path: string; used_by: string[] };
+
 export type SelectedInfo = {
   selected: Record<string, unknown>;
   notebook: string | null;
@@ -31,8 +34,8 @@ async function json<T>(response: Response): Promise<T> {
 }
 
 /** Notebooks in the workspace with entry/helper classification. */
-export function getWorkspace(): Promise<{ notebooks: NotebookRow[] }> {
-  return fetch("/api/workspace").then((response) => json<{ notebooks: NotebookRow[] }>(response));
+export function getWorkspace(): Promise<{ notebooks: NotebookRow[]; modules: ModuleRow[] }> {
+  return fetch("/api/workspace").then((response) => json<{ notebooks: NotebookRow[]; modules: ModuleRow[] }>(response));
 }
 
 /** Switch the active entry notebook (server restarts the kernel). */

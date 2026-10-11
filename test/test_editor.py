@@ -337,3 +337,57 @@ class CellLinesTest(unittest.TestCase):
 
         self.assertEqual(file_line_ranges(self.NOTEBOOK, ["a = 1\nb = 2", "c = 99"])[1], None)
         self.assertEqual(file_line_ranges("def broken(", ["x"]), [None])
+
+
+class ModulesTest(unittest.TestCase):
+    def _workspace(self, root: Path) -> None:
+        (root / "dims.py").write_text(
+            "from dataclasses import dataclass\n\n@dataclass(frozen=True)\nclass D:\n    L: float = 80.0\n\nDIMS = D()\n"
+        )
+        (root / "helper.py").write_text("def helper():\n    return 1\n")
+        notebook = create_notebook(root, "part", "part")
+        notebook.write_text(
+            notebook.read_text().replace(
+                "with app.setup:\n    import simplecadapi as scad\n",
+                "with app.setup:\n    import simplecadapi as scad\n    from dims import DIMS\n    from helper import helper\n",
+            )
+        )
+
+    def test_the_workspace_lists_the_modules_notebooks_import(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._workspace(root)
+            state = WorkspaceState(root)
+            modules = {m["path"]: m for m in state.modules()}
+            self.assertEqual(sorted(modules), ["dims.py", "helper.py"])
+            self.assertEqual(modules["dims.py"]["used_by"], ["part.py"])
+
+    def test_a_module_opens_with_its_dataclass_fields_as_parameters(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._workspace(root)
+            state = WorkspaceState(root)
+            seen: list[dict] = []
+            state.emit = seen.append  # type: ignore[method-assign]
+            state.open_module("dims.py")
+            envelope = seen[-1]
+            self.assertEqual((envelope["type"], envelope["origin"], envelope["used_by"]), ("module", "open", ["part.py"]))
+            self.assertEqual([p["id"] for p in envelope["params"]], ["D.L"])
+            with self.assertRaises(ValueError):
+                state.open_module("../outside.py")
+
+    def test_a_parameter_edit_is_written_to_the_module_and_propagated(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._workspace(root)
+            state = WorkspaceState(root)
+            state.emit = lambda envelope: None  # type: ignore[method-assign]
+            changed: list[set[Path]] = []
+            state._files_changed = lambda paths, announce=True: changed.append(paths)  # type: ignore[method-assign]
+            state.open_module("dims.py")
+            state.set_module_params("dims.py", {"D.L": 120})
+            self.assertIn("L: float = 120.0", (root / "dims.py").read_text())
+            self.assertEqual(changed, [{(root / "dims.py").resolve()}])
+            state.save_module("dims.py", "X = 1\n")
+            self.assertEqual((root / "dims.py").read_text(), "X = 1\n")
+            self.assertEqual(len(changed), 2)
