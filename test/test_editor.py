@@ -391,3 +391,48 @@ class ModulesTest(unittest.TestCase):
             state.save_module("dims.py", "X = 1\n")
             self.assertEqual((root / "dims.py").read_text(), "X = 1\n")
             self.assertEqual(len(changed), 2)
+
+
+class SelectionLatencyTest(unittest.TestCase):
+    """A pick shows up at once and the kernel only ever writes the newest selection."""
+
+    def test_the_cell_is_pushed_before_the_kernel_writes_and_writes_coalesce(self) -> None:
+        import threading
+
+        from simplecadapi.editor.server import PENDING_SELECTION_ID
+
+        gate = threading.Event()
+        written: list[str] = []
+
+        class Kernel:
+            def put_cell(self, code: str, *, cell_id: str | None, run: bool = True) -> str:
+                gate.wait(5)  # the kernel is busy with something long
+                written.append(code)
+                return cell_id or "real"
+
+            def wait_idle(self, timeout: float = 0) -> bool:
+                return True
+
+        state = WorkspaceState(Path(tempfile.gettempdir()))
+        sent: list[dict] = []
+        state.emit = sent.append  # type: ignore[method-assign]
+        state.push_cells = lambda: None  # type: ignore[method-assign]
+        state.write_snapshot = lambda: None  # type: ignore[method-assign]
+        face = {"kind": "face", "properties": FACE, "geometry": {"type": "plane"}}
+        worker = threading.Thread(target=state._set_selection, args=(Kernel(), [face]))
+        worker.start()
+        deadline = time.monotonic() + 3
+        while not any(m["type"] == "notebook.cells" for m in sent) and time.monotonic() < deadline:
+            time.sleep(0.01)
+        cells = next(m for m in sent if m["type"] == "notebook.cells")["cells"]
+        self.assertEqual(cells[-1]["id"], PENDING_SELECTION_ID)  # shown while the kernel is still busy
+        self.assertEqual(written, [])
+        # two more picks while the first write is stuck: only the newest is written afterwards
+        edge = {"kind": "edge", "properties": EDGE, "geometry": {"type": "line"}}
+        state._set_selection(Kernel(), [face, edge])
+        state._set_selection(Kernel(), [edge])
+        gate.set()
+        worker.join(5)
+        self.assertEqual(len(written), 2)  # the first, then the newest
+        self.assertIn("selected_edge = ", written[-1])
+        self.assertNotIn("selected_face", written[-1])

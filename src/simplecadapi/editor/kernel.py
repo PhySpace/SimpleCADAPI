@@ -36,6 +36,7 @@ from typing import Callable
 import websockets
 
 SESSION_ID = "sca-runtime"
+_TRACE = bool(os.environ.get("SCA_EDITOR_TRACE"))
 
 
 class KernelError(RuntimeError):
@@ -476,11 +477,15 @@ class MarimoKernel:
     def execute(self, code: str, timeout: float = 120.0) -> dict:
         """Run a scratch snippet in the kernel; returns {success, output, log}."""
         self._own_calls += 1
+        started = time.monotonic()
         try:
             return self._execute(code, timeout)
         finally:
             self._own_ended = time.monotonic()
             self._own_calls -= 1
+            if _TRACE:
+                first = next((line for line in code.splitlines() if line.strip()), "")[:70]
+                print(f"[sca edit] kernel {self._own_ended - started:6.2f}s  {first}", file=sys.stderr, flush=True)
 
     def _execute(self, code: str, timeout: float) -> dict:
         body = json.dumps({"code": code}).encode("utf-8")

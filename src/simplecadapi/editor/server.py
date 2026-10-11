@@ -127,6 +127,9 @@ class WorkspaceState:
         self._module_dirty: set[Path] = set()
         self._module_busy = False
         self._module_lock = threading.Lock()
+        self._selection_code: str | None = None
+        self._selection_busy = False
+        self._selection_lock = threading.Lock()
         self._settle_timer: threading.Timer | None = None
         self._settle_lock = threading.Lock()
         self._last_publish_error = ""
@@ -746,7 +749,14 @@ class WorkspaceState:
     # -- selection and the agent snapshot ----------------------------------------
 
     def _set_selection(self, kernel: MarimoKernel, items: list[dict]) -> None:
-        """Write the viewport selection into the notebook's selection cell."""
+        """Write the viewport selection into the notebook's selection cell.
+
+        The webuis are told at once, from here: the kernel runs scratch code
+        one piece at a time, so a write that queues behind a long run (a
+        publish of a big assembly takes seconds) must not hold the picture
+        back.  The write itself is coalesced: while one is in flight only the
+        latest selection waits, and it is the one written.
+        """
         keep = ("kind", "entity_id", "node_id", "definition_id", "properties", "geometry")
         self.selection_items = [{key: item.get(key) for key in keep if key in item} for item in items]
         cell = next((c for c in self.cells if c["code"].lstrip().startswith(MARKER)), None)
@@ -757,10 +767,56 @@ class WorkspaceState:
         if cell is not None and code.strip() == cell["code"].strip():
             self.write_snapshot()
             return
-        kernel.put_cell(code, cell_id=cell["id"] if cell else None)
-        kernel.wait_idle()
-        self.push_cells()
+        if cell is not None:
+            cell["code"] = code
+        else:
+            self.cells.append(
+                {
+                    "id": PENDING_SELECTION_ID,
+                    "name": "_",
+                    "code": code,
+                    "status": "idle",
+                    "errors": [],
+                    "output": None,
+                    "console": [],
+                    "key": "",
+                    "feature": None,
+                    "title": "selection",
+                    "readonly": False,
+                    "lines": None,
+                    "ref": f"{self.notebook} (cell {len(self.cells) + 1:02d} `selection`)",
+                }
+            )
+        self.emit({"type": "notebook.cells", "cells": self.cells})
         self.emit({"type": "selection", "items": self._selection_summary(), "variables": variable_names(self.selection_items)})
+        self.write_snapshot()
+        with self._selection_lock:
+            self._selection_code = code
+            if self._selection_busy:
+                return
+            self._selection_busy = True
+        self._write_selection(kernel)
+
+    def _write_selection(self, kernel: MarimoKernel) -> None:
+        """Write the newest selection code into the kernel's cell; repeat while a newer one arrived."""
+        try:
+            while True:
+                with self._selection_lock:
+                    code, self._selection_code = self._selection_code, None
+                    if code is None:
+                        self._selection_busy = False
+                        return
+                cell = next(
+                    (c for c in self.cells if c["code"].lstrip().startswith(MARKER) and c["id"] != PENDING_SELECTION_ID),
+                    None,
+                )
+                kernel.put_cell(code, cell_id=cell["id"] if cell else None)
+                kernel.wait_idle(10)
+                self.push_cells()
+        except Exception:
+            with self._selection_lock:
+                self._selection_busy = False
+            raise
 
     def _selection_summary(self) -> list[dict]:
         names = variable_names(self.selection_items)
@@ -871,6 +927,10 @@ def _module_code(code: str) -> str:
         before, after = line[: node.col_offset], line[node.col_offset + len("return"):]
         lines[node.lineno - 1] = before + ("pass" if node.value is None else after.lstrip())
     return "\n".join(lines)
+
+
+PENDING_SELECTION_ID = "selection-pending"
+"""Id of the selection cell the webuis see before the kernel has created it."""
 
 
 def file_line_ranges(text: str, codes: list[str]) -> list[tuple[int, int] | None]:

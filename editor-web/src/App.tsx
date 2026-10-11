@@ -191,7 +191,7 @@ export function App() {
     }
     const send = window.setTimeout(
       () => socketRef.current?.send({ type: "selection.set", items: selectionPayload(selection) }),
-      120,
+      40,
     );
     const snapshot = window.setTimeout(() => {
       const png = viewRef.current?.snapshotPng();
