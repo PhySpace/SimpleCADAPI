@@ -78,3 +78,5 @@ src/simplecadapi/editor/webui/
 
 # The editor's per-workspace state (kernel log, snapshot, viewport image)
 .sca-editor/
+# Written by `sca edit` into a workspace to put marimo in lazy mode
+.marimo.toml
