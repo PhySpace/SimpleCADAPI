@@ -28,6 +28,8 @@ export type NotebookCell = {
   code: string;
   status?: string | null;
   errors?: string[] | null;
+  /** Not run: a cell it depends on (or the setup) failed. */
+  blocked?: boolean;
   output?: string | null;
   console?: string[];
   /** Slug of the cell's `# ---- feature: ... ----` header, if it has one. */
@@ -354,7 +356,10 @@ function CellBlock({
           {role && <span className="label shrink-0">{role}</span>}
         </button>
         {dirty && <span className="h-2 w-2 shrink-0 bg-focus" title="saving…" />}
+        {cell.status === "running" && <Badge variant="focus" className="animate-pulse">running</Badge>}
+        {cell.status === "queued" && <Badge variant="secondary">queued</Badge>}
         {failed && <Badge variant="fail">failed</Badge>}
+        {cell.blocked && !failed && <Badge variant="secondary">blocked</Badge>}
         {stale && !failed && <Badge variant="focus">stale</Badge>}
         {cell.readonly && <Badge variant="secondary">function</Badge>}
         <button
@@ -397,6 +402,7 @@ function CellBlock({
           <Trash2 className="h-3.5 w-3.5" />
         </IconButton>
       </header>
+      {live && <div className="cell-running h-[2px] w-full" />}
       {!folded && (
         <div className="border-t-2 border-border">
           <CodeMirror

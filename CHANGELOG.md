@@ -18,6 +18,15 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   notebook file; `sca snapshot` and `.sca-editor/snapshot.json` + `viewport.png`
   tell a coding agent what is selected and shown. Ground grid and axis gizmo in
   a Z-up CAD frame; cells fold to their step name and can run all cells above.
+- Editor: a log dock along the bottom replaces the error line in the header.
+  It lists what happened and what failed (with the time), and while cells are
+  re-evaluated shows how many of them are done, which one is running and for
+  how long; each cell shows running/queued/blocked. A module that does not
+  compile is reported as the cause ("setup failed — SyntaxError ...").
+- Editor: models reach the viewport as a live preview straight from the
+  solids (`simplecadapi.scene.preview`, wire format `SCAPREV1`), without
+  building a package; a picked entity's details are fetched on demand.
+  Solids no longer carry an eagerly built mesh (modeling is about 20% faster).
 - Editor: the local modules a notebook imports (shared dimensions, helpers)
   are listed in the workspace, with the notebooks that use them, and open in a
   module view: source (autosaved) plus the dataclass fields (and top-level
@@ -57,6 +66,14 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ### Fixed
 
+- Editor: switching notebooks quickly no longer ends on the wrong one or
+  reports `open failed: Connection refused`: opens are ordered, a superseded
+  open stops its kernel quietly, and the list highlights the notebook being
+  opened at once. A kernel for a notebook with inline dependencies no longer
+  waits for marimo's sandbox prompt ("marimo not ready after 60s"); opening a
+  notebook no longer publishes its model before its cells ran; a page
+  refreshed after an unchanged publish shows the model; the viewport redraws
+  after a panel resize; edges stay visible where a coarse mesh would hide them.
 - `ql.vertices()` resolves through solids, faces and wires (it found nothing
   unless the scope was an edge).
 - The editor no longer rewrites a notebook when a cell is run unchanged, and

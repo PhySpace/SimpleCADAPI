@@ -968,6 +968,8 @@ export class BRepRenderer {
     this.modelRoot.traverse((object) => {
       if (object instanceof LineSegments2) object.material.resolution.set(resolution.width, resolution.height);
     });
+    // setSize cleared the canvas.
+    this.needsRender = true;
   }
 
   dispose(): void {

@@ -8,12 +8,15 @@ import type { ModuleRow, NotebookRow } from "@/lib/api";
  * that imports it. */
 export function NotebookList({
   notebooks,
+  current,
   modules,
   openModule,
   onOpen,
   onOpenModule,
 }: {
   notebooks: NotebookRow[];
+  /** Workspace-relative path of the open notebook. */
+  current: string | null;
   modules: ModuleRow[];
   openModule: string | null;
   onOpen: (path: string) => void;
@@ -32,13 +35,13 @@ export function NotebookList({
               type="button"
               className={cn(
                 "flex w-full flex-col gap-0.5 border-l-2 px-3 py-2 text-left hover:bg-accent",
-                row.current ? "border-focus bg-accent" : "border-transparent",
+                row.path === current ? "border-focus bg-accent" : "border-transparent",
               )}
-              onClick={() => !row.current && onOpen(row.path)}
+              onClick={() => row.path !== current && onOpen(row.path)}
               title={row.path}
             >
               <span className="flex items-center gap-2">
-                <span className={row.current ? "text-focus" : "text-foreground"}>{row.name}</span>
+                <span className={row.path === current ? "text-focus" : "text-foreground"}>{row.name}</span>
                 <Badge variant="secondary">{row.kind}</Badge>
                 {row.error && <Badge variant="fail">error</Badge>}
               </span>

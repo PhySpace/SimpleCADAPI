@@ -141,6 +141,9 @@ class WorkspaceState:
         self._settle_timer: threading.Timer | None = None
         self._settle_lock = threading.Lock()
         self._last_publish_error = ""
+        self._generation = 0
+        self._switch_lock = threading.Lock()
+        self._booting: MarimoKernel | None = None
 
     # -- notebook / kernel lifecycle ---------------------------------------------
 
@@ -148,7 +151,7 @@ class WorkspaceState:
     def config(self) -> NotebookConfig | None:
         return read_notebook_config(self.notebook) if self.notebook else None
 
-    def open_notebook(self, rel_path: str) -> None:
+    def open_notebook(self, rel_path: str, generation: int | None = None) -> None:
         """Switch the active notebook: restart the kernel on it.
 
         Runs synchronously (the caller wraps it in a thread): marimo boot
@@ -156,58 +159,121 @@ class WorkspaceState:
         model was last published, that model and the notebook's cells are shown
         at once, while the kernel boots.
         """
+        target = self.resolve_notebook(rel_path)
+        if generation is None:
+            generation = self.reserve_switch()
+            self.announce_opening(target)
+        if not self._begin_switch(target, generation):
+            return  # a later open was asked for meanwhile
+        restored = self._restore(target, generation)
+        self.start_kernel(target, restored=restored, generation=generation)
+
+    def resolve_notebook(self, rel_path: str) -> Path:
+        """The file of the workspace notebook *rel_path*; ``ValueError`` if it is none."""
         target = (self.workspace / rel_path).resolve()
         if not target.is_file() or self.workspace not in target.parents:
             raise ValueError(f"notebook outside workspace: {rel_path}")
         if read_notebook_config(target) is None:
             raise ValueError(f"not a SimpleCAD notebook (no [tool.simplecadapi]): {rel_path}")
-        # Let the webuis drop the old model now; commands have no kernel until the new one is up.
-        self.latest.clear()
-        self.latest_preview_bytes = None
-        self.hub.broadcast({"type": "opening", "notebook": target.name, "path": rel_path})
-        self._drop_kernel()
-        restored = self._restore(target)
-        self.start_kernel(target, restored=restored)
+        return target
+
+    def announce_opening(self, target: Path) -> None:
+        """Tell the webuis a notebook is being opened (they show it at once)."""
+        self.hub.broadcast(
+            {"type": "opening", "notebook": target.name, "path": target.relative_to(self.workspace).as_posix()}
+        )
+
+    def reserve_switch(self) -> int:
+        """Take the next place in the order of opens.
+
+        Taken where a request arrives, so that a later click wins however the
+        threads that carry the opens out happen to be scheduled.
+        """
+        with self._switch_lock:
+            self._generation += 1
+            return self._generation
+
+    def _begin_switch(self, target: Path, generation: int) -> bool:
+        """Make *target* the notebook being opened, superseding any open in flight.
+
+        The list of notebooks shows it as the current one from now on, not
+        once its kernel is up; whatever an older open is still doing (booting a
+        kernel, publishing) is cancelled: it notices it was superseded.
+        """
+        with self._switch_lock:
+            if generation != self._generation:
+                return False
+            self.notebook = target
+            # Let the webuis drop the old model now; commands have no kernel until the new one is up.
+            self.latest.clear()
+            self.latest_preview_bytes = None
+            self._drop_kernel()
+        return True
+
+    def _superseded(self, generation: int) -> bool:
+        return generation != self._generation
 
     def _drop_kernel(self) -> None:
         with self.lock:
             old, self.kernel = self.kernel, None
-        if old is not None:
-            old.stop()
+            booting, self._booting = self._booting, None
+        for kernel in (old, booting):
+            if kernel is not None:
+                kernel.stop()
 
-    def start_kernel(self, notebook: Path, *, restored: bool = False) -> None:
+    def start_kernel(self, notebook: Path, *, restored: bool = False, generation: int | None = None) -> None:
         """Boot a marimo kernel for *notebook*, adopt it, and publish its product.
 
         Shared by server boot, open_notebook, and the auto-heal watch.  With
         *restored* the notebook's last model and cells are already on screen.
+        An open that is superseded while it boots (the person opened another
+        notebook meanwhile) ends quietly: its kernel is stopped, nothing is shown.
         """
-        self._drop_kernel()
-        if not restored:
-            restored = self._restore(notebook)
+        if generation is None:
+            generation = self.reserve_switch()
+            if not self._begin_switch(notebook, generation):
+                return
+            restored = self._restore(notebook, generation)
         kernel = MarimoKernel(
             notebook,
             server_port=self.port,
-            on_run_complete=self.schedule_settle,
-            on_cell_status=self.cell_status,
+            on_run_complete=lambda: self._superseded(generation) or self.schedule_settle(),
+            on_cell_status=lambda cell_id, status: self._superseded(generation) or self.cell_status(cell_id, status),
         )
-        kernel.start()
         with self.lock:
-            self.kernel = kernel
-            self.notebook = notebook
-        # Envelopes from the previous model must not replay.
-        self.selection = {}
-        self.selection_items = []
-        self.viewport_png = None
-        self._last_publish_error = ""
-        if not restored:
-            self.latest.clear()
-            self.latest_preview_bytes = None
-            self.cells = []
-            self.specs = {}
-        self._watched = self._watched_files()[0]
-        self.hub.broadcast(self.hello())
-        kernel.wait_idle()
-        self.settle()
+            if self._superseded(generation):
+                return
+            self._booting = kernel
+        try:
+            kernel.start()
+            with self.lock:
+                if self._superseded(generation):
+                    kernel.stop()
+                    return
+                self._booting = None
+                self.kernel = kernel
+            # Envelopes from the previous model must not replay.
+            self.selection = {}
+            self.selection_items = []
+            self.viewport_png = None
+            self._last_publish_error = ""
+            if not restored:
+                self.latest.clear()
+                self.latest_preview_bytes = None
+                self.cells = []
+                self.specs = {}
+            self._watched = self._watched_files()[0]
+            self.hub.broadcast(self.hello())
+            kernel.wait_instantiated()
+            kernel.wait_idle()
+            if self._superseded(generation):
+                return
+            self.settle()
+        except Exception:
+            kernel.stop()
+            if self._superseded(generation):
+                return  # its kernel was stopped under it; not an error
+            raise
         threading.Thread(
             target=self._watch_files, args=(kernel,), name="file-watch", daemon=True
         ).start()
@@ -271,7 +337,7 @@ class WorkspaceState:
             pass
         return None
 
-    def _restore(self, notebook: Path) -> bool:
+    def _restore(self, notebook: Path, generation: int | None = None) -> bool:
         """Show *notebook* from its last published model, if nothing it depends on changed.
 
         Its cells appear too, read from the file (not editable until the kernel is
@@ -282,7 +348,7 @@ class WorkspaceState:
             data = self._recall_model(notebook, self._signature(notebook))
         except (OSError, ValueError):
             data = None
-        if data is None:
+        if data is None or (generation is not None and self._superseded(generation)):
             return False
         self.notebook = notebook
         self._publish_cells(_static_cells(notebook))
@@ -311,23 +377,26 @@ class WorkspaceState:
         while True:
             time.sleep(5)
             kernel = self.kernel
+            # Between kernels (a notebook is being opened) there is nothing to watch.
             if kernel is None or kernel._stop.is_set():
-                return
+                failures = 0
+                continue
             if not kernel.alive:
                 self.hub.broadcast({"type": "status", "error": "marimo server exited — restarting kernel"})
-                break
-            # Not a scratch snippet: one queued behind a long cell and given
-            # up on interrupts the kernel (see MarimoKernel.execute).
-            failures = 0 if kernel.session_exists() else failures + 1
-            if failures >= 2:
+            else:
+                # Not a scratch snippet: one queued behind a long cell and given
+                # up on interrupts the kernel (see MarimoKernel.execute).
+                failures = 0 if kernel.session_exists() else failures + 1
+                if failures < 2:
+                    continue
                 self.hub.broadcast({"type": "status", "error": "kernel session lost — restarting"})
-                break
-        try:
-            assert self.notebook is not None
-            self.start_kernel(self.notebook)
-            self.hub.broadcast({"type": "status", "recovered": self.notebook.name})
-        except Exception as exc:
-            self.hub.broadcast({"type": "status", "error": f"kernel restart failed: {exc}"})
+            failures = 0
+            try:
+                assert self.notebook is not None
+                self.start_kernel(self.notebook)
+                self.hub.broadcast({"type": "status", "recovered": self.notebook.name})
+            except Exception as exc:
+                self.hub.broadcast({"type": "status", "error": f"kernel restart failed: {exc}"})
 
     # -- child notebooks ---------------------------------------------------------
 
@@ -533,10 +602,12 @@ class WorkspaceState:
 
     def cell_status(self, cell_id: str, status: str) -> None:
         """A cell's state changed in the kernel: tell the webuis (its run button shows it)."""
+        title = None
         for cell in self.cells:
             if cell["id"] == cell_id:
                 cell["status"] = status
-        self.hub.broadcast({"type": "cell.status", "id": cell_id, "status": status})
+                title = cell.get("title")
+        self.hub.broadcast({"type": "cell.status", "id": cell_id, "status": status, "title": title})
 
     def remember(self, envelope: dict) -> None:
         if envelope.get("type") in self._REPLAYED:
@@ -554,6 +625,7 @@ class WorkspaceState:
             "type": "hello",
             "workspace": str(self.workspace),
             "notebook": self.notebook.name if self.notebook else None,
+            "path": self.notebook.relative_to(self.workspace).as_posix() if self.notebook else None,
             "kernel": self.kernel is not None and self.kernel.alive,
             "marimo_url": self.kernel.marimo_url if self.kernel else None,
         }
@@ -593,6 +665,10 @@ class WorkspaceState:
                 self._stopped = False
                 return
             message = str(result.get("error", ""))
+            if kernel.setup_errors:
+                # No product because the notebook's setup failed (a module it imports
+                # does not compile): that is the cause, not the missing product.
+                message = f"setup failed — {kernel.setup_errors[0]}"
             if self._stopped:
                 # The person stopped the run: its cells have no product, and that is no fault.
                 self._stopped = False
@@ -926,6 +1002,8 @@ class WorkspaceState:
         back.  The write itself is coalesced: while one is in flight only the
         latest selection waits, and it is the one written.
         """
+        if kernel is not self.kernel:
+            return  # the notebook was switched under this pick
         keep = ("kind", "entity_id", "node_id", "definition_id", "properties", "geometry")
         self.selection_items = [{key: item.get(key) for key in keep if key in item} for item in items]
         cell = next((c for c in self.cells if c["code"].lstrip().startswith(MARKER)), None)
@@ -972,7 +1050,10 @@ class WorkspaceState:
             while True:
                 with self._selection_lock:
                     code, self._selection_code = self._selection_code, None
-                    if code is None:
+                    if code is None or kernel is not self.kernel:
+                        # nothing (more) to write, or the notebook was switched meanwhile:
+                        # a stale write must not land in the new notebook's cells
+                        self._selection_code = None
                         self._selection_busy = False
                         return
                 cell = next(
@@ -981,6 +1062,8 @@ class WorkspaceState:
                 )
                 kernel.put_cell(code, cell_id=cell["id"] if cell else None)
                 kernel.wait_idle(10)
+                if kernel is not self.kernel:
+                    continue
                 self.push_cells()
         except Exception:
             with self._selection_lock:
@@ -1308,9 +1391,16 @@ def create_app(state: WorkspaceState) -> Starlette:
         except Exception:
             return JSONResponse({"ok": False, "error": "body must be {path}"}, status_code=400)
 
+        try:
+            target = state.resolve_notebook(rel_path)
+        except ValueError as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+        generation = state.reserve_switch()
+        state.announce_opening(target)
+
         def run() -> None:
             try:
-                state.open_notebook(rel_path)
+                state.open_notebook(rel_path, generation)
             except Exception as exc:
                 hub.broadcast({"type": "status", "error": f"open failed: {exc}"})
 
@@ -1328,9 +1418,12 @@ def create_app(state: WorkspaceState) -> Starlette:
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
         rel_path = path.relative_to(state.workspace).as_posix()
 
+        generation = state.reserve_switch()
+        state.announce_opening(path)
+
         def run() -> None:
             try:
-                state.open_notebook(rel_path)
+                state.open_notebook(rel_path, generation)
                 hub.broadcast({"type": "status", "created": rel_path})
             except Exception as exc:
                 hub.broadcast({"type": "status", "error": f"open failed: {exc}"})
@@ -1446,8 +1539,8 @@ def serve_workspace(
                     hub.broadcast({"type": "status", "error": f"kernel boot failed: {exc}"})
                     return
                 kernel = state.kernel
-                assert kernel is not None
-                print(f"[sca edit] marimo kernel ready on {kernel.marimo_url}")
+                if kernel is not None:  # None: a notebook was opened meanwhile
+                    print(f"[sca edit] marimo kernel ready on {kernel.marimo_url}")
                 state.watch_kernel()
 
             threading.Thread(target=boot, name="kernel-boot", daemon=True).start()

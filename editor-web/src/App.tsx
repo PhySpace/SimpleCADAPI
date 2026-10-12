@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CellEditor, type NotebookCell, type NotebookFeature, type ParamMeta } from "@/components/CellEditor";
+import { Dock } from "@/components/Dock";
 import { Header } from "@/components/Header";
 import { Inspector } from "@/components/Inspector";
 import { LoadingMask } from "@/components/LoadingMask";
@@ -11,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { fetchPreview, getWorkspace, openNotebook, postViewport, type ModuleRow, type NotebookRow } from "@/lib/api";
 import { parsePreview } from "@/lib/preview";
 import { EnvelopeSocket, type Envelope } from "@/lib/envelope";
+import { useRunLog } from "@/lib/runlog";
 import { selectionPayload, variableNames, type SelectionItem } from "@/lib/selection";
 import { cn } from "@/lib/utils";
 import { Viewport, type PickResult, type SelectionMode } from "@/scene/Viewport";
@@ -40,7 +42,10 @@ export function App() {
   const [moduleView, setModuleView] = useState<ModuleState | null>(null);
   const [leftTab, setLeftTab] = useState("notebook");
   const [notebook, setNotebook] = useState<string | null>(null);
-  const [kind, setKind] = useState<string | null>(null);
+  // The notebook the server says is open (workspace-relative): what the list
+  // highlights.  It changes the moment another is asked for, not when its
+  // kernel is up, and a late answer of the workspace list cannot undo it.
+  const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [kernelAlive, setKernelAlive] = useState(false);
   const [marimoUrl, setMarimoUrl] = useState<string | null>(null);
   const [status, setStatus] = useState("Connecting…");
@@ -57,11 +62,15 @@ export function App() {
   // slider, one cell) are not veiled.
   const [loading, setLoading] = useState<string | null>("connecting");
 
+  const kind = notebooks.find((row) => row.path === currentPath)?.kind ?? null;
+  const log = useRunLog();
   const running = cells.some((cell) => cell.status === "running" || cell.status === "queued");
   const handleStop = useCallback(() => {
     socketRef.current?.send({ type: "interrupt.request" });
     setLoading(null);
-  }, []);
+    log.push("info", "stop requested");
+    log.resetBatch();
+  }, [log.push, log.resetBatch]);
 
   const selection: SelectionItem[] = useMemo(() => {
     const names = variableNames(picked);
@@ -85,10 +94,11 @@ export function App() {
         framedNotebook.current = name;
       }
       setSceneVersion((version) => version + 1);
+      log.push("ok", `model shown: ${preview.nodes.length} ${preview.nodes.length === 1 ? "part" : "parts"}`);
     } catch (error) {
-      setStatus(error instanceof Error ? `error: ${error.message}` : "error: unable to open the preview");
+      log.push("error", error instanceof Error ? error.message : "unable to open the preview");
     }
-  }, []);
+  }, [log.push]);
 
   // -- socket + lifecycle --------------------------------------------------------
 
@@ -100,11 +110,12 @@ export function App() {
       void getWorkspace().then((data) => {
         setNotebooks(data.notebooks);
         setModules(data.modules ?? []);
-        setKind(data.notebooks.find((row) => row.current)?.kind ?? null);
+        setCurrentPath((path) => path ?? data.notebooks.find((row) => row.current)?.path ?? null);
       });
 
     socket.on("hello", (envelope) => {
       setNotebook((envelope["notebook"] as string) ?? null);
+      setCurrentPath((envelope["path"] as string) ?? null);
       setKernelAlive(Boolean(envelope["kernel"]));
       // No notebook: nothing to wait for. Else the model is on its way.
       if (hasModel.current) return;
@@ -126,8 +137,11 @@ export function App() {
       setFeatures([]);
       setPicked([]);
       setNotebook(String(envelope["notebook"] ?? ""));
+      setCurrentPath((envelope["path"] as string) ?? null);
       setStatus(`opening ${envelope["notebook"]}…`);
       setLoading(`opening ${envelope["notebook"]}`);
+      log.resetBatch();
+      log.push("info", `opening ${envelope["notebook"]}`);
       setSceneVersion((version) => version + 1);
       refreshWorkspace();
     });
@@ -160,17 +174,28 @@ export function App() {
       const id = String(envelope["id"]);
       const status = String(envelope["status"]);
       setCells((previous) => previous.map((cell) => (cell.id === id ? { ...cell, status } : cell)));
+      log.cellStatus(id, status, (envelope["title"] as string | null) ?? null);
     });
 
-    socket.on("notebook.cells", (envelope) => setCells((envelope["cells"] as NotebookCell[]) ?? []));
+    socket.on("notebook.cells", (envelope) => {
+      const next = (envelope["cells"] as NotebookCell[]) ?? [];
+      setCells(next);
+      log.knowCells(next);
+    });
     socket.on("notebook.features", (envelope) => setFeatures((envelope["features"] as NotebookFeature[]) ?? []));
 
     socket.on("preview", (envelope) => {
       setLoading(null);
+      const shown = hasModel.current;
       hasModel.current = true;
-      // The kernel published the model that is already on screen: nothing to reload.
-      if (envelope["unchanged"]) return;
+      // The kernel published the model that is already on screen: nothing to
+      // reload.  (A page that has none yet, a refresh replaying this envelope, needs it.)
+      if (envelope["unchanged"] && shown) {
+        log.modelShown();
+        return;
+      }
       void fetchPreview().then((buffer) => loadPreviewBytes(buffer, (envelope["name"] as string) ?? null));
+      log.modelShown();
     });
 
     // The details of a picked entity (a preview carries none), asked for when it was picked.
@@ -186,26 +211,32 @@ export function App() {
       );
     });
 
+    // Messages of the server.  Errors go to the log (the dock opens on one), not the header.
     socket.on("status", (envelope) => {
-      // An empty error means "the model is fine again": keep the package line.
       if (typeof envelope["error"] === "string") {
         if (envelope["error"]) {
-          setStatus(`error: ${envelope["error"]}`);
+          log.push("error", envelope["error"]);
           setLoading(null);
         }
       } else if (typeof envelope["info"] === "string") {
         setStatus(envelope["info"]);
+        log.push("info", envelope["info"]);
       } else if (typeof envelope["working"] === "string") {
         setStatus(envelope["working"]);
+        log.push("run", envelope["working"]);
         setLoading(envelope["working"].replace(/…$/, ""));
+      } else if (typeof envelope["exported"] === "string") {
+        setStatus(`exported ${envelope["exported"]}`);
+        log.push("ok", `exported ${envelope["exported"]}`);
+      } else if (typeof envelope["created"] === "string") {
+        setStatus(`created ${envelope["created"]}`);
+        log.push("ok", `created ${envelope["created"]}`);
       }
-      else if (typeof envelope["exported"] === "string") setStatus(`exported ${envelope["exported"]}`);
-      else if (typeof envelope["created"] === "string") setStatus(`created ${envelope["created"]}`);
     });
 
     socket.connect();
     return () => socket.close();
-  }, [loadPreviewBytes]);
+  }, [loadPreviewBytes, log.push, log.cellStatus, log.knowCells, log.resetBatch, log.modelShown]);
 
   // -- selection -------------------------------------------------------------------
 
@@ -274,7 +305,7 @@ export function App() {
   const handleOpen = (path: string) => {
     setStatus(`opening ${path}…`);
     openNotebook(path).catch((error) => {
-      setStatus(`error: open failed: ${error.message}`);
+      log.push("error", `open failed: ${error.message}`);
       setLoading(null);
     });
   };
@@ -316,6 +347,7 @@ export function App() {
               <TabsContent value="workspace" className="min-h-0">
                 <NotebookList
                   notebooks={notebooks}
+                  current={currentPath}
                   modules={modules}
                   openModule={moduleView?.path ?? null}
                   onOpen={handleOpen}
@@ -381,6 +413,14 @@ export function App() {
         </ResizablePanelGroup>
         <LoadingMask active={loading !== null} message={loading ?? ""} />
       </div>
+      <Dock
+        entries={log.entries}
+        batch={log.batch}
+        status={status}
+        unseenErrors={log.unseenErrors}
+        onClear={log.clear}
+        onSeen={log.markSeen}
+      />
     </div>
   );
 }

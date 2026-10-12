@@ -178,3 +178,15 @@
     animation: none;
   }
 }
+
+/* A cell the kernel is running or has queued: a thin bar marching under its header. */
+.cell-running {
+  background: repeating-linear-gradient(90deg, var(--focus, #f5a623) 0 12px, transparent 12px 24px);
+  background-size: 24px 100%;
+  animation: cell-march 0.6s linear infinite;
+}
+@keyframes cell-march {
+  to {
+    background-position: 24px 0;
+  }
+}

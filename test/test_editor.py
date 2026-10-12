@@ -414,12 +414,14 @@ class SelectionLatencyTest(unittest.TestCase):
                 return True
 
         state = WorkspaceState(Path(tempfile.gettempdir()))
+        kernel = Kernel()
+        state.kernel = kernel  # type: ignore[assignment]
         sent: list[dict] = []
         state.emit = sent.append  # type: ignore[method-assign]
         state.push_cells = lambda: None  # type: ignore[method-assign]
         state.write_snapshot = lambda: None  # type: ignore[method-assign]
         face = {"kind": "face", "properties": FACE, "geometry": {"type": "plane"}}
-        worker = threading.Thread(target=state._set_selection, args=(Kernel(), [face]))
+        worker = threading.Thread(target=state._set_selection, args=(kernel, [face]))
         worker.start()
         deadline = time.monotonic() + 3
         while not any(m["type"] == "notebook.cells" for m in sent) and time.monotonic() < deadline:
@@ -429,8 +431,8 @@ class SelectionLatencyTest(unittest.TestCase):
         self.assertEqual(written, [])
         # two more picks while the first write is stuck: only the newest is written afterwards
         edge = {"kind": "edge", "properties": EDGE, "geometry": {"type": "line"}}
-        state._set_selection(Kernel(), [face, edge])
-        state._set_selection(Kernel(), [edge])
+        state._set_selection(kernel, [face, edge])
+        state._set_selection(kernel, [edge])
         gate.set()
         worker.join(5)
         self.assertEqual(len(written), 2)  # the first, then the newest
@@ -631,6 +633,115 @@ class RestoreTest(unittest.TestCase):
             self.assertEqual(len(names), 3)
 
 
+class SwitchOrderTest(unittest.TestCase):
+    """Opening one notebook after another: the last one asked for is the one that ends up open."""
+
+    def test_the_last_open_wins_however_the_threads_are_scheduled(self) -> None:
+        import simplecadapi.editor.server as server
+
+        booted: list[str] = []
+
+        class FakeKernel:
+            marimo_url = "http://127.0.0.1:1"
+            alive = True
+
+            def __init__(self, notebook, **_kw) -> None:
+                self.notebook = notebook
+                self._stop = __import__("threading").Event()
+
+            def start(self) -> None:
+                time.sleep(0.2)
+                if self._stop.is_set():
+                    raise RuntimeError("stopped while booting")
+                booted.append(self.notebook.stem)
+
+            def stop(self) -> None:
+                self._stop.set()
+
+            def wait_instantiated(self, *_a, **_k) -> bool:
+                return True
+
+            def wait_idle(self, *_a, **_k) -> bool:
+                return True
+
+        original = server.MarimoKernel
+        server.MarimoKernel = FakeKernel  # type: ignore[misc]
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                a = create_notebook(root, "alpha", "part")
+                b = create_notebook(root, "beta", "part")
+                state = WorkspaceState(root, a)
+                sent: list[dict] = []
+                state.hub.broadcast = sent.append  # type: ignore[method-assign]
+                state.settle = lambda: None  # type: ignore[method-assign]
+                state._watch_files = lambda kernel: None  # type: ignore[method-assign]
+                first = state.reserve_switch()
+                second = state.reserve_switch()
+                # the later request's thread runs first, the earlier one after it
+                state.open_notebook("beta.py", second)
+                state.open_notebook("alpha.py", first)
+                self.assertEqual(state.notebook, b)
+                self.assertEqual(booted, ["beta"])
+                self.assertEqual([m for m in sent if m.get("error")], [])
+        finally:
+            server.MarimoKernel = original  # type: ignore[misc]
+
+    def test_an_open_superseded_while_booting_ends_quietly(self) -> None:
+        import threading
+
+        import simplecadapi.editor.server as server
+
+        class SlowKernel:
+            marimo_url = "http://127.0.0.1:1"
+            alive = True
+
+            def __init__(self, notebook, **_kw) -> None:
+                self._stop = threading.Event()
+
+            def start(self) -> None:
+                self._stop.wait(5)
+                raise RuntimeError("marimo exited with code -15")
+
+            def stop(self) -> None:
+                self._stop.set()
+
+            def wait_instantiated(self, *_a, **_k) -> bool:
+                return True
+
+            def wait_idle(self, *_a, **_k) -> bool:
+                return True
+
+        original = server.MarimoKernel
+        server.MarimoKernel = SlowKernel  # type: ignore[misc]
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                create_notebook(root, "alpha", "part")
+                b = create_notebook(root, "beta", "part")
+                state = WorkspaceState(root, None)
+                state.hub.broadcast = lambda message: None  # type: ignore[method-assign]
+                errors: list[BaseException] = []
+
+                def first() -> None:
+                    try:
+                        state.open_notebook("alpha.py")
+                    except BaseException as exc:  # noqa: BLE001
+                        errors.append(exc)
+
+                thread = threading.Thread(target=first)
+                thread.start()
+                time.sleep(0.3)  # alpha is booting
+                state.reserve_switch()
+                state._begin_switch(b, state._generation)  # beta is asked for: alpha's kernel is stopped
+                thread.join(5)
+                self.assertFalse(thread.is_alive())
+                self.assertEqual(errors, [])
+                self.assertEqual(state.notebook, b)
+        finally:
+            server.MarimoKernel = original  # type: ignore[misc]
+
+
 class InterruptTest(unittest.TestCase):
     def test_the_stop_command_interrupts_the_kernel(self) -> None:
         state = WorkspaceState(Path(tempfile.gettempdir()))
@@ -650,14 +761,17 @@ class InterruptTest(unittest.TestCase):
         kernel._on_message(json.dumps({"op": "cell-op", "data": {"cell_id": "Hbol", "status": "running"}}))
         kernel._on_message(json.dumps({"op": "cell-op", "data": {"cell_id": "Hbol", "status": None}}))
         kernel._on_message("not json")
+        # the setup cell and the bridge's own scratch snippets are not cells of the notebook
+        kernel._on_message(json.dumps({"op": "cell-op", "data": {"cell_id": "setup", "status": "running"}}))
+        kernel._on_message(json.dumps({"op": "cell-op", "data": {"cell_id": "__scratch__", "status": "running"}}))
         self.assertEqual(seen, [("Hbol", "running")])
         state = WorkspaceState(Path(tempfile.gettempdir()))
         sent: list[dict] = []
         state.hub.broadcast = sent.append  # type: ignore[method-assign]
-        state.cells = [{"id": "Hbol", "code": "", "status": "idle"}]
+        state.cells = [{"id": "Hbol", "code": "", "status": "idle", "title": "base"}]
         state.cell_status("Hbol", "queued")
         self.assertEqual(state.cells[0]["status"], "queued")
-        self.assertEqual(sent, [{"type": "cell.status", "id": "Hbol", "status": "queued"}])
+        self.assertEqual(sent, [{"type": "cell.status", "id": "Hbol", "status": "queued", "title": "base"}])
 
 
 @unittest.skipUnless(os.environ.get("SCA_EDITOR_E2E"), "set SCA_EDITOR_E2E=1 to boot a marimo kernel")

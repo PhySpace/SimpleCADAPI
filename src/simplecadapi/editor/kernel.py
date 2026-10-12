@@ -56,6 +56,8 @@ class MarimoKernel:
         self.on_run_complete = on_run_complete
         self.on_cell_status = on_cell_status
         self._interrupted = threading.Event()
+        self.setup_errors: list[str] = []
+        self._ran = threading.Event()  # a run of cells completed (see wait_instantiated)
         self._own_calls = 0
         self._own_ended = 0.0
         self.workspace = self.notebook.parent
@@ -223,11 +225,13 @@ class MarimoKernel:
             # A cell started, finished, was queued...: the live state of its run button.
             payload = data.get("data") or {}
             cell_id, status = payload.get("cell_id"), payload.get("status")
-            if cell_id and isinstance(status, str) and self.on_cell_status is not None:
+            # (the setup cell and the bridge's scratch snippets are not cells of the notebook)
+            if cell_id and cell_id != "setup" and not str(cell_id).startswith("__") and isinstance(status, str) and self.on_cell_status is not None:
                 self.on_cell_status(str(cell_id), status)
             return
         if not isinstance(data, dict) or data.get("op") != "completed-run":
             return
+        self._ran.set()
         # Runs this bridge asked for (scratch snippets, publishing) end in a
         # completed-run too; only the cell runs of someone else count.
         if self._own_calls or time.monotonic() - self._own_ended < 0.5:
@@ -235,8 +239,18 @@ class MarimoKernel:
         if self.on_run_complete is not None:
             self.on_run_complete()
 
+    def wait_instantiated(self, timeout: float = 120.0) -> bool:
+        """Wait until marimo reports the run that :meth:`instantiate` asked for as completed.
+
+        The kernel takes a moment to begin that run, and a probe sent in that
+        moment (see :meth:`wait_idle`) finds it idle: the cells would be read,
+        and the product published, before they ran.
+        """
+        return self._ran.wait(timeout)
+
     def instantiate(self) -> None:
         """Run all notebook cells (what the marimo frontend does on load)."""
+        self._ran.clear()
         self._post("/api/kernel/instantiate", {"objectIds": [], "values": []})
 
     def list_cells(self) -> list[dict]:
@@ -289,15 +303,31 @@ class MarimoKernel:
             "            _v = _html.unescape(_re.sub(r'<[^>]+>', '', _v)).strip()\n"
             "        return _v\n"
             "    return str(_v) if _v is not None else None\n"
+            "def _failures(_c):\n"
+            "    # An error is the cell's output: a list of marimo error objects.\n"
+            "    _d = getattr(getattr(_c, 'output', None), 'data', None)\n"
+            "    _own, _blocked = [], False\n"
+            "    if isinstance(_d, (list, tuple)):\n"
+            "        for _e in _d:\n"
+            "            _kind = str(getattr(_e, 'exception_type', '') or '')\n"
+            "            _msg = str(getattr(_e, 'msg', _e))\n"
+            "            if _kind == 'Ancestor raised':\n"
+            "                _blocked = True\n"
+            "            else:\n"
+            "                _own.append((_kind + ': ' if _kind else '') + _msg)\n"
+            "    return _own, _blocked\n"
             "_ctx = _cm.get_context()\n"
             "_rows = []\n"
             "for _c in _ctx.cells:\n"
             "    _st = getattr(_c, 'status', None)\n"
+            "    _own, _blocked = _failures(_c)\n"
+            "    _failed = bool(_own) or _blocked\n"
             "    _rows.append({\n"
             "        'id': _c.id, 'name': _c.name, 'code': _c.code,\n"
             "        'status': getattr(_st, 'value', None) if _st is not None else None,\n"
-            "        'errors': [str(getattr(_e, 'msg', _e))[:300] for _e in (getattr(_c, 'errors', None) or [])][:4],\n"
-            "        'output': (_text(_c.output) or '')[:400] if getattr(_c, 'output', None) is not None else None,\n"
+            "        'errors': ([str(getattr(_e, 'msg', _e))[:300] for _e in (getattr(_c, 'errors', None) or [])][:4] + [_m[:400] for _m in _own])[:4],\n"
+            "        'blocked': _blocked,\n"
+            "        'output': None if _failed else ((_text(_c.output) or '')[:400] if getattr(_c, 'output', None) is not None else None),\n"
             "        'console': [t for t in ((_text(_o) or '')[-4000:] for _o in (getattr(_c, 'console_outputs', None) or [])[-4:]) if t],\n"
             "    })\n"
             "print(_json.dumps(_rows))\n"
@@ -308,6 +338,14 @@ class MarimoKernel:
                 try:
                     cells = json.loads(line)
                     if isinstance(cells, list):
+                        # What the setup cell raised (a module it imports does not compile)
+                        # blocks every cell: that is the error to show.
+                        self.setup_errors = [
+                            str(message)
+                            for c in cells
+                            if isinstance(c, dict) and c.get("name") == "setup"
+                            for message in c.get("errors") or []
+                        ]
                         return [c for c in cells if isinstance(c, dict) and str(c.get("name", "")) not in hidden]
                 except json.JSONDecodeError:
                     continue
