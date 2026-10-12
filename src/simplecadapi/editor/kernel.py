@@ -109,10 +109,14 @@ class MarimoKernel:
         self._process = subprocess.Popen(
             [
                 sys.executable, "-m", "marimo", "edit", str(self.notebook),
-                "--headless", "--no-token", "--port", str(self.marimo_port),
+                "--headless", "--no-token", "--no-sandbox",
+                "--port", str(self.marimo_port),
             ],
             cwd=str(self.workspace),
             env=env,
+            # A notebook with inline dependencies makes marimo ask whether to
+            # sandbox it; nobody is there to answer.
+            stdin=subprocess.DEVNULL,
             stdout=self._log_file,
             stderr=subprocess.STDOUT,
         )
