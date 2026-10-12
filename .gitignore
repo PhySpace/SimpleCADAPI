@@ -80,3 +80,10 @@ src/simplecadapi/editor/webui/
 .sca-editor/
 # Written by `sca edit` into a workspace to put marimo in lazy mode
 .marimo.toml
+
+# Local tooling and private work, never part of the repo
+sandbox-envs/
+.omp/
+.claude/
+.agents/
+.sharednet/
