@@ -74,6 +74,29 @@ function isHiddenEdge(entity: Entity | undefined): boolean {
   return props?.seam === true || props?.degenerate === true;
 }
 
+/**
+ * Edges and faces are tessellated independently, so where a chord of the
+ * mesh bulges past the edge's own polyline the edge sinks behind the surface
+ * and breaks into dashes.  Slope-scaled polygon offset cannot cover that (the
+ * gap is a distance, not a slope), so the line shader pulls its fragments
+ * towards the camera by EDGE_DEPTH_BIAS (scene units, metres): a little more
+ * than the mesh's chord deviation.  Only depth moves; the line stays where it
+ * is on screen, and anything further behind than the bias still hides it.
+ */
+const EDGE_DEPTH_BIAS = 0.0004;
+
+function createEdgeMaterial(): LineMaterial {
+  const material = new LineMaterial({ color: CAD_EDGE_COLOR, linewidth: CAD_EDGE_LINE_WIDTH, worldUnits: false, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.edgeDepthBias = { value: EDGE_DEPTH_BIAS };
+    shader.vertexShader = shader.vertexShader
+      .replace('void main() {', 'uniform float edgeDepthBias;\nvoid main() {')
+      .replace('gl_Position = clip;', 'float biasedView = -clip.w + edgeDepthBias;\n\t\t\tclip.z = (projectionMatrix[2][2] * biasedView + projectionMatrix[3][2]) / -biasedView * clip.w;\n\t\t\tgl_Position = clip;');
+  };
+  material.customProgramCacheKey = () => 'edge-depth-bias';
+  return material;
+}
+
 export class BRepRenderer {
   readonly host: HTMLElement;
   readonly threeScene: THREE.Scene;
@@ -599,7 +622,7 @@ export class BRepRenderer {
       this.previewGeometries.push(faces, pick, edges, ...(vertices ? [vertices] : []));
       return { faces, pick, edges, vertices, sidecar };
     };
-    const edgeMaterial = new LineMaterial({ color: CAD_EDGE_COLOR, linewidth: CAD_EDGE_LINE_WIDTH, worldUnits: false, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const edgeMaterial = createEdgeMaterial();
     const size = this.resolution();
     edgeMaterial.resolution.set(Math.max(size.width, 1), Math.max(size.height, 1));
     for (const item of preview.nodes) {
@@ -760,7 +783,7 @@ export class BRepRenderer {
     geometry.setPositions(positions);
     // Negative slope-scaled offset mirrors the faces' push (see materialFor):
     // keeps silhouette edges continuous where a flat bias loses.
-    const material = new LineMaterial({ color: CAD_EDGE_COLOR, linewidth: CAD_EDGE_LINE_WIDTH, worldUnits: false, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const material = createEdgeMaterial();
     const size = this.resolution();
     material.resolution.set(Math.max(size.width, 1), Math.max(size.height, 1));
     const visual = new LineSegments2(geometry, material);
