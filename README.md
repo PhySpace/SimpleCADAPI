@@ -205,9 +205,24 @@ Current release: `simplecadapi==2.1.3`.
 
 ## Install
 
+The shortest way: paste this to your coding agent and it does the rest
+(installs the SDK, installs the skill for itself, opens an example in the
+editor and walks you through it):
+
+```text
+Read physpace.dev/sca/landing.md and landing me on this sdk.
+```
+
+By hand:
+
 ```bash
 pip install simplecadapi
 ```
+
+The code-first editor (`sca edit`) needs its extra, `pip install "simplecadapi[editor]"`;
+`uv tool install "simplecadapi[editor]"` or `pipx install "simplecadapi[editor]"` put
+`sca` on your PATH without a virtual environment. `sca example u_link` copies a
+bundled example workspace out to open with `sca edit`.
 
 With `uv`:
 
