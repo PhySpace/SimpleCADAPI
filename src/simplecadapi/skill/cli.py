@@ -15,6 +15,13 @@ def configure(subparsers: argparse._SubParsersAction) -> None:
     )
     commands = skill.add_subparsers(dest="command", required=True)
     commands.add_parser("targets", help="list supported harness targets")
+    where = commands.add_parser(
+        "where", help="print where `install` would put the skill (nothing is written)"
+    )
+    where.add_argument(
+        "--skills-dir", type=Path,
+        help="skills parent directory (default: config/env or ~/.agents/skills)",
+    )
     install = commands.add_parser(
         "install", help="compile the bundled skill into <skills-dir>/<skill name>"
     )
@@ -37,6 +44,9 @@ def _run(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     if args.command == "targets":
         return {"targets": list(project.targets)}, 0
     skills_dir = resolve_paths(skills_dir=args.skills_dir).skills_dir
+    if args.command == "where":
+        destination = skills_dir.expanduser().absolute() / project.name
+        return {"where": str(destination), "exists": destination.exists()}, 0
     report = build_skill(
         project=project,
         target=args.target,
@@ -50,6 +60,8 @@ def _run(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
 def _print(report: dict[str, Any]) -> None:
     if "targets" in report:
         print("\n".join(report["targets"]))
+    elif "where" in report:
+        print(report["where"])
     else:
         print(
             f"installed {report['name']} for {report['target']}: "

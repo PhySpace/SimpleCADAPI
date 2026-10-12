@@ -92,9 +92,17 @@ artifacts = ["src/simplecadapi/editor/webui/**"]
 [tool.hatch.build.targets.wheel.force-include]
 "docs/skill" = "simplecadapi/skill/resources/docs/skill"
 "skillproj.toml" = "simplecadapi/skill/resources/skillproj.toml"
+# The notebooks `sca example u_link` copies out.
+"examples/u_link_motor_mount/u_link.py" = "simplecadapi/example/resources/u_link_motor_mount/u_link.py"
+"examples/u_link_motor_mount/shell.py" = "simplecadapi/example/resources/u_link_motor_mount/shell.py"
+"examples/u_link_motor_mount/u_link_motor_mount.py" = "simplecadapi/example/resources/u_link_motor_mount/u_link_motor_mount.py"
+"examples/u_link_motor_mount/dimensions.py" = "simplecadapi/example/resources/u_link_motor_mount/dimensions.py"
+"examples/u_link_motor_mount/common.py" = "simplecadapi/example/resources/u_link_motor_mount/common.py"
 
 [tool.hatch.build.targets.sdist]
 core-metadata-version = "2.4"
+# The release builds its wheel from this sdist, so the built webui has to be in it.
+artifacts = ["src/simplecadapi/editor/webui/**"]
 include = [
   "/README.md",
   "/LICENSE",
@@ -112,6 +120,15 @@ exclude = [
   "/skills",
   "/examples",
 ]
+
+# The sdist leaves out /examples, but `sca example u_link` builds its wheel
+# from these five notebooks (the wheel is built from the sdist on release).
+[tool.hatch.build.targets.sdist.force-include]
+"examples/u_link_motor_mount/u_link.py" = "examples/u_link_motor_mount/u_link.py"
+"examples/u_link_motor_mount/shell.py" = "examples/u_link_motor_mount/shell.py"
+"examples/u_link_motor_mount/u_link_motor_mount.py" = "examples/u_link_motor_mount/u_link_motor_mount.py"
+"examples/u_link_motor_mount/dimensions.py" = "examples/u_link_motor_mount/dimensions.py"
+"examples/u_link_motor_mount/common.py" = "examples/u_link_motor_mount/common.py"
 
 [dependency-groups]
 dev = [

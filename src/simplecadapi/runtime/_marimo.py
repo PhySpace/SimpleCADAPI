@@ -78,7 +78,7 @@ def load_notebook(path: Path, *, cell_prefix: str) -> App | None:
     marimo compiles each cell under a file name made of its cell id, and
     registers the cell's source in :mod:`linecache` under that name.  Cell
     ids come from a fixed seed, so every notebook has the same ones: two
-    notebooks loaded into one process (a ``use``\ d child, or a headless
+    notebooks loaded into one process (a child run by ``use``, or a headless
     run inside the editor kernel) would show each other's source in
     tracebacks, source positions and restored functions.  A prefix per
     notebook keeps them apart, as marimo's own prefix for nested apps does.

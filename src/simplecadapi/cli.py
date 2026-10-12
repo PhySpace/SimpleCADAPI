@@ -5,11 +5,12 @@ Groups, each owned by its module and registered here at parser level so
 
     sca init                      # machine setup: addon home + shell wiring
     sca addon add|update|remove|list|use
-    sca skill targets|install
+    sca skill targets|where|install
     sca export <package.scadpkg> [--format ...]
     sca run <notebook.py> [--set NAME=VALUE] [--out ...]
     sca ls [DIR]  |  sca params <notebook.py>
     sca edit [WORKSPACE]          # the web editor (needs the 'editor' extra)
+    sca example [NAME] [DIR]      # copy a bundled example workspace out
     sca snapshot [WORKSPACE]      # what the editor user has selected / sees
 
 Shared contract: group handlers return ``(report, exit_code)`` and are
@@ -33,6 +34,7 @@ from .skill.compiler import SkillBuildError
 def build_parser() -> argparse.ArgumentParser:
     from .addon import cli as addon_cli
     from .editor import cli as editor_cli
+    from .example import cli as example_cli
     from .exporter import cli as exporter_cli
     from .runtime import cli as runtime_cli
     from .skill import cli as skill_cli
@@ -48,6 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="group", required=True)
     addon_cli.configure(subparsers)
     editor_cli.configure(subparsers)
+    example_cli.configure(subparsers)
     exporter_cli.configure(subparsers)
     runtime_cli.configure(subparsers)
     skill_cli.configure(subparsers)
