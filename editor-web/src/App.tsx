@@ -9,7 +9,7 @@ import { ModuleView, type ModuleState } from "@/components/ModuleView";
 import { NotebookList } from "@/components/NotebookList";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { fetchPreview, getWorkspace, openNotebook, postViewport, type ModuleRow, type NotebookRow } from "@/lib/api";
+import { fetchPreview, getWorkspace, newNotebook, openNotebook, postViewport, type ModuleRow, type NotebookRow } from "@/lib/api";
 import { parsePreview } from "@/lib/preview";
 import { EnvelopeSocket, type Envelope } from "@/lib/envelope";
 import { useRunLog } from "@/lib/runlog";
@@ -118,12 +118,14 @@ export function App() {
     socket.on("hello", (envelope) => {
       setNotebook((envelope["notebook"] as string) ?? null);
       setCurrentPath((envelope["path"] as string) ?? null);
+      // an empty workspace: the way forward is the workspace tab's "new"
+      if (!envelope["notebook"]) setLeftTab("workspace");
       setKernelAlive(Boolean(envelope["kernel"]));
       // No notebook: nothing to wait for. Else the model is on its way.
       if (hasModel.current) return;
       const stage = envelope["notebook"] ? (envelope["kernel"] ? "building the model" : "starting the kernel") : null;
       setLoading(stage);
-      if (stage) setStatus(`${stage[0].toUpperCase()}${stage.slice(1)}…`);
+      setStatus(stage ? `${stage[0].toUpperCase()}${stage.slice(1)}…` : "No notebook yet: create one in the workspace tab");
       setMarimoUrl((envelope["marimo_url"] as string) ?? null);
       refreshWorkspace();
     });
@@ -312,6 +314,13 @@ export function App() {
     });
   };
 
+  const handleCreate = async (name: string, kind: "part" | "assembly") => {
+    setStatus(`creating ${name}…`);
+    await newNotebook(name, kind);
+    // the server opens it: show its cells
+    setLeftTab("notebook");
+  };
+
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <Header
@@ -356,6 +365,7 @@ export function App() {
                   openModule={moduleView?.path ?? null}
                   onOpen={handleOpen}
                   onOpenModule={(path) => socketRef.current?.send({ type: "module.open", path })}
+                  onCreate={handleCreate}
                 />
               </TabsContent>
               {moduleView && (

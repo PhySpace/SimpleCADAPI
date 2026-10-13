@@ -6,6 +6,23 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+### Added
+
+- Editor: code completion from the SDK itself. `scad.` (and `scad.ql.`, `scad.std.gear.`, `ql.`)
+  lists the real functions with their signatures and docstrings; accepting one, or typing `(`
+  after a known name, writes the call with every required parameter as `name=` and Tab moves
+  between them; inside a call the parameters not given yet complete as `name=` (required first).
+  The names come from the running package (`GET /api/sdk`), so they cannot drift from the code.
+- Editor: a **new** action in the workspace tab starts a notebook from the SDK's template (a part,
+  or an assembly that uses the first two parts of the workspace), with the name checked as you
+  type. An empty workspace opens on that form, so `sca edit` on an empty directory is usable.
+
+### Fixed
+
+- Editor: the cell editors rebuilt their configuration on every render (a new `onChange` and
+  `basicSetup` each time), which dropped any snippet in progress and could disturb typing; both
+  are stable now.
+
 ## 2.2.1 — 2026-10-13
 
 The first stable release of the 2.2 line (2.2.0b1 was a pre-release): everything
@@ -21,11 +38,6 @@ below was added since 2.1.4, the notebook runtime of 2.2.0b1 included.
 
 ### Added
 
-- Editor: code completion from the SDK itself. `scad.` (and `scad.ql.`, `scad.std.gear.`, `ql.`)
-  lists the real functions with their signatures and docstrings; accepting one, or typing `(`
-  after a known name, writes the call with every required parameter as `name=` and Tab moves
-  between them; inside a call the parameters not given yet complete as `name=` (required first).
-  The names come from the running package (`GET /api/sdk`), so they cannot drift from the code.
 - Modeling: `scale`, affine `transform`, signed `offset`, `draft`, tapered and
   until-limited extrusions and multisection sweeps are recorded features, and
   boolean results can keep every output of a set operation; graph nodes keep
