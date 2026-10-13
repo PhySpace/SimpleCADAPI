@@ -6,6 +6,8 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+## 2.2.2 — 2026-10-14
+
 ### Added
 
 - Editor: code completion from the SDK itself. `scad.` (and `scad.ql.`, `scad.std.gear.`, `ql.`)

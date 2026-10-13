@@ -133,10 +133,12 @@ CalculiX 静力 FEM（边界面按保真的 `interface.*` 标签选取，仿真�
 
 ---
 
-## 更新日志（2.2.1）
+## 更新日志（2.2.2）
 
 > 投入生产前请验证生成的定义、装配约束和制造几何。
 
+- **2.2.2。** 编辑器直接从 SDK 补全 `scad.`（调用会把每个必填参数写成 `name=`，Tab 在它们之间跳转），并能在工作区页面创建
+  notebook；见[更新说明](docs/updates/2.2.2.zh-CN.md)。
 - **新编辑器。** `sca edit` 现在是 SDK 的一部分（`pip install
   "simplecadapi[editor]"`）。它用 SDK 自己的 cell 执行器在 marimo 内核里运行工作
   区的 notebook，直接由实体生成实时预览，把你在视口里的点选写成选择代码，并让
@@ -173,7 +175,7 @@ CalculiX 静力 FEM（边界面按保真的 `interface.*` 标签选取，仿真�
 
 SimpleCADAPI 是一个基于 OCP 的 Python CAD SDK，提供清晰的函数式建模操作和可重放的模型图。它在 OpenCascade 几何内核之上提供精简的公共 API，可用于创建实体、应用特征、添加语义标签、查询拓扑、导出制造文件，以及将记录的模型转换为 FreeCAD 工作流。
 
-当前版本：`simplecadapi==2.2.1`。
+当前版本：`simplecadapi==2.2.2`。
 
 ## 核心能力
 
@@ -599,6 +601,7 @@ uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py
 
 ## 文档
 
+- 2.2.2 更新说明：[`docs/updates/2.2.2.zh-CN.md`](docs/updates/2.2.2.zh-CN.md)
 - 2.2.1 更新说明：[`docs/updates/2.2.1.zh-CN.md`](docs/updates/2.2.1.zh-CN.md)
 - 2.1.3b1 更新说明：[`docs/updates/2.1.3b1.zh-CN.md`](docs/updates/2.1.3b1.zh-CN.md)
 - 2.1.2 更新说明：[`docs/updates/2.1.2.zh-CN.md`](docs/updates/2.1.2.zh-CN.md)
