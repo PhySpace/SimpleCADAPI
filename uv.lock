@@ -3286,9 +3286,13 @@ dev = [
     { name = "numpy-stl" },
     { name = "pymupdf" },
     { name = "pytest" },
+    { name = "starlette" },
     { name = "trimesh" },
     { name = "twine" },
     { name = "ty" },
+    { name = "uvicorn" },
+    { name = "websockets", version = "16.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "websockets", version = "17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 
 [package.metadata]
@@ -3332,9 +3336,12 @@ dev = [
     { name = "numpy-stl", specifier = ">=3.2.0" },
     { name = "pymupdf", specifier = ">=1.28.2" },
     { name = "pytest" },
+    { name = "starlette", specifier = ">=1.7.0" },
     { name = "trimesh", specifier = ">=4.11.3" },
     { name = "twine", specifier = ">=6.1.0" },
     { name = "ty", specifier = ">=0.0.18" },
+    { name = "uvicorn", specifier = ">=0.54.0" },
+    { name = "websockets", specifier = ">=16.1.1" },
 ]
 
 [[package]]
