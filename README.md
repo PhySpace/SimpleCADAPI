@@ -154,35 +154,19 @@ the full crank cycle sweeps clean in the same sim ·
 > Validate generated definitions, assembly constraints, and manufacturing
 > geometry before production use.
 
-- **2.2.2.** The editor completes `scad.` from the SDK itself (a call is written with every required
-  parameter as `name=`, Tab moves between them) and creates notebooks from the workspace tab; see the
-  [update notes](docs/updates/2.2.2.md).
-- **New editor.** `sca edit` is part of the SDK now (`pip install
-  "simplecadapi[editor]"`). It runs a workspace's notebooks in a marimo kernel
-  with the SDK's own cell executor, previews the live model straight from the
-  solids, writes your viewport picks as selection code, and lets an agent see
-  what you see (`sca snapshot`). **Re-Studio is removed**: the reverse-
-  engineering studio (the `Re-mode` workspace of the standalone sca-web-editor)
-  is gone, and the standalone sca-web-editor is replaced by `sca edit`. STEP
-  reconstruction continues through the inspection API and the skill's
-  step-reconstruction workflow.
-- **One runtime, one cache.** The editor, `sca run` and
-  `simplecadapi.runtime.run_notebook()` share the per-cell cache, so what one
-  computed the others restore. Notebook parameters come from `# ---- params
-  ----` cells with an optional `# ui:` comment; local modules (shared
-  dimensions) get their own view in the editor.
-- **Landing path.** `docs/landing.md` is the script an agent follows to install
-  the SDK and its skill and open an example; `sca example u_link` copies the
-  bundled workspace and `sca skill where` shows where the skill goes.
-- Earlier: 2.1.3b1 shipped the addon ecosystem (`sca addon ...`, the
-  `sca-addon.toml` descriptor, the `.scadpkg` format spec); see its
-  [update notes](docs/updates/2.1.3b1.md).
+- **Code completion from the SDK.** In the editor, `scad.` (and `scad.ql.`,
+  `scad.std.gear.`) lists the real functions with their signatures and
+  docstrings. Accepting one, or typing `(` after its name, writes the call with
+  every required parameter as `name=`, and Tab moves between them; inside a call
+  the parameters not given yet complete as `name=`.
+- **New notebooks from the workspace tab.** A **new** action starts a part, or
+  an assembly that uses the first two parts, from the SDK's template; an empty
+  workspace opens on that form.
+- **Fix.** The cell editors no longer rebuild their configuration on every
+  render, which dropped a snippet in progress.
 
-Every example model is a notebook; its export scripts load the product with
-`run_notebook`, capture one `.scadpkg`, and translate AP242 `.step` and
-editable `.FCStd` from that same package. The AP242/Gmsh example under
-`examples/ap242_gmsh_volume_mesh/` exposes each export and FEM stage as a
-separate directly runnable script.
+Full notes for this version: [`docs/updates/2.2.2.md`](docs/updates/2.2.2.md).
+Earlier versions: the [changelog](CHANGELOG.md) and [`docs/updates/`](docs/updates/).
 
 ---
 
