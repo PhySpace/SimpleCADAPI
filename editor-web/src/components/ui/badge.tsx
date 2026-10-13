@@ -8,14 +8,14 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "border-white bg-white text-black",
+        default: "border-primary bg-primary text-primary-foreground",
         secondary: "border-input text-muted-foreground",
         outline: "border-input text-foreground",
         focus: "border-focus text-focus",
         pass: "border-pass text-pass",
         fail: "border-fail text-fail",
         name: "border-name text-name",
-        destructive: "border-fail bg-fail text-black",
+        destructive: "border-fail bg-fail text-primary-foreground",
       },
     },
     defaultVariants: { variant: "default" },

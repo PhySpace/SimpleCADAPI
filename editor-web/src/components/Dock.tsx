@@ -61,7 +61,7 @@ export function Dock({
   const percent = batch && batch.total > 0 ? Math.round((batch.done / batch.total) * 100) : 0;
 
   return (
-    <section className="shrink-0 border-t-2 border-border bg-black" aria-label="log">
+    <section className="shrink-0 border-t-2 border-border bg-background" aria-label="log">
       {open && (
         <div ref={list} className="h-44 overflow-y-auto border-b-2 border-border px-3 py-1.5 text-[11px] leading-5">
           {entries.length === 0 ? (

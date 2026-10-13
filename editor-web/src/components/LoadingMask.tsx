@@ -18,7 +18,7 @@ const WAVE_SPEED = 0.0009;
  * dot-matrix with a ripple that spreads from the middle, and a small retro
  * window saying what is going on and for how long.  It appears only after
  * `DELAY_MS`, so quick operations do not flash it. */
-export function LoadingMask({ active, message }: { active: boolean; message: string }) {
+export function LoadingMask({ active, message, theme }: { active: boolean; message: string; theme: string }) {
   const DELAY_MS = 250;
   const [visible, setVisible] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -45,11 +45,11 @@ export function LoadingMask({ active, message }: { active: boolean; message: str
     <div
       role="status"
       aria-live="polite"
-      className="absolute inset-0 z-50 flex cursor-progress items-center justify-center bg-[#1b1b1b]/75"
+      className="absolute inset-0 z-50 flex cursor-progress items-center justify-center bg-overlay"
     >
-      <Ripple />
-      <div className="relative w-[280px] border-2 border-white/80 bg-black shadow-[6px_6px_0_0_rgba(255,255,255,0.1)]">
-        <div className="flex h-6 items-center justify-between bg-white/85 px-2 text-[11px] font-bold uppercase tracking-[0.18em] text-black">
+      <Ripple theme={theme} />
+      <div className="relative w-[280px] border-2 border-foreground/80 bg-background shadow-[6px_6px_0_0_var(--shadow-hard)]">
+        <div className="flex h-6 items-center justify-between bg-foreground/85 px-2 text-[11px] font-bold uppercase tracking-[0.18em] text-background">
           <span>loading</span>
           <span className="tabular-nums">
             {minutes}:{seconds}
@@ -58,7 +58,7 @@ export function LoadingMask({ active, message }: { active: boolean; message: str
         <div className="flex items-center gap-4 px-4 py-4">
           <Spinner />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[12px] uppercase tracking-[0.1em] text-white" title={message}>
+            <p className="truncate text-[12px] uppercase tracking-[0.1em] text-foreground" title={message}>
               {message}
             </p>
             <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -81,7 +81,7 @@ function Spinner() {
         return (
           <span
             key={cell}
-            className={cn("block bg-white", order < 0 && "invisible", order >= 0 && "sca-chase")}
+            className={cn("block bg-foreground", order < 0 && "invisible", order >= 0 && "sca-chase")}
             style={order >= 0 ? { animationDelay: `${order * 0.1}s` } : undefined}
           />
         );
@@ -93,18 +93,32 @@ function Spinner() {
 /** A strip of blocks filling and emptying: the load has no known length. */
 function Progress() {
   return (
-    <div className="flex gap-[3px] border-t-2 border-white px-2 py-1.5" aria-hidden>
+    <div className="flex gap-[3px] border-t-2 border-foreground px-2 py-1.5" aria-hidden>
       {Array.from({ length: 20 }, (_, index) => (
-        <span key={index} className="sca-bar block h-[6px] flex-1 bg-white" style={{ animationDelay: `${index * 0.07}s` }} />
+        <span key={index} className="sca-bar block h-[6px] flex-1 bg-foreground" style={{ animationDelay: `${index * 0.07}s` }} />
       ))}
     </div>
   );
 }
 
+/** A CSS color variable of the page (a #rrggbb token) as "r,g,b", for drawing on a canvas. */
+function cssRgb(name: string, fallback: string): string {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const match = /^#([0-9a-f]{6})$/i.exec(value);
+  if (!match) return fallback;
+  const n = parseInt(match[1], 16);
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}
+
 /** The dot-matrix: square dots whose brightness follows a ring-shaped wave
  * travelling out from the middle, quantised to four levels. */
-function Ripple() {
+function Ripple({ theme }: { theme: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // The dots take the theme's ink: the crest is the focus color, the rest the foreground.
+  const inks = useRef({ crest: "255,154,46", base: "255,255,255" });
+  useEffect(() => {
+    inks.current = { crest: cssRgb("--focus", "255,154,46"), base: cssRgb("--foreground", "255,255,255") };
+  }, [theme]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -142,7 +156,7 @@ function Ripple() {
         }
       }
       paths.forEach((path, level) => {
-        context.fillStyle = level === LEVELS.length - 1 ? `rgba(255,154,46,${LEVELS[level]})` : `rgba(255,255,255,${LEVELS[level]})`;
+        context.fillStyle = `rgba(${level === LEVELS.length - 1 ? inks.current.crest : inks.current.base},${LEVELS[level]})`;
         context.fill(path);
       });
     };

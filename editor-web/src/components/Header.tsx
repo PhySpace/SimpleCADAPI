@@ -1,4 +1,6 @@
-import { ExternalLink, Play, Square } from "lucide-react";
+import { ExternalLink, Monitor, Moon, Play, Square, Sun } from "lucide-react";
+
+import type { ThemePreference } from "@/lib/theme";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +16,8 @@ export function Header({
   running,
   onStop,
   marimoUrl,
+  themePreference,
+  onTheme,
 }: {
   notebook: string | null;
   kind: string | null;
@@ -24,10 +28,12 @@ export function Header({
   running: boolean;
   onStop: () => void;
   marimoUrl: string | null;
+  themePreference: ThemePreference;
+  onTheme: () => void;
 }) {
   const failing = status.startsWith("error");
   return (
-    <header className="flex h-11 shrink-0 items-center gap-3 border-b-2 border-border bg-black px-3">
+    <header className="flex h-11 shrink-0 items-center gap-3 border-b-2 border-border bg-background px-3">
       <span className="text-[13px] font-bold uppercase tracking-[0.14em]">SimpleCAD</span>
       <span className="h-5 w-[2px] bg-border" />
       {notebook ? (
@@ -64,6 +70,18 @@ export function Header({
           </a>
         </Button>
       )}
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={onTheme}
+        title={`Theme: ${themePreference} (click: ${NEXT_THEME[themePreference]})`}
+        aria-label={`Theme: ${themePreference}. Switch to ${NEXT_THEME[themePreference]}`}
+      >
+        {themePreference === "system" ? <Monitor /> : themePreference === "light" ? <Sun /> : <Moon />}
+        {themePreference}
+      </Button>
     </header>
   );
 }
+
+const NEXT_THEME: Record<ThemePreference, ThemePreference> = { system: "light", light: "dark", dark: "system" };
