@@ -21,6 +21,9 @@ below was added since 2.1.4, the notebook runtime of 2.2.0b1 included.
 
 ### Added
 
+- Editor: a **new** action in the workspace tab starts a notebook from the SDK's template (a part,
+  or an assembly that uses the first two parts of the workspace), with the name checked as you
+  type. An empty workspace opens on that form, so `sca edit` on an empty directory is usable.
 - Modeling: `scale`, affine `transform`, signed `offset`, `draft`, tapered and
   until-limited extrusions and multisection sweeps are recorded features, and
   boolean results can keep every output of a set operation; graph nodes keep
