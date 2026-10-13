@@ -134,6 +134,7 @@ exclude = [
 dev = [
     "twine>=6.1.0",
     "pytest",
+    "pymupdf>=1.28.2",
     "jupyterlab>=4.5.5",
     "ipykernel>=6.29.5",
     "matplotlib>=3.10.8",
