@@ -823,3 +823,61 @@ class InterruptEndToEndTest(unittest.TestCase):
                 if kernel is not None:
                     kernel.stop()
                 server.should_exit = True
+
+
+class ApiIndexTest(unittest.TestCase):
+    """The SDK's API as data, for the cell editor's completion."""
+
+    def setUp(self) -> None:
+        from simplecadapi.editor.apiindex import build_index
+
+        self.index = build_index()
+        self.scad = {entry["n"]: entry for entry in self.index["namespaces"]["scad"]}
+
+    def test_it_is_plain_json_and_small(self) -> None:
+        text = json.dumps(self.index, separators=(",", ":"))
+        self.assertLess(len(text), 400_000)
+
+    def test_a_function_lists_its_parameters_and_which_are_required(self) -> None:
+        box = self.scad["make_box_rsolid"]
+        self.assertEqual(box["k"], "f")
+        required = [p["n"] for p in box["p"] if p["r"]]
+        self.assertEqual(required, ["width", "height", "depth"])
+        optional = {p["n"]: p for p in box["p"] if not p["r"]}
+        self.assertIn("bottom_face_center", optional)
+        self.assertEqual(optional["bottom_face_center"]["d"], "(0, 0, 0)")
+        self.assertTrue(box["d"])  # the first line of its docstring
+
+    def test_star_args_are_marked_and_not_required(self) -> None:
+        cut = self.scad["cut_rsolid"]
+        solids = next(p for p in cut["p"] if p["n"] == "solids")
+        self.assertEqual((solids["k"], solids["r"]), ("a", False))
+
+    def test_classes_list_their_constructor_without_private_fields(self) -> None:
+        part = self.scad["Part"]
+        self.assertEqual(part["k"], "c")
+        names = [p["n"] for p in part["p"]]
+        self.assertEqual([p["n"] for p in part["p"] if p["r"]], ["part_id", "body"])
+        self.assertFalse([n for n in names if n.startswith("_")])
+
+    def test_namespaces_and_submodules(self) -> None:
+        namespaces = self.index["namespaces"]
+        self.assertIn("faces", {e["n"] for e in namespaces["scad.ql"]})
+        self.assertIn("make_spur_gear_rsolid", {e["n"] for e in namespaces["scad.std.gear"]})
+        self.assertEqual(self.index["submodules"]["scad"], ["ql", "std"])
+        self.assertIn("gear", self.index["submodules"]["scad.std"])
+        # nothing private, and the errors ql re-exports are not ql functions
+        for entries in namespaces.values():
+            self.assertFalse([e["n"] for e in entries if e["n"].startswith("_")])
+        self.assertNotIn("SimpleCADError", {e["n"] for e in namespaces["scad.ql"]})
+
+    def test_the_server_serves_it(self) -> None:
+        from starlette.testclient import TestClient
+
+        from simplecadapi.editor.server import create_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            app = create_app(WorkspaceState(Path(tmp)))
+            response = TestClient(app).get("/api/sdk")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("scad", response.json()["namespaces"])

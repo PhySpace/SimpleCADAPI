@@ -1365,6 +1365,12 @@ def create_app(state: WorkspaceState) -> Starlette:
             )
         return JSONResponse({"error": "no package made yet"}, status_code=404)
 
+    async def sdk_index(request: Request) -> JSONResponse:
+        """The SDK's public API (names and parameters), for the cell editor's completion."""
+        from .apiindex import build_index
+
+        return JSONResponse(build_index(), headers={"Cache-Control": "max-age=3600"})
+
     async def workspace_list(request: Request) -> JSONResponse:
         """The SimpleCAD notebooks of the workspace."""
         current = state.notebook.relative_to(state.workspace).as_posix() if state.notebook else None
@@ -1484,6 +1490,7 @@ def create_app(state: WorkspaceState) -> Starlette:
         Route("/api/preview/latest", latest_preview, methods=["GET"]),
         Route("/api/runtime/package", push_package, methods=["POST"]),
         Route("/api/package/latest", latest_package, methods=["GET"]),
+        Route("/api/sdk", sdk_index, methods=["GET"]),
         Route("/api/workspace", workspace_list, methods=["GET"]),
         Route("/api/workspace/open", workspace_open, methods=["POST"]),
         Route("/api/workspace/new", workspace_new, methods=["POST"]),
