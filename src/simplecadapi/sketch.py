@@ -519,8 +519,10 @@ class Sketch(TaggedMixin, TopoMixein):
         """Add a B-spline whose poles participate in sketch solving.
 
         Control points may be literal 2-D coordinates or refs to points in
-        this sketch. The first and last poles always share the declared
-        start/end point entities.
+        this sketch. For nonperiodic curves the first and last poles share
+        the declared start/end point entities. A closed curve may use one
+        seam point for both endpoints; a periodic seam does not replace its
+        control poles, which generally lie away from the seam.
         """
         from .operators.geometry import (
             _normalize_bspline_knots,
@@ -529,8 +531,6 @@ class Sketch(TaggedMixin, TopoMixein):
 
         start_id = self.resolve_point_id(start)
         end_id = self.resolve_point_id(end)
-        if start_id == end_id:
-            raise ValueError("A sketch bspline requires two distinct endpoint refs")
         if isinstance(degree, bool) or int(degree) != degree:
             raise ValueError("degree must be an integer")
         degree_value = int(degree)
@@ -591,18 +591,19 @@ class Sketch(TaggedMixin, TopoMixein):
         end_entity = self.entities[end_id]
         start_point = [_as_float(start_entity.data["x"]), _as_float(start_entity.data["y"])]
         end_point = [_as_float(end_entity.data["x"]), _as_float(end_entity.data["y"])]
-        if isinstance(normalized_cps[0], Mapping):
+        if not periodic and isinstance(normalized_cps[0], Mapping):
             if normalized_cps[0]["point_id"] != start_id:
                 raise ValueError("The first B-spline control-point ref must match start")
-        else:
+        elif not periodic:
             normalized_cps[0] = start_point
-        if isinstance(normalized_cps[-1], Mapping):
+        if not periodic and isinstance(normalized_cps[-1], Mapping):
             if normalized_cps[-1]["point_id"] != end_id:
                 raise ValueError("The last B-spline control-point ref must match end")
-        else:
+        elif not periodic:
             normalized_cps[-1] = end_point
-        resolved_cps[0] = start_point
-        resolved_cps[-1] = end_point
+        if not periodic:
+            resolved_cps[0] = start_point
+            resolved_cps[-1] = end_point
         self._add_entity(
             SketchEntity(
                 entity_id,

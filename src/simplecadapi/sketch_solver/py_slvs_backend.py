@@ -234,9 +234,9 @@ class _PySlvsSystem:
                 if isinstance(point, Mapping)
                 else None
             )
-            if point_id is None and index == 0:
+            if point_id is None and index == 0 and not data.get("periodic", False):
                 point_id = str(data["start"])
-            elif point_id is None and index == len(raw_points) - 1:
+            elif point_id is None and index == len(raw_points) - 1 and not data.get("periodic", False):
                 point_id = str(data["end"])
             if point_id is not None:
                 endpoint = self.point_handles[str(point_id)]

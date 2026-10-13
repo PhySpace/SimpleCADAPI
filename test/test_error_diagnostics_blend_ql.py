@@ -132,8 +132,7 @@ def test_fillet_bore_mouth_boundary_room():
 
 def test_fillet_silent_garbage_output_caught_at_exit():
     # Mechanism E: r=5 on all 12 edges of a 10-cube fails loudly, but r=6
-    # makes the kernel *succeed* and hand back a solid with volume 1036.35
-    # — more material than the 1000 it started with. Geometrically
+    # makes the kernel *succeed* and hand back a degenerate solid. Geometrically
     # impossible; the exit check must name it instead of returning it.
     box = _box()
     edges = _box_edges(box)
@@ -141,17 +140,23 @@ def test_fillet_silent_garbage_output_caught_at_exit():
         scad.fillet_rsolid(box, edges, 6)
 
     payload = _payload(ctx.value)
+    what = payload["what_happened"]
     # The volume violation leads what_happened so the agent can tell
-    # "kernel silently lied" apart from "kernel refused" (r=5 path). The
-    # garbage volume itself is platform-dependent OCC behavior (macOS
-    # reports ~1036, Linux ~1039) — the contract is only that the kernel
-    # handed back MORE material than the 1000 it was given.
-    garbage = re.search(r"result volume ([0-9.]+)", payload["what_happened"])
-    assert garbage, payload["what_happened"]
-    assert float(garbage.group(1)) > 1000
-    assert "exceeds the input volume 1000" in payload["what_happened"]
+    # "kernel silently lied" apart from "kernel refused" (r=5 path). How the
+    # garbage solid measures depends on the volume integrator: the fixed-order
+    # one reported phantom extra material (~1036 on macOS, ~1039 on Linux, more
+    # than the 1000 it was given); the knot-span (Gauss-Kronrod) one sees an
+    # empty solid (volume 0). Either way the exit check must name it.
+    garbage = re.search(r"result volume (?:is )?([0-9.]+)", what)
+    assert garbage, what
+    volume = float(garbage.group(1))
+    if volume > 1000:
+        assert "exceeds the input volume 1000" in what
+    else:
+        assert volume == 0.0
+        assert "empty/degenerate solid" in what
     # Probe explanation follows as the suspected root cause.
-    assert "probes indicate" in payload["what_happened"]
+    assert "probes indicate" in what
     assert "BlendVolumeViolation" in (payload["technical_details"] or "")
 
 

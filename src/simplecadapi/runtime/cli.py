@@ -7,6 +7,8 @@
     sca run link_bar.py --id crank            # run one member of a part family
     sca run bracket.py --out bracket.scadpkg  # also write the product package
     sca run bracket.py --no-cache             # ignore the cell cache
+    sca ls [DIR]                              # the notebooks under DIR
+    sca params bracket.py                     # features and parameters
 
 The report is one JSON object on stdout.
 """
@@ -21,6 +23,7 @@ from typing import Any, Sequence
 
 from ..product.packages import build_product_package, encode_product_package
 from .runner import run_notebook
+from .workspace import describe_notebook, scan_modules, scan_workspace
 
 
 def configure(subparsers: argparse._SubParsersAction) -> None:
@@ -50,6 +53,23 @@ def configure(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--no-cache", action="store_true", help="run every cell")
     parser.add_argument("--out", type=Path, help="write the product package here")
     parser.set_defaults(handler=_execute, printer=_print_report)
+
+    listing = subparsers.add_parser(
+        "ls",
+        help="list the SimpleCAD notebooks under a directory",
+        description="List the notebooks under DIR whose script header has "
+        "[tool.simplecadapi]: id, kind, the notebooks each uses, and the local "
+        "modules (shared dimensions, helpers) their cells import.",
+    )
+    listing.add_argument("directory", type=Path, nargs="?", default=Path.cwd())
+    listing.set_defaults(handler=_list, printer=_print_report)
+
+    describe = subparsers.add_parser(
+        "params",
+        help="list a notebook's features and parameters (without running it)",
+    )
+    describe.add_argument("notebook", type=Path, help="marimo notebook (.py)")
+    describe.set_defaults(handler=_describe, printer=_print_report)
 
 
 def parse_overrides(items: Sequence[str]) -> dict[str, Any]:
@@ -95,6 +115,25 @@ def _execute(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         args.out.write_bytes(payload)
         report["package"] = str(args.out)
     return report, 0
+
+
+def _list(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    root = args.directory.expanduser().resolve()
+    if not root.is_dir():
+        raise ValueError(f"{args.directory}: not a directory")
+    entries = scan_workspace(root)
+    return {
+        "root": str(root),
+        "notebooks": [entry.to_dict() for entry in entries],
+        "modules": [module.to_dict() for module in scan_modules(root, entries)],
+    }, 0
+
+
+def _describe(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    path = args.notebook.expanduser().resolve()
+    if not path.is_file():
+        raise ValueError(f"{args.notebook}: no such file")
+    return {"notebook": str(path), **describe_notebook(path)}, 0
 
 
 def _print_report(report: dict[str, Any]) -> None:

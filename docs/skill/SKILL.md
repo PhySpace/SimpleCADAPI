@@ -4,9 +4,9 @@ description: Build, assemble, inspect, reconstruct, and export parametric CAD mo
 license: Apache-2.0
 metadata:
   project: simplecadapi
-  version: 2.1.3
+  version: 2.2.1
   package-name: simplecadapi
-  package-version: 2.1.3
+  package-version: 2.2.1
 ---
 
 # SimpleCAD SDK Skill
@@ -44,6 +44,13 @@ Paths are relative to this file's directory.
 - Questions about an existing STEP file that change nothing enter no
   workflow; you MUST use `references/domains/step-inspection.md` for them
   directly.
+- A person who has the code-first editor open (`sca edit`) and talks
+  about what they selected, a cell they copied, or a value they
+  tuned enters no new workflow: the modeling follows the workflow you
+  selected, and you MUST read
+  `references/domains/editor-collaboration.md` first to see what they
+  see (selection cell, `sca snapshot`, cell references) and how to
+  hand the work back.
 - Creating, installing, updating, or removing a SimpleCADAPI addon (a
   third-party skill+tooling package around `.scadpkg`) enters no
   workflow; you MUST use `references/domains/addon-development.md`
@@ -134,7 +141,8 @@ it and stop that route; never invent an alternative route.
     `scad.std.bearing`.
 11. Read `references/docs/guides/notebook-runtime.md` in full
     before writing a notebook, composing notebooks, or reasoning
-    about the cell cache. Run models with `sca run`; never enable
+    about the cell cache. Run models with `sca run` (`sca edit` opens
+    them in the editor for a person); never enable
     marimo's `[tool.marimo.runtime] cache_cells` in the editor, and
     never commit the generated `__marimo__/` directory.
 
@@ -193,6 +201,8 @@ print(len(rebuilt))
 - `references/SDK_OVERVIEW.md` — package-level map
 - `references/inspect/brep-reverse-engineering.md`
 - `references/domains/addon-development.md` — `sca` addon CLI and authoring guide
+- `references/domains/editor-collaboration.md` — working with a person in `sca edit`:
+  selection cell, snapshot, cell references, parameters
 - `references/docs/guides/reconstruction-agent-test-prompt.md`
 - `references/docs/guides/reconstruction-agent-strategy.md`
 - `references/docs/guides/notebook-runtime.md`

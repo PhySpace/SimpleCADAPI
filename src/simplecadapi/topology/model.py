@@ -648,6 +648,8 @@ def _node_display_category(op: str) -> str:
         "mirror",
         "make_translate_rshape",
         "make_rotate_rshape",
+        "make_scale_rsolid",
+        "make_transform_rsolid",
         "make_mirror_rshape",
     }:
         return "transform"
@@ -664,6 +666,9 @@ def _node_display_category(op: str) -> str:
         "make_loft_rsolid",
         "make_sweep_rsolid",
         "make_twisted_sweep_rsolid",
+        "make_extrude_taper_rsolid",
+        "make_extrude_until_rsolid",
+        "make_sweep_multisection_rsolid",
     }:
         return "feature"
     if op in {
@@ -673,6 +678,8 @@ def _node_display_category(op: str) -> str:
         "make_fillet_rsolid",
         "make_chamfer_rsolid",
         "make_shell_rsolid",
+        "make_offset_rsolid",
+        "make_draft_rsolid",
     }:
         return "detail"
     if op.startswith("make_"):

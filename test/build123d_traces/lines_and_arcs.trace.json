@@ -1,0 +1,178 @@
+{
+  "schema_version": "1.0",
+  "steps": [
+    {
+      "id": "s1",
+      "op": "extrude",
+      "inputs": [],
+      "parameters": {
+        "direction": [
+          0.0,
+          0.0,
+          10.0
+        ]
+      },
+      "source": "Solid.extrude",
+      "result": {
+        "volume": 69504.67164903213,
+        "volume_gk": 69504.67164903213,
+        "default_volume": 69504.6716490322,
+        "bbox": [
+          0.0,
+          0.0,
+          0.0,
+          80.0,
+          95.31128874149275,
+          10.0
+        ],
+        "solid_count": 1
+      },
+      "profile": {
+        "kind": "face",
+        "origin": [
+          40.0,
+          43.87364956936529,
+          0.0
+        ],
+        "x_dir": [
+          1.0,
+          0.0,
+          -0.0
+        ],
+        "y_dir": [
+          -0.0,
+          1.0,
+          0.0
+        ],
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "wires": [
+          {
+            "edges": [
+              {
+                "kind": "line",
+                "start": [
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "end": [
+                  80.0,
+                  0.0,
+                  0.0
+                ],
+                "parameter_range": [
+                  0.0,
+                  80.0
+                ],
+                "reversed": false
+              },
+              {
+                "kind": "line",
+                "start": [
+                  80.0,
+                  0.0,
+                  0.0
+                ],
+                "end": [
+                  80.0,
+                  60.0,
+                  0.0
+                ],
+                "parameter_range": [
+                  0.0,
+                  60.0
+                ],
+                "reversed": false
+              },
+              {
+                "kind": "arc",
+                "mid": [
+                  40.00000000000001,
+                  95.31128874149275,
+                  0.0
+                ],
+                "start": [
+                  80.0,
+                  60.0,
+                  0.0
+                ],
+                "end": [
+                  0.0,
+                  60.00000000000001,
+                  0.0
+                ],
+                "parameter_range": [
+                  0.0,
+                  2.89288266449627
+                ],
+                "reversed": false,
+                "center": [
+                  40.0,
+                  55.0,
+                  0.0
+                ],
+                "radius": 40.311288741492746,
+                "normal": [
+                  0.0,
+                  0.0,
+                  1.0
+                ],
+                "x_dir": [
+                  0.9922778767136677,
+                  0.12403473458920847,
+                  -0.0
+                ]
+              },
+              {
+                "kind": "line",
+                "start": [
+                  0.0,
+                  60.0,
+                  0.0
+                ],
+                "end": [
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "parameter_range": [
+                  0.0,
+                  60.0
+                ],
+                "reversed": false
+              }
+            ],
+            "closed": true
+          }
+        ]
+      }
+    }
+  ],
+  "result_refs": [
+    "s1"
+  ],
+  "b3d_volume": 69504.67164903213,
+  "b3d_volume_gk": 69504.67164903213,
+  "b3d_default_volume": 69504.6716490322,
+  "b3d_bbox": [
+    0.0,
+    0.0,
+    0.0,
+    80.0,
+    95.31128874149275,
+    10.0
+  ],
+  "solid_count": 1,
+  "b3d_status": "ok",
+  "unsupported": [],
+  "fixture_provenance": {
+    "source_stem": "04_lines_and_arcs_profile",
+    "build123d_version": "0.13.0",
+    "source_kernel": "8.0.1.1",
+    "reference_volume_method": "Gauss-Kronrod, eps=1e-9, use_span=True"
+  }
+}

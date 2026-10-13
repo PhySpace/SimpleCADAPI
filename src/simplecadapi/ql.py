@@ -148,6 +148,15 @@ def _lookup_property(obj: Any, path: str) -> Any:
         gtype = _geom_type(obj)
         return gtype if gtype is not None else MISSING
 
+    if path.startswith("geom.bbox.") and hasattr(obj, "wrapped"):
+        from .kernel.ocp_properties import bounding_box
+        field = path.removeprefix("geom.bbox.")
+        names = {f"{side}.{axis}": axis + bound
+                 for side, bound in (("min", "min"), ("max", "max")) for axis in "xyz"}
+        if field in names:
+            return float(getattr(bounding_box(obj.wrapped), names[field]))
+        return MISSING
+
     if path == "geom.family":
         cls_name = obj.__class__.__name__.lower()
         if cls_name == "edge":
@@ -1307,12 +1316,11 @@ def _boundary_items(scope: Any, target_kind: str) -> List[Any]:
                 for child in scope.get_children()
                 if child.__class__.__name__ == "Vertex"
             ]
-        if target_kind == "vertex" and hasattr(scope, "get_edges"):
-            vertices = []
-            for edge in _boundary_items(scope, "edge"):
-                vertices.extend(_boundary_items(edge, "vertex"))
-            return _dedupe_items(vertices)
-        return []
+        # Any scope with edges to walk: a wire, a face, a solid.
+        vertices = []
+        for edge in _boundary_items(scope, "edge"):
+            vertices.extend(_boundary_items(edge, "vertex"))
+        return _dedupe_items(vertices)
 
     if target_kind == "solid":
         if cls_name == "Compound" and hasattr(scope, "get_solids"):
@@ -1712,11 +1720,17 @@ def _resolve_scope_items(scope: Any, target_kind: str) -> List[Any]:
             ]
     if target_kind == "vertex":
         if hasattr(scope, "get_children"):
-            return [
+            vertices = [
                 child
                 for child in scope.get_children()
                 if child.__class__.__name__ == "Vertex"
             ]
+            if vertices:
+                return vertices
+        # A wire, face or solid has vertices only through its edges.
+        vertices = _boundary_items(scope, "vertex")
+        if vertices:
+            return vertices
     if isinstance(scope, Iterable) and not isinstance(scope, (str, bytes, dict)):
         return list(scope)
     raise TypeError(f"cannot resolve QL selector scope for target_kind={target_kind}")

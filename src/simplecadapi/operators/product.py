@@ -131,9 +131,10 @@ def make_part_rpart(
     try:
         part = Part(part_id, body, name=name)
         _reserve_semantic_id("part", part.part_id)
+        _ensure_geo_selection_input_nodes([body])
         record_operation_if_active(
             _OP_MAKE_PART_RPART,
-            _part_params(part),
+            {**_part_params(part), "input_refs": _serialize_shape_refs([body])},
             outputs=part,
             input_shapes=[body],
             semantic_delta=_semantic_created("Part", part.part_id, part.to_dict()),

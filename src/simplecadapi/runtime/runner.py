@@ -6,9 +6,9 @@ in three ways:
 
 * cells run through :class:`~.executor.SimpleCadExecutor`, so each records
   into a session of its own;
-* cells are cached with marimo's cell cache, under the dependency digest
-  *D* (:mod:`.deps`) so that a changed local module, child notebook or
-  input file invalidates the cache;
+* cells are cached with marimo's cell cache, each under a digest of the
+  local modules, child notebooks and input files *it* depends on
+  (:mod:`.cache`), so a changed file recomputes only the cells that read it;
 * after the last cell the product is projected onto its definition
   (:mod:`.projection`).
 
@@ -23,7 +23,6 @@ a part family: one notebook, one definition per id.
 from __future__ import annotations
 
 import hashlib
-import shutil
 import sys
 from collections.abc import Callable, Iterator, Mapping
 from concurrent.futures import ThreadPoolExecutor
@@ -38,15 +37,11 @@ from ..build.definition import Definition
 from ..recording.graph import isolated_recording
 from ._marimo import (
     AppScriptRunner,
-    CachedLifecycle,
     CellId_t,
     CellImpl,
     Evaluator,
     ExecutionLifecycle,
-    FileStore,
     InternalApp,
-    LazyLoader,
-    LazyStore,
     MarimoRescheduleError,
     MarimoRuntimeException,
     MutableGlobals,
@@ -57,16 +52,15 @@ from ._marimo import (
     runtime_context_installed,
     safe_get_context,
 )
+from .cache import CellCache, CellDigests, cache_root, prune
 from .cells import NotebookCells
 from .config import NotebookConfig, NotebookConfigError, read_notebook_config
 from .deps import (
-    dependency_digest,
     local_modules,
     read_dependencies,
     record_dependencies,
     recording_dependencies,
     refresh_local_modules,
-    state_dir,
     write_dependencies,
 )
 from .executor import NotebookScope, SimpleCadExecutor
@@ -77,11 +71,6 @@ _T = TypeVar("_T")
 CellStatus = Literal["ran", "cached", "skipped"]
 """``ran``: executed; ``cached``: restored from the cell cache; ``skipped``:
 not run, because overrides replace its variables or the cell is disabled."""
-
-_CELLS = "cells"
-"""The cell cache's loader name, fixed so a cache directory can be renamed:
-its entries reference their values by paths starting with this name."""
-
 
 @dataclass(frozen=True)
 class CellReport:
@@ -204,10 +193,13 @@ def _run(config: NotebookConfig, overrides: dict[str, Any], *, cache: bool) -> N
     modules = local_modules(config, (cell.code for cell in ordered))
     module_files = frozenset(modules.values())
     previous = read_dependencies(config)
-    digest = dependency_digest(config, module_files | previous)
-    cache_root = _cache_root(config)
+    setup_cell = internal.graph.cells.get(internal.cell_manager.setup_cell_id)
+    digests = CellDigests(config, ordered, setup_cell)
+    root = cache_root(config)
     progress = _Progress()
-    cell_cache = _CellCache(internal, cache_root / digest) if cache else None
+    cell_cache = (
+        CellCache(internal.graph, root, lambda cell: digests.digest(cell.cell_id)) if cache else None
+    )
 
     refresh_local_modules(modules)
     with isolated_recording(), _importable(config.directory), recording_dependencies() as used:
@@ -247,8 +239,18 @@ def _run(config: NotebookConfig, overrides: dict[str, Any], *, cache: bool) -> N
     recorded = frozenset(used) | (previous if restored else frozenset())
     write_dependencies(config, recorded)
     dependencies = module_files | recorded
-    if cache:
-        _keep_cache(cache_root, digest, dependency_digest(config, dependencies))
+    if cache and cell_cache is not None:
+        # A cell that runs a child notebook depends on the record just written:
+        # its entries move to the digest of what it now depends on.
+        after = CellDigests(config, ordered, setup_cell)
+        used_digests = set(cell_cache.used)
+        for cell in ordered:
+            old, new = digests.digest(cell.cell_id), after.digest(cell.cell_id)
+            if old is not None and new is not None and old != new and old in used_digests:
+                cell_cache.move(old, new)
+                used_digests.discard(old)
+                used_digests.add(new)
+        prune(root, used_digests)
 
     reports = tuple(
         CellReport(
@@ -276,7 +278,7 @@ def _execute(
     scope: NotebookScope,
     overrides: dict[str, Any],
     progress: _Progress,
-    cell_cache: _CellCache | None = None,
+    cell_cache: CellCache | None = None,
 ) -> MutableGlobals:
     glbls = {**_run_setup(internal, scope, progress), **overrides}
     runner = AppScriptRunner(internal, str(scope.config.path), glbls)
@@ -371,30 +373,6 @@ class _Progress:
         return None
 
 
-class _CellCache(CachedLifecycle):
-    """marimo's cell cache, stored in *directory* and reporting its hits."""
-
-    def __init__(self, internal: InternalApp, directory: Path) -> None:
-        # CachedLifecycle only takes a loader kind and stores in marimo's
-        # default place; its loader is replaced by one stored in *directory*
-        # (the pickle kind is merely the cheapest to build and discard).
-        super().__init__(internal.graph, loader="pickle")
-        self._lazy_loader = LazyLoader(
-            name=_CELLS, store=LazyStore(FileStore(str(directory)))
-        )
-        self._loader = self._lazy_loader
-        self.restored: set[CellId_t] = set()
-
-    def setup(self, cell: CellImpl, glbls: MutableGlobals) -> Skip | None:
-        decision = super().setup(cell, glbls)
-        if isinstance(decision, Skip):
-            self.restored.add(cell.cell_id)
-        return decision
-
-    def flush(self) -> None:
-        self._lazy_loader.flush()
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -404,36 +382,6 @@ def _cell_prefix(config: NotebookConfig) -> str:
     """A cell id prefix of the notebook's own (see ``load_notebook``)."""
 
     return hashlib.sha256(str(config.path).encode()).hexdigest()[:8] + "-"
-
-
-def _cache_root(config: NotebookConfig) -> Path:
-    """The notebook's cell caches: one directory per dependency digest."""
-
-    return state_dir(config) / "cache"
-
-
-def _keep_cache(root: Path, used: str, current: str) -> None:
-    """Keep the cache the run used, under the digest of what it now depends on.
-
-    The two digests differ when the run found out what it depends on anew
-    (a ``use`` it had not made before, or one it no longer makes); every
-    entry is valid for the files' current content either way.
-    Caches under any other digest are stale and removed.
-    """
-
-    source = root / used
-    target = root / current
-    if source != target and source.is_dir():
-        shutil.rmtree(target, ignore_errors=True)
-        source.rename(target)
-    if not root.is_dir():  # nothing was cached
-        return
-    for stale in root.iterdir():
-        if stale != target:
-            if stale.is_dir():
-                shutil.rmtree(stale, ignore_errors=True)
-            else:
-                stale.unlink(missing_ok=True)
 
 
 @contextmanager

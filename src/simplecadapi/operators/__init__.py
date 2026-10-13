@@ -16,7 +16,7 @@ keep observing the executed binding.
 import sys as _sys
 from types import ModuleType as _ModuleType
 
-from . import _support, geometry, transform, boolean, product, sketch, selection, features
+from . import _support, geometry, transform, boolean, product, sketch, selection, features, deformation, section_features, limited_extrusion, draft
 from ._support import *
 from .geometry import *
 from .transform import *
@@ -25,6 +25,10 @@ from .product import *
 from .sketch import *
 from .selection import *
 from .features import *
+from .deformation import *
+from .section_features import *
+from .limited_extrusion import *
+from .draft import *
 
 _IMPLEMENTATION_MODULES = (
     _support,
@@ -35,6 +39,10 @@ _IMPLEMENTATION_MODULES = (
     sketch,
     selection,
     features,
+    deformation,
+    section_features,
+    limited_extrusion,
+    draft,
 )
 
 __all__ = tuple(

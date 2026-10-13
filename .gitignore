@@ -55,6 +55,7 @@ tools/research/out/
 tools/research/histjson/out/
 tools/research/whucad/out/
 tools/research/cadqueryftc/out/
+tools/research/build123dftc/out/
 .venv-cq/
 
 # Source screen recordings stay local; compressed MP4/GIF derivatives are tracked
@@ -70,3 +71,21 @@ examples/bowl_connector/re_work/
 examples/bowl_connector/__pycache__/
 examples/bowl_connector/.re_server.lock
 session-audit-*.md
+
+# Editor web UI (built into the package: `cd editor-web && npm run build`)
+editor-web/node_modules/
+editor-web/dist/
+src/simplecadapi/editor/webui/
+
+# The editor's per-workspace state (kernel log, snapshot, viewport image)
+.sca-editor/
+# Written by `sca edit` into a workspace to put marimo in lazy mode
+.marimo.toml
+
+# Local tooling and private work, never part of the repo
+sandbox-envs/
+.omp/
+.claude/
+.agents/
+.sharednet/
+design-docs/

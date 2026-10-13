@@ -431,7 +431,9 @@ class TestSurfaceApi(unittest.TestCase):
 
         solid = scad.make_solid_from_shell_rsolid(shell)
         self.assertIsInstance(solid, scad.Solid)
-        self.assertAlmostEqual(solid.get_volume(), 512019.199, delta=2.0)
+        # The sewn solid is an 80 mm cube; the knot-span volume integral is exact
+        # (the fixed-order one overshot it by ~19 mm3 on these rational patches).
+        self.assertAlmostEqual(solid.get_volume(), 80.0**3, delta=0.1)
         self.assertTrue(all(face.get_area() > 4 * side * side for face in solid._iter_faces()))
 
     def test_trim_surface_with_hole_and_replay(self):

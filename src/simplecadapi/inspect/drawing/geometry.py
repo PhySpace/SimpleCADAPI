@@ -5,9 +5,12 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
-import pymupdf
+if TYPE_CHECKING:
+    import pymupdf
+else:
+    from ._pymupdf import pymupdf
 
 from ._pdf import color_to_hex, item_kind, open_page, parse_color, point_to_display
 from ._provenance import page_metadata
