@@ -85,6 +85,14 @@ class NotebookCells:
             self._spans.setdefault(filename, []).append(span)
         self._placements: dict[str, CellPlacement] | None = None
 
+    def __contains__(self, cell_id: object) -> bool:
+        """Whether *cell_id* is a cell of the notebook.
+
+        The editor kernel also runs cells that are not (its scratch cell,
+        for one); they are not recorded.
+        """
+        return cell_id in self._keys
+
     def key(self, cell_id: CellId_t) -> str:
         """Return the key of the cell marimo calls *cell_id*."""
 

@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.10, <3.14"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -3239,7 +3239,6 @@ dependencies = [
     { name = "ocp-gordon" },
     { name = "plotly" },
     { name = "py-slvs" },
-    { name = "pymupdf" },
     { name = "rfc8785" },
     { name = "rich" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
@@ -3251,8 +3250,18 @@ dev = [
     { name = "black" },
     { name = "isort" },
     { name = "mypy" },
+    { name = "pymupdf" },
     { name = "pytest" },
     { name = "pytest-cov" },
+]
+drawing = [
+    { name = "pymupdf" },
+]
+editor = [
+    { name = "starlette" },
+    { name = "uvicorn" },
+    { name = "websockets", version = "16.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "websockets", version = "17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 fem = [
     { name = "ccx2paraview", extra = ["vtk"] },
@@ -3275,10 +3284,15 @@ dev = [
     { name = "jupyterlab" },
     { name = "matplotlib" },
     { name = "numpy-stl" },
+    { name = "pymupdf" },
     { name = "pytest" },
+    { name = "starlette" },
     { name = "trimesh" },
     { name = "twine" },
     { name = "ty" },
+    { name = "uvicorn" },
+    { name = "websockets", version = "16.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "websockets", version = "17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 
 [package.metadata]
@@ -3299,15 +3313,19 @@ requires-dist = [
     { name = "ocp-gordon", specifier = ">=0.2,<0.3" },
     { name = "plotly", specifier = ">=7.1.0" },
     { name = "py-slvs", specifier = "==1.0.6" },
-    { name = "pymupdf", specifier = ">=1.28.2" },
+    { name = "pymupdf", marker = "extra == 'dev'", specifier = ">=1.28.2" },
+    { name = "pymupdf", marker = "extra == 'drawing'", specifier = ">=1.28.2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
     { name = "rfc8785", specifier = ">=0.1.4,<0.2.0" },
     { name = "rich", specifier = ">=14.0.0" },
+    { name = "starlette", marker = "extra == 'editor'", specifier = ">=1.7.0" },
     { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0,<3" },
     { name = "typing-extensions", specifier = ">=4.12,<5" },
+    { name = "uvicorn", marker = "extra == 'editor'", specifier = ">=0.54.0" },
+    { name = "websockets", marker = "extra == 'editor'", specifier = ">=16.1.1" },
 ]
-provides-extras = ["dev", "editor", "inspect", "whucad", "gmsh", "fem"]
+provides-extras = ["dev", "drawing", "editor", "inspect", "whucad", "gmsh", "fem"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -3316,10 +3334,14 @@ dev = [
     { name = "jupyterlab", specifier = ">=4.5.5" },
     { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "numpy-stl", specifier = ">=3.2.0" },
+    { name = "pymupdf", specifier = ">=1.28.2" },
     { name = "pytest" },
+    { name = "starlette", specifier = ">=1.7.0" },
     { name = "trimesh", specifier = ">=4.11.3" },
     { name = "twine", specifier = ">=6.1.0" },
     { name = "ty", specifier = ">=0.0.18" },
+    { name = "uvicorn", specifier = ">=0.54.0" },
+    { name = "websockets", specifier = ">=16.1.1" },
 ]
 
 [[package]]

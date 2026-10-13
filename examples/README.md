@@ -46,6 +46,7 @@ uv run python examples/four_bar_linkage/export.py     # package + exchange files
 | `u_link_motor_mount/` | assembly | `u_link_motor_mount.py` | `export.py`, `verify/acceptance.py` | `u_link_assembly.scadpkg` + STEP/STL + renders (`demo/index.html` session replay) |
 | `l_link_motor_mount/` | assembly (part family) | `l_link_motor_mount.py` (`--id l-link-motor-mount-<preset> --set PRESET=<preset>`) | `export.py`, `verify/acceptance.py`, `verify/export_artifacts.py` | `l_link_assembly_<preset>.scadpkg` + STEP/STL per adapter preset + renders |
 | `pcg_attractor_canopy/` | part (procedural) | `attractor_canopy.py` | `export.py`, `verify.py` | `attractor_canopy.scadpkg` + STEP/STL/OBJ + GIF |
+| `pcg_facade_tower/` | procedural building (plain modules) | — | `export.py [rect\|chamfer\|l_shape] [n_floors]`, then `verify/s1_verify.py` … `verify/s8_verify.py` | `facade_tower.scadpkg` + AP242 STEP + panel-schedule CSV + rationalization/scale sweeps + verify renders |
 | `compact_two_stage_planetary_reducer/` | assembly (part families) | `compact_two_stage_planetary_reducer.py` | `export.py`, `export_mjcf.py` | `compact_two_stage_planetary_reducer.scadpkg` + STEP/FCStd/MJCF |
 | `integrated_bldc_joint_actuator/` | product (sub-assembly notebooks) | `integrated_bldc_joint_actuator.py` | `export_all.py`, `render_showcase.py` | `integrated_bldc_joint_actuator.scadpkg` + STEP/FCStd/MJCF + renders |
 | `ap242_gmsh_volume_mesh/` | FEM / data exchange | `bracket.py` | see below | AP242 + Gmsh volume mesh + CalculiX statics |

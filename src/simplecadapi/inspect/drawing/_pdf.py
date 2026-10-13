@@ -14,9 +14,12 @@ vector coordinates, and rendered pixels mutually consistent for calibration.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence
 
-import pymupdf
+if TYPE_CHECKING:
+    import pymupdf
+else:
+    from ._pymupdf import pymupdf
 
 _ITEM_KINDS = {"l": "line", "c": "bezier", "qu": "quad", "re": "rect"}
 

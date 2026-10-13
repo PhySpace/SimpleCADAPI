@@ -133,7 +133,9 @@ In a notebook every block is one `@app.cell`:
   the exception.
 - Parameters live in their own cell(s) at the top (`# ---- params ----`),
   grouped by what is overridden together: an override replaces every
-  variable of its cell. The product — the `Part` or `Assembly` whose id is
+  variable of its cell. A trailing `# ui: slider(min, max, step=, unit=,
+  label=)` comment (or `number(...)`, `toggle()`) on a parameter's line
+  chooses the control an editor offers; see the notebook runtime guide. The product — the `Part` or `Assembly` whose id is
   the notebook id — is made in the last cell. A notebook that describes a part family names the
   product `scad.notebook_id()`, and each use gives the member its id
   (`scad.use("link_bar.py", id="crank", ...)`).

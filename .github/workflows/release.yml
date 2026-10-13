@@ -77,11 +77,42 @@ jobs:
       - name: Run tests
         run: xvfb-run --auto-servernum uv run pytest test tests -q
 
+      # `sca edit` serves a web UI that is built from editor-web/ and git-ignored:
+      # without this step the wheel would ship an editor with no front end.
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: editor-web/package-lock.json
+      - name: Build the editor web UI
+        working-directory: editor-web
+        run: |
+          npm ci
+          npm run build
+
       - name: Build wheel and source distribution
         run: uv build
 
       - name: Verify distributions
         run: uv run twine check dist/*
+
+      - name: Verify the wheel carries the editor, the skill and the example
+        run: |
+          set -euo pipefail
+          wheel="$(ls dist/*.whl)"
+          listing="$(unzip -Z1 "$wheel")"
+          for required in \
+            simplecadapi/editor/webui/index.html \
+            simplecadapi/skill/resources/skillproj.toml \
+            simplecadapi/skill/resources/docs/skill/SKILL.md \
+            simplecadapi/example/resources/u_link_motor_mount/u_link.py \
+            simplecadapi/example/resources/u_link_motor_mount/dimensions.py; do
+            if ! grep -qx "$required" <<<"$listing"; then
+              echo "wheel is missing $required" >&2
+              exit 1
+            fi
+          done
       - name: Build and verify Agent Skill archive
         run: |
           uv run python tools/auto_docs_gen.py --quiet

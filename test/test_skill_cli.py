@@ -124,3 +124,27 @@ def test_main_reports_unknown_target_without_traceback(project, tmp_path, capsys
     error = capsys.readouterr().err
     assert "unknown target" in error and "Traceback" not in error
     assert not (tmp_path / "s").exists()
+
+
+def test_where_reports_the_destination_without_writing(project, tmp_path):
+    report, code, printer = run(["skill", "where"])
+    expected = tmp_path / "home" / ".agents" / "skills" / "demo"
+    assert code == 0 and Path(report["where"]) == expected and report["exists"] is False
+    assert not expected.parent.exists()  # nothing was created
+    printer(report)
+    run(install_args())
+    assert run(["skill", "where"])[0]["exists"] is True
+    elsewhere, _, _ = run(["skill", "where", "--skills-dir", str(tmp_path / "other")])
+    assert Path(elsewhere["where"]) == tmp_path / "other" / "demo"
+
+
+def test_where_reports_the_destination_without_writing(project, tmp_path):
+    report, code, printer = run(["skill", "where"])
+    expected = tmp_path / "home" / ".agents" / "skills" / "demo"
+    assert code == 0 and Path(report["where"]) == expected and report["exists"] is False
+    assert not expected.parent.exists()  # nothing was created
+    printer(report)
+    run(install_args())
+    assert run(["skill", "where"])[0]["exists"] is True
+    elsewhere, _, _ = run(["skill", "where", "--skills-dir", str(tmp_path / "other")])
+    assert Path(elsewhere["where"]) == tmp_path / "other" / "demo"

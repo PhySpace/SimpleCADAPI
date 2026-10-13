@@ -33,7 +33,6 @@ dependencies = [
     "py-slvs==1.0.6",
     "ocp-gordon>=0.2,<0.3",
     "ezdxf>=1.4.4",
-    "pymupdf>=1.28.2",
     "marimo>=0.25.0",
     "plotly>=7.1.0",
 ]
@@ -45,8 +44,16 @@ dev = [
   "mypy>=1.0",
   "black>=23.0",
   "isort>=5.0",
+  "pymupdf>=1.28.2",
 ]
-editor = []
+drawing = [
+    "pymupdf>=1.28.2",
+]
+editor = [
+    "starlette>=1.7.0",
+    "uvicorn>=0.54.0",
+    "websockets>=16.1.1",
+]
 inspect = [
     "matplotlib>=3.7.0",
 ]
@@ -78,13 +85,24 @@ core-metadata-version = "2.4"
 # Ship harness-neutral source; sca skill compiles it on the user's machine.
 packages = ["src/simplecadapi"]
 include = ["src/**/*"]
+# The built webui (`cd editor-web && npm run build`) is git-ignored; ship it
+# with `sca edit` when it has been built.
+artifacts = ["src/simplecadapi/editor/webui/**"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "docs/skill" = "simplecadapi/skill/resources/docs/skill"
 "skillproj.toml" = "simplecadapi/skill/resources/skillproj.toml"
+# The notebooks `sca example u_link` copies out.
+"examples/u_link_motor_mount/u_link.py" = "simplecadapi/example/resources/u_link_motor_mount/u_link.py"
+"examples/u_link_motor_mount/shell.py" = "simplecadapi/example/resources/u_link_motor_mount/shell.py"
+"examples/u_link_motor_mount/u_link_motor_mount.py" = "simplecadapi/example/resources/u_link_motor_mount/u_link_motor_mount.py"
+"examples/u_link_motor_mount/dimensions.py" = "simplecadapi/example/resources/u_link_motor_mount/dimensions.py"
+"examples/u_link_motor_mount/common.py" = "simplecadapi/example/resources/u_link_motor_mount/common.py"
 
 [tool.hatch.build.targets.sdist]
 core-metadata-version = "2.4"
+# The release builds its wheel from this sdist, so the built webui has to be in it.
+artifacts = ["src/simplecadapi/editor/webui/**"]
 include = [
   "/README.md",
   "/LICENSE",
@@ -103,10 +121,24 @@ exclude = [
   "/examples",
 ]
 
+# The sdist leaves out /examples, but `sca example u_link` builds its wheel
+# from these five notebooks (the wheel is built from the sdist on release).
+[tool.hatch.build.targets.sdist.force-include]
+"examples/u_link_motor_mount/u_link.py" = "examples/u_link_motor_mount/u_link.py"
+"examples/u_link_motor_mount/shell.py" = "examples/u_link_motor_mount/shell.py"
+"examples/u_link_motor_mount/u_link_motor_mount.py" = "examples/u_link_motor_mount/u_link_motor_mount.py"
+"examples/u_link_motor_mount/dimensions.py" = "examples/u_link_motor_mount/dimensions.py"
+"examples/u_link_motor_mount/common.py" = "examples/u_link_motor_mount/common.py"
+
 [dependency-groups]
 dev = [
     "twine>=6.1.0",
     "pytest",
+    "pymupdf>=1.28.2",
+    # the editor tests (test/test_editor.py) need the editor extra's packages
+    "starlette>=1.7.0",
+    "uvicorn>=0.54.0",
+    "websockets>=16.1.1",
     "jupyterlab>=4.5.5",
     "ipykernel>=6.29.5",
     "matplotlib>=3.10.8",

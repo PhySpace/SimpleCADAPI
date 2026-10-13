@@ -142,6 +142,70 @@ run.values["width"]    # any top-level variable
 
 Errors raised by a cell propagate unchanged.
 
+## Parameters and the editor
+
+A **parameter** is a top-level variable a cell assigns a number, a bool, or a
+`scad.var`, in a cell headed `# ---- params ----` (or `# ---- params: <group> ----`).
+No change to a notebook is needed for an editor to list them. A trailing
+`# ui:` comment on the line says which control to offer:
+
+```python
+# ---- params ----
+OUTER_D = scad.var("outer_d", 100.0, unit="mm")  # ui: slider(50, 200, step=1, label="Outer diameter")
+BOLTS = 6                                        # ui: number(3, 12, step=1)
+CHAMFER = True                                   # no comment: a toggle, inferred
+```
+
+`slider(min, max, step=)`, `number(min=, max=, step=)` and `toggle()` take
+`unit=` and `label=`. Without the comment a number gets a number box and a
+bool a toggle. A bad comment is reported (`sca params`) and the inferred
+control is used. A `scad.var`'s `unit` and `comment` show up in the editor.
+
+```bash
+sca params bracket.py        # features (# ---- feature: ... ---- headers) and parameters, from the file
+sca ls [DIR]                 # the notebooks under DIR: id, part or assembly, the notebooks each uses
+```
+
+A **workspace** is any directory tree: its models are the notebooks whose
+header has `[tool.simplecadapi]`, wherever they are. There is no manifest.
+
+`sca edit [WORKSPACE]` (needs `pip install "simplecadapi[editor]"`) opens a
+code-first editor on a workspace. The notebooks run in a marimo kernel with
+this runtime's executor, so a model gives the same product in the editor as
+under `sca run`; marimo's dataflow decides what reruns. A slider does not
+edit the file: the editor saves the value (`params.json` in the notebook's
+state directory), the kernel executor applies it as the declaring cell
+finishes, and marimo reruns the cells that read it. **Write to source**
+commits the saved values into the notebook; **revert** drops them. A headless
+run takes only the overrides it is given, never the saved values, and the
+notebook an assembly `use`s is run from its file: tune a part by opening it
+and writing the value to source.
+
+The editor and a coding agent share the notebook file:
+
+- Every edit in a cell is **autosaved** to the file (it is not run; the cell
+  shows `stale` until it is).
+- **Picking in the viewport writes a selection cell**: each picked solid, face,
+  edge or vertex becomes a `scad.ql` selector built from its geometry and
+  is assigned to `selected_<kind>` (`selected_<kind>_<i>` when several of a
+  kind are picked); `selected_item` lists them all. Ctrl/Cmd+click adds to the
+  selection. The agent reads the cell from the file and builds on it, e.g.
+  `scad.chamfer_rsolid(solid=body, edges=selected_edge_1, ...)`.
+- `sca snapshot [WORKSPACE]` prints what the person is looking at as JSON: the
+  selection, each cell's state and errors, the parameter values, and the path
+  of the viewport image (`.sca-editor/viewport.png`) the agent can look at. The
+  editor keeps `.sca-editor/snapshot.json` current while it runs.
+- The local modules a notebook imports (`from dimensions import DIMS`) are
+  listed under *modules* in the workspace tab, with the notebooks that use
+  them. A module opens in a module view: its source, autosaved, and the fields
+  of its dataclasses (and top-level constants with a `# ui:` comment) as
+  controls whose values are written into the file. A change to a module, from
+  the editor or from an agent on disk, reloads it and reruns the open notebook;
+  the notebooks it `use`s are rerun from their files.
+- A cell folds to its name (its feature slug, params header or first variable)
+  and can run everything above it; `@app.function` cells are shown read-only
+  (edit them in the file).
+
 ## Composing notebooks
 
 `scad.use(path, **overrides)` runs another notebook and returns its product,
@@ -200,20 +264,28 @@ named in its header.
 
 ## The cell cache
 
-Headless runs cache every cell except the setup cell. marimo keys a cell's
-entry by its code and the values it reads; SimpleCAD adds one digest, *D*, of
-what the cells cannot show:
+Every cell except the setup cell is cached, in headless runs and in the
+editor's kernel alike (what one computed the other restores). marimo keys a
+cell's entry by its code and what it reads; SimpleCAD adds a digest of what
+the cells cannot show, **per cell**, over the files *that cell* depends on:
 
-- **local modules** — Python files under the notebook's directory that the
-  cells import, and the local modules those import in turn, found from the
-  `import` statements;
-- **child notebooks** run with `scad.use`, with everything they depend on;
-- the files listed in `inputs`;
+- **local modules** — Python files under the notebook's directory, found from
+  the `import` statements (setup cell included), and the local modules those
+  import in turn. A cell depends on a module when it reads a name an `import`
+  bound to it, or calls a function the notebook defines (an `@app.function`
+  cell, a `def` in the setup cell) that does;
+- **everything the cells it reads from depend on**: marimo keys a cell that
+  reads an object (a solid, a part) by the code of the cells that made it, so
+  it cannot see a module that changed upstream;
+- **child notebooks** run with `scad.use` (and what they depend on), for the
+  cells that call `use` and those that read what they make;
+- the files listed in `inputs`, for every cell;
 - the SimpleCAD, OpenCASCADE, and marimo versions.
 
-A run reads and writes only the cache stored under the current *D*, so any
-change to any of these files invalidates the notebook's whole cache: coarse,
-but never stale. Local modules are imported afresh when their files changed
+So editing `dimensions.py` recomputes the cells that read the dimensions (and
+what is made from them) and restores the rest, and going back to an earlier
+value restores everything. A run keeps the entries of its own digests and of
+the previous run's. Local modules are imported afresh when their files changed
 since the last run in the same process.
 
 - Imports through `importlib` or `__import__` are not seen; import local
@@ -221,16 +293,20 @@ since the last run in the same process.
 - Values that cannot be pickled cannot be restored: the run then executes the
   whole notebook without the cache. Keep such values (locks, open files,
   handles) out of top-level variables.
+- The editor kernel does not cache the cells that run child notebooks (only a
+  headless run records what they depend on; the children themselves are
+  cached), and keys the cells downstream of a value an editor saved by that
+  value. `SCA_NO_KERNEL_CACHE=1` turns the kernel's cache off.
 - The state lives in `__marimo__/simplecad/<notebook file name>/<id>/`
-  (`deps.json` and `cache/<D>/`), one directory per part-family member. It is generated state: do not commit
-  `__marimo__/`. Entries are unsigned unless the `cryptography` package is
-  installed; treat the directory as trusted local files.
+  (`deps.json` and `cache/<digest>/`), one directory per part-family member. It
+  is generated state: do not commit `__marimo__/`. Entries are unsigned unless
+  the `cryptography` package is installed; treat the directory as trusted local
+  files.
 
 **In the marimo editor, leave `[tool.marimo.runtime] cache_cells` off.** That
-is marimo's own cache: it does not know *D*, so after a local module or child
-notebook changes it would restore stale values. The editor re-runs cells
-reactively; set `[tool.marimo.runtime] auto_reload` to pick up edited local
-modules.
+is marimo's own cache: it does not know these digests, so after a local module
+or child notebook changes it would restore stale values. Under `sca edit` the
+SimpleCAD cache above is already in use.
 
 ## Library parts: `@scad.part` and `@scad.assemble`
 

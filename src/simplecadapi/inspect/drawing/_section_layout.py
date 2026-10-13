@@ -2,7 +2,7 @@
 
 import math
 
-import pymupdf
+from ._pymupdf import pymupdf
 from ._provenance import digest
 
 COLOR = (0.0, 0.0, 0.75)

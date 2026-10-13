@@ -205,9 +205,24 @@ Current release: `simplecadapi==2.1.3`.
 
 ## Install
 
+The shortest way: paste this to your coding agent and it does the rest
+(installs the SDK, installs the skill for itself, opens an example in the
+editor and walks you through it):
+
+```text
+Read physpace.dev/sca/landing.md and landing me on this sdk.
+```
+
+By hand:
+
 ```bash
 pip install simplecadapi
 ```
+
+The code-first editor (`sca edit`) needs its extra, `pip install "simplecadapi[editor]"`;
+`uv tool install "simplecadapi[editor]"` or `pipx install "simplecadapi[editor]"` put
+`sca` on your PATH without a virtual environment. `sca example u_link` copies a
+bundled example workspace out to open with `sca edit`.
 
 With `uv`:
 
@@ -342,7 +357,13 @@ marimo edit bracket.py                                    # reactive editor
 sca run bracket.py                                        # run, print a JSON report
 sca run bracket.py --set width=80 --out out/bracket.scadpkg
 sca export out/bracket.scadpkg --output-dir out/exports   # AP242 STEP, STL, OBJ
+sca edit .                                                # web editor over this directory of notebooks
 ```
+
+`sca edit` (`pip install "simplecadapi[editor]"`) is a code-first editor: the
+notebook's cells on the left, the live model on the right, and a slider or
+toggle for every parameter (`# ---- params ----` cells; a `# ui:` comment on
+the line picks the control). See `docs/skill/references/docs/guides/notebook-runtime.md`.
 
 ## Notebook Runtime
 

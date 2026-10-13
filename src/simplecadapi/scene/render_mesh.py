@@ -7,6 +7,8 @@ import struct
 from dataclasses import dataclass
 from typing import Iterable, Sequence
 
+import numpy as np
+
 from OCP.BRepAdaptor import BRepAdaptor_Curve
 from OCP.GCPnts import GCPnts_TangentialDeflection
 from OCP.TopAbs import TopAbs_FORWARD, TopAbs_REVERSED
@@ -219,43 +221,57 @@ def _triangle_block(
     face_range,
     entity_id: str,
 ) -> CanonicalTriangleBlock:
-    vertex_records: dict[bytes, tuple[tuple[float, float, float], tuple[float, float, float]]] = {}
-    triangle_keys: list[tuple[bytes, bytes, bytes]] = []
-    triangle_start = face_range.start
-    triangle_end = triangle_start + face_range.count
-    for triangle_index in range(triangle_start, triangle_end):
-        node_indices = tuple(int(index) for index in mesh.triangles[triangle_index])
-        positions = tuple(cad_to_gltf(mesh.vertices[index]) for index in node_indices)
-        if len(set(_position_key(position) for position in positions)) != 3:
-            continue
-        cross = profile_cross(
-            tuple(positions[1][axis] - positions[0][axis] for axis in range(3)),
-            tuple(positions[2][axis] - positions[0][axis] for axis in range(3)),
-        )
-        if all(component == 0.0 for component in cross):
-            continue
-        fallback_normal = profile_normalize(cross)
-        keys: list[bytes] = []
-        for corner in range(3):
-            raw_normal = tuple(
-                float(value) for value in mesh.corner_normals[triangle_index, corner]
-            )
-            normal = (
-                fallback_normal
-                if all(component == 0.0 for component in raw_normal)
-                else profile_normalize(cad_direction_to_gltf(raw_normal))
-            )
-            position = positions[corner]
-            key = _vertex_key(position, normal)
-            vertex_records[key] = (position, normal)
-            keys.append(key)
-        triangle_keys.append(_least_cyclic_rotation(tuple(keys)))
-    if not triangle_keys:
+    """One face's canonical triangle block.
+
+    Every value follows the profile's fixed steps: binary64 arithmetic in a
+    fixed order, then rounding to binary32 with ``-0`` written as ``+0``
+    (:func:`~simplecadapi.scene.glb.profile_f32`).  They are evaluated here for
+    all of the face's triangles at once, with numpy, which performs the same
+    IEEE operations in the same order as the scalar helpers (and never fuses a
+    multiply and an add), so the bytes are identical, at a fraction of the cost.
+    """
+
+    start = face_range.start
+    stop = start + face_range.count
+    corners = np.asarray(mesh.triangles[start:stop], dtype=np.int64)
+    vertices = np.asarray(mesh.vertices, dtype=np.float64)
+    positions = _cad_to_gltf_rows(vertices[corners])  # (n, 3 corners, 3 axes)
+
+    # A triangle whose corners collapse to fewer than three distinct positions
+    # (after binary32 rounding) is dropped.
+    distinct = (
+        (positions[:, 0] != positions[:, 1]).any(axis=1)
+        & (positions[:, 0] != positions[:, 2]).any(axis=1)
+        & (positions[:, 1] != positions[:, 2]).any(axis=1)
+    )
+    keep = np.flatnonzero(distinct)
+    positions = positions[keep]
+    a, b, c = positions[:, 0], positions[:, 1], positions[:, 2]
+    cross = _cross_rows(b - a, c - a)
+    nonzero = ~(cross == 0.0).all(axis=1)
+    keep = keep[nonzero]
+    positions = positions[nonzero]
+    cross = cross[nonzero]
+    if len(keep) == 0:
         raise ValueError(f"face {entity_id} has no non-degenerate triangle")
+
+    fallback = _normalize_rows(cross)
+    raw = np.asarray(mesh.corner_normals[start:stop], dtype=np.float64)[keep]  # (n, 3 corners, 3)
+    given = ~(raw == 0.0).all(axis=2)  # corners that carry a normal of their own
+    normals = np.broadcast_to(fallback[:, None, :], raw.shape).copy()
+    if given.any():
+        normals[given] = _normalize_rows(_cad_to_gltf_rows(raw[given]))
+
+    # One 24-byte key per corner: position bits, then normal bits.
+    packed = np.concatenate([positions, normals], axis=2).astype(np.float32).astype("<f4")
+    keys = packed.view(np.uint8).reshape(len(keep), 3, 24)
+    triangle_keys = [
+        _least_cyclic_rotation(tuple(bytes(corner) for corner in triangle)) for triangle in keys
+    ]
     unique_keys = sorted(set(key for triangle in triangle_keys for key in triangle))
     key_to_index = {key: index for index, key in enumerate(unique_keys)}
     triangles = tuple(sorted(tuple(key_to_index[key] for key in triangle) for triangle in triangle_keys))
-    decoded = tuple(vertex_records[key] for key in unique_keys)
+    decoded = np.frombuffer(b"".join(unique_keys), dtype="<f4").reshape(-1, 6).astype(np.float64)
     vertex_bytes = b"".join(unique_keys)
     index_format = "<H" if len(unique_keys) <= 65536 else "<I"
     index_bytes = b"".join(struct.pack(index_format, index) for triangle in triangles for index in triangle)
@@ -265,10 +281,63 @@ def _triangle_block(
         render_key=hashlib.sha256(b"\x01" + block_bytes).digest(),
         block_bytes=block_bytes,
         vertex_keys=tuple(unique_keys),
-        positions=tuple(item[0] for item in decoded),
-        normals=tuple(item[1] for item in decoded),
+        positions=tuple(tuple(row[:3]) for row in decoded.tolist()),
+        normals=tuple(tuple(row[3:]) for row in decoded.tolist()),
         triangles=triangles,
     )
+
+
+def _f32_rows(values: "np.ndarray") -> "np.ndarray":
+    """:func:`profile_f32` of every value: binary32 rounding, ``-0`` as ``+0`` (as binary64)."""
+
+    if not np.isfinite(values).all():
+        raise ValueError("f32 input must be a finite number")
+    with np.errstate(over="ignore"):
+        narrow = values.astype(np.float32)
+    if not np.isfinite(narrow).all():
+        raise ValueError("f32 conversion overflowed")
+    return np.where(narrow == 0, np.float32(0.0), narrow).astype(np.float64)
+
+
+def _cad_to_gltf_rows(points: "np.ndarray") -> "np.ndarray":
+    """:func:`cad_to_gltf` of every point (the last axis is x, y, z)."""
+
+    return _f32_rows(
+        np.stack(
+            [points[..., 0] / 1000.0, points[..., 2] / 1000.0, (-points[..., 1]) / 1000.0],
+            axis=-1,
+        )
+    )
+
+
+def _cross_rows(left: "np.ndarray", right: "np.ndarray") -> "np.ndarray":
+    """:func:`profile_cross` of every pair, in its fixed operation order."""
+
+    p1x, p2x = left[:, 1] * right[:, 2], left[:, 2] * right[:, 1]
+    p1y, p2y = left[:, 2] * right[:, 0], left[:, 0] * right[:, 2]
+    p1z, p2z = left[:, 0] * right[:, 1], left[:, 1] * right[:, 0]
+    result = np.stack([p1x - p2x, p1y - p2y, p1z - p2z], axis=1)
+    if not np.isfinite(result).all():
+        raise ValueError("cross product produced a non-finite value")
+    return result
+
+
+def _normalize_rows(vectors: "np.ndarray") -> "np.ndarray":
+    """:func:`profile_normalize` of every vector."""
+
+    if not np.isfinite(vectors).all():
+        raise ValueError("normalize input must contain finite values")
+    squared = vectors[:, 0] * vectors[:, 0] + vectors[:, 1] * vectors[:, 1]
+    squared = squared + vectors[:, 2] * vectors[:, 2]
+    if not (np.isfinite(squared).all() and (squared > 0).all()):
+        raise ValueError("normalize input has zero or non-finite length")
+    result = _f32_rows(vectors / np.sqrt(squared)[:, None])
+    norm_squared = result[:, 0] * result[:, 0] + result[:, 1] * result[:, 1]
+    norm_squared = norm_squared + result[:, 2] * result[:, 2]
+    norm = np.sqrt(norm_squared)
+    if not ((norm >= 1.0 - 1e-6) & (norm <= 1.0 + 1e-6)).all():
+        raise ValueError("normalized binary32 vector is outside the profile tolerance")
+    return result
 
 
 def _edge_block(

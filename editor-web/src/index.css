@@ -1,0 +1,192 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Black and white, square, hard 2px rules (after the SimpleCAD landing page).
+ * Color is reserved for meaning: focus (selection, what is being edited),
+ * pass, fail, name (the names of steps and parameters). */
+:root {
+  --radius: 0px;
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #050505;
+  --card-foreground: #ffffff;
+  --popover: #000000;
+  --popover-foreground: #ffffff;
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --secondary: #111111;
+  --secondary-foreground: #ffffff;
+  --muted: #111111;
+  --muted-foreground: #a8a8a8;
+  --accent: #1c1c1c;
+  --accent-foreground: #ffffff;
+  --destructive: #ff4d5e;
+  --destructive-foreground: #000000;
+  --border: #262626;
+  --input: #3a3a3a;
+  --ring: #ff9a2e;
+  --focus: #ff9a2e;
+  --pass: #3ddc84;
+  --fail: #ff4d5e;
+  --name: #4aa3ff;
+  --rule: 2px;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-focus: var(--focus);
+  --color-pass: var(--pass);
+  --color-fail: var(--fail);
+  --color-name: var(--name);
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --font-mono: var(--mono);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    border-radius: 0;
+    /* Thin, square scrollbars everywhere; the thumb shows on hover. */
+    scrollbar-width: thin;
+    scrollbar-color: #333 transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #333;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: #777;
+  }
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  html,
+  body {
+    background: #000;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: #fff;
+    color: #000;
+  }
+  .font-mono,
+  code,
+  pre {
+    font-family: var(--mono);
+  }
+  button {
+    cursor: pointer;
+  }
+  /* Notebook cells: the editor fills its block and wraps long lines, so a
+   * cell never shows a horizontal scrollbar. */
+  .cm-editor {
+    width: 100%;
+    background: transparent !important;
+  }
+  .cm-editor .cm-scroller {
+    overflow-x: hidden;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    font-family: var(--mono);
+  }
+  .cm-editor .cm-scroller::-webkit-scrollbar {
+    display: none;
+  }
+  .cm-editor.cm-focused {
+    outline: none;
+  }
+}
+
+/* Small caps label used for section titles and badges. */
+.label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* Loading mask: the spinner's chase, the progress strip, the blinking cursor. */
+@keyframes sca-chase {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.12;
+  }
+}
+@keyframes sca-bar {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes sca-blink {
+  50% {
+    opacity: 0;
+  }
+}
+.sca-chase {
+  animation: sca-chase 0.8s steps(5, end) infinite;
+}
+.sca-bar {
+  animation: sca-bar 1.4s steps(4, end) infinite;
+}
+.sca-blink {
+  animation: sca-blink 1s steps(1, end) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sca-chase,
+  .sca-bar,
+  .sca-blink {
+    animation: none;
+  }
+}
+
+/* A cell the kernel is running or has queued: a thin bar marching under its header. */
+.cell-running {
+  background: repeating-linear-gradient(90deg, var(--focus, #f5a623) 0 12px, transparent 12px 24px);
+  background-size: 24px 100%;
+  animation: cell-march 0.6s linear infinite;
+}
+@keyframes cell-march {
+  to {
+    background-position: 24px 0;
+  }
+}

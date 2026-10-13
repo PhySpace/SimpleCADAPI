@@ -4,6 +4,92 @@ All notable changes to SimpleCADAPI are documented here. Per-version
 user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 中文).
 
+## Unreleased
+
+### Added
+
+- `sca edit [WORKSPACE]`: the web editor, now part of the SDK
+  (`simplecadapi.editor`, UI sources in `editor-web/`; needs the `editor`
+  extra). It runs a workspace's notebooks in a marimo kernel with the SDK's
+  own cell executor, so the editor, `sca run` and `run_notebook` share one
+  runtime, and marimo's dataflow decides what a parameter change reruns.
+- Editor: picking in the viewport writes a selection cell of `scad.ql`
+  selectors (`selected_<kind>[_<i>]`, `selected_item`); edits autosave to the
+  notebook file; `sca snapshot` and `.sca-editor/snapshot.json` + `viewport.png`
+  tell a coding agent what is selected and shown. Ground grid and axis gizmo in
+  a Z-up CAD frame; cells fold to their step name and can run all cells above.
+- Editor: a log dock along the bottom replaces the error line in the header.
+  It lists what happened and what failed (with the time), and while cells are
+  re-evaluated shows how many of them are done, which one is running and for
+  how long; each cell shows running/queued/blocked. A module that does not
+  compile is reported as the cause ("setup failed — SyntaxError ...").
+- Editor: models reach the viewport as a live preview straight from the
+  solids (`simplecadapi.scene.preview`, wire format `SCAPREV1`), without
+  building a package; a picked entity's details are fetched on demand.
+  Solids no longer carry an eagerly built mesh (modeling is about 20% faster).
+- Editor: the local modules a notebook imports (shared dimensions, helpers)
+  are listed in the workspace, with the notebooks that use them, and open in a
+  module view: source (autosaved) plus the dataclass fields (and top-level
+  constants with a `# ui:` comment) as parameter controls. Editing a module,
+  there or on disk, reloads it in the kernel and reruns the open notebook; the
+  notebooks it `use`s are rerun from their files. `sca ls` reports each
+  notebook's modules.
+- Notebook parameters: the numbers, bools and `scad.var`s of a
+  `# ---- params ----` cell are discoverable (`sca params`,
+  `simplecadapi.runtime.params.list_parameters`) with an optional trailing
+  `# ui: slider(min, max, step=, unit=, label=)` comment to pick the control.
+  Existing notebooks need no change.
+- `sca ls [DIR]` lists the SimpleCAD notebooks under a directory (id, part or
+  assembly, the notebooks each uses); `simplecadapi.runtime.workspace` also
+  parses `# ---- feature: ... ----` headers.
+- `simplecadapi.runtime.live`: project the running kernel's product to a
+  `.scadpkg` (`live_package`, `publish_live`).
+
+- Editor: a cell's run button is a stop button while the kernel runs the cell (the header's run-all too);
+  stopping interrupts the kernel. Switching back to a notebook shows its last model and cells at once
+  when nothing it depends on changed (the editor remembers each notebook's last published package,
+  keyed by a digest of its files), while the kernel boots.
+
+### Changed
+
+- The cell cache is per cell: an entry is stored under a digest of the local
+  modules, child notebooks and input files *that cell* depends on (and what the
+  cells it reads from depend on), no longer one digest for the whole notebook. A
+  changed module recomputes the cells that read it and restores the rest; going
+  back to an earlier value restores everything. The editor kernel uses the same
+  cache. `sca run` reports the same cell statuses; caches written by earlier
+  versions are ignored and removed.
+- Building a package is about twice as fast: the render mesh of a face is
+  computed with numpy in the profile's fixed operation order (the bytes, and so
+  every content hash, are unchanged).
+- Editor: parameters of local modules and `inputs` data files are watched.
+
+### Fixed
+
+- Editor: switching notebooks quickly no longer ends on the wrong one or
+  reports `open failed: Connection refused`: opens are ordered, a superseded
+  open stops its kernel quietly, and the list highlights the notebook being
+  opened at once. A kernel for a notebook with inline dependencies no longer
+  waits for marimo's sandbox prompt ("marimo not ready after 60s"); opening a
+  notebook no longer publishes its model before its cells ran; a page
+  refreshed after an unchanged publish shows the model; the viewport redraws
+  after a panel resize; edges stay visible where a coarse mesh would hide them.
+- `ql.vertices()` resolves through solids, faces and wires (it found nothing
+  unless the scope was an edge).
+- The editor no longer rewrites a notebook when a cell is run unchanged, and
+  keeps `return` statements inside the functions a cell defines.
+- The notebook executor no longer fails on cells that are not part of the
+  notebook (the editor's scratch cell raised `KeyError`).
+
+### Changed
+
+- pymupdf is no longer a default-install dependency: it is optional under
+  the new `drawing` extra. The engineering-drawing family is the only user:
+  vector-PDF drawing inspection, and DXF -> PNG rendering (via ezdxf's
+  drawing backend). `import simplecadapi`, modeling, STEP export, and VTK
+  rendering all work without it. Drawing functions without pymupdf raise an
+  ImportError naming the extra: `pip install 'simplecadapi[drawing]'`.
+
 ## 2.1.3 — 2026-09-18
 
 The addon ecosystem leaves the beta line: one stable `sca` CLI, addon
