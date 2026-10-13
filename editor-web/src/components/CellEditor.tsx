@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
 import { EditorView } from "@codemirror/view";
@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ParamControl, type ParamMeta, type ParamValue } from "@/components/ParamControl";
 import { cadTheme } from "@/lib/cm-theme";
+import { sdkCompletion } from "@/lib/sdk-complete";
 import { cn } from "@/lib/utils";
 
 export type NotebookCell = {
@@ -49,7 +50,9 @@ export type { ParamMeta, ParamValue };
 type SocketLike = { send: (message: Record<string, unknown>) => void } | null;
 
 const AUTOSAVE_MS = 700;
-const EXTENSIONS = [python(), EditorView.lineWrapping];
+const EXTENSIONS = [python(), EditorView.lineWrapping, sdkCompletion];
+/** a constant: a new object each render makes the editor wrapper rebuild its configuration, which drops a snippet in progress */
+const BASIC_SETUP = { lineNumbers: false, foldGutter: false, highlightActiveLine: false };
 
 function loadCollapsed(notebook: string | null): Set<string> {
   try {
@@ -317,6 +320,10 @@ function CellBlock({
   onDelete: () => void;
   onEdit: (value: string) => void;
 }) {
+  // the editor takes this once: a new function each render would rebuild its configuration
+  const onEditRef = useRef(onEdit);
+  onEditRef.current = onEdit;
+  const handleChange = useCallback((value: string) => onEditRef.current(value), []);
   const failed = cell.status === "exception" || cell.status === "error" || (cell.errors?.length ?? 0) > 0;
   const stale = cell.status === "stale";
   const dirty = draft !== undefined && draft !== cell.code;
@@ -411,8 +418,8 @@ function CellBlock({
             extensions={EXTENSIONS}
             theme={cadTheme}
             editable={!cell.readonly}
-            basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: false }}
-            onChange={onEdit}
+            basicSetup={BASIC_SETUP}
+            onChange={handleChange}
             onKeyDown={(event) => {
               if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
                 event.preventDefault();

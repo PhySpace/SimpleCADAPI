@@ -21,6 +21,11 @@ below was added since 2.1.4, the notebook runtime of 2.2.0b1 included.
 
 ### Added
 
+- Editor: code completion from the SDK itself. `scad.` (and `scad.ql.`, `scad.std.gear.`, `ql.`)
+  lists the real functions with their signatures and docstrings; accepting one, or typing `(`
+  after a known name, writes the call with every required parameter as `name=` and Tab moves
+  between them; inside a call the parameters not given yet complete as `name=` (required first).
+  The names come from the running package (`GET /api/sdk`), so they cannot drift from the code.
 - Modeling: `scale`, affine `transform`, signed `offset`, `draft`, tapered and
   until-limited extrusions and multisection sweeps are recorded features, and
   boolean results can keep every output of a set operation; graph nodes keep
