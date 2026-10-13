@@ -47,13 +47,16 @@ export function openNotebook(path: string): Promise<{ ok: boolean }> {
   }).then((response) => json<{ ok: boolean }>(response));
 }
 
-/** Provision a new entry notebook from the server template and open it. */
-export function newNotebook(name: string, kind: "part" | "assembly"): Promise<{ created: string }> {
-  return fetch("/api/workspace/new", {
+/** Provision a new entry notebook from the server template and open it. Rejects with the server's reason (a bad or taken name). */
+export async function newNotebook(name: string, kind: "part" | "assembly"): Promise<{ created: string }> {
+  const response = await fetch("/api/workspace/new", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, kind }),
-  }).then((response) => json<{ created: string }>(response));
+  });
+  const body = (await response.json().catch(() => null)) as { created?: string; error?: string } | null;
+  if (!response.ok || !body?.created) throw new Error(body?.error ?? `${response.status} ${response.statusText}`);
+  return { created: body.created };
 }
 
 /** What the viewport shows (PNG data URL), for coding agents to look at. */

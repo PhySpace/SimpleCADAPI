@@ -133,30 +133,19 @@ CalculiX 静力 FEM（边界面按保真的 `interface.*` 标签选取，仿真�
 
 ---
 
-## 更新日志（2.2.1）
+## 更新日志（2.2.2）
 
 > 投入生产前请验证生成的定义、装配约束和制造几何。
 
-- **新编辑器。** `sca edit` 现在是 SDK 的一部分（`pip install
-  "simplecadapi[editor]"`）。它用 SDK 自己的 cell 执行器在 marimo 内核里运行工作
-  区的 notebook，直接由实体生成实时预览，把你在视口里的点选写成选择代码，并让
-  agent 看到你看到的（`sca snapshot`）。**Re-Studio 已移除**：逆向工程 studio
-  （独立 sca-web-editor 的 `Re-mode` 工作区）不再存在，独立的 sca-web-editor 由
-  `sca edit` 取代。STEP 重建继续通过检查 API 和 skill 的 step-reconstruction
-  工作流进行。
-- **一个运行时，一份缓存。** 编辑器、`sca run` 和
-  `simplecadapi.runtime.run_notebook()` 共用逐 cell 缓存，一方算过的另一方直接
-  复用。notebook 参数来自 `# ---- params ----` cell，可加 `# ui:` 注释指定控件；
-  本地模块（共用尺寸）在编辑器里有独立视图。
-- **落地路径。** `docs/landing.md` 是 agent 安装 SDK 和 skill、打开示例时遵循的
-  脚本；`sca example u_link` 复制内置工作区，`sca skill where` 显示 skill 的安装位置。
-- 之前：2.1.3b1 带来插件生态（`sca addon ...`、`sca-addon.toml` 描述文件、
-  `.scadpkg` 格式规范），见[更新说明](docs/updates/2.1.3b1.zh-CN.md)。
+- **来自 SDK 的代码补全。** 在编辑器里，输入 `scad.`（以及 `scad.ql.`、`scad.std.gear.`）
+  会列出真实存在的函数、签名和文档说明。选中一个函数，或在函数名后输入 `(`，会把每个必填
+  参数写成 `name=`，Tab 在它们之间跳转；在调用括号内，还没写的参数会补全成 `name=`。
+- **在工作区页面创建 notebook。** 新增的 **new** 按 SDK 模板创建一个零件，或一个使用前两个
+  零件的装配；空工作区会直接打开这个表单。
+- **修复。** cell 编辑器不再每次渲染都重建配置，这会让进行中的占位跳转丢失。
 
-每个示例模型都是 notebook；导出脚本用 `run_notebook` 载入产品，捕获一个
-`.scadpkg`，再从同一个产品包转换出 AP242 `.step` 和可编辑 `.FCStd`。
-`examples/ap242_gmsh_volume_mesh/` 下的 AP242/Gmsh 示例把每个导出和 FEM 阶段
-都做成可直接运行的独立脚本。
+本版本的完整说明：[`docs/updates/2.2.2.zh-CN.md`](docs/updates/2.2.2.zh-CN.md)。
+更早的版本：见[更新日志](CHANGELOG.md)和 [`docs/updates/`](docs/updates/)。
 
 ---
 
@@ -173,7 +162,7 @@ CalculiX 静力 FEM（边界面按保真的 `interface.*` 标签选取，仿真�
 
 SimpleCADAPI 是一个基于 OCP 的 Python CAD SDK，提供清晰的函数式建模操作和可重放的模型图。它在 OpenCascade 几何内核之上提供精简的公共 API，可用于创建实体、应用特征、添加语义标签、查询拓扑、导出制造文件，以及将记录的模型转换为 FreeCAD 工作流。
 
-当前版本：`simplecadapi==2.2.1`。
+当前版本：`simplecadapi==2.2.2`。
 
 ## 核心能力
 
@@ -599,6 +588,7 @@ uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py
 
 ## 文档
 
+- 2.2.2 更新说明：[`docs/updates/2.2.2.zh-CN.md`](docs/updates/2.2.2.zh-CN.md)
 - 2.2.1 更新说明：[`docs/updates/2.2.1.zh-CN.md`](docs/updates/2.2.1.zh-CN.md)
 - 2.1.3b1 更新说明：[`docs/updates/2.1.3b1.zh-CN.md`](docs/updates/2.1.3b1.zh-CN.md)
 - 2.1.2 更新说明：[`docs/updates/2.1.2.zh-CN.md`](docs/updates/2.1.2.zh-CN.md)
