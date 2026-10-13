@@ -6,6 +6,14 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+### Removed
+
+- Re-Studio, the reverse-engineering studio (the `Re-mode` workspace of the
+  standalone sca-web-editor), and its skill workflow
+  `reverse-engineering-studio.md`. `sca edit` replaces the standalone editor;
+  STEP reconstruction continues through the inspection API and the
+  `step-reconstruction` workflow.
+
 ### Added
 
 - `sca edit [WORKSPACE]`: the web editor, now part of the SDK

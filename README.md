@@ -6,6 +6,18 @@
 
 [中文说明](README.zh-CN.md)
 
+**Start here.** Paste this line to your coding agent (Claude Code, Codex, OpenCode, …):
+
+```text
+Read physpace.dev/sca/landing.md and landing me on this sdk.
+```
+
+It installs the SDK, installs the skill for itself, opens a real example in the
+code-first editor, and shows you how to work with it. SimpleCADAPI is a
+parametric CAD SDK built for agents: a model is a notebook of code, every
+dimension is a named parameter, selection is by what geometry *is*, and every
+step reports back why it worked or failed.
+
 ## What Can It Do
 
 Four capability pillars. Every case below is a **real, reproducible session**:
@@ -45,9 +57,8 @@ deterministic face tags that survive re-parameterization, and synchronized
 </tr>
 </table>
 
-Turntables are rendered by the standalone [sca-web-editor](https://github.com/PhySpace/sca-web-editor)'s
-BRep renderer (face shading + wide edges); one full turn = 48 deterministic
-azimuth steps driven through its `gif-harness.html`.
+Turntables are rendered with BRep shading and wide edges; one full turn = 48
+deterministic azimuth steps.
 
 ### 2 · Assembly Modeling
 
@@ -80,23 +91,25 @@ notebook, composed with `scad.use` from part and sub-assembly notebooks.
 the package plus STEP / editable FCStd / MJCF; `render_showcase.py` renders
 the views above.
 
-### 3 · Reverse Engineering
+### 3 · Code-first Editor
 
-Import a STEP, inspect its BREP in the browser, and click the geometric
-entities you care about — each pick lands as a tag in an annotation composer
-next to operation intents (sketch · boolean · fillet · pattern …) and a free
-note. Your reverse-engineering hunches ride on concrete face tags, so the
-agent receives a narrowed search space instead of guessing from scratch —
-and the whole human-agent session is recorded and replayable.
+`sca edit` opens a browser editor over a directory of notebooks, built for
+working *with* an agent. The notebook's cells are on the left and the live
+model is in the middle; a slider or toggle appears for every parameter. Click a
+solid, face, edge or vertex and the editor writes a `scad.ql` selection cell
+into the notebook file (autosaved), so your coding agent reads what you picked
+from disk and "chamfer these two edges" needs no ids. Copy a cell's reference
+to tell the agent which cell to change. A log dock shows which cells are being
+re-evaluated. The editor and `sca run` share one runtime and one per-cell
+cache.
 
 <table>
 <tr>
-<td width="50%" align="center" valign="top">
-<img src="img/capability/reverse_studio_mvp.gif" alt="re-studio: click faces, annotate intent, agent rebuilds"><br/>
-<b>re-studio MVP</b> — click faces on the STEP target, stack operation
-chips and notes per pick, submit; the agent classifies all 37 faces of a
-link rod and starts rebuilding from your context ·
-<a href="img/capability/reverse_studio_mvp.mp4">▶ full video</a>
+<td align="center" valign="top">
+<img src="img/capability/editor.png" alt="sca edit on the u_link motor mount: a picked face, the selection cell it wrote, its properties"><br/>
+<b>u_link motor mount in <code>sca edit</code></b> — a picked cylindrical face, the
+<code>selected_face</code> cell the editor wrote for it, and its properties;
+<code>sca example u_link</code> copies this workspace out
 </td>
 </tr>
 </table>
@@ -136,20 +149,31 @@ the full crank cycle sweeps clean in the same sim ·
 
 ---
 
-## Update Notes (2.1.3b1)
+## Update Notes (2.2)
 
 > **Release notice:** Pre-release (beta). Validate generated definitions,
 > assembly constraints, and manufacturing geometry before production use.
 
-SimpleCADAPI 2.1.3b1 ships the addon ecosystem: a `sca` CLI that installs
-third-party skill+tooling repositories (`sca addon init/add/update/remove/list`),
-a strict `sca-addon.toml` descriptor with platform and `[compat] sca` gates, and
-a consumer-facing `.scadpkg` format spec written so an agent given the document
-alone can produce a correct parser or exporter. See the
-[full English update notes](docs/updates/2.1.3b1.md) for the CLI contract, the
-two legal integration modes, and the tag channel. 2.1.2's script-anchored part
-cache ([docs/updates/2.1.2.md](docs/updates/2.1.2.md)) has since been replaced
-by the notebook runtime and its cell cache.
+- **New editor.** `sca edit` is part of the SDK now (`pip install
+  "simplecadapi[editor]"`). It runs a workspace's notebooks in a marimo kernel
+  with the SDK's own cell executor, previews the live model straight from the
+  solids, writes your viewport picks as selection code, and lets an agent see
+  what you see (`sca snapshot`). **Re-Studio is removed**: the reverse-
+  engineering studio (the `Re-mode` workspace of the standalone sca-web-editor)
+  is gone, and the standalone sca-web-editor is replaced by `sca edit`. STEP
+  reconstruction continues through the inspection API and the skill's
+  step-reconstruction workflow.
+- **One runtime, one cache.** The editor, `sca run` and
+  `simplecadapi.runtime.run_notebook()` share the per-cell cache, so what one
+  computed the others restore. Notebook parameters come from `# ---- params
+  ----` cells with an optional `# ui:` comment; local modules (shared
+  dimensions) get their own view in the editor.
+- **Landing path.** `docs/landing.md` is the script an agent follows to install
+  the SDK and its skill and open an example; `sca example u_link` copies the
+  bundled workspace and `sca skill where` shows where the skill goes.
+- Earlier: 2.1.3b1 shipped the addon ecosystem (`sca addon ...`, the
+  `sca-addon.toml` descriptor, the `.scadpkg` format spec); see its
+  [update notes](docs/updates/2.1.3b1.md).
 
 Every example model is a notebook; its export scripts load the product with
 `run_notebook`, capture one `.scadpkg`, and translate AP242 `.step` and
@@ -175,13 +199,15 @@ in a compact public API for creating solids, applying features, tagging semantic
 intent, querying topology, exporting manufacturing files, and translating recorded
 models into FreeCAD workflows.
 
-Current release: `simplecadapi==2.1.3`.
+Package: `simplecadapi` on PyPI (the 2.2 line is pre-release; 2.1.4 is the latest stable).
 
 ## What It Provides
 
 - Models as [marimo](https://marimo.io) notebooks: plain `.py` files that are
   the only source of truth, one feature per cell, a per-cell cache for
   incremental headless runs (`sca run`), and notebook composition (`scad.use`).
+- A code-first web editor, `sca edit`: live model, parameter controls, viewport
+  picks written back as selection code, built for working alongside an agent.
 - OCP-native shape types: `Vertex`, `Edge`, `Wire`, `Face`, and `Solid`.
 - Functional modeling operations for primitives, profiles, extrude, revolve,
   loft, sweep, booleans, transforms, patterns, fillets, chamfers, and shells.
@@ -205,13 +231,8 @@ Current release: `simplecadapi==2.1.3`.
 
 ## Install
 
-The shortest way: paste this to your coding agent and it does the rest
-(installs the SDK, installs the skill for itself, opens an example in the
-editor and walks you through it):
-
-```text
-Read physpace.dev/sca/landing.md and landing me on this sdk.
-```
+The shortest way is the line at the top of this page: paste it to your coding
+agent and it does the rest.
 
 By hand:
 
@@ -360,10 +381,14 @@ sca export out/bracket.scadpkg --output-dir out/exports   # AP242 STEP, STL, OBJ
 sca edit .                                                # web editor over this directory of notebooks
 ```
 
-`sca edit` (`pip install "simplecadapi[editor]"`) is a code-first editor: the
-notebook's cells on the left, the live model on the right, and a slider or
-toggle for every parameter (`# ---- params ----` cells; a `# ui:` comment on
-the line picks the control). See `docs/skill/references/docs/guides/notebook-runtime.md`.
+`sca edit` (`pip install "simplecadapi[editor]"`) is the code-first editor
+described above: the notebook's cells on the left, the live model in the
+middle, a slider or toggle for every parameter (`# ---- params ----` cells; a
+`# ui:` comment on the line picks the control), and your viewport picks written
+back as `selected_*` selection cells. See
+`docs/skill/references/docs/guides/notebook-runtime.md` and
+`docs/skill/references/domains/editor-collaboration.md` (how an agent works with
+what you picked and which cell you mean).
 
 ## Notebook Runtime
 
@@ -585,7 +610,7 @@ print("carrier", face["geometry"]["type"])
 ```
 
 Use the [Reconstruction Agent test specification](docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md)
-for controlled runs and the [STEP BREP reverse-engineering guide](docs/skill/references/workflows/reverse-engineering-studio.md)
+for controlled runs and the [STEP reconstruction workflow](docs/skill/references/workflows/step-reconstruction.md)
 for the inspection primitives, modeling loop, replay checks, and acceptance gates.
 
 ## Physical Units And Tolerances
@@ -680,10 +705,12 @@ uv run --extra gmsh python examples/ap242_gmsh_volume_mesh/export_fem_mesh.py
 uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py
 ```
 
-Reverse engineering runs in the `Re-mode` workspace of the standalone
-[sca-web-editor](https://github.com/PhySpace/sca-web-editor) against a target
-STEP (see `examples/bowl_connector/` and the
-[reverse-engineering studio workflow](docs/skill/references/workflows/reverse-engineering-studio.md)).
+To try the editor on a real model, `sca example u_link` copies a motor mount
+(two part notebooks and the assembly that fixes them) out of the package, and
+`sca edit u_link_motor_mount` opens it; from a checkout,
+`sca edit examples/u_link_motor_mount`. Reconstructing a STEP file (see
+`examples/bowl_connector/`) is driven by the agent through the inspection API
+and the [STEP reconstruction workflow](docs/skill/references/workflows/step-reconstruction.md).
 
 ## Documentation
 
@@ -693,8 +720,11 @@ STEP (see `examples/bowl_connector/` and the
 - 2.1.0 update notes: [`docs/updates/2.1.0.md`](docs/updates/2.1.0.md)
 - Reconstruction Agent test specification:
   [`docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md`](docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md)
-- Reverse-engineering studio workflow:
-  [`docs/skill/references/workflows/reverse-engineering-studio.md`](docs/skill/references/workflows/reverse-engineering-studio.md)
+- Landing script for agents: [`docs/landing.md`](docs/landing.md)
+- Editor collaboration (selection, cell references, parameters):
+  [`docs/skill/references/domains/editor-collaboration.md`](docs/skill/references/domains/editor-collaboration.md)
+- STEP reconstruction workflow:
+  [`docs/skill/references/workflows/step-reconstruction.md`](docs/skill/references/workflows/step-reconstruction.md)
 - Notebook runtime and product build workflow:
   [`docs/skill/references/docs/guides/notebook-runtime.md`](docs/skill/references/docs/guides/notebook-runtime.md)
 - Public API reference: [`docs/skill/references/docs/api/`](docs/skill/references/docs/api/)

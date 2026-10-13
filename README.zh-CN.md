@@ -6,6 +6,17 @@
 
 [English](README.md)
 
+**从这里开始。** 把下面这句话发给你的 coding agent（Claude Code、Codex、OpenCode 等）：
+
+```text
+Read physpace.dev/sca/landing.md and landing me on this sdk.
+```
+
+它会帮你安装 SDK、为自己安装 skill、在 code-first 编辑器里打开一个真实示例，并
+教你怎么和它一起工作。SimpleCADAPI 是为 agent 设计的参数化 CAD SDK：模型就是一个
+代码 notebook，每个尺寸都是命名参数，按“几何是什么”来选择对象，每一步都会反馈
+成功或失败的原因。
+
 ## 它能做什么
 
 四块能力支柱。下面每个 case 都是**真实、可复现的会话**：回放 demo 是单文件离线
@@ -41,8 +52,7 @@ HTML，忠实回放完整录制的对话（用户输入、Agent 思考、每一�
 </tr>
 </table>
 
-旋转展示由独立的 [sca-web-editor](https://github.com/PhySpace/sca-web-editor) 的 BRep
-渲染器渲染（面着色 + 宽棱边），一圈 = 48 个确定性方位角步进，经其 `gif-harness.html` 驱动生成。
+旋转展示使用 BRep 着色加宽边线渲染；转一整圈 = 48 个确定性方位角步进。
 
 ### 2 · 装配体建模
 
@@ -72,20 +82,22 @@ HTML，忠实回放完整录制的对话（用户输入、Agent 思考、每一�
 `uv run python examples/integrated_bldc_joint_actuator/export_all.py` 导出装配包和
 STEP / 可编辑 FCStd / MJCF；`render_showcase.py` 渲染上述视图。
 
-### 3 · 逆向工程
+### 3 · Code-first 编辑器
 
-导入 STEP，在浏览器里检查 BREP，直接点选你关注的几何对象——每次点选都会以标签
-形式落进标注输入框，旁边配上操作意图（sketch · boolean · fillet · 阵列…）和自由
-备注。你的逆向思路挂在具体的面标签上，agent 收到的是被收窄的搜索空间，而不是从
-零盲猜——人机协作全程录制、可回放。
+`sca edit` 在浏览器里打开一个面向“与 agent 协作”的编辑器，作用于一个 notebook
+目录。左边是 notebook 的 cell，中间是实时模型，每个参数都有滑块或开关。点选实体、
+面、边或顶点后，编辑器会把一个 `scad.ql` 选择 cell 写进 notebook 文件（自动保存），
+你的 coding agent 直接从磁盘读到你选了什么，“给这两条边倒角”不需要任何 id。复制
+cell 引用就能告诉 agent 要改哪个 cell。底部日志面板显示哪些 cell 正在重算。编辑器
+与 `sca run` 共用同一个运行时和同一份逐 cell 缓存。
 
 <table>
 <tr>
-<td width="50%" align="center" valign="top">
-<img src="img/capability/reverse_studio_mvp.gif" alt="re-studio：点选面、标注意图，agent 重建"><br/>
-<b>re-studio MVP</b> —— 在 STEP 目标上点选面、逐条叠加操作意图与备注后提交；
-agent 据此对连杆全部 37 个面做分类，从你的上下文出发开始重建 ·
-<a href="img/capability/reverse_studio_mvp.mp4">▶ 完整视频</a>
+<td align="center" valign="top">
+<img src="img/capability/editor.png" alt="sca edit 打开 u_link 电机座：选中的面、编辑器写出的选择 cell 及其属性"><br/>
+<b><code>sca edit</code> 中的 u_link 电机座</b> —— 选中的圆柱面、编辑器为它写出的
+<code>selected_face</code> cell，以及它的属性；
+<code>sca example u_link</code> 可把这个工作区复制出来
 </td>
 </tr>
 </table>
@@ -121,17 +133,25 @@ CalculiX 静力 FEM（边界面按保真的 `interface.*` 标签选取，仿真�
 
 ---
 
-## 更新日志（2.1.3b1）
+## 更新日志（2.2）
 
-> **发布说明：** 预发布（beta）。用于生产前，请验证生成的定义、装配约束和制造几何。
+> **版本提示：** 预发布（beta）。投入生产前请验证生成的定义、装配约束和制造几何。
 
-SimpleCADAPI 2.1.3b1 带来插件生态：`sca` 命令行安装第三方 skill+工具仓库
-（`sca addon init/add/update/remove/list`）、带平台与 `[compat] sca` 硬门的
-严格 `sca-addon.toml` 描述文件，以及面向消费者的 `.scadpkg` 格式规范——把
-文档交给 agent 即可写出正确的解析器/导出器。CLI 契约、两种合法集成模式与
-tag 通道见[完整中文更新说明](docs/updates/2.1.3b1.zh-CN.md)。2.1.2 的脚本
-锚定 part cache（[docs/updates/2.1.2.zh-CN.md](docs/updates/2.1.2.zh-CN.md)）
-已由 notebook 运行时及其 cell 缓存取代。
+- **新编辑器。** `sca edit` 现在是 SDK 的一部分（`pip install
+  "simplecadapi[editor]"`）。它用 SDK 自己的 cell 执行器在 marimo 内核里运行工作
+  区的 notebook，直接由实体生成实时预览，把你在视口里的点选写成选择代码，并让
+  agent 看到你看到的（`sca snapshot`）。**Re-Studio 已移除**：逆向工程 studio
+  （独立 sca-web-editor 的 `Re-mode` 工作区）不再存在，独立的 sca-web-editor 由
+  `sca edit` 取代。STEP 重建继续通过检查 API 和 skill 的 step-reconstruction
+  工作流进行。
+- **一个运行时，一份缓存。** 编辑器、`sca run` 和
+  `simplecadapi.runtime.run_notebook()` 共用逐 cell 缓存，一方算过的另一方直接
+  复用。notebook 参数来自 `# ---- params ----` cell，可加 `# ui:` 注释指定控件；
+  本地模块（共用尺寸）在编辑器里有独立视图。
+- **落地路径。** `docs/landing.md` 是 agent 安装 SDK 和 skill、打开示例时遵循的
+  脚本；`sca example u_link` 复制内置工作区，`sca skill where` 显示 skill 的安装位置。
+- 之前：2.1.3b1 带来插件生态（`sca addon ...`、`sca-addon.toml` 描述文件、
+  `.scadpkg` 格式规范），见[更新说明](docs/updates/2.1.3b1.zh-CN.md)。
 
 每个示例模型都是 notebook；导出脚本用 `run_notebook` 载入产品，捕获一个
 `.scadpkg`，再从同一个产品包转换出 AP242 `.step` 和可编辑 `.FCStd`。
@@ -153,13 +173,15 @@ tag 通道见[完整中文更新说明](docs/updates/2.1.3b1.zh-CN.md)。2.1.2 �
 
 SimpleCADAPI 是一个基于 OCP 的 Python CAD SDK，提供清晰的函数式建模操作和可重放的模型图。它在 OpenCascade 几何内核之上提供精简的公共 API，可用于创建实体、应用特征、添加语义标签、查询拓扑、导出制造文件，以及将记录的模型转换为 FreeCAD 工作流。
 
-当前版本：`simplecadapi==2.1.3`。
+包：PyPI 上的 `simplecadapi`（2.2 系列为预发布；2.1.4 是最新稳定版）。
 
 ## 核心能力
 
 - 模型即 [marimo](https://marimo.io) notebook：普通 `.py` 文件就是唯一的真相
   来源，一个 cell 一个特征，按 cell 缓存实现增量无头运行（`sca run`），并可用
   `scad.use` 组合 notebook。
+- Code-first 网页编辑器 `sca edit`：实时模型、参数控件，视口点选写回为选择代码，
+  为与 agent 协作而设计。
 - 由 notebook 生成的规范 `.scadpkg` 产品包，用于交换和发布，不会反过来作为模型
   输入。
 - 基于 OCP 的 `Vertex`、`Edge`、`Wire`、`Face` 和 `Solid` 类型。
@@ -176,11 +198,18 @@ SimpleCADAPI 是一个基于 OCP 的 Python CAD SDK，提供清晰的函数式�
 
 ## 安装
 
-使用 pip：
+最快的方式是页面顶部那句话：发给你的 coding agent，剩下的它来做。
+
+手动安装，使用 pip：
 
 ```bash
 pip install simplecadapi
 ```
+
+代码优先编辑器（`sca edit`）需要 `editor` extra：`pip install "simplecadapi[editor]"`；
+`uv tool install "simplecadapi[editor]"` 或 `pipx install "simplecadapi[editor]"`
+不用虚拟环境就能把 `sca` 放进 PATH。`sca example u_link` 把内置示例工作区复制出来，
+再用 `sca edit` 打开。
 
 使用 uv：
 
@@ -309,7 +338,16 @@ marimo edit bracket.py                                    # 响应式编辑器
 sca run bracket.py                                        # 运行并输出 JSON 报告
 sca run bracket.py --set width=80 --out out/bracket.scadpkg
 sca export out/bracket.scadpkg --output-dir out/exports   # AP242 STEP、STL、OBJ
+sca edit .                                                # 这个目录 notebook 的网页编辑器
 ```
+
+`sca edit`（`pip install "simplecadapi[editor]"`）就是上面介绍的 code-first
+编辑器：左边是 notebook 的 cell，中间是实时模型，每个参数一个滑块或开关
+（`# ---- params ----` cell；一行末尾的 `# ui:` 注释选择控件），视口点选写回为
+`selected_*` 选择 cell。详见
+`docs/skill/references/docs/guides/notebook-runtime.md` 和
+`docs/skill/references/domains/editor-collaboration.md`（agent 如何使用你的选择和
+指定的 cell）。
 
 ## Notebook 运行时
 
@@ -512,7 +550,7 @@ print("carrier", face["geometry"]["type"])
 
 受控测试请使用 [Reconstruction Agent 测试规范](docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md)，
 检查原语、建模循环、回放检查和验收门槛请阅读
-[STEP BREP 逆向工程指南](docs/skill/references/workflows/reverse-engineering-studio.md)。
+[STEP 重建工作流](docs/skill/references/workflows/step-reconstruction.md)。
 
 ## FreeCAD 转换
 
@@ -553,9 +591,11 @@ uv run --extra gmsh python examples/ap242_gmsh_volume_mesh/export_fem_mesh.py
 uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py
 ```
 
-逆向工程在独立的 [sca-web-editor](https://github.com/PhySpace/sca-web-editor)
-的 `Re-mode` 工作区里针对目标 STEP 进行（见 `examples/bowl_connector/` 和
-[逆向工程 studio 工作流](docs/skill/references/workflows/reverse-engineering-studio.md)）。
+想在真实模型上试用编辑器：`sca example u_link` 把一个电机座（两个零件 notebook 加
+把它们固定在一起的装配）从包里复制出来，`sca edit u_link_motor_mount` 打开它；
+在源码仓库里则是 `sca edit examples/u_link_motor_mount`。重建 STEP 文件（见
+`examples/bowl_connector/`）由 agent 通过检查 API 和
+[STEP 重建工作流](docs/skill/references/workflows/step-reconstruction.md)驱动。
 
 ## 文档
 
@@ -565,8 +605,11 @@ uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py
 - 2.1.0 更新说明：[`docs/updates/2.1.0.zh-CN.md`](docs/updates/2.1.0.zh-CN.md)
 - Reconstruction Agent 测试规范：
   [`docs/guides/reconstruction-agent-test-prompt.md`](docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md)
-- STEP BREP 逆向工程指南：
-  [`docs/guides/step-brep-reverse-engineering.md`](docs/skill/references/workflows/reverse-engineering-studio.md)
+- Agent 落地脚本：[`docs/landing.md`](docs/landing.md)
+- 编辑器协作（选择、cell 引用、参数）：
+  [`docs/skill/references/domains/editor-collaboration.md`](docs/skill/references/domains/editor-collaboration.md)
+- STEP 重建工作流：
+  [`docs/skill/references/workflows/step-reconstruction.md`](docs/skill/references/workflows/step-reconstruction.md)
 - Notebook 运行时与产品构建工作流：
   [`docs/guides/notebook-runtime.md`](docs/skill/references/docs/guides/notebook-runtime.md)
 - 公共 API 参考：[`docs/api/`](docs/skill/references/docs/api/)
