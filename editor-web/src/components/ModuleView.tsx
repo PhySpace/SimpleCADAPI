@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
 import { EditorView } from "@codemirror/view";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ParamControl, type ParamMeta, type ParamValue } from "@/components/ParamControl";
 import { cadTheme } from "@/lib/cm-theme";
+import { sdkCompletion } from "@/lib/sdk-complete";
 
 /** A local module of the workspace (shared dimensions, helpers): what the
  * server sends as the `module` envelope. */
@@ -21,7 +22,9 @@ export type ModuleState = {
 };
 
 const AUTOSAVE_MS = 700;
-const EXTENSIONS = [python(), EditorView.lineWrapping];
+const EXTENSIONS = [python(), EditorView.lineWrapping, sdkCompletion];
+/** a constant: a new object each render makes the editor wrapper rebuild its configuration, which drops a snippet in progress */
+const BASIC_SETUP = { lineNumbers: true, foldGutter: false, highlightActiveLine: false };
 
 /** A module open next to the notebooks: its dataclass fields as controls, its
  * source below. Every edit is written to the file at once, and every notebook
@@ -59,6 +62,11 @@ export function ModuleView({
       socket?.send({ type: "module.save", path: module.path, code: value });
     }, AUTOSAVE_MS);
   };
+
+  // the editor takes this once: a new function each render would rebuild its configuration
+  const editRef = useRef(edit);
+  editRef.current = edit;
+  const handleChange = useCallback((value: string) => editRef.current(value), []);
 
   const forward = (id: string, value: ParamValue) => {
     pending.current.set(id, value);
@@ -124,8 +132,8 @@ export function ModuleView({
               height="auto"
               extensions={EXTENSIONS}
               theme={cadTheme}
-              basicSetup={{ lineNumbers: true, foldGutter: false, highlightActiveLine: false }}
-              onChange={edit}
+              basicSetup={BASIC_SETUP}
+              onChange={handleChange}
             />
           </section>
         </div>
