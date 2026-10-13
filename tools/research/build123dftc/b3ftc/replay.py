@@ -118,9 +118,9 @@ class TraceReplayer:
         ident = step.get('id', f's{self.feature_count + 1}')
         var = _variable(ident)
         inputs = self.source(step)
-        create = op in {'box', 'cylinder', 'cone', 'sphere', 'torus', 'extrude', 'revolve', 'loft', 'sweep', 'extrude_linear', 'extrude_linear_with_rotation', 'extrude_taper', 'extrude_twist', 'extrude_until', 'sweep_multi'}
+        create = op in {'box', 'cylinder', 'cone', 'sphere', 'torus', 'extrude', 'revolve', 'loft', 'sweep', 'sew_solid', 'extrude_linear', 'extrude_linear_with_rotation', 'extrude_taper', 'extrude_twist', 'extrude_until', 'sweep_multi'}
         role = 'build' if create else {'union': 'add', 'fuse': 'add', 'cut': 'subtract', 'intersect': 'intersect', 'compound': 'pattern'}.get(op, 'modify')
-        tiers = ['profile=geometry'] if op in {'extrude', 'revolve', 'loft', 'sweep', 'extrude_linear', 'extrude_linear_with_rotation', 'torus', 'extrude_taper', 'extrude_twist', 'extrude_until', 'sweep_multi'} else []
+        tiers = ['profile=geometry'] if op in {'extrude', 'revolve', 'loft', 'sweep', 'sew_solid', 'extrude_linear', 'extrude_linear_with_rotation', 'torus', 'extrude_taper', 'extrude_twist', 'extrude_until', 'sweep_multi'} else []
         if op in {'sweep', 'sweep_multi'}:
             tiers.append('path=geometry')
         self.lines.append(block_header(self.slugs.allocate(op), role, tiers))
@@ -152,7 +152,10 @@ class TraceReplayer:
             else:
                 direction = _named(p, 'normal', 'direction', 'vector', default=(0, 0, 1))
                 distance = math.sqrt(dot(direction, direction))
-                expression = f'scad.twisted_sweep_rsolid(profile=_profile, distance={fmt_num(distance)}, twist_angle={fmt_num(_named(p, "angle", "twist_angle", default=0))}, axis={fmt_vec(direction)}, origin={fmt_vec(_named(p, "center", "origin", default=(0, 0, 0)))}, guide_radius=1)'
+                origin = list(_named(p, 'center', 'origin', default=(0, 0, 0)))
+                if len(origin) == 2:
+                    origin.append(0)
+                expression = f'scad.twisted_sweep_rsolid(profile=_profile, distance={fmt_num(distance)}, twist_angle={fmt_num(_named(p, "angle", "twist_angle", default=0))}, axis={fmt_vec(direction)}, origin={fmt_vec(origin)}, guide_radius=1)'
             self.lines.append(f'    {var} = [{expression} for _profile in [{", ".join(refs)}]]')
         elif op == 'revolve':
             profiles = _profiles(step)
@@ -168,6 +171,15 @@ class TraceReplayer:
             if len(refs) < 2:
                 raise ValueError('loft needs at least two recorded sections')
             self.lines.append(f'    {var} = [scad.loft_rsolid(profiles=[{", ".join(refs)}], ruled={bool(p.get("ruled", False))!r})]')
+        elif op == 'sew_solid':
+            if step.get('geometry_error'):
+                raise ValueError(step['geometry_error'])
+            profiles = step.get('profiles') or []
+            if not profiles:
+                raise ValueError('solid shell requires recorded planar faces')
+            refs = [self.profile(profile, f'{var}_face{i}') for i, profile in enumerate(profiles)]
+            self.lines.append(f'    {var}_shell = scad.sew_faces_rshell(faces=[{", ".join(refs)}])')
+            self.lines.append(f'    {var} = [scad.make_solid_from_shell_rsolid(shell={var}_shell)]')
         elif op in {'sweep', 'sweep_multi'}:
             profiles = _profiles(step)
             path = step.get('path')
@@ -175,7 +187,9 @@ class TraceReplayer:
                 raise ValueError('sweep path missing')
             path_lines, path_expr = emit_path(path, var + '_path', snapshots=self.snapshots)
             self.lines.extend(path_lines)
-            refs = [self.profile(profile, f'{var}_profile{i}') for i, profile in enumerate(profiles)]
+            refs = ([self.profile(profile, f'{var}_profile{i}') for i, profile in enumerate(profiles)]
+                    if op == 'sweep_multi' or not any(len(profile.get('wires', [])) > 1 for profile in profiles)
+                    else [])
             frenet = bool(_named(p, 'is_frenet', 'frenet', default=False))
             if op == 'sweep_multi':
                 binormal = p.get('binormal')
@@ -185,11 +199,28 @@ class TraceReplayer:
             else:
                 if p.get('mode') is not None or str(p.get('transition', 'TRANSFORMED')) != 'TRANSFORMED':
                     raise ValueError('sweep mode/transition needs a native advanced sweep operator')
-                self.lines.append(f'    {var} = [scad.sweep_rsolid(profile=_profile, path={path_expr}, is_frenet={frenet!r}) for _profile in [{", ".join(refs)}]]')
+                if any(len(profile.get('wires', [])) > 1 for profile in profiles):
+                    pieces = []
+                    for index, profile in enumerate(profiles):
+                        loops = [self.profile({**profile, 'wires': [wire]}, f'{var}_loop{index}_{i}')
+                                 for i, wire in enumerate(profile['wires'])]
+                        outer = var + f'_outer{index}'
+                        self.lines.append(f'    {outer} = [scad.sweep_rsolid(profile={loops[0]}, path={path_expr}, is_frenet={frenet!r})]')
+                        tools = ', '.join(f'scad.sweep_rsolid(profile={loop}, path={path_expr}, is_frenet={frenet!r})' for loop in loops[1:])
+                        pieces.append(f'scad.boolean_rsolidlist(left={outer}, right=[{tools}], operation="cut")')
+                    self.lines.append(f'    {var} = [_b for _group in [{", ".join(pieces)}] for _b in _group]')
+                else:
+                    self.lines.append(f'    {var} = [scad.sweep_rsolid(profile=_profile, path={path_expr}, is_frenet={frenet!r}) for _profile in [{", ".join(refs)}]]')
         elif op == 'component':
             if len(inputs) != 1:
                 raise ValueError('component requires one parent feature')
-            self.lines.append(f'    {var} = [{inputs[0]}[{int(p["index"])}]]')
+            fingerprint = p.get('fingerprint', {})
+            if fingerprint.get('bbox') is not None:
+                self.uses_ql = True
+                selector = fingerprint_selector([fingerprint], 'solid')
+                self.lines.append(f'    {var} = {selector}.resolve({inputs[0]})')
+            else:
+                self.lines.append(f'    {var} = [{inputs[0]}[{int(p["index"])}]]')
         elif op in {'compound', 'copy', 'clean'}:
             self.lines.append(f'    {var} = [ _b for _group in [{", ".join(inputs)}] for _b in _group ]')
         elif op in {'union', 'fuse', 'cut', 'intersect'}:
@@ -199,21 +230,23 @@ class TraceReplayer:
                 self.lines.append(f'    {var} = list({inputs[0]})')
             elif op == 'cut':
                 tools = f'[_b for _group in [{", ".join(inputs[1:])}] for _b in _group]'
-                self.lines.append(f'    {var} = [scad.cut_rsolid(_b, {tools}) for _b in {inputs[0]}]')
+                self.lines.append(f'    {var} = scad.boolean_rsolidlist(left={inputs[0]}, right={tools}, operation="cut")')
             elif op == 'intersect':
-                self.lines.append(f'    {var} = [scad.intersect_rsolid([{", ".join(inputs)}])]')
+                self.lines.append(f'    {var} = list({inputs[0]})')
+                for group in inputs[1:]:
+                    self.lines.append(f'    {var} = scad.boolean_rsolidlist(left={var}, right={group}, operation="intersect")')
             else:
                 groups = step.get('result_groups')
                 if groups:
                     values = []
                     for group in groups:
                         group_refs = [self.variables[x] for x in group]
-                        values.append(f'scad.union_rsolid([{", ".join(group_refs)}])' if len(group_refs) > 1 else f'{group_refs[0]}[0]')
+                        values.append(f'scad.union_rsolid([{", ".join(group_refs)}], tracking_policy="graph")' if len(group_refs) > 1 else f'{group_refs[0]}[0]')
                     self.lines.append(f'    {var} = [{", ".join(values)}]')
                 elif step.get('result', {}).get('solid_count', 1) > 1:
                     raise ValueError('disconnected union requires recorded connected operand groups')
                 else:
-                    self.lines.append(f'    {var} = [scad.union_rsolid([{", ".join(inputs)}])]')
+                    self.lines.append(f'    {var} = [scad.union_rsolid([{", ".join(inputs)}], tracking_policy="graph")]')
         elif op in {'fillet', 'chamfer'}:
             selector = fingerprint_selector(step.get('selection', []), 'edge')
             self.uses_ql = True
@@ -232,7 +265,20 @@ class TraceReplayer:
                             raise ValueError('per-edge chamfer reference normals vary; the native operator requires one reference direction')
                         raise ValueError('asymmetric chamfer requires reference-face normal')
                     extras += ', reference_direction=' + fmt_vec(direction)
-            self.lines.append(f'    {var} = [scad.{op}_rsolid(solid=_b, edges={selector}, {extras}) for _b in {inputs[0]}]')
+            groups = step.get('component_selections')
+            if groups is not None:
+                self.lines.append(f'    {var} = []')
+                for index, selection in enumerate(groups):
+                    body = f'{inputs[0]}[{index}]'
+                    if selection:
+                        local = fingerprint_selector(selection, 'edge')
+                        self.lines.append(f'    {var}.append(scad.{op}_rsolid(solid={body}, edges={local}, {extras}))')
+                    else:
+                        self.lines.append(f'    {var}.append({body})')
+            elif self.steps[step['inputs'][0]].get('result', {}).get('solid_count', 1) > 1:
+                raise ValueError('multi-body blend requires per-component selections')
+            else:
+                self.lines.append(f'    {var} = [scad.{op}_rsolid(solid=_b, edges={selector}, {extras}) for _b in {inputs[0]}]')
         elif op == 'draft':
             if len(inputs) != 1:
                 raise ValueError('draft requires one parent feature')
@@ -259,6 +305,13 @@ class TraceReplayer:
             self.transform(op, p, inputs, var)
         else:
             raise ValueError(f'unsupported op: {op}')
+        components = step.get('result_components', [])
+        if components and all(fp.get('bbox') is not None for fp in components):
+            # Kernel output order is not stable across environments. Restore the
+            # traced component order before indexed selections and modifications.
+            self.uses_ql = True
+            selectors = [fingerprint_selector([fp], 'solid') for fp in components]
+            self.lines.append(f'    {var} = [{", ".join(f"{selector}.resolve({var})[0]" for selector in selectors)}]')
         self.lines.append('')
         self.variables[ident] = var
         self.steps[ident] = step
@@ -324,7 +377,9 @@ class TraceReplayer:
                 return
             self.lines.append(f'    {var} = [scad.make_sphere_rsolid(radius={fmt_num(p["radius"])}, center={fmt_vec(origin)})]')
         else:
-            if abs(float(p.get('angle1', 0))) > 1e-9 or abs(float(p.get('angle2', 360)) - 360) > 1e-9:
+            start = _named(p, 'start_angle', 'angle1', default=0)
+            end = _named(p, 'end_angle', 'angle2', default=360)
+            if abs(float(start)) > 1e-9 or abs(float(end) - 360) > 1e-9:
                 raise ValueError('partial torus tube needs a traced meridian closure profile')
             major, minor = _named(p, 'major_radius', 'radius1'), _named(p, 'minor_radius', 'radius2')
             axis = unit(axis)
@@ -333,7 +388,7 @@ class TraceReplayer:
             profile = {'origin': profile_origin, 'u': x_dir, 'v': axis, 'normal': cross(x_dir, axis),
                        'wires': [{'edges': [{'kind': 'circle', 'center': profile_origin, 'radius': minor}]}]}
             face = self.profile(profile, var + '_meridian')
-            self.lines.append(f'    {var} = [scad.revolve_rsolid(profile={face}, axis={fmt_vec(axis)}, angle={fmt_num(_named(p, "angle3", "angle", default=360))}, origin={fmt_vec(origin)})]')
+            self.lines.append(f'    {var} = [scad.revolve_rsolid(profile={face}, axis={fmt_vec(axis)}, angle={fmt_num(_named(p, "major_angle", "angle3", "angle", default=360))}, origin={fmt_vec(origin)})]')
 
     def transform(self, op, p, inputs, var):
         if len(inputs) != 1:
@@ -408,10 +463,10 @@ class TraceReplayer:
             tool = var + '_' + label
             self.lines.extend([f'    with scad.SimpleWorkplane(origin={fmt_vec(tool_origin)}, normal={fmt_vec([sign * x for x in normal])}, x_dir={fmt_vec(u)}):',
                 f'        {tool} = scad.make_box_rsolid(width={fmt_num(width)}, height={fmt_num(height)}, depth={fmt_num(depth)}, bottom_face_center=(0, 0, 0))'])
-            refs.append(f'scad.intersect_rsolid(_b, [{tool}])')
+            refs.append(f'scad.boolean_rsolidlist(left={inputs[0]}, right=[{tool}], operation="intersect")')
         if not refs:
             raise ValueError(f'unknown split keep mode: {keep}')
-        self.lines.append(f'    {var} = [_piece for _b in {inputs[0]} for _piece in [{", ".join(refs)}]]')
+        self.lines.append(f'    {var} = [_piece for _group in [{", ".join(refs)}] for _piece in _group]')
 
     def replay(self):
         for step in self.trace.get('steps', []):
@@ -464,6 +519,10 @@ class TraceReplayer:
             sys.path.insert(0, sibling)
         from cqftc.constraints import emit_constraint_lines, recover_constraints_guarded
         for snapshot in self.snapshots:
+            if snapshot.get('compact'):
+                self.constraint_reports.append({'name': snapshot['name'], 'status': 'unsupported',
+                    'reason': 'constraint emission is unavailable for compact multi-loop sketches', 'constraints': []})
+                continue
             if any(entity['kind'] not in {'point', 'line', 'circle', 'arc'} for entity in snapshot['entities']):
                 self.constraint_reports.append({'name': snapshot['name'], 'status': 'unsupported',
                     'reason': 'constraint recovery does not handle ellipse/B-spline entities', 'constraints': []})

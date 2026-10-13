@@ -67,7 +67,16 @@ def fingerprint_selector(fingerprints: Sequence[Mapping[str, Any]], kind: str, t
         geom_type = fp.get('geom_type') or fp.get('type')
         if geom_type:
             terms.append(f"ql.prop('geom.type', '==', {str(geom_type).upper()!r})")
+        if kind == 'solid' and fp.get('bbox') is not None:
+            for index, value in enumerate(fp['bbox']):
+                side, axis = ('min' if index < 3 else 'max'), 'xyz'[index % 3]
+                terms.extend([
+                    f"ql.prop('geom.bbox.{side}.{axis}', '>=', {fmt_num(float(value) - tolerance)})",
+                    f"ql.prop('geom.bbox.{side}.{axis}', '<=', {fmt_num(float(value) + tolerance)})",
+                ])
         for name in ('center', 'normal'):
+            if kind == 'solid':
+                continue
             values = fp.get(name)
             if values is not None:
                 for axis, value in zip('xyz', values):
@@ -77,7 +86,9 @@ def fingerprint_selector(fingerprints: Sequence[Mapping[str, Any]], kind: str, t
                         f"ql.prop('geom.{name}.{axis}', '>=', {fmt_num(value - tolerance_here)})",
                         f"ql.prop('geom.{name}.{axis}', '<=', {fmt_num(value + tolerance_here)})",
                     ])
-        for name in ('length', 'area', 'radius'):
+        for name in ('length', 'area', 'radius', 'volume'):
+            if kind == 'solid' and name != 'volume':
+                continue
             if (kind == 'edge' and name == 'area') or (kind == 'face' and name == 'length'):
                 continue
             if fp.get(name) is not None:
@@ -97,7 +108,8 @@ def fingerprint_selector(fingerprints: Sequence[Mapping[str, Any]], kind: str, t
         raise ValueError(f'{kind} selection is empty')
     combined = predicates[0] if len(predicates) == 1 else 'ql.or_(' + ', '.join(predicates) + ')'
     count = len([fp for fp in fingerprints if fp.get('kind', kind) == kind])
-    return f'ql.{kind}s().where({combined}).take({count}).exactly({count})'
+    limit = '' if kind == 'solid' else f'.take({count})'
+    return f'ql.{kind}s().where({combined}){limit}.exactly({count})'
 
 
 def emit_module(stem: str, lines: Sequence[str], refs: Sequence[str], unsupported: Sequence[str], uses_ql: bool, solid_count: int = 1) -> str:

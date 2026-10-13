@@ -149,6 +149,40 @@ class Sketch:
             raise ValueError(f'unsupported exact curve kind: {kind}')
 
 
+def _polygon_loops(profile, wires, name, snapshots):
+    """Compact native sketch construction for a large set of closed polygons."""
+    sketches = [Sketch(f'{name}_loop{i}_sketch', profile) for i in range(len(wires))]
+    points = []
+    for sketch, wire in zip(sketches, wires):
+        edges = wire['edges']
+        if any(edge['kind'] != 'line' or math.dist(edge['end'], following['start']) > 1e-7
+               for edge, following in zip(edges, edges[1:] + edges[:1])):
+            return None
+        points.append([sketch.local(edge['start']) for edge in edges])
+    if snapshots is not None:
+        for sketch, wire in zip(sketches, wires):
+            edges = wire['edges']
+            for edge in edges:
+                sketch.entity(edge)
+            snapshots.append({'name': sketch.name, 'entities': sketch.snapshot_entities,
+                'closed': True, 'compact': True,
+                'plane': {'origin': list(sketch.origin), 'x_axis': list(sketch.u), 'y_axis': list(sketch.v)}})
+    origin, u, v, normal = frame(profile)
+    plane_expr = "{'origin': " + fmt_vec(origin) + ", 'x_axis': " + fmt_vec(u) + ", 'y_axis': " + fmt_vec(v) + "}"
+    data, refs = name + '_polygon_points', name + '_loop_wires'
+    lines = [f'    {data} = [', *[f'        {fmt_literal(loop)},' for loop in points], '    ]',
+             f'    {refs} = []', f'    for _loop_index, _points in enumerate({data}):',
+             f'        _loop_sketch = scad.make_sketch_rsketch(name={name!r} + f"_loop{{_loop_index}}_sketch", plane={plane_expr})',
+             '        for _point_index, (_x, _y) in enumerate(_points):',
+             '            _loop_sketch = scad.add_point_rsketch(sketch=_loop_sketch, point_id=f"p{_point_index + 1}", x=_x, y=_y)',
+             '        for _edge_index in range(len(_points)):',
+             '            _loop_sketch = scad.add_line_rsketch(sketch=_loop_sketch, entity_id=f"e{_edge_index + 1}", start=f"p{_edge_index + 1}", end=f"p{(_edge_index + 1) % len(_points) + 1}")',
+             f'        {refs}.append(scad.make_wire_from_sketch_rwire(sketch=_loop_sketch, profile=0))']
+    output = name + '_face'
+    lines.append(f'    {output} = scad.make_face_from_wires_rface(outer_wire={refs}[0], inner_wires={refs}[1:], normal={fmt_vec(normal)})')
+    return lines, output
+
+
 def emit_profile(profile: Mapping[str, Any], name: str, *, as_wire: bool = False, snapshots=None):
     """Return source lines + face/wire expression; outer-first wire ordering."""
     wires = profile.get('wires') or [{'edges': profile.get('edges', [])}]
@@ -156,6 +190,23 @@ def emit_profile(profile: Mapping[str, Any], name: str, *, as_wire: bool = False
         raise ValueError('empty profile')
     if as_wire and len(wires) > 1:
         raise ValueError('a wire section cannot represent multiple disconnected loops')
+    if not as_wire and len(wires) > 1 and sum(len(wire.get('edges', [])) for wire in wires) > 256:
+        # A many-hole face can exceed libslvs' per-system unknown limit even
+        # without constraints. Promote each supplied loop in its own small
+        # sketch, then construct the same face from all its exact wires.
+        if all(wire.get('edges') and all(edge['kind'] == 'line' for edge in wire['edges']) for wire in wires):
+            compact = _polygon_loops(profile, wires, name, snapshots)
+            if compact is not None:
+                return compact
+        lines, refs = [], []
+        for index, wire in enumerate(wires):
+            loop_lines, ref = emit_profile({**profile, 'wires': [wire]}, f'{name}_loop{index}',
+                                           as_wire=True, snapshots=snapshots)
+            lines.extend(loop_lines)
+            refs.append(ref)
+        output = name + '_face'
+        lines.append(f'    {output} = scad.make_face_from_wires_rface(outer_wire={refs[0]}, inner_wires=[{", ".join(refs[1:])}], normal={fmt_vec(frame(profile)[3])})')
+        return lines, output
     sketch = Sketch(name + '_sketch', profile)
     profile_ids = []
     for wire in wires:

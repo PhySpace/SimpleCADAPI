@@ -227,3 +227,34 @@ result = intersection[0].moved(Location((0,10,0)))
     assert any(s["op"] == "component" for s in trace["steps"])
     assert trace["solid_count"] == 1
     assert trace["b3d_volume"] == pytest.approx(8)
+
+
+@pytest.mark.parametrize("result", ["a-a", "[]", "()", "None", "Compound([])"])
+def test_explicit_empty_result_never_promotes_old_solid(result):
+    trace = trace_source(f"from build123d import *\na=Box(2,2,2)\nresult={result}")
+    assert trace["b3d_status"] == "error"
+    assert trace["result_refs"] == []
+    assert trace["solid_count"] == 0
+
+
+@pytest.mark.parametrize("z", [-10, 10])
+def test_both_split_with_empty_side_is_serializable(z):
+    trace = checked(f"""from build123d import *
+a = Solid.make_box(2,2,2)
+result = a.split(Plane.XY.offset({z}), keep=Keep.BOTH)
+""")
+    assert trace["solid_count"] == 1
+    assert trace["b3d_valid"]
+    assert trace["b3d_volume"] == pytest.approx(8)
+
+
+@pytest.mark.parametrize("op", ["revolve", "sweep"])
+def test_face_section_ignores_explicit_inner_wires(op):
+    call = ("Solid.revolve(section, 360, Axis((0,0,0),(0,1,0)), inner_wires=[hole])"
+            if op == "revolve" else "Solid.sweep(section, Wire.make_polygon([(3,0,0),(3,0,5)]), inner_wires=[hole])")
+    trace = checked(f"""from build123d import *
+section = Face(Wire.make_circle(1, plane=Plane((3,0,0))))
+hole = Wire.make_circle(.2, plane=Plane((3,0,0)))
+result = {call}
+""")
+    assert not trace["steps"][-1].get("inner_wires")

@@ -13,7 +13,6 @@ from b3ftc.validation import compare_metrics
 
 
 @pytest.mark.parametrize("statement", [
-    "result = ConvexPolyhedron([(0,0,0),(1,0,0),(0,1,0),(0,0,1)])",
     "result = Box(2,3,4).to_splines()",
     "from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox\nresult = Solid(BRepPrimAPI_MakeBox(2,3,4).Solid())",
 ])

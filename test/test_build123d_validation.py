@@ -213,3 +213,32 @@ def test_requested_missing_reference_rejected(tmp_path):
     row = validate_row(ftc, trace, timeout=30, reference_step=tmp_path / "absent.step")
     assert row["quality"] == "rejected", row
     assert "reference_error" in row["reasons"]
+
+
+@pytest.mark.parametrize("returned", ["None", "scad.make_box_rsolid(1, 1, 1)",
+                                     "scad.translate_shape(body, (10, 0, 0))"])
+def test_actual_build_return_cannot_hide_behind_matching_bodies(tmp_path, returned):
+    source = box_source().replace("return body", f"return {returned}")
+    # A plain build allows None so the worker itself must reject it.
+    source = "\n".join(line for line in source.splitlines() if not line.startswith("@scad.part"))
+    ftc, trace = write_case(tmp_path, "wrong_return", source)
+    row = validate_row(ftc, trace, timeout=30)
+    assert row["quality"] == "rejected", row
+
+
+def test_returned_assembly_is_checked_in_world_coordinates(tmp_path):
+    source = """import simplecadapi as scad
+BODIES = None
+def build():
+    global BODIES
+    body = scad.make_box_rsolid(10, 10, 10)
+    BODIES = [body]
+    part = scad.make_part_rpart(part_id='box', body=body)
+    assembly = scad.make_assembly_rassembly(assembly_id='placed')
+    return scad.add_component_rassembly(assembly=assembly, item=part,
+        component_id='box', placement=scad.make_placement_rplacement(origin=(10,0,0)))
+"""
+    ftc, trace = write_case(tmp_path, "placed", source)
+    row = validate_row(ftc, trace, timeout=30)
+    assert row["quality"] == "rejected", row
+    assert "does not match" in row["error"]

@@ -194,10 +194,22 @@ class Recorder:
                         extra["path"] = geometry.path(value)
                     elif field in {"edge_list", "faces", "openings"}:
                         extra["selection"] = [geometry.fingerprint(v, receiver) for v in value or []]
+                        if receiver is not None and len(receiver.solids()) > 1:
+                            kind = "edge" if field == "edge_list" else "face"
+                            extra["component_selections"] = [
+                                [geometry.fingerprint(v, solid) for v in value or []
+                                 if any(child.wrapped.IsSame(v.wrapped) for child in
+                                        (solid.edges() if kind == "edge" else solid.faces()))]
+                                for solid in receiver.solids()]
                     elif field in {"to_fuse", "to_cut", "to_intersect", "target"}:
                         inputs.extend(self.reference(value))
                     elif field == "inner_wires":
-                        extra["inner_wires"] = [geometry.wire(v) for v in value or []]
+                        # build123d uses explicit holes only for Wire sections.
+                        # A Face already owns the loops actually consumed by the feature.
+                        import build123d as b
+                        section = params.get("section")
+                        extra["inner_wires"] = ([] if isinstance(section, b.Face) else
+                                                [geometry.wire(v) for v in value or []])
                     else:
                         encoded[field] = geometry.serialize(value)
             except Exception as exc:
@@ -278,6 +290,56 @@ class Recorder:
 
     def install(self):
         import build123d as b
+        # Compound algebra and Builder insertion can call the kernel boolean
+        # boundary directly, without Shape.fuse/cut/intersect.
+        original_boolean = b.Shape._bool_op
+
+        @functools.wraps(original_boolean)
+        def boolean(shape, args, tools, operation):
+            if self.depth:
+                return original_boolean(shape, args, tools, operation)
+            args, tools = list(args), list(tools)
+            from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut, BRepAlgoAPI_Common
+            op = next((name for cls, name in ((BRepAlgoAPI_Fuse, "union"),
+                       (BRepAlgoAPI_Cut, "cut"), (BRepAlgoAPI_Common, "intersect"))
+                       if isinstance(operation, cls)), None)
+            if op is None or not args or any(not self.is_solid(s) for s in [*args, *tools]):
+                return original_boolean(shape, args, tools, operation)
+            # Each side is a set of bodies, not a chain of intersections.
+            inputs = self.reference(b.Compound(args))
+            if tools:
+                inputs.extend(self.reference(b.Compound(tools)))
+            self.depth += 1
+            try:
+                result = original_boolean(shape, args, tools, operation)
+            finally:
+                self.depth -= 1
+            if result is not None and self.is_solid(result):
+                self.emit(op, inputs, {}, result, "Shape._bool_op")
+            return result
+
+        self.patch(b.Shape, "_bool_op", boolean)
+        original_solid_init = b.Solid.__init__
+
+        @functools.wraps(original_solid_init)
+        def solid_init(solid, obj=None, *args, **kwargs):
+            if self.depth or not isinstance(obj, b.Shell):
+                return original_solid_init(solid, obj, *args, **kwargs)
+            extra = {}
+            try:
+                extra["profiles"] = [geometry.profile(face) for face in obj.faces()]
+            except Exception as exc:
+                extra["geometry_error"] = str(exc)
+                self.unsupported(f"Cannot transcribe Solid(Shell) inputs: {exc}", source="Solid.__init__")
+            self.depth += 1
+            try:
+                original_solid_init(solid, obj, *args, **kwargs)
+            finally:
+                self.depth -= 1
+            if self.is_solid(solid):
+                self.emit("sew_solid", [], {}, solid, "Solid.__init__", **extra)
+
+        self.patch(b.Solid, "__init__", solid_init)
         factories = {"make_box": "box", "make_cylinder": "cylinder", "make_cone": "cone",
                      "make_sphere": "sphere", "make_torus": "torus", "make_wedge": "wedge",
                      "extrude": "extrude", "extrude_taper": "extrude_taper", "extrude_until": "extrude_until",
@@ -350,13 +412,13 @@ class Recorder:
 def _find_result(namespace):
     from build123d import BuildPart, Shape
     for name in ("result", "part", "model", "solid", "body"):
-        value = namespace.get(name)
+        if name not in namespace:
+            continue
+        value = namespace[name]
         if isinstance(value, BuildPart):
             return value.part
-        if isinstance(value, Shape) and value.solids():
-            return value
-        if isinstance(value, (list, tuple)) and any(isinstance(v, Shape) and v.solids() for v in value):
-            return value
+        # An explicit output is authoritative, including an empty or invalid one.
+        return value
     for value in reversed(list(namespace.values())):
         if isinstance(value, BuildPart) and value.part is not None:
             return value.part
@@ -380,7 +442,10 @@ def trace_source(source: str, filename: str = "<build123d-model>") -> dict[str, 
                 recorder.trace["b3d_status"] = "error"
                 recorder.trace["error"] = traceback.format_exc()
             result = _find_result(namespace)
-            if result is None:
+            values = result if isinstance(result, (list, tuple)) else [result]
+            from build123d import Shape
+            if (not values or any(v is not None and not isinstance(v, Shape) for v in values)
+                    or not any(v is not None and recorder.is_solid(v) for v in values)):
                 recorder.trace["b3d_status"] = "error"
                 recorder.trace["error"] += "\nNo solid result found in model namespace"
             else:
@@ -389,8 +454,7 @@ def trace_source(source: str, filename: str = "<build123d-model>") -> dict[str, 
                 recorder.trace.update(b3d_volume=summary["volume"], b3d_bbox=summary["bbox"], solid_count=summary["solid_count"])
                 recorder.trace["b3d_default_volume"] = summary.get("default_volume", summary["volume"])
                 recorder.trace["b3d_volume_gk"] = summary["volume"]
-                values = result if isinstance(result, (list, tuple)) else [result]
-                recorder.trace["b3d_valid"] = all(v.is_valid for v in values)
+                recorder.trace["b3d_valid"] = all(v.is_valid for v in values if v is not None)
                 recorder.trace["b3d_area"] = summary["area"]
         finally:
             recorder.restore()

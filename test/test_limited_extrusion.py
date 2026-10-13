@@ -71,7 +71,10 @@ def test_operation_retains_profile_and_target_as_replay_inputs():
         session.capture_result(value=output)
     node = next(n for n in session.graph.nodes if n.op == "make_extrude_until_rsolid")
     assert len(node.inputs) == 2
-    assert node.params == {"direction": (0, 0, 1), "until": "NEXT", "target_count": 1}
+    assert {key: value for key, value in node.params.items() if key != "input_refs"} == {
+        "direction": (0, 0, 1), "until": "NEXT", "target_count": 1}
+    assert [ref["node_id"] for ref in node.params["input_refs"]] == [n.node_id for n in node.inputs]
+    assert [ref["output_slot"] for ref in node.params["input_refs"]] == [0, 0]
     replayed = s.replay_model_json(s.export_model_json(session))[0]
     assert replayed.get_volume() == pytest.approx(output.get_volume(), rel=1e-9)
     assert replayed.get_volume() == pytest.approx(20)

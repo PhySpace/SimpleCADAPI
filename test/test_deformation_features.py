@@ -62,3 +62,36 @@ def test_affine_singular_matrix_rejected():
     original = scad.make_box_rsolid(width=10, height=12, depth=14)
     with pytest.raises(ValueError):
         scad.transform_rsolid(solid=original, matrix=[[0]*4 for _ in range(4)])
+
+
+def test_set_boolean_keeps_all_output_slots_and_part_replay():
+    with scad.GraphSession(graph_id="cut-pieces") as session:
+        base = scad.make_box_rsolid(10, 2, 2)
+        tool = scad.make_box_rsolid(2, 4, 4, bottom_face_center=(0, 0, -1))
+        pieces = scad.boolean_rsolidlist(left=[base], right=[tool], operation="cut")
+        assert len(pieces) == 2
+        final = scad.make_part_rpart(part_id="second", body=pieces[1])
+        session.capture_result(value=final)
+    replayed = scad.replay_model_json(scad.export_model_json(session=session), strict=True)[0]
+    from simplecadapi.kernel.ocp_properties import center_of_mass
+    assert tuple(center_of_mass(replayed.body.wrapped)) == pytest.approx(tuple(center_of_mass(pieces[1].wrapped)))
+    assert replayed.body.get_volume() == pytest.approx(16)
+
+
+@pytest.mark.parametrize("operation", ["cut", "intersect", "union"])
+def test_set_boolean_compound_members_and_graph_replay(operation):
+    with scad.GraphSession(graph_id="set-boolean") as session:
+        left = [scad.make_box_rsolid(2, 2, 2, bottom_face_center=(x, 0, 0)) for x in (-4, 4)]
+        right = [scad.make_box_rsolid(1, 4, 4, bottom_face_center=(x, 0, -1)) for x in (-4, 4)]
+        result = scad.boolean_rsolidlist(left=left, right=right, operation=operation)
+        session.capture_result(value=result)
+    expected = {"cut": 8, "intersect": 8, "union": 40}[operation]
+    assert sum(body.get_volume() for body in result) == pytest.approx(expected)
+    replayed = scad.replay_model_json(scad.export_model_json(session=session), strict=True)
+    assert len(replayed) == len(result)
+    assert sum(body.get_volume() for body in replayed) == pytest.approx(expected)
+
+
+def test_set_boolean_complete_removal_returns_no_solid():
+    base = scad.make_box_rsolid(2, 2, 2)
+    assert scad.boolean_rsolidlist(left=[base], right=[base], operation="cut") == []

@@ -86,10 +86,13 @@ def _read_step(step):
 
 
 def _compare_reference(shapes, step):
+    return _compare_shapes(shapes, _read_step(step))
+
+
+def _compare_shapes(shapes, reference):
     from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
     from OCP.BRepCheck import BRepCheck_Analyzer
-    reference = _read_step(step)
-    # Treat BODIES as a geometric set. Fuse disjoint bodies too, avoiding double
+    # Treat body groups as a geometric set. Fuse disjoint bodies too, avoiding double
     # counting overlap when comparing a multi-body result to STEP assemblies.
     actual = shapes[0]
     for shape in shapes[1:]:
@@ -179,6 +182,30 @@ def _export_step(shapes, path, options=None):
             "rebuild_pcurves_on_import": not pcurves}
 
 
+def _returned_shapes(value, placement=None):
+    """Extract world-space topology from the actual build result."""
+    from simplecadapi import Solid, Part, Assembly, PartBuildResult, AssemblyBuildResult
+    from simplecadapi.product.placement import identity_placement
+    from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform
+    from OCP.gp import gp_Trsf
+    if isinstance(value, (PartBuildResult, AssemblyBuildResult)):
+        value = value.value
+    if isinstance(value, Part):
+        value = value.body
+    if isinstance(value, Assembly):
+        parent = placement or identity_placement()
+        return [shape for component in value.components
+                for shape in _returned_shapes(component.item, parent.compose(component.placement))]
+    if isinstance(value, Solid):
+        if placement is None or placement == identity_placement():
+            return [value.wrapped]
+        x, y, z, o = placement.x_axis, placement.y_axis, placement.z_axis, placement.origin
+        transform = gp_Trsf()
+        transform.SetValues(x[0], y[0], z[0], o[0], x[1], y[1], z[1], o[1], x[2], y[2], z[2], o[2])
+        return [BRepBuilderAPI_Transform(value.wrapped, transform, True).Shape()]
+    raise ValueError("build() must return an actual Solid, Part or Assembly build result")
+
+
 def run(ftc_path, staging_dir, reference_step=None, export_step=None, export_options=None):
     import OCP
     from OCP.Bnd import Bnd_Box
@@ -197,19 +224,28 @@ def run(ftc_path, staging_dir, reference_step=None, export_step=None, export_opt
     build = getattr(module, "build", None)
     if not callable(build):
         raise ValueError("FTC module must define callable build()")
-    build()
+    built = build()
     bodies = getattr(module, "BODIES", None)
     if not isinstance(bodies, (list, tuple)) or not bodies:
         return {"status": "ok", "body_count": 0, "solid_count": 0,
                 "is_valid": False, "volume": None, "bbox": None}
-    shapes = []
     for index, body in enumerate(bodies):
         wrapped = getattr(body, "wrapped", None)
         if not isinstance(wrapped, TopoDS_Shape) or wrapped.IsNull():
             raise ValueError(f"BODIES[{index}] is not actual nonempty CAD topology")
         if _solid_count(wrapped) < 1:
             raise ValueError(f"BODIES[{index}] contains no solid")
-        shapes.append(wrapped)
+    shapes = _returned_shapes(built)
+    if not shapes or len(shapes) != len(bodies):
+        raise ValueError("build() result body count does not match BODIES")
+    if any(shape.IsNull() or not _solid_count(shape) for shape in shapes):
+        raise ValueError("build() returned empty CAD topology")
+    if not all(body.wrapped.IsSame(shape) for body, shape in zip(bodies, shapes)):
+        from simplecadapi.kernel.ocp_export import make_compound_always
+        consistency = _compare_shapes(shapes, make_compound_always([body.wrapped for body in bodies]))
+        if (consistency["reference_status"] != "ok" or
+                consistency["symmetric_difference_volume"] > max(1e-7, abs(consistency["reference_volume"]) * 1e-7)):
+            raise ValueError("BODIES geometry does not match the actual build() result")
     bounds = Bnd_Box()
     for shape in shapes:
         BRepBndLib.AddOptimal_s(shape, bounds, False, False)

@@ -1245,6 +1245,7 @@ def _record_geo_selection_nodes(
             op=op,
             params={
                 "target_kind": kind,
+                "source_output_slot": int(source_shape._get_runtime("graph.output_slot", 0)),
                 "geo_selector": _make_geo_selector(
                     selected,
                     source_shape=source_shape,

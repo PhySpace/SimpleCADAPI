@@ -12,7 +12,8 @@ trace.json → build123d_profile.py → profile.json
 ```
 
 捕获执行模型的 Python；只对可信源文件运行。模型的 `__main__` 分支不会运行，
-可在顶层将最终形状绑定为 `result`。捕获和验收分别在隔离子进程执行，设置
+可在顶层将最终形状绑定为 `result`。显式输出即使为空也具有优先级，不会回退
+到先前创建的实体。捕获和验收分别在隔离子进程执行，设置
 超时，一例失败仍处理后续文件。
 
 ## 环境
@@ -80,7 +81,9 @@ uv pip install --python ../.venv-sca/bin/python -e . 'cadquery-ocp==7.9.3.1' pyt
 
 ## 验收依据
 
-- 实际执行 FTC，检查非空实体、内核有效性、体积、表面积和实体数量。
+- 实际执行 FTC，以 `build()` 返回的 Solid、Part 或 Assembly 为验收对象，
+  应用嵌套装配位置后检查非空实体、内核有效性、体积、表面积和实体数量。
+  `BODIES` 必须非空，并与实际返回模型的实体数量和几何一致。
 - 比较世界坐标中的六个包围盒边界；同尺寸但位置错误会失败。
 - 指定参考 STEP 时，要求两个方向几何差集的总体积通过检查。
 - `--reference-python` 让参考几何对账在指定内核执行，FTC 仍在
@@ -116,6 +119,16 @@ uv pip install --python ../.venv-sca/bin/python -e . 'cadquery-ocp==7.9.3.1' pyt
 草图支持直线、圆弧、圆、椭圆、精确有理 B 样条与闭合/周期样条；曲线型
 文字及三维路径使用实际曲线控制数据。多实体输出为完整 `@scad.assemble`。
 
+切割与交集使用录制的 `scad.boolean_rsolidlist` 保留全部输出实体；Compound
+成员属于同一交集操作数，多参数交集仍按顺序取交。每块实体的圆角/倒角使用
+各自的选边基数，未选中的实体直接保留。多输出顺序通过实体几何指纹恢复；
+截面特征保存有序输入引用及输出槽，QL 得到的截面也进入录制图。
+实体排序使用世界包围盒和体积，避免不同 OCCT 版本质心计算的差异。
+圆环支持 `major_angle` 主圆周角度；非完整管截面的 `start_angle/end_angle`
+目前明确记录为未转换，不会生成完整圆环代替。
+更新工具后应重新捕获旧模型；缺少逐实体选边信息的旧多实体圆角图会被标为
+未转换，历史空结果图也需要重捕获才能纠正。
+
 生成代码使用现行 FTC 块头、几何档标注、keyword 实参、QL 谓词和基数。
 数字来源于实际调用，不虚构参数名。动态追踪只描述执行到的路径；输出不会
 保留未执行的分支，也不承诺恢复源草图的约束或全部表达式。
@@ -145,3 +158,7 @@ fixture，并带出处。普通 FTC 测试不依赖 build123d；执行捕获测�
   test/test_section_features.py test/test_limited_extrusion.py \
   test/test_rational_volume_precision.py test/test_sketch_closed_bspline.py -q
 ```
+
+`test/test_build123d_review_regressions.py` 额外从专用 build123d 环境捕获审查
+反例，再在 SimpleCADAPI 环境执行生成代码并验收实际返回模型；运行该文件
+需要相邻的 `../.venv`。

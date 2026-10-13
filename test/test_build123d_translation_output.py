@@ -113,6 +113,20 @@ class FormatTests(unittest.TestCase):
 
 
 class GeometryTests(unittest.TestCase):
+    def test_many_holes_use_small_sketches_and_preserve_all_loops(self):
+        profile = rectangle(500, 600)
+        for i in range(25):
+            for j in range(25):
+                x, y = 5 + 10 * i, 5 + 10 * j
+                points = [(x, y, 0), (x + 1, y, 0), (x + 1, y + 1, 0), (x, y + 1, 0)]
+                profile['wires'].append({'edges': [{'kind': 'line', 'start': a, 'end': b}
+                    for a, b in zip(points, points[1:] + points[:1])]})
+        payload = trace({'id': 's1', 'op': 'extrude', 'profile': profile,
+                         'parameters': {'direction': (0, 0, 1), 'distance': 1}})
+        source, _ = replay_trace_to_ftc(payload)
+        self.assertIn('scad.make_face_from_wires_rface(', source)
+        self.build(payload, 500 * 600 - 625)
+
     def test_real_recorded_fixtures_reconcile(self):
         import json
         for path in sorted((ROOT / 'test/build123d_traces').glob('*.trace.json')):

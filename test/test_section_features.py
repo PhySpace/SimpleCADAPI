@@ -64,3 +64,42 @@ def test_taper_with_hole_tapers_inner_loop_oppositely():
     slope = math.tan(math.radians(5))
     expected = math.pi * ((100 - 4) * 3 - (10 + 2) * slope * 9)
     assert body.get_volume() == pytest.approx(expected, rel=1e-6)
+
+
+def test_taper_ql_face_is_recorded_as_feature_input():
+    with s.GraphSession(graph_id="selected-taper") as session:
+        base = s.make_box_rsolid(10, 6, 2)
+        profile = s.ql.faces().where(s.ql.prop("geom.normal.z", ">", .9)).exactly(1).resolve(base)[0]
+        result = s.extrude_taper_rsolid(profile=profile, vector=(0, 0, 4), taper=10)
+        session.capture_result(value=result)
+    replayed = s.replay_model_json(s.export_model_json(session=session), strict=True)[0]
+    assert replayed.get_volume() == pytest.approx(result.get_volume(), rel=1e-8)
+    from simplecadapi.kernel.ocp_properties import center_of_mass
+    assert tuple(center_of_mass(replayed.wrapped)) == pytest.approx(tuple(center_of_mass(result.wrapped)))
+
+
+def test_multisection_uses_ordered_slots_from_one_boundary_node():
+    with s.GraphSession(graph_id="boundary-sweep") as session:
+        first = s.make_circle_rwire(center=(0, 0, 0), radius=2)
+        last = s.make_circle_rwire(center=(0, 0, 6), radius=3)
+        shell = s.loft_rshell(sections=[first, last])
+        boundaries = s.free_boundaries_rwirelist(shell)
+        assert len(boundaries) == 2
+        path = s.make_segment_rwire(start=(0, 0, 0), end=(0, 0, 6))
+        body = s.sweep_multisection_rsolid(profiles=list(reversed(boundaries)), path=path)
+        session.capture_result(value=body)
+    replayed = s.replay_model_json(s.export_model_json(session=session), strict=True)[0]
+    assert replayed.get_volume() == pytest.approx(body.get_volume(), rel=1e-7)
+
+
+def test_taper_ql_face_from_second_boolean_output_replays_in_place():
+    with s.GraphSession(graph_id="second-profile") as session:
+        base = s.make_box_rsolid(10, 2, 2)
+        tool = s.make_box_rsolid(2, 4, 4, bottom_face_center=(0, 0, -1))
+        pieces = s.boolean_rsolidlist(left=[base], right=[tool], operation="cut")
+        profile = s.ql.faces().where(s.ql.prop("geom.normal.z", ">", .9)).exactly(1).resolve(pieces[1])[0]
+        body = s.extrude_taper_rsolid(profile=profile, vector=(0, 0, 1), taper=5)
+        session.capture_result(value=body)
+    replayed = s.replay_model_json(s.export_model_json(session=session), strict=True)[0]
+    from simplecadapi.kernel.ocp_properties import center_of_mass
+    assert tuple(center_of_mass(replayed.wrapped)) == pytest.approx(tuple(center_of_mass(body.wrapped)))

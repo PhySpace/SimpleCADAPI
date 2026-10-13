@@ -148,6 +148,15 @@ def _lookup_property(obj: Any, path: str) -> Any:
         gtype = _geom_type(obj)
         return gtype if gtype is not None else MISSING
 
+    if path.startswith("geom.bbox.") and hasattr(obj, "wrapped"):
+        from .kernel.ocp_properties import bounding_box
+        field = path.removeprefix("geom.bbox.")
+        names = {f"{side}.{axis}": axis + bound
+                 for side, bound in (("min", "min"), ("max", "max")) for axis in "xyz"}
+        if field in names:
+            return float(getattr(bounding_box(obj.wrapped), names[field]))
+        return MISSING
+
     if path == "geom.family":
         cls_name = obj.__class__.__name__.lower()
         if cls_name == "edge":

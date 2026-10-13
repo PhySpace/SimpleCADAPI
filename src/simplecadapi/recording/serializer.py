@@ -424,6 +424,7 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
     "scale_rsolid": {"status": "replayable", "op": "make_scale_rsolid"},
     "transform_rsolid": {"status": "replayable", "op": "make_transform_rsolid"},
     "offset_rsolid": {"status": "replayable", "op": "make_offset_rsolid"},
+    "boolean_rsolidlist": {"status": "replayable", "op": "make_boolean_rsolidlist"},
     "extrude_taper_rsolid": {"status": "replayable", "op": "make_extrude_taper_rsolid"},
     "sweep_multisection_rsolid": {"status": "replayable", "op": "make_sweep_multisection_rsolid"},
     "extrude_until_rsolid": {"status": "replayable", "op": "make_extrude_until_rsolid"},
@@ -607,6 +608,7 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "make_scale_rsolid",
     "make_transform_rsolid",
     "make_offset_rsolid",
+    "make_boolean_rsolidlist",
     "make_extrude_taper_rsolid",
     "make_sweep_multisection_rsolid",
     "make_extrude_until_rsolid",
@@ -2159,6 +2161,14 @@ def _ordered_input_shapes(
     return resolved
 
 
+def _feature_input_shapes(ctx, graph, outputs, node, params):
+    # New features preserve order and output slots, including repeated inputs.
+    # Older graphs only carried distinct upstream nodes.
+    if "input_refs" in params:
+        return _ordered_input_shapes(ctx, graph, outputs, node, params)
+    return _all_input_outputs(ctx, outputs, node)
+
+
 def _semantic_view_origin(
     ctx: _ReplayContext,
     graph: OperationGraph,
@@ -2924,7 +2934,7 @@ def _execute_graph(
 
                     if op_name == "make_part_rpart":
                         ctx.require_params(node.node_id, op_name, params, ("part_id",))
-                        body_outputs = _input_outputs(ctx, outputs, node, 0)
+                        body_outputs = _feature_input_shapes(ctx, graph, outputs, node, params)
                         if body_outputs:
                             result = ops.make_part_rpart(
                                 str(params["part_id"]),
@@ -3418,8 +3428,11 @@ def _execute_graph(
                         )
                         source_outputs = _input_outputs(ctx, outputs, node, 0)
                         if source_outputs:
+                            source_slot = int(params.get("source_output_slot", 0))
+                            if source_slot < 0 or source_slot >= len(source_outputs):
+                                ctx.fail(f"Graph node '{node.node_id}' selection source output slot {source_slot} is missing")
                             result = _resolve_shape_from_geo_selector(
-                                source_outputs[0],
+                                source_outputs[source_slot],
                                 cast(Dict[str, Any], params["geo_selector"]),
                             )
                             _store_outputs(node, result)
@@ -3926,7 +3939,9 @@ def _execute_graph(
                     if op_name == "make_extrude_until_rsolid":
                         ctx.require_params(node.node_id, op_name, params, ("direction", "until", "target_count"))
                         count = int(params["target_count"])
-                        values = [_input_outputs(ctx, outputs, node, i)[0] for i in range(count + 1)]
+                        values = _feature_input_shapes(ctx, graph, outputs, node, params)
+                        if len(values) != count + 1:
+                            ctx.fail(f"Graph node '{node.node_id}' requires a profile and {count} ordered targets")
                         result = ops.extrude_until_rsolid(profile=values[0], target=values[1:],
                             direction=params["direction"], until=params["until"])
                         _store_outputs(node, result)
@@ -3934,7 +3949,7 @@ def _execute_graph(
 
                     if op_name == "make_extrude_taper_rsolid":
                         ctx.require_params(node.node_id, op_name, params, ("vector", "taper"))
-                        input_values = _input_outputs(ctx, outputs, node, 0)
+                        input_values = _feature_input_shapes(ctx, graph, outputs, node, params)
                         if input_values:
                             result = ops.extrude_taper_rsolid(profile=input_values[0], vector=params["vector"],
                                 taper=params["taper"], flip_inner=params.get("flip_inner", True))
@@ -3944,8 +3959,11 @@ def _execute_graph(
                     if op_name == "make_sweep_multisection_rsolid":
                         ctx.require_params(node.node_id, op_name, params, ("profile_count", "is_frenet"))
                         count = int(params["profile_count"])
-                        values = [_input_outputs(ctx, outputs, node, i)[0] for i in range(count + 1)]
-                        binormal = _input_outputs(ctx, outputs, node, count + 1)[0] if params.get("binormal_is_wire") else params.get("binormal")
+                        values = _feature_input_shapes(ctx, graph, outputs, node, params)
+                        expected = count + 1 + int(bool(params.get("binormal_is_wire")))
+                        if len(values) != expected:
+                            ctx.fail(f"Graph node '{node.node_id}' requires {expected} ordered sweep inputs")
+                        binormal = values[count + 1] if params.get("binormal_is_wire") else params.get("binormal")
                         result = ops.sweep_multisection_rsolid(profiles=values[:count], path=values[count],
                             is_frenet=params["is_frenet"], binormal=binormal)
                         _store_outputs(node, result)
@@ -3953,7 +3971,7 @@ def _execute_graph(
 
                     if op_name == "make_transform_rsolid":
                         ctx.require_params(node.node_id, op_name, params, ("matrix",))
-                        inputs = _input_outputs(ctx, outputs, node, 0)
+                        inputs = _feature_input_shapes(ctx, graph, outputs, node, params)
                         if inputs:
                             result = ops.transform_rsolid(solid=inputs[0], matrix=params["matrix"])
                             _store_outputs(node, result)
@@ -3961,7 +3979,7 @@ def _execute_graph(
 
                     if op_name == "make_scale_rsolid":
                         ctx.require_params(node.node_id, op_name, params, ("factors", "center"))
-                        inputs = _input_outputs(ctx, outputs, node, 0)
+                        inputs = _feature_input_shapes(ctx, graph, outputs, node, params)
                         if inputs:
                             result = ops.scale_rsolid(solid=inputs[0], factors=params["factors"], center=params["center"])
                             _store_outputs(node, result)
@@ -3969,7 +3987,7 @@ def _execute_graph(
 
                     if op_name == "make_offset_rsolid":
                         ctx.require_params(node.node_id, op_name, params, ("amount", "removed_face_count"))
-                        inputs = _input_outputs(ctx, outputs, node, 0)
+                        inputs = _feature_input_shapes(ctx, graph, outputs, node, params)
                         if inputs:
                             solid = inputs[0]
                             faces = _resolve_feature_selection(ctx, node=node, solid=solid,
@@ -3979,6 +3997,18 @@ def _execute_graph(
                             result = ops.offset_rsolid(solid=solid, amount=params["amount"], openings=faces,
                                 tolerance=params.get("tolerance", 1e-4), kind=params.get("kind", "ARC"))
                             _store_outputs(node, result)
+                        continue
+
+                    if op_name == "make_boolean_rsolidlist":
+                        ctx.require_params(node.node_id, op_name, params,
+                                           ("operation", "left_count", "right_count", "input_refs"))
+                        inputs = _ordered_input_shapes(ctx, graph, outputs, node, params)
+                        count, right_count = int(params["left_count"]), int(params["right_count"])
+                        if count < 0 or right_count < 0 or len(inputs) != count + right_count:
+                            ctx.fail(f"Graph node '{node.node_id}' boolean input counts do not match")
+                        result = ops.boolean_rsolidlist(left=inputs[:count], right=inputs[count:],
+                                                       operation=params["operation"])
+                        _store_outputs(node, result)
                         continue
 
                     if op_name == "make_extrude_rsolid":

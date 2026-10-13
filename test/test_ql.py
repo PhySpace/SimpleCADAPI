@@ -6,6 +6,14 @@ from simplecadapi.topology import tagging
 
 
 class TestQLTagPredicates(unittest.TestCase):
+    def test_solid_world_bounds_distinguish_equal_volume_components(self):
+        first = scad.make_box_rsolid(2, 2, 2, bottom_face_center=(3, 0, 4))
+        second = scad.make_box_rsolid(2, 2, 2, bottom_face_center=(8, 0, 4))
+        selector = Q.solids().where(Q.and_(
+            Q.prop("geom.bbox.min.x", "==", 7),
+            Q.prop("geom.bbox.max.z", "==", 6))).exactly(1)
+        self.assertEqual(selector.resolve([first, second]), [second])
+
     def test_tag_exact_and_wildcard(self):
         box = scad.make_box_rsolid(1.0, 1.0, 1.0)
         scad.apply_tag(box, "role.mounting_surface")
