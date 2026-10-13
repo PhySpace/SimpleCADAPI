@@ -149,10 +149,10 @@ the full crank cycle sweeps clean in the same sim ·
 
 ---
 
-## Update Notes (2.2)
+## Update Notes (2.2.1)
 
-> **Release notice:** Pre-release (beta). Validate generated definitions,
-> assembly constraints, and manufacturing geometry before production use.
+> Validate generated definitions, assembly constraints, and manufacturing
+> geometry before production use.
 
 - **New editor.** `sca edit` is part of the SDK now (`pip install
   "simplecadapi[editor]"`). It runs a workspace's notebooks in a marimo kernel
@@ -199,7 +199,7 @@ in a compact public API for creating solids, applying features, tagging semantic
 intent, querying topology, exporting manufacturing files, and translating recorded
 models into FreeCAD workflows.
 
-Package: `simplecadapi` on PyPI (the 2.2 line is pre-release; 2.1.4 is the latest stable).
+Current release: `simplecadapi==2.2.1`.
 
 ## What It Provides
 
@@ -714,6 +714,7 @@ and the [STEP reconstruction workflow](docs/skill/references/workflows/step-reco
 
 ## Documentation
 
+- 2.2.1 update notes: [`docs/updates/2.2.1.md`](docs/updates/2.2.1.md)
 - 2.1.3b1 update notes: [`docs/updates/2.1.3b1.md`](docs/updates/2.1.3b1.md)
 - 2.1.2 update notes: [`docs/updates/2.1.2.md`](docs/updates/2.1.2.md)
 - 2.1.1 update notes: [`docs/updates/2.1.1.md`](docs/updates/2.1.1.md)

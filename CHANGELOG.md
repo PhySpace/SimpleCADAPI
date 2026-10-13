@@ -6,6 +6,11 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+## 2.2.1 — 2026-10-13
+
+The first stable release of the 2.2 line (2.2.0b1 was a pre-release): everything
+below was added since 2.1.4, the notebook runtime of 2.2.0b1 included.
+
 ### Removed
 
 - Re-Studio, the reverse-engineering studio (the `Re-mode` workspace of the
@@ -16,6 +21,14 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ### Added
 
+- Modeling: `scale`, affine `transform`, signed `offset`, `draft`, tapered and
+  until-limited extrusions and multisection sweeps are recorded features, and
+  boolean results can keep every output of a set operation; graph nodes keep
+  ordered input references so a replay selects the same entities.
+- `tools/research/build123dftc`: an execution-based build123d to FTC converter
+  (isolated tracing, exact profile reconstruction, generated notebooks and
+  assemblies) with independent geometry and STEP acceptance. It is research
+  tooling, not part of the installed package.
 - Editor: light mode. The editor follows the system theme and a button in the
   header cycles system, light and dark (remembered); the 3D viewport, edges,
   grid, axes and the code editor switch with it, in place, without reloading
@@ -64,6 +77,11 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ### Changed
 
+- Volumes and centres of mass integrate NURBS by knot spans (Gauss-Kronrod)
+  instead of the fixed-order routine: exact for rational patches (a sewn
+  80 mm cube measures 512000 mm3, the old routine overshot by ~19 mm3) and
+  safe on affine-transformed trims. A degenerate blend result now measures 0
+  and is still reported as `BlendVolumeViolation`.
 - The cell cache is per cell: an entry is stored under a digest of the local
   modules, child notebooks and input files *that cell* depends on (and what the
   cells it reads from depend on), no longer one digest for the whole notebook. A
