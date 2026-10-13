@@ -8,10 +8,7 @@ acceptance.
 
 Use when the deliverable is an editable/replayable model reproducing a target
 `.step`/`.stp`. Not for read-only questions about a STEP file — those stay in
-`domains/step-inspection.md` without reconstruction. When a human operator is
-available to annotate feature intent on the target, run the variant workflow
-`references/workflows/reverse-engineering-studio.md` instead of this
-autonomous path.
+`domains/step-inspection.md` without reconstruction.
 
 ## Task decomposition
 
