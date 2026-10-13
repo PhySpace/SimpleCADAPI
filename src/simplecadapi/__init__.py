@@ -69,6 +69,10 @@ from .core import (
     get_current_cs,
 )
 from .errors import SimpleCADError
+from .operators.deformation import scale_rsolid, offset_rsolid, transform_rsolid, boolean_rsolidlist
+from .operators.section_features import extrude_taper_rsolid, sweep_multisection_rsolid
+from .operators.limited_extrusion import extrude_until_rsolid
+from .operators.draft import draft_rsolid
 from .params.expr import (
     Const,
     DimensionTolerance,
@@ -433,6 +437,14 @@ def notebook_id() -> str:
 
 
 __all__ = [
+    "scale_rsolid",
+    "boolean_rsolidlist",
+    "transform_rsolid",
+    "offset_rsolid",
+    "extrude_taper_rsolid",
+    "sweep_multisection_rsolid",
+    "extrude_until_rsolid",
+    "draft_rsolid",
     "exporter",
     # 核心类
     "CoordinateSystem",
