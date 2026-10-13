@@ -24,7 +24,7 @@ function ScrollBar({ className, ...props }: React.ComponentProps<typeof ScrollAr
       className={cn("flex w-[6px] touch-none select-none border-l border-transparent p-0 transition-opacity", className)}
       {...props}
     >
-      <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 bg-[#444] hover:bg-[#888]" />
+      <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 bg-scrollbar hover:bg-scrollbar-hover" />
     </ScrollAreaPrimitive.ScrollAreaScrollbar>
   );
 }

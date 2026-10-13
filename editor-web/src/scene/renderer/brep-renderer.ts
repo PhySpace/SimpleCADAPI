@@ -23,7 +23,8 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { strFromU8 } from 'fflate';
-import { DEFAULT_BASE_COLOR, CAD_EDGE_COLOR, CAD_EDGE_LINE_WIDTH, cadPointToGltf, disposeObject, materialFor, placementMatrix } from '../cad-three';
+import { DEFAULT_BASE_COLOR, CAD_EDGE_LINE_WIDTH, cadPointToGltf, disposeObject, materialFor, placementMatrix } from '../cad-three';
+import { PALETTES, type SceneTheme, type ScenePalette } from '../theme';
 import type { PackageFiles } from '../product-package';
 import type { PreviewData, PreviewPart } from '../../lib/preview';
 import type { Entity, EntitySidecar, FaceGroup, SceneManifest, SceneNode, Vec3 } from '../scene2';
@@ -45,6 +46,9 @@ export type CameraState = {
 };
 
 export type BRepRendererOptions = {
+  /** The scene's theme (default dark); `setTheme` changes it later. */
+  theme?: SceneTheme;
+  /** Overrides the theme's background (sRGB). */
   background?: string;
   /** GTAO ambient occlusion pass (default on). */
   ssao?: boolean;
@@ -85,8 +89,8 @@ function isHiddenEdge(entity: Entity | undefined): boolean {
  */
 const EDGE_DEPTH_BIAS = 0.0004;
 
-function createEdgeMaterial(): LineMaterial {
-  const material = new LineMaterial({ color: CAD_EDGE_COLOR, linewidth: CAD_EDGE_LINE_WIDTH, worldUnits: false, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+function createEdgeMaterial(color: string): LineMaterial {
+  const material = new LineMaterial({ color, linewidth: CAD_EDGE_LINE_WIDTH, worldUnits: false, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   material.onBeforeCompile = (shader) => {
     shader.uniforms.edgeDepthBias = { value: EDGE_DEPTH_BIAS };
     shader.vertexShader = shader.vertexShader
@@ -94,6 +98,7 @@ function createEdgeMaterial(): LineMaterial {
       .replace('gl_Position = clip;', 'float biasedView = -clip.w + edgeDepthBias;\n\t\t\tclip.z = (projectionMatrix[2][2] * biasedView + projectionMatrix[3][2]) / -biasedView * clip.w;\n\t\t\tgl_Position = clip;');
   };
   material.customProgramCacheKey = () => 'edge-depth-bias';
+  material.userData.role = 'edge'; // setTheme recolors these, and only these
   return material;
 }
 
@@ -119,6 +124,9 @@ export class BRepRenderer {
   private ssaoPass: GTAOPass | null = null;
   private ssaoEnabled: boolean;
   private rendererClearColor: THREE.Color;
+  private palette: ScenePalette;
+  /** The gizmo's per-axis parts, kept to recolor on a theme change. */
+  private gizmoAxes: { materials: THREE.MeshBasicMaterial[]; tail: THREE.MeshBasicMaterial; canvas: HTMLCanvasElement; texture: THREE.CanvasTexture; label: string }[] = [];
   private blitScene: THREE.Scene | null = null;
   private blitCamera: THREE.OrthographicCamera | null = null;
   private copyMaterial: THREE.MeshBasicMaterial | null = null;
@@ -151,7 +159,8 @@ export class BRepRenderer {
     // color is consumed raw as linear working-space values, so convert the
     // sRGB design color first — otherwise the presented background is ~4x
     // brighter than intended.
-    this.rendererClearColor = new THREE.Color(options.background ?? '#0b0e12').convertSRGBToLinear();
+    this.palette = PALETTES[options.theme ?? 'dark'];
+    this.rendererClearColor = this.clearColorFor(options.background);
     this.renderer.setClearColor(this.rendererClearColor, 1);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -386,8 +395,8 @@ export class BRepRenderer {
     const extent = count * step;
     const positions: number[] = [];
     const colors: number[] = [];
-    const minor = new THREE.Color('#262626');
-    const major = new THREE.Color('#444444');
+    const minor = new THREE.Color(this.palette.gridMinor);
+    const major = new THREE.Color(this.palette.gridMajor);
     for (let index = -count; index <= count; index += 1) {
       const color = index % 5 === 0 ? major : minor;
       const at = index * step;
@@ -412,28 +421,23 @@ export class BRepRenderer {
 
   /** The three axes as blocks and letters; drawn in a corner of the canvas. */
   private buildGizmo(): void {
-    const axes: { dir: THREE.Vector3; color: string; label: string }[] = [
-      { dir: new THREE.Vector3(1, 0, 0), color: '#ff4d5e', label: 'X' },
-      { dir: new THREE.Vector3(0, 1, 0), color: '#3ddc84', label: 'Y' },
-      { dir: new THREE.Vector3(0, 0, 1), color: '#4aa3ff', label: 'Z' },
-    ];
+    const dirs = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)];
+    const labels = ['X', 'Y', 'Z'];
     const basic = (color: string) => new THREE.MeshBasicMaterial({ color, toneMapped: false });
-    for (const { dir, color, label } of axes) {
-      const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 1), basic(color));
+    dirs.forEach((dir, index) => {
+      const color = this.palette.axes[index];
+      const shaftMaterial = basic(color);
+      const tipMaterial = basic(color);
+      const tailMaterial = basic(this.palette.axisTail);
+      const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 1), shaftMaterial);
       shaft.position.copy(dir).multiplyScalar(0.5);
       shaft.lookAt(dir);
-      const tip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), basic(color));
+      const tip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), tipMaterial);
       tip.position.copy(dir);
-      const tail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), basic('#555555'));
+      const tail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), tailMaterial);
       tail.position.copy(dir).multiplyScalar(-1);
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = 64;
-      const context = canvas.getContext('2d')!;
-      context.font = '700 44px ui-monospace, SFMono-Regular, Menlo, monospace';
-      context.textAlign = 'center';
-      context.textBaseline = 'middle';
-      context.fillStyle = color;
-      context.fillText(label, 32, 34);
       const texture = new THREE.CanvasTexture(canvas);
       texture.colorSpace = THREE.SRGBColorSpace;
       const sprite = new THREE.Sprite(
@@ -441,8 +445,57 @@ export class BRepRenderer {
       );
       sprite.scale.set(0.42, 0.42, 1);
       sprite.position.copy(dir).multiplyScalar(1.38);
+      this.gizmoAxes.push({ materials: [shaftMaterial, tipMaterial], tail: tailMaterial, canvas, texture, label: labels[index] });
+      this.paintGizmoLabel(this.gizmoAxes[index], color);
       this.gizmoScene.add(shaft, tip, tail, sprite);
-    }
+    });
+  }
+
+  private vertexMaterial(): THREE.PointsMaterial {
+    const material = new THREE.PointsMaterial({ color: this.palette.vertex, size: 7, sizeAttenuation: false, depthWrite: false, transparent: true, opacity: 0.48 });
+    material.userData.role = 'vertex';
+    return material;
+  }
+
+  private paintGizmoLabel(axis: { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture; label: string }, color: string): void {
+    const context = axis.canvas.getContext('2d')!;
+    context.clearRect(0, 0, 64, 64);
+    context.font = '700 44px ui-monospace, SFMono-Regular, Menlo, monospace';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillStyle = color;
+    context.fillText(axis.label, 32, 34);
+    axis.texture.needsUpdate = true;
+  }
+
+  /** The viewport background as a linear color: sRGB design value, brightened by the
+   * theme's boost so the tone-mapped result is the page's own background. */
+  private clearColorFor(background?: string): THREE.Color {
+    const color = new THREE.Color(background ?? this.palette.clear).convertSRGBToLinear();
+    if (background === undefined) color.multiplyScalar(this.palette.clearBoost);
+    return color;
+  }
+
+  /** Switch the scene to another theme in place: background, edges, grid, gizmo, vertex
+   * points. The camera, the model and any selection overlay stay as they are. */
+  setTheme(theme: SceneTheme): void {
+    this.palette = PALETTES[theme];
+    this.rendererClearColor = this.clearColorFor();
+    this.renderer.setClearColor(this.rendererClearColor, 1);
+    this.modelRoot.traverse((object) => {
+      const material = (object as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      if (!material || Array.isArray(material)) return;
+      if (material.userData.role === 'edge') (material as LineMaterial).color.set(this.palette.edge);
+      else if (material.userData.role === 'vertex') (material as THREE.PointsMaterial).color.set(this.palette.vertex);
+    });
+    this.gizmoAxes.forEach((axis, index) => {
+      const color = this.palette.axes[index];
+      axis.materials.forEach((material) => material.color.set(color));
+      axis.tail.color.set(this.palette.axisTail);
+      this.paintGizmoLabel(axis, color);
+    });
+    this.updateGrid();
+    this.needsRender = true;
   }
 
   private renderGizmo(): void {
@@ -622,7 +675,7 @@ export class BRepRenderer {
       this.previewGeometries.push(faces, pick, edges, ...(vertices ? [vertices] : []));
       return { faces, pick, edges, vertices, sidecar };
     };
-    const edgeMaterial = createEdgeMaterial();
+    const edgeMaterial = createEdgeMaterial(this.palette.edge);
     const size = this.resolution();
     edgeMaterial.resolution.set(Math.max(size.width, 1), Math.max(size.height, 1));
     for (const item of preview.nodes) {
@@ -662,7 +715,7 @@ export class BRepRenderer {
       }
       group.add(pickEdges);
       if (geometry.vertices) {
-        const points = new THREE.Points(geometry.vertices, new THREE.PointsMaterial({ color: '#d8ff83', size: 7, sizeAttenuation: false, depthWrite: false, transparent: true, opacity: 0.48 }));
+        const points = new THREE.Points(geometry.vertices, this.vertexMaterial());
         points.visible = false;
         points.userData.pickRole = 'vertex';
         points.userData.pickable = true;
@@ -728,7 +781,7 @@ export class BRepRenderer {
         });
         const vertexGeometry = new THREE.BufferGeometry();
         vertexGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const vertexPoints = new THREE.Points(vertexGeometry, new THREE.PointsMaterial({ color: '#d8ff83', size: 7, sizeAttenuation: false, depthWrite: false, transparent: true, opacity: 0.48 }));
+        const vertexPoints = new THREE.Points(vertexGeometry, this.vertexMaterial());
         vertexPoints.visible = false;
         vertexPoints.userData.pickRole = 'vertex';
         vertexPoints.userData.pickable = true;
@@ -783,7 +836,7 @@ export class BRepRenderer {
     geometry.setPositions(positions);
     // Negative slope-scaled offset mirrors the faces' push (see materialFor):
     // keeps silhouette edges continuous where a flat bias loses.
-    const material = createEdgeMaterial();
+    const material = createEdgeMaterial(this.palette.edge);
     const size = this.resolution();
     material.resolution.set(Math.max(size.width, 1), Math.max(size.height, 1));
     const visual = new LineSegments2(geometry, material);

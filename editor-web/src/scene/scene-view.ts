@@ -4,6 +4,7 @@
 // modes and annotation marks. All rendering — materials, edge display,
 // lighting, ambient occlusion, camera — lives in the renderer component.
 
+import type { SceneTheme } from './theme';
 import * as THREE from 'three';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
@@ -36,6 +37,8 @@ export type SceneViewOptions = {
   onClear?: () => void;
   selectionMode?: SelectionMode;
   background?: string;
+  /** The scene's theme (default dark). */
+  theme?: SceneTheme;
   interactive?: boolean;
   /** GTAO ambient occlusion (default on). */
   ssao?: boolean;
@@ -61,7 +64,7 @@ export class SceneView {
     this.onPick = options.onPick ?? null;
     this.onClear = options.onClear ?? null;
     this.selectionMode = options.selectionMode ?? 'face';
-    this.engine = new BRepRenderer(host, { background: options.background, ssao: options.ssao, seams: options.seams });
+    this.engine = new BRepRenderer(host, { background: options.background, theme: options.theme, ssao: options.ssao, seams: options.seams });
     if (options.interactive !== false) {
       this.unbindClick = bindClickSelection({
         element: this.engine.domElement,
@@ -337,6 +340,11 @@ export class SceneView {
   setSeamsVisible(visible: boolean): void {
     this.engine.invalidate();
     this.engine.setSeamsVisible(visible);
+  }
+
+  /** Recolor the scene for another theme without reloading it. */
+  setTheme(theme: SceneTheme): void {
+    this.engine.setTheme(theme);
   }
 
   setSSAO(enabled: boolean): void {

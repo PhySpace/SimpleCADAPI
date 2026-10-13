@@ -6,8 +6,46 @@
 /* Black and white, square, hard 2px rules (after the SimpleCAD landing page).
  * Color is reserved for meaning: focus (selection, what is being edited),
  * pass, fail, name (the names of steps and parameters). */
+/* Light is the default; `html.dark` (set before first paint from the saved choice or
+ * the system, see index.html and lib/theme.ts) restores the dark palette. */
 :root {
   --radius: 0px;
+  --background: #ffffff;
+  --foreground: #000000;
+  --card: #f6f6f6;
+  --card-foreground: #000000;
+  --popover: #ffffff;
+  --popover-foreground: #000000;
+  --primary: #000000;
+  --primary-foreground: #ffffff;
+  --secondary: #eeeeee;
+  --secondary-foreground: #000000;
+  --muted: #eeeeee;
+  --muted-foreground: #555555;
+  --accent: #e4e4e4;
+  --accent-foreground: #000000;
+  --destructive: #d12b3c;
+  --destructive-foreground: #ffffff;
+  --border: #cfcfcf;
+  --input: #9a9a9a;
+  --ring: #d56a00;
+  --focus: #d56a00;
+  --pass: #12803f;
+  --fail: #d12b3c;
+  --name: #1a62c4;
+  --comment: #6b6b6b;
+  --code-selection: rgba(0, 0, 0, 0.15);
+  --scrollbar: #bdbdbd;
+  --scrollbar-hover: #7a7a7a;
+  --selection-bg: #000000;
+  --selection-fg: #ffffff;
+  --overlay: rgba(255, 255, 255, 0.78);
+  --shadow-hard: rgba(0, 0, 0, 0.14);
+  --rule: 2px;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+:root.dark {
   --background: #000000;
   --foreground: #ffffff;
   --card: #050505;
@@ -31,8 +69,14 @@
   --pass: #3ddc84;
   --fail: #ff4d5e;
   --name: #4aa3ff;
-  --rule: 2px;
-  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --comment: #777777;
+  --code-selection: rgba(255, 255, 255, 0.2);
+  --scrollbar: #333333;
+  --scrollbar-hover: #777777;
+  --selection-bg: #ffffff;
+  --selection-fg: #000000;
+  --overlay: rgba(27, 27, 27, 0.75);
+  --shadow-hard: rgba(255, 255, 255, 0.1);
 }
 
 @theme inline {
@@ -59,6 +103,9 @@
   --color-pass: var(--pass);
   --color-fail: var(--fail);
   --color-name: var(--name);
+  --color-scrollbar: var(--scrollbar);
+  --color-scrollbar-hover: var(--scrollbar-hover);
+  --color-overlay: var(--overlay);
   --radius-sm: 0px;
   --radius-md: 0px;
   --radius-lg: 0px;
@@ -72,17 +119,17 @@
     border-radius: 0;
     /* Thin, square scrollbars everywhere; the thumb shows on hover. */
     scrollbar-width: thin;
-    scrollbar-color: #333 transparent;
+    scrollbar-color: var(--scrollbar) transparent;
   }
   *::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   *::-webkit-scrollbar-thumb {
-    background: #333;
+    background: var(--scrollbar);
   }
   *::-webkit-scrollbar-thumb:hover {
-    background: #777;
+    background: var(--scrollbar-hover);
   }
   *::-webkit-scrollbar-track,
   *::-webkit-scrollbar-corner {
@@ -90,7 +137,7 @@
   }
   html,
   body {
-    background: #000;
+    background: var(--background);
   }
   body {
     @apply bg-background text-foreground;
@@ -100,8 +147,8 @@
     -webkit-font-smoothing: antialiased;
   }
   ::selection {
-    background: #fff;
-    color: #000;
+    background: var(--selection-bg);
+    color: var(--selection-fg);
   }
   .font-mono,
   code,

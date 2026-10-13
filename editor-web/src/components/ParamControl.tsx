@@ -45,7 +45,7 @@ export function ParamControl({
         onClick={() => forwardParam(param.id, !on)}
       >
         <span className={ink}>{label}</span>
-        <span className={cn("border-2 px-1.5 text-[10px] font-bold uppercase", on ? "border-white bg-white text-black" : "border-input text-muted-foreground")}>
+        <span className={cn("border-2 px-1.5 text-[10px] font-bold uppercase", on ? "border-primary bg-primary text-primary-foreground" : "border-input text-muted-foreground")}>
           {on ? "on" : "off"}
         </span>
       </button>

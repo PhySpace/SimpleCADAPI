@@ -8,6 +8,10 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ### Added
 
+- Editor: light mode. The editor follows the system theme and a button in the
+  header cycles system, light and dark (remembered); the 3D viewport, edges,
+  grid, axes and the code editor switch with it, in place, without reloading
+  the model or losing the camera and selection.
 - `sca edit [WORKSPACE]`: the web editor, now part of the SDK
   (`simplecadapi.editor`, UI sources in `editor-web/`; needs the `editor`
   extra). It runs a workspace's notebooks in a marimo kernel with the SDK's

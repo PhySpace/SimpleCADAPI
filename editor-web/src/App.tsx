@@ -13,6 +13,7 @@ import { fetchPreview, getWorkspace, openNotebook, postViewport, type ModuleRow,
 import { parsePreview } from "@/lib/preview";
 import { EnvelopeSocket, type Envelope } from "@/lib/envelope";
 import { useRunLog } from "@/lib/runlog";
+import { useTheme } from "@/lib/theme";
 import { selectionPayload, variableNames, type SelectionItem } from "@/lib/selection";
 import { cn } from "@/lib/utils";
 import { Viewport, type PickResult, type SelectionMode } from "@/scene/Viewport";
@@ -63,6 +64,7 @@ export function App() {
   const [loading, setLoading] = useState<string | null>("connecting");
 
   const kind = notebooks.find((row) => row.path === currentPath)?.kind ?? null;
+  const theme = useTheme();
   const log = useRunLog();
   const running = cells.some((cell) => cell.status === "running" || cell.status === "queued");
   const handleStop = useCallback(() => {
@@ -318,6 +320,8 @@ export function App() {
         kernelAlive={kernelAlive}
         status={status}
         marimoUrl={marimoUrl}
+        themePreference={theme.preference}
+        onTheme={theme.cycle}
         running={running}
         onStop={handleStop}
         onRunAll={() => {
@@ -376,7 +380,7 @@ export function App() {
                     className={cn(
                       "border-2 px-2 py-px text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors",
                       selectionMode === mode
-                        ? "border-white bg-white text-black"
+                        ? "border-primary bg-primary text-primary-foreground"
                         : "border-transparent text-muted-foreground hover:border-input hover:text-foreground",
                     )}
                     onClick={() => setSelectionMode(mode)}
@@ -400,6 +404,7 @@ export function App() {
                   selectionMode={selectionMode}
                   selection={selection}
                   sceneVersion={sceneVersion}
+                  theme={theme.resolved}
                   onPick={handlePick}
                   onClear={handleClear}
                 />
@@ -411,7 +416,7 @@ export function App() {
             <Inspector selection={selection} />
           </ResizablePanel>
         </ResizablePanelGroup>
-        <LoadingMask active={loading !== null} message={loading ?? ""} />
+        <LoadingMask active={loading !== null} message={loading ?? ""} theme={theme.resolved} />
       </div>
       <Dock
         entries={log.entries}

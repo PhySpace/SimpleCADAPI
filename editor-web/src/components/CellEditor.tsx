@@ -234,7 +234,7 @@ function CellGap({ after, onInsert }: { after: string | null; onInsert: (after: 
       <button
         type="button"
         title="Insert a cell here"
-        className="z-10 flex h-4 w-4 items-center justify-center border-2 border-input bg-black text-muted-foreground opacity-0 transition-opacity hover:border-focus hover:text-focus group-hover/gap:opacity-100"
+        className="z-10 flex h-4 w-4 items-center justify-center border-2 border-input bg-background text-muted-foreground opacity-0 transition-opacity hover:border-focus hover:text-focus group-hover/gap:opacity-100"
         onClick={(event) => {
           event.stopPropagation();
           onInsert(after);
@@ -337,7 +337,7 @@ function CellBlock({
   return (
     <section
       className={cn(
-        "border-2 bg-black transition-colors",
+        "border-2 bg-background transition-colors",
         isSelection ? "border-focus/60" : failed ? "border-fail/70" : "border-border",
         stale && !failed && "border-dashed",
         armed && "border-fail",
@@ -397,7 +397,7 @@ function CellBlock({
           title={armed ? "Click again to delete this cell" : "Delete this cell"}
           onClick={onDelete}
           data-delete-armed={cell.id}
-          className={armed ? "border-fail bg-fail text-black hover:border-fail hover:text-black" : "hover:text-fail"}
+          className={armed ? "border-fail bg-fail text-primary-foreground hover:border-fail hover:text-primary-foreground" : "hover:text-fail"}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </IconButton>

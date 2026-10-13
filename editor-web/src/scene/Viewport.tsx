@@ -2,11 +2,10 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
 import { SceneView, type PickResult, type SelectionMode } from "@/scene/scene-view";
+import { PALETTES, type SceneTheme } from "@/scene/theme";
 
 export type { PickResult, SelectionMode };
 
-/** Selection highlight: the "focus" ink. */
-const SELECTION_COLOR = "#ff9a2e";
 
 /** What the viewport highlights: the picked entities. */
 export type Highlight = { nodeId: string; entityId: string | null };
@@ -24,6 +23,7 @@ export function Viewport({
   selectionMode,
   selection,
   sceneVersion,
+  theme,
   onPick,
   onClear,
 }: {
@@ -31,6 +31,7 @@ export function Viewport({
   selectionMode: SelectionMode;
   selection: Highlight[];
   sceneVersion: number;
+  theme: SceneTheme;
   onPick: (pick: PickResult) => void;
   onClear: () => void;
 }) {
@@ -40,6 +41,9 @@ export function Viewport({
   const clearRef = useRef(onClear);
   clearRef.current = onClear;
   const overlayRef = useRef<THREE.Object3D[]>([]);
+  // The theme the view was created with; later changes go through setTheme.
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
 
   const dropOverlays = () => {
     for (const object of overlayRef.current) {
@@ -62,7 +66,7 @@ export function Viewport({
       onPick: (result) => pickRef.current(result),
       onClear: () => clearRef.current(),
       selectionMode: "solid",
-      background: "#000000",
+      theme: themeRef.current,
     });
     viewRef.current = view;
     // Debug/agent affordance: reach the imperative scene from the console.
@@ -84,12 +88,20 @@ export function Viewport({
     if (!view) return;
     dropOverlays();
     for (const item of selection) {
-      overlayRef.current.push(...view.buildEntityOverlays(item.nodeId, item.entityId, SELECTION_COLOR, 0.8));
+      overlayRef.current.push(...view.buildEntityOverlays(item.nodeId, item.entityId, PALETTES[theme].selection, 0.8));
     }
     view.engine.invalidate();
     document.documentElement.dataset.overlayCount = String(overlayRef.current.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selection, sceneVersion]);
+  }, [selection, sceneVersion, theme]);
+
+  // Another theme: recolor in place (camera, model and selection stay).
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.setTheme(theme);
+    view.engine.invalidate();
+  }, [theme, viewRef]);
 
   return <div ref={hostRef} className="h-full w-full" />;
 }

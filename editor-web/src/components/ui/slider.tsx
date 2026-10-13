@@ -16,12 +16,12 @@ function Slider({
       {...props}
     >
       <SliderPrimitive.Track className="relative h-[2px] w-full grow overflow-hidden bg-input">
-        <SliderPrimitive.Range className={cn("absolute h-full", modified ? "bg-focus" : "bg-white")} />
+        <SliderPrimitive.Range className={cn("absolute h-full", modified ? "bg-focus" : "bg-primary")} />
       </SliderPrimitive.Track>
       <SliderPrimitive.Thumb
         className={cn(
-          "block h-3 w-2 border-2 bg-black transition-colors focus-visible:outline-none focus-visible:border-focus disabled:pointer-events-none disabled:opacity-50",
-          modified ? "border-focus" : "border-white",
+          "block h-3 w-2 border-2 bg-background transition-colors focus-visible:outline-none focus-visible:border-focus disabled:pointer-events-none disabled:opacity-50",
+          modified ? "border-focus" : "border-primary",
         )}
       />
     </SliderPrimitive.Root>
