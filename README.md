@@ -149,23 +149,20 @@ the full crank cycle sweeps clean in the same sim ·
 
 ---
 
-## Update Notes (2.2.2)
+## Update Notes (2.2.3)
 
 > Validate generated definitions, assembly constraints, and manufacturing
 > geometry before production use.
 
-- **Code completion from the SDK.** In the editor, `scad.` (and `scad.ql.`,
-  `scad.std.gear.`) lists the real functions with their signatures and
-  docstrings. Accepting one, or typing `(` after its name, writes the call with
-  every required parameter as `name=`, and Tab moves between them; inside a call
-  the parameters not given yet complete as `name=`.
-- **New notebooks from the workspace tab.** A **new** action starts a part, or
-  an assembly that uses the first two parts, from the SDK's template; an empty
-  workspace opens on that form.
-- **Fix.** The cell editors no longer rebuild their configuration on every
-  render, which dropped a snippet in progress.
+- **The editor takes in edits made to the notebook file.** An agent's saved change is applied
+  cell by cell (changed cells update and run again, no reload), and is no longer written over by
+  the editor. If a cell was edited in both places, the file's version is kept and your unsaved
+  text goes to the log. Notebooks added to the workspace appear in the list by themselves.
+- **`sca cell` and `sca new`.** `sca cell ls|get|put|insert|rm|run` edits the open notebook's cells
+  through the running editor (the page updates live, each write prints the cell's status and
+  errors); `sca new NAME` creates a notebook the editor then lists.
 
-Full notes for this version: [`docs/updates/2.2.2.md`](docs/updates/2.2.2.md).
+Full notes for this version: [`docs/updates/2.2.3.md`](docs/updates/2.2.3.md).
 Earlier versions: the [changelog](CHANGELOG.md) and [`docs/updates/`](docs/updates/).
 
 ---
@@ -186,7 +183,7 @@ in a compact public API for creating solids, applying features, tagging semantic
 intent, querying topology, exporting manufacturing files, and translating recorded
 models into FreeCAD workflows.
 
-Current release: `simplecadapi==2.2.2`.
+Current release: `simplecadapi==2.2.3`.
 
 ## What It Provides
 
@@ -701,6 +698,7 @@ and the [STEP reconstruction workflow](docs/skill/references/workflows/step-reco
 
 ## Documentation
 
+- 2.2.3 update notes: [`docs/updates/2.2.3.md`](docs/updates/2.2.3.md)
 - 2.2.2 update notes: [`docs/updates/2.2.2.md`](docs/updates/2.2.2.md)
 - 2.2.1 update notes: [`docs/updates/2.2.1.md`](docs/updates/2.2.1.md)
 - 2.1.3b1 update notes: [`docs/updates/2.1.3b1.md`](docs/updates/2.1.3b1.md)
