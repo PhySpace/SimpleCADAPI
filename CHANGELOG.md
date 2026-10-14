@@ -6,6 +6,23 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+## 2.2.4 — 2026-10-15
+
+### Fixed
+
+- Editor: a failed publish is reported again on every run someone asked for — a page rerun, an
+  agent `sca cell` command, a change to the notebook file, a module reload, a parameter commit —
+  so the page's "building the model" veil lifts with the reason instead of waiting out its
+  fallback. The once-per-identical-message dedup stays for the parameter burst. A page that
+  connects after the failure is told the last error at the end of the connection handshake.
+
+### Changed
+
+- Editor: the header's button that opened the raw marimo editor is gone.
+- Skill: the editor docs state which notebooks the workspace scan lists — subfolders of any
+  depth are scanned; names starting with `.` or `_` and `node_modules`, `venv`, `site-packages`,
+  `build`, `dist` are skipped.
+
 ## 2.2.3 — 2026-10-14
 
 ### Added
