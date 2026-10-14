@@ -35,9 +35,14 @@ sca edit <workspace> --no-browser --port 7180
 
 - Needs the `editor` extra (`pip install "simplecadapi[editor]"`); without it
   the command says so and stops.
-- The workspace is any directory tree. Models are the notebooks whose header has
-  `[tool.simplecadapi]`; assemblies list the parts they `use(...)`. Open the
-  assembly to see the product, a part to edit that part.
+- The workspace is any directory tree, scanned to any depth. Models are the
+  notebooks whose header has `[tool.simplecadapi]`; assemblies list the parts
+  they `use(...)`. Open the assembly to see the product, a part to edit that
+  part. Working in a subfolder is fine; what hides a file from the workspace
+  tab is its name: directories and files starting with `.` or `_`, and
+  anything under `node_modules`, `venv`, `site-packages`, `build` or `dist`,
+  are not listed and are never a candidate at boot. Keep notebooks and the
+  modules they import in normally named paths.
 - The URL is printed (default `http://127.0.0.1:7180`). Give it to the person.
 - To try it: `sca example u_link` copies a motor-mount workspace (two parts and
   the assembly that fixes them together) to `./u_link_motor_mount`, then

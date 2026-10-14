@@ -642,6 +642,7 @@ class WorkspaceState:
         kernel = self.kernel
         if kernel is None:
             return {"error": "the editor has no kernel yet; wait for it to start"}
+        self._begin_run()
         self.push_cells()
         touched: list[str] = []
         try:
@@ -691,6 +692,7 @@ class WorkspaceState:
         return report
 
     def _rerun_changed(self, kernel: MarimoKernel, changed: list[str]) -> None:
+        self._begin_run()
         kernel.run_until_settled(changed)
         self.schedule_settle()
 
@@ -758,6 +760,7 @@ class WorkspaceState:
                     if not uses:
                         continue
                     kernel.run_until_settled(uses)
+                self._begin_run()
                 self.schedule_settle()
         except Exception as exc:
             with self._module_lock:
@@ -881,6 +884,17 @@ class WorkspaceState:
             "marimo_url": self.kernel.marimo_url if self.kernel else None,
         }
 
+    def settled_error(self) -> dict | None:
+        """The publish error of the last settle, for a page that connects late.
+
+        ``status`` envelopes are momentary and not replayed, but a page that
+        refreshes after a failed publish must still learn why no model is
+        coming — its veil only lifts on a ``preview`` or an error.
+        """
+        if not self._last_publish_error:
+            return None
+        return {"type": "status", "error": self._last_publish_error[-300:]}
+
     # -- settling: the cells ran; publish what they made -----------------------
 
     def schedule_settle(self) -> None:
@@ -930,6 +944,18 @@ class WorkspaceState:
             if message != self._last_publish_error:
                 self._last_publish_error = message
                 self.hub.broadcast({"type": "status", "error": message[-300:]})
+
+    def _begin_run(self) -> None:
+        """Cells are about to run because someone asked for it: report afresh.
+
+        The dedup above is for the parameter burst, where a product-less
+        notebook would repeat the same line on every slider tick.  A discrete
+        run (a page command, an agent edit, a file change) is a new question:
+        its failure must be told even if it repeats the last error word for
+        word, or the page waits out its whole veil for an answer that never
+        comes.
+        """
+        self._last_publish_error = ""
 
     @property
     def preview_url(self) -> str:
@@ -1111,6 +1137,7 @@ class WorkspaceState:
             return {"type": "error", "message": f"unknown command: {kind}"}
 
         def run() -> None:
+            self._begin_run()
             result = action()
             if result.get("success") is False:
                 self.hub.broadcast(
@@ -1265,6 +1292,7 @@ class WorkspaceState:
         write_saved_params(config, saved)
         if revert:
             kernel.run_until_settled([self.specs[name].cell for name in names if name in self.specs])
+        self._begin_run()
         self.schedule_settle()
 
     # -- selection and the agent snapshot ----------------------------------------
@@ -1801,6 +1829,9 @@ def create_app(state: WorkspaceState) -> Starlette:
         await websocket.send_json(state.hello())
         for envelope in state.replay():
             await websocket.send_json(envelope)
+        settled = state.settled_error()
+        if settled is not None:
+            await websocket.send_json(settled)
         try:
             while True:
                 message = await websocket.receive_json()

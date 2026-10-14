@@ -48,7 +48,6 @@ export function App() {
   // kernel is up, and a late answer of the workspace list cannot undo it.
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [kernelAlive, setKernelAlive] = useState(false);
-  const [marimoUrl, setMarimoUrl] = useState<string | null>(null);
   const [status, setStatus] = useState("Connecting…");
 
   const [params, setParams] = useState<ParamMeta[]>([]);
@@ -126,7 +125,6 @@ export function App() {
       const stage = envelope["notebook"] ? (envelope["kernel"] ? "building the model" : "starting the kernel") : null;
       setLoading(stage);
       setStatus(stage ? `${stage[0].toUpperCase()}${stage.slice(1)}…` : "No notebook yet: create one in the workspace tab");
-      setMarimoUrl((envelope["marimo_url"] as string) ?? null);
       refreshWorkspace();
     });
 
@@ -335,7 +333,6 @@ export function App() {
         kind={kind}
         kernelAlive={kernelAlive}
         status={status}
-        marimoUrl={marimoUrl}
         themePreference={theme.preference}
         onTheme={theme.cycle}
         running={running}
