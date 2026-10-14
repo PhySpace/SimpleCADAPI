@@ -6,6 +6,8 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+## 2.3.0 — 2026-10-14
+
 ### Added
 
 - Editor: `sca cell ls|get|put|insert|rm|run` edits the open notebook's cells through the
