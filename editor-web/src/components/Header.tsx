@@ -1,4 +1,4 @@
-import { ExternalLink, Monitor, Moon, Play, Square, Sun } from "lucide-react";
+import { Monitor, Moon, Play, Square, Sun } from "lucide-react";
 
 import type { ThemePreference } from "@/lib/theme";
 
@@ -15,7 +15,6 @@ export function Header({
   onRunAll,
   running,
   onStop,
-  marimoUrl,
   themePreference,
   onTheme,
 }: {
@@ -27,7 +26,6 @@ export function Header({
   /** The kernel is running cells: the button stops them instead. */
   running: boolean;
   onStop: () => void;
-  marimoUrl: string | null;
   themePreference: ThemePreference;
   onTheme: () => void;
 }) {
@@ -61,13 +59,6 @@ export function Header({
       ) : (
         <Button size="sm" variant="outline" onClick={onRunAll} title="Run every cell">
           <Play /> run all
-        </Button>
-      )}
-      {marimoUrl && (
-        <Button size="sm" variant="ghost" asChild>
-          <a href={marimoUrl} target="_blank" rel="noreferrer" title="Open the raw marimo editor">
-            <ExternalLink /> marimo
-          </a>
         </Button>
       )}
       <Button
