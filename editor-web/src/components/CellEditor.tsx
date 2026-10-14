@@ -74,6 +74,7 @@ export function CellEditor({
   socket,
   notebook,
   onInterrupt,
+  onConflict,
 }: {
   cells: NotebookCell[];
   features: NotebookFeature[];
@@ -81,6 +82,8 @@ export function CellEditor({
   socket: SocketLike;
   notebook: string | null;
   onInterrupt: () => void;
+  /** A cell changed on disk while it had an unsaved edit here: the file's version was kept. */
+  onConflict: (cell: NotebookCell, mine: string) => void;
 }) {
   const [drafts, setDrafts] = useState<Map<string, string>>(new Map());
   const [running, setRunning] = useState<string | null>(null);
@@ -89,13 +92,59 @@ export function CellEditor({
   // the second; any click elsewhere disarms.
   const [armed, setArmed] = useState<string | null>(null);
   const saveTimers = useRef(new Map<string, number>());
+  // What each edited cell's draft started from, and the last text sent to be saved:
+  // a cell that arrives as something else was changed by someone else (an agent).
+  const bases = useRef(new Map<string, string>());
+  const sent = useRef(new Map<string, string>());
 
   const featureByCell = useMemo(() => new Map(features.map((feature) => [feature.cell, feature])), [features]);
 
   useEffect(() => {
     setCollapsed(loadCollapsed(notebook));
     setDrafts(new Map());
+    bases.current.clear();
+    sent.current.clear();
   }, [notebook]);
+
+  // The cells arrive again after every save and every change on disk: settle each draft
+  // against them.  Saved (equal) -> done; confirms our last save -> keep editing from it;
+  // anything else -> the file's version wins, the person is told.
+  const onConflictRef = useRef(onConflict);
+  onConflictRef.current = onConflict;
+  useEffect(() => {
+    const same = (a: string, b: string) => a.trim() === b.trim();
+    const lost: [NotebookCell, string][] = [];
+    setDrafts((previous) => {
+      let next: Map<string, string> | null = null;
+      const drop = (id: string) => {
+        next ??= new Map(previous);
+        next.delete(id);
+        bases.current.delete(id);
+        sent.current.delete(id);
+      };
+      for (const [id, draft] of previous) {
+        const cell = cells.find((candidate) => candidate.id === id);
+        if (!cell) {
+          drop(id);
+          continue;
+        }
+        const base = bases.current.get(id);
+        const last = sent.current.get(id);
+        if (same(cell.code, draft)) drop(id);
+        else if (last !== undefined && same(cell.code, last)) bases.current.set(id, cell.code);
+        else if (base !== undefined && !same(cell.code, base)) {
+          lost.push([cell, draft]);
+          drop(id);
+        }
+      }
+      return next ?? previous;
+    });
+    for (const [cell, mine] of lost) {
+      cancelSave(cell.id);
+      onConflictRef.current(cell, mine);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cells]);
 
   const remember = (next: Set<string>) => {
     setCollapsed(next);
@@ -122,7 +171,8 @@ export function CellEditor({
     cancelSave(cell.id);
     const code = drafts.get(cell.id) ?? cell.code;
     setRunning(cell.id);
-    socket?.send({ type: "code.edit", cell: cell.id, code });
+    sent.current.set(cell.id, code);
+    socket?.send({ type: "code.edit", cell: cell.id, code, base: bases.current.get(cell.id) });
     window.setTimeout(() => setRunning((current) => (current === cell.id ? null : current)), 2500);
   };
 
@@ -141,6 +191,7 @@ export function CellEditor({
   const insert = (after: string | null) => socket?.send({ type: "insert.request", after });
 
   const edit = (cell: NotebookCell, value: string) => {
+    if (!bases.current.has(cell.id)) bases.current.set(cell.id, cell.code);
     setDrafts((previous) => new Map(previous).set(cell.id, value));
     if (cell.readonly) return;
     cancelSave(cell.id);
@@ -148,7 +199,8 @@ export function CellEditor({
       cell.id,
       window.setTimeout(() => {
         saveTimers.current.delete(cell.id);
-        socket?.send({ type: "cell.save", cell: cell.id, code: value });
+        sent.current.set(cell.id, value);
+        socket?.send({ type: "cell.save", cell: cell.id, code: value, base: bases.current.get(cell.id) });
       }, AUTOSAVE_MS),
     );
   };

@@ -144,6 +144,9 @@ class WorkspaceState:
         self._generation = 0
         self._switch_lock = threading.Lock()
         self._booting: MarimoKernel | None = None
+        self._setup_code: str | None = None
+        self._edited_from: dict[str, set[str]] = {}
+        self._shutdown = threading.Event()
 
     # -- notebook / kernel lifecycle ---------------------------------------------
 
@@ -263,6 +266,7 @@ class WorkspaceState:
                 self.cells = []
                 self.specs = {}
             self._watched = self._watched_files()[0]
+            self._setup_code = _setup_code_of(notebook)
             self.hub.broadcast(self.hello())
             kernel.wait_instantiated()
             kernel.wait_idle()
@@ -276,6 +280,9 @@ class WorkspaceState:
             raise
         threading.Thread(
             target=self._watch_files, args=(kernel,), name="file-watch", daemon=True
+        ).start()
+        threading.Thread(
+            target=self._watch_notebook, args=(kernel,), name="notebook-watch", daemon=True
         ).start()
 
     # -- remembering what was published -----------------------------------------------
@@ -478,6 +485,250 @@ class WorkspaceState:
                 return
             self._module_busy = True
         threading.Thread(target=self._propagate, name="propagate", daemon=True).start()
+
+    # -- the notebook file changed under the editor ------------------------------
+
+    def _watch_notebook(self, kernel: MarimoKernel) -> None:
+        """Take in edits made to the open notebook's file by someone else (an agent).
+
+        The kernel holds the notebook in memory and writes the file on every edit
+        the editor makes, so an outside edit that the kernel never hears of would be
+        written over by the editor's next save.  Poll the file; once it has been
+        quiet for one tick, compare it with the kernel's cells (a change the editor
+        itself made shows no difference) and apply what differs.
+        """
+        stamp = self._stamp(self.notebook)
+        pending: tuple[int, int] | None = None
+        while not kernel._stop.is_set():
+            time.sleep(0.3)
+            if self.kernel is not kernel:
+                return
+            current = self._stamp(self.notebook)
+            if current != stamp:
+                stamp, pending = current, current
+                continue
+            if pending is None:
+                continue
+            pending = None
+            try:
+                self.ingest_external(kernel)
+            except Exception as exc:
+                self.hub.broadcast({"type": "status", "error": f"could not take in the file change: {str(exc)[-200:]}"})
+
+    @staticmethod
+    def _stamp(path: Path | None) -> tuple[int, int]:
+        try:
+            assert path is not None
+            info = path.stat()
+            return info.st_mtime_ns, info.st_size
+        except (OSError, AssertionError):
+            return 0, 0
+
+    def ingest_external(self, kernel: MarimoKernel) -> None:
+        """Make the kernel's cells equal the notebook file's, changing only what differs.
+
+        Cells that differ are edited, created or deleted in place (the page updates
+        without a reload), then the cells that changed are run and what they feed
+        turns fresh.  A change the cell commands cannot carry (the setup cell, an
+        ``@app.function`` cell) restarts the kernel instead.
+        """
+        import difflib
+
+        from ..runtime._marimo import parse_notebook
+
+        notebook = self.notebook
+        if notebook is None:
+            return
+        with kernel.write_lock:
+            try:
+                parsed = parse_notebook(notebook.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError):
+                return
+            except SyntaxError as exc:
+                self.hub.broadcast({"type": "status", "error": f"{notebook.name} has a syntax error ({exc.msg}, line {exc.lineno}); waiting for the next save"})
+                return
+            if parsed is None:
+                return
+            setup = next((c.code.strip() for c in parsed.cells if getattr(c, "name", None) == "setup"), "")
+            if self._setup_code is not None and setup != self._setup_code:
+                self.hub.broadcast({"type": "status", "working": "the setup cell changed on disk: restarting the kernel…"})
+                self._in_thread(lambda: self.start_kernel(notebook))
+                return
+            disk = [
+                (getattr(c, "name", None) or None, c.code)
+                for c in parsed.cells
+                if getattr(c, "name", None) != "setup"
+            ]
+            live = kernel.list_cells()
+            norm = lambda code: code.strip()  # noqa: E731
+            matcher = difflib.SequenceMatcher(
+                None, [norm(c["code"]) for c in live], [norm(code) for _name, code in disk], autojunk=False
+            )
+            ops = [op for op in matcher.get_opcodes() if op[0] != "equal"]
+            if not ops:
+                return
+            touched = [live[i]["code"] for _t, i1, i2, _j1, _j2 in ops for i in range(i1, i2)]
+            touched += [code for _t, _i1, _i2, j1, j2 in ops for _name, code in disk[j1:j2]]
+            if any(_is_function_cell(code) for code in touched):
+                self.hub.broadcast({"type": "status", "working": "an @app.function cell changed on disk: restarting the kernel…"})
+                self._in_thread(lambda: self.start_kernel(notebook))
+                return
+            ids = [c["id"] for c in live]
+            changed: list[str] = []
+            previous: str | None = None
+            for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                if tag == "equal":
+                    previous = ids[i2 - 1] if i2 > i1 else previous
+                    continue
+                paired = min(i2 - i1, j2 - j1) if tag == "replace" else 0
+                for offset in range(paired):
+                    kernel.save_cell(ids[i1 + offset], disk[j1 + offset][1])
+                    changed.append(ids[i1 + offset])
+                    previous = ids[i1 + offset]
+                for index in range(i1 + paired, i2):
+                    kernel.delete_cell(ids[index])
+                for name, code in disk[j1 + paired : j2]:
+                    created = kernel.create_cell_after(previous, code, name, run=False)
+                    new_id = _created_id(created)
+                    if new_id is None:
+                        raise RuntimeError("the kernel did not create a cell for the new code on disk")
+                    changed.append(new_id)
+                    previous = new_id
+        self.hub.broadcast({"type": "status", "info": f"{notebook.name} changed on disk: {len(changed)} cell(s) updated, running them"})
+        self.push_cells()
+        self._in_thread(lambda: self._rerun_changed(kernel, changed))
+
+    # -- the same cell edits, for an agent (``sca cell``) -------------------------
+
+    def _brief(self, number: int, cell: dict) -> dict:
+        return {
+            "index": number,
+            "id": cell["id"],
+            "key": cell.get("key"),
+            "name": cell.get("name"),
+            "title": cell.get("title"),
+            "status": cell.get("status"),
+            "errors": cell.get("errors") or [],
+            "output": cell.get("output"),
+            "console": cell.get("console") or [],
+            "readonly": bool(cell.get("readonly")),
+            "ref": cell.get("ref"),
+            "code": cell["code"],
+        }
+
+    def cells_report(self, *, refresh: bool = True) -> dict:
+        if refresh and self.kernel is not None:
+            self.push_cells()
+        return {
+            "notebook": self.notebook.relative_to(self.workspace).as_posix() if self.notebook else None,
+            "cells": [self._brief(n, c) for n, c in enumerate(self.cells, start=1)],
+        }
+
+    def _find_cell(self, ref: Any) -> dict:
+        text = str(ref).strip()
+        for cell in self.cells:
+            if text in (cell["id"], cell.get("key")) or (text == cell.get("name") and text != "_"):
+                return cell
+        if text.isdigit() and 1 <= int(text) <= len(self.cells):
+            return self.cells[int(text) - 1]
+        raise KeyError(f"no cell {text!r} in {self.notebook.name if self.notebook else 'the notebook'}; run `sca cell ls`")
+
+    def cell_command(self, op: str, body: dict) -> dict:
+        """Run one cell operation for the CLI; returns the report or ``{"error": ...}``.
+
+        The edit goes through the kernel exactly as one made in the page does, so the
+        page shows it live and the file is written by the one writer that holds it.
+        """
+        kernel = self.kernel
+        if kernel is None:
+            return {"error": "the editor has no kernel yet; wait for it to start"}
+        self.push_cells()
+        touched: list[str] = []
+        try:
+            if op == "edit":
+                cell = self._find_cell(body.get("cell"))
+                code = _module_code(str(body.get("code", "")))
+                if _is_function_cell(cell["code"]):
+                    return {"error": "this cell is an @app.function; edit it in the file (the editor takes the change in)"}
+                if body.get("base") is not None and _module_code(str(body["base"])).strip() != _module_code(cell["code"]).strip():
+                    return {"error": "conflict: the cell changed since you read it", "theirs": cell["code"]}
+                if code.strip() != _module_code(cell["code"]).strip():
+                    (kernel.edit_cell if body.get("run", True) else kernel.save_cell)(cell["id"], code)
+                elif body.get("run", True):
+                    kernel.run_cells([cell["id"]])
+                touched = [cell["id"]]
+            elif op == "insert":
+                after = body.get("after")
+                if after in (None, "end"):
+                    anchor = self.cells[-1]["id"] if self.cells else None
+                elif after == "start":
+                    anchor = None
+                else:
+                    anchor = self._find_cell(after)["id"]
+                code = _module_code(str(body.get("code", ""))) or "# new cell"
+                name = str(body["name"]) if body.get("name") else None
+                created = _created_id(kernel.create_cell_after(anchor, code, name, run=bool(body.get("run", True))))
+                if created is None:
+                    return {"error": "the kernel did not create the cell"}
+                touched = [created]
+            elif op == "delete":
+                cell = self._find_cell(body.get("cell"))
+                kernel.delete_cell(cell["id"])
+            elif op == "run":
+                refs = body.get("cells") or []
+                ids = [self._find_cell(ref)["id"] for ref in refs] or [c["id"] for c in self.cells]
+                kernel.run_until_settled(ids)
+                touched = ids
+            else:
+                return {"error": f"unknown cell operation {op!r}"}
+        except KeyError as exc:
+            return {"error": str(exc.args[0])}
+        kernel.wait_idle()
+        self.push_cells()
+        self.schedule_settle()
+        report = self.cells_report(refresh=False)
+        report["touched"] = [c["index"] for c in report["cells"] if c["id"] in touched]
+        return report
+
+    def _rerun_changed(self, kernel: MarimoKernel, changed: list[str]) -> None:
+        kernel.run_until_settled(changed)
+        self.schedule_settle()
+
+    def _watch_workspace(self) -> None:
+        """Tell the pages when notebooks appear or disappear under the workspace."""
+        known = self._workspace_stamps()
+        while not self._shutdown.is_set():
+            time.sleep(0.7)
+            try:
+                current = self._workspace_stamps()
+            except OSError:
+                continue
+            # The open notebook is rewritten by the editor on every edit; only its
+            # appearing or vanishing counts.
+            open_path = self.notebook
+            changed = set(current) ^ set(known)
+            changed |= {p for p in current if p in known and current[p] != known[p] and p != open_path}
+            known = current
+            if changed:
+                self.hub.broadcast({"type": "workspace.changed"})
+
+    def _workspace_stamps(self) -> dict[Path, int]:
+        import os
+
+        stamps: dict[Path, int] = {}
+        for directory, subdirectories, files in os.walk(self.workspace):
+            subdirectories[:] = [
+                name for name in subdirectories
+                if not name.startswith((".", "_")) and name not in _SKIPPED_DIRS
+            ]
+            for name in files:
+                if name.endswith(".py") and not name.startswith("_"):
+                    path = Path(directory) / name
+                    try:
+                        stamps[path] = path.stat().st_mtime_ns
+                    except OSError:
+                        continue
+        return stamps
 
     def _propagate(self) -> None:
         """Serialized, coalescing: one reload covers every change that arrived meanwhile."""
@@ -807,6 +1058,8 @@ class WorkspaceState:
             current = next((c["code"] for c in self.cells if c["id"] == cell), None)
             if current is None or code.strip() == _module_code(current).strip():
                 return {"type": "ack", "command": kind}
+            if self._conflicts(message, cell, code, current):
+                return {"type": "ack", "command": kind}
             if _is_function_cell(current):
                 return {
                     "type": "error",
@@ -840,6 +1093,8 @@ class WorkspaceState:
         elif kind == "code.edit":
             code = _module_code(str(message.get("code", "")))
             current = next((c["code"] for c in self.cells if c["id"] == cell), None)
+            if current is not None and code.strip() != _module_code(current).strip() and self._conflicts(message, cell, code, current):
+                return {"type": "ack", "command": kind}
             if current is not None and code.strip() != _module_code(current).strip() and _is_function_cell(current):
                 # marimo's code mode would turn an @app.function into a plain
                 # cell; edit those in the file or in marimo's own editor.
@@ -869,6 +1124,27 @@ class WorkspaceState:
 
         self._in_thread(run)
         return {"type": "ack", "command": kind}
+
+    def _conflicts(self, message: dict, cell: str, mine: str, current: str) -> bool:
+        """The page edited a cell that changed under it: keep what is on disk.
+
+        The page says which code its edit started from (``base``).  If the cell
+        is something else now (an agent edited the file and the editor took the
+        change in), writing the page's version would erase that edit, so the
+        write is dropped and the page is told both versions; it shows the file's
+        version and keeps its own in the log.
+        """
+        base = message.get("base")
+        now = _module_code(current).strip()
+        # A page types on: its second save still names the text it started from, which
+        # its own first save has replaced since.  Only a text the editor did not write
+        # over is a change made by someone else.
+        mine_before = self._edited_from.setdefault(cell, set())
+        if base is None or _module_code(str(base)).strip() in (now, *mine_before):
+            mine_before.add(now)
+            return False
+        self.hub.broadcast({"type": "cell.conflict", "cell": cell, "mine": mine, "theirs": current})
+        return True
 
     def _in_thread(self, work: Any) -> None:
         def run() -> None:
@@ -1119,6 +1395,26 @@ class WorkspaceState:
             "model_revision": self.preview_revision,
         }
 
+    def write_endpoint(self, host: str) -> None:
+        """Say where this editor listens, so ``sca cell`` and other tools find it."""
+        try:
+            directory = self.snapshot_dir
+            directory.mkdir(parents=True, exist_ok=True)
+            import os
+
+            (directory / "server.json").write_text(
+                json.dumps({"url": f"http://{host}:{self.port}", "pid": os.getpid(), "workspace": str(self.workspace)}),
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
+
+    def remove_endpoint(self) -> None:
+        try:
+            (self.snapshot_dir / "server.json").unlink()
+        except OSError:
+            pass
+
     def write_snapshot(self) -> None:
         """Keep ``.sca-editor/snapshot.json`` current; ``sca snapshot`` reads it."""
         try:
@@ -1190,6 +1486,28 @@ def _module_code(code: str) -> str:
         before, after = line[: node.col_offset], line[node.col_offset + len("return"):]
         lines[node.lineno - 1] = before + ("pass" if node.value is None else after.lstrip())
     return "\n".join(lines)
+
+
+_SKIPPED_DIRS = frozenset({"node_modules", "venv", "site-packages", "build", "dist"})
+
+
+def _setup_code_of(notebook: Path) -> str | None:
+    from ..runtime._marimo import parse_notebook
+
+    try:
+        parsed = parse_notebook(notebook.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, SyntaxError):
+        return None
+    if parsed is None:
+        return None
+    return next((c.code.strip() for c in parsed.cells if getattr(c, "name", None) == "setup"), "")
+
+
+def _created_id(result: dict) -> str | None:
+    for line in (result.get("log") or "").splitlines():
+        if line.startswith("SCA-CELL "):
+            return line[len("SCA-CELL "):].strip()
+    return None
 
 
 def _static_cells(notebook: Path) -> list[dict]:
@@ -1365,6 +1683,21 @@ def create_app(state: WorkspaceState) -> Starlette:
             )
         return JSONResponse({"error": "no package made yet"}, status_code=404)
 
+    async def api_cells(request: Request) -> JSONResponse:
+        """The open notebook's cells, with their state (for ``sca cell ls``)."""
+        report = await asyncio.to_thread(state.cells_report)
+        return JSONResponse(report)
+
+    async def api_cell_command(request: Request) -> JSONResponse:
+        op = request.path_params["op"]
+        try:
+            body = json.loads(await request.body() or b"{}")
+        except json.JSONDecodeError:
+            return JSONResponse({"error": "body is not JSON"}, status_code=400)
+        report = await asyncio.to_thread(state.cell_command, op, body if isinstance(body, dict) else {})
+        status = 409 if str(report.get("error", "")).startswith("conflict") else 400 if "error" in report else 200
+        return JSONResponse(report, status_code=status)
+
     async def sdk_index(request: Request) -> JSONResponse:
         """The SDK's public API (names and parameters), for the cell editor's completion."""
         from .apiindex import build_index
@@ -1491,6 +1824,8 @@ def create_app(state: WorkspaceState) -> Starlette:
         Route("/api/runtime/package", push_package, methods=["POST"]),
         Route("/api/package/latest", latest_package, methods=["GET"]),
         Route("/api/sdk", sdk_index, methods=["GET"]),
+        Route("/api/cells", api_cells, methods=["GET"]),
+        Route("/api/cells/{op}", api_cell_command, methods=["POST"]),
         Route("/api/workspace", workspace_list, methods=["GET"]),
         Route("/api/workspace/open", workspace_open, methods=["POST"]),
         Route("/api/workspace/new", workspace_new, methods=["POST"]),
@@ -1532,6 +1867,8 @@ def serve_workspace(
         hub = state.hub
         hub.attach_loop(asyncio.get_running_loop())
         print(f"[sca edit] workspace {state.workspace}")
+        state.write_endpoint(host)
+        threading.Thread(target=state._watch_workspace, name="workspace-watch", daemon=True).start()
 
         if state.notebook is None:
             print("[sca edit] no SimpleCAD notebook found in the workspace", file=sys.stderr)
@@ -1563,6 +1900,8 @@ def serve_workspace(
     original_shutdown = server.shutdown
 
     async def shutdown(sockets=None):
+        state._shutdown.set()
+        state.remove_endpoint()
         if state.kernel is not None:
             state.kernel.stop()
         await original_shutdown(sockets=sockets)

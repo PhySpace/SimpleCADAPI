@@ -20,6 +20,7 @@ typing in the embedded marimo editor), and is what the server reacts to.
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import re
@@ -43,6 +44,22 @@ class KernelError(RuntimeError):
     pass
 
 
+def _locked(method):
+    """Run a cell-writing method under the kernel's write lock.
+
+    The editor's own writes and the ingest of an external edit of the notebook
+    file must not interleave: ingest compares the file with the kernel's cells,
+    and a write half-way through would look like an external change.
+    """
+
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self.write_lock:
+            return method(self, *args, **kwargs)
+
+    return wrapper
+
+
 class MarimoKernel:
     def __init__(
         self,
@@ -59,6 +76,7 @@ class MarimoKernel:
         self.setup_errors: list[str] = []
         self._ran = threading.Event()  # a run of cells completed (see wait_instantiated)
         self._own_calls = 0
+        self.write_lock = threading.RLock()
         self._own_ended = 0.0
         self.workspace = self.notebook.parent
         self.marimo_port = _free_port(server_port + 1)
@@ -357,6 +375,7 @@ class MarimoKernel:
         """Queue cells to run (lazy mode: their dependents turn stale)."""
         return self.execute(_driver("\n".join(f"    ctx.run_cell({cell_id!r})" for cell_id in cell_ids)))
 
+    @_locked
     def edit_cell(self, cell_id: str, code: str) -> dict:
         """Replace a cell's code (persisted to the file) and run it."""
         return self.execute(
@@ -365,6 +384,7 @@ class MarimoKernel:
             + _driver(f"    ctx.edit_cell({cell_id!r}, code=__code)\n    ctx.run_cell({cell_id!r})")
         )
 
+    @_locked
     def save_cell(self, cell_id: str, code: str) -> dict:
         """Replace a cell's code (persisted to the file) without running it."""
         return self.execute(
@@ -373,6 +393,7 @@ class MarimoKernel:
             + _driver(f"    ctx.edit_cell({cell_id!r}, code=__code)")
         )
 
+    @_locked
     def put_cell(self, code: str, *, cell_id: str | None, run: bool = True) -> str | None:
         """Write *code* into cell *cell_id*, or append a new cell holding it.
 
@@ -401,9 +422,11 @@ class MarimoKernel:
                 return line[len("SCA-CELL "):].strip()
         return None
 
+    @_locked
     def delete_cell(self, cell_id: str) -> dict:
         return self.execute(_driver(f"    ctx.delete_cell({cell_id!r})"))
 
+    @_locked
     def insert_cell(self, after: str | None) -> dict:
         """Insert one empty, named cell after *after* (at the top if None).
 
@@ -429,6 +452,27 @@ class MarimoKernel:
                 "        __i += 1\n"
                 "        __name = f'new_cell_{__i}'\n" + create
             )
+        )
+
+    @_locked
+    def create_cell_after(self, after: str | None, code: str, name: str | None, *, run: bool = True) -> dict:
+        """Create a cell holding *code* after cell *after* (at the top if None)."""
+        body = (
+            "    __names = [c.id for c in ctx.cells]\n"
+            + (
+                f"    __id = ctx.create_cell(__code, after={after!r}, name={name!r})\n"
+                if after
+                else (
+                    f"    __id = ctx.create_cell(__code, before=__names[0], name={name!r}) if __names"
+                    f" else ctx.create_cell(__code, name={name!r})\n"
+                )
+            )
+            + ("    ctx.run_cell(__id)\n" if run else "")
+            + "print('SCA-CELL', __id)\n"
+        )
+        return self.execute(
+            "import json as _json\n"
+            f"__code = _json.loads({json.dumps(json.dumps(code))})\n" + _driver(body)
         )
 
     def reload_modules(self, names: list[str]) -> dict:
