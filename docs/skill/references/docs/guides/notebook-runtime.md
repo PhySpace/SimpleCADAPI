@@ -167,7 +167,11 @@ sca ls [DIR]                 # the notebooks under DIR: id, part or assembly, th
 ```
 
 A **workspace** is any directory tree: its models are the notebooks whose
-header has `[tool.simplecadapi]`, wherever they are. There is no manifest.
+header has `[tool.simplecadapi]`, at any depth. There is no manifest. Skipped
+everywhere: names starting with `.` or `_`, and `node_modules`, `venv`,
+`site-packages`, `build`, `dist` — a notebook in such a place is not listed
+by `sca ls` or the editor's workspace tab, so keep notebooks in normally
+named paths.
 
 `sca edit [WORKSPACE]` (needs `pip install "simplecadapi[editor]"`) opens a
 code-first editor on a workspace. The notebooks run in a marimo kernel with
