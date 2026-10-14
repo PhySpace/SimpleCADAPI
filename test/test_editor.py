@@ -976,3 +976,128 @@ class ExternalEditTest(unittest.TestCase):
             finally:
                 if state.kernel is not None:
                     state.kernel.stop()
+
+
+class PublishErrorReportingTest(unittest.TestCase):
+    """A page's veil lifts on a preview or an error: a failed publish is told
+    once per identical state, told again on every run someone asked for, and
+    told to a page that connects after it happened."""
+
+    ERROR = "ProductNotFoundError: no top-level Part or Assembly has the notebook id"
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name).resolve()
+
+    def state(self) -> tuple[WorkspaceState, list[dict]]:
+        path = create_notebook(self.root, "bracket", "part")
+        state = WorkspaceState(self.root, path)
+        sent: list[dict] = []
+        state.hub.broadcast = sent.append  # type: ignore[method-assign]
+        state.push_cells = lambda: None  # type: ignore[method-assign]
+        state._signature = lambda notebook: None  # type: ignore[method-assign]
+        self.fail_kernel(state)
+        return state, sent
+
+    def fail_kernel(self, state: WorkspaceState) -> None:
+        state_error = self.ERROR
+        state.kernel = type(  # type: ignore[assignment]
+            "K",
+            (),
+            {
+                "publish_preview": lambda self, url, step="": {"ok": False, "error": state_error},
+                "setup_errors": [],
+            },
+        )()
+
+    @staticmethod
+    def told(sent: list[dict]) -> int:
+        return len([message for message in sent if message.get("type") == "status" and message.get("error")])
+
+    def test_a_failure_is_told_once_and_an_identical_repeat_is_not(self) -> None:
+        state, sent = self.state()
+        state.settle()
+        state.settle()
+        self.assertEqual(self.told(sent), 1)
+
+    def test_a_rerun_asked_for_on_the_page_reports_afresh(self) -> None:
+        import threading
+
+        state, sent = self.state()
+        state_error = self.ERROR
+        state.kernel = type(  # type: ignore[assignment]
+            "K",
+            (),
+            {
+                "run_cells": lambda self, ids: {},
+                "wait_idle": lambda self: True,
+                "publish_preview": lambda self, url, step="": {"ok": False, "error": state_error},
+                "setup_errors": [],
+            },
+        )()
+        state.cells = [{"id": "c1", "code": "x = 1"}]
+        settled = threading.Event()
+        state.schedule_settle = lambda: settled.set()  # type: ignore[method-assign]
+        state.settle()
+        state.settle()
+        self.assertEqual(self.told(sent), 1)
+        state.dispatch_command({"type": "rerun.request"})
+        self.assertTrue(settled.wait(5))
+        state.settle()
+        self.assertEqual(self.told(sent), 2)
+
+    def test_an_agent_cell_run_reports_afresh(self) -> None:
+        state, sent = self.state()
+        state_error = self.ERROR
+        state.kernel = type(  # type: ignore[assignment]
+            "K",
+            (),
+            {
+                "run_until_settled": lambda self, ids: {},
+                "wait_idle": lambda self: True,
+                "publish_preview": lambda self, url, step="": {"ok": False, "error": state_error},
+                "setup_errors": [],
+            },
+        )()
+        state.cells = [{"id": "c1", "code": "x = 1"}]
+        state.schedule_settle = lambda: None  # type: ignore[method-assign]
+        state.settle()
+        state.settle()
+        state.cell_command("run", {"cells": ["c1"]})
+        state.settle()
+        self.assertEqual(self.told(sent), 2)
+
+    def test_a_page_that_connects_late_is_told_the_last_error_until_it_clears(self) -> None:
+        state, _ = self.state()
+        self.assertIsNone(state.settled_error())
+        state.settle()
+        self.assertEqual(state.settled_error(), {"type": "status", "error": self.ERROR})
+        state.kernel = type(  # type: ignore[assignment]
+            "K",
+            (),
+            {"publish_preview": lambda self, url, step="": {"ok": True}, "setup_errors": []},
+        )()
+        state.settle()
+        self.assertIsNone(state.settled_error())
+
+    def test_the_ws_handshake_ends_with_the_last_error(self) -> None:
+        from starlette.testclient import TestClient
+
+        from simplecadapi.editor.server import create_app
+
+        state, _ = self.state()
+        state.settle()
+        state.kernel = type(  # type: ignore[assignment]
+            "K",
+            (),
+            {
+                "publish_preview": lambda self, url, step="": {"ok": False, "error": self.ERROR},
+                "setup_errors": [],
+                "alive": False,
+                "marimo_url": None,
+            },
+        )()
+        with TestClient(create_app(state)) as client, client.websocket_connect("/ws") as ws:
+            self.assertEqual(ws.receive_json()["type"], "hello")
+            self.assertEqual(ws.receive_json(), {"type": "status", "error": self.ERROR})
