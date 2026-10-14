@@ -149,7 +149,7 @@ the full crank cycle sweeps clean in the same sim ·
 
 ---
 
-## Update Notes (2.3.0)
+## Update Notes (2.2.3)
 
 > Validate generated definitions, assembly constraints, and manufacturing
 > geometry before production use.
@@ -162,7 +162,7 @@ the full crank cycle sweeps clean in the same sim ·
   through the running editor (the page updates live, each write prints the cell's status and
   errors); `sca new NAME` creates a notebook the editor then lists.
 
-Full notes for this version: [`docs/updates/2.3.0.md`](docs/updates/2.3.0.md).
+Full notes for this version: [`docs/updates/2.2.3.md`](docs/updates/2.2.3.md).
 Earlier versions: the [changelog](CHANGELOG.md) and [`docs/updates/`](docs/updates/).
 
 ---
@@ -183,7 +183,7 @@ in a compact public API for creating solids, applying features, tagging semantic
 intent, querying topology, exporting manufacturing files, and translating recorded
 models into FreeCAD workflows.
 
-Current release: `simplecadapi==2.3.0`.
+Current release: `simplecadapi==2.2.3`.
 
 ## What It Provides
 
@@ -698,7 +698,7 @@ and the [STEP reconstruction workflow](docs/skill/references/workflows/step-reco
 
 ## Documentation
 
-- 2.3.0 update notes: [`docs/updates/2.3.0.md`](docs/updates/2.3.0.md)
+- 2.2.3 update notes: [`docs/updates/2.2.3.md`](docs/updates/2.2.3.md)
 - 2.2.2 update notes: [`docs/updates/2.2.2.md`](docs/updates/2.2.2.md)
 - 2.2.1 update notes: [`docs/updates/2.2.1.md`](docs/updates/2.2.1.md)
 - 2.1.3b1 update notes: [`docs/updates/2.1.3b1.md`](docs/updates/2.1.3b1.md)

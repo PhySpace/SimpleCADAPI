@@ -6,7 +6,7 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
-## 2.3.0 — 2026-10-14
+## 2.2.3 — 2026-10-14
 
 ### Added
 
