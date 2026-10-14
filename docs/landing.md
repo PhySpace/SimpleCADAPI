@@ -195,6 +195,9 @@ each instruction to one action and wait for them.
      these edges by 1 mm"). You read the selection from the file (`selection` cell) or with
      `sca snapshot`, and you can look at `.sca-editor/viewport.png` to see what they see. Then
      you edit the notebook; they see your change in the editor.
+   - **Work through the editor.** Change cells with `sca cell` (`sca cell ls`, `put`, `insert`):
+     the page updates live and nothing the person typed is overwritten. Editing the file works
+     too: the editor takes the change in within a second.
    - **"Change this cell."** Every cell has a copy button that copies a reference such as
      `/path/u_link.py:L47-L48 (cell 02 ...)`. They paste it to you with what they want changed,
      and you edit exactly those lines.

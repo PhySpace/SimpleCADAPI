@@ -6,10 +6,25 @@ edit code. It is not a workflow. The modeling you do still follows the workflow
 you selected; this page says how to see what the person sees and how to hand
 work back.
 
-The notebook file is the only shared state. The editor autosaves every edit to
+The notebook file is the shared state. The editor autosaves every edit to
 it, and every message the person gives you (a selection, a cell reference, a
 tuned value) is also something you can read from disk. Never rely on what the
 person says they selected when the file or the snapshot can tell you.
+
+The editor holds the open notebook in memory and is the one writer of its
+file. You have two safe ways to change it while it runs; use the first:
+
+1. **`sca cell` (preferred).** It edits through the editor: the page shows the
+   change live (no reload, no flicker), the cell runs, and you get its state back.
+2. **Edit the file.** The editor notices a saved change within a second, compares
+   it with its cells and applies only what differs (changed cells are edited in
+   place and run again, added or removed cells appear or go away). A change to the
+   setup cell or an `@app.function` cell restarts the kernel instead. A file that
+   does not parse is ignored until the next save that does.
+
+If the person has the same cell open with unsaved typing, **your version wins**:
+their text is dropped and kept in the editor's log for them. Do not rewrite a
+cell the person is typing in without telling them.
 
 ## Start the editor for a person
 
@@ -27,6 +42,29 @@ sca edit <workspace> --no-browser --port 7180
 - To try it: `sca example u_link` copies a motor-mount workspace (two parts and
   the assembly that fixes them together) to `./u_link_motor_mount`, then
   `sca edit ./u_link_motor_mount`.
+
+## Edit cells through the editor: `sca cell`
+
+```bash
+sca cell ls [--code]                 # numbered cells with status, errors and output
+sca cell get 3                       # one cell: code, status, errors, output
+echo 'L = 90' | sca cell put 3       # replace the code of cell 3 and run it (--no-run to only save)
+sca cell insert --after 3 -f new.py  # add a cell (--after start|end|CELL, --name fn_name)
+sca cell rm 4
+sca cell run [CELL ...]              # run cells (default all) and what they feed
+sca new bracket --kind part          # a new notebook; the open editor lists it, the person's view stays
+```
+
+- A cell is named by its number in `sca cell ls`, its `key`, its function name, or its id.
+  Numbers move when cells are added or removed: read the list the command prints back.
+- Each write prints the touched cell's state (`status`, `errors`, `output`). That is the
+  feedback: read it before the next step, as with any other operation.
+- `put` fails with a conflict if you pass a base that is out of date; without one it
+  replaces the cell, so `get` first when the person may have changed it.
+- The commands find the running editor through `<workspace>/.sca-editor/server.json`. With no
+  editor running, or with another notebook open, `ls` and `get` read the file and the write
+  commands refuse: then edit the file directly, nothing else holds it.
+- `@app.function` cells cannot be changed this way; edit them in the file.
 
 ## Read what the person is doing
 
@@ -140,10 +178,12 @@ file first, since every cell is blocked until it compiles.
 
 ## Rules of thumb
 
-- Re-read the file before editing: the person edits and autosaves too, and the
-  editor rewrites the selection cell.
-- Edit by cell. A change that touches many cells at once makes the person's
+- Re-read the cell before editing (`sca cell get`, or the file): the person edits and
+  autosaves too, and the editor rewrites the selection cell.
+- Edit by cell, with `sca cell`. A change that touches many cells at once makes the person's
   screen reflow and loses their place.
+- New notebooks: `sca new`, not a bare file write plus a request to refresh; the editor
+  lists a new file by itself either way.
 - After an edit, say which cells you changed (by reference) and what to look
   at, so the person can run them and judge the result.
 - Never edit `__marimo__/` or `.sca-editor/`; both are generated.

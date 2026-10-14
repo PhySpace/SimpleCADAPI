@@ -6,6 +6,24 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+### Added
+
+- Editor: `sca cell ls|get|put|insert|rm|run` edits the open notebook's cells through the
+  running editor (found by `<workspace>/.sca-editor/server.json`): the page shows the change live,
+  with no reload, the cell runs, and the command prints its status, errors and output. `sca new
+  NAME [--kind part|assembly]` writes a notebook the editor then lists, leaving the person's view
+  alone. The routes behind them are `GET /api/cells` and `POST /api/cells/{edit,insert,delete,run}`.
+- Editor: a change to the open notebook's file made by someone else (an agent) is noticed
+  within a second and applied cell by cell (edited cells are updated and run again, added or
+  removed cells appear or go), without a reload; a changed setup or `@app.function` cell restarts
+  the kernel. Notebooks added to or removed from the workspace appear in the list by themselves.
+
+### Fixed
+
+- Editor: an edit made in the editor no longer writes over what an agent saved to the same
+  notebook file. If a cell was edited in both places, the file's version is kept and the
+  editor's unsaved text goes to the log.
+
 ## 2.2.2 — 2026-10-14
 
 ### Added

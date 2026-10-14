@@ -186,6 +186,13 @@ export function App() {
       setCells(next);
       log.knowCells(next);
     });
+    // A notebook was added or removed under the workspace (an agent wrote one).
+    socket.on("workspace.changed", () => refreshWorkspace());
+    // The server dropped an edit made on a cell that had changed on disk.
+    socket.on("cell.conflict", (envelope) => {
+      const mine = String(envelope["mine"] ?? "");
+      log.push("error", `a cell changed on disk while you were editing it: kept the file's version. Your unsaved text was:\n${mine.length > 600 ? `${mine.slice(0, 600)}…` : mine}`);
+    });
     socket.on("notebook.features", (envelope) => setFeatures((envelope["features"] as NotebookFeature[]) ?? []));
 
     socket.on("preview", (envelope) => {
@@ -355,6 +362,12 @@ export function App() {
                   socket={socketRef.current}
                   notebook={notebook}
                   onInterrupt={handleStop}
+                  onConflict={(cell, mine) =>
+                    log.push(
+                      "error",
+                      `${cell.title ?? "cell"} changed on disk while you were editing it: kept the file's version. Your unsaved text was:\n${mine.length > 600 ? `${mine.slice(0, 600)}…` : mine}`,
+                    )
+                  }
                 />
               </TabsContent>
               <TabsContent value="workspace" className="min-h-0">

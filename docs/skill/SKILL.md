@@ -50,7 +50,9 @@ Paths are relative to this file's directory.
   selected, and you MUST read
   `references/domains/editor-collaboration.md` first to see what they
   see (selection cell, `sca snapshot`, cell references) and how to
-  hand the work back.
+  hand the work back. While the editor runs, change its notebooks with
+  `sca cell` (or the file; never both blindly): the editor is the
+  file's writer.
 - Creating, installing, updating, or removing a SimpleCADAPI addon (a
   third-party skill+tooling package around `.scadpkg`) enters no
   workflow; you MUST use `references/domains/addon-development.md`
@@ -202,7 +204,7 @@ print(len(rebuilt))
 - `references/inspect/brep-reverse-engineering.md`
 - `references/domains/addon-development.md` — `sca` addon CLI and authoring guide
 - `references/domains/editor-collaboration.md` — working with a person in `sca edit`:
-  selection cell, snapshot, cell references, parameters
+  selection cell, snapshot, cell references, `sca cell` / `sca new`, parameters
 - `references/docs/guides/reconstruction-agent-test-prompt.md`
 - `references/docs/guides/reconstruction-agent-strategy.md`
 - `references/docs/guides/notebook-runtime.md`

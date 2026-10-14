@@ -881,3 +881,98 @@ class ApiIndexTest(unittest.TestCase):
             response = TestClient(app).get("/api/sdk")
         self.assertEqual(response.status_code, 200)
         self.assertIn("scad", response.json()["namespaces"])
+
+
+class ConflictTest(unittest.TestCase):
+    """A page's edit of a cell that changed on disk must not erase the change."""
+
+    def make_state(self) -> tuple[WorkspaceState, list[dict]]:
+        state = WorkspaceState(Path(tempfile.mkdtemp()))
+        sent: list[dict] = []
+        state.hub.broadcast = sent.append  # type: ignore[method-assign]
+        return state, sent
+
+    def test_an_edit_that_started_from_another_text_is_dropped_and_reported(self) -> None:
+        state, sent = self.make_state()
+        self.assertTrue(state._conflicts({"base": "x = 1"}, "c1", "x = 2", "x = 9"))
+        self.assertEqual(sent[0]["type"], "cell.conflict")
+        self.assertEqual((sent[0]["mine"], sent[0]["theirs"]), ("x = 2", "x = 9"))
+
+    def test_an_edit_from_the_current_text_goes_through(self) -> None:
+        state, sent = self.make_state()
+        self.assertFalse(state._conflicts({"base": "x = 1\n"}, "c1", "x = 2", "x = 1"))
+        self.assertFalse(state._conflicts({}, "c1", "x = 2", "x = 1"))  # an old page sends no base
+        self.assertEqual(sent, [])
+
+    def test_a_second_save_of_the_same_typing_is_not_a_conflict(self) -> None:
+        state, sent = self.make_state()
+        # first save: the page started from "a", the file has "a"
+        self.assertFalse(state._conflicts({"base": "a"}, "c1", "ab", "a"))
+        # second save arrives while the first is applied: the file has "ab", the page still says "a"
+        self.assertFalse(state._conflicts({"base": "a"}, "c1", "abc", "ab"))
+        # the file has "abc" now; an agent makes it "zzz": the page's next save from "abc" is a conflict
+        self.assertTrue(state._conflicts({"base": "abc"}, "c1", "abd", "zzz"))
+        self.assertEqual(len(sent), 1)
+
+
+class WorkspaceWatchTest(unittest.TestCase):
+    def test_stamps_see_new_notebooks_and_skip_hidden_directories(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = WorkspaceState(root)
+            create_notebook(root, "first", "part")
+            before = state._workspace_stamps()
+            (root / ".sca-editor").mkdir()
+            (root / ".sca-editor" / "x.py").write_text("x = 1\n")
+            create_notebook(root, "second", "part")
+            after = state._workspace_stamps()
+            self.assertEqual({p.name for p in after} - {p.name for p in before}, {"second.py"})
+
+
+class CellCliTest(unittest.TestCase):
+    def test_cell_commands_refuse_to_write_without_an_editor(self) -> None:
+        from simplecadapi.cli import main
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = create_notebook(Path(tmp), "bracket", "part")
+            self.assertEqual(main(["cell", "rm", "1", "--notebook", str(path)]), 2)
+
+    def test_cell_ls_reads_the_file_when_no_editor_runs(self) -> None:
+        from simplecadapi.editor import cli
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = create_notebook(Path(tmp), "bracket", "part")
+            cells = cli._cells_from_file(path)
+            self.assertTrue(cells)
+            self.assertEqual(cells[0]["index"], 1)
+            self.assertIsNone(cli._find_editor(Path(tmp)))
+
+
+@unittest.skipUnless(os.environ.get("SCA_EDITOR_E2E"), "set SCA_EDITOR_E2E=1 to boot a marimo kernel")
+class ExternalEditTest(unittest.TestCase):
+    def test_an_edit_of_the_file_is_taken_in_and_not_written_over(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = create_notebook(root, "bracket", "part")
+            state = WorkspaceState(root)
+            state.port = 17733
+            state.hub.attach_loop(__import__("asyncio").new_event_loop())
+            try:
+                state.start_kernel(path)
+                kernel = state.kernel
+                assert kernel is not None
+                before = [c["code"] for c in kernel.list_cells()]
+                text = path.read_text()
+                anchor = 'if __name__ == "__main__":'
+                added = '@app.cell\ndef _agent():\n    agent_note = 1\n    return (agent_note,)\n\n\n'
+                path.write_text(text.replace(anchor, added + anchor, 1))
+                state.ingest_external(kernel)
+                after = [c["code"] for c in kernel.list_cells()]
+                self.assertEqual(len(after), len(before) + 1)
+                self.assertIn("agent_note = 1", after[-1])
+                # the editor writes on its next save: the agent's cell is still in the file
+                kernel.save_cell(kernel.list_cells()[0]["id"], before[0] + "\n# touched")
+                self.assertIn("agent_note = 1", path.read_text())
+            finally:
+                if state.kernel is not None:
+                    state.kernel.stop()
