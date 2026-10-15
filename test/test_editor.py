@@ -1129,6 +1129,31 @@ class EndpointDiscoveryTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "server.json.*17612.*unreachable"):
             _find_editor(self.root)
 
+    def test_a_record_whose_process_is_gone_names_the_stale_pid(self) -> None:
+        from simplecadapi.editor.cli import _find_editor
+
+        directory = self.root / ".sca-editor"
+        directory.mkdir()
+        (directory / "server.json").write_text(json.dumps({"url": "http://127.0.0.1:17615", "pid": 2**22}))
+        with self.assertRaisesRegex(ValueError, r"pid \d+ is gone"):
+            _find_editor(self.root)
+
+    def test_a_write_that_outlives_its_call_says_the_edit_landed(self) -> None:
+        import argparse
+        from unittest import mock
+
+        from simplecadapi.editor import cli
+
+        args = argparse.Namespace(notebook=None, workspace=self.root, cell="1", file=None, no_run=False)
+        with mock.patch("simplecadapi.editor.cli._session", return_value=("http://127.0.0.1:1", None, "nb.py")):
+            with mock.patch(
+                "simplecadapi.editor.cli._call", side_effect=TimeoutError("the editor did not answer")
+            ):
+                report, code = cli._write_op(args, "edit", {"cell": "c1", "code": "x = 1"})
+        self.assertEqual(code, 1)
+        self.assertIn("the edit was applied", report["error"])
+        self.assertIn("sca cell ls", report["error"])
+
     def test_the_health_check_reaches_a_local_editor_through_a_proxy_environment(self) -> None:
         import threading
 

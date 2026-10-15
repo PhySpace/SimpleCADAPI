@@ -69,10 +69,10 @@ def configure(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument(
         "--timeout",
         type=float,
-        default=120.0,
+        default=None,
         metavar="SECONDS",
-        help="fail the run when it takes longer (default: 120; heavy features "
-        "can take minutes)",
+        help="fail the run when it takes longer (default: no limit; heavy "
+        "features can take minutes)",
     )
     parser.set_defaults(handler=_execute, printer=_print_report)
 
