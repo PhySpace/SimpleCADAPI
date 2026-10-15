@@ -133,16 +133,18 @@ CalculiX 静力 FEM（边界面按保真的 `interface.*` 标签选取，仿真�
 
 ---
 
-## 更新日志（2.2.4）
+## 更新日志（2.2.5）
 
 > 投入生产前请验证生成的定义、装配约束和制造几何。
 
-- **编辑器会告诉你模型为什么没出来。** 你或 agent 主动发起的每次运行（重跑、`sca cell`、文件变更、
-  模块重载）失败都会重新报告，失败后打开或刷新的页面也会立刻拿到原因——"building the model"
-  遮罩随原因揭开，不再等兜底超时。
-- **顶栏跳转 marimo 的按钮已移除。**
+- **`sca cell` 在容器代理后面也能用。** 编辑器发现记录钉在回环地址并绕过代理，应答不了的记录会报出来
+  而不是被静默忽略，降级读文件会在 stderr 上说明。
+- **cell 反馈带着整条链。** put/insert/run 返回 console 输出和每个不健康的 cell，stale 依赖会被运行，
+  出错 cell 会列出上游。
+- **按阶段做无头校验。** `sca run --through N / --no-product / --timeout`。
+- **更安静的输出、更短的打印。** 缓存与 VTK 噪声消失，打印 `BRepInspection` 是一行摘要。
 
-本版本的完整说明：[`docs/updates/2.2.4.zh-CN.md`](docs/updates/2.2.4.zh-CN.md)。
+本版本的完整说明：[`docs/updates/2.2.5.zh-CN.md`](docs/updates/2.2.5.zh-CN.md)。
 更早的版本：见[更新日志](CHANGELOG.md)和 [`docs/updates/`](docs/updates/)。
 
 ---
@@ -160,7 +162,7 @@ CalculiX 静力 FEM（边界面按保真的 `interface.*` 标签选取，仿真�
 
 SimpleCADAPI 是一个基于 OCP 的 Python CAD SDK，提供清晰的函数式建模操作和可重放的模型图。它在 OpenCascade 几何内核之上提供精简的公共 API，可用于创建实体、应用特征、添加语义标签、查询拓扑、导出制造文件，以及将记录的模型转换为 FreeCAD 工作流。
 
-当前版本：`simplecadapi==2.2.4`。
+当前版本：`simplecadapi==2.2.5`。
 
 ## 核心能力
 
@@ -586,6 +588,7 @@ uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py
 
 ## 文档
 
+- 2.2.5 更新说明：[`docs/updates/2.2.5.zh-CN.md`](docs/updates/2.2.5.zh-CN.md)
 - 2.2.4 更新说明：[`docs/updates/2.2.4.zh-CN.md`](docs/updates/2.2.4.zh-CN.md)
 - 2.2.3 更新说明：[`docs/updates/2.2.3.zh-CN.md`](docs/updates/2.2.3.zh-CN.md)
 - 2.2.2 更新说明：[`docs/updates/2.2.2.zh-CN.md`](docs/updates/2.2.2.zh-CN.md)
