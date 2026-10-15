@@ -706,3 +706,18 @@ def test_step_model_combines_multiple_transferred_roots(tmp_path: Path):
     assert model.summary()["volume"] == pytest.approx(48.0)
 
     brep.clear_step_model_cache_rnone()
+
+
+def test_inspection_repr_is_a_summary_not_a_face_dump():
+    """The default repr is a digest: printing an inspection in a REPL must
+    not spill the per-face records (tens of thousands of characters on a
+    real part). The full record is to_dict() / .faces / .edges."""
+    inspection = brep.inspect_shape_rbrepinspection(_box().wrapped)
+    text = repr(inspection)
+    assert "valid=True" in text
+    assert "unique_faces" in text
+    assert "uv_bounds" not in text
+    assert len(text) < 600
+    # the full record is untouched
+    assert len(inspection.faces) == 6
+    assert inspection.to_dict()["faces"] == inspection.faces

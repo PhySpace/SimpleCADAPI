@@ -14,6 +14,9 @@ from typing import Any, Mapping
 def _read_polydata(path: Path):
     import vtk
 
+    # VTK's own chatter (a missing X server, driver notes) reads as a render
+    # failure; a real one fails the worker and is named by the caller.
+    vtk.vtkObject.GlobalWarningDisplayOff()
     reader = vtk.vtkXMLPolyDataReader()
     reader.SetFileName(str(path))
     reader.Update()

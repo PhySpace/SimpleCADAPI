@@ -154,28 +154,79 @@ def _print_json(report: dict[str, Any]) -> None:
     print(json.dumps(report, indent=2, ensure_ascii=False))
 
 
-def _find_editor(start: Path) -> tuple[Path, str] | None:
-    """The running editor whose workspace holds *start*: ``(workspace, base url)``."""
-    import json
+def _opener() -> Any:
+    """An opener that bypasses the proxy environment for the local editor.
+
+    The editor is on this machine (its url is 127.0.0.1); a container's
+    ``http_proxy`` does not know that and swallows the request, which once
+    read as "no editor is running" while one was.
+    """
     import urllib.request
 
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def _find_editor(start: Path) -> tuple[Path, str] | None:
+    """The running editor whose workspace holds *start*: ``(workspace, base url)``.
+
+    A record whose server does not answer is an error, not a stale record to
+    skip quietly: "an editor was running here" is exactly the belief that
+    must not be dropped in silence.  The one definite stale case is a record
+    whose process is gone (a crashed editor leaves its server.json behind).
+    """
+    import json
+    import os
+    import urllib.error
+
     here = start.expanduser().resolve()
+    unreachable: list[str] = []
+    opener = _opener()
     for directory in (here, *here.parents):
         record = directory / ".sca-editor" / "server.json"
         if not record.is_file():
             continue
         try:
-            url = json.loads(record.read_text(encoding="utf-8"))["url"]
-            with urllib.request.urlopen(f"{url}/api/health", timeout=1.5):
+            body = json.loads(record.read_text(encoding="utf-8"))
+            url = body["url"]
+        except (OSError, ValueError, KeyError) as error:
+            unreachable.append(f"{record}: unreadable ({error})")
+            continue
+        pid = body.get("pid")
+        if isinstance(pid, int):
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                unreachable.append(
+                    f"stale record {record} (pid {pid} is gone); delete it or restart the editor"
+                )
+                continue
+            except OSError:
+                pass  # a live process we cannot signal
+        try:
+            with opener.open(f"{url}/api/health", timeout=1.5):
                 pass
-        except (OSError, ValueError, KeyError):
-            continue  # a stale record: the editor is gone
+        except urllib.error.HTTPError:
+            pass  # an editor that answers at all is running
+        except OSError as error:
+            unreachable.append(f"found {record} but {url} is unreachable: {error}")
+            continue
         return directory, str(url)
+    if unreachable:
+        raise ValueError("; ".join(unreachable))
     return None
 
 
-def _call(url: str, path: str, body: dict | None = None) -> dict[str, Any]:
+def _call_timeout() -> float:
+    """How long one editor call may take; a heavy downstream rerun is on the
+    clock of the write that triggered it. ``SCA_EDITOR_CALL_TIMEOUT`` seconds."""
+    import os
+
+    return float(os.environ.get("SCA_EDITOR_CALL_TIMEOUT", "300"))
+
+
+def _call(url: str, path: str, body: dict | None = None, timeout: float | None = None) -> dict[str, Any]:
     import json
+    import socket
     import urllib.error
     import urllib.request
 
@@ -183,20 +234,29 @@ def _call(url: str, path: str, body: dict | None = None) -> dict[str, Any]:
     request = urllib.request.Request(
         url + path, data=data, headers={"Content-Type": "application/json"}, method="GET" if body is None else "POST"
     )
+    seconds = _call_timeout() if timeout is None else timeout
     try:
-        with urllib.request.urlopen(request, timeout=300) as response:
+        with _opener().open(request, timeout=seconds) as response:
             return json.loads(response.read())
     except urllib.error.HTTPError as error:
         try:
             return json.loads(error.read())
         except ValueError:
             return {"error": f"editor answered {error.code}"}
+    except (socket.timeout, TimeoutError) as error:
+        raise TimeoutError(f"the editor did not answer {path} within {seconds:g}s") from error
 
 
 def _session(args: argparse.Namespace, *, write: bool) -> tuple[str | None, Path | None, str]:
     """``(editor url or None, notebook path or None, relative notebook name)`` for a cell command."""
     start = args.workspace or (args.notebook.parent if args.notebook else Path.cwd())
-    found = _find_editor(start)
+    try:
+        found = _find_editor(start)
+    except ValueError as error:
+        if write:
+            raise
+        _warn(f"editor not reached: {error}")
+        found = None
     notebook = args.notebook.expanduser().resolve() if args.notebook else None
     if found is None:
         if write:
@@ -206,6 +266,7 @@ def _session(args: argparse.Namespace, *, write: bool) -> tuple[str | None, Path
             )
         if notebook is None:
             raise ValueError("no editor is running here; name the notebook with --notebook")
+        _warn(f"no editor is running on this workspace; reading the file: {notebook.name}")
         return None, notebook, notebook.name
     workspace, url = found
     open_path = _call(url, "/api/cells").get("notebook")
@@ -221,7 +282,15 @@ def _session(args: argparse.Namespace, *, write: bool) -> tuple[str | None, Path
             f"the editor has {open_path} open, not {relative}: edit {relative} directly "
             "(the editor does not hold it), or open it in the editor first"
         )
+    _warn(f"the editor has {open_path} open; reading {relative} from the file")
     return None, notebook, relative
+
+
+def _warn(message: str) -> None:
+    """Say a fallback out loud: silence once read as "the editor agreed"."""
+    import sys
+
+    print(f"warning: {message}", file=sys.stderr)
 
 
 def _cells_from_file(notebook: Path) -> list[dict[str, Any]]:
@@ -239,7 +308,7 @@ def _cells_from_file(notebook: Path) -> list[dict[str, Any]]:
 def _slim(report: dict[str, Any], *, code: bool) -> dict[str, Any]:
     if "cells" not in report:
         return report
-    keep = ("index", "key", "name", "title", "status", "errors", "output", "ref", "readonly")
+    keep = ("index", "key", "name", "title", "status", "errors", "output", "console", "upstream", "ref", "readonly")
     return {
         **report,
         "cells": [
@@ -285,13 +354,25 @@ def _read_code(args: argparse.Namespace) -> str:
 def _write_op(args: argparse.Namespace, op: str, body: dict[str, Any]) -> tuple[dict[str, Any], int]:
     url, _notebook, _name = _session(args, write=True)
     assert url is not None
-    report = _call(url, f"/api/cells/{op}", body)
+    try:
+        report = _call(url, f"/api/cells/{op}", body)
+    except TimeoutError:
+        # The server took the write and reruns on its own; the clock that ran
+        # out is this call's, not the editor's.
+        return {
+            "error": "the edit was applied and the rerun is still going; check "
+            "`sca cell ls` (SCA_EDITOR_CALL_TIMEOUT raises the wait)"
+        }, 1
     if "error" in report:
         return _slim(report, code=False), 1
     touched = set(report.get("touched", []))
     report = _slim(report, code=False)
-    # What the change did: the touched cells with their state; the rest as a count.
-    report["cells"] = [c for c in report["cells"] if c.get("index") in touched] or report["cells"]
+    # What the change did: the touched cells with their state, plus any cell
+    # that is not healthy after the run — a rerun dependent failing is the
+    # feedback the edit was after, hiding it once read as "the edit was fine".
+    report["cells"] = [
+        c for c in report["cells"] if c.get("index") in touched or c.get("errors") or c.get("blocked")
+    ] or report["cells"]
     return report, 0
 
 

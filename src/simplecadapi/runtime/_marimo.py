@@ -14,13 +14,14 @@ import marimo
 from marimo._ast.app import App, InternalApp
 from marimo._ast.cell import CellImpl
 from marimo._ast.cell_manager import CellManager
-from marimo._ast.compiler import get_filename, solve_source_position
+from marimo._ast.compiler import compile_cell, get_filename, solve_source_position
 from marimo._ast.parse import (
     NonMarimoPythonScriptError,
     is_non_marimo_python_script,
     parse_notebook,
 )
 from marimo._schemas.serialization import UnparsableCell
+from marimo._loggers import suppress_warnings_logs
 from marimo._session.notebook.serializer import get_notebook_serializer
 from marimo._runtime.app.script_runner import AppScriptRunner
 from marimo._runtime.context.types import (
@@ -61,6 +62,7 @@ __all__ = [
     "MutableGlobals",
     "RunResult",
     "Skip",
+    "compile_cell",
     "get_filename",
     "is_unhashable_stub",
     "load_notebook",
@@ -70,6 +72,7 @@ __all__ = [
     "runtime_context_installed",
     "safe_get_context",
     "solve_source_position",
+    "suppress_warnings_logs",
 ]
 
 def load_notebook(path: Path, *, cell_prefix: str) -> App | None:

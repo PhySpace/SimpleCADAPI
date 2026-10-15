@@ -46,6 +46,23 @@ class BRepInspection:
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
+    def summary(self) -> str:
+        """One digest line: the facts an agent checks first, no per-face dump.
+
+        The full record (tens of thousands of characters on a real part) is
+        ``.to_dict()`` / the ``faces`` / ``edges`` lists.
+        """
+        box = self.bounding_box
+        size = [round(box[i + 3] - box[i], 3) for i in range(3)]
+        return (
+            f"<BRepInspection {self.source or '?'}: valid={self.valid} "
+            f"counts={self.counts} volume={self.volume:.6g} area={self.surface_area:.6g} "
+            f"size(xyz)={size} surfaces={self.surface_type_counts} edges={self.edge_type_counts}>"
+        )
+
+    def __repr__(self) -> str:
+        return self.summary()
+
     def write_json(self, path: str | Path, *, indent: int = 2) -> Path:
         output = Path(path)
         output.parent.mkdir(parents=True, exist_ok=True)

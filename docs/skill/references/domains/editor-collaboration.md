@@ -12,11 +12,17 @@ tuned value) is also something you can read from disk. Never rely on what the
 person says they selected when the file or the snapshot can tell you.
 
 The editor holds the open notebook in memory and is the one writer of its
-file. You have two safe ways to change it while it runs; use the first:
+file. While it runs, **`sca cell` is the only way to change a regular cell**:
+writing the file behind the editor's back races its next save, and the page's
+version or yours is lost. Edit the file directly only when no editor is
+running (then nothing else holds it), or for the cells `sca cell` refuses
+(the setup cell and `@app.function` cells): the editor takes those file
+changes in.
 
-1. **`sca cell` (preferred).** It edits through the editor: the page shows the
+1. **`sca cell` (always, for regular cells).** It edits through the editor: the page shows the
    change live (no reload, no flicker), the cell runs, and you get its state back.
-2. **Edit the file.** The editor notices a saved change within a second, compares
+2. **Edit the file** — only with no editor running, or for a setup / `@app.function` cell. The
+   editor notices a saved change within a second, compares
    it with its cells and applies only what differs (changed cells are edited in
    place and run again, added or removed cells appear or go away). A change to the
    setup cell or an `@app.function` cell restarts the kernel instead. A file that

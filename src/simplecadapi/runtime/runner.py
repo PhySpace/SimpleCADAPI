@@ -51,6 +51,7 @@ from ._marimo import (
     load_notebook,
     runtime_context_installed,
     safe_get_context,
+    suppress_warnings_logs,
 )
 from .cache import CellCache, CellDigests, cache_root, prune
 from .cells import NotebookCells
@@ -93,14 +94,15 @@ class NotebookRun:
     """The outcome of :func:`run_notebook`.
 
     ``product`` is the notebook's product and ``definition`` its durable
-    definition; ``values`` holds every top-level variable, ``cells`` one
-    report per cell in notebook order, and ``dependencies`` the files
-    outside the cells the run depends on.
+    definition (``None`` for a partial run — see ``through``/``product``);
+    ``values`` holds every top-level variable, ``cells`` one report per cell
+    in notebook order, and ``dependencies`` the files outside the cells the
+    run depends on.
     """
 
     config: NotebookConfig
-    product: Product
-    """The product, carrying its definition."""
+    product: Product | None
+    """The product, carrying its definition; ``None`` when none was asked for."""
     values: Mapping[str, Any]
     """Every top-level variable, overrides included."""
     cells: tuple[CellReport, ...]
@@ -110,6 +112,8 @@ class NotebookRun:
 
     @property
     def definition(self) -> Definition:
+        if self.product is None:
+            raise ValueError("this run produced no product (a partial run: through= or product=False)")
         definition = attached_definition(self.product)
         # project_product attaches one to every product it returns.
         assert definition is not None
@@ -122,6 +126,9 @@ def run_notebook(
     id: str | None = None,
     overrides: Mapping[str, Any] | None = None,
     cache: bool = True,
+    through: int | None = None,
+    product: bool = True,
+    timeout: float | None = None,
 ) -> NotebookRun:
     """Run the notebook at *path* and project its product.
 
@@ -131,6 +138,12 @@ def run_notebook(
     not run (marimo requires such a cell's variables to be overridden all
     together).  ``cache=False`` neither reads nor writes the cell cache.
     Errors raised by a cell propagate unchanged.
+
+    *through* runs only the first *through* cells, in notebook order — the
+    validation of a stage the tail does not have to exist for.  With
+    ``product=False`` the run does not look for the notebook's product at
+    all.  *timeout* (seconds) fails the run with :class:`TimeoutError` when
+    it takes longer; ``None`` (the default) runs unbounded.
     """
 
     config = read_notebook_config(path)
@@ -144,13 +157,20 @@ def run_notebook(
     values = dict(overrides or {})
 
     def run() -> NotebookRun:
-        return _run(config, values, cache=cache)
+        # The cache loaders warn about the degraded states they heal
+        # themselves out of (unsigned entries for missing cryptography, a
+        # value restored as a stub); at WARNING they read as run failures.
+        # Errors still come through.
+        with suppress_warnings_logs("lazy"):
+            return _run(config, values, cache=cache, through=through, product=product)
 
     # marimo keeps its runtime context per thread, and a notebook run needs
     # one of its own; a run started from a cell (``use``) gets a thread.
     if runtime_context_installed():
         return _on_own_thread(run)
-    return run()
+    if timeout is None:
+        return run()
+    return _with_timeout(run, timeout)
 
 
 def use(path: str | Path, /, *, id: str | None = None, **overrides: Any) -> Product:
@@ -167,6 +187,9 @@ def use(path: str | Path, /, *, id: str | None = None, **overrides: Any) -> Prod
     if not target.is_absolute():
         target = _calling_directory() / target
     child = run_notebook(target, id=id, overrides=overrides)
+    # use() never asks for a partial run, so the product is always there.
+    if child.product is None:
+        raise RuntimeError(f"{child.config.path}: the child run produced no product")
     record_dependencies({child.config.path, *child.dependencies})
     return child.product
 
@@ -176,7 +199,14 @@ def use(path: str | Path, /, *, id: str | None = None, **overrides: Any) -> Prod
 # ---------------------------------------------------------------------------
 
 
-def _run(config: NotebookConfig, overrides: dict[str, Any], *, cache: bool) -> NotebookRun:
+def _run(
+    config: NotebookConfig,
+    overrides: dict[str, Any],
+    *,
+    cache: bool,
+    through: int | None = None,
+    product: bool = True,
+) -> NotebookRun:
     app = load_notebook(config.path, cell_prefix=_cell_prefix(config))
     if app is None:
         raise NotebookConfigError(f"{config.path}: the notebook has no cells")
@@ -186,6 +216,18 @@ def _run(config: NotebookConfig, overrides: dict[str, Any], *, cache: bool) -> N
         for cell_id in internal.cell_manager.cell_ids()
         if cell_id in internal.graph.cells
     ]
+    if through is not None:
+        if through < 1:
+            raise ValueError(f"through must be at least 1, got {through}")
+        # Counted the way the editor numbers cells: the setup cell is
+        # infrastructure and takes no number.  Disabled is what the script
+        # runner filters on (graph.disable_cell only sets a runtime status);
+        # a cell before the cut that reads one behind it fails with its own
+        # NameError, which is the honest report.
+        setup_id = internal.cell_manager.setup_cell_id
+        visible = [cell for cell in ordered if cell.cell_id != setup_id]
+        for cell in visible[through:]:
+            cell.config.disabled = True
     _check_overrides(config, internal, ordered, overrides)
     cells = NotebookCells(config.path, ordered)
     scope = NotebookScope(config, cells)
@@ -227,12 +269,14 @@ def _run(config: NotebookConfig, overrides: dict[str, Any], *, cache: bool) -> N
         name: glbls[name] for cell in ordered for name in cell.defs if name in glbls
     }
     read = frozenset().union(*(cell.refs for cell in ordered))
-    product = project_product(
-        find_product(config, values, read),
-        config=config,
-        cells=cells,
-        values=values.values(),
-    )
+    product_value: Product | None = None
+    if product:
+        product_value = project_product(
+            find_product(config, values, read),
+            config=config,
+            cells=cells,
+            values=values.values(),
+        )
 
     # Cells restored from the cache ran no ``use`` this time; the files they
     # depend on are among those the previous run recorded.
@@ -266,11 +310,41 @@ def _run(config: NotebookConfig, overrides: dict[str, Any], *, cache: bool) -> N
     )
     return NotebookRun(
         config=config,
-        product=product,
+        product=product_value,
         values=values,
         cells=reports,
         dependencies=dependencies,
     )
+
+
+def _with_timeout(run: Callable[[], NotebookRun], timeout: float) -> NotebookRun:
+    """Put a wall clock around *run*.
+
+    The worker thread is a daemon: a run that ignores the deadline (native
+    code deep in a fillet) cannot keep the process alive past it.
+    """
+    import threading
+
+    outcome: list[NotebookRun] = []
+    failure: list[BaseException] = []
+
+    def work() -> None:
+        try:
+            outcome.append(run())
+        except BaseException as error:  # re-raised on the caller's thread
+            failure.append(error)
+
+    worker = threading.Thread(target=work, daemon=True, name="notebook-run")
+    worker.start()
+    worker.join(timeout)
+    if worker.is_alive():
+        raise TimeoutError(
+            f"the notebook did not finish in {timeout:g}s (pass a larger "
+            "timeout; heavy features can take minutes)"
+        )
+    if failure:
+        raise failure[0]
+    return outcome[0]
 
 
 def _execute(

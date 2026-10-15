@@ -37,6 +37,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from ..runtime.cells import cell_keys
 from ..runtime.config import NotebookConfig, read_notebook_config
+from ..runtime._marimo import compile_cell
 from ..runtime.params import (
     ParamSpec,
     commit_field_value,
@@ -601,7 +602,7 @@ class WorkspaceState:
     # -- the same cell edits, for an agent (``sca cell``) -------------------------
 
     def _brief(self, number: int, cell: dict) -> dict:
-        return {
+        brief = {
             "index": number,
             "id": cell["id"],
             "key": cell.get("key"),
@@ -615,13 +616,34 @@ class WorkspaceState:
             "ref": cell.get("ref"),
             "code": cell["code"],
         }
+        if cell.get("blocked"):
+            # The cell did not itself fail: an ancestor did (its report says which).
+            brief["blocked"] = True
+        return brief
 
     def cells_report(self, *, refresh: bool = True) -> dict:
         if refresh and self.kernel is not None:
             self.push_cells()
+        upstream = _upstream_of(self.cells)
+        place = {cell["id"]: (number, cell) for number, cell in enumerate(self.cells, start=1)}
+        briefs = []
+        for number, cell in enumerate(self.cells, start=1):
+            brief = self._brief(number, cell)
+            if brief["errors"] or brief.get("blocked"):
+                # The cell the error names is often not the one at fault: say
+                # what it reads, the failing ancestors first.
+                brief["upstream"] = [
+                    {
+                        "index": place[dep][0],
+                        "name": place[dep][1].get("name"),
+                        "failing": bool(place[dep][1].get("errors")),
+                    }
+                    for dep in sorted(upstream.get(cell["id"], ()), key=lambda cid: place[cid][0])
+                ]
+            briefs.append(brief)
         return {
             "notebook": self.notebook.relative_to(self.workspace).as_posix() if self.notebook else None,
-            "cells": [self._brief(n, c) for n, c in enumerate(self.cells, start=1)],
+            "cells": briefs,
         }
 
     def _find_cell(self, ref: Any) -> dict:
@@ -654,9 +676,16 @@ class WorkspaceState:
                 if body.get("base") is not None and _module_code(str(body["base"])).strip() != _module_code(cell["code"]).strip():
                     return {"error": "conflict: the cell changed since you read it", "theirs": cell["code"]}
                 if code.strip() != _module_code(cell["code"]).strip():
-                    (kernel.edit_cell if body.get("run", True) else kernel.save_cell)(cell["id"], code)
+                    run = bool(body.get("run", True))
+                    (kernel.edit_cell if run else kernel.save_cell)(cell["id"], code)
+                    if run:
+                        # The edit runs the cell itself; the sweep adds the
+                        # dependents it made stale — their state is the
+                        # feedback the caller asked for.
+                        kernel.wait_idle()
+                        kernel.run_until_settled([])
                 elif body.get("run", True):
-                    kernel.run_cells([cell["id"]])
+                    kernel.run_until_settled([cell["id"]])
                 touched = [cell["id"]]
             elif op == "insert":
                 after = body.get("after")
@@ -668,9 +697,11 @@ class WorkspaceState:
                     anchor = self._find_cell(after)["id"]
                 code = _module_code(str(body.get("code", ""))) or "# new cell"
                 name = str(body["name"]) if body.get("name") else None
-                created = _created_id(kernel.create_cell_after(anchor, code, name, run=bool(body.get("run", True))))
+                created = _created_id(kernel.create_cell_after(anchor, code, name, run=False))
                 if created is None:
                     return {"error": "the kernel did not create the cell"}
+                if body.get("run", True):
+                    kernel.run_until_settled([created])
                 touched = [created]
             elif op == "delete":
                 cell = self._find_cell(body.get("cell"))
@@ -1430,8 +1461,10 @@ class WorkspaceState:
             directory.mkdir(parents=True, exist_ok=True)
             import os
 
+            # The record is read on this machine, so the url is always the
+            # loopback: a 0.0.0.0 url is no address (and walks into proxies).
             (directory / "server.json").write_text(
-                json.dumps({"url": f"http://{host}:{self.port}", "pid": os.getpid(), "workspace": str(self.workspace)}),
+                json.dumps({"url": f"http://127.0.0.1:{self.port}", "pid": os.getpid(), "workspace": str(self.workspace)}),
                 encoding="utf-8",
             )
         except OSError:
@@ -1484,6 +1517,36 @@ class WorkspaceState:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(self.latest_package_bytes)
         self.hub.broadcast({"type": "status", "exported": str(target)})
+
+
+def _upstream_of(cells: list[dict]) -> dict[str, set[str]]:
+    """Per cell id: the ids of the cells it (transitively) reads.
+
+    Compiled with marimo's own cell compiler, so a name is a dependency
+    exactly when marimo's dataflow says so; a cell mid-edit (its code does
+    not compile) contributes no edges rather than wrong ones.
+    """
+    owner: dict[str, str] = {}
+    refs: dict[str, frozenset[str]] = {}
+    for cell in cells:
+        try:
+            impl = compile_cell(_module_code(cell["code"]), cell["id"])
+        except Exception:
+            refs[cell["id"]] = frozenset()
+            continue
+        refs[cell["id"]] = impl.refs
+        for name in impl.defs:
+            owner.setdefault(name, cell["id"])
+    direct = {cid: {owner[name] for name in names if name in owner and owner[name] != cid} for cid, names in refs.items()}
+    closure: dict[str, set[str]] = {}
+
+    def walk(cid: str) -> set[str]:
+        if cid not in closure:
+            closure[cid] = set()  # marimo forbids cycles; the placeholder guards one anyway
+            closure[cid] = set().union(*(walk(dep) | {dep} for dep in direct.get(cid, ()))) if direct.get(cid) else set()
+        return closure[cid]
+
+    return {cid: walk(cid) for cid in refs}
 
 
 def _module_code(code: str) -> str:

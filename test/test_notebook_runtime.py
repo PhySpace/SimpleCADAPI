@@ -766,3 +766,54 @@ class TestScaRun(NotebookTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPartialRuns(NotebookTestCase):
+    """Validation of a stage: a prefix of the cells, no product required, a wall clock."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.bracket = self.write("bracket.py", BRACKET)
+        self.headless = self.write(
+            "headless.py",
+            notebook_text(
+                cell("width = 20.0", returns="width"),
+                cell("block = scad.make_box_rsolid(width, 10.0, 5.0)", reads="width", returns="block"),
+                table='id = "headless"',
+            ),
+        )
+        self.sleepy = self.write(
+            "sleepy.py",
+            notebook_text(
+                cell("import time\ntime.sleep(30)\nwidth = 1.0", returns="width"),
+                table='id = "sleepy"',
+            ),
+        )
+
+    def test_through_runs_the_first_cells_and_marks_the_rest_skipped(self) -> None:
+        run = run_notebook(self.bracket, through=2, product=False)
+        # setup + the first two visible cells; the tail is named skipped
+        self.assertEqual(self.statuses(run), ["ran", "ran", "ran", "skipped"])
+        self.assertIsNone(run.product)
+        with self.assertRaisesRegex(ValueError, "no product"):
+            run.definition
+
+    def test_through_counts_cells_the_way_the_editor_numbers_them(self) -> None:
+        # the setup cell is infrastructure and takes no number
+        run = run_notebook(self.bracket, through=1, product=False)
+        self.assertEqual(self.statuses(run), ["ran", "ran", "skipped", "skipped"])
+        with self.assertRaisesRegex(ValueError, "through must be at least 1"):
+            run_notebook(self.bracket, through=0)
+
+    def test_product_false_runs_a_notebook_that_has_no_product_yet(self) -> None:
+        from simplecadapi.runtime import ProductNotFoundError
+
+        with self.assertRaises(ProductNotFoundError):
+            run_notebook(self.headless, cache=False)
+        run = run_notebook(self.headless, cache=False, product=False)
+        self.assertEqual(self.statuses(run), ["ran", "ran", "ran"])
+        self.assertIsNone(run.product)
+
+    def test_timeout_fails_the_run_and_names_the_knob(self) -> None:
+        with self.assertRaisesRegex(TimeoutError, "timeout"):
+            run_notebook(self.sleepy, timeout=0.5)

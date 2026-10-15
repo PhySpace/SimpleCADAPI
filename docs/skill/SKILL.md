@@ -50,9 +50,10 @@ Paths are relative to this file's directory.
   selected, and you MUST read
   `references/domains/editor-collaboration.md` first to see what they
   see (selection cell, `sca snapshot`, cell references) and how to
-  hand the work back. While the editor runs, change its notebooks with
-  `sca cell` (or the file; never both blindly): the editor is the
-  file's writer.
+  hand the work back. While the editor runs, `sca cell` is the only way to
+  change a regular cell; edit the file only when no editor is running, or
+  for the setup / `@app.function` cells `sca cell` refuses: the editor is
+  the file's writer.
 - Creating, installing, updating, or removing a SimpleCADAPI addon (a
   third-party skill+tooling package around `.scadpkg`) enters no
   workflow; you MUST use `references/domains/addon-development.md`
@@ -147,6 +148,13 @@ it and stop that route; never invent an alternative route.
     them in the editor for a person); never enable
     marimo's `[tool.marimo.runtime] cache_cells` in the editor, and
     never commit the generated `__marimo__/` directory.
+12. Manage the modeling project the way software is managed: put the
+    workspace under git from the first file, commit at verified
+    milestones (a passed verification, not a wall clock) with messages
+    that say what changed and why, and use a branch per design
+    direction when alternatives are on the table. Generated state —
+    `__marimo__/`, `.sca-editor/`, `out/` — belongs in `.gitignore`,
+    never in a commit.
 
 ## Boundaries
 

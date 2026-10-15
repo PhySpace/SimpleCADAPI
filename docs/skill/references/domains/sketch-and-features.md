@@ -81,6 +81,10 @@ Read the exact page under `references/docs/api/` for every API used:
 ## Validation gates
 
 - Record plane mapping, closure, solve status, and remaining DOF in the brief.
+- `dof=0` says the constraint system closed, not that the shape is the intended
+  one: angle and symmetry constraints can solve to the mirror solution. Verify
+  the promoted geometry by measurement (bounding box, area, edge counts), never
+  by the solver status alone.
 - When sketch promotion may change measured geometry, build Wire and Sketch
   from one parameter source and compare closure/area/bounds/segmentation before
   promoting.
