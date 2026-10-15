@@ -6,6 +6,40 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+## 2.2.5 — 2026-10-15
+
+### Fixed
+
+- Editor: `sca cell` finds the editor through a container's proxy environment: the recorded
+  url is always the loopback (`--host 0.0.0.0` included), the health check and the editor
+  calls bypass `http_proxy`, and a record whose server does not answer is an error naming
+  the record and the url instead of a silent "no editor is running". A record whose pid is
+  gone reports the stale record and the remedy. A fallback to reading the file says so on
+  stderr.
+
+### Added
+
+- Run: `sca run --through N` runs the first N cells only (a stage, numbered the way the
+  editor numbers cells), `--no-product` runs a work-in-progress notebook that has no product
+  yet, and `--timeout SECONDS` fails a run that takes longer (off by default).
+- Editor: a failing or blocked cell's report names its upstream cells (failing ones first),
+  with marimo's own dependency semantics.
+
+### Changed
+
+- Editor: `sca cell put/insert/run` report the console output and every cell left unhealthy
+  by the change, and the dependents a write made stale are run, not left stale. A write whose
+  rerun outlives the call says the edit was applied and names `sca cell ls`
+  (`SCA_EDITOR_CALL_TIMEOUT` raises the wait, default 300s).
+- Inspect: printing a `BRepInspection` shows a one-line summary; the full record is
+  `to_dict()` / `.faces` / `.edges`.
+- Runs are quieter: the cache loaders' degraded-state warnings no longer print at WARNING,
+  and the render paths switch VTK's warning display off process-wide (this also hides VTK
+  chatter from code run in the same process); a real failure is still raised and named.
+- Skill: while an editor runs, `sca cell` is the only way to change a regular cell; `dof=0`
+  says the constraint system closed, not that the shape is right (mirror solutions); modeling
+  projects are version-controlled with git.
+
 ## 2.2.4 — 2026-10-15
 
 ### Fixed

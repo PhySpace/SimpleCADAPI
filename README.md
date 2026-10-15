@@ -149,18 +149,21 @@ the full crank cycle sweeps clean in the same sim ·
 
 ---
 
-## Update Notes (2.2.4)
+## Update Notes (2.2.5)
 
 > Validate generated definitions, assembly constraints, and manufacturing
 > geometry before production use.
 
-- **The editor tells you why no model is coming.** A failed build is reported on every run you or
-  an agent asks for (rerun, `sca cell`, a file change, a module reload), and to a page that opens
-  or refreshes afterwards — the "building the model" veil lifts with the reason instead of
-  waiting out its fallback.
-- **The header's jump-to-marimo button is gone.**
+- **`sca cell` works behind container proxies.** The editor's discovery record is loopback and
+  proxy-proof, an unreachable record is reported instead of silently ignored, and file
+  fallbacks say so on stderr.
+- **Cell feedback carries the chain.** put/insert/run return console output and every cell
+  left unhealthy, stale dependents are run, and a failing cell names its upstream.
+- **Validate a stage headlessly.** `sca run --through N / --no-product / --timeout`.
+- **Quieter output, shorter prints.** Cache and VTK chatter is gone; a printed
+  `BRepInspection` is a one-line summary.
 
-Full notes for this version: [`docs/updates/2.2.4.md`](docs/updates/2.2.4.md).
+Full notes for this version: [`docs/updates/2.2.5.md`](docs/updates/2.2.5.md).
 Earlier versions: the [changelog](CHANGELOG.md) and [`docs/updates/`](docs/updates/).
 
 ---
@@ -181,7 +184,7 @@ in a compact public API for creating solids, applying features, tagging semantic
 intent, querying topology, exporting manufacturing files, and translating recorded
 models into FreeCAD workflows.
 
-Current release: `simplecadapi==2.2.4`.
+Current release: `simplecadapi==2.2.5`.
 
 ## What It Provides
 
@@ -696,6 +699,7 @@ and the [STEP reconstruction workflow](docs/skill/references/workflows/step-reco
 
 ## Documentation
 
+- 2.2.5 update notes: [`docs/updates/2.2.5.md`](docs/updates/2.2.5.md)
 - 2.2.4 update notes: [`docs/updates/2.2.4.md`](docs/updates/2.2.4.md)
 - 2.2.3 update notes: [`docs/updates/2.2.3.md`](docs/updates/2.2.3.md)
 - 2.2.2 update notes: [`docs/updates/2.2.2.md`](docs/updates/2.2.2.md)
