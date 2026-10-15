@@ -129,7 +129,7 @@ class FunctionCellTest(unittest.TestCase):
 
     def test_editing_one_is_refused_and_unchanged_code_is_not(self) -> None:
         state = WorkspaceState(Path(tempfile.gettempdir()))
-        state.kernel = type("K", (), {"run_cells": lambda self, ids: {}, "wait_idle": lambda self: True})()  # type: ignore[assignment]
+        state.kernel = type("K", (), {"run_until_settled": lambda self, ids: None, "wait_idle": lambda self: True})()  # type: ignore[assignment]
         state.cells = [{"id": "f1", "code": "def f():\n    return 1"}]
         state.schedule_settle = lambda: None  # type: ignore[method-assign]
         refused = state.dispatch_command({"type": "code.edit", "cell": "f1", "code": "def f():\n    return 2"})
@@ -1101,3 +1101,137 @@ class PublishErrorReportingTest(unittest.TestCase):
         with TestClient(create_app(state)) as client, client.websocket_connect("/ws") as ws:
             self.assertEqual(ws.receive_json()["type"], "hello")
             self.assertEqual(ws.receive_json(), {"type": "status", "error": self.ERROR})
+
+
+class EndpointDiscoveryTest(unittest.TestCase):
+    """How `sca cell` finds the editor, and what it says when it cannot."""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name).resolve()
+
+    def test_server_json_pins_the_loopback_even_for_a_wildcard_host(self) -> None:
+        state = WorkspaceState(self.root)
+        state.port = 17611
+        state.write_endpoint("0.0.0.0")
+        record = json.loads((self.root / ".sca-editor" / "server.json").read_text())
+        # The record is read on this machine; a 0.0.0.0 url is no address and
+        # walks into a container's proxy.
+        self.assertEqual(record["url"], "http://127.0.0.1:17611")
+
+    def test_a_stale_record_is_an_error_that_names_the_record_and_url(self) -> None:
+        from simplecadapi.editor.cli import _find_editor
+
+        directory = self.root / ".sca-editor"
+        directory.mkdir()
+        (directory / "server.json").write_text(json.dumps({"url": "http://127.0.0.1:17612"}))
+        with self.assertRaisesRegex(ValueError, "server.json.*17612.*unreachable"):
+            _find_editor(self.root)
+
+    def test_the_health_check_reaches_a_local_editor_through_a_proxy_environment(self) -> None:
+        import threading
+
+        import uvicorn
+
+        from simplecadapi.editor.cli import _find_editor
+        from simplecadapi.editor.server import create_app
+
+        path = create_notebook(self.root, "bracket", "part")
+        state = WorkspaceState(self.root, path)
+        state.port = 17613
+        server = uvicorn.Server(uvicorn.Config(create_app(state), port=state.port, log_level="error"))
+        threading.Thread(target=server.run, daemon=True).start()
+        try:
+            deadline = time.monotonic() + 10
+            healthy = False
+            while time.monotonic() < deadline:
+                try:
+                    with urllib.request.urlopen(f"http://127.0.0.1:{state.port}/api/health", timeout=1):
+                        healthy = True
+                        break
+                except OSError:
+                    time.sleep(0.1)
+            self.assertTrue(healthy, "the test editor did not come up")
+            directory = self.root / ".sca-editor"
+            directory.mkdir(exist_ok=True)
+            (directory / "server.json").write_text(json.dumps({"url": f"http://127.0.0.1:{state.port}"}))
+            # The old code let urllib honor this proxy for a 127.0.0.1 url and
+            # read the resulting failure as "no editor is running".
+            environment = {"http_proxy": "http://127.0.0.1:1", "https_proxy": "http://127.0.0.1:1"}
+            saved = {name: os.environ.get(name) for name in environment}
+            os.environ.update(environment)
+            try:
+                found = _find_editor(self.root)
+            finally:
+                for name, value in saved.items():
+                    if value is None:
+                        os.environ.pop(name, None)
+                    else:
+                        os.environ[name] = value
+            self.assertIsNotNone(found)
+            self.assertEqual(found[1], f"http://127.0.0.1:{state.port}")
+        finally:
+            server.should_exit = True
+
+    def test_reading_the_file_without_an_editor_says_so_on_stderr(self) -> None:
+        import argparse
+        import contextlib
+        import io
+
+        from simplecadapi.editor import cli
+
+        path = create_notebook(self.root, "bracket", "part")
+        args = argparse.Namespace(notebook=path, workspace=None, cell="1")
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            report, code = cli._cell_ls(args)
+        self.assertEqual(code, 0)
+        self.assertEqual(report["source"], "file")
+        self.assertIn("reading the file", err.getvalue())
+
+        # A record that does not answer is the misleading one: the warning
+        # must say the editor was found but not reached.
+        directory = self.root / ".sca-editor"
+        directory.mkdir()
+        (directory / "server.json").write_text(json.dumps({"url": "http://127.0.0.1:17614"}))
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            report, code = cli._cell_ls(args)
+        self.assertEqual(code, 0)
+        self.assertEqual(report["source"], "file")
+        self.assertIn("editor not reached", err.getvalue())
+        self.assertIn("17614", err.getvalue())
+
+    def test_slim_keeps_the_console_and_the_upstream(self) -> None:
+        from simplecadapi.editor.cli import _slim
+
+        report = {
+            "cells": [
+                {"index": 1, "status": "idle"},
+                {"index": 2, "status": "idle", "console": ["printed"], "upstream": [{"index": 1, "failing": False}]},
+            ]
+        }
+        slim = _slim(report, code=False)
+        self.assertNotIn("console", slim["cells"][0])
+        self.assertEqual(slim["cells"][1]["console"], ["printed"])
+        self.assertEqual(slim["cells"][1]["upstream"], [{"index": 1, "failing": False}])
+
+    def test_a_failing_cell_names_its_upstream_and_the_failing_ancestor(self) -> None:
+        state = WorkspaceState(self.root)
+        state.notebook = self.root / "bracket.py"
+        state.cells = [
+            {"id": "c1", "code": "width = 20"},
+            {"id": "c2", "code": "block = scad.make_box_rsolid(width, 10, 5)"},
+            {"id": "c3", "code": 'part = scad.Part(part_id="p", body=block)', "errors": ["boom"]},
+            {"id": "c4", "code": "print(part)", "blocked": True},
+        ]
+        report = state.cells_report(refresh=False)
+        by_index = {cell["index"]: cell for cell in report["cells"]}
+        self.assertNotIn("upstream", by_index[1])
+        self.assertEqual(by_index[4].get("blocked"), True)
+        upstream = by_index[4]["upstream"]
+        self.assertEqual([row["index"] for row in upstream], [1, 2, 3])
+        self.assertEqual([row["failing"] for row in upstream], [False, False, True])
+        self.assertEqual([row["index"] for row in by_index[3]["upstream"]], [1, 2])
+        self.assertEqual([row["failing"] for row in by_index[3]["upstream"]], [False, False])
