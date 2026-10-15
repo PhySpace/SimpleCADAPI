@@ -52,6 +52,28 @@ def configure(subparsers: argparse._SubParsersAction) -> None:
     )
     parser.add_argument("--no-cache", action="store_true", help="run every cell")
     parser.add_argument("--out", type=Path, help="write the product package here")
+    parser.add_argument(
+        "--through",
+        type=int,
+        default=None,
+        metavar="N",
+        help="run only the first N cells, in notebook order: validate a stage "
+        "the rest of the notebook need not exist for (pair with --no-product "
+        "unless the stage already defines the product)",
+    )
+    parser.add_argument(
+        "--no-product",
+        action="store_true",
+        help="do not look for the notebook's product: a work-in-progress run",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=120.0,
+        metavar="SECONDS",
+        help="fail the run when it takes longer (default: 120; heavy features "
+        "can take minutes)",
+    )
     parser.set_defaults(handler=_execute, printer=_print_report)
 
     listing = subparsers.add_parser(
@@ -96,20 +118,31 @@ def _execute(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         id=args.run_id,
         overrides=parse_overrides(args.overrides),
         cache=not args.no_cache,
+        through=args.through,
+        product=not args.no_product,
+        timeout=args.timeout,
     )
-    definition = run.definition
     report: dict[str, Any] = {
         "notebook": str(run.config.path),
-        "definition_id": definition.definition_id,
-        "definition_kind": definition.definition_kind,
-        "revision": definition.revision,
-        "content_hash": definition.content_hash,
         "cells": [
             {"name": cell.name, "key": cell.key, "status": cell.status}
             for cell in run.cells
         ],
     }
+    if run.product is not None:
+        definition = run.definition
+        report.update(
+            definition_id=definition.definition_id,
+            definition_kind=definition.definition_kind,
+            revision=definition.revision,
+            content_hash=definition.content_hash,
+        )
+    else:
+        report["product"] = None
     if args.out is not None:
+        if run.product is None:
+            raise ValueError("--out needs a product: drop --no-product/--through, or narrow the notebook")
+        definition = run.definition
         payload = encode_product_package(build_product_package(definition))
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_bytes(payload)

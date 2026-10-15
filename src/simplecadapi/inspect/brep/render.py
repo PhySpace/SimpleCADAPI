@@ -67,6 +67,9 @@ def _vtk_modules():
         from vtk.util.numpy_support import numpy_to_vtk, numpy_to_vtkIdTypeArray
     except ImportError as error:
         raise ImportError("BREP rendering requires VTK") from error
+    # VTK's own chatter (a missing X server, driver notes) reads as a render
+    # failure; a real one is raised and named here.
+    vtk.vtkObject.GlobalWarningDisplayOff()
     return vtk, numpy_to_vtk, numpy_to_vtkIdTypeArray
 
 _OFFSCREEN_WINDOW: Any | None = None
