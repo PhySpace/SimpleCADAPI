@@ -817,3 +817,46 @@ class TestPartialRuns(NotebookTestCase):
     def test_timeout_fails_the_run_and_names_the_knob(self) -> None:
         with self.assertRaisesRegex(TimeoutError, "timeout"):
             run_notebook(self.sleepy, timeout=0.5)
+
+
+class TestRunNoise(unittest.TestCase):
+    """The run path keeps third-party degraded-state chatter out of the report."""
+
+    def test_the_cache_loaders_degraded_warning_does_not_print(self) -> None:
+        import logging
+
+        from simplecadapi.runtime._marimo import suppress_warnings_logs
+
+        records: list[logging.LogRecord] = []
+
+        class Capture(logging.Handler):
+            def emit(self, record: logging.LogRecord) -> None:
+                records.append(record)
+
+        logger = logging.getLogger("marimo")  # the logger marimo's modules share
+        handler = Capture()
+        logger.addHandler(handler)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                path = root / "noisy.py"
+                path.write_text(
+                    notebook_text(
+                        cell("width = 20.0", returns="width"),
+                        cell(
+                            "block = scad.make_box_rsolid(width, 10.0, 5.0)",
+                            reads="width",
+                            returns="block",
+                        ),
+                        table='id = "noisy"',
+                    )
+                )
+                # A first run initializes the cache store: exactly when the
+                # degraded-verification warning would fire.
+                run_notebook(path, product=False)
+        finally:
+            logger.removeHandler(handler)
+        degraded = [r for r in records if "degraded" in r.getMessage()]
+        self.assertEqual(degraded, [])
+        # and the suppression is scoped: the logger level is restored
+        self.assertEqual(suppress_warnings_logs.__name__, "suppress_warnings_logs")

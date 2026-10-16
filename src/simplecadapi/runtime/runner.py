@@ -160,8 +160,10 @@ def run_notebook(
         # The cache loaders warn about the degraded states they heal
         # themselves out of (unsigned entries for missing cryptography, a
         # value restored as a stub); at WARNING they read as run failures.
-        # Errors still come through.
-        with suppress_warnings_logs("lazy"):
+        # Errors still come through.  "marimo" is the logger every marimo
+        # module shares (lazy.py's record shows its file name, "lazy", which
+        # is not the logger's name).
+        with suppress_warnings_logs("marimo"):
             return _run(config, values, cache=cache, through=through, product=product)
 
     # marimo keeps its runtime context per thread, and a notebook run needs
