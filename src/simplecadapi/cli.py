@@ -12,6 +12,7 @@ Groups, each owned by its module and registered here at parser level so
     sca edit [WORKSPACE]          # the web editor (needs the 'editor' extra)
     sca example [NAME] [DIR]      # copy a bundled example workspace out
     sca snapshot [WORKSPACE]      # what the editor user has selected / sees
+    sca viewport [WORKSPACE]      # the image of what the editor user sees
 
 Shared contract: group handlers return ``(report, exit_code)`` and are
 followed by the group's own printer (human-readable for init/addon, JSON
