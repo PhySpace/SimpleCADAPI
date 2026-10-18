@@ -6,6 +6,8 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+## 2.2.6 — 2026-10-19
+
 ### Added
 
 - Editor: `sca cell open NOTEBOOK` switches the running editor to another notebook of the

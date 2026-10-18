@@ -149,21 +149,20 @@ the full crank cycle sweeps clean in the same sim ·
 
 ---
 
-## Update Notes (2.2.5)
+## Update Notes (2.2.6)
 
 > Validate generated definitions, assembly constraints, and manufacturing
 > geometry before production use.
 
-- **`sca cell` works behind container proxies.** The editor's discovery record is loopback and
-  proxy-proof, an unreachable record is reported instead of silently ignored, and file
-  fallbacks say so on stderr.
-- **Cell feedback carries the chain.** put/insert/run return console output and every cell
-  left unhealthy, stale dependents are run, and a failing cell names its upstream.
-- **Validate a stage headlessly.** `sca run --through N / --no-product / --timeout`.
-- **Quieter output, shorter prints.** Cache and VTK chatter is gone; a printed
-  `BRepInspection` is a one-line summary.
+- **Switch notebooks without leaving the CLI.** `sca cell open NOTEBOOK` moves the editor
+  and waits for its kernel; the write commands take `--open` to switch and write in one
+  step, and a refused write names the way out.
+- **`sca viewport` answers what the person sees.** The image's path, age and size, copied
+  out with `--out`, instead of reading `.sca-editor/viewport.png` by hand.
+- **Cache entries are signed and verified again.** `cryptography` ships as a dependency,
+  so marimo's cache verification no longer silently degrades to off.
 
-Full notes for this version: [`docs/updates/2.2.5.md`](docs/updates/2.2.5.md).
+Full notes for this version: [`docs/updates/2.2.6.md`](docs/updates/2.2.6.md).
 Earlier versions: the [changelog](CHANGELOG.md) and [`docs/updates/`](docs/updates/).
 
 ---
@@ -184,7 +183,7 @@ in a compact public API for creating solids, applying features, tagging semantic
 intent, querying topology, exporting manufacturing files, and translating recorded
 models into FreeCAD workflows.
 
-Current release: `simplecadapi==2.2.5`.
+Current release: `simplecadapi==2.2.6`.
 
 ## What It Provides
 
@@ -699,6 +698,7 @@ and the [STEP reconstruction workflow](docs/skill/references/workflows/step-reco
 
 ## Documentation
 
+- 2.2.6 update notes: [`docs/updates/2.2.6.md`](docs/updates/2.2.6.md)
 - 2.2.5 update notes: [`docs/updates/2.2.5.md`](docs/updates/2.2.5.md)
 - 2.2.4 update notes: [`docs/updates/2.2.4.md`](docs/updates/2.2.4.md)
 - 2.2.3 update notes: [`docs/updates/2.2.3.md`](docs/updates/2.2.3.md)
