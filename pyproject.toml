@@ -35,6 +35,7 @@ dependencies = [
     "ezdxf>=1.4.4",
     "marimo>=0.25.0",
     "plotly>=7.1.0",
+    "cryptography>=42.0.0",
 ]
 
 [project.optional-dependencies]

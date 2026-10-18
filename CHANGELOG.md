@@ -18,6 +18,9 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ### Changed
 
+- Cache: `cryptography` ships as a dependency, so the notebook cache keeps marimo's
+  manifest signing and verification on instead of silently degrading to unsigned,
+  unverified entries (the "LazyLoader verification='on' degraded to 'off'" warning).
 - Editor: a refused write now names `sca cell open NOTEBOOK` (or `--open`) as the way out,
   and the bundled skill's editor-collaboration reference says so.
 
