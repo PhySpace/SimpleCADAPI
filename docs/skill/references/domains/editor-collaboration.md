@@ -63,6 +63,7 @@ echo 'L = 90' | sca cell put 3       # replace the code of cell 3 and run it (--
 sca cell insert --after 3 -f new.py  # add a cell (--after start|end|CELL, --name fn_name)
 sca cell rm 4
 sca cell run [CELL ...]              # run cells (default all) and what they feed
+sca cell open other.py               # have the editor open another notebook (waits for its kernel)
 sca new bracket --kind part          # a new notebook; the open editor lists it, the person's view stays
 ```
 
@@ -74,7 +75,8 @@ sca new bracket --kind part          # a new notebook; the open editor lists it,
   replaces the cell, so `get` first when the person may have changed it.
 - The commands find the running editor through `<workspace>/.sca-editor/server.json`. With no
   editor running, or with another notebook open, `ls` and `get` read the file and the write
-  commands refuse: then edit the file directly, nothing else holds it.
+  commands refuse: run `sca cell open NOTEBOOK` (or pass `--open` to switch and write in one
+  step), or edit the file directly, nothing else holds it.
 - `@app.function` cells cannot be changed this way; edit them in the file.
 
 ## Read what the person is doing
@@ -83,7 +85,7 @@ sca new bracket --kind part          # a new notebook; the open editor lists it,
 | --- | --- |
 | What is selected | the cell headed `# ---- selection ----` in the notebook file |
 | Everything at once (selection, cell states, errors, parameter values) | `sca snapshot [WORKSPACE]`, or `<workspace>/.sca-editor/snapshot.json` |
-| What the viewport looks like | `<workspace>/.sca-editor/viewport.png` (a PNG; look at it) |
+| What the viewport looks like | `sca viewport [WORKSPACE] [--out PATH]` — the PNG's path, age and size, copied out with `--out` (the file is `<workspace>/.sca-editor/viewport.png`) |
 | Which notebook is open | `notebook` in the snapshot |
 
 `sca snapshot` only has an answer while the editor runs; it reports the last

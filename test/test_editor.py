@@ -1260,3 +1260,171 @@ class EndpointDiscoveryTest(unittest.TestCase):
         self.assertEqual([row["failing"] for row in upstream], [False, False, True])
         self.assertEqual([row["index"] for row in by_index[3]["upstream"]], [1, 2])
         self.assertEqual([row["failing"] for row in by_index[3]["upstream"]], [False, False])
+
+
+class CellOpenAndViewportTest(unittest.TestCase):
+    """`sca cell open` / `--open`, and `sca viewport`: how an agent moves the
+    editor between notebooks and reaches what the person sees without reading
+    the server's source or calling its http api by hand."""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name).resolve()
+        self.other = create_notebook(self.root, "other", "part")
+
+    @staticmethod
+    def _fake_call(responses: list[dict]) -> object:
+        """A `_call` that answers from a list of canned bodies in order."""
+        from unittest import mock
+
+        return mock.patch(
+            "simplecadapi.editor.cli._call", side_effect=[dict(body) for body in responses]
+        )
+
+    def test_cell_open_switches_and_waits_for_the_kernel(self) -> None:
+        import argparse
+        from unittest import mock
+
+        from simplecadapi.editor import cli
+
+        args = argparse.Namespace(notebook=self.other, workspace=self.root, wait=5)
+        responses = [
+            {"notebook": "gripper.py", "kernel": True},  # the editor has another notebook
+            {"ok": True, "opening": "other.py"},  # the switch was accepted
+            {"notebook": "other.py", "kernel": False},  # flipping, kernel still booting
+            {"notebook": "other.py", "kernel": True},  # ready
+        ]
+        with mock.patch("simplecadapi.editor.cli._find_editor", return_value=(self.root, "http://127.0.0.1:1")):
+            with self._fake_call(responses):
+                report, code = cli._cell_open(args)
+        self.assertEqual(code, 0)
+        self.assertEqual(report, {"ok": True, "open": "other.py"})
+
+    def test_cell_open_names_a_notebook_outside_the_workspace(self) -> None:
+        import argparse
+        import tempfile
+        from unittest import mock
+
+        from simplecadapi.editor import cli
+
+        with tempfile.TemporaryDirectory() as elsewhere:
+            args = argparse.Namespace(notebook=Path(elsewhere) / "elsewhere.py", workspace=self.root, wait=5)
+            with mock.patch("simplecadapi.editor.cli._find_editor", return_value=(self.root, "http://127.0.0.1:1")):
+                with self.assertRaisesRegex(ValueError, "not in the editor's workspace"):
+                    cli._cell_open(args)
+
+    def test_cell_open_without_an_editor_says_so(self) -> None:
+        import argparse
+
+        from simplecadapi.editor import cli
+
+        args = argparse.Namespace(notebook=self.other, workspace=self.root, wait=5)
+        with self.assertRaisesRegex(ValueError, "no editor is running"):
+            cli._cell_open(args)
+
+    def test_a_write_with_open_switches_notebooks_in_one_step(self) -> None:
+        import argparse
+        from unittest import mock
+
+        from simplecadapi.editor import cli
+
+        def session(**kwargs: object) -> tuple:
+            args = argparse.Namespace(
+                notebook=self.other, workspace=self.root, open=kwargs.get("open", False), wait=5
+            )
+            with mock.patch("simplecadapi.editor.cli._find_editor", return_value=(self.root, "http://127.0.0.1:1")):
+                with self._fake_call(kwargs["responses"]):
+                    return cli._session(args, write=True)
+
+        # Without --open the write refuses, and the refusal names the way out.
+        with self.assertRaisesRegex(ValueError, r"sca cell open other\.py"):
+            session(
+                responses=[
+                    {"notebook": "gripper.py", "kernel": True},
+                ]
+            )
+        # With --open the editor switches first, then the write goes through.
+        url, notebook, name = session(
+            open=True,
+            responses=[
+                {"notebook": "gripper.py", "kernel": True},  # refusal would fire here
+                {"notebook": "gripper.py", "kernel": True},  # the open's already-open check
+                {"ok": True, "opening": "other.py"},
+                {"notebook": "other.py", "kernel": True},
+            ]
+        )
+        self.assertEqual(url, "http://127.0.0.1:1")
+        self.assertEqual(notebook, self.root / "other.py")
+        self.assertEqual(name, "other.py")
+
+    def test_a_switch_that_never_settles_is_reported_not_swallowed(self) -> None:
+        import argparse
+        from unittest import mock
+
+        from simplecadapi.editor import cli
+
+        args = argparse.Namespace(notebook=self.other, workspace=self.root, wait=0.3)
+        responses = [
+            {"notebook": "gripper.py", "kernel": True},
+            {"ok": True, "opening": "other.py"},
+            *[{"notebook": "gripper.py", "kernel": True}] * 10,  # the switch never lands
+        ]
+        with mock.patch("simplecadapi.editor.cli._find_editor", return_value=(self.root, "http://127.0.0.1:1")):
+            with self._fake_call(responses):
+                report, code = cli._cell_open(args)
+        self.assertEqual(code, 1)
+        self.assertIn("still opening other.py", report["error"])
+
+    def test_the_cells_report_says_whether_the_kernel_is_up(self) -> None:
+        state = WorkspaceState(self.root)
+        state.notebook = self.other
+        self.assertFalse(state.cells_report(refresh=False)["kernel"])
+        state.kernel = object()  # any live kernel
+        self.assertTrue(state.cells_report(refresh=False)["kernel"])
+
+    def test_viewport_tells_the_image_and_copies_it_out(self) -> None:
+        import argparse
+
+        from simplecadapi.editor import cli
+
+        png = b"\x89PNG\r\n\x1a\nnot really a png body"
+        directory = self.root / ".sca-editor"
+        directory.mkdir()
+        (directory / "viewport.png").write_bytes(png)
+        out = self.root / "out" / "seen.png"
+        args = argparse.Namespace(workspace=self.root, out=out)
+        report, code = cli._viewport(args)
+        self.assertEqual(code, 0)
+        self.assertEqual(report["path"], str(directory / "viewport.png"))
+        self.assertEqual(report["bytes"], len(png))
+        self.assertLess(report["age_seconds"], 10)
+        self.assertEqual(report["copied_to"], str(out))
+        self.assertEqual(out.read_bytes(), png)
+
+    def test_viewport_without_an_image_says_what_is_missing(self) -> None:
+        import argparse
+
+        from simplecadapi.editor import cli
+
+        args = argparse.Namespace(workspace=self.root, out=None)
+        with self.assertRaisesRegex(ValueError, "no viewport image"):
+            cli._viewport(args)
+
+    def test_viewport_finds_the_image_from_a_child_directory(self) -> None:
+        import argparse
+        from unittest import mock
+
+        from simplecadapi.editor import cli
+
+        png = b"\x89PNG child"
+        directory = self.root / ".sca-editor"
+        directory.mkdir()
+        (directory / "viewport.png").write_bytes(png)
+        child = self.root / "sub"
+        child.mkdir()
+        args = argparse.Namespace(workspace=child, out=None)
+        with mock.patch("simplecadapi.editor.cli._find_editor", return_value=(self.root, "http://127.0.0.1:1")):
+            report, code = cli._viewport(args)
+        self.assertEqual(code, 0)
+        self.assertEqual(report["path"], str(directory / "viewport.png"))

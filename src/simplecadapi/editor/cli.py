@@ -6,7 +6,9 @@
     sca edit path/to/model.py       # ... starting at one notebook
     sca edit --port 7180 --no-browser
     sca snapshot [WORKSPACE]        # what the person has selected / is looking at
+    sca viewport [WORKSPACE] [--out PATH]  # the image of what the person sees
     sca cell ls|get|put|insert|rm|run   # edit the cells of the notebook the editor has open
+    sca cell open NOTEBOOK [--wait S]   # have the editor open another notebook
     sca new NAME [--kind part|assembly] # a new notebook; the editor lists it at once
 """
 
@@ -45,6 +47,19 @@ def configure(subparsers: argparse._SubParsersAction) -> None:
     snapshot.add_argument("workspace", type=Path, nargs="?", default=Path.cwd())
     snapshot.set_defaults(handler=_snapshot, printer=_print_snapshot)
 
+    viewport = subparsers.add_parser(
+        "viewport",
+        help="the image of what the editor user sees, to look at or copy out",
+        description="Locate the editor's viewport image (the PNG of what the person sees, "
+        "kept in WORKSPACE/.sca-editor/ while the editor runs), tell its path, age and "
+        "size, and with --out copy it somewhere an agent's image reader reaches.  A stale "
+        "age means the page has not redrawn since then; there is no image until the page "
+        "showed a model at least once.",
+    )
+    viewport.add_argument("workspace", type=Path, nargs="?", default=Path.cwd())
+    viewport.add_argument("--out", type=Path, default=None, help="copy the PNG to this path")
+    viewport.set_defaults(handler=_viewport, printer=_print_json)
+
     cell = subparsers.add_parser(
         "cell",
         help="read and edit the cells of a notebook through the running editor",
@@ -52,7 +67,8 @@ def configure(subparsers: argparse._SubParsersAction) -> None:
         "shows the change live (no reload) and the editor, the one writer of the file, saves "
         "it, so nothing is overwritten.  Cells are named by number (see `sca cell ls`), by key "
         "or by id.  When the editor is not running, or has another notebook open, `ls` and "
-        "`get` read the file and the write commands refuse: edit the file directly then, "
+        "`get` read the file and the write commands refuse: `sca cell open NOTEBOOK` switches "
+        "(or pass --open to switch and write in one step), or edit the file directly then — "
         "nothing else holds it.",
     )
     cell_sub = cell.add_subparsers(dest="cell_command", required=True)
@@ -60,6 +76,19 @@ def configure(subparsers: argparse._SubParsersAction) -> None:
     def common(parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--notebook", "-n", type=Path, default=None, help="the notebook (default: the one the editor has open)")
         parser.add_argument("--workspace", "-w", type=Path, default=None, help="the workspace the editor serves (default: found from the current directory)")
+
+    def writable(parser: argparse.ArgumentParser) -> None:
+        common(parser)
+        parser.add_argument(
+            "--open", action="store_true",
+            help="when the editor has another notebook open, open this one first "
+            "(the editor switches and the notebook's kernel restarts)",
+        )
+        parser.add_argument(
+            "--wait", type=float, default=None,
+            help="seconds to wait for a notebook opened by --open to be ready "
+            "(default: SCA_EDITOR_OPEN_WAIT or 120)",
+        )
 
     ls = cell_sub.add_parser("ls", help="list the cells with their state")
     common(ls)
@@ -70,26 +99,37 @@ def configure(subparsers: argparse._SubParsersAction) -> None:
     get.add_argument("cell")
     get.set_defaults(handler=_cell_get, printer=_print_json)
     put = cell_sub.add_parser("put", help="replace a cell's code (the code comes from --file or stdin) and run it")
-    common(put)
+    writable(put)
     put.add_argument("cell")
     put.add_argument("--file", "-f", type=Path, default=None, help="read the code from this file (default: stdin)")
     put.add_argument("--no-run", action="store_true", help="save the code without running the cell")
     put.set_defaults(handler=_cell_put, printer=_print_json)
     insert = cell_sub.add_parser("insert", help="add a cell (the code comes from --file or stdin)")
-    common(insert)
+    writable(insert)
     insert.add_argument("--after", default="end", help="a cell, or `start` / `end` (default)")
     insert.add_argument("--name", default=None, help="the cell's function name")
     insert.add_argument("--file", "-f", type=Path, default=None)
     insert.add_argument("--no-run", action="store_true")
     insert.set_defaults(handler=_cell_insert, printer=_print_json)
     rm = cell_sub.add_parser("rm", help="delete a cell")
-    common(rm)
+    writable(rm)
     rm.add_argument("cell")
     rm.set_defaults(handler=_cell_rm, printer=_print_json)
     run = cell_sub.add_parser("run", help="run cells (default: all) and what they feed")
-    common(run)
+    writable(run)
     run.add_argument("cells", nargs="*")
     run.set_defaults(handler=_cell_run, printer=_print_json)
+    open_ = cell_sub.add_parser(
+        "open",
+        help="have the running editor open another notebook of this workspace",
+        description="Switch the editor to NOTEBOOK: the page shows it at once and its "
+        "kernel restarts, so `sca cell` writes go to it.  Waits until the kernel is "
+        "up so a following write does not race the boot.",
+    )
+    open_.add_argument("notebook", type=Path, help="the notebook file (workspace-relative, or absolute inside the workspace)")
+    open_.add_argument("--workspace", "-w", type=Path, default=None, help="the workspace the editor serves (default: found from the current directory)")
+    open_.add_argument("--wait", type=float, default=None, help="seconds to wait for the notebook's kernel (default: SCA_EDITOR_OPEN_WAIT or 120)")
+    open_.set_defaults(handler=_cell_open, printer=_print_json)
 
     new = subparsers.add_parser(
         "new",
@@ -143,6 +183,37 @@ def _print_snapshot(report: dict[str, Any]) -> None:
     import json
 
     print(json.dumps(report, indent=2, ensure_ascii=False))
+
+
+def _viewport(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    import time
+
+    root = args.workspace.expanduser().resolve()
+    if root.is_file():
+        root = root.parent
+    png = root / ".sca-editor" / "viewport.png"
+    if not png.is_file():
+        # The record knows the editor's workspace even when this directory is
+        # one of its children; the image the person sees lives next to it.
+        found = _find_editor(root)
+        if found is not None:
+            png = found[0] / ".sca-editor" / "viewport.png"
+    if not png.is_file():
+        raise ValueError(
+            f"{root}: no viewport image; is `sca edit` running with the page showing a model?"
+        )
+    stat = png.stat()
+    report: dict[str, Any] = {
+        "path": str(png),
+        "bytes": stat.st_size,
+        "age_seconds": round(time.time() - stat.st_mtime, 1),
+    }
+    if args.out is not None:
+        target = args.out.expanduser().resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(png.read_bytes())
+        report["copied_to"] = str(target)
+    return report, 0
 
 
 # -- sca cell / sca new ---------------------------------------------------------
@@ -247,6 +318,63 @@ def _call(url: str, path: str, body: dict | None = None, timeout: float | None =
         raise TimeoutError(f"the editor did not answer {path} within {seconds:g}s") from error
 
 
+def _open_wait_seconds(wait: float | None) -> float:
+    """How long to wait for a switched notebook's kernel; ``--wait`` or
+    ``SCA_EDITOR_OPEN_WAIT`` seconds (a marimo boot takes a few)."""
+    import os
+
+    return float(os.environ.get("SCA_EDITOR_OPEN_WAIT", "120")) if wait is None else float(wait)
+
+
+def _wait_open(url: str, relative: str, wait: float | None = None) -> dict[str, Any]:
+    """Poll until the editor has *relative* open and its kernel is up.
+
+    The switch itself lands in milliseconds; the kernel boot is the slow part,
+    and a write sent into it reads as "no kernel yet".  Waiting here is what
+    makes `sca cell open` a safe step before a write instead of a race.
+    """
+    import time
+
+    seconds = _open_wait_seconds(wait)
+    deadline = time.monotonic() + seconds
+    while True:
+        report = _call(url, "/api/cells")
+        if report.get("notebook") == relative and report.get("kernel"):
+            return {"ok": True, "open": relative}
+        if time.monotonic() >= deadline:
+            return {
+                "ok": False,
+                "error": f"the editor is still opening {relative} after {seconds:g}s "
+                "(the switch was asked for; check `sca cell ls`; "
+                "SCA_EDITOR_OPEN_WAIT or --wait raises the time)",
+            }
+        time.sleep(0.25)
+
+
+def _open_notebook(url: str, relative: str, wait: float | None = None) -> dict[str, Any]:
+    """Ask the editor to open *relative* and wait until it is writable."""
+    current = _call(url, "/api/cells")
+    if current.get("notebook") == relative and current.get("kernel"):
+        return {"ok": True, "open": relative, "already": True}
+    report = _call(url, "/api/workspace/open", {"path": relative})
+    if not report.get("ok"):
+        return report
+    return _wait_open(url, relative, wait)
+
+
+def _cell_open(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    start = (args.workspace or Path.cwd()).expanduser().resolve()
+    found = _find_editor(start)
+    if found is None:
+        raise ValueError("no editor is running on this workspace (start `sca edit`)")
+    workspace, url = found
+    notebook = args.notebook.expanduser().resolve()
+    if not notebook.is_relative_to(workspace):
+        raise ValueError(f"{args.notebook} is not in the editor's workspace ({workspace})")
+    report = _open_notebook(url, notebook.relative_to(workspace).as_posix(), wait=args.wait)
+    return report, 0 if report.get("ok") else 1
+
+
 def _session(args: argparse.Namespace, *, write: bool) -> tuple[str | None, Path | None, str]:
     """``(editor url or None, notebook path or None, relative notebook name)`` for a cell command."""
     start = args.workspace or (args.notebook.parent if args.notebook else Path.cwd())
@@ -278,9 +406,15 @@ def _session(args: argparse.Namespace, *, write: bool) -> tuple[str | None, Path
     if relative == open_path:
         return url, notebook, relative
     if write:
+        if getattr(args, "open", False):
+            report = _open_notebook(url, relative, wait=getattr(args, "wait", None))
+            if report.get("ok"):
+                return url, workspace / relative, relative
+            raise ValueError(report.get("error") or f"could not open {relative} in the editor")
         raise ValueError(
-            f"the editor has {open_path} open, not {relative}: edit {relative} directly "
-            "(the editor does not hold it), or open it in the editor first"
+            f"the editor has {open_path} open, not {relative}: run `sca cell open {relative}` "
+            f"(or pass --open to switch and write in one step), or edit {relative} directly "
+            "— nothing else holds it"
         )
     _warn(f"the editor has {open_path} open; reading {relative} from the file")
     return None, notebook, relative

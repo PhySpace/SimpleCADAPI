@@ -643,6 +643,10 @@ class WorkspaceState:
             briefs.append(brief)
         return {
             "notebook": self.notebook.relative_to(self.workspace).as_posix() if self.notebook else None,
+            # Agents poll this after a switch: the name flips at once, the
+            # kernel is what makes a write go through instead of reading
+            # "no kernel yet".
+            "kernel": self.kernel is not None,
             "cells": briefs,
         }
 
