@@ -6,6 +6,21 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+### Added
+
+- Editor: `sca cell open NOTEBOOK` switches the running editor to another notebook of the
+  workspace and waits for its kernel, so the following `sca cell` writes go through instead
+  of refusing. The write commands take `--open` to switch and write in one step
+  (`--wait`, or `SCA_EDITOR_OPEN_WAIT`, raises the boot wait; default 120s). `/api/cells`
+  reports `kernel` so a caller can tell a booted notebook from one still opening.
+- Editor: `sca viewport [WORKSPACE] [--out PATH]` reports where the viewport image lives
+  (path, age, size) and copies it out, instead of reading `.sca-editor/viewport.png` by hand.
+
+### Changed
+
+- Editor: a refused write now names `sca cell open NOTEBOOK` (or `--open`) as the way out,
+  and the bundled skill's editor-collaboration reference says so.
+
 ## 2.2.5 — 2026-10-15
 
 ### Fixed
