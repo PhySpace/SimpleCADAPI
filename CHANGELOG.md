@@ -23,6 +23,20 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   cell, changed (marimo keyed any object it cannot hash by the code of the cell that made it).
 - Editor: a slider drag is sent when it pauses (250 ms) or ends, not step by step; clicks and
   number-box commits still go at once.
+- Cache: a cell that runs a notebook with `use("child.py")` (a literal path) is keyed by what
+  that child is (its text, the modules it imports, the notebooks it uses in turn) instead of
+  by everything a run recorded: editing one child redoes the cell that uses it and not those
+  that use its siblings, and the editor kernel caches such cells too (it ran them live
+  before). A path computed at run time still depends on what a run recorded.
+- Runtime: the `use` calls a cell is about to make (literal path; arguments made of values it
+  reads, `float(...)`, `notebook_id()`) are started together in worker processes, which fill
+  the notebooks' caches; the cell then finds them built. OpenCASCADE keeps the interpreter
+  lock, so these are processes, not threads. `SCA_JOBS` sets how many (default: the smaller of
+  4 and the cores; 1 turns it off). Workers are only started when the builds they take off
+  the cell's hands are worth the seconds a worker takes to start (a notebook remembers how
+  long it last took to build), and a notebook that has not changed since it last ran is not
+  started at all. A notebook's state directory is locked between processes while it runs.
+  Desktop-arm benchmark: cold 80.5 s to 34.6 s.
 - Cache: a cell that does `from lib.dims import A` now depends on the definition of `A` (and
   what it reads, across local modules), not on the whole file. Editing another name of
   `lib/dims.py`, a comment, or the formatting leaves the cell cached. A module the analysis

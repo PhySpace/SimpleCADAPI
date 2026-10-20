@@ -41,6 +41,7 @@ from ._marimo import (
     RunResult,
     Skip,
 )
+from .children import notebook_digest
 from .config import NotebookConfig
 from .names import names_tag
 from .stubs import register_scalar_stubs  # noqa: F401  (registers on import)
@@ -50,7 +51,6 @@ from .deps import (
     cell_digest,
     cell_module_files,
     read_dependencies,
-    recorded_dependents,
     state_dir,
 )
 
@@ -133,7 +133,8 @@ class CellDigests:
         # A cell that runs a child notebook, or reads what one makes, depends
         # on what the last run recorded; its entries are kept apart so they
         # can follow the record.
-        self._uses = recorded_dependents(sources)
+        self._uses = frozenset(key for key, deps in self._files.items() if deps.dynamic)
+        self._recorded = read_dependencies(config)
         self._kernel = kernel
         self._saved_tag: dict[str, str] = {}
         if saved:
@@ -154,8 +155,31 @@ class CellDigests:
         if self._kernel and cell_id in self._uses:
             return None
         named, fallback = names_tag(self.config.directory, deps.names)
-        tag = ("use" if cell_id in self._uses else "") + self._saved_tag.get(cell_id, "") + named
+        used, unknown = self._used_tag(deps.uses)
+        if unknown:
+            # A notebook this one uses has a part of its own that only a run
+            # can name: depend on what the last run recorded.
+            if self._kernel:
+                return None
+            fallback = fallback | self._recorded
+        tag = ("use" if cell_id in self._uses or unknown else "") + self._saved_tag.get(cell_id, "") + named + used
         return cell_digest(self.config, deps.files | fallback, tag=tag)
+
+    @staticmethod
+    def _used_tag(paths: frozenset[Path]) -> tuple[str, bool]:
+        """The digest of the notebooks a cell uses by a literal path, and
+        whether one of them cannot be digested."""
+
+        if not paths:
+            return "", False
+        digests: dict[str, str] = {}
+        for path in sorted(paths):
+            digest = notebook_digest(path)
+            if digest is None:
+                return "", True
+            digests[path.name] = digest
+        encoded = json.dumps(digests, sort_keys=True).encode("utf-8")
+        return "u" + hashlib.sha256(encoded).hexdigest()[:12], False
 
 
 class CellCache(CachedLifecycle):

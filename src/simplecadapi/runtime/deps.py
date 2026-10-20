@@ -92,6 +92,49 @@ def state_dir(config: NotebookConfig) -> Path:
     return notebook_output_dir(config.path) / "simplecad" / config.path.name / config.id
 
 
+_held: set[str] = set()
+_held_lock = threading.Lock()
+
+
+@contextmanager
+def exclusive(config: NotebookConfig) -> Iterator[None]:
+    """Hold the notebook's state directory against other processes.
+
+    Worker processes may run the same notebook at once (two notebooks that
+    use a third), and a run prunes the cache directories it did not use.  The
+    lock is between processes only: a run of a notebook this process is
+    already running (a ``use`` cycle, an editor next to a headless run) goes
+    on without it, as it always did.  Without ``fcntl`` (Windows) it is a
+    no-op.
+    """
+
+    directory = state_dir(config)
+    key = str(directory)
+    with _held_lock:
+        nested = key in _held
+        _held.add(key)
+    handle = None
+    try:
+        if not nested:
+            try:
+                import fcntl
+
+                directory.mkdir(parents=True, exist_ok=True)
+                handle = open(directory / "run.lock", "a")  # noqa: SIM115
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            except (ImportError, OSError):
+                if handle is not None:
+                    handle.close()
+                handle = None
+        yield
+    finally:
+        if handle is not None:
+            handle.close()  # releases the lock
+        if not nested:
+            with _held_lock:
+                _held.discard(key)
+
+
 def deps_file(config: NotebookConfig) -> Path:
     return state_dir(config) / "deps.json"
 
@@ -312,9 +355,18 @@ class CellDeps:
 
     files: frozenset[Path]
     names: frozenset[NameDep] = frozenset()
+    uses: frozenset[Path] = frozenset()
+    """Notebooks the cell runs with ``use``, by a literal path (see :mod:`.children`)."""
+    dynamic: bool = False
+    """The cell runs a notebook whose path is computed: only a run knows which."""
 
     def __or__(self, other: CellDeps) -> CellDeps:
-        return CellDeps(self.files | other.files, self.names | other.names)
+        return CellDeps(
+            self.files | other.files,
+            self.names | other.names,
+            self.uses | other.uses,
+            self.dynamic or other.dynamic,
+        )
 
 
 def cell_module_files(
@@ -411,9 +463,14 @@ def cell_module_files(
                 named.add(NameDep(module_name, original, frozenset(coarse)))
             else:
                 files |= coarse
-        if calls_use(cell.code):
+        calls = use_calls(cell.code)
+        dynamic = any(call is None for call in calls)
+        if dynamic:
             files |= recorded_files
-        result[cell.key] = CellDeps(frozenset(files), frozenset(named))
+        uses = frozenset(
+            (root / call).resolve() for call in calls if call is not None
+        )
+        result[cell.key] = CellDeps(frozenset(files), frozenset(named), uses, dynamic)
 
     # marimo keys a cell that reads an object (a solid, a part) by the code of
     # the cells that made it, not by its value: a file an ancestor depends on
@@ -565,6 +622,27 @@ def _loaded_names_of(node: ast.AST) -> set[str]:
     }
 
 
+def use_calls(source: str) -> list[str | None]:
+    """The paths of the ``use(...)`` calls in *source*: the literal, or ``None``
+    where it is computed (or the source cannot be read)."""
+
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return [None]
+    paths: list[str | None] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            function = node.func
+            if (isinstance(function, ast.Name) and function.id == "use") or (
+                isinstance(function, ast.Attribute) and function.attr == "use"
+            ):
+                first = node.args[0] if node.args else None
+                literal = isinstance(first, ast.Constant) and isinstance(first.value, str)
+                paths.append(first.value if literal else None)  # type: ignore[union-attr]
+    return paths
+
+
 def calls_use(source: str) -> bool:
     try:
         tree = ast.parse(source)
@@ -668,12 +746,14 @@ __all__ = [
     "NameDep",
     "ancestors",
     "calls_use",
+    "use_calls",
     "cell_digest",
     "cell_module_files",
     "dependency_digest",
     "file_digest",
     "recorded_dependents",
     "deps_file",
+    "exclusive",
     "input_files",
     "local_modules",
     "read_dependencies",
