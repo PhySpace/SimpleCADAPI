@@ -28,11 +28,28 @@ def extrude_taper_rsolid(
     taper: float,
     flip_inner: bool = True,
 ) -> Solid:
-    """Extrude a planar face by a vector, with a taper in degrees.
+    """Extrude a planar sketch face by a vector, with a taper in degrees.
 
-    Positive taper shrinks the outer section. Inner loops optionally taper in
-    the opposite direction. Analytic draft prisms are retained where valid;
-    other orientations/holes use exact offset wire sections and solid lofts.
+    The vector is nonzero and in current coordinate-system coordinates. The
+    finite taper angle lies strictly between -90 and 90; a positive taper
+    shrinks the outer section, and inner loops taper the opposite way when
+    ``flip_inner`` is true. An analytic draft prism is used where applicable
+    and exact offset sections with lofts otherwise. Collapsed loops and invalid
+    topology raise errors. The operation is recorded as
+    ``make_extrude_taper_rsolid`` for replay.
+
+    Args:
+        profile: The planar face to extrude.
+        vector: Extrusion vector (nonzero).
+        taper: Taper angle in degrees, strictly between -90 and 90.
+        flip_inner: Taper inner loops in the opposite direction.
+
+    Returns:
+        The tapered solid.
+
+    Raises:
+        ValueError: A zero vector, an out-of-range taper, a nonplanar profile,
+            collapsed loops or an invalid result.
     """
     values = _finite_vector(vector, "vector")
     angle = float(evaluate_scalar(taper))
@@ -107,11 +124,29 @@ def sweep_multisection_rsolid(
     is_frenet: bool = False,
     binormal: Sequence[float] | Wire | None = None,
 ) -> Solid:
-    """Sweep through explicit ordered section wires along a continuous path.
+    """Sweep through explicit ordered sections along a continuous path.
 
-    Face sections use their outer boundary, as in build123d's multi-section
-    pipe contract. Binormal may be a direction vector or auxiliary spine.
-    Each supplied section and path remains a graph input for replay.
+    At least two ordered sections are needed. Face sections supply their outer
+    wire, matching build123d's multi-section sweep contract. ``binormal`` is an
+    optional direction vector or an auxiliary spine. The kernel must produce
+    one valid solid. Every section and the path are recorded as inputs of
+    ``make_sweep_multisection_rsolid``, so model JSON preserves the
+    construction.
+
+    Args:
+        profiles: Ordered section faces or wires (at least two).
+        path: The continuous path wire.
+        is_frenet: Use the Frenet frame along the path.
+        binormal: A direction, or an auxiliary spine wire, that fixes the
+            section orientation.
+
+    Returns:
+        The swept solid.
+
+    Raises:
+        TypeError: A section is neither a Face nor a Wire.
+        ValueError: Fewer than two sections, a zero ``binormal`` direction, or
+            the kernel could not make a solid.
     """
     sections = list(profiles)
     if len(sections) < 2:

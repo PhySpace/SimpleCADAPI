@@ -57,11 +57,27 @@ def scale_rsolid(
     factors: Sequence[float],
     center: Sequence[float] = (0, 0, 0),
 ) -> Solid:
-    """Scale along current coordinate-system axes about an explicit center.
+    """Scale a solid along the current coordinate system's axes about a center.
 
-    Every factor must be finite and nonzero. A uniform scale preserves analytic
-    geometry; a nonuniform scale converts curves/surfaces where the kernel needs
-    it. The input is unchanged and this operation is recorded for graph replay.
+    The three factors must be finite and nonzero. A uniform scale preserves
+    analytic curves and surfaces; a nonuniform scale uses the CAD kernel's
+    general affine transform. The source solid stays unchanged. The operation
+    is recorded as ``make_scale_rsolid`` for graph replay; topology tag lineage
+    is conservatively partial.
+
+    Args:
+        solid: The solid to scale.
+        factors: Scale factors along the x, y and z axes of the current
+            coordinate system; finite and nonzero.
+        center: The fixed point of the scaling, in current coordinate-system
+            coordinates.
+
+    Returns:
+        The scaled solid.
+
+    Raises:
+        ValueError: A factor is zero or not finite, or the kernel could not
+            scale the solid.
     """
     values = _finite_vector(factors, "factors")
     center_value = _finite_vector(center, "center")
@@ -95,10 +111,24 @@ def scale_rsolid(
 
 
 def transform_rsolid(solid: Solid, matrix: Sequence[Sequence[float]]) -> Solid:
-    """Apply a finite nonsingular 4x4 affine matrix in the current frame.
+    """Apply a finite nonsingular 4x4 affine matrix in the current coordinate system.
 
-    General affine transformations include shear and reflection. Perspective
-    matrices and singular maps cannot define a solid and are rejected.
+    The matrix may include shear, reflection and nonuniform scale. Perspective
+    matrices and singular maps cannot define a solid and are rejected. The
+    input geometry stays unchanged. The operation is recorded as
+    ``make_transform_rsolid`` for graph replay; topology tag lineage is partial.
+
+    Args:
+        solid: The solid to transform.
+        matrix: A 4x4 affine matrix (row-major, last row ``0 0 0 1``), finite
+            and nonsingular, in current coordinate-system coordinates.
+
+    Returns:
+        The transformed solid.
+
+    Raises:
+        ValueError: The matrix is not a finite 4x4 affine matrix, is singular
+            or a perspective map, or the kernel could not transform the solid.
     """
     values = np.asarray(evaluate_value(matrix), dtype=float)
     if values.shape != (4, 4) or not np.isfinite(values).all():
@@ -135,9 +165,28 @@ def offset_rsolid(
 ) -> Solid:
     """Offset a solid outward (positive) or inward (negative).
 
-    Selected openings form an open shell. Empty openings produce the closed
-    offset solid. This is distinct from shell_rsolid's positive inward wall
-    thickness, and supports both signs and ARC/INTERSECTION joins explicitly.
+    The amount must be finite and nonzero. Faces passed as ``openings`` form an
+    open shell; with no openings the result is the closed offset solid. The
+    join ``kind`` is ``ARC`` or ``INTERSECTION``. Invalid kernel results raise
+    an error. The operation is recorded as ``make_offset_rsolid`` with explicit
+    face selections; topology tag lineage is conservatively partial.
+    ``shell_rsolid`` keeps its own contract (a positive inward wall thickness);
+    this one supports both signs.
+
+    Args:
+        solid: The solid to offset.
+        amount: Offset distance; positive outward, negative inward.
+        openings: Faces of ``solid`` (or a QL selector) left open.
+        tolerance: Kernel tolerance of the offset.
+        kind: Join type, ``"ARC"`` or ``"INTERSECTION"``.
+
+    Returns:
+        The offset solid.
+
+    Raises:
+        ValueError: ``amount`` is zero or not finite, ``tolerance`` is not
+            finite and positive, ``kind`` is unknown, ``openings`` do not select
+            faces, or the kernel produced an invalid result.
     """
     distance = evaluate_scalar(amount)
     if not math.isfinite(distance) or distance == 0:
@@ -178,6 +227,18 @@ def boolean_rsolidlist(
     a cut or intersection may return several solids or an empty list.
     Topology lineage is partial; the ordered inputs and all output slots are
     recorded so downstream features can replay the same geometry.
+
+    Args:
+        left: The first group of solids.
+        right: The second group of solids.
+        operation: ``"cut"``, ``"intersect"`` or ``"union"``.
+
+    Returns:
+        The result solids, possibly several or none.
+
+    Raises:
+        TypeError: A group contains something that is not a Solid.
+        ValueError: ``operation`` is unknown, or a member is invalid or empty.
     """
     from ..kernel.ocp_booleans import cut_shapes, common_shapes, fuse_shapes
     from ..kernel.ocp_export import make_compound_always
