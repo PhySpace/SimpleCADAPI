@@ -54,3 +54,59 @@ class TestCellCacheStore(NotebookTestCase):
         self.assertEqual(self.statuses(second), ["ran", "cached", "cached"])
         self.assertEqual(first.definition.content_hash, second.definition.content_hash)
 
+
+def _params_notebook(params: str) -> str:
+    """A params cell, a cell that reads `a` only, and the part made from it."""
+
+    return notebook_text(
+        cell(params, returns="a, b, w" if "w =" in params else "a, b"),
+        cell("block = scad.make_box_rsolid(float(w), 4.0, 4.0)", reads="w", returns="block")
+        if "w =" in params
+        else cell("block = scad.make_box_rsolid(float(a), 4.0, 4.0)", reads="a", returns="block"),
+        cell("part = scad.Part(part_id='vars', body=block)", reads="block", returns="part"),
+        table='id = "vars"',
+    )
+
+
+class TestParametersAreKeyedByValue(NotebookTestCase):
+    """`scad.var` is a value, not a piece of its cell's code: a cell that reads
+    one parameter is not redone because another one, defined next to it,
+    changed (marimo keys what it cannot hash by the code that made it)."""
+
+    def run_edit(self, before: str, after: str):
+        path = self.write("vars.py", _params_notebook(before))
+        run_notebook(path)
+        self.write("vars.py", _params_notebook(after))
+        edited = run_notebook(path)
+        fresh = run_notebook(path, cache=False)
+        self.assertEqual(edited.definition.content_hash, fresh.definition.content_hash)
+        return self.statuses(edited)
+
+    A, B = 'a = scad.var("a", 10.0, unit="mm")', 'b = scad.var("b", {}, unit="mm")'
+
+    def test_editing_a_sibling_parameter_leaves_the_reader_cached(self) -> None:
+        statuses = self.run_edit(f"{self.A}\n{self.B.format(1.0)}", f"{self.A}\n{self.B.format(2.0)}")
+        self.assertEqual(statuses, ["ran", "ran", "cached", "cached"])
+
+    def test_editing_the_parameter_it_reads_redoes_it(self) -> None:
+        statuses = self.run_edit(
+            f"{self.A}\n{self.B.format(1.0)}", f'a = scad.var("a", 11.0, unit="mm")\n{self.B.format(1.0)}'
+        )
+        self.assertEqual(statuses, ["ran", "ran", "ran", "ran"])
+
+    def test_what_else_a_declaration_says_also_redoes_it(self) -> None:
+        for after in (
+            'a = scad.var("a", 10.0, unit="mm", comment="new comment")',
+            'a = scad.var("a2", 10.0, unit="mm")',
+            'a = scad.var("a", 10.0, unit="mm", tolerance=0.1)',
+        ):
+            with self.subTest(after=after):
+                statuses = self.run_edit(f"{self.A}\n{self.B.format(1.0)}", f"{after}\n{self.B.format(1.0)}")
+                self.assertEqual(statuses[2:], ["ran", "ran"])
+
+    def test_a_derived_expression_is_keyed_by_its_content_too(self) -> None:
+        derived = f"{self.A}\n{self.B.format(1.0)}\nw = a * 2.0 + 1.0"
+        statuses = self.run_edit(derived, derived.replace('b", 1.0', 'b", 2.0'))
+        self.assertEqual(statuses, ["ran", "ran", "cached", "cached"])
+        changed = self.run_edit(derived, derived.replace("a * 2.0", "a * 3.0"))
+        self.assertEqual(changed[2:], ["ran", "ran"])

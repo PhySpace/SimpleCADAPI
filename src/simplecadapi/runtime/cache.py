@@ -43,6 +43,7 @@ from ._marimo import (
 )
 from .config import NotebookConfig
 from .names import names_tag
+from .stubs import register_scalar_stubs  # noqa: F401  (registers on import)
 from .deps import (
     CellSource,
     ancestors,

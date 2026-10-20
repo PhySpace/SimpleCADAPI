@@ -37,6 +37,7 @@ from marimo._runtime.executor.lifecycles.cached import CachedLifecycle
 from marimo._runtime.runner.result import RunResult
 from marimo._save.loaders.lazy import LazyLoader, LazyStore
 from marimo._save.stores.file import FileStore
+from marimo._save.stubs.stubs import CustomStub, register_stub
 from marimo._types.globals import MutableGlobals
 from marimo._types.ids import CellId_t
 from marimo._utils.paths import notebook_output_dir
@@ -47,6 +48,7 @@ __all__ = [
     "CachedLifecycle",
     "CellId_t",
     "CellImpl",
+    "CustomStub",
     "DefaultExecutor",
     "DirectedGraph",
     "Evaluator",
@@ -68,6 +70,7 @@ __all__ = [
     "load_notebook",
     "notebook_output_dir",
     "parse_notebook",
+    "register_stub",
     "read_pyproject_from_script",
     "runtime_context_installed",
     "safe_get_context",

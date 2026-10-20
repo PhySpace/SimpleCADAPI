@@ -18,6 +18,11 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   running cell reads is never built, and pickling it again hands back what it was restored
   from), and the cell cache compresses what it writes (zlib level 1; entries written before
   are still read). The desktop-arm cache drops from 1.2 GB to 96 MB.
+- Cache: `scad.var(...)` values and the expressions made from them are keyed by content, so a
+  cell that reads one parameter is no longer redone because another one, defined in the same
+  cell, changed (marimo keyed any object it cannot hash by the code of the cell that made it).
+- Editor: a slider drag is sent when it pauses (250 ms) or ends, not step by step; clicks and
+  number-box commits still go at once.
 - Cache: a cell that does `from lib.dims import A` now depends on the definition of `A` (and
   what it reads, across local modules), not on the whole file. Editing another name of
   `lib/dims.py`, a comment, or the formatting leaves the cell cached. A module the analysis
