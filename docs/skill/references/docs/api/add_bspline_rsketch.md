@@ -17,4 +17,6 @@ def add_bspline_rsketch(sketch: Sketch, entity_id: str, start: Union[SketchRef, 
 Add a B-spline curve entity to a sketch.
 
 The start/end point refs link the B-spline into a closed profile
-loop. Control points may be literal 2-D coordinates or point refs.
+loop. A closed curve may reuse one seam ref for both endpoints.
+Control points may be literal 2-D coordinates or point refs. A periodic
+seam links topology without replacing the periodic curve's poles.
