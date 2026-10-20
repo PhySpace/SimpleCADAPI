@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from OCP.BRepBuilderAPI import BRepBuilderAPI_Copy, BRepBuilderAPI_GTransform, BRepBuilderAPI_Transform
+from OCP.gp import gp_GTrsf, gp_Trsf
 from ._support import *
 
 def translate_shape(shape: AnyShape, vector: Tuple[float, float, float]) -> AnyShape:
@@ -419,5 +421,108 @@ def mirror_shape(
             ],
             error=e,
         )
+
+
+def scale_rsolid(
+    solid: Solid,
+    factors: Sequence[float],
+    center: Sequence[float] = (0, 0, 0),
+) -> Solid:
+    """Scale a solid along the current coordinate system's axes about a center.
+
+    The three factors must be finite and nonzero. A uniform scale preserves
+    analytic curves and surfaces; a nonuniform scale uses the CAD kernel's
+    general affine transform. The source solid stays unchanged. The operation
+    is recorded as ``make_scale_rsolid`` for graph replay; topology tag lineage
+    is conservatively partial.
+
+    Args:
+        solid: The solid to scale.
+        factors: Scale factors along the x, y and z axes of the current
+            coordinate system; finite and nonzero.
+        center: The fixed point of the scaling, in current coordinate-system
+            coordinates.
+
+    Returns:
+        The scaled solid.
+
+    Raises:
+        ValueError: A factor is zero or not finite, or the kernel could not
+            scale the solid.
+    """
+    values = _finite_vector(factors, "factors")
+    center_value = _finite_vector(center, "center")
+    if any(v == 0 for v in values):
+        raise ValueError("scale factors must be nonzero")
+    cs = get_current_cs()
+    global_center = cs.transform_point(np.array(center_value))
+    if values[0] == values[1] == values[2]:
+        transform = gp_Trsf()
+        transform.SetScale(gp_Pnt(*global_center), values[0])
+        builder = BRepBuilderAPI_Transform(solid.wrapped, transform, True)
+    else:
+        basis = np.column_stack([cs.transform_vector(np.eye(3)[i]) for i in range(3)])
+        matrix = basis @ np.diag(values) @ basis.T
+        translation = global_center - matrix @ global_center
+        transform = gp_GTrsf()
+        for row in range(3):
+            for col in range(3):
+                transform.SetValue(row + 1, col + 1, float(matrix[row, col]))
+            transform.SetValue(row + 1, 4, float(translation[row]))
+        # GTransform's copy flag copies topology, but can retain shared curve
+        # geometry from boolean/fillet history. Isolate that geometry first:
+        # otherwise OCCT 7.9 can produce invalid p-curves and crash its checker.
+        copied = BRepBuilderAPI_Copy(solid.wrapped, True, False).Shape()
+        builder = BRepBuilderAPI_GTransform(copied, transform, True)
+    builder.Build()
+    if not builder.IsDone():
+        raise ValueError("kernel could not scale the solid")
+    return _finish(solid, builder.Shape(), "make_scale_rsolid",
+                   {"factors": factors, "center": center}, [solid])
+
+
+def transform_rsolid(solid: Solid, matrix: Sequence[Sequence[float]]) -> Solid:
+    """Apply a finite nonsingular 4x4 affine matrix in the current coordinate system.
+
+    The matrix may include shear, reflection and nonuniform scale. Perspective
+    matrices and singular maps cannot define a solid and are rejected. The
+    input geometry stays unchanged. The operation is recorded as
+    ``make_transform_rsolid`` for graph replay; topology tag lineage is partial.
+
+    Args:
+        solid: The solid to transform.
+        matrix: A 4x4 affine matrix (row-major, last row ``0 0 0 1``), finite
+            and nonsingular, in current coordinate-system coordinates.
+
+    Returns:
+        The transformed solid.
+
+    Raises:
+        ValueError: The matrix is not a finite 4x4 affine matrix, is singular
+            or a perspective map, or the kernel could not transform the solid.
+    """
+    values = np.asarray(evaluate_value(matrix), dtype=float)
+    if values.shape != (4, 4) or not np.isfinite(values).all():
+        raise ValueError("matrix must be a finite 4x4 affine matrix")
+    if not np.allclose(values[3], (0, 0, 0, 1), rtol=0, atol=1e-12):
+        raise ValueError("perspective transforms cannot define an affine solid")
+    if abs(float(np.linalg.det(values[:3, :3]))) < 1e-14:
+        raise ValueError("matrix must be nonsingular")
+    cs = get_current_cs()
+    basis = np.column_stack([cs.transform_vector(np.eye(3)[i]) for i in range(3)])
+    origin = cs.transform_point(np.zeros(3))
+    linear = basis @ values[:3, :3] @ basis.T
+    translation = origin + basis @ values[:3, 3] - linear @ origin
+    transform = gp_GTrsf()
+    for row in range(3):
+        for col in range(3):
+            transform.SetValue(row + 1, col + 1, float(linear[row, col]))
+        transform.SetValue(row + 1, 4, float(translation[row]))
+    copied = BRepBuilderAPI_Copy(solid.wrapped, True, False).Shape()
+    builder = BRepBuilderAPI_GTransform(copied, transform, True)
+    builder.Build()
+    if not builder.IsDone():
+        raise ValueError("kernel could not transform the solid")
+    return _finish(solid, builder.Shape(), "make_transform_rsolid", {"matrix": matrix}, [solid])
 
 __all__ = tuple(name for name in globals() if not name.startswith("__"))

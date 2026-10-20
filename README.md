@@ -149,20 +149,19 @@ the full crank cycle sweeps clean in the same sim ·
 
 ---
 
-## Update Notes (2.2.6.post1)
+## Update Notes (2.2.6.post2)
 
 > Validate generated definitions, assembly constraints, and manufacturing
 > geometry before production use.
 
-- **Keyword `scad.var` is a parameter again.** `scad.var(name="j1", default=0.0)` is read
-  by the editor's parameter panel like the positional form; before, it was skipped.
-- **A cached run costs much less.** On the desktop arm: cold 80 s to 35 s, nothing changed
-  24 s to 4 s, one joint edited 18 s to 3 s, cache 1.7 GB to 96 MB. Restored shapes are built
-  on first use, parameters and imported names are keyed by value, and the `use` calls of a
-  cell run in worker processes (`SCA_JOBS`, 1 turns it off).
-- **Slider drags are sent when they settle**, not step by step.
+- **Operators live with their family.** `scale_rsolid`, `transform_rsolid`, `boolean_rsolidlist`,
+  `offset_rsolid`, `draft_rsolid`, `extrude_taper_rsolid`, `extrude_until_rsolid` and
+  `sweep_multisection_rsolid` moved into `operators/transform.py`, `boolean.py` and `features.py`.
+  `from simplecadapi import ...` is unchanged; the old module paths warn and still work.
+- **Every operator's API reference is generated**, and tests fail when one has no doc or the
+  committed docs differ from the generator's output.
 
-Full notes for this version: [`docs/updates/2.2.6.post1.md`](docs/updates/2.2.6.post1.md).
+Full notes for this version: [`docs/updates/2.2.6.post2.md`](docs/updates/2.2.6.post2.md).
 Earlier versions: the [changelog](CHANGELOG.md) and [`docs/updates/`](docs/updates/).
 
 ---
@@ -183,7 +182,7 @@ in a compact public API for creating solids, applying features, tagging semantic
 intent, querying topology, exporting manufacturing files, and translating recorded
 models into FreeCAD workflows.
 
-Current release: `simplecadapi==2.2.6.post1`.
+Current release: `simplecadapi==2.2.6.post2`.
 
 ## What It Provides
 
@@ -698,6 +697,7 @@ and the [STEP reconstruction workflow](docs/skill/references/workflows/step-reco
 
 ## Documentation
 
+- 2.2.6.post2 update notes: [`docs/updates/2.2.6.post2.md`](docs/updates/2.2.6.post2.md)
 - 2.2.6.post1 update notes: [`docs/updates/2.2.6.post1.md`](docs/updates/2.2.6.post1.md)
 - 2.2.6 update notes: [`docs/updates/2.2.6.md`](docs/updates/2.2.6.md)
 - 2.2.5 update notes: [`docs/updates/2.2.5.md`](docs/updates/2.2.5.md)

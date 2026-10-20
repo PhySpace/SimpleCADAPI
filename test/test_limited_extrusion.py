@@ -8,7 +8,7 @@ from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
 import simplecadapi as s
 from simplecadapi.kernel.ocp_booleans import solids_of
 from simplecadapi.kernel.ocp_properties import center_of_mass, volume
-from simplecadapi.operators.limited_extrusion import extrude_until_rsolid
+from simplecadapi import extrude_until_rsolid
 from simplecadapi.recording.graph import GraphSession
 
 

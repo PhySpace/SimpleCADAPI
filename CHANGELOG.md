@@ -6,6 +6,31 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+## 2.2.6.post2 — 2026-10-21
+
+### Changed
+
+- Operators: `scale_rsolid` and `transform_rsolid` are implemented in `operators/transform.py`,
+  `boolean_rsolidlist` in `operators/boolean.py`, and `offset_rsolid`, `draft_rsolid`,
+  `extrude_taper_rsolid`, `extrude_until_rsolid` and `sweep_multisection_rsolid` in
+  `operators/features.py`, next to the operators of their family. `from simplecadapi import ...`
+  is unchanged. The one-feature modules they were first written in (`operators.deformation`,
+  `draft`, `section_features`, `limited_extrusion`) remain as aliases: importing a name from
+  them still works and raises a `DeprecationWarning` that names the new place.
+
+### Fixed
+
+- Skill API docs: the documentation generator listed its source files and public functions by
+  hand and had never been told about those four modules, so the docs of the eight operators
+  above were kept by hand and deleted by the generator's clean-up. `operators/` is now
+  discovered, a function the package exports is public, the content of the hand-written docs
+  (examples, error conditions, replay notes) is in the docstrings, and tests check that every
+  public operator has a doc and that the committed docs are exactly what the generator writes.
+  `boolean_rsolidlist` had no doc at all.
+- Skill API docs of `NotebookRun`, `run_notebook` and `add_bspline_rsketch` caught up with the
+  code (`through`, `product` and `timeout`; a partial run's `product` is `None`; closed
+  B-splines).
+
 ## 2.2.6.post1 — 2026-10-21
 
 ### Fixed

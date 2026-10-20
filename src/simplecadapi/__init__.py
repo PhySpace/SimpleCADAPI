@@ -69,10 +69,15 @@ from .core import (
     get_current_cs,
 )
 from .errors import SimpleCADError
-from .operators.deformation import scale_rsolid, offset_rsolid, transform_rsolid, boolean_rsolidlist
-from .operators.section_features import extrude_taper_rsolid, sweep_multisection_rsolid
-from .operators.limited_extrusion import extrude_until_rsolid
-from .operators.draft import draft_rsolid
+from .operators.boolean import boolean_rsolidlist
+from .operators.features import (
+    draft_rsolid,
+    extrude_taper_rsolid,
+    extrude_until_rsolid,
+    offset_rsolid,
+    sweep_multisection_rsolid,
+)
+from .operators.transform import scale_rsolid, transform_rsolid
 from .params.expr import (
     Const,
     DimensionTolerance,
@@ -437,14 +442,6 @@ def notebook_id() -> str:
 
 
 __all__ = [
-    "scale_rsolid",
-    "boolean_rsolidlist",
-    "transform_rsolid",
-    "offset_rsolid",
-    "extrude_taper_rsolid",
-    "sweep_multisection_rsolid",
-    "extrude_until_rsolid",
-    "draft_rsolid",
     "exporter",
     # 核心类
     "CoordinateSystem",
@@ -585,12 +582,19 @@ __all__ = [
     # 变换操作
     "mirror_shape",
     "rotate_shape",
+    "scale_rsolid",
+    "transform_rsolid",
     "translate_shape",
     # 3D操作
+    "draft_rsolid",
     "extrude_rsolid",
+    "extrude_taper_rsolid",
+    "extrude_until_rsolid",
     "helical_sweep_rsolid",
     "loft_rsolid",
+    "offset_rsolid",
     "revolve_rsolid",
+    "sweep_multisection_rsolid",
     "sweep_rsolid",
     "twisted_sweep_rsolid",
     # 标签和选择
@@ -601,6 +605,7 @@ __all__ = [
     "select_edges_by_tag",
     "select_faces_by_tag",
     # 布尔运算
+    "boolean_rsolidlist",
     "cut_rsolid",
     "make_2d_cut_rface",
     "intersect_rsolid",

@@ -191,6 +191,15 @@ def _package_root_from(module_file: Path | str | None = None) -> Path:
 
 def _default_source_files(package_root: Path) -> List[Path]:
     source_files = [package_root / name for name in DEFAULT_SOURCE_FILENAMES]
+    # Every operators module is part of the API surface: found, not listed, so
+    # a new one cannot be left out (four were, and their docs went stale).
+    listed = set(source_files)
+    operators_root = package_root / "operators"
+    source_files.extend(
+        path
+        for path in sorted(operators_root.glob("*.py"))
+        if not path.name.startswith("_") and path not in listed
+    )
     translator_root = package_root / "translator"
     for backend_dir in sorted(translator_root.glob("*_translator")):
         source_files.extend([backend_dir / "api.py", backend_dir / "translator.py"])
@@ -393,6 +402,9 @@ class APIDocumentGenerator:
             return False
         if module_name in FULL_PUBLIC_FUNCTION_MODULES:
             return True
+        if module_name.startswith("operators/") and exported_names:
+            # a module nobody listed: what the package exports is the API
+            return name in exported_names
         if _translator_backend_name(module_name) is not None:
             return True
         if module_name.startswith("inspect/brep/"):
