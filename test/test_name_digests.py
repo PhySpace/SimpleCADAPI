@@ -9,6 +9,7 @@ analysis cannot prove falls back to the whole file.
 from __future__ import annotations
 
 from simplecadapi.runtime import run_notebook
+from simplecadapi.runtime.deps import state_dir
 from simplecadapi.runtime.names import definition_digest
 from test_notebook_runtime import NotebookTestCase, cell, notebook_text
 
@@ -117,3 +118,30 @@ class TestVariableLevelCache(NotebookTestCase):
                 run_notebook(self.nb, cache=False).definition.content_hash,
                 text,
             )
+
+
+class TestWhatTheCacheStores(NotebookTestCase):
+    """A cell's private (underscore) names are invisible to every other cell:
+    storing them only costs disk and restore time."""
+
+    def test_private_names_are_not_stored_and_the_cell_is_still_restored(self) -> None:
+        text = notebook_text(
+            cell(
+                """
+                _scratch = scad.make_box_rsolid(30.0, 30.0, 30.0)
+                width = 20.0
+                """,
+                returns="width",
+            ),
+            cell("block = scad.make_box_rsolid(width, 4.0, 4.0)", reads="width", returns="block"),
+            cell("part = scad.Part(part_id='priv', body=block)", reads="block", returns="part"),
+            table='id = "priv"',
+        )
+        path = self.write("priv.py", text)
+        first = run_notebook(path)
+        stored = {item.stem for item in (state_dir(first.config) / "cache").rglob("*.pickle")}
+        self.assertIn("block", stored)
+        self.assertNotIn("_scratch", stored)
+        second = run_notebook(path)
+        self.assertEqual(self.statuses(second), ["ran", "cached", "cached", "cached"])
+        self.assertEqual(first.definition.content_hash, second.definition.content_hash)

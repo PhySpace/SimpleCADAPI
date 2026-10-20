@@ -186,6 +186,18 @@ class CellCache(CachedLifecycle):
         if loader is None:
             return
         self._loader = loader
+        # A name that starts with an underscore belongs to its cell: no other
+        # cell reads it, so storing its value only costs disk and restore time
+        # (a cell that builds an assembly in `_a` stored it twice).  marimo
+        # insists that an entry has a value for every name the cell defines,
+        # so the name stays, with nothing in it.
+        attempt = self._attempts.get(cell.cell_id)
+        if attempt is not None and not attempt.hit:
+            glbls = {**glbls}
+            for name in attempt.defs:
+                if name.startswith("_"):
+                    glbls[name] = None
+                    glbls[f"_cell_{cell.cell_id}_{name[1:]}"] = None
         super().teardown(cell, glbls, run_result)
 
     def _invalidate(self, cell_id: CellId_t) -> None:

@@ -8,6 +8,12 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ### Changed
 
+- Cache and pickling: restoring a cached shape is about 40% faster (adding a child to a
+  shape no longer refreshes its whole subtree's tag cache unless a tag can pass down; the
+  restore finds entities by position instead of scanning, and refreshes each tag cache
+  once). The cache no longer stores a cell's private (`_name`) variables, and the geometry
+  bytes in a pickle are compressed (zlib, level 1); entries written before are still read.
+  On the desktop-arm benchmark a no-change run drops from 23.6 s to 7.0 s.
 - Cache: a cell that does `from lib.dims import A` now depends on the definition of `A` (and
   what it reads, across local modules), not on the whole file. Editing another name of
   `lib/dims.py`, a comment, or the formatting leaves the cell cached. A module the analysis

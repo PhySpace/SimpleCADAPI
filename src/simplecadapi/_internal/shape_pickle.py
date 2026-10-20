@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import io
 import re
+import zlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Set, Tuple
 
@@ -93,6 +94,20 @@ def _write_shape(shape: TopoDS_Shape) -> bytes:
     return stream.getvalue()
 
 
+_PACKED = b"SCZ1"
+"""Starts a payload stored compressed; entries written before it was
+introduced hold the BinTools bytes as they are, and are still read."""
+
+
+def _pack(raw: bytes) -> bytes:
+    # BinTools is bit-exact doubles: level 1 gets most of the ~10x for little time.
+    return _PACKED + zlib.compress(raw, 1)
+
+
+def _unpack(payload: bytes) -> bytes:
+    return zlib.decompress(payload[len(_PACKED) :]) if payload.startswith(_PACKED) else payload
+
+
 def _read_shape(payload: bytes) -> TopoDS_Shape:
     shape = TopoDS_Shape()
     BinTools.Read_s(shape, io.BytesIO(payload))
@@ -156,15 +171,55 @@ def _capture_states(wrapper: "AnyShape") -> Tuple[_EntityState, ...]:
     return tuple(states)
 
 
-def _find_entity(
-    cache: "_TopologyEntityCache", kind: str, shape: TopoDS_Shape
-) -> "_TopoEntity | None":
-    """Look an entity up without creating one (``cache.get`` would)."""
+def _entities_by_position(
+    cache: "_TopologyEntityCache", kind: str, shapes: TopTools_IndexedMapOfShape
+) -> Dict[int, "_TopoEntity"]:
+    """The entity of each position in *shapes* (``FindIndex`` is ``IsSame``),
+    found in one pass rather than one scan per position."""
 
+    found: Dict[int, "_TopoEntity"] = {}
     for entity in cache.entities(kind):
-        if entity.representative.IsSame(shape):
-            return entity
-    return None
+        position = shapes.FindIndex(entity.representative)
+        if position > 0:
+            found.setdefault(position, entity)
+    return found
+
+
+def _refresh_restored_tags(wrapper: "AnyShape") -> None:
+    """Rebuild the tag cache of every wrapper under *wrapper*, once each.
+
+    The restored tree has no ancestors above *wrapper*.  When none of its
+    bindings is passed downward, an entity's effective tags are its own
+    (local and legacy) and need no walk up through its parents; otherwise
+    the general refresh runs.
+    """
+
+    from ..core import TaggedMixin, TopologyPropagation
+
+    members: List[Any] = []
+    seen: Set[int] = set()
+    stack: List[Any] = [wrapper]
+    while stack:
+        item = stack.pop()
+        if id(item) in seen:
+            continue
+        seen.add(id(item))
+        members.append(item)
+        stack.extend(item.get_children())
+    tagged = [item for item in members if isinstance(item, TaggedMixin)]
+    if any(
+        binding.propagation.topology == TopologyPropagation.DOWNWARD
+        for item in tagged
+        for binding in item._local_tag_bindings()
+    ):
+        wrapper._refresh_tag_cache(recursive=True)
+        return
+    for item in tagged:
+        item._tag_cache.clear()
+        item._tag_cache.update(
+            binding.tag
+            for binding in (*item._local_tag_bindings(), *item._legacy_effective_bindings())
+        )
 
 
 _TOPO_ID_RE = re.compile(r"^(?P<kind>[a-z]+)_(?P<index>\d+)$")
@@ -195,16 +250,18 @@ def _renumber(cache: "_TopologyEntityCache", restored: Set[int]) -> None:
 def _apply_states(wrapper: "AnyShape", states: Tuple[_EntityState, ...]) -> None:
     cache = wrapper._topology_cache
     maps: Dict[str, TopTools_IndexedMapOfShape] = {}
+    by_index: Dict[str, Dict[int, "_TopoEntity"]] = {}
     restored: Set[int] = set()
     for state in states:
         shapes = maps.get(state.kind)
         if shapes is None:
             shapes = maps[state.kind] = _index_map(wrapper.wrapped, state.kind)
+            by_index[state.kind] = _entities_by_position(cache, state.kind, shapes)
         if state.index > shapes.Extent():
             raise ValueError(
                 f"pickled {state.kind} #{state.index} is outside the restored shape"
             )
-        entity = _find_entity(cache, state.kind, shapes.FindKey(state.index))
+        entity = by_index[state.kind].get(state.index)
         if entity is None:
             continue
         entity.topo_id = state.topo_id
@@ -228,13 +285,13 @@ def _apply_states(wrapper: "AnyShape", states: Tuple[_EntityState, ...]) -> None
         entity.incident_edge_ids.update(state.incident_edge_ids)
         restored.add(id(entity))
     _renumber(cache, restored)
-    wrapper._refresh_tag_cache(recursive=True)
+    _refresh_restored_tags(wrapper)
 
 
 def reduce_shape(wrapper: "AnyShape") -> Tuple[Any, Tuple[Any, ...]]:
     """``__reduce__`` implementation shared by every topology wrapper."""
 
-    payload = source_bytes(wrapper) or _write_shape(wrapper.wrapped)
+    payload = _pack(source_bytes(wrapper) or _write_shape(wrapper.wrapped))
     return (restore_shape, (type(wrapper).__name__, payload, _capture_states(wrapper)))
 
 
@@ -246,6 +303,7 @@ def restore_shape(
     from .. import core
 
     wrapper_type = getattr(core, class_name)
+    payload = _unpack(payload)
     wrapper = wrapper_type(_read_shape(payload))
     remember_source_bytes(wrapper, payload)
     _apply_states(wrapper, states)
