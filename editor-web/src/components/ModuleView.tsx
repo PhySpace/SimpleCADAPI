@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ParamControl, type ParamMeta, type ParamValue } from "@/components/ParamControl";
 import { cadTheme } from "@/lib/cm-theme";
+import { createSettler, SETTLE_MS } from "@/lib/settle";
 import { sdkCompletion } from "@/lib/sdk-complete";
 
 /** A local module of the workspace (shared dimensions, helpers): what the
@@ -41,8 +42,17 @@ export function ModuleView({
   const [draft, setDraft] = useState(module.code);
   const dirty = useRef(false);
   const saveTimer = useRef<number | null>(null);
-  const paramTimer = useRef<number | null>(null);
-  const pending = useRef(new Map<string, ParamValue>());
+  const socketRef = useRef(socket);
+  socketRef.current = socket;
+  const pathRef = useRef(module.path);
+  pathRef.current = module.path;
+  const settler = useRef(
+    createSettler<ParamValue>(SETTLE_MS, (values) =>
+      socketRef.current?.send({ type: "module.param", path: pathRef.current, values }),
+    ),
+  );
+  // values of the module that was left are not the next one's
+  useEffect(() => () => settler.current.cancel(), [module.path]);
 
   // A different module, an external edit or a parameter edit replaces the
   // text; our own autosave echo must not clobber what is being typed.
@@ -68,14 +78,11 @@ export function ModuleView({
   editRef.current = edit;
   const handleChange = useCallback((value: string) => editRef.current(value), []);
 
-  const forward = (id: string, value: ParamValue) => {
-    pending.current.set(id, value);
-    if (paramTimer.current !== null) return;
-    paramTimer.current = window.setTimeout(() => {
-      paramTimer.current = null;
-      socket?.send({ type: "module.param", path: module.path, values: Object.fromEntries(pending.current) });
-      pending.current.clear();
-    }, 120);
+  // A drag is sent when it pauses or ends, not step by step: every value the
+  // server gets is a rebuild.
+  const forward = (id: string, value: ParamValue, now = false) => {
+    settler.current.push(id, value);
+    if (now) settler.current.flush();
   };
 
   const groups = new Map<string, ParamMeta[]>();

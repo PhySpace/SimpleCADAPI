@@ -45,6 +45,7 @@ from ._marimo import (
     RunResult,
     safe_get_context,
 )
+from . import prefetch
 from .cache import CellCache, CellDigests, cache_root, prune
 from .cells import NotebookCells, bound_requirements
 from .config import NotebookConfig, read_notebook_config
@@ -116,6 +117,7 @@ class SimpleCadExecutor:
         if restored is not _MISS:
             return restored
         cache = cache if restored is _MISS else None
+        _prefetch(scope, cell, glbls)
         try:
             with _cell_recording(scope, cell, glbls):
                 result = self._delegate.execute_cell(cell, glbls)
@@ -134,6 +136,7 @@ class SimpleCadExecutor:
         restored = _restore(cache, cell, glbls)
         if restored is not _MISS:
             return restored
+        _prefetch(scope, cell, glbls)
         try:
             with _cell_recording(scope, cell, glbls):
                 result = await self._delegate.execute_cell_async(cell, glbls)
@@ -158,6 +161,15 @@ class SimpleCadExecutor:
         if self._scope is not None or scope.graph is None or os.environ.get("SCA_NO_KERNEL_CACHE"):
             return None
         return _kernel_cache(scope, cell)
+
+
+def _prefetch(scope: NotebookScope, cell: CellImpl, glbls: MutableGlobals) -> None:
+    """Start the notebooks the cell is about to ``use`` in worker processes."""
+
+    try:
+        prefetch.start(scope.config.directory, cell.code, glbls, scope.config.id)
+    except Exception:  # noqa: BLE001 - an optimisation, never a reason for a cell to fail
+        pass
 
 
 _MISS = object()
