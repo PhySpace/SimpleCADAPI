@@ -6,6 +6,14 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+## 2.2.6.post1 — 2026-10-20
+
+### Fixed
+
+- Editor: the parameter panel reads `scad.var(name="j1", default=0.0, ...)` — the keyword
+  form — as well as `scad.var("j1", 0.0, ...)`. Before, only the second positional argument
+  was taken as the default, so keyword declarations never showed up as parameters.
+
 ## 2.2.6 — 2026-10-19
 
 ### Added
