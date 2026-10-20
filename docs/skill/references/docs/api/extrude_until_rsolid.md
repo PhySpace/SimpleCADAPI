@@ -6,7 +6,7 @@
 def extrude_until_rsolid(profile: Face, target: Solid | Sequence[Solid], direction: Sequence[float] = (0, 0, 1), until: str = 'NEXT') -> Solid
 ```
 
-*Source: operators/limited_extrusion.py*
+*Source: operators/features.py*
 
 ## Import Surface
 

@@ -6,7 +6,7 @@
 def extrude_taper_rsolid(profile: Face, vector: Sequence[float], taper: float, flip_inner: bool = True) -> Solid
 ```
 
-*Source: operators/section_features.py*
+*Source: operators/features.py*
 
 ## Import Surface
 

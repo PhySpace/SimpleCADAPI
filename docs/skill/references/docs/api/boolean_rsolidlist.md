@@ -6,7 +6,7 @@
 def boolean_rsolidlist(left: Sequence[Solid], right: Sequence[Solid], operation: str) -> list[Solid]
 ```
 
-*Source: operators/deformation.py*
+*Source: operators/boolean.py*
 
 ## Import Surface
 

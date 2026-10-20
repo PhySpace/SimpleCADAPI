@@ -6,7 +6,7 @@
 def transform_rsolid(solid: Solid, matrix: Sequence[Sequence[float]]) -> Solid
 ```
 
-*Source: operators/deformation.py*
+*Source: operators/transform.py*
 
 ## Import Surface
 

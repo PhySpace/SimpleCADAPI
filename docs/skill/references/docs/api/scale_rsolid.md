@@ -6,7 +6,7 @@
 def scale_rsolid(solid: Solid, factors: Sequence[float], center: Sequence[float] = (0, 0, 0)) -> Solid
 ```
 
-*Source: operators/deformation.py*
+*Source: operators/transform.py*
 
 ## Import Surface
 

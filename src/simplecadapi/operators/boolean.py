@@ -696,4 +696,63 @@ def make_2d_intersect_rface(face_a: Face, face_b: Face) -> Face:
             error=e,
         )
 
+
+def boolean_rsolidlist(
+    left: Sequence[Solid],
+    right: Sequence[Solid],
+    operation: str,
+) -> list[Solid]:
+    """Apply a set boolean to two body groups, retaining every result solid.
+
+    Members of each group are a geometric set. Unlike single-solid booleans,
+    a cut or intersection may return several solids or an empty list.
+    Topology lineage is partial; the ordered inputs and all output slots are
+    recorded so downstream features can replay the same geometry.
+
+    Args:
+        left: The first group of solids.
+        right: The second group of solids.
+        operation: ``"cut"``, ``"intersect"`` or ``"union"``.
+
+    Returns:
+        The result solids, possibly several or none.
+
+    Raises:
+        TypeError: A group contains something that is not a Solid.
+        ValueError: ``operation`` is unknown, or a member is invalid or empty.
+    """
+    from ..kernel.ocp_booleans import cut_shapes, common_shapes, fuse_shapes
+    from ..kernel.ocp_export import make_compound_always
+    lhs, rhs = list(left), list(right)
+    if operation not in {"cut", "intersect", "union"}:
+        raise ValueError("operation must be cut, intersect or union")
+    inputs = [*lhs, *rhs]
+    if any(not isinstance(body, Solid) for body in inputs):
+        raise TypeError("boolean groups must contain Solid values")
+    if any(body.wrapped.IsNull() or not BRepCheck_Analyzer(body.wrapped).IsValid() for body in inputs):
+        raise ValueError("boolean groups must contain valid nonempty topology")
+    if operation == "union":
+        shape = fuse_shapes([body.wrapped for body in inputs]) if inputs else None
+    elif not lhs or (operation == "intersect" and not rhs):
+        shape = None
+    elif operation == "cut":
+        shape = cut_shapes(make_compound_always([body.wrapped for body in lhs]),
+                           [body.wrapped for body in rhs])
+    else:
+        shape = common_shapes([make_compound_always([body.wrapped for body in group])
+                               for group in (lhs, rhs)])
+    if shape is not None and not BRepCheck_Analyzer(shape).IsValid():
+        raise ValueError("set boolean produced invalid topology")
+    result = [Solid(solid) for solid in solids_of(shape)] if shape is not None else []
+    for body in result:
+        for source in inputs:
+            _attach_lineage_from_source(source, body, derivation="continuation",
+                                        op="make_boolean_rsolidlist", coverage="partial")
+    _ensure_geo_selection_input_nodes(inputs)
+    record_operation_if_active(op="make_boolean_rsolidlist",
+        params={"operation": operation, "left_count": len(lhs), "right_count": len(rhs),
+                "input_refs": _serialize_shape_refs(inputs)}, outputs=result,
+        input_shapes=inputs, context=_current_context_metadata())
+    return result
+
 __all__ = tuple(name for name in globals() if not name.startswith("__"))

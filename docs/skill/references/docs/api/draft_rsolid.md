@@ -6,7 +6,7 @@
 def draft_rsolid(solid: Solid, faces_to_draft: Sequence[Face] | ShapeSelector, angle: ScalarLike, plane_origin: Sequence[float] = (0, 0, 0), plane_normal: Sequence[float] = (0, 0, 1)) -> Solid
 ```
 
-*Source: operators/draft.py*
+*Source: operators/features.py*
 
 ## Import Surface
 

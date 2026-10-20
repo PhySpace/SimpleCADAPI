@@ -6,7 +6,7 @@
 def sweep_multisection_rsolid(profiles: Sequence[Face | Wire], path: Wire, is_frenet: bool = False, binormal: Sequence[float] | Wire | None = None) -> Solid
 ```
 
-*Source: operators/section_features.py*
+*Source: operators/features.py*
 
 ## Import Surface
 

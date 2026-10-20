@@ -6,7 +6,7 @@
 def offset_rsolid(solid: Solid, amount: ScalarLike, openings: Sequence[Face] | ShapeSelector = (), *, tolerance: float = 0.0001, kind: str = 'ARC') -> Solid
 ```
 
-*Source: operators/deformation.py*
+*Source: operators/features.py*
 
 ## Import Surface
 

@@ -6,7 +6,7 @@ from OCP.BRepCheck import BRepCheck_Analyzer
 
 import simplecadapi as s
 from simplecadapi import ql
-from simplecadapi.operators.draft import draft_rsolid
+from simplecadapi import draft_rsolid
 from simplecadapi.recording.graph import GraphSession
 
 

@@ -42,6 +42,8 @@ from ..errors import (
 suppress_vendor_deprecation_warnings()
 
 from OCP.BRepCheck import BRepCheck_Analyzer
+from OCP.BRepGProp import BRepGProp
+from OCP.GProp import GProp_GProps
 
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
 
@@ -2249,5 +2251,33 @@ def _apply_tag_rselection(
     return view
 
 _EXPORTABLE_TYPES = (Compound, Solid, Shell, Face, Wire, Edge, Vertex)
+
+
+def _finite_vector(value: Sequence[float], name: str) -> tuple[float, float, float]:
+    values = tuple(float(v) for v in evaluate_value(value))
+    if len(values) != 3 or not all(math.isfinite(v) for v in values):
+        raise ValueError(f"{name} must contain three finite numbers")
+    return values
+
+
+def _finish(source: Solid, wrapped, op: str, params: dict, inputs: list) -> Solid:
+    solids = solids_of(wrapped)
+    if len(solids) != 1:
+        raise ValueError(f"{op} must produce exactly one solid, got {len(solids)}")
+    result = Solid(solids[0])
+    props = GProp_GProps()
+    BRepGProp.VolumePropertiesGK_s(result.wrapped, props, 1e-9, True, True)
+    if props.Mass() < 0:
+        result.wrapped.Reverse()
+    if not BRepCheck_Analyzer(result.wrapped).IsValid():
+        raise ValueError(f"{op} produced invalid geometry")
+    result._metadata = source._metadata.copy()
+    # These builders do not yet provide a complete face-history channel.
+    _attach_lineage_from_source(source, result, derivation="continuation", op=op, coverage="partial")
+    _ensure_geo_selection_input_nodes(inputs)
+    params = {**params, "input_refs": _serialize_shape_refs(inputs)}
+    record_operation_if_active(op=op, params=params, outputs=result,
+                               input_shapes=inputs, context=_current_context_metadata())
+    return result
 
 __all__ = tuple(name for name in globals() if not name.startswith("__"))
