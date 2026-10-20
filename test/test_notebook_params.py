@@ -112,6 +112,11 @@ class CommitValueTest(unittest.TestCase):
         assert out is not None
         self.assertIn('OD = scad.var("od", 120.0, comment="é", unit="mm")  # 外径', out)
 
+    def test_var_with_keyword_name_and_default_is_recognised(self) -> None:
+        code = 'J = scad.var(name="j1", default=0.0, comment="joint")\n'
+        out = commit_value(code, "J", 15)
+        self.assertEqual(out, 'J = scad.var(name="j1", default=15.0, comment="joint")\n')
+
     def test_refuses_what_does_not_fit(self) -> None:
         self.assertIsNone(commit_value(self.CODE, "MISSING", 1))
         self.assertIsNone(commit_value(self.CODE, "F", 1.0))
