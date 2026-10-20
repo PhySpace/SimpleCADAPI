@@ -30,8 +30,16 @@ export function ParamControl({
   forwardParam,
 }: {
   param: ParamMeta;
-  forwardParam: (id: string, value: ParamValue) => void;
+  /** `now`: send at once (a click, a release) instead of when the changes settle. */
+  forwardParam: (id: string, value: ParamValue, now?: boolean) => void;
 }) {
+  // A drag shows its own value: the server only hears of it when it settles,
+  // so the value it echoes back cannot move the thumb meanwhile.
+  const [drag, setDrag] = useState<number | null>(null);
+  const dragging = useRef(false);
+  useEffect(() => {
+    if (!dragging.current) setDrag(null);
+  }, [param.value]);
   const label = param.label || param.id;
   const title = [param.comment, ...(param.issues ?? [])].filter(Boolean).join("\n") || undefined;
   const ink = param.modified ? "text-focus" : "text-name";
@@ -42,7 +50,7 @@ export function ParamControl({
         type="button"
         className="flex items-center justify-between gap-2 text-left text-[11px]"
         title={title}
-        onClick={() => forwardParam(param.id, !on)}
+        onClick={() => forwardParam(param.id, !on, true)}
       >
         <span className={ink}>{label}</span>
         <span className={cn("border-2 px-1.5 text-[10px] font-bold uppercase", on ? "border-primary bg-primary text-primary-foreground" : "border-input text-muted-foreground")}>
@@ -51,7 +59,7 @@ export function ParamControl({
       </button>
     );
   }
-  const value = Number(param.value);
+  const value = drag ?? Number(param.value);
   return (
     <div title={title}>
       <div className="mb-1 flex items-baseline justify-between gap-2 text-[11px]">
@@ -63,7 +71,7 @@ export function ParamControl({
               min={param.min}
               max={param.max}
               step={param.step ?? (param.kind === "int" ? 1 : null)}
-              onCommit={(next) => forwardParam(param.id, next)}
+              onCommit={(next) => forwardParam(param.id, next, true)}
             />
           ) : (
             <span>{value}</span>
@@ -78,7 +86,15 @@ export function ParamControl({
           max={param.max}
           modified={param.modified}
           step={param.step ?? (param.kind === "int" ? 1 : (param.max - param.min) / 200)}
-          onValueChange={([next]) => forwardParam(param.id, next)}
+          onValueChange={([next]) => {
+            dragging.current = true;
+            setDrag(next);
+            forwardParam(param.id, next);
+          }}
+          onValueCommit={([next]) => {
+            dragging.current = false;
+            forwardParam(param.id, next, true);
+          }}
         />
       )}
     </div>

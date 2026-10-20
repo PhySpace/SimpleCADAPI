@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import sys
+import time
 from collections.abc import Callable, Iterator, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -53,11 +54,13 @@ from ._marimo import (
     safe_get_context,
     suppress_warnings_logs,
 )
+from . import prefetch
 from .cache import CellCache, CellDigests, cache_root, prune
 from .cells import NotebookCells
 from .config import NotebookConfig, NotebookConfigError, read_notebook_config
 from .deps import (
     local_modules,
+    exclusive,
     read_dependencies,
     record_dependencies,
     recording_dependencies,
@@ -163,7 +166,7 @@ def run_notebook(
         # Errors still come through.  "marimo" is the logger every marimo
         # module shares (lazy.py's record shows its file name, "lazy", which
         # is not the logger's name).
-        with suppress_warnings_logs("marimo"):
+        with suppress_warnings_logs("marimo"), exclusive(config):
             return _run(config, values, cache=cache, through=through, product=product)
 
     # marimo keeps its runtime context per thread, and a notebook run needs
@@ -188,6 +191,7 @@ def use(path: str | Path, /, *, id: str | None = None, **overrides: Any) -> Prod
     target = Path(path)
     if not target.is_absolute():
         target = _calling_directory() / target
+    prefetch.wait(target, id, overrides)  # a worker may be building it
     child = run_notebook(target, id=id, overrides=overrides)
     # use() never asks for a partial run, so the product is always there.
     if child.product is None:
@@ -209,6 +213,8 @@ def _run(
     through: int | None = None,
     product: bool = True,
 ) -> NotebookRun:
+    started = time.perf_counter()
+    given = dict(overrides)  # (``overrides`` becomes the run's values below)
     app = load_notebook(config.path, cell_prefix=_cell_prefix(config))
     if app is None:
         raise NotebookConfigError(f"{config.path}: the notebook has no cells")
@@ -310,6 +316,9 @@ def _run(
         )
         for cell in ordered
     )
+    if product and through is None and cache:
+        built = any(report.status == "ran" and report.name != "setup" for report in reports)
+        prefetch.write_stamp(config, given, time.perf_counter() - started if built else None)
     return NotebookRun(
         config=config,
         product=product_value,
