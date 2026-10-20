@@ -6,13 +6,51 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
-## 2.2.6.post1 — 2026-10-20
+## 2.2.6.post1 — 2026-10-21
 
 ### Fixed
 
 - Editor: the parameter panel reads `scad.var(name="j1", default=0.0, ...)` — the keyword
   form — as well as `scad.var("j1", 0.0, ...)`. Before, only the second positional argument
   was taken as the default, so keyword declarations never showed up as parameters.
+- Add-ons: `[compat] sca` ranges and the add-on commands accept a post-release version such as
+  `2.2.6.post1` (it sorts after `2.2.6` and before `2.2.7`); the parser rejected it.
+
+### Changed
+
+Cache and runtime speed, measured on the desktop six-axis arm (cold 80.5 s to 34.6 s, no
+change 23.6 s to 4.0 s, one joint edited 18.2 s to 3.0 s, cache 1.7 GB to 96 MB):
+
+- Restoring a cached shape is cheaper: adding a child to a shape no longer refreshes its
+  whole subtree's tag cache unless a tag can pass down, and a restore finds entities by
+  position and refreshes each tag cache once. A restored shape is then built when something
+  first uses it, so a cached value that no running cell reads is never built; pickling it
+  again hands back what it was restored from.
+- The cell cache stores less and compresses it: no values for a cell's private (`_name`)
+  variables, geometry bytes and cache entries zlib-compressed (level 1). Entries written
+  before are still read.
+- `scad.var(...)` values and the expressions made from them are keyed by content, so a cell
+  that reads one parameter is no longer redone because another one, defined in the same cell,
+  changed (marimo keyed any object it cannot hash by the code of the cell that made it).
+- A cell that does `from lib.dims import A` depends on the definition of `A` (and what it
+  reads, across local modules), not on the whole file. A module the analysis cannot prove
+  (calls or loops at top level, star imports, a name defined twice, a plain
+  `import lib.dims`) still depends on the whole file.
+- A cell that runs a notebook with `use("child.py")` (a literal path) is keyed by what that
+  child is (its text, the modules it imports, the notebooks it uses in turn) instead of by
+  everything a run recorded: editing one child redoes the cell that uses it and not those
+  that use its siblings, and the editor kernel caches such cells too (it ran them live
+  before). A path computed at run time still depends on what a run recorded.
+- The `use` calls a cell is about to make (literal path; arguments made of values it reads,
+  `float(...)`, `notebook_id()`) are started together in worker processes, which fill the
+  notebooks' caches; the cell then finds them built. OpenCASCADE keeps the interpreter lock,
+  so these are processes, not threads. `SCA_JOBS` sets how many (default: the smaller of 4
+  and the cores; 1 turns it off). Workers are only started when the builds they take off the
+  cell's hands are worth the seconds a worker takes to start (a notebook remembers how long
+  it last took to build), and a notebook that has not changed since it last ran is not
+  started at all. A notebook's state directory is locked between processes while it runs.
+- Editor: a slider drag is sent when it pauses (250 ms) or ends, not step by step; clicks and
+  number-box commits still go at once.
 
 ## 2.2.6 — 2026-10-19
 

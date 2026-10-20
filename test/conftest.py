@@ -11,3 +11,8 @@ import os
 # with the agent-facing default.
 os.environ.setdefault("SCA_NO_DIAGNOSTIC_RENDER", "1")
 os.environ.setdefault("SCA_DIAGNOSTIC_RENDER_BUDGET", "60")
+
+# Worker processes for the notebooks a cell uses are for the tests that are
+# about them (they set SCA_JOBS themselves): starting several interpreters per
+# run would only slow the rest of the suite down.
+os.environ.setdefault("SCA_JOBS", "1")

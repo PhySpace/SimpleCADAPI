@@ -156,6 +156,11 @@ the full crank cycle sweeps clean in the same sim ·
 
 - **Keyword `scad.var` is a parameter again.** `scad.var(name="j1", default=0.0)` is read
   by the editor's parameter panel like the positional form; before, it was skipped.
+- **A cached run costs much less.** On the desktop arm: cold 80 s to 35 s, nothing changed
+  24 s to 4 s, one joint edited 18 s to 3 s, cache 1.7 GB to 96 MB. Restored shapes are built
+  on first use, parameters and imported names are keyed by value, and the `use` calls of a
+  cell run in worker processes (`SCA_JOBS`, 1 turns it off).
+- **Slider drags are sent when they settle**, not step by step.
 
 Full notes for this version: [`docs/updates/2.2.6.post1.md`](docs/updates/2.2.6.post1.md).
 Earlier versions: the [changelog](CHANGELOG.md) and [`docs/updates/`](docs/updates/).

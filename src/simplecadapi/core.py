@@ -940,8 +940,27 @@ class TopoMixein:
         if child not in self.children:
             self.children.append(child)
             child.set_parent(self.self_shape_ref)
-            if isinstance(child, TaggedMixin):
+            if isinstance(child, TaggedMixin) and self._may_pass_tags_down():
                 child._refresh_tag_cache(recursive=True)
+
+    def _may_pass_tags_down(self) -> bool:
+        """Whether a new child of this entity can inherit any tag from it.
+
+        A child's effective tags are its own plus what its ancestors pass
+        down; an entity that holds no downward binding, and has no ancestor
+        that does, adds nothing, and the child's tag cache stays right.  A
+        shape being built (or restored) has no ancestors yet, so this spares
+        refreshing the whole subtree for every child added.
+        """
+
+        if not isinstance(self, TaggedMixin):
+            return True
+        if any(
+            binding.propagation.topology == TopologyPropagation.DOWNWARD
+            for binding in self._local_tag_bindings()
+        ):
+            return True
+        return bool(self._inherited_tag_bindings_with_paths())
 
     def get_children(self) -> List["AnyShape"]:
         return self.children

@@ -50,8 +50,27 @@ def test_prerelease_suffix_sorts_before_release():
     assert compare_versions("2.1.2", "2.1.2") == 0
 
 
+def test_post_release_sorts_after_its_release_and_before_the_next():
+    # the SDK itself is released as 2.2.6.post1 (PEP 440): compat ranges are
+    # checked against that version
+    assert compare_versions("2.2.6.post1", "2.2.6") == 1
+    assert compare_versions("2.2.6", "2.2.6.post1") == -1
+    assert compare_versions("2.2.6.post2", "2.2.6.post1") == 1
+    assert compare_versions("2.2.6.post10", "2.2.6.post2") == 1
+    assert compare_versions("2.2.7", "2.2.6.post9") == 1
+    assert compare_versions("2.2.6.post1", "2.2.6.post1") == 0
+    assert compare_versions("2.2.6b2", "2.2.6.post1") == -1
+
+
+def test_ranges_hold_for_a_post_release():
+    assert VersionRange.parse(">=2.2.6,<2.2.7").matches("2.2.6.post1")
+    assert VersionRange.parse("==2.2.6.post1").matches("2.2.6.post1")
+    assert not VersionRange.parse("<=2.2.6").matches("2.2.6.post1")
+    assert not VersionRange.parse(">=2.2.7").matches("2.2.6.post1")
+
+
 @pytest.mark.parametrize(
-    "spec", ["", "  ", "*", "2.*", ">=2.1,,3", ">=", "==x.y", "v2.1"]
+    "spec", ["", "  ", "*", "2.*", ">=2.1,,3", ">=", "==x.y", "v2.1", "2.2.post", "2.2.postx"]
 )
 def test_invalid_specs_are_rejected_with_named_error(spec):
     with pytest.raises(VersionSpecError):

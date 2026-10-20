@@ -5,6 +5,9 @@ Supported syntax — deliberately a small, documented subset:
 * versions are dot-separated numeric components with optional
   pre-release suffixes (``2.1.2``, ``2.0.4b2``); a suffix sorts before
   the same numeric component without one (``2.0.4b2 < 2.0.4``);
+* a trailing ``.postN`` component is a post-release (PEP 440): it sorts
+  after the release it follows and before the next one
+  (``2.2.6 < 2.2.6.post1 < 2.2.6.post2 < 2.2.7``);
 * ranges are comma-separated clauses with the operators
   ``== != >= <= > <``; a bare version means exact equality;
 * clauses must be jointly satisfiable (``>=2.1,<2.0`` is rejected).
@@ -21,6 +24,7 @@ from . import AddonError
 
 _CLAUSE_RE = re.compile(r"^(==|!=|>=|<=|>|<)?\s*([0-9][0-9A-Za-z.]*)$")
 _COMPONENT_RE = re.compile(r"^([0-9]+)([a-zA-Z][0-9A-Za-z]*)?$")
+_POST_RE = re.compile(r"^post([0-9]+)$")
 
 
 class VersionSpecError(AddonError):
@@ -34,6 +38,12 @@ def version_key(text: str) -> tuple[tuple[int, int, str], ...]:
         raise VersionSpecError("empty version literal")
     components: list[tuple[int, int, str]] = []
     for part in stripped.split("."):
+        post = _POST_RE.match(part)
+        if post is not None and components:
+            # after the release it follows (a missing component pads as (0, 1, "")),
+            # and in order among post-releases
+            components.append((int(post.group(1)), 2, ""))
+            continue
         match = _COMPONENT_RE.match(part)
         if match is None:
             raise VersionSpecError(
