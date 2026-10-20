@@ -105,3 +105,58 @@ class TestShapePayload(unittest.TestCase):
         self.assertEqual(effective_tags(legacy), before)
         self.assertAlmostEqual(legacy.get_volume(), shape.get_volume(), places=6)
 
+
+class TestLazyRestore(unittest.TestCase):
+    """A restored shape is built when something first uses it: most cached
+    values are never read by the cells that run."""
+
+    def test_a_restored_shape_is_built_on_first_use(self) -> None:
+        from simplecadapi._internal.shape_pickle import is_pending
+
+        shape = drilled_plate()
+        restored = pickle.loads(pickle.dumps(shape))
+        self.assertIsInstance(restored, scad.Solid)
+        self.assertTrue(is_pending(restored))
+        self.assertAlmostEqual(restored.get_volume(), shape.get_volume(), places=6)
+        self.assertFalse(is_pending(restored))
+        self.assertEqual(effective_tags(restored), effective_tags(shape))
+
+    def test_pickling_a_shape_nobody_used_does_not_build_it(self) -> None:
+        from simplecadapi._internal.shape_pickle import is_pending
+
+        shape = drilled_plate()
+        restored = pickle.loads(pickle.dumps(shape))
+        again = pickle.loads(pickle.dumps(restored))
+        self.assertTrue(is_pending(restored))
+        self.assertTrue(is_pending(again))
+        self.assertAlmostEqual(again.get_volume(), shape.get_volume(), places=6)
+
+    def test_a_missing_attribute_is_still_an_attribute_error(self) -> None:
+        restored = pickle.loads(pickle.dumps(drilled_plate()))
+        self.assertFalse(hasattr(restored, "no_such_attribute"))
+        self.assertTrue(hasattr(restored, "wrapped"))
+
+    def test_two_threads_first_using_a_shape_build_it_once(self) -> None:
+        import threading
+
+        from simplecadapi._internal import shape_pickle
+
+        restored = pickle.loads(pickle.dumps(drilled_plate()))
+        reads = 0
+        original = shape_pickle._read_shape
+
+        def counted(payload):
+            nonlocal reads
+            reads += 1
+            return original(payload)
+
+        shape_pickle._read_shape = counted
+        try:
+            volumes: list[float] = []
+            threads = [threading.Thread(target=lambda: volumes.append(restored.get_volume())) for _ in range(4)]
+            [thread.start() for thread in threads]
+            [thread.join() for thread in threads]
+        finally:
+            shape_pickle._read_shape = original
+        self.assertEqual(reads, 1)
+        self.assertEqual(len(set(volumes)), 1)

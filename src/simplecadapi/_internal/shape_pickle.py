@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import io
 import re
+import threading
 import zlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Set, Tuple
@@ -295,19 +296,108 @@ def reduce_shape(wrapper: "AnyShape") -> Tuple[Any, Tuple[Any, ...]]:
     return (restore_shape, (type(wrapper).__name__, payload, _capture_states(wrapper)))
 
 
+_PENDING = "_pending_restore"
+"""The ``__dict__`` key under which a restored shape that is not built yet
+keeps what it needs to be: ``(payload, states)``."""
+
+_build_lock = threading.RLock()
+_building = threading.local()
+_lazy_classes: Dict[type, type] = {}
+
+
+class _PendingShape:
+    """Behaviour of a restored shape that has not been built yet.
+
+    The instance is empty.  Its first attribute read or write builds it (the
+    kernel shape from its bytes, the wrapper tree, the saved state) and puts
+    its real class back, after which none of this is in the way.  Pickling it
+    again hands back what it was restored from.
+    """
+
+    def __getattr__(self, name: str) -> Any:
+        if not name.startswith("__"):
+            _build(self)
+            try:
+                return object.__getattribute__(self, name)
+            except AttributeError:
+                pass
+        raise AttributeError(f"{type(self).__name__!r} object has no attribute {name!r}")
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        _build(self)
+        object.__setattr__(self, name, value)
+
+    def __reduce__(self) -> Tuple[Any, Tuple[Any, ...]]:
+        pending = self.__dict__.get(_PENDING)
+        if pending is None:
+            _build(self)
+            return type(self).__reduce__(self)
+        return (restore_shape, (_real_class(type(self)).__name__, *pending))
+
+
+def _real_class(cls: type) -> type:
+    return cls.__mro__[2] if _PendingShape in cls.__mro__ else cls
+
+
+def _lazy_class(wrapper_type: type) -> type:
+    lazy = _lazy_classes.get(wrapper_type)
+    if lazy is None:
+        # Same name as the real class, so a repr or a ``type(x).__name__``
+        # does not tell the two apart.
+        lazy = _lazy_classes[wrapper_type] = type(
+            wrapper_type.__name__, (_PendingShape, wrapper_type), {"__module__": wrapper_type.__module__}
+        )
+    return lazy
+
+
+def is_pending(wrapper: "AnyShape") -> bool:
+    """Whether *wrapper* was restored and nothing has used it yet."""
+
+    return _PENDING in wrapper.__dict__
+
+
+def _build(wrapper: Any) -> None:
+    """Build a pending shape; a no-op for one already built (or being built
+    by this thread: its own constructor reads its attributes)."""
+
+    if _PENDING not in wrapper.__dict__:
+        return
+    with _build_lock:
+        pending = wrapper.__dict__.get(_PENDING)
+        building = _building.__dict__.setdefault("ids", set())
+        if pending is None or id(wrapper) in building:
+            return
+        building.add(id(wrapper))
+        try:
+            payload, states = pending
+            payload = _unpack(payload)
+            real = _real_class(type(wrapper))
+            real.__init__(wrapper, _read_shape(payload))
+            remember_source_bytes(wrapper, payload)
+            _apply_states(wrapper, states)
+            del wrapper.__dict__[_PENDING]
+            wrapper.__class__ = real
+        finally:
+            building.discard(id(wrapper))
+
+
 def restore_shape(
     class_name: str, payload: bytes, states: Tuple[_EntityState, ...]
 ) -> "AnyShape":
-    """Unpickle target: rebuild the wrapper and re-apply entity state."""
+    """Unpickle target: a shape that is built when it is first used.
+
+    Most values a cell cache restores are never read by the cells that run
+    (they are only there so that the cell counts as done), and building one
+    (decoding the kernel shape, the wrapper tree, the saved state) is most of
+    the time restoring costs.
+    """
 
     from .. import core
 
     wrapper_type = getattr(core, class_name)
-    payload = _unpack(payload)
-    wrapper = wrapper_type(_read_shape(payload))
-    remember_source_bytes(wrapper, payload)
-    _apply_states(wrapper, states)
+    wrapper = wrapper_type.__new__(_lazy_class(wrapper_type))
+    object.__setattr__(wrapper, "__dict__", {_PENDING: (payload, states)})
     return wrapper
 
 
-__all__ = ["reduce_shape", "remember_source_bytes", "restore_shape", "source_bytes"]
+__all__ = ["is_pending", "reduce_shape", "remember_source_bytes", "restore_shape", "source_bytes"]

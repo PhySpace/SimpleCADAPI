@@ -14,6 +14,10 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   once). The cache no longer stores a cell's private (`_name`) variables, and the geometry
   bytes in a pickle are compressed (zlib, level 1); entries written before are still read.
   On the desktop-arm benchmark a no-change run drops from 23.6 s to 7.0 s.
+- Cache: a restored shape is built when something first uses it (a cached value that no
+  running cell reads is never built, and pickling it again hands back what it was restored
+  from), and the cell cache compresses what it writes (zlib level 1; entries written before
+  are still read). The desktop-arm cache drops from 1.2 GB to 96 MB.
 - Cache: a cell that does `from lib.dims import A` now depends on the definition of `A` (and
   what it reads, across local modules), not on the whole file. Editing another name of
   `lib/dims.py`, a comment, or the formatting leaves the cell cached. A module the analysis

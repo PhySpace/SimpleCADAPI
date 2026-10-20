@@ -149,9 +149,13 @@ def scenario(title: str, top: Path) -> float:
 
     _rows.clear()
     start = time.perf_counter()
+    cpu = time.process_time()
     runner.run_notebook(top)
     total = time.perf_counter() - start
-    print(f"\n== {title}: {total:.2f}s")
+    cpu = time.process_time() - cpu
+    # CPU seconds (all threads of this process) stay comparable between runs
+    # when the machine is busy; wall seconds do not.
+    print(f"\n== {title}: {total:.2f}s wall, {cpu:.2f}s cpu")
     for depth, name, seconds, ran, cached in _rows:
         mark = "" if ran == 0 else f"  <- {ran} cell(s) ran"
         print(f"  {'  ' * depth}{name:<14} {seconds:6.2f}s  ran {ran:>2}  cached {cached:>2}{mark}")

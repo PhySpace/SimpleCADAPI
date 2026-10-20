@@ -24,6 +24,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import zlib
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
@@ -63,6 +64,35 @@ def cache_root(config: NotebookConfig) -> Path:
     """The notebook's cell caches: one directory per dependency digest."""
 
     return state_dir(config) / "cache"
+
+
+_PACKED = b"SCZ2"
+"""Starts an entry written compressed; one without it was written before
+compression existed and is read as it is."""
+
+_MIN_PACKED = 1024
+
+
+class CompressedFileStore(FileStore):
+    """marimo's file store, compressing what it writes.
+
+    A cell's value carries the definitions of the parts in it (archives and
+    JSON documents, written uncompressed) and the geometry: an assembly is a
+    hundred megabytes of pickle that shrinks ten-fold at zlib level 1, and
+    reading less is most of what a restore costs.  Decompressing happens on
+    the loader's reader threads, where zlib lets go of the interpreter lock.
+    """
+
+    def get(self, key: str) -> bytes | None:
+        data = super().get(key)
+        if data is not None and data.startswith(_PACKED):
+            return zlib.decompress(data[len(_PACKED) :])
+        return data
+
+    def put(self, key: str, value: bytes) -> bool:
+        if len(value) >= _MIN_PACKED:
+            value = _PACKED + zlib.compress(value, 1)
+        return super().put(key, value)
 
 
 class CellDigests:
@@ -162,7 +192,7 @@ class CellCache(CachedLifecycle):
     def _store(self, digest: str) -> LazyLoader:
         if digest not in self._stores:
             self._stores[digest] = LazyLoader(
-                name=_CELLS, store=LazyStore(FileStore(str(self._root / digest)))
+                name=_CELLS, store=LazyStore(CompressedFileStore(str(self._root / digest)))
             )
         return self._stores[digest]
 

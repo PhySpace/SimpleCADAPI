@@ -26,6 +26,13 @@ CASE = Path(__file__).resolve().parent.parent / "sandbox-envs" / "desktop_arm_so
 
 
 def main() -> None:
+    import os
+
+    if os.environ.get("SCA_NO_PACK"):  # A/B: write cache entries uncompressed
+        from simplecadapi.runtime import cache
+
+        cache._MIN_PACKED = 1 << 60
+
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--keep", type=Path, help="copy the case here and keep it")
     args = parser.parse_args()
