@@ -193,9 +193,9 @@ def _read_value(node: ast.expr) -> _Value | None:
     if (
         isinstance(node, ast.Call)
         and _callee(node.func) == "var"
-        and len(node.args) >= 2
+        and _var_default_node(node) is not None
     ):
-        default = _literal(node.args[1])
+        default = _literal(_var_default_node(node))
         if default is None or isinstance(default, bool):
             return None
         unit = comment = None
@@ -209,6 +209,17 @@ def _read_value(node: ast.expr) -> _Value | None:
             if isinstance(third, ast.Constant) and isinstance(third.value, str):
                 comment = third.value
         return _Value(default, "var", unit, comment)
+    return None
+
+
+def _var_default_node(call: ast.Call) -> ast.expr | None:
+    """The default argument of ``var(name, default, ...)``, positional or ``default=``."""
+
+    if len(call.args) >= 2:
+        return call.args[1]
+    for keyword in call.keywords:
+        if keyword.arg == "default":
+            return keyword.value
     return None
 
 
@@ -595,7 +606,8 @@ def commit_value(code: str, name: str, value: float | int | bool) -> str | None:
         node = statement.value
         if declared.declared == "var":
             assert isinstance(node, ast.Call)
-            node = node.args[1]
+            node = _var_default_node(node)
+            assert node is not None
         text = _format_value(declared.default, value)
         if text is None or node.end_lineno != node.lineno:
             return None

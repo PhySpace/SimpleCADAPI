@@ -149,20 +149,15 @@ the full crank cycle sweeps clean in the same sim ·
 
 ---
 
-## Update Notes (2.2.6)
+## Update Notes (2.2.6.post1)
 
 > Validate generated definitions, assembly constraints, and manufacturing
 > geometry before production use.
 
-- **Switch notebooks without leaving the CLI.** `sca cell open NOTEBOOK` moves the editor
-  and waits for its kernel; the write commands take `--open` to switch and write in one
-  step, and a refused write names the way out.
-- **`sca viewport` answers what the person sees.** The image's path, age and size, copied
-  out with `--out`, instead of reading `.sca-editor/viewport.png` by hand.
-- **Cache entries are signed and verified again.** `cryptography` ships as a dependency,
-  so marimo's cache verification no longer silently degrades to off.
+- **Keyword `scad.var` is a parameter again.** `scad.var(name="j1", default=0.0)` is read
+  by the editor's parameter panel like the positional form; before, it was skipped.
 
-Full notes for this version: [`docs/updates/2.2.6.md`](docs/updates/2.2.6.md).
+Full notes for this version: [`docs/updates/2.2.6.post1.md`](docs/updates/2.2.6.post1.md).
 Earlier versions: the [changelog](CHANGELOG.md) and [`docs/updates/`](docs/updates/).
 
 ---
@@ -183,7 +178,7 @@ in a compact public API for creating solids, applying features, tagging semantic
 intent, querying topology, exporting manufacturing files, and translating recorded
 models into FreeCAD workflows.
 
-Current release: `simplecadapi==2.2.6`.
+Current release: `simplecadapi==2.2.6.post1`.
 
 ## What It Provides
 
@@ -698,6 +693,7 @@ and the [STEP reconstruction workflow](docs/skill/references/workflows/step-reco
 
 ## Documentation
 
+- 2.2.6.post1 update notes: [`docs/updates/2.2.6.post1.md`](docs/updates/2.2.6.post1.md)
 - 2.2.6 update notes: [`docs/updates/2.2.6.md`](docs/updates/2.2.6.md)
 - 2.2.5 update notes: [`docs/updates/2.2.5.md`](docs/updates/2.2.5.md)
 - 2.2.4 update notes: [`docs/updates/2.2.4.md`](docs/updates/2.2.4.md)
