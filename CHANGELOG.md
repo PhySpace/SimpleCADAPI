@@ -6,6 +6,14 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+### Changed
+
+- Cache: a cell that does `from lib.dims import A` now depends on the definition of `A` (and
+  what it reads, across local modules), not on the whole file. Editing another name of
+  `lib/dims.py`, a comment, or the formatting leaves the cell cached. A module the analysis
+  cannot prove (calls or loops at top level, star imports, a name defined twice, a plain
+  `import lib.dims`) still depends on the whole file.
+
 ## 2.2.6 — 2026-10-19
 
 ### Added

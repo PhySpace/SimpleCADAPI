@@ -18,7 +18,10 @@ reads.  It cannot see three kinds of dependency a SimpleCAD notebook has:
 *D* digests the current content of all these files, together with the
 versions of the software that writes the cache, and a run uses the cell
 cache stored under *D* only.  Any change to any of these files therefore
-invalidates the notebook's whole cache: coarse, but never stale.
+invalidates the cache of the cells that depend on it: coarse, but never
+stale.  A name a cell imports with ``from m import x`` is the exception: it
+is a dependency on the definition of ``x`` (:mod:`.names`), and falls back
+to the file when that cannot be digested.
 """
 
 from __future__ import annotations
@@ -289,13 +292,42 @@ class CellSource:
     """The names the cell defines (marimo's ``cell.defs``)."""
 
 
+@dataclass(frozen=True)
+class NameDep:
+    """A dependency on one name a cell imports from a local module.
+
+    ``from lib.dims import A`` depends on the definition of ``A`` (see
+    :mod:`.names`), not on the file; *fallback* is the files it depends on
+    instead when that definition cannot be digested.
+    """
+
+    module: str
+    name: str
+    fallback: frozenset[Path]
+
+
+@dataclass(frozen=True)
+class CellDeps:
+    """What a cell depends on outside its code."""
+
+    files: frozenset[Path]
+    names: frozenset[NameDep] = frozenset()
+
+    def __or__(self, other: CellDeps) -> CellDeps:
+        return CellDeps(self.files | other.files, self.names | other.names)
+
+
 def cell_module_files(
     config: NotebookConfig,
     setup: str | None,
     cells: Sequence[CellSource],
     recorded: Iterable[Path] = (),
-) -> dict[str, frozenset[Path]]:
-    """Return, per cell key, the local files whose content its result depends on.
+) -> dict[str, CellDeps]:
+    """Return, per cell key, what its result depends on in local files.
+
+    Names imported with ``from m import x`` from a local module are
+    dependencies on that name (:class:`NameDep`); every other dependency is
+    on whole files.  What follows describes the files.
 
     A cell depends on a local module when it reads a name that an ``import``
     in the notebook (the setup cell, or any cell) bound to that module, or
@@ -319,6 +351,7 @@ def cell_module_files(
         for name, modules in _import_bindings(root, source).items():
             bound.setdefault(name, set()).update(modules)
     star = bound.pop("*", set())
+    fine = _from_imports(root, sources)
 
     closures: dict[tuple[str, Path], frozenset[Path]] = {}
 
@@ -356,7 +389,7 @@ def cell_module_files(
 
     star_files = frozenset(path for module in star for path in closure(module))
     recorded_files = frozenset(recorded)
-    result: dict[str, frozenset[Path]] = {}
+    result: dict[str, CellDeps] = {}
     for cell in cells:
         names = set(cell.refs) | (cell.defs & bound.keys()) | _loaded_names(cell.code)
         needed: set[str] = set()
@@ -368,21 +401,31 @@ def cell_module_files(
         for name in cell.defs & reads.keys():
             needed |= reach(name, set())
         files: set[Path] = set(star_files)
+        named: set[NameDep] = set()
         for name in needed:
+            coarse: set[Path] = set()
             for module in bound.get(name, ()):
-                files |= closure(module)
+                coarse |= closure(module)
+            if name in fine:
+                module_name, original = fine[name]
+                named.add(NameDep(module_name, original, frozenset(coarse)))
+            else:
+                files |= coarse
         if calls_use(cell.code):
             files |= recorded_files
-        result[cell.key] = frozenset(files)
+        result[cell.key] = CellDeps(frozenset(files), frozenset(named))
 
     # marimo keys a cell that reads an object (a solid, a part) by the code of
     # the cells that made it, not by its value: a file an ancestor depends on
     # is one this cell depends on.
     reached = ancestors(cells)
-    return {
-        cell.key: frozenset(result[cell.key].union(*(result[key] for key in reached[cell.key])))
-        for cell in cells
-    }
+    merged: dict[str, CellDeps] = {}
+    for cell in cells:
+        deps = result[cell.key]
+        for key in reached[cell.key]:
+            deps = deps | result[key]
+        merged[cell.key] = deps
+    return merged
 
 
 def ancestors(cells: Sequence[CellSource]) -> dict[str, frozenset[str]]:
@@ -454,6 +497,43 @@ def _import_bindings(root: Path, source: str) -> dict[str, set[tuple[str, Path]]
                     modules += _module_files(root, f"{base}.{alias.name}")
                     bind(alias.asname or alias.name, modules)
     return bindings
+
+
+def _from_imports(root: Path, sources: Sequence[str]) -> dict[str, tuple[str, str]]:
+    """The names bound exactly once, by ``from m import x`` of a local module.
+
+    Name -> (m, x).  A name bound any other way, or to two things, or to a
+    submodule, is left out: it is a dependency on whole files.
+    """
+
+    found: dict[str, tuple[str, str] | None] = {}
+    for source in sources:
+        try:
+            tree = ast.parse(source)
+        except (SyntaxError, ValueError):
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    found[alias.asname or alias.name.split(".")[0]] = None
+            elif isinstance(node, ast.ImportFrom):
+                base = _absolute(node.module, node.level, "")
+                for alias in node.names:
+                    bound = alias.asname or alias.name
+                    if base is None or alias.name == "*" or not _is_local_module(root, base):
+                        found[bound] = None
+                    elif _is_local_module(root, f"{base}.{alias.name}"):
+                        found[bound] = None  # a submodule, not a name
+                    elif found.get(bound, (base, alias.name)) != (base, alias.name):
+                        found[bound] = None
+                    else:
+                        found[bound] = (base, alias.name)
+    return {name: target for name, target in found.items() if target is not None}
+
+
+def _is_local_module(root: Path, module: str) -> bool:
+    files = _module_files(root, module)
+    return bool(files) and files[-1][0] == module
 
 
 def _definitions(source: str) -> dict[str, set[str]]:
@@ -583,7 +663,9 @@ def _display(config: NotebookConfig, path: Path) -> str:
 
 
 __all__ = [
+    "CellDeps",
     "CellSource",
+    "NameDep",
     "ancestors",
     "calls_use",
     "cell_digest",

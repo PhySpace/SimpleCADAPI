@@ -41,6 +41,7 @@ from ._marimo import (
     Skip,
 )
 from .config import NotebookConfig
+from .names import names_tag
 from .deps import (
     CellSource,
     ancestors,
@@ -116,13 +117,14 @@ class CellDigests:
     def digest(self, cell_id: CellId_t) -> str | None:
         """The digest for *cell_id*, ``None`` for a cell that is not cached."""
 
-        files = self._files.get(cell_id)
-        if files is None:
+        deps = self._files.get(cell_id)
+        if deps is None:
             return None  # the setup cell
         if self._kernel and cell_id in self._uses:
             return None
-        tag = ("use" if cell_id in self._uses else "") + self._saved_tag.get(cell_id, "")
-        return cell_digest(self.config, files, tag=tag)
+        named, fallback = names_tag(self.config.directory, deps.names)
+        tag = ("use" if cell_id in self._uses else "") + self._saved_tag.get(cell_id, "") + named
+        return cell_digest(self.config, deps.files | fallback, tag=tag)
 
 
 class CellCache(CachedLifecycle):
