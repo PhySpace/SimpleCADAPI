@@ -13,6 +13,8 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 - Editor: the parameter panel reads `scad.var(name="j1", default=0.0, ...)` — the keyword
   form — as well as `scad.var("j1", 0.0, ...)`. Before, only the second positional argument
   was taken as the default, so keyword declarations never showed up as parameters.
+- Add-ons: `[compat] sca` ranges and the add-on commands accept a post-release version such as
+  `2.2.6.post1` (it sorts after `2.2.6` and before `2.2.7`); the parser rejected it.
 
 ### Changed
 
