@@ -89,3 +89,7 @@ sandbox-envs/
 .agents/
 .sharednet/
 design-docs/
+
+# local, not part of the SDK
+examples/workspace/
+phase2-contract-review.md
