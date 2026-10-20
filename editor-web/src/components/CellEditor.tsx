@@ -19,6 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ParamControl, type ParamMeta, type ParamValue } from "@/components/ParamControl";
+import { createSettler, SETTLE_MS } from "@/lib/settle";
 import { cadTheme } from "@/lib/cm-theme";
 import { sdkCompletion } from "@/lib/sdk-complete";
 import { cn } from "@/lib/utils";
@@ -205,17 +206,16 @@ export function CellEditor({
     );
   };
 
-  // Forward slider bursts; the server coalesces (latest-wins rebuild).
-  const pendingParams = useRef(new Map<string, ParamValue>());
-  const paramTimer = useRef<number | null>(null);
-  const forwardParam = (id: string, value: ParamValue) => {
-    pendingParams.current.set(id, value);
-    if (paramTimer.current !== null) return;
-    paramTimer.current = window.setTimeout(() => {
-      paramTimer.current = null;
-      socket?.send({ type: "param.set", values: Object.fromEntries(pendingParams.current) });
-      pendingParams.current.clear();
-    }, 60);
+  // A drag is sent when it pauses or ends, not step by step: every value the
+  // server gets is a rebuild.
+  const socketRef = useRef(socket);
+  socketRef.current = socket;
+  const settler = useRef(
+    createSettler<ParamValue>(SETTLE_MS, (values) => socketRef.current?.send({ type: "param.set", values })),
+  );
+  const forwardParam = (id: string, value: ParamValue, now = false) => {
+    settler.current.push(id, value);
+    if (now) settler.current.flush();
   };
 
   // Disarm delete when clicking anywhere outside the armed button.
@@ -364,7 +364,7 @@ function CellBlock({
   live: boolean;
   armed: boolean;
   socket: SocketLike;
-  forwardParam: (id: string, value: ParamValue) => void;
+  forwardParam: (id: string, value: ParamValue, now?: boolean) => void;
   onToggle: () => void;
   onRun: () => void;
   onInterrupt: () => void;
