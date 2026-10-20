@@ -682,3 +682,55 @@ def _private_helper():
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPublicApiIsDocumented(unittest.TestCase):
+    """Whatever the package exports has a doc, and the docs are what the
+    generator writes: a new module cannot be left out of the generator's
+    list, and a docstring cannot change without the docs following."""
+
+    ROOT = Path(__file__).resolve().parents[1]
+    PACKAGE = ROOT / "src/simplecadapi"
+    DOCS = ROOT / "docs/skill/references/docs/api"
+
+    def test_every_operators_module_is_scanned(self):
+        scanned = {path.resolve() for path in auto_docs_gen._default_source_files(self.PACKAGE)}
+        for path in sorted((self.PACKAGE / "operators").glob("*.py")):
+            if path.name.startswith("_"):
+                continue
+            self.assertIn(path.resolve(), scanned, f"{path.name} is not documented by the generator")
+
+    def test_every_public_operator_function_has_its_doc(self):
+        import inspect
+
+        import simplecadapi
+
+        missing = []
+        for name in simplecadapi.__all__:
+            obj = getattr(simplecadapi, name, None)
+            # an alias (cut = cut_rsolid) is documented under its real name
+            if not inspect.isfunction(obj) or obj.__name__ != name:
+                continue
+            source = Path(inspect.getsourcefile(obj)).resolve()
+            if (self.PACKAGE / "operators") not in source.parents or source.name.startswith("_"):
+                continue
+            if not (self.DOCS / f"{name}.md").is_file():
+                missing.append(name)
+        self.assertEqual(missing, [])
+
+    def test_the_committed_docs_are_what_the_generator_writes(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            out = Path(tmp_dir) / "api"
+            generator = auto_docs_gen.APIDocumentGenerator(
+                source_files=auto_docs_gen._resolve_source_files(None),
+                output_dirs=[out],
+                clean_stale=True,
+                quiet=True,
+            )
+            generator.extract_apis()
+            generator.generate_markdown_docs()
+            generated = {path.name: path.read_text(encoding="utf-8") for path in out.glob("*.md")}
+        committed = {path.name: path.read_text(encoding="utf-8") for path in self.DOCS.glob("*.md")}
+        self.assertEqual(sorted(set(generated) ^ set(committed)), [], "files differ; run tools/auto_docs_gen.py")
+        stale = sorted(name for name in committed if committed[name] != generated[name])
+        self.assertEqual(stale, [], "docs out of date; run tools/auto_docs_gen.py")

@@ -1,53 +1,75 @@
 # extrude_until_rsolid
 
+## API Definition
+
 ```python
-def extrude_until_rsolid(
-    profile: Face,
-    target: Solid | Sequence[Solid],
-    direction: Sequence[float] = (0, 0, 1),
-    until: str = "NEXT",
-) -> Solid
+def extrude_until_rsolid(profile: Face, target: Solid | Sequence[Solid], direction: Sequence[float] = (0, 0, 1), until: str = 'NEXT') -> Solid
 ```
 
-*Source: operators/limited_extrusion.py*
+*Source: operators/features.py*
 
-Import with `from simplecadapi import extrude_until_rsolid`.
+## Import Surface
 
-Extrude a planar face until it reaches an actual boundary on one or more target
-solids. Planar and curved termination surfaces are supported. The direction is
-interpreted in the current coordinate system and normalized before construction.
+- top-level: `from simplecadapi import extrude_until_rsolid`
 
-| Mode | Direction | Termination |
-| --- | --- | --- |
-| `NEXT` | Forward | Nearest intersecting target surface |
-| `LAST` | Forward | Farthest intersecting target surface |
-| `PREVIOUS` | Reverse | Nearest intersecting target surface |
-| `FIRST` | Reverse | Farthest intersecting target surface |
+## Description
 
-The implementation intersects a temporary prism with the target, obtains target
-boundary faces from kernel history, sews the contact faces into surfaces, and
-splits the prism on the selected surface. Bounding boxes only determine a
-sufficient temporary prism length; they do not define the termination surface.
-Side walls parallel to the direction do not join separate near and far limits.
+Extrude a planar face until a target surface, including curved surfaces.
+
+The direction is interpreted in the current coordinate system and
+normalized before construction. ``until`` selects the termination:
+``NEXT`` (forward, nearest intersecting target surface), ``LAST`` (forward,
+farthest), ``PREVIOUS`` (reverse, nearest) and ``FIRST`` (reverse,
+farthest). The temporary prism is intersected with the target, the target's
+boundary faces are taken from kernel history and sewn into surfaces, and
+the prism is split on the selected one. Bounding boxes only size the
+temporary prism; they do not define the termination surface, and side
+walls parallel to the direction do not join separate near and far limits.
+
+Targets must cover the profile at the requested contact: an uncovered,
+open or disconnected output is rejected, as are a missing contact, an
+invalid mode, a zero or nonfinite direction and an empty target sequence.
+Inputs are preserved. The operation is recorded as
+``make_extrude_until_rsolid``; its ordered inputs are the profile followed
+by every target solid and its parameters keep ``direction``, ``until`` and
+``target_count``, so a changed target is recomputed on replay (no final
+BRep is embedded).
+
+## Parameters
+
+### profile
+
+- **Description**: The planar face to extrude.
+
+### target
+
+- **Description**: A solid, or a sequence of solids, that bounds the extrusion.
+
+### direction
+
+- **Description**: Extrusion direction in current coordinate-system coordinates.
+
+### until
+
+- **Description**: ``"NEXT"``, ``"LAST"``, ``"PREVIOUS"`` or ``"FIRST"``.
+
+## Returns
+
+One valid solid.
+
+## Raises
+
+- **TypeError**: ``profile`` is not a Face, or ``target`` is not a Solid or a sequence of Solid.
+- **ValueError**: No target, no contact, insufficient coverage, a bad mode or direction, or an invalid kernel result.
+
+## Examples
 
 ```python
 import simplecadapi as scad
-
 profile = scad.make_rectangle_rface(2, 2)
 ceiling = scad.make_box_rsolid(10, 10, 2, bottom_face_center=(0, 0, 5))
-near = scad.extrude_until_rsolid(profile, ceiling, until="NEXT")  # Volume 20
-far = scad.extrude_until_rsolid(profile, ceiling, until="LAST")   # Volume 28
-
+near = scad.extrude_until_rsolid(profile, ceiling, until="NEXT")  # volume 20
+far = scad.extrude_until_rsolid(profile, ceiling, until="LAST")  # volume 28
 sphere = scad.make_sphere_rsolid(5, center=(0, 0, 10))
 curved = scad.extrude_until_rsolid(profile, sphere)
 ```
-
-Targets must cover the profile at the requested contact. Missing contact,
-insufficient coverage, an invalid mode, a zero/nonfinite direction, and invalid
-kernel output raise errors. An empty target sequence is rejected. A successful
-result is one valid solid; inputs are preserved.
-
-The recorded operation is `make_extrude_until_rsolid`. Its ordered inputs are the
-profile followed by every target solid. Parameters retain `direction`, `until`,
-and `target_count`, so model JSON replay recomputes the boundary when a target
-changes. No final BRep is embedded in the feature.

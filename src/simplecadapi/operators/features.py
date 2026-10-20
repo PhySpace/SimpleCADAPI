@@ -11,6 +11,23 @@ from ._diagnostics import (
     raise_open_wire_failure,
     render_failure_evidence,
 )
+from ..kernel.ocp_properties import center_of_mass, distance, volume
+from ..kernel.ocp_topology import faces_of
+from OCP.BRepAdaptor import BRepAdaptor_Surface
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut, BRepAlgoAPI_Splitter
+from OCP.BRepBuilderAPI import BRepBuilderAPI_Sewing, BRepBuilderAPI_Transform
+from OCP.BRepGProp import BRepGProp, BRepGProp_Face
+from OCP.BRepOffsetAPI import BRepOffsetAPI_DraftAngle, BRepOffsetAPI_MakeOffset, BRepOffsetAPI_MakePipeShell, BRepOffsetAPI_MakeThickSolid, BRepOffsetAPI_ThruSections
+from OCP.BRepPrimAPI import BRepPrimAPI_MakeHalfSpace, BRepPrimAPI_MakePrism
+from OCP.BRepTools import BRepTools
+from OCP.GProp import GProp_GProps
+from OCP.GeomAbs import GeomAbs_Arc, GeomAbs_Cone, GeomAbs_Cylinder, GeomAbs_Intersection, GeomAbs_Plane
+from OCP.LocOpe import LocOpe_DPrism
+from OCP.TopAbs import TopAbs_COMPOUND, TopAbs_FACE, TopAbs_SHELL, TopAbs_WIRE
+from OCP.TopExp import TopExp_Explorer
+from OCP.TopTools import TopTools_ListOfShape
+from OCP.TopoDS import TopoDS_Iterator
+from OCP.gp import gp_Pln, gp_Trsf, gp_Vec
 from ._support import *
 from .geometry import (
     _default_plane_x_direction,
@@ -1376,5 +1393,502 @@ def helical_sweep_rsolid(
             ],
             error=e,
         )
+
+
+def offset_rsolid(
+    solid: Solid,
+    amount: ScalarLike,
+    openings: Sequence[Face] | ShapeSelector = (),
+    *,
+    tolerance: float = 1e-4,
+    kind: str = "ARC",
+) -> Solid:
+    """Offset a solid outward (positive) or inward (negative).
+
+    The amount must be finite and nonzero. Faces passed as ``openings`` form an
+    open shell; with no openings the result is the closed offset solid. The
+    join ``kind`` is ``ARC`` or ``INTERSECTION``. Invalid kernel results raise
+    an error. The operation is recorded as ``make_offset_rsolid`` with explicit
+    face selections; topology tag lineage is conservatively partial.
+    ``shell_rsolid`` keeps its own contract (a positive inward wall thickness);
+    this one supports both signs.
+
+    Args:
+        solid: The solid to offset.
+        amount: Offset distance; positive outward, negative inward.
+        openings: Faces of ``solid`` (or a QL selector) left open.
+        tolerance: Kernel tolerance of the offset.
+        kind: Join type, ``"ARC"`` or ``"INTERSECTION"``.
+
+    Returns:
+        The offset solid.
+
+    Raises:
+        ValueError: ``amount`` is zero or not finite, ``tolerance`` is not
+            finite and positive, ``kind`` is unknown, ``openings`` do not select
+            faces, or the kernel produced an invalid result.
+    """
+    distance = evaluate_scalar(amount)
+    if not math.isfinite(distance) or distance == 0:
+        raise ValueError("amount must be finite and nonzero")
+    if not math.isfinite(tolerance) or tolerance <= 0:
+        raise ValueError("tolerance must be finite and positive")
+    joins = {"ARC": GeomAbs_Arc, "INTERSECTION": GeomAbs_Intersection}
+    if kind not in joins:
+        raise ValueError("kind must be ARC or INTERSECTION")
+    faces = list(_resolve_selector_or_shapes(solid, openings))
+    if any(not isinstance(face, Face) for face in faces):
+        raise ValueError("openings must select faces")
+    selected_ids = _ensure_geo_selection_node_ids(solid, faces)
+    face_list = TopTools_ListOfShape()
+    for face in faces:
+        face_list.Append(face.wrapped)
+    builder = BRepOffsetAPI_MakeThickSolid()
+    builder.MakeThickSolidByJoin(solid.wrapped, face_list, distance, tolerance,
+                                Intersection=True, RemoveIntEdges=True, Join=joins[kind])
+    builder.Build()
+    if not builder.IsDone():
+        raise ValueError("kernel could not offset the solid")
+    params = {"amount": amount, "tolerance": tolerance, "kind": kind,
+              "removed_face_count": len(faces), "selected_faces": _serialize_shape_refs(faces)}
+    if selected_ids:
+        params["selected_face_node_ids"] = selected_ids
+    return _finish(solid, builder.Shape(), "make_offset_rsolid", params, [solid, *faces])
+
+
+def draft_rsolid(
+    solid: Solid,
+    faces_to_draft: Sequence[Face] | ShapeSelector,
+    angle: ScalarLike,
+    plane_origin: Sequence[float] = (0, 0, 0),
+    plane_normal: Sequence[float] = (0, 0, 1),
+) -> Solid:
+    """Draft planar, cylindrical or conical faces by a signed angle in degrees.
+
+    The neutral plane fixes the unchanged section: the selected faces lean
+    toward or away from it. Its origin and normal are in current
+    coordinate-system coordinates. Face selection is checked against the input
+    body and retained as graph inputs for strict replay. The input solid is
+    preserved, the output must be one valid solid, and a zero angle records an
+    unchanged result. Other surface families are explicitly rejected.
+
+    The operation is recorded as ``make_draft_rsolid``; the body and selected
+    faces are ordered inputs, and the angle, neutral plane and face selection
+    nodes are parameters, so model JSON replay is strict.
+
+    Args:
+        solid: The body to draft.
+        faces_to_draft: Faces of ``solid``, or a QL selector that picks them.
+        angle: Draft angle in degrees, strictly between -90 and 90.
+        plane_origin: A point of the neutral plane.
+        plane_normal: Normal of the neutral plane; must be nonzero.
+
+    Returns:
+        The drafted solid.
+
+    Raises:
+        TypeError: ``solid`` is not a Solid.
+        ValueError: Empty selection, a selection that is not made of faces of
+            ``solid``, an unsupported surface family, a zero plane normal, or
+            a nonfinite or out-of-range angle.
+
+    Examples:
+        import simplecadapi as scad
+        from simplecadapi import ql
+        body = scad.make_box_rsolid(10, 10, 10)
+        right = ql.faces().where(ql.prop("geom.normal.x", ">", 0.9)).exactly(1)
+        drafted = scad.draft_rsolid(body, right, angle=10)
+    """
+    if not isinstance(solid, Solid):
+        raise TypeError("solid must be a Solid")
+    degrees = float(evaluate_scalar(angle))
+    if not math.isfinite(degrees) or abs(degrees) >= 90:
+        raise ValueError("angle must be finite and strictly between -90 and 90 degrees")
+    origin = _finite_vector(plane_origin, "plane_origin")
+    normal = _finite_vector(plane_normal, "plane_normal")
+    cs = get_current_cs()
+    global_origin = cs.transform_point(np.asarray(origin))
+    global_normal = cs.transform_vector(np.asarray(normal))
+    magnitude = float(np.linalg.norm(global_normal))
+    if magnitude <= 1e-14:
+        raise ValueError("plane_normal must be nonzero")
+    global_normal = global_normal / magnitude
+    selected = list(_resolve_selector_or_shapes(solid, faces_to_draft))
+    if not selected:
+        raise ValueError("draft requires at least one selected face")
+    original_faces = solid._iter_faces()
+    for face in selected:
+        if not isinstance(face, Face):
+            raise ValueError("faces_to_draft must select only Face objects")
+        if not any(face.wrapped.IsSame(other.wrapped) for other in original_faces):
+            raise ValueError("selected draft faces must belong to the input solid")
+        if BRepAdaptor_Surface(face.wrapped).GetType() not in {GeomAbs_Plane, GeomAbs_Cylinder, GeomAbs_Cone}:
+            raise ValueError("draft supports only planar, cylindrical, and conical faces")
+    # Remove repeated references without changing the ordered face selection.
+    selected = list({face.topo_id: face for face in selected}.values())
+    selected_ids = _ensure_geo_selection_node_ids(solid, selected)
+    if degrees == 0:
+        shape = solid.wrapped
+    else:
+        direction = gp_Dir(*global_normal)
+        plane = gp_Pln(gp_Pnt(*global_origin), direction)
+        builder = BRepOffsetAPI_DraftAngle(solid.wrapped)
+        for face in selected:
+            builder.Add(face.wrapped, direction, math.radians(degrees), plane, True)
+            if not builder.AddDone():
+                raise ValueError("kernel could not add the requested draft angle to a selected face")
+        builder.Build()
+        if not builder.IsDone():
+            raise ValueError("kernel could not build the drafted solid")
+        shape = builder.Shape()
+    params = {"angle": angle, "plane_origin": plane_origin, "plane_normal": plane_normal,
+              "selected_face_count": len(selected), "selected_faces": _serialize_shape_refs(selected)}
+    if selected_ids:
+        params["selected_face_node_ids"] = selected_ids
+    return _finish(solid, shape, "make_draft_rsolid", params, [solid, *selected])
+
+
+def extrude_taper_rsolid(
+    profile: Face,
+    vector: Sequence[float],
+    taper: float,
+    flip_inner: bool = True,
+) -> Solid:
+    """Extrude a planar sketch face by a vector, with a taper in degrees.
+
+    The vector is nonzero and in current coordinate-system coordinates. The
+    finite taper angle lies strictly between -90 and 90; a positive taper
+    shrinks the outer section, and inner loops taper the opposite way when
+    ``flip_inner`` is true. An analytic draft prism is used where applicable
+    and exact offset sections with lofts otherwise. Collapsed loops and invalid
+    topology raise errors. The operation is recorded as
+    ``make_extrude_taper_rsolid`` for replay.
+
+    Args:
+        profile: The planar face to extrude.
+        vector: Extrusion vector (nonzero).
+        taper: Taper angle in degrees, strictly between -90 and 90.
+        flip_inner: Taper inner loops in the opposite direction.
+
+    Returns:
+        The tapered solid.
+
+    Raises:
+        ValueError: A zero vector, an out-of-range taper, a nonplanar profile,
+            collapsed loops or an invalid result.
+    """
+    values = _finite_vector(vector, "vector")
+    angle = float(evaluate_scalar(taper))
+    if not math.isfinite(angle) or abs(angle) >= 90:
+        raise ValueError("taper must be finite and between -90 and 90 degrees")
+    displacement = get_current_cs().transform_vector(np.asarray(values))
+    length = float(np.linalg.norm(displacement))
+    if length <= 1e-12:
+        raise ValueError("extrusion vector must be nonzero")
+    surface = BRepAdaptor_Surface(profile.wrapped, True)
+    if surface.GetType() != GeomAbs_Plane:
+        raise ValueError("taper extrusion requires a planar profile")
+    normal = np.asarray(tuple(profile.get_normal_at()), dtype=float)
+    outer = BRepTools.OuterWire_s(profile.wrapped)
+    wires = [outer]
+    explorer = TopExp_Explorer(profile.wrapped, TopAbs_WIRE)
+    while explorer.More():
+        wire = TopoDS.Wire_s(explorer.Current())
+        if not wire.IsSame(outer):
+            wires.append(wire)
+        explorer.Next()
+    if angle == 0:
+        shape = BRepPrimAPI_MakePrism(profile.wrapped, gp_Vec(*displacement)).Shape()
+    elif np.linalg.norm(displacement / length - normal) < 1e-8 and normal[2] > 0 and len(wires) == 1 and angle > 0:
+        shape = LocOpe_DPrism(profile.wrapped, length / math.cos(math.radians(angle)), math.radians(angle)).Shape()
+    else:
+        # Offset in the profile plane before translating the final section.
+        move = gp_Trsf()
+        move.SetTranslation(gp_Vec(*displacement))
+        solids = []
+        for i, wire in enumerate(wires):
+            # Face inner wires wind opposite to the outer boundary. Normalize
+            # their winding before applying the signed 2-D offset so that
+            # flip_inner controls geometry rather than kernel wire orientation.
+            if i:
+                wire = TopoDS.Wire_s(wire.Reversed())
+            offset = -length * math.tan(math.radians(angle)) * (-1 if i and flip_inner else 1)
+            builder = BRepOffsetAPI_MakeOffset(wire, GeomAbs_Intersection, False)
+            builder.Perform(offset)
+            if not builder.IsDone():
+                raise ValueError("taper collapses a profile loop")
+            offset_shape = builder.Shape()
+            exp = TopExp_Explorer(offset_shape, TopAbs_WIRE)
+            found = []
+            while exp.More():
+                found.append(TopoDS.Wire_s(exp.Current()))
+                exp.Next()
+            if len(found) != 1:
+                raise ValueError("taper changes loop connectivity")
+            moved = BRepBuilderAPI_Transform(found[0], move, True).Shape()
+            loft = BRepOffsetAPI_ThruSections(True, False)
+            loft.AddWire(wire)
+            loft.AddWire(TopoDS.Wire_s(moved))
+            loft.Build()
+            if not loft.IsDone():
+                raise ValueError("kernel could not build tapered sections")
+            solids.append(loft.Shape())
+        shape = solids[0]
+        for tool in solids[1:]:
+            cut = BRepAlgoAPI_Cut(shape, tool)
+            cut.Build()
+            if not cut.IsDone():
+                raise ValueError("kernel could not subtract tapered inner loop")
+            shape = cut.Shape()
+    return _finish(profile, shape, "make_extrude_taper_rsolid",
+                   {"vector": vector, "taper": taper, "flip_inner": flip_inner}, [profile])
+
+
+def sweep_multisection_rsolid(
+    profiles: Sequence[Face | Wire],
+    path: Wire,
+    is_frenet: bool = False,
+    binormal: Sequence[float] | Wire | None = None,
+) -> Solid:
+    """Sweep through explicit ordered sections along a continuous path.
+
+    At least two ordered sections are needed. Face sections supply their outer
+    wire, matching build123d's multi-section sweep contract. ``binormal`` is an
+    optional direction vector or an auxiliary spine. The kernel must produce
+    one valid solid. Every section and the path are recorded as inputs of
+    ``make_sweep_multisection_rsolid``, so model JSON preserves the
+    construction.
+
+    Args:
+        profiles: Ordered section faces or wires (at least two).
+        path: The continuous path wire.
+        is_frenet: Use the Frenet frame along the path.
+        binormal: A direction, or an auxiliary spine wire, that fixes the
+            section orientation.
+
+    Returns:
+        The swept solid.
+
+    Raises:
+        TypeError: A section is neither a Face nor a Wire.
+        ValueError: Fewer than two sections, a zero ``binormal`` direction, or
+            the kernel could not make a solid.
+    """
+    sections = list(profiles)
+    if len(sections) < 2:
+        raise ValueError("multi-section sweep requires at least two sections")
+    builder = BRepOffsetAPI_MakePipeShell(path.wrapped)
+    rotate = False
+    if isinstance(binormal, Wire):
+        builder.SetMode(binormal.wrapped, True)
+    elif binormal is not None:
+        values = _finite_vector(binormal, "binormal")
+        direction = get_current_cs().transform_vector(np.asarray(values))
+        if np.linalg.norm(direction) < 1e-12:
+            raise ValueError("binormal direction must be nonzero")
+        builder.SetMode(gp_Dir(*direction))
+        rotate = True
+    else:
+        builder.SetMode(bool(is_frenet))
+    for section in sections:
+        if not isinstance(section, (Face, Wire)):
+            raise TypeError("sections must be Face or Wire")
+        wire = BRepTools.OuterWire_s(section.wrapped) if isinstance(section, Face) else section.wrapped
+        builder.Add(wire, False, rotate)
+    builder.Build()
+    if not builder.IsDone() or not builder.MakeSolid():
+        raise ValueError("kernel could not make a solid multi-section sweep")
+    inputs = [*sections, path]
+    params = {"profile_count": len(sections), "is_frenet": bool(is_frenet), "binormal": None}
+    if isinstance(binormal, Wire):
+        inputs.append(binormal)
+        params["binormal_is_wire"] = True
+    elif binormal is not None:
+        params["binormal"] = binormal
+    return _finish(sections[0], builder.Shape(), "make_sweep_multisection_rsolid", params, inputs)
+
+
+def _top_level(shape):
+    if shape.ShapeType() != TopAbs_COMPOUND:
+        return [shape]
+    output = []
+    iterator = TopoDS_Iterator(shape)
+    while iterator.More():
+        output.extend(_top_level(iterator.Value()))
+        iterator.Next()
+    return output
+
+
+def _crosses_direction(face, axis):
+    """Ignore side walls tangent to the extrusion, including coincident walls."""
+    u0, u1, v0, v1 = BRepTools.UVBounds_s(face)
+    properties = BRepGProp_Face(face)
+    for u in (.25, .5, .75):
+        for v in (.25, .5, .75):
+            point, normal = gp_Pnt(), gp_Vec()
+            properties.Normal(u0 + u * (u1-u0), v0 + v * (v1-v0), point, normal)
+            length = normal.Magnitude()
+            if length > 1e-14 and abs(normal.X()*axis[0] + normal.Y()*axis[1] + normal.Z()*axis[2]) / length > 1e-8:
+                return True
+    return False
+
+
+def _contact_surfaces(target, prism, axis):
+    common = BRepAlgoAPI_Common(target, prism)
+    common.Build()
+    if not common.IsDone() or not faces_of(common.Shape()):
+        raise ValueError("No intersection: extrusion does not contact target")
+    history = common.History()
+    modified = []
+    intersection_faces = faces_of(common.Shape())
+    for face in faces_of(target):
+        affected = list(history.Modified(face))
+        if affected:
+            modified.extend(TopoDS.Face_s(item) for item in affected if item.ShapeType() == TopAbs_FACE)
+        elif not history.IsRemoved(face) and any(item.IsSame(face) for item in intersection_faces):
+            # A whole target may lie inside the temporary prism, in which case
+            # unchanged boundary faces are still genuine contact surfaces.
+            modified.append(face)
+    if not modified:
+        raise ValueError("No target boundary surfaces found in extrusion intersection")
+    sewing = BRepBuilderAPI_Sewing(1e-6)
+    for face in modified:
+        if _crosses_direction(face, axis):
+            sewing.Add(face)
+    sewing.Perform()
+    surfaces = _top_level(sewing.SewedShape())
+    if not surfaces or any(part.ShapeType() not in {TopAbs_FACE, TopAbs_SHELL} for part in surfaces):
+        raise ValueError("Kernel could not sew target contact surfaces")
+    return surfaces
+
+
+def _split_on_surface(prism, surface, keep_top):
+    arguments, tools = TopTools_ListOfShape(), TopTools_ListOfShape()
+    arguments.Append(prism)
+    tools.Append(surface)
+    splitter = BRepAlgoAPI_Splitter()
+    splitter.SetArguments(arguments)
+    splitter.SetTools(tools)
+    splitter.Build()
+    if not splitter.IsDone():
+        raise ValueError("Kernel could not split extrusion on target surface")
+    reference_face = TopoDS.Face_s(surface) if surface.ShapeType() == TopAbs_FACE else faces_of(surface)[0]
+    u0, u1, v0, v1 = BRepTools.UVBounds_s(reference_face)
+    point, normal = gp_Pnt(), gp_Vec()
+    BRepGProp_Face(reference_face).Normal((u0+u1)/2, (v0+v1)/2, point, normal)
+    if normal.Magnitude() <= 1e-14:
+        raise ValueError("Undefined normal on termination surface")
+    normal.Normalize()
+    reference = point.Translated(normal)
+    if surface.ShapeType() == TopAbs_FACE:
+        halfspace = BRepPrimAPI_MakeHalfSpace(TopoDS.Face_s(surface), reference).Solid()
+    else:
+        halfspace = BRepPrimAPI_MakeHalfSpace(TopoDS.Shell_s(surface), reference).Solid()
+    candidates = []
+    for part in solids_of(splitter.Shape()):
+        common = BRepAlgoAPI_Common(part, halfspace)
+        common.Build()
+        if not common.IsDone():
+            raise ValueError("Kernel could not classify the termination side")
+        properties = GProp_GProps()
+        BRepGProp.LinearProperties_s(common.Shape(), properties)
+        is_top = properties.Mass() >= 1e-6
+        if is_top == keep_top:
+            candidates.append(part)
+    return candidates
+
+
+def extrude_until_rsolid(
+    profile: Face,
+    target: Solid | Sequence[Solid],
+    direction: Sequence[float] = (0, 0, 1),
+    until: str = "NEXT",
+) -> Solid:
+    """Extrude a planar face until a target surface, including curved surfaces.
+
+    The direction is interpreted in the current coordinate system and
+    normalized before construction. ``until`` selects the termination:
+    ``NEXT`` (forward, nearest intersecting target surface), ``LAST`` (forward,
+    farthest), ``PREVIOUS`` (reverse, nearest) and ``FIRST`` (reverse,
+    farthest). The temporary prism is intersected with the target, the target's
+    boundary faces are taken from kernel history and sewn into surfaces, and
+    the prism is split on the selected one. Bounding boxes only size the
+    temporary prism; they do not define the termination surface, and side
+    walls parallel to the direction do not join separate near and far limits.
+
+    Targets must cover the profile at the requested contact: an uncovered,
+    open or disconnected output is rejected, as are a missing contact, an
+    invalid mode, a zero or nonfinite direction and an empty target sequence.
+    Inputs are preserved. The operation is recorded as
+    ``make_extrude_until_rsolid``; its ordered inputs are the profile followed
+    by every target solid and its parameters keep ``direction``, ``until`` and
+    ``target_count``, so a changed target is recomputed on replay (no final
+    BRep is embedded).
+
+    Args:
+        profile: The planar face to extrude.
+        target: A solid, or a sequence of solids, that bounds the extrusion.
+        direction: Extrusion direction in current coordinate-system
+            coordinates.
+        until: ``"NEXT"``, ``"LAST"``, ``"PREVIOUS"`` or ``"FIRST"``.
+
+    Returns:
+        One valid solid.
+
+    Raises:
+        TypeError: ``profile`` is not a Face, or ``target`` is not a Solid or
+            a sequence of Solid.
+        ValueError: No target, no contact, insufficient coverage, a bad mode
+            or direction, or an invalid kernel result.
+
+    Examples:
+        import simplecadapi as scad
+        profile = scad.make_rectangle_rface(2, 2)
+        ceiling = scad.make_box_rsolid(10, 10, 2, bottom_face_center=(0, 0, 5))
+        near = scad.extrude_until_rsolid(profile, ceiling, until="NEXT")  # volume 20
+        far = scad.extrude_until_rsolid(profile, ceiling, until="LAST")  # volume 28
+        sphere = scad.make_sphere_rsolid(5, center=(0, 0, 10))
+        curved = scad.extrude_until_rsolid(profile, sphere)
+    """
+    if not isinstance(profile, Face):
+        raise TypeError("profile must be a Face")
+    targets = [target] if isinstance(target, Solid) else list(target)
+    if not targets:
+        raise ValueError("target must contain at least one Solid")
+    if any(not isinstance(item, Solid) for item in targets):
+        raise TypeError("target must be a Solid or a sequence of Solid")
+    mode = str(getattr(until, "name", until)).upper()
+    if mode not in {"NEXT", "LAST", "PREVIOUS", "FIRST"}:
+        raise ValueError("until must be NEXT, LAST, PREVIOUS, or FIRST")
+    values = _finite_vector(direction, "direction")
+    global_direction = get_current_cs().transform_vector(np.asarray(values))
+    magnitude = float(np.linalg.norm(global_direction))
+    if not math.isfinite(magnitude) or magnitude <= 1e-14:
+        raise ValueError("direction must be a finite nonzero vector")
+    axis = global_direction / magnitude
+    if mode in {"PREVIOUS", "FIRST"}:
+        axis = -axis
+    bound_target = make_compound_always([item.wrapped for item in targets])
+    box = bounding_box(make_compound_always([profile.wrapped, bound_target]))
+    length = math.sqrt((box.xmax-box.xmin)**2 + (box.ymax-box.ymin)**2 + (box.zmax-box.zmin)**2)
+    if length <= 1e-12:
+        raise ValueError("Degenerate profile and target bounds")
+    prism = BRepPrimAPI_MakePrism(profile.wrapped, gp_Vec(*(axis * length))).Shape()
+    surfaces = sorted(_contact_surfaces(bound_target, prism, axis), key=lambda part: distance(part, profile.wrapped))
+    nearest = mode in {"NEXT", "PREVIOUS"}
+    surface = surfaces[0] if nearest else surfaces[-1]
+    candidates = _split_on_surface(prism, surface, keep_top=nearest)
+    if not candidates:
+        raise ValueError("Extrusion produced no solid on the requested side of the target")
+    origin = np.asarray(tuple(center_of_mass(profile.wrapped)))
+    chosen = min(candidates, key=lambda part: np.dot(np.asarray(tuple(center_of_mass(part))) - origin, axis))
+    if abs(volume(chosen) - volume(prism)) <= max(1e-8, abs(volume(prism))*1e-9):
+        raise ValueError("Target termination surface does not completely cover the extrusion profile")
+    if volume(chosen) <= 1e-12 or not BRepCheck_Analyzer(chosen).IsValid():
+        raise ValueError("Target surface did not completely cover a valid limited extrusion")
+    result = _finish(profile, chosen, "make_extrude_until_rsolid",
+                     {"direction": direction, "until": mode, "target_count": len(targets)}, [profile, *targets])
+    result._apply_tag("solid.extrusion", propagate=False)
+    return result
 
 __all__ = tuple(name for name in globals() if not name.startswith("__"))
