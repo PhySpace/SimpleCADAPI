@@ -13,24 +13,24 @@ from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 import numpy as np
-from OCP.BRep import BRep_Builder, BRep_Tool
-from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Section
-from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
-from OCP.BRepExtrema import BRepExtrema_DistShapeShape
-from OCP.BRepGProp import BRepGProp
-from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
-from OCP.GProp import GProp_GProps
-from OCP.TopAbs import (
+from simplecadapi._cpp.occt.BRep import BRep_Builder, BRep_Tool
+from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
+from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Section
+from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
+from simplecadapi._cpp.occt.BRepExtrema import BRepExtrema_DistShapeShape
+from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+from simplecadapi._cpp.occt.BRepTools import BRepTools, BRepTools_WireExplorer
+from simplecadapi._cpp.occt.GProp import GProp_GProps
+from simplecadapi._cpp.occt.TopAbs import (
     TopAbs_EDGE,
     TopAbs_FACE,
     TopAbs_REVERSED,
     TopAbs_VERTEX,
     TopAbs_WIRE,
 )
-from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopTools import TopTools_IndexedMapOfShape
-from OCP.TopoDS import (
+from simplecadapi._cpp.occt.TopExp import TopExp, TopExp_Explorer
+from simplecadapi._cpp.occt.TopTools import TopTools_IndexedMapOfShape
+from simplecadapi._cpp.occt.TopoDS import (
     TopoDS,
     TopoDS_Compound,
     TopoDS_Edge,
@@ -38,7 +38,7 @@ from OCP.TopoDS import (
     TopoDS_Shape,
     TopoDS_Wire,
 )
-from OCP.gp import gp_Dir, gp_Pln, gp_Pnt
+from simplecadapi._cpp.occt.gp import gp_Dir, gp_Pln, gp_Pnt
 
 from .io import xyz
 from .model import (

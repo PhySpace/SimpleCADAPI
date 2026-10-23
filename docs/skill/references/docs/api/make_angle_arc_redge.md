@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_angle_arc_redge(center: Tuple[float, float, float], radius: ScalarLike, start_angle: ScalarLike, end_angle: ScalarLike, normal: Tuple[float, float, float] = (0, 0, 1)) -> Edge
+def make_angle_arc_redge(center, radius, start_angle, end_angle, normal=(0, 0, 1))
 ```
 
 *Source: operators/geometry.py*

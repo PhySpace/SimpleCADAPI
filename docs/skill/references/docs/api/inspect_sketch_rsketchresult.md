@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def inspect_sketch_rsketchresult(sketch: Sketch, *, require_fully_constrained: bool = False, strict: bool = True, tolerance: float = 1e-07, max_iterations: int = 80) -> SketchSolveResult
+def inspect_sketch_rsketchresult(sketch, *, require_fully_constrained=False, strict=True, tolerance=1e-07, max_iterations=80)
 ```
 
 *Source: operators/sketch.py*

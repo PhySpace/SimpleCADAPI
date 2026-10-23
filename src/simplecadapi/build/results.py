@@ -8,8 +8,7 @@ from ..artifacts.assembly_definition import AssemblyDefinition
 from ..artifacts.assembly_io import attach_definition
 from ..artifacts.feature_graph import FeatureGraphArtifact
 from ..artifacts.part_definition import PartDefinition
-from ..product.assembly import Assembly
-from ..product.part import Part
+from simplecadapi._cpp import Assembly, Part
 
 
 @dataclass(frozen=True)

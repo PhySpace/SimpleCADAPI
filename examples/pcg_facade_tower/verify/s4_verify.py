@@ -35,7 +35,7 @@ CLASH_TOL = 1.0e-3  # mm^3 of Common volume
 
 def trsf(pl):
     """gp_Trsf of a solved Placement (columns x, y, z, origin)."""
-    from OCP.gp import gp_Trsf
+    from simplecadapi._cpp.occt.gp import gp_Trsf
 
     (xx, xy, xz), (yx, yy, yz), (zx, zy, zz), (ox, oy, oz) = pl.x_axis, pl.y_axis, pl.z_axis, pl.origin
     out = gp_Trsf()
@@ -46,7 +46,7 @@ def trsf(pl):
 def placed(component, outer=None):
     """World shape of a band component from its solved placement (diagnostic, not the SDK path); `outer` = the
     parent's gp_Trsf when the band is itself placed (tower)."""
-    from OCP.TopLoc import TopLoc_Location
+    from simplecadapi._cpp.occt.TopLoc import TopLoc_Location
 
     t = trsf(component.placement)
     if outer is not None:
@@ -55,10 +55,10 @@ def placed(component, outer=None):
 
 
 def _points(shape) -> list[tuple]:
-    from OCP.BRep import BRep_Tool
-    from OCP.TopAbs import TopAbs_VERTEX
-    from OCP.TopExp import TopExp_Explorer
-    from OCP.TopoDS import TopoDS
+    from simplecadapi._cpp.occt.BRep import BRep_Tool
+    from simplecadapi._cpp.occt.TopAbs import TopAbs_VERTEX
+    from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
+    from simplecadapi._cpp.occt.TopoDS import TopoDS
 
     out, it = [], TopExp_Explorer(shape, TopAbs_VERTEX)
     while it.More():
@@ -69,8 +69,8 @@ def _points(shape) -> list[tuple]:
 
 
 def _volume(shape) -> float:
-    from OCP.BRepGProp import BRepGProp
-    from OCP.GProp import GProp_GProps
+    from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+    from simplecadapi._cpp.occt.GProp import GProp_GProps
 
     props = GProp_GProps()
     BRepGProp.VolumeProperties_s(shape, props)
@@ -78,7 +78,7 @@ def _volume(shape) -> float:
 
 
 def _common_volume(a, b) -> float:
-    from OCP.BRepAlgoAPI import BRepAlgoAPI_Common
+    from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Common
 
     op = BRepAlgoAPI_Common(a, b)
     if not op.IsDone():
@@ -188,8 +188,8 @@ def check_closure(sched: L.FacadeSchedule, band: dict, shapes: dict, z_base: flo
 
 
 def check_clash(band: dict, shapes: dict) -> tuple[list[str], int]:
-    from OCP.Bnd import Bnd_Box
-    from OCP.BRepBndLib import BRepBndLib
+    from simplecadapi._cpp.occt.Bnd import Bnd_Box
+    from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
 
     boxes = {}
     for cid, shape in shapes.items():

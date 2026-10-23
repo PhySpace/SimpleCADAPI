@@ -6,7 +6,7 @@ import subprocess
 import sys
 import time
 import pytest
-from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
+from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakeBox
 
 import simplecadapi as scad
 from simplecadapi.inverse_engineer.brep import evaluation as benchmark_evaluation

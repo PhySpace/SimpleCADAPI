@@ -3,18 +3,18 @@
 from itertools import product
 
 import numpy as np
-from OCP.BRep import BRep_Tool
-from OCP.Bnd import Bnd_Box
-from OCP.BRepBndLib import BRepBndLib
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Common
-from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
-from OCP.BRepCheck import BRepCheck_Analyzer
-from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
-from OCP.TopAbs import TopAbs_FACE, TopAbs_WIRE, TopAbs_EDGE
-from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopoDS import TopoDS
-from OCP.TopTools import TopTools_ListOfShape
-from OCP.gp import gp_Pln, gp_Pnt, gp_Dir
+from simplecadapi._cpp.occt.BRep import BRep_Tool
+from simplecadapi._cpp.occt.Bnd import Bnd_Box
+from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
+from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Common
+from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_MakeFace
+from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
+from simplecadapi._cpp.occt.BRepTools import BRepTools, BRepTools_WireExplorer
+from simplecadapi._cpp.occt.TopAbs import TopAbs_FACE, TopAbs_WIRE, TopAbs_EDGE
+from simplecadapi._cpp.occt.TopExp import TopExp, TopExp_Explorer
+from simplecadapi._cpp.occt.TopoDS import TopoDS
+from simplecadapi._cpp.occt.TopTools import TopTools_ListOfShape
+from simplecadapi._cpp.occt.gp import gp_Pln, gp_Pnt, gp_Dir
 
 from ..brep.queries import (
     _sample_edge,

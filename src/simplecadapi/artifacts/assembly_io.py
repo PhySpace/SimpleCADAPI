@@ -6,26 +6,23 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Mapping
 
-from ..product.assembly import (
+from simplecadapi._cpp import (
     Assembly,
     Component,
-    PublicConnectorRef,
-    _restore_component_occurrence_placements,
-)
-from ..product.solver import (
-    constraint_reports_match,
-    inspect_assembly_constraints,
-    solve_assembly_constraints,
-)
-from ..product.connector import (
     Connector,
     ConnectorAnchor,
     ConnectorRef,
+    Constraint,
+    constraint_reports_match,
     GeometryRef,
+    inspect_assembly_constraints,
+    Material,
+    Part,
+    PublicConnectorRef,
+    ScalarLimit,
+    solve_assembly_constraints,
 )
-from ..product.constraint import Constraint, ScalarLimit
-from ..product.material import Material
-from ..product.part import Part
+from ..product.assembly import _restore_component_occurrence_placements
 from ..product.placement import placement_from_canonical, placement_ticks
 from ..scene.archive import canonical_zip_bytes, preflight_zip_bytes
 from .assembly_definition import (

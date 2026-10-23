@@ -20,8 +20,8 @@ class TestGeometryTierEllipse(unittest.TestCase):
         face = scad.make_ellipse_rface(
             (0.0, 0.0, 0.0), 4.0, 2.0, major_direction=(0.0, 1.0, 0.0)
         )
-        from OCP.Bnd import Bnd_Box
-        from OCP.BRepBndLib import BRepBndLib
+        from simplecadapi._cpp.occt.Bnd import Bnd_Box
+        from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
 
         box = Bnd_Box()
         BRepBndLib.Add_s(face.wrapped, box)

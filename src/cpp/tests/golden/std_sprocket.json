@@ -1,0 +1,30 @@
+{
+  "meta": {
+    "bore_radius": 10.2,
+    "chain_pitch": 19.05,
+    "n_teeth": 18,
+    "outside_radius": 59.73395933185868,
+    "pitch_radius": 54.852288851943115,
+    "roller_clearance": 0.15,
+    "roller_diameter": 12.07,
+    "root_radius": 48.66728885194311,
+    "sprocket_thickness": 11.1
+  },
+  "shape": {
+    "area": 27034.110002164103,
+    "bbox": [
+      -59.6024833385373,
+      -59.3848159331366,
+      0.0,
+      59.6024833385373,
+      59.38481593313661,
+      11.1
+    ],
+    "edges": 156,
+    "faces": 54,
+    "tags": [
+      "solid.boolean.cut"
+    ],
+    "volume": 98201.67369173263
+  }
+}

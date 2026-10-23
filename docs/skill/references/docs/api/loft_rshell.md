@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def loft_rshell(sections: Sequence[Union[Wire, Vertex]], *, ruled: bool = False, tag_prefix: Optional[str] = None, result_tag: Optional[str] = None, start_wire_tag: Optional[str] = None, end_wire_tag: Optional[str] = None, side_faces_tag: Optional[str] = None) -> Shell
+def loft_rshell(sections, *, ruled=False, tag_prefix=None, result_tag=None, start_wire_tag=None, end_wire_tag=None, side_faces_tag=None)
 ```
 
 *Source: operators/geometry.py*

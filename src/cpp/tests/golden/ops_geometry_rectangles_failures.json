@@ -1,0 +1,77 @@
+{
+  "edge_tag_count": {
+    "how_to_fix": [
+      "Use width and height values greater than zero.",
+      "Pass a valid center and a non-zero normal vector.",
+      "If the normal is near zero, normalize or replace it before retrying."
+    ],
+    "operation": "make_rectangle_rwire",
+    "possible_causes": [
+      "Width or height is not a positive finite scalar.",
+      "The center or normal is not a valid finite 3D vector.",
+      "The local rectangle basis became degenerate."
+    ],
+    "technical_details": "ValueError: edge_tags must contain exactly 4 tags, got 2",
+    "what_happened": "Failed to create a rectangular wire."
+  },
+  "face": {
+    "how_to_fix": [
+      "Use width and height values greater than zero.",
+      "Pass a valid center and a non-zero normal vector.",
+      "If the normal is near zero, normalize or replace it before retrying."
+    ],
+    "operation": "make_rectangle_rwire",
+    "possible_causes": [
+      "Width or height is not a positive finite scalar.",
+      "The center or normal is not a valid finite 3D vector.",
+      "The local rectangle basis became degenerate."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create a rectangular wire."
+  },
+  "height": {
+    "how_to_fix": [
+      "Use width and height values greater than zero.",
+      "Pass a valid center and a non-zero normal vector.",
+      "If the normal is near zero, normalize or replace it before retrying."
+    ],
+    "operation": "make_rectangle_rwire",
+    "possible_causes": [
+      "Width or height is not a positive finite scalar.",
+      "The center or normal is not a valid finite 3D vector.",
+      "The local rectangle basis became degenerate."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create a rectangular wire."
+  },
+  "width": {
+    "how_to_fix": [
+      "Use width and height values greater than zero.",
+      "Pass a valid center and a non-zero normal vector.",
+      "If the normal is near zero, normalize or replace it before retrying."
+    ],
+    "operation": "make_rectangle_rwire",
+    "possible_causes": [
+      "Width or height is not a positive finite scalar.",
+      "The center or normal is not a valid finite 3D vector.",
+      "The local rectangle basis became degenerate."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create a rectangular wire."
+  },
+  "zero_normal": {
+    "how_to_fix": [
+      "Use width and height values greater than zero.",
+      "Pass a valid center and a non-zero normal vector.",
+      "If the normal is near zero, normalize or replace it before retrying."
+    ],
+    "operation": "make_rectangle_rwire",
+    "possible_causes": [
+      "Width or height is not a positive finite scalar.",
+      "The center or normal is not a valid finite 3D vector.",
+      "The local rectangle basis became degenerate."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create a rectangular wire."
+  }
+}

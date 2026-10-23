@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Mapping, Tuple
 
 from .._internal.semantic import SemanticValueMixin, _finite_float
+from simplecadapi._cpp import Placement
 
 Vec3 = Tuple[float, float, float]
 _AXIS_TOLERANCE = 1e-9
@@ -45,121 +46,6 @@ def _normalize_axis(value: Any, *, field_name: str) -> Vec3:
     return (vec[0] / length, vec[1] / length, vec[2] / length)
 
 
-@dataclass(frozen=True)
-class Placement(SemanticValueMixin):
-    """Right-handed placement mapping child-local coordinates to parent coordinates."""
-
-    origin: Vec3
-    x_axis: Vec3 = (1.0, 0.0, 0.0)
-    y_axis: Vec3 = (0.0, 1.0, 0.0)
-    z_axis: Vec3 = (0.0, 0.0, 1.0)
-    _metadata: Dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
-    _runtime: Dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
-
-    def __post_init__(self) -> None:
-        origin = _vec3(self.origin, field_name="origin")
-        x_axis = _normalize_axis(self.x_axis, field_name="x_axis")
-        y_axis = _normalize_axis(self.y_axis, field_name="y_axis")
-        dot = abs(_dot(x_axis, y_axis))
-        if dot > _ORTHOGONAL_TOLERANCE:
-            raise ValueError("x_axis and y_axis must be orthogonal")
-        z_axis = _cross(x_axis, y_axis)
-        z_norm = _norm(z_axis)
-        if z_norm <= _AXIS_TOLERANCE:
-            raise ValueError("x_axis and y_axis must define a right-handed frame")
-        z_axis = (z_axis[0] / z_norm, z_axis[1] / z_norm, z_axis[2] / z_norm)
-        object.__setattr__(self, "origin", origin)
-        object.__setattr__(self, "x_axis", x_axis)
-        object.__setattr__(self, "y_axis", y_axis)
-        object.__setattr__(self, "z_axis", z_axis)
-
-    def transform_point(self, point: Vec3) -> Vec3:
-        local = _vec3(point, field_name="point")
-        return (
-            self.origin[0]
-            + local[0] * self.x_axis[0]
-            + local[1] * self.y_axis[0]
-            + local[2] * self.z_axis[0],
-            self.origin[1]
-            + local[0] * self.x_axis[1]
-            + local[1] * self.y_axis[1]
-            + local[2] * self.z_axis[1],
-            self.origin[2]
-            + local[0] * self.x_axis[2]
-            + local[1] * self.y_axis[2]
-            + local[2] * self.z_axis[2],
-        )
-
-    def transform_vector(self, vector: Vec3) -> Vec3:
-        local = _vec3(vector, field_name="vector")
-        return (
-            local[0] * self.x_axis[0]
-            + local[1] * self.y_axis[0]
-            + local[2] * self.z_axis[0],
-            local[0] * self.x_axis[1]
-            + local[1] * self.y_axis[1]
-            + local[2] * self.z_axis[1],
-            local[0] * self.x_axis[2]
-            + local[1] * self.y_axis[2]
-            + local[2] * self.z_axis[2],
-        )
-
-    @classmethod
-    def from_exact_frame(
-        cls,
-        origin: Vec3,
-        x_axis: Vec3,
-        y_axis: Vec3,
-        z_axis: Vec3,
-    ) -> "Placement":
-        """Build a Placement that keeps durable-boundary components verbatim.
-
-        Tick frames are validated in tick space and must survive a
-        reconstruct -> re-tick cycle bit-exactly, so orthonormality is
-        checked (never recomputed) here.  Residual axis error stays below
-        1e-9, far inside solver tolerances.
-        """
-        origin_value = _vec3(origin, field_name="origin")
-        x_value = _vec3(x_axis, field_name="x_axis")
-        y_value = _vec3(y_axis, field_name="y_axis")
-        z_value = _vec3(z_axis, field_name="z_axis")
-        for name, axis in (("x_axis", x_value), ("y_axis", y_value), ("z_axis", z_value)):
-            if abs(_norm(axis) - 1.0) > 2.0e-6:
-                raise ValueError(f"{name} must be a unit vector")
-        for name, dot in (
-            ("x_axis/y_axis", _dot(x_value, y_value)),
-            ("x_axis/z_axis", _dot(x_value, z_value)),
-            ("y_axis/z_axis", _dot(y_value, z_value)),
-        ):
-            if abs(dot) > 2.0e-6:
-                raise ValueError(f"{name} must be orthogonal")
-        if _dot(_cross(x_value, y_value), z_value) <= 0.9:
-            raise ValueError("axes must define a right-handed frame")
-        instance = cls.__new__(cls)
-        object.__setattr__(instance, "origin", origin_value)
-        object.__setattr__(instance, "x_axis", x_value)
-        object.__setattr__(instance, "y_axis", y_value)
-        object.__setattr__(instance, "z_axis", z_value)
-        object.__setattr__(instance, "_metadata", {})
-        object.__setattr__(instance, "_runtime", {})
-        return instance
-
-    def compose(self, child: "Placement") -> "Placement":
-        if not isinstance(child, Placement):
-            raise TypeError("child must be a Placement")
-        return Placement(
-            origin=self.transform_point(child.origin),
-            x_axis=self.transform_vector(child.x_axis),
-            y_axis=self.transform_vector(child.y_axis),
-        )
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "origin": list(self.origin),
-            "x_axis": list(self.x_axis),
-            "y_axis": list(self.y_axis),
-            "z_axis": list(self.z_axis),
-        }
 
 
 _POSITION_CHUNK_MM = 1.0e-9

@@ -1,0 +1,419 @@
+{
+  "aliases": [
+    {
+      "bbox": [
+        -0.5,
+        -1.0,
+        0.0,
+        0.5,
+        1.0,
+        0.0
+      ],
+      "closed": true,
+      "edge_tags": [
+        [
+          "edge.boundary"
+        ],
+        [
+          "edge.boundary"
+        ],
+        [
+          "edge.boundary"
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      "edges": 4,
+      "face_tags": [],
+      "faces": 0,
+      "geo": null,
+      "length": 6.0,
+      "tags": [],
+      "track": {
+        "op": "make_rectangle_wire"
+      },
+      "type": "Wire",
+      "vertices": 4
+    },
+    {
+      "area": 2.0,
+      "bbox": [
+        -0.5,
+        -1.0,
+        0.0,
+        0.5,
+        1.0,
+        0.0
+      ],
+      "edge_tags": [
+        [
+          "edge.boundary"
+        ],
+        [
+          "edge.boundary"
+        ],
+        [
+          "edge.boundary"
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      "edges": 4,
+      "face_tags": [],
+      "faces": 1,
+      "geo": null,
+      "tags": [],
+      "track": {
+        "op": "make_rectangle_face"
+      },
+      "type": "Face",
+      "vertices": 4
+    }
+  ],
+  "face": {
+    "area": 2.0,
+    "bbox": [
+      -1.0,
+      -0.5,
+      0.0,
+      1.0,
+      0.5,
+      0.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [],
+    "track": {
+      "op": "make_rectangle_face"
+    },
+    "type": "Face",
+    "vertices": 4
+  },
+  "face_tagged": {
+    "area": 2.0,
+    "bbox": [
+      0.5,
+      0.0,
+      -1.0,
+      1.5,
+      0.0,
+      1.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "plate.edge.a"
+      ],
+      [
+        "edge.boundary",
+        "plate.edge.b"
+      ],
+      [
+        "edge.boundary",
+        "plate.edge.c"
+      ],
+      [
+        "edge.boundary",
+        "plate.edge.d"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [
+      "plate.face"
+    ],
+    "track": {
+      "op": "make_rectangle_face"
+    },
+    "type": "Face",
+    "vertices": 4
+  },
+  "wire": {
+    "bbox": [
+      -15.0,
+      -5.0,
+      0.0,
+      15.0,
+      5.0,
+      0.0
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 80.0,
+    "tags": [],
+    "track": {
+      "op": "make_rectangle_wire"
+    },
+    "type": "Wire",
+    "vertices": 4
+  },
+  "wire_centered": {
+    "bbox": [
+      0.0,
+      0.5,
+      3.0,
+      2.0,
+      3.5,
+      3.0
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 10.0,
+    "tags": [],
+    "track": {
+      "op": "make_rectangle_wire"
+    },
+    "type": "Wire",
+    "vertices": 4
+  },
+  "wire_edge_tags_only": {
+    "bbox": [
+      -1.0,
+      -0.5,
+      0.0,
+      1.0,
+      0.5,
+      0.0
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "a",
+        "edge.boundary"
+      ],
+      [
+        "b",
+        "edge.boundary"
+      ],
+      [
+        "c",
+        "edge.boundary"
+      ],
+      [
+        "d",
+        "edge.boundary"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 6.0,
+    "tags": [],
+    "track": {
+      "op": "make_rectangle_wire"
+    },
+    "type": "Wire",
+    "vertices": 4
+  },
+  "wire_prefix_only": {
+    "bbox": [
+      -1.0,
+      -0.5,
+      0.0,
+      1.0,
+      0.5,
+      0.0
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "frame.edge.line1"
+      ],
+      [
+        "edge.boundary",
+        "frame.edge.line2"
+      ],
+      [
+        "edge.boundary",
+        "frame.edge.line3"
+      ],
+      [
+        "edge.boundary",
+        "frame.edge.line4"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 6.0,
+    "tags": [
+      "frame.wire"
+    ],
+    "track": {
+      "op": "make_rectangle_wire"
+    },
+    "type": "Wire",
+    "vertices": 4
+  },
+  "wire_tagged": {
+    "bbox": [
+      -1.0,
+      -0.5,
+      0.0,
+      1.0,
+      0.5,
+      0.0
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "frame.edge.a"
+      ],
+      [
+        "edge.boundary",
+        "frame.edge.b"
+      ],
+      [
+        "edge.boundary",
+        "frame.edge.c"
+      ],
+      [
+        "edge.boundary",
+        "frame.edge.d"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 6.0,
+    "tags": [
+      "frame.wire"
+    ],
+    "track": {
+      "op": "make_rectangle_wire"
+    },
+    "type": "Wire",
+    "vertices": 4
+  },
+  "wire_tilted": {
+    "bbox": [
+      -1.718704312010516,
+      -1.5916057493473543,
+      -0.5026204573745304,
+      1.718704312010516,
+      1.5916057493473543,
+      0.5026204573745304
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 10.0,
+    "tags": [],
+    "track": {
+      "op": "make_rectangle_wire"
+    },
+    "type": "Wire",
+    "vertices": 4
+  },
+  "wire_x_normal": {
+    "bbox": [
+      0.0,
+      -1.5,
+      -1.0,
+      0.0,
+      1.5,
+      1.0
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 10.0,
+    "tags": [],
+    "track": {
+      "op": "make_rectangle_wire"
+    },
+    "type": "Wire",
+    "vertices": 4
+  }
+}

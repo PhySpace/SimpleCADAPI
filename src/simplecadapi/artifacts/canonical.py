@@ -155,12 +155,37 @@ def validate_json_value(value: Any, path: str = "") -> None:
     visit(value, path)
 
 
+def _native_canonical() -> Any:
+    """The C++ canonical-JSON walker on the native backend, else None.
+
+    It returns None for any value outside its domain (the Python path below then raises the same
+    errors it always did), so the result is byte-identical by construction.
+    """
+
+    try:
+        import simplecadapi._cpp as native
+    except ImportError:  # pragma: no cover - the C++ module is a hard dependency
+        return None
+    return native if hasattr(native, "canonical_hash") else None
+
+
+_NATIVE = _native_canonical()
+
+
 def canonical_bytes(value: Any) -> bytes:
+    if _NATIVE is not None:
+        fast = _NATIVE.canonical_bytes(value)
+        if fast is not None:
+            return fast
     validate_json_value(value)
     return canonical_json_bytes(value)
 
 
 def content_hash(value: Mapping[str, Any], *, omit: tuple[str, ...] = ("content_hash",)) -> str:
+    if _NATIVE is not None:
+        fast = _NATIVE.canonical_hash(value, omit)
+        if fast is not None:
+            return fast
     draft = {key: item for key, item in value.items() if key not in omit}
     return sha256_bytes(canonical_bytes(draft))
 

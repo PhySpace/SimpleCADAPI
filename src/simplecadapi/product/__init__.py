@@ -6,11 +6,21 @@ persistence pipeline (``occurrence`` → ``packages`` → ``capture``).
 """
 
 from .placement import Placement
-from .connector import Connector, ConnectorAnchor, ConnectorRef, GeometryRef
-from .constraint import Constraint, ConstraintReport, ConstraintResidual, ScalarLimit
-from .material import Material
-from .part import Part
-from .assembly import Assembly, Component, PublicConnectorRef
+from simplecadapi._cpp import (
+    Assembly,
+    Component,
+    Connector,
+    ConnectorAnchor,
+    ConnectorRef,
+    Constraint,
+    ConstraintReport,
+    ConstraintResidual,
+    GeometryRef,
+    Material,
+    Part,
+    PublicConnectorRef,
+    ScalarLimit,
+)
 
 __all__ = [
     "Assembly",

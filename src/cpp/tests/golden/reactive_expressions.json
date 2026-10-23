@@ -1,0 +1,87 @@
+{
+  "-scad.var('x', 1.0)": {
+    "id": "expr_4bdda8041e80e10e",
+    "repr": "Expr(op='neg', args=(Var(name='x', default=1.0, comment=None, expr_id='var_b13c5ced8414a9a3', tolerance=None, unit=None, tolerance_unit=None),), expr_id='expr_4bdda8041e80e10e')",
+    "value": -1.0
+  },
+  "10 / scad.var('x', 4.0)": {
+    "id": "expr_0acae79c09e81853",
+    "repr": "Expr(op='div', args=(Const(value=10.0, expr_id='const_e6cbd1828fe2fcec'), Var(name='x', default=4.0, comment=None, expr_id='var_3af0ccae9d08daec', tolerance=None, unit=None, tolerance_unit=None)), expr_id='expr_0acae79c09e81853')",
+    "value": 2.5
+  },
+  "2 ** scad.var('x', 3.0)": {
+    "id": "expr_104861ced245d647",
+    "repr": "Expr(op='pow', args=(Const(value=2.0, expr_id='const_c51de2f6cbbc2a1e'), Var(name='x', default=3.0, comment=None, expr_id='var_30b7c705db886480', tolerance=None, unit=None, tolerance_unit=None)), expr_id='expr_104861ced245d647')",
+    "value": 8.0
+  },
+  "2 - scad.var('x', 1.0)": {
+    "id": "expr_509fb870a89f1079",
+    "repr": "Expr(op='sub', args=(Const(value=2.0, expr_id='const_c51de2f6cbbc2a1e'), Var(name='x', default=1.0, comment=None, expr_id='var_b13c5ced8414a9a3', tolerance=None, unit=None, tolerance_unit=None)), expr_id='expr_509fb870a89f1079')",
+    "value": 1.0
+  },
+  "abs(scad.var('x', -1.0))": {
+    "id": "expr_c794859cd0a9ff40",
+    "repr": "Expr(op='abs', args=(Var(name='x', default=-1.0, comment=None, expr_id='var_7d2d4a8354537fb7', tolerance=None, unit=None, tolerance_unit=None),), expr_id='expr_c794859cd0a9ff40')",
+    "value": 1.0
+  },
+  "scad.acos(scad.var('p', 50.0, unit='%'))": {
+    "id": "expr_448ab3d935256e51",
+    "repr": "Expr(op='acos', args=(Var(name='p', default=50.0, comment=None, expr_id='var_a12582b874f80ffe', tolerance=None, unit=Unit(symbol='%', dimension=Dimension(length=0, angle=0), scale_to_canonical=0.01), tolerance_unit=None),), expr_id='expr_448ab3d935256e51')",
+    "value": 59.99999999999999
+  },
+  "scad.atan2(scad.var('y', 1.0), scad.var('x', 1.0))": {
+    "id": "expr_cd2e3ba1f3014ccd",
+    "repr": "Expr(op='atan2', args=(Var(name='y', default=1.0, comment=None, expr_id='var_7a8e317be26f2f90', tolerance=None, unit=None, tolerance_unit=None), Var(name='x', default=1.0, comment=None, expr_id='var_b13c5ced8414a9a3', tolerance=None, unit=None, tolerance_unit=None)), expr_id='expr_cd2e3ba1f3014ccd')",
+    "value": 0.7853981633974483
+  },
+  "scad.const(-0.0)": {
+    "id": "const_47aaa25271a02431",
+    "repr": "Const(value=-0.0, expr_id='const_47aaa25271a02431')",
+    "value": -0.0
+  },
+  "scad.const(0.1)": {
+    "id": "const_052cbc9733f977d9",
+    "repr": "Const(value=0.1, expr_id='const_052cbc9733f977d9')",
+    "value": 0.1
+  },
+  "scad.const(2)": {
+    "id": "const_c51de2f6cbbc2a1e",
+    "repr": "Const(value=2.0, expr_id='const_c51de2f6cbbc2a1e')",
+    "value": 2.0
+  },
+  "scad.sin(scad.var('a', 30.0, unit='deg'))": {
+    "id": "expr_465b7e98c446938a",
+    "repr": "Expr(op='sin', args=(Var(name='a', default=30.0, comment=None, expr_id='var_2aad16705cc1f42a', tolerance=None, unit=Unit(symbol='deg', dimension=Dimension(length=0, angle=1), scale_to_canonical=1.0), tolerance_unit=None),), expr_id='expr_465b7e98c446938a')",
+    "value": 0.49999999999999994
+  },
+  "scad.sqrt(scad.var('x', 4.0)) ** 2": {
+    "id": "expr_cc57c0408875da7a",
+    "repr": "Expr(op='pow', args=(Expr(op='sqrt', args=(Var(name='x', default=4.0, comment=None, expr_id='var_3af0ccae9d08daec', tolerance=None, unit=None, tolerance_unit=None),), expr_id='expr_5f6730f09c073458'), Const(value=2.0, expr_id='const_c51de2f6cbbc2a1e')), expr_id='expr_cc57c0408875da7a')",
+    "value": 4.0
+  },
+  "scad.var('r', 5.0)": {
+    "id": "var_c8fbc9d12f568139",
+    "repr": "Var(name='r', default=5.0, comment=None, expr_id='var_c8fbc9d12f568139', tolerance=None, unit=None, tolerance_unit=None)",
+    "value": 5.0
+  },
+  "scad.var('r', 5.0, 'a \\'quoted\\' comment', 0.1, unit='in', tolerance_unit='mm')": {
+    "id": "var_8652ec181748217b",
+    "repr": "Var(name='r', default=5.0, comment=\"a 'quoted' comment\", expr_id='var_8652ec181748217b', tolerance=DimensionTolerance(lower_deviation=-0.1, upper_deviation=0.1), unit=Unit(symbol='in', dimension=Dimension(length=1, angle=0), scale_to_canonical=25.4), tolerance_unit=Unit(symbol='mm', dimension=Dimension(length=1, angle=0), scale_to_canonical=1.0))",
+    "value": 127.0
+  },
+  "scad.var('r', 5.0, unit='mm')": {
+    "id": "var_1dfda245614375fc",
+    "repr": "Var(name='r', default=5.0, comment=None, expr_id='var_1dfda245614375fc', tolerance=None, unit=Unit(symbol='mm', dimension=Dimension(length=1, angle=0), scale_to_canonical=1.0), tolerance_unit=None)",
+    "value": 5.0
+  },
+  "scad.var('r', 5.0, unit='mm') * 2 + 1": {
+    "id": "expr_d44ad8ebee707556",
+    "repr": "Expr(op='add', args=(Expr(op='mul', args=(Var(name='r', default=5.0, comment=None, expr_id='var_1dfda245614375fc', tolerance=None, unit=Unit(symbol='mm', dimension=Dimension(length=1, angle=0), scale_to_canonical=1.0), tolerance_unit=None), Const(value=2.0, expr_id='const_c51de2f6cbbc2a1e')), expr_id='expr_2ece69357ab4b237'), Const(value=1.0, expr_id='const_abdce65477d1247f')), expr_id='expr_d44ad8ebee707556')",
+    "value": 11.0
+  },
+  "scad.var('w', 1.5, comment='c', tolerance=(-0.1, 0.2))": {
+    "id": "var_b548982a6a604e86",
+    "repr": "Var(name='w', default=1.5, comment='c', expr_id='var_b548982a6a604e86', tolerance=DimensionTolerance(lower_deviation=-0.1, upper_deviation=0.2), unit=None, tolerance_unit=None)",
+    "value": 1.5
+  }
+}

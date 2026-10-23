@@ -1,0 +1,89 @@
+{
+  "bad_a": {
+    "exception": "TypeError",
+    "message": "connector_a must be a ConnectorRef"
+  },
+  "belt_extra": {
+    "exception": "ValueError",
+    "message": "belt constraints only accept pulley_radius_a and pulley_radius_b"
+  },
+  "belt_missing": {
+    "exception": "ValueError",
+    "message": "belt constraints require pulley_radius_a and pulley_radius_b"
+  },
+  "fixed_drive": {
+    "exception": "ValueError",
+    "message": "fixed constraints do not accept drive scalars"
+  },
+  "fixed_limit": {
+    "exception": "ValueError",
+    "message": "fixed constraints do not accept scalar limits"
+  },
+  "gear_drive": {
+    "exception": "ValueError",
+    "message": "gear constraints do not accept drive scalars"
+  },
+  "gear_extra": {
+    "exception": "ValueError",
+    "message": "gear constraints only accept pitch_radius_a and pitch_radius_b"
+  },
+  "gear_missing": {
+    "exception": "ValueError",
+    "message": "gear constraints require pitch_radius_a and pitch_radius_b"
+  },
+  "kind_is_normalised": {
+    "angle_limit": null,
+    "connector_a": {
+      "component_id": "a",
+      "connector_id": "axis"
+    },
+    "connector_b": {
+      "component_id": "b",
+      "connector_id": "axis"
+    },
+    "constraint_id": "c",
+    "constraint_kind": "gear",
+    "distance_limit": null,
+    "drive_angle_degrees": null,
+    "drive_distance": null,
+    "name": null,
+    "phase_offset": 0.0,
+    "pitch_radius": null,
+    "pitch_radius_a": 1.0,
+    "pitch_radius_b": 2.0,
+    "pulley_radius_a": null,
+    "pulley_radius_b": null
+  },
+  "nan_drive": {
+    "exception": "ValueError",
+    "message": "drive_angle_degrees must be finite"
+  },
+  "prismatic_angle": {
+    "exception": "ValueError",
+    "message": "prismatic constraints only accept distance scalars"
+  },
+  "prismatic_radius": {
+    "exception": "ValueError",
+    "message": "prismatic constraints do not accept coupling radii or phase_offset"
+  },
+  "rack_extra": {
+    "exception": "ValueError",
+    "message": "rack_pinion constraints only accept pitch_radius"
+  },
+  "rack_missing": {
+    "exception": "ValueError",
+    "message": "rack_pinion constraints require pitch_radius"
+  },
+  "revolute_distance": {
+    "exception": "ValueError",
+    "message": "revolute constraints only accept angle scalars"
+  },
+  "same_ref": {
+    "exception": "ValueError",
+    "message": "constraint cannot connect the same connector ref twice"
+  },
+  "unknown_kind": {
+    "exception": "ValueError",
+    "message": "constraint_kind must be fixed, revolute, prismatic, gear, belt, or rack_pinion"
+  }
+}

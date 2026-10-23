@@ -59,9 +59,9 @@ def export(sched: L.FacadeSchedule, stem: str = "facade_tower", render: bool = T
     paths = {"scadpkg": package, "step": step.output_path, "csv": write_csv(sched, OUT / f"{stem}_panels.csv")}
     if render:
         start = time.perf_counter()
-        whole = scad.make_compound_from_assembly_rcompound(assembly=result.value).wrapped
+        whole = scad.make_compound_from_assembly_rcompound(assembly=result.value)
         paths["png"] = Path(scad.render_screenshot_rpath(
-            shapes=[whole], output_path=str(OUT / f"{stem}.png"), view=(20.0, 225.0), view_up=(0.0, 0.0, 1.0),
+            shapes=list(whole.solids()), output_path=str(OUT / f"{stem}.png"), view=(20.0, 225.0), view_up=(0.0, 0.0, 1.0),
             show_callouts=False, show_legend=False))
         timings["render"] = time.perf_counter() - start
     return {"result": result, "step_report": step, "paths": paths, "timings": timings}

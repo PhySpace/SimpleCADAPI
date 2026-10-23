@@ -14,5 +14,5 @@ class Resolved(kind: str, name: str, view: str, requested: str, resolved: str, a
 
 ## Description
 
-一个标注元素在纸面上的求解结果：requested(声明值) → resolved(实际位置) +
-adjust(最少调整顺延记录) + draw(渲染所需的预计算几何) + rules(触发的规则)。
+The solved result of one annotation element on the sheet: requested (declared value) → resolved (actual position) +
+adjust (record of the minimum adjustments) + draw (precomputed geometry for rendering) + rules (the rules that fired).

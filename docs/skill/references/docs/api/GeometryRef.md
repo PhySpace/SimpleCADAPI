@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class GeometryRef(kind: str, source_node_id: Optional[str], geo_selector: Dict[str, Any], flip: bool = False)
+class GeometryRef(kind, source_node_id, geo_selector, flip=False)
 ```
 
 *Source: product/connector.py*

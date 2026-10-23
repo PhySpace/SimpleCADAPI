@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_sphere_rsolid(radius: ScalarLike, center: Tuple[float, float, float] = (0, 0, 0)) -> Solid
+def make_sphere_rsolid(radius, center=(0, 0, 0))
 ```
 
 *Source: operators/geometry.py*

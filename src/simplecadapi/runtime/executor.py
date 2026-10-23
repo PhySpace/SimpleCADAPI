@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..recording.graph import GraphSession
+from simplecadapi._glue.session import GraphSession
 from ..recording.source_mapping import cell_sources
 from ._marimo import (
     CellImpl,
@@ -68,6 +68,14 @@ class NotebookScope:
     cells: NotebookCells
     graph: Any = None
     """marimo's dataflow graph of the notebook, known when marimo itself runs it."""
+
+
+_sessions: dict[str, Any] = {}
+"""The recording session of the last run of each cell, until its cache entry is written (native)."""
+
+
+def take_session(cell_id: str) -> Any:
+    return _sessions.pop(cell_id, None)
 
 
 _running: ContextVar[NotebookScope | None] = ContextVar(
@@ -296,6 +304,8 @@ def _cell_recording(
         _running.reset(token)
     # Reached only when the body succeeded; failures propagate untouched.
     _check_bound(session, cell, glbls)
+    # The cell cache writes the nodes of the session beside the cell's entry.
+    _sessions[cell.cell_id] = session
 
 
 def _check_bound(session: GraphSession, cell: CellImpl, glbls: MutableGlobals) -> None:

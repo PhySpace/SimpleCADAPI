@@ -15,8 +15,8 @@ import math
 import sys
 from pathlib import Path
 
-from OCP.Bnd import Bnd_Box
-from OCP.BRepBndLib import BRepBndLib
+from simplecadapi._cpp.occt.Bnd import Bnd_Box
+from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
 from simplecadapi import ql
 from simplecadapi.runtime import run_notebook
 

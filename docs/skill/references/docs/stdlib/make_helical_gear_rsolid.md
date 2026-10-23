@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_helical_gear_rsolid(n_teeth: int, module: float, pressure_angle: float = 20.0, helix_angle: float = 30.0, gear_height: float = 8.0, *, addendum_factor: float = 1.0, clearance_factor: float = 0.25, backlash: float = 0.0) -> Solid
+def make_helical_gear_rsolid(n_teeth, module, pressure_angle=20.0, helix_angle=30.0, gear_height=8.0, *, addendum_factor=1.0, clearance_factor=0.25, backlash=0.0)
 ```
 
 *Source: std/gear.py*

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def extrude_until_rsolid(profile: Face, target: Solid | Sequence[Solid], direction: Sequence[float] = (0, 0, 1), until: str = 'NEXT') -> Solid
+def extrude_until_rsolid(profile, target, direction=(0, 0, 1), until='NEXT')
 ```
 
 *Source: operators/features.py*

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def geo(field: str, default: Any = None) -> SerializableKey
+def geo(field, default=None)
 ```
 
 *Source: ql.py*

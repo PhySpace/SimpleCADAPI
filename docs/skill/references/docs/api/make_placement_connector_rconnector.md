@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_placement_connector_rconnector(connector_id: str, placement: Placement, name: Optional[str] = None) -> Connector
+def make_placement_connector_rconnector(connector_id, placement, name=None)
 ```
 
 *Source: operators/product.py*

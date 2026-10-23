@@ -14,11 +14,11 @@ import math
 import sys
 from pathlib import Path
 
-from OCP.Bnd import Bnd_Box
-from OCP.BRepBndLib import BRepBndLib
-from OCP.BRepClass3d import BRepClass3d_SolidClassifier
-from OCP.gp import gp_Pnt
-from OCP.TopAbs import TopAbs_IN, TopAbs_ON
+from simplecadapi._cpp.occt.Bnd import Bnd_Box
+from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
+from simplecadapi._cpp.occt.BRepClass3d import BRepClass3d_SolidClassifier
+from simplecadapi._cpp.occt.gp import gp_Pnt
+from simplecadapi._cpp.occt.TopAbs import TopAbs_IN, TopAbs_ON
 
 import simplecadapi as scad
 from simplecadapi import ql

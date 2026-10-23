@@ -1,0 +1,46 @@
+[
+  [
+    "ValueError",
+    "outer_diameter must be greater than bore_diameter"
+  ],
+  [
+    "ValueError",
+    "bearing_width must be greater than ball_diameter plus raceway_clearance"
+  ],
+  [
+    "ValueError",
+    "ball_diameter plus raceway_clearance leaves no radial wall thickness"
+  ],
+  [
+    "ValueError",
+    "ball_count is too high for ball_diameter on the bearing pitch circle"
+  ],
+  [
+    "ValueError",
+    "ball_count must be at least 3"
+  ],
+  [
+    "ValueError",
+    "edge_chamfer must be smaller than the thinnest bearing feature"
+  ],
+  [
+    "ValueError",
+    "bore_diameter must be positive"
+  ],
+  [
+    "ValueError",
+    "raceway_clearance must be non-negative"
+  ],
+  [
+    "ValueError",
+    "edge_chamfer must be finite"
+  ],
+  [
+    "ValueError",
+    "rolling_element_fuse_overlap must be finite and positive"
+  ],
+  [
+    "ValueError",
+    "rolling_element_fuse_overlap must be smaller than ball radius"
+  ]
+]

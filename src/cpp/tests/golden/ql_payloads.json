@@ -1,0 +1,381 @@
+{
+  "bare": {
+    "faces": {
+      "cardinality": {},
+      "order_desc": false,
+      "target_kind": "face"
+    },
+    "shells": {
+      "cardinality": {},
+      "order_desc": false,
+      "target_kind": "shell"
+    },
+    "solids": {
+      "cardinality": {},
+      "order_desc": false,
+      "target_kind": "solid"
+    },
+    "vertices": {
+      "cardinality": {},
+      "order_desc": false,
+      "target_kind": "vertex"
+    },
+    "wires": {
+      "cardinality": {},
+      "order_desc": false,
+      "target_kind": "wire"
+    }
+  },
+  "chain": {
+    "cardinality": {},
+    "order_desc": false,
+    "predicate": {
+      "children": [],
+      "data": {
+        "op": "==",
+        "path": "geom.type",
+        "value": "LINE"
+      },
+      "kind": "property_compare"
+    },
+    "source": {
+      "cardinality": {
+        "at_least": 1,
+        "at_most": 4
+      },
+      "limit": 3,
+      "order_desc": false,
+      "order_key": {
+        "data": {
+          "default": null,
+          "path": "geom.center.x"
+        },
+        "kind": "property"
+      },
+      "order_keys": [
+        {
+          "desc": true,
+          "key": {
+            "data": {
+              "default": 0.0,
+              "path": "geo.area"
+            },
+            "kind": "value"
+          }
+        },
+        {
+          "desc": false,
+          "key": {
+            "data": {
+              "default": null,
+              "path": "geom.center.x"
+            },
+            "kind": "property"
+          }
+        }
+      ],
+      "predicate": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [],
+                "data": {
+                  "pattern": "a.*",
+                  "scope": "local"
+                },
+                "kind": "tag"
+              },
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "data": {
+                      "op": ">=",
+                      "path": "x.y",
+                      "value": 3
+                    },
+                    "kind": "meta"
+                  }
+                ],
+                "data": {},
+                "kind": "not"
+              }
+            ],
+            "data": {},
+            "kind": "and"
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "data": {
+                  "event": "modified",
+                  "op": "cut"
+                },
+                "kind": "operation_event"
+              },
+              {
+                "children": [],
+                "data": {
+                  "role": "tool"
+                },
+                "kind": "origin_role"
+              },
+              {
+                "children": [],
+                "data": {
+                  "role": "a.b"
+                },
+                "kind": "output_role"
+              }
+            ],
+            "data": {},
+            "kind": "or"
+          }
+        ],
+        "data": {},
+        "kind": "and"
+      },
+      "source_node_id": "node_1",
+      "source_output_slot": 2,
+      "target_kind": "face"
+    },
+    "source_node_id": "node_1",
+    "source_output_slot": 2,
+    "target_kind": "edge",
+    "traversal": {
+      "relation": "boundary"
+    }
+  },
+  "edge_selector": {
+    "cardinality": {
+      "exactly": 1
+    },
+    "limit": 1,
+    "order_desc": false,
+    "order_key": {
+      "data": {
+        "default": null,
+        "path": "geom.center.z"
+      },
+      "kind": "property"
+    },
+    "order_keys": [
+      {
+        "desc": false,
+        "key": {
+          "data": {
+            "default": null,
+            "path": "geom.center.z"
+          },
+          "kind": "property"
+        }
+      }
+    ],
+    "predicate": {
+      "children": [],
+      "data": {
+        "op": "==",
+        "path": "geom.type",
+        "value": "CIRCLE"
+      },
+      "kind": "property_compare"
+    },
+    "target_kind": "edge"
+  },
+  "incident": {
+    "cardinality": {
+      "exactly": 1
+    },
+    "incident_face_cardinality": {
+      "exactly": 2
+    },
+    "incident_faces": {
+      "distinct": true,
+      "selectors": [
+        {
+          "cardinality": {},
+          "order_desc": false,
+          "predicate": {
+            "children": [],
+            "data": {
+              "pattern": "face.top",
+              "scope": "effective"
+            },
+            "kind": "tag"
+          },
+          "target_kind": "face"
+        },
+        {
+          "cardinality": {},
+          "order_desc": false,
+          "predicate": {
+            "children": [],
+            "data": {
+              "pattern": "face.front",
+              "scope": "effective"
+            },
+            "kind": "tag"
+          },
+          "target_kind": "face"
+        }
+      ]
+    },
+    "order_desc": false,
+    "source": {
+      "cardinality": {},
+      "order_desc": false,
+      "predicate": {
+        "children": [],
+        "data": {
+          "pattern": "a",
+          "scope": "effective"
+        },
+        "kind": "tag"
+      },
+      "target_kind": "face"
+    },
+    "target_kind": "edge",
+    "traversal": {
+      "relation": "boundary"
+    }
+  },
+  "keys": [
+    {
+      "data": {
+        "default": null,
+        "path": "a.b"
+      },
+      "kind": "value"
+    },
+    {
+      "data": {
+        "default": 0,
+        "path": "geom.area"
+      },
+      "kind": "property"
+    },
+    {
+      "data": {
+        "default": 1.5,
+        "path": "geo.volume"
+      },
+      "kind": "value"
+    },
+    {
+      "data": {
+        "default": null,
+        "path": "geom.center.y"
+      },
+      "kind": "property"
+    }
+  ],
+  "role": {
+    "children": [],
+    "data": {
+      "pattern": "role.section.*",
+      "scope": "effective"
+    },
+    "kind": "tag"
+  },
+  "shared": {
+    "cardinality": {
+      "exactly": 1
+    },
+    "order_desc": false,
+    "set_operation": {
+      "op": "intersection",
+      "operands": [
+        {
+          "cardinality": {},
+          "order_desc": false,
+          "source": {
+            "cardinality": {},
+            "order_desc": false,
+            "predicate": {
+              "children": [],
+              "data": {
+                "pattern": "face.top",
+                "scope": "effective"
+              },
+              "kind": "tag"
+            },
+            "target_kind": "face"
+          },
+          "target_kind": "edge",
+          "traversal": {
+            "relation": "boundary"
+          }
+        },
+        {
+          "cardinality": {},
+          "order_desc": false,
+          "source": {
+            "cardinality": {},
+            "order_desc": false,
+            "predicate": {
+              "children": [],
+              "data": {
+                "pattern": "face.front",
+                "scope": "effective"
+              },
+              "kind": "tag"
+            },
+            "target_kind": "face"
+          },
+          "target_kind": "edge",
+          "traversal": {
+            "relation": "boundary"
+          }
+        }
+      ]
+    },
+    "target_kind": "edge"
+  },
+  "source": [
+    {
+      "children": [],
+      "data": {
+        "source_binding_id": "b1"
+      },
+      "kind": "source_binding"
+    },
+    {
+      "children": [],
+      "data": {
+        "source_topo_id": "face_3"
+      },
+      "kind": "source_topology"
+    }
+  ],
+  "wire_walk": {
+    "cardinality": {},
+    "order_desc": false,
+    "source": {
+      "cardinality": {},
+      "order_desc": false,
+      "source": {
+        "cardinality": {},
+        "order_desc": false,
+        "source": {
+          "cardinality": {},
+          "order_desc": false,
+          "target_kind": "solid"
+        },
+        "target_kind": "face",
+        "traversal": {
+          "relation": "boundary"
+        }
+      },
+      "target_kind": "wire",
+      "traversal": {
+        "relation": "boundary"
+      }
+    },
+    "target_kind": "vertex",
+    "traversal": {
+      "relation": "boundary"
+    }
+  }
+}

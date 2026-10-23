@@ -437,13 +437,13 @@ def test_section_pixel_roundtrip_layout_and_placeholder(tube, tmp_path, dpi, pla
 
 def test_ellipse_fit_is_only_candidate_and_extrema_are_continuous():
     import math
-    from OCP.BRepBuilderAPI import (
+    from simplecadapi._cpp.occt.BRepBuilderAPI import (
         BRepBuilderAPI_MakeEdge,
         BRepBuilderAPI_MakeWire,
         BRepBuilderAPI_MakeFace,
     )
-    from OCP.BRepPrimAPI import BRepPrimAPI_MakePrism
-    from OCP.gp import gp_Ax2, gp_Pnt, gp_Dir, gp_Elips, gp_Vec
+    from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakePrism
+    from simplecadapi._cpp.occt.gp import gp_Ax2, gp_Pnt, gp_Dir, gp_Elips, gp_Vec
 
     angle = math.radians(27)
     ellipse = gp_Elips(
@@ -493,9 +493,9 @@ def test_ellipse_fit_is_only_candidate_and_extrema_are_continuous():
 
 
 def test_eccentric_gap_and_actual_model_change_invalidate_evidence(tube):
-    from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
-    from OCP.BRepPrimAPI import BRepPrimAPI_MakeCylinder
-    from OCP.gp import gp_Ax2, gp_Pnt, gp_Dir
+    from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Cut
+    from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakeCylinder
+    from simplecadapi._cpp.occt.gp import gp_Ax2, gp_Pnt, gp_Dir
 
     outer = BRepPrimAPI_MakeCylinder(
         gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), 3.5, 50
@@ -541,9 +541,9 @@ def test_formal_render_records_valid_binding_and_independent_reviews(tube, tmp_p
 def test_material_strategy_retains_its_actual_edges_and_ignores_environment(
     tube, monkeypatch
 ):
-    from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
-    from OCP.BRepExtrema import BRepExtrema_DistShapeShape
-    from OCP.gp import gp_Pnt
+    from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
+    from simplecadapi._cpp.occt.BRepExtrema import BRepExtrema_DistShapeShape
+    from simplecadapi._cpp.occt.gp import gp_Pnt
     from simplecadapi.inspect.drawing._section_geometry import section_geometry
 
     monkeypatch.setenv("SIMPLECADAPI_MATERIAL_SECTION", "1")
@@ -582,8 +582,8 @@ def test_evidence_cli_rereads_step_and_keeps_visual_review_separate(tube, tmp_pa
     import subprocess
     import sys
     from types import SimpleNamespace
-    from OCP.STEPControl import STEPControl_Writer, STEPControl_AsIs
-    from OCP.IFSelect import IFSelect_RetDone
+    from simplecadapi._cpp.occt.STEPControl import STEPControl_Writer, STEPControl_AsIs
+    from simplecadapi._cpp.occt.IFSelect import IFSelect_RetDone
 
     writer = STEPControl_Writer()
     writer.Transfer(tube.wrapped, STEPControl_AsIs)

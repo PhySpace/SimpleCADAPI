@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def and_(*predicates: Predicate) -> Predicate
+def and_(*args)
 ```
 
 *Source: ql.py*

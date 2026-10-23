@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_segment_rwire(start: Tuple[float, float, float], end: Tuple[float, float, float]) -> Wire
+def make_segment_rwire(start, end)
 ```
 
 *Source: operators/geometry.py*

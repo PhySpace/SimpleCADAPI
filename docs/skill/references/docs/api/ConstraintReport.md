@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class ConstraintReport(solved: bool, grounded_component_ids: Tuple[str, ...], solved_component_ids: Tuple[str, ...], unsolved_component_ids: Tuple[str, ...], residuals: Tuple[ConstraintResidual, ...])
+class ConstraintReport(solved, grounded_component_ids, solved_component_ids, unsolved_component_ids, residuals)
 ```
 
 *Source: product/constraint.py*

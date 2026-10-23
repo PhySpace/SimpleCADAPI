@@ -8,17 +8,17 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 import simplecadapi as scad
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
-from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder
-from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
-from OCP.IFSelect import IFSelect_RetDone
-from OCP.Quantity import Quantity_Color, Quantity_TOC_RGB
-from OCP.STEPCAFControl import STEPCAFControl_Writer
-from OCP.TCollection import TCollection_ExtendedString
-from OCP.TDocStd import TDocStd_Document
-from OCP.XCAFApp import XCAFApp_Application
-from OCP.XCAFDoc import XCAFDoc_ColorSurf, XCAFDoc_DocumentTool
-from OCP.TDataStd import TDataStd_Name
+from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Cut
+from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder
+from simplecadapi._cpp.occt.gp import gp_Ax2, gp_Dir, gp_Pnt
+from simplecadapi._cpp.occt.IFSelect import IFSelect_RetDone
+from simplecadapi._cpp.occt.Quantity import Quantity_Color, Quantity_TOC_RGB
+from simplecadapi._cpp.occt.STEPCAFControl import STEPCAFControl_Writer
+from simplecadapi._cpp.occt.TCollection import TCollection_ExtendedString
+from simplecadapi._cpp.occt.TDocStd import TDocStd_Document
+from simplecadapi._cpp.occt.XCAFApp import XCAFApp_Application
+from simplecadapi._cpp.occt.XCAFDoc import XCAFDoc_ColorSurf, XCAFDoc_DocumentTool
+from simplecadapi._cpp.occt.TDataStd import TDataStd_Name
 
 from simplecadapi.inspect.brep.model import BRepEntityError, index_shape_rbrepmodel
 from simplecadapi.inspect.brep.queries import (
@@ -52,8 +52,8 @@ def _box():
 
 
 def _translated(shape, x, y, z):
-    from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform
-    from OCP.gp import gp_Trsf, gp_Vec
+    from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_Transform
+    from simplecadapi._cpp.occt.gp import gp_Trsf, gp_Vec
 
     transform = gp_Trsf()
     transform.SetTranslation(gp_Vec(x, y, z))

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_gordon_surface_rface(profiles: Sequence[Edge], guides: Sequence[Edge], *, tolerance: float = 0.001, tag_prefix: Optional[str] = None) -> Face
+def make_gordon_surface_rface(profiles, guides, *, tolerance=0.001, tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

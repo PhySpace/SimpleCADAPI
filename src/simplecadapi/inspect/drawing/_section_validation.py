@@ -4,14 +4,14 @@ import math
 from collections.abc import Mapping
 
 import numpy as np
-from OCP.BRep import BRep_Tool
-from OCP.BRepCheck import BRepCheck_Analyzer
-from OCP.BRepClass import BRepClass_FaceClassifier
-from OCP.BRepClass3d import BRepClass3d_SolidClassifier
-from OCP.TopAbs import TopAbs_SOLID, TopAbs_SHELL, TopAbs_IN, TopAbs_OUT, TopAbs_ON
-from OCP.TopExp import TopExp_Explorer
-from OCP.TopoDS import TopoDS
-from OCP.gp import gp_Pnt
+from simplecadapi._cpp.occt.BRep import BRep_Tool
+from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
+from simplecadapi._cpp.occt.BRepClass import BRepClass_FaceClassifier
+from simplecadapi._cpp.occt.BRepClass3d import BRepClass3d_SolidClassifier
+from simplecadapi._cpp.occt.TopAbs import TopAbs_SOLID, TopAbs_SHELL, TopAbs_IN, TopAbs_OUT, TopAbs_ON
+from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
+from simplecadapi._cpp.occt.TopoDS import TopoDS
+from simplecadapi._cpp.occt.gp import gp_Pnt
 
 from ..brep.queries import _point_in_polygon
 from ._provenance import digest

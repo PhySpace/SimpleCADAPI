@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def or_(*predicates: Predicate) -> Predicate
+def or_(*args)
 ```
 
 *Source: ql.py*

@@ -1,0 +1,528 @@
+{
+  "all_ops": [
+    "make_box_rsolid",
+    "make_material_rmaterial",
+    "make_part_rpart",
+    "make_assign_material_rpart",
+    "make_face_connector_rconnector",
+    "make_add_connector_rpart",
+    "make_placement_rplacement",
+    "make_placement_connector_rconnector",
+    "make_add_connector_rpart",
+    "make_assembly_rassembly",
+    "make_identity_placement_rplacement",
+    "make_add_component_rassembly",
+    "make_placement_rplacement",
+    "make_add_component_rassembly",
+    "make_placement_rplacement",
+    "make_place_component_rassembly",
+    "make_ground_component_rassembly",
+    "make_set_public_connector_rassembly",
+    "make_scalar_limit_rscalarlimit",
+    "make_connector_ref_rconnectorref",
+    "make_connector_ref_rconnectorref",
+    "make_prismatic_constraint_rassembly",
+    "make_connector_ref_rconnectorref",
+    "make_connector_ref_rconnectorref",
+    "make_gear_constraint_rassembly",
+    "make_unground_component_rassembly",
+    "make_ground_component_rassembly",
+    "make_solve_assembly_constraints_rassembly",
+    "make_compound_from_assembly_rcompound"
+  ],
+  "compound_volume": 11.999999999999996,
+  "graph": [
+    {
+      "op": "make_material_rmaterial",
+      "params": {
+        "color": null,
+        "density": 7.85e-06,
+        "density_unit": "kg/mm^3",
+        "material_id": "steel_8_8",
+        "name": null
+      }
+    },
+    {
+      "op": "make_part_rpart",
+      "params": {
+        "name": "Plate",
+        "part_id": "plate"
+      }
+    },
+    {
+      "op": "make_assign_material_rpart",
+      "params": {
+        "material": {
+          "color": null,
+          "density": 7.85e-06,
+          "density_unit": "kg/mm^3",
+          "material_id": "steel_8_8",
+          "name": null
+        },
+        "material_id": "steel_8_8",
+        "part_id": "plate"
+      }
+    },
+    {
+      "op": "make_face_connector_rconnector",
+      "params": {
+        "anchor": {
+          "anchor_kind": "geometry",
+          "geometry_ref": {
+            "flip": false,
+            "geo_selector": {
+              "area": 6.0,
+              "bbox": {
+                "max": [
+                  1.0,
+                  1.5,
+                  1.0
+                ],
+                "min": [
+                  -1.0,
+                  -1.5,
+                  1.0
+                ]
+              },
+              "center": [
+                2.42861286636753e-17,
+                0.0,
+                1.0
+              ],
+              "edge_count": 4.0,
+              "geom_type": "PLANE",
+              "inner_wire_count": 0.0,
+              "kind": "face",
+              "metadata_geo": {},
+              "mode": "geo_exact",
+              "normal": [
+                0.0,
+                0.0,
+                1.0
+              ]
+            },
+            "kind": "face"
+          }
+        },
+        "connector_id": "top",
+        "geometry_ref": {
+          "flip": false,
+          "geo_selector": {
+            "area": 6.0,
+            "bbox": {
+              "max": [
+                1.0,
+                1.5,
+                1.0
+              ],
+              "min": [
+                -1.0,
+                -1.5,
+                1.0
+              ]
+            },
+            "center": [
+              2.42861286636753e-17,
+              0.0,
+              1.0
+            ],
+            "edge_count": 4.0,
+            "geom_type": "PLANE",
+            "inner_wire_count": 0.0,
+            "kind": "face",
+            "metadata_geo": {},
+            "mode": "geo_exact",
+            "normal": [
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "kind": "face"
+        },
+        "name": null
+      }
+    },
+    {
+      "op": "make_add_connector_rpart",
+      "params": {
+        "connector_id": "top",
+        "part_id": "plate"
+      }
+    },
+    {
+      "op": "make_placement_rplacement",
+      "params": {
+        "origin": [
+          0.0,
+          1.0,
+          2.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "op": "make_placement_connector_rconnector",
+      "params": {
+        "connector_id": "axis",
+        "name": null,
+        "placement": {
+          "origin": [
+            0.0,
+            1.0,
+            2.0
+          ],
+          "x_axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "y_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "z_axis": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      }
+    },
+    {
+      "op": "make_add_connector_rpart",
+      "params": {
+        "connector_id": "axis",
+        "part_id": "plate"
+      }
+    },
+    {
+      "op": "make_assembly_rassembly",
+      "params": {
+        "assembly_id": "fixture",
+        "name": null
+      }
+    },
+    {
+      "op": "make_identity_placement_rplacement",
+      "params": {}
+    },
+    {
+      "op": "make_add_component_rassembly",
+      "params": {
+        "assembly_id": "fixture",
+        "component_id": "plate_1",
+        "item_id": "plate",
+        "item_kind": "part",
+        "name": null,
+        "placement": {
+          "origin": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "x_axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "y_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "z_axis": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      }
+    },
+    {
+      "op": "make_placement_rplacement",
+      "params": {
+        "origin": [
+          5.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "op": "make_add_component_rassembly",
+      "params": {
+        "assembly_id": "fixture",
+        "component_id": "plate_2",
+        "item_id": "plate",
+        "item_kind": "part",
+        "name": null,
+        "placement": {
+          "origin": [
+            5.0,
+            0.0,
+            0.0
+          ],
+          "x_axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "y_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "z_axis": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      }
+    },
+    {
+      "op": "make_placement_rplacement",
+      "params": {
+        "origin": [
+          6.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "op": "make_place_component_rassembly",
+      "params": {
+        "assembly_id": "fixture",
+        "component_id": "plate_2",
+        "placement": {
+          "origin": [
+            6.0,
+            0.0,
+            0.0
+          ],
+          "x_axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "y_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "z_axis": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      }
+    },
+    {
+      "op": "make_ground_component_rassembly",
+      "params": {
+        "assembly_id": "fixture",
+        "component_id": "plate_1"
+      }
+    },
+    {
+      "op": "make_set_public_connector_rassembly",
+      "params": {
+        "assembly_id": "fixture",
+        "name": null,
+        "public_connector_id": "pub",
+        "source_component_id": "plate_1",
+        "source_connector_id": "axis"
+      }
+    },
+    {
+      "op": "make_scalar_limit_rscalarlimit",
+      "params": {
+        "lower_value": 0.0,
+        "upper_value": 10.0
+      }
+    },
+    {
+      "op": "make_connector_ref_rconnectorref",
+      "params": {
+        "component_id": "plate_1",
+        "connector_id": "axis"
+      }
+    },
+    {
+      "op": "make_connector_ref_rconnectorref",
+      "params": {
+        "component_id": "plate_2",
+        "connector_id": "axis"
+      }
+    },
+    {
+      "op": "make_prismatic_constraint_rassembly",
+      "params": {
+        "angle_limit": null,
+        "connector_a": {
+          "component_id": "plate_1",
+          "connector_id": "axis"
+        },
+        "connector_b": {
+          "component_id": "plate_2",
+          "connector_id": "axis"
+        },
+        "constraint_id": "slide",
+        "constraint_kind": "prismatic",
+        "distance_limit": {
+          "lower_value": 0.0,
+          "upper_value": 10.0
+        },
+        "drive_angle_degrees": null,
+        "drive_distance": 4.0,
+        "name": null,
+        "phase_offset": null,
+        "pitch_radius": null,
+        "pitch_radius_a": null,
+        "pitch_radius_b": null,
+        "pulley_radius_a": null,
+        "pulley_radius_b": null
+      }
+    },
+    {
+      "op": "make_connector_ref_rconnectorref",
+      "params": {
+        "component_id": "plate_1",
+        "connector_id": "axis"
+      }
+    },
+    {
+      "op": "make_connector_ref_rconnectorref",
+      "params": {
+        "component_id": "plate_2",
+        "connector_id": "axis"
+      }
+    },
+    {
+      "op": "make_gear_constraint_rassembly",
+      "params": {
+        "angle_limit": null,
+        "connector_a": {
+          "component_id": "plate_1",
+          "connector_id": "axis"
+        },
+        "connector_b": {
+          "component_id": "plate_2",
+          "connector_id": "axis"
+        },
+        "constraint_id": "mesh",
+        "constraint_kind": "gear",
+        "distance_limit": null,
+        "drive_angle_degrees": null,
+        "drive_distance": null,
+        "name": null,
+        "phase_offset": 0.5,
+        "pitch_radius": null,
+        "pitch_radius_a": 1.0,
+        "pitch_radius_b": 2.0,
+        "pulley_radius_a": null,
+        "pulley_radius_b": null
+      }
+    },
+    {
+      "op": "make_unground_component_rassembly",
+      "params": {
+        "assembly_id": "fixture",
+        "component_id": "plate_1"
+      }
+    },
+    {
+      "op": "make_ground_component_rassembly",
+      "params": {
+        "assembly_id": "fixture",
+        "component_id": "plate_1"
+      }
+    },
+    {
+      "op": "make_solve_assembly_constraints_rassembly",
+      "params": {
+        "assembly_id": "fixture",
+        "component_placements": {
+          "plate_1": {
+            "origin": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "x_axis": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "y_axis": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z_axis": [
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "plate_2": {
+            "origin": [
+              0.0,
+              0.0,
+              4.0
+            ],
+            "x_axis": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "y_axis": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z_axis": [
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        },
+        "strict": false
+      }
+    }
+  ]
+}

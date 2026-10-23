@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import pytest
-from OCP.BRep import BRep_Builder
-from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform
-from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeSphere
-from OCP.TopoDS import TopoDS_Compound
-from OCP.gp import gp_Trsf, gp_Vec
+from simplecadapi._cpp.occt.BRep import BRep_Builder
+from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_Transform
+from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeSphere
+from simplecadapi._cpp.occt.TopoDS import TopoDS_Compound
+from simplecadapi._cpp.occt.gp import gp_Trsf, gp_Vec
 
 from simplecadapi.inspect.brep.diagnostics import (
     inspect_difference_regions_rdescriptor,

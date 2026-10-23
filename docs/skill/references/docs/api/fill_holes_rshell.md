@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def fill_holes_rshell(shell: Shell, hole_indices: Optional[Sequence[int]] = None, *, tolerance: float = 1e-06, settings: Optional[SurfaceFillingSettings] = None, tag_prefix: Optional[str] = None) -> Shell
+def fill_holes_rshell(shell, hole_indices=None, *, tolerance=1e-06, settings=None, tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

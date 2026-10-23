@@ -1,0 +1,317 @@
+{
+  "alias": {
+    "bbox": [
+      -0.5,
+      -0.5,
+      0.0,
+      0.5,
+      0.5,
+      1.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 12,
+    "face_tags": [
+      [
+        "face.back",
+        "face.box.left"
+      ],
+      [
+        "face.bottom",
+        "face.box.bottom"
+      ],
+      [
+        "face.box.back",
+        "face.left"
+      ],
+      [
+        "face.box.front",
+        "face.right"
+      ],
+      [
+        "face.box.right",
+        "face.front"
+      ],
+      [
+        "face.box.top",
+        "face.top"
+      ]
+    ],
+    "faces": 6,
+    "geo": {
+      "bottom_face_center": [
+        0,
+        0,
+        0
+      ],
+      "size": {
+        "x": 1.0,
+        "y": 1.0,
+        "z": 1.0
+      },
+      "type": "box"
+    },
+    "tags": [
+      "box",
+      "geom.primitive.box"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 6,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_box_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 8,
+    "volume": 0.9999999999999997
+  },
+  "offset": {
+    "bbox": [
+      4.0,
+      -2.5,
+      2.0,
+      6.0,
+      0.5,
+      6.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 12,
+    "face_tags": [
+      [
+        "face.back",
+        "face.box.left"
+      ],
+      [
+        "face.bottom",
+        "face.box.bottom"
+      ],
+      [
+        "face.box.back",
+        "face.left"
+      ],
+      [
+        "face.box.front",
+        "face.right"
+      ],
+      [
+        "face.box.right",
+        "face.front"
+      ],
+      [
+        "face.box.top",
+        "face.top"
+      ]
+    ],
+    "faces": 6,
+    "geo": {
+      "bottom_face_center": [
+        5,
+        -1,
+        2
+      ],
+      "size": {
+        "x": 2.0,
+        "y": 3.0,
+        "z": 4.0
+      },
+      "type": "box"
+    },
+    "tags": [
+      "box",
+      "geom.primitive.box"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 6,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_box_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 8,
+    "volume": 23.999999999999993
+  },
+  "plain": {
+    "bbox": [
+      -5.0,
+      -10.0,
+      0.0,
+      5.0,
+      10.0,
+      30.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 12,
+    "face_tags": [
+      [
+        "face.back",
+        "face.box.left"
+      ],
+      [
+        "face.bottom",
+        "face.box.bottom"
+      ],
+      [
+        "face.box.back",
+        "face.left"
+      ],
+      [
+        "face.box.front",
+        "face.right"
+      ],
+      [
+        "face.box.right",
+        "face.front"
+      ],
+      [
+        "face.box.top",
+        "face.top"
+      ]
+    ],
+    "faces": 6,
+    "geo": {
+      "bottom_face_center": [
+        0,
+        0,
+        0
+      ],
+      "size": {
+        "x": 10.0,
+        "y": 20.0,
+        "z": 30.0
+      },
+      "type": "box"
+    },
+    "tags": [
+      "box",
+      "geom.primitive.box"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 6,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_box_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 8,
+    "volume": 5999.999999999999
+  }
+}

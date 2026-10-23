@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def infer_dimension(value: 'ScalarLike') -> Dimension | None
+def infer_dimension(value)
 ```
 
 *Source: params/units.py*

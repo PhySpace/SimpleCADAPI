@@ -5,18 +5,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence, Tuple
 
-from OCP.Bnd import Bnd_Box
-from OCP.BRep import BRep_Tool
-from OCP.BRepAdaptor import BRepAdaptor_Surface
-from OCP.BRepBndLib import BRepBndLib
-from OCP.BRepExtrema import BRepExtrema_DistShapeShape
-from OCP.BRepGProp import BRepGProp
-from OCP.BRepLProp import BRepLProp_SLProps
-from OCP.GProp import GProp_GProps
-from OCP.GeomAbs import GeomAbs_Plane
+from simplecadapi._cpp.occt.Bnd import Bnd_Box
+from simplecadapi._cpp.occt.BRep import BRep_Tool
+from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Surface
+from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
+from simplecadapi._cpp.occt.BRepExtrema import BRepExtrema_DistShapeShape
+from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+from simplecadapi._cpp.occt.BRepLProp import BRepLProp_SLProps
+from simplecadapi._cpp.occt.GProp import GProp_GProps
+from simplecadapi._cpp.occt.GeomAbs import GeomAbs_Plane
 import math
 
-from OCP.TopAbs import (
+from simplecadapi._cpp.occt.TopAbs import (
     TopAbs_COMPOUND,
     TopAbs_COMPSOLID,
     TopAbs_EDGE,
@@ -27,8 +27,8 @@ from OCP.TopAbs import (
     TopAbs_VERTEX,
     TopAbs_WIRE,
 )
-from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Face, TopoDS_Shape, TopoDS_Solid
-from OCP.gp import gp_Pnt, gp_Vec
+from simplecadapi._cpp.occt.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Face, TopoDS_Shape, TopoDS_Solid
+from simplecadapi._cpp.occt.gp import gp_Pnt, gp_Vec
 
 from .ocp_topology import vertex_point
 

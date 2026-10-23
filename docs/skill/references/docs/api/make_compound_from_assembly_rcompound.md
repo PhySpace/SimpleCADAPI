@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_compound_from_assembly_rcompound(assembly: Assembly) -> Compound
+def make_compound_from_assembly_rcompound(assembly)
 ```
 
 *Source: operators/product.py*

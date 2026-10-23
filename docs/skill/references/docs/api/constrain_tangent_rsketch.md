@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def constrain_tangent_rsketch(sketch: Sketch, a: Union[SketchRef, str], b: Union[SketchRef, str], *, at_a: Optional[str] = None, at_b: Optional[str] = None, mode: str = 'external', constraint_id: Optional[str] = None) -> Sketch
+def constrain_tangent_rsketch(sketch, a, b, *, at_a=None, at_b=None, mode='external', constraint_id=None)
 ```
 
 *Source: operators/sketch.py*

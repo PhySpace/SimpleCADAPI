@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def transform_rsolid(solid: Solid, matrix: Sequence[Sequence[float]]) -> Solid
+def transform_rsolid(solid, matrix)
 ```
 
 *Source: operators/transform.py*

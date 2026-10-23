@@ -14,4 +14,4 @@ class DatumDecl(letter: str, kind: str, view: str, at: tuple, box_off: tuple = (
 
 ## Description
 
-基准符号声明（GB 基准体系）：主基准 A、辅助基准 B/C…。
+Datum symbol declaration (the GB datum system): primary datum A, secondary datums B/C…

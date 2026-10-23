@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def sweep_multisection_rsolid(profiles: Sequence[Face | Wire], path: Wire, is_frenet: bool = False, binormal: Sequence[float] | Wire | None = None) -> Solid
+def sweep_multisection_rsolid(profiles, path, is_frenet=False, binormal=None)
 ```
 
 *Source: operators/features.py*

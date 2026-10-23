@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_wire_from_sketch_rwire(sketch: Sketch, profile: int | str = 0, *, require_fully_constrained: bool = False, strict: bool = True, tolerance: float = 1e-07, max_iterations: int = 80) -> Wire
+def make_wire_from_sketch_rwire(sketch, profile=0, *, require_fully_constrained=False, strict=True, tolerance=1e-07, max_iterations=80)
 ```
 
 *Source: operators/sketch.py*

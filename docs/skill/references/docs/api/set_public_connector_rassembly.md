@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def set_public_connector_rassembly(assembly: Assembly, public_connector_id: str, source_component_id: str, source_connector_id: str, name: Optional[str] = None) -> Assembly
+def set_public_connector_rassembly(assembly, public_connector_id, source_component_id, source_connector_id, name=None)
 ```
 
 *Source: operators/product.py*

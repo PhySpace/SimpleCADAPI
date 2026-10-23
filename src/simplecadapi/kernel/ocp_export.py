@@ -5,12 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Sequence
 
-from OCP.BRep import BRep_Builder
-from OCP.BRepMesh import BRepMesh_IncrementalMesh
-from OCP.STEPControl import STEPControl_AsIs, STEPControl_Writer
-from OCP.StlAPI import StlAPI_Writer
-from OCP.TopoDS import TopoDS_Compound, TopoDS_Shape
-from OCP.IFSelect import IFSelect_RetDone
+from simplecadapi._cpp.occt.BRep import BRep_Builder
+from simplecadapi._cpp.occt.BRepMesh import BRepMesh_IncrementalMesh
+from simplecadapi._cpp.occt.STEPControl import STEPControl_AsIs, STEPControl_Writer
+from simplecadapi._cpp.occt.StlAPI import StlAPI_Writer
+from simplecadapi._cpp.occt.TopoDS import TopoDS_Compound, TopoDS_Shape
+from simplecadapi._cpp.occt.IFSelect import IFSelect_RetDone
 
 
 def make_compound(shapes: Sequence[TopoDS_Shape]) -> TopoDS_Shape:

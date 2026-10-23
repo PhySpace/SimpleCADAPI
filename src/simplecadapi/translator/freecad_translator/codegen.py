@@ -7,9 +7,13 @@ import json
 import pprint
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
-from ...params.expr import ExpressionGraph
-from ...topology import OperationNode
-from ...params.units import expression_uses_units, infer_dimension, unit_from_payload
+from simplecadapi._cpp import (
+    expression_uses_units,
+    ExpressionGraph,
+    infer_dimension,
+    OperationNode,
+    unit_from_payload,
+)
 
 
 def _json_ascii(value: Any) -> str:

@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 import pytest
-from OCP.BRep import BRep_Builder
-from OCP.BRepBuilderAPI import (
+from simplecadapi._cpp.occt.BRep import BRep_Builder
+from simplecadapi._cpp.occt.BRepBuilderAPI import (
     BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeFace,
     BRepBuilderAPI_MakeVertex,
     BRepBuilderAPI_MakeWire,
 )
-from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
-from OCP.TopAbs import TopAbs_FACE, TopAbs_VERTEX
-from OCP.TopExp import TopExp
-from OCP.TopTools import TopTools_IndexedMapOfShape
-from OCP.TopoDS import TopoDS, TopoDS_Compound, TopoDS_Edge, TopoDS_Shell
-from OCP.gp import gp_Pnt
+from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakeBox
+from simplecadapi._cpp.occt.TopAbs import TopAbs_FACE, TopAbs_VERTEX
+from simplecadapi._cpp.occt.TopExp import TopExp
+from simplecadapi._cpp.occt.TopTools import TopTools_IndexedMapOfShape
+from simplecadapi._cpp.occt.TopoDS import TopoDS, TopoDS_Compound, TopoDS_Edge, TopoDS_Shell
+from simplecadapi._cpp.occt.gp import gp_Pnt
 
 from simplecadapi.inspect import brep
 

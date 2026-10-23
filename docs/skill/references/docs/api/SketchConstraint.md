@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class SketchConstraint(constraint_id: str, kind: str, targets: Tuple[Dict[str, Any], ...], value: Any = None, driving: bool = True, metadata: Dict[str, Any] = field(default_factory=dict))
+class SketchConstraint()
 ```
 
 *Source: sketch.py*

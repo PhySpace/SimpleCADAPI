@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def value(path: str, default: Any = None) -> SerializableKey
+def value(path, default=None)
 ```
 
 *Source: ql.py*

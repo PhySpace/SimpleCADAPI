@@ -1,0 +1,32 @@
+{
+ "highlight-opaque": {
+  "silhouette_iou": 0.9974,
+  "mad_union": 1.56,
+  "mad_both": 1.39,
+  "edge_f1": 0.999,
+  "edge_precision": 1.0,
+  "edge_recall": 0.999,
+  "vtk_ink_px": 17485,
+  "soft_ink_px": 17749
+ },
+ "highlight-context": {
+  "silhouette_iou": 0.9974,
+  "mad_union": 2.64,
+  "mad_both": 2.47,
+  "edge_f1": 0.932,
+  "edge_precision": 1.0,
+  "edge_recall": 0.872,
+  "vtk_ink_px": 13524,
+  "soft_ink_px": 11286
+ },
+ "highlight-opaque-thin": {
+  "silhouette_iou": 0.9975,
+  "mad_union": 1.52,
+  "mad_both": 1.36,
+  "edge_f1": 0.999,
+  "edge_precision": 1.0,
+  "edge_recall": 0.999,
+  "vtk_ink_px": 17485,
+  "soft_ink_px": 17779
+ }
+}

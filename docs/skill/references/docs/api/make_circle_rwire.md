@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_circle_rwire(center: Tuple[float, float, float], radius: ScalarLike, normal: Tuple[float, float, float] = (0, 0, 1), *, tag_prefix: Optional[str] = None, edge_tag: Optional[str] = None) -> Wire
+def make_circle_rwire(center, radius, normal=(0, 0, 1), *, tag_prefix=None, edge_tag=None)
 ```
 
 *Source: operators/geometry.py*

@@ -1,0 +1,158 @@
+{
+  "alias": {
+    "bbox": [
+      -0.5,
+      -0.5,
+      -0.5,
+      0.5,
+      0.5,
+      0.5
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.surface"
+      ]
+    ],
+    "faces": 1,
+    "geo": {
+      "center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "radius": 0.5,
+      "type": "sphere"
+    },
+    "tags": [
+      "geom.primitive.sphere",
+      "sphere"
+    ],
+    "track": {
+      "op": "make_sphere_rsolid"
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 0.5235987755982979
+  },
+  "offset": {
+    "bbox": [
+      -1.5,
+      -0.5,
+      0.5,
+      3.5,
+      4.5,
+      5.5
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.surface"
+      ]
+    ],
+    "faces": 1,
+    "geo": {
+      "center": [
+        1.0,
+        2.0,
+        3.0
+      ],
+      "radius": 2.5,
+      "type": "sphere"
+    },
+    "tags": [
+      "geom.primitive.sphere",
+      "sphere"
+    ],
+    "track": {
+      "op": "make_sphere_rsolid"
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 65.44984694978722
+  },
+  "unit": {
+    "bbox": [
+      -1.0,
+      -1.0,
+      -1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.surface"
+      ]
+    ],
+    "faces": 1,
+    "geo": {
+      "center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "radius": 1.0,
+      "type": "sphere"
+    },
+    "tags": [
+      "geom.primitive.sphere",
+      "sphere"
+    ],
+    "track": {
+      "op": "make_sphere_rsolid"
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 4.188790204786383
+  },
+  "zero": {
+    "how_to_fix": [
+      "Use a radius greater than zero.",
+      "Pass center as a finite 3D tuple.",
+      "If the center is expression-driven, inspect the evaluated coordinates."
+    ],
+    "operation": "make_sphere_rsolid",
+    "possible_causes": [
+      "The radius is not a positive finite scalar.",
+      "The center is not a valid finite 3D point.",
+      "The kernel rejected the sphere definition."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create a sphere solid."
+  }
+}

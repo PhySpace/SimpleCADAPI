@@ -7,11 +7,11 @@ import sys
 import numpy as np
 import pytest
 import simplecadapi as scad
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
-from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform
-from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
-from OCP.BRepPrimAPI import BRepPrimAPI_MakeCylinder
-from OCP.gp import gp_Ax1, gp_Ax3, gp_Cylinder, gp_Dir, gp_Pnt, gp_Trsf
+from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Cut
+from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_Transform
+from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_MakeFace
+from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakeCylinder
+from simplecadapi._cpp.occt.gp import gp_Ax1, gp_Ax3, gp_Cylinder, gp_Dir, gp_Pnt, gp_Trsf
 
 from simplecadapi.inspect import brep
 from simplecadapi.inspect.brep.manufacturing import (

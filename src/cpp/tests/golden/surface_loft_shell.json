@@ -1,0 +1,64 @@
+{
+  "pointed": {
+    "area": 7.024814731040726,
+    "bbox": [
+      -1.0000001,
+      -1.0000001,
+      1.9999999,
+      1.0000001,
+      1.0000001,
+      4.0000001
+    ],
+    "edges": 3,
+    "faces": 1,
+    "kind": "Shell",
+    "valid": true
+  },
+  "ruled": {
+    "area": 21.074444193122176,
+    "bbox": [
+      -2.0000001,
+      -2.0000001,
+      -1e-07,
+      2.0000001,
+      2.0000001,
+      2.0000001
+    ],
+    "edges": 3,
+    "faces": 1,
+    "kind": "Shell",
+    "valid": true
+  },
+  "smooth": {
+    "area": 21.074444193122176,
+    "bbox": [
+      -2.0000001,
+      -2.0000001,
+      -1e-07,
+      2.0000001,
+      2.0000001,
+      2.0000001
+    ],
+    "edges": 3,
+    "faces": 1,
+    "kind": "Shell",
+    "valid": true
+  },
+  "square": {
+    "area": 18.24828759089466,
+    "bbox": [
+      -1.0000001,
+      -1.0000001,
+      -1e-07,
+      1.0000001,
+      1.0000001,
+      3.0000001
+    ],
+    "edges": 12,
+    "faces": 4,
+    "kind": "Shell",
+    "valid": true
+  },
+  "three": "Technical details: ValueError: loft endpoint profile must match exactly one result boundary, got 0",
+  "wires": 2
+}

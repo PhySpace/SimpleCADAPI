@@ -1,0 +1,78 @@
+{
+  "cut": {
+    "area": 12.0,
+    "tags": [],
+    "wires": 1
+  },
+  "errors": [
+    {
+      "how_to_fix": [
+        "Pass two valid Face objects.",
+        "Ensure both faces lie on the same plane.",
+        "Verify the tool face overlaps the body face."
+      ],
+      "inventory": [],
+      "measurements": [],
+      "operation": "make_2d_cut_rface",
+      "possible_causes": [
+        "The body or tool is not a Face.",
+        "The faces do not overlap or are not coplanar.",
+        "The kernel could not compute a stable 2D difference."
+      ],
+      "repair": [],
+      "technical_details": "ValueError: tool must be a Face",
+      "what_happened": "Failed to subtract one face from another."
+    },
+    {
+      "how_to_fix": [
+        "Pass two valid Face objects.",
+        "Ensure the faces overlap or share a boundary.",
+        "Ensure both faces lie on the same plane."
+      ],
+      "inventory": [],
+      "measurements": [],
+      "operation": "make_2d_union_rface",
+      "possible_causes": [
+        "One or both inputs are not Face objects.",
+        "The faces do not overlap or touch.",
+        "The faces are not coplanar."
+      ],
+      "repair": [],
+      "technical_details": "ValueError: face_a must be a Face",
+      "what_happened": "Failed to union two faces."
+    },
+    {
+      "how_to_fix": [
+        "Pass two valid Face objects.",
+        "Ensure the faces have a non-empty overlap region.",
+        "Ensure both faces lie on the same plane."
+      ],
+      "inventory": [],
+      "measurements": [],
+      "operation": "make_2d_intersect_rface",
+      "possible_causes": [
+        "One or both inputs are not Face objects.",
+        "The faces do not overlap.",
+        "The faces are not coplanar."
+      ],
+      "repair": [],
+      "technical_details": "ValueError: make_2d_intersect_rface expected exactly 1 face in the result, got 0",
+      "what_happened": "Failed to intersect two faces."
+    }
+  ],
+  "hole": {
+    "area": 15.0,
+    "tags": [],
+    "wires": 2
+  },
+  "intersect": {
+    "area": 4.0,
+    "tags": [],
+    "wires": 1
+  },
+  "union": {
+    "area": 16.0,
+    "tags": [],
+    "wires": 1
+  }
+}

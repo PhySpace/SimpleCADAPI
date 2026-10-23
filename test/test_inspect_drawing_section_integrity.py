@@ -10,24 +10,24 @@ import re
 import numpy as np
 import pymupdf
 import pytest
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
-from OCP.BRepBuilderAPI import (
+from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Cut
+from simplecadapi._cpp.occt.BRepBuilderAPI import (
     BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeWire,
     BRepBuilderAPI_MakeFace,
 )
-from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet
-from OCP.BRepCheck import BRepCheck_Analyzer
-from OCP.BRepPrimAPI import (
+from simplecadapi._cpp.occt.BRepFilletAPI import BRepFilletAPI_MakeFillet
+from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
+from simplecadapi._cpp.occt.BRepPrimAPI import (
     BRepPrimAPI_MakeBox,
     BRepPrimAPI_MakeCylinder,
     BRepPrimAPI_MakePrism,
 )
-from OCP.Geom import Geom_Circle, Geom_TrimmedCurve
-from OCP.TopAbs import TopAbs_EDGE
-from OCP.TopExp import TopExp_Explorer
-from OCP.TopoDS import TopoDS
-from OCP.gp import gp_Pnt, gp_Dir, gp_Ax2, gp_Vec
+from simplecadapi._cpp.occt.Geom import Geom_Circle, Geom_TrimmedCurve
+from simplecadapi._cpp.occt.TopAbs import TopAbs_EDGE
+from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
+from simplecadapi._cpp.occt.TopoDS import TopoDS
+from simplecadapi._cpp.occt.gp import gp_Pnt, gp_Dir, gp_Ax2, gp_Vec
 
 from simplecadapi.inspect import drawing
 from simplecadapi.inspect.drawing._circle_fit import fit_circle_diagnostics
@@ -423,8 +423,8 @@ def test_invalid_strategy_and_material_on_open_wire_are_explicit():
 
 
 def test_expected_solid_count_uses_original_model_before_material_union():
-    from OCP.BRep import BRep_Builder
-    from OCP.TopoDS import TopoDS_Compound
+    from simplecadapi._cpp.occt.BRep import BRep_Builder
+    from simplecadapi._cpp.occt.TopoDS import TopoDS_Compound
     from test_drawing_evidence_contracts import box_checks
 
     compound = TopoDS_Compound()
@@ -462,8 +462,8 @@ def test_section_diagnostics_preserve_model_geometry(perforated_fillet_plate, st
 
 
 def _brep_bytes(shape):
-    from OCP.BRepTools import BRepTools
-    from OCP.TopTools import TopTools_FormatVersion
+    from simplecadapi._cpp.occt.BRepTools import BRepTools
+    from simplecadapi._cpp.occt.TopTools import TopTools_FormatVersion
 
     stream = io.BytesIO()
     BRepTools.Write_s(
@@ -477,8 +477,8 @@ def _brep_bytes(shape):
 
 
 def _overlapping_boxes(count=2):
-    from OCP.BRep import BRep_Builder
-    from OCP.TopoDS import TopoDS_Compound
+    from simplecadapi._cpp.occt.BRep import BRep_Builder
+    from simplecadapi._cpp.occt.TopoDS import TopoDS_Compound
 
     bodies = [
         BRepPrimAPI_MakeBox(gp_Pnt(5 * i, 0, 0), 10, 20, 2).Shape()
@@ -545,7 +545,7 @@ def test_overlapping_multibody_section_preserves_original_brep(
 
 @pytest.mark.parametrize("count", [2, 3])
 def test_material_union_preserves_inputs_on_cold_and_cached_calls(count):
-    from OCP.TopAbs import TopAbs_SOLID
+    from simplecadapi._cpp.occt.TopAbs import TopAbs_SOLID
     from simplecadapi.inspect.brep import index_shape_rbrepmodel
 
     root, bodies = _overlapping_boxes(count)

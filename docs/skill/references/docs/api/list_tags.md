@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def list_tags(shape: AnyShape, scope: str | TagScope = TagScope.EFFECTIVE) -> List[str]
+def list_tags(shape, scope=<EFFECTIVE: 'effective'>)
 ```
 
 *Source: operators/selection.py*

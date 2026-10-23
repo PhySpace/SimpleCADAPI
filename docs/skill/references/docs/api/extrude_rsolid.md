@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def extrude_rsolid(profile: Union[Wire, Face], direction: Tuple[float, float, float], distance: ScalarLike, *, tag_prefix: Optional[str] = None, result_tag: Optional[str] = None, start_face_tag: Optional[str] = None, end_face_tag: Optional[str] = None, side_faces_tag: Optional[str] = None) -> Solid
+def extrude_rsolid(profile, direction, distance, *, tag_prefix=None, result_tag=None, start_face_tag=None, end_face_tag=None, side_faces_tag=None)
 ```
 
 *Source: operators/features.py*

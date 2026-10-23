@@ -1,0 +1,653 @@
+{
+  "fused": {
+    "ball": null,
+    "components": [
+      "outer_ring",
+      "inner_ring"
+    ],
+    "constraint": [
+      "revolute",
+      "outer_ring",
+      "axis",
+      "inner_ring",
+      "axis",
+      null
+    ],
+    "constraints": [
+      "inner_outer_revolute"
+    ],
+    "grounded": [],
+    "inner": {
+      "connectors": [
+        "axis"
+      ],
+      "material": null,
+      "shape": {
+        "area": 592.3113438989367,
+        "bbox": [
+          4.0,
+          0.0,
+          -3.5,
+          6.1875,
+          0.0,
+          3.5
+        ],
+        "edges": 10,
+        "faces": 6,
+        "tags": [
+          "group.ball_bearing",
+          "role.inner_ring"
+        ],
+        "volume": 459.0177171065902
+      }
+    },
+    "inner_ring_meta": {
+      "ball_pitch_radius": 7.5,
+      "bearing_width": 7.0,
+      "edge_chamfer": 0.0,
+      "groove_radius": 1.8,
+      "inner_radius": 4.0,
+      "outer_radius": 6.1875,
+      "raceway_mouth_z": 1.2318050779242633,
+      "role": "inner_ring"
+    },
+    "meta": {
+      "axial_clearance": 1.7,
+      "axis_connector_id": "axis",
+      "ball_angles_degrees": {},
+      "ball_component_ids": [],
+      "ball_count": 7,
+      "ball_diameter": 3.5,
+      "ball_pitch_radius": 7.5,
+      "bearing_width": 7.0,
+      "bore_diameter": 8.0,
+      "edge_chamfer": 0.0,
+      "groove_radius": 1.8,
+      "inner_axis_connector_id": "inner_axis",
+      "inner_component_id": "inner_ring",
+      "inner_groove_root_radius": 5.7,
+      "inner_wall_thickness": 1.7000000000000002,
+      "outer_axis_connector_id": "outer_axis",
+      "outer_component_id": "outer_ring",
+      "outer_diameter": 22.0,
+      "outer_groove_root_radius": 9.3,
+      "outer_wall_thickness": 1.6999999999999993,
+      "raceway_clearance": 0.05,
+      "revolute_constraint_id": "inner_outer_revolute",
+      "rolling_element_fuse_mode": "outer_ring_union",
+      "rolling_element_fuse_overlap": 0.02,
+      "rolling_elements_fused": true
+    },
+    "outer": {
+      "connectors": [
+        "axis"
+      ],
+      "material": null,
+      "shape": {
+        "area": 1229.8592920407355,
+        "bbox": [
+          -8.398318422384277,
+          -8.781865266992298,
+          -3.5,
+          11.0,
+          8.781865266992298,
+          3.5
+        ],
+        "edges": 51,
+        "faces": 19,
+        "tags": [
+          "role.rolling_elements_fused_into_outer_ring"
+        ],
+        "volume": 999.8447138181698
+      }
+    },
+    "public": [
+      "outer_axis",
+      "inner_axis"
+    ],
+    "ring_meta": {
+      "ball_pitch_radius": 7.5,
+      "bearing_width": 7.0,
+      "edge_chamfer": 0.0,
+      "groove_radius": 1.8,
+      "inner_radius": 8.8125,
+      "outer_radius": 11.0,
+      "raceway_mouth_z": 1.2318050779242633,
+      "role": "outer_ring"
+    }
+  },
+  "inferred": {
+    "ball": {
+      "connectors": [],
+      "material": null,
+      "shape": {
+        "area": 38.48451000647496,
+        "bbox": [
+          1.071565949253934e-16,
+          -2.624579619658251e-32,
+          -1.75,
+          1.071565949253934e-16,
+          -2.624579619658251e-32,
+          1.75
+        ],
+        "edges": 3,
+        "faces": 1,
+        "tags": [
+          "geom.primitive.sphere",
+          "group.ball_bearing",
+          "role.rolling_element",
+          "sphere"
+        ],
+        "volume": 22.449297503777025
+      }
+    },
+    "components": [
+      "outer_ring",
+      "inner_ring",
+      "ball_00",
+      "ball_01",
+      "ball_02",
+      "ball_03",
+      "ball_04",
+      "ball_05",
+      "ball_06",
+      "ball_07"
+    ],
+    "constraint": [
+      "revolute",
+      "outer_ring",
+      "axis",
+      "inner_ring",
+      "axis",
+      null
+    ],
+    "constraints": [
+      "inner_outer_revolute"
+    ],
+    "grounded": [],
+    "inner": {
+      "connectors": [
+        "axis"
+      ],
+      "material": null,
+      "shape": {
+        "area": 592.0290077581928,
+        "bbox": [
+          4.0,
+          0.0,
+          -3.5,
+          6.1875,
+          0.0,
+          3.5
+        ],
+        "edges": 10,
+        "faces": 6,
+        "tags": [
+          "group.ball_bearing",
+          "role.inner_ring"
+        ],
+        "volume": 461.96198378288625
+      }
+    },
+    "inner_ring_meta": {
+      "ball_pitch_radius": 7.5,
+      "bearing_width": 7.0,
+      "edge_chamfer": 0.0,
+      "groove_radius": 1.77,
+      "inner_radius": 4.0,
+      "outer_radius": 6.1875,
+      "raceway_mouth_z": 1.187536841533769,
+      "role": "inner_ring"
+    },
+    "meta": {
+      "axial_clearance": 1.73,
+      "axis_connector_id": "axis",
+      "ball_angles_degrees": {
+        "ball_00": 0.0,
+        "ball_01": 45.0,
+        "ball_02": 90.0,
+        "ball_03": 135.0,
+        "ball_04": 180.0,
+        "ball_05": 225.0,
+        "ball_06": 270.0,
+        "ball_07": 315.0
+      },
+      "ball_component_ids": [
+        "ball_00",
+        "ball_01",
+        "ball_02",
+        "ball_03",
+        "ball_04",
+        "ball_05",
+        "ball_06",
+        "ball_07"
+      ],
+      "ball_count": 8,
+      "ball_diameter": 3.5,
+      "ball_pitch_radius": 7.5,
+      "bearing_width": 7.0,
+      "bore_diameter": 8.0,
+      "edge_chamfer": 0.0,
+      "groove_radius": 1.77,
+      "inner_axis_connector_id": "inner_axis",
+      "inner_component_id": "inner_ring",
+      "inner_groove_root_radius": 5.73,
+      "inner_wall_thickness": 1.7300000000000004,
+      "outer_axis_connector_id": "outer_axis",
+      "outer_component_id": "outer_ring",
+      "outer_diameter": 22.0,
+      "outer_groove_root_radius": 9.27,
+      "outer_wall_thickness": 1.7300000000000004,
+      "raceway_clearance": 0.02,
+      "revolute_constraint_id": "inner_outer_revolute",
+      "rolling_element_fuse_mode": "components",
+      "rolling_element_fuse_overlap": null,
+      "rolling_elements_fused": false
+    },
+    "outer": {
+      "connectors": [
+        "axis"
+      ],
+      "material": null,
+      "shape": {
+        "area": 1161.303691659736,
+        "bbox": [
+          8.8125,
+          0.0,
+          -3.5,
+          11.0,
+          0.0,
+          3.5
+        ],
+        "edges": 10,
+        "faces": 6,
+        "tags": [
+          "group.ball_bearing",
+          "role.outer_ring"
+        ],
+        "volume": 910.9486734214424
+      }
+    },
+    "public": [
+      "outer_axis",
+      "inner_axis"
+    ],
+    "ring_meta": {
+      "ball_pitch_radius": 7.5,
+      "bearing_width": 7.0,
+      "edge_chamfer": 0.0,
+      "groove_radius": 1.77,
+      "inner_radius": 8.8125,
+      "outer_radius": 11.0,
+      "raceway_mouth_z": 1.187536841533769,
+      "role": "outer_ring"
+    }
+  },
+  "many": {
+    "ball": {
+      "connectors": [],
+      "material": null,
+      "shape": {
+        "area": 201.06192982974682,
+        "bbox": [
+          2.4492935982947064e-16,
+          -5.99903913064743e-32,
+          -4.0,
+          2.4492935982947064e-16,
+          -5.99903913064743e-32,
+          4.0
+        ],
+        "edges": 3,
+        "faces": 1,
+        "tags": [
+          "geom.primitive.sphere",
+          "group.ball_bearing",
+          "role.rolling_element",
+          "sphere"
+        ],
+        "volume": 268.08257310632854
+      }
+    },
+    "components": [
+      "outer_ring",
+      "inner_ring",
+      "ball_00",
+      "ball_01",
+      "ball_02",
+      "ball_03",
+      "ball_04",
+      "ball_05",
+      "ball_06",
+      "ball_07",
+      "ball_08",
+      "ball_09",
+      "ball_10",
+      "ball_11",
+      "ball_12",
+      "ball_13",
+      "ball_14",
+      "ball_15",
+      "ball_16",
+      "ball_17",
+      "ball_18",
+      "ball_19"
+    ],
+    "constraint": [
+      "revolute",
+      "outer_ring",
+      "axis",
+      "inner_ring",
+      "axis",
+      null
+    ],
+    "constraints": [
+      "inner_outer_revolute"
+    ],
+    "grounded": [],
+    "inner": {
+      "connectors": [
+        "axis"
+      ],
+      "material": null,
+      "shape": {
+        "area": 10616.75851345836,
+        "bbox": [
+          30.0,
+          0.0,
+          -9.0,
+          37.0,
+          0.0,
+          9.0
+        ],
+        "edges": 10,
+        "faces": 6,
+        "tags": [
+          "group.ball_bearing",
+          "role.inner_ring"
+        ],
+        "volume": 25660.89769186794
+      }
+    },
+    "inner_ring_meta": {
+      "ball_pitch_radius": 40.0,
+      "bearing_width": 18.0,
+      "edge_chamfer": 0.0,
+      "groove_radius": 4.02,
+      "inner_radius": 30.0,
+      "outer_radius": 37.0,
+      "raceway_mouth_z": 2.67589237451733,
+      "role": "inner_ring"
+    },
+    "meta": {
+      "axial_clearance": 4.98,
+      "axis_connector_id": "axis",
+      "ball_angles_degrees": {
+        "ball_00": 0.0,
+        "ball_01": 18.0,
+        "ball_02": 36.0,
+        "ball_03": 54.0,
+        "ball_04": 72.0,
+        "ball_05": 90.0,
+        "ball_06": 108.0,
+        "ball_07": 126.0,
+        "ball_08": 144.0,
+        "ball_09": 162.0,
+        "ball_10": 180.0,
+        "ball_11": 198.0,
+        "ball_12": 216.0,
+        "ball_13": 234.0,
+        "ball_14": 252.0,
+        "ball_15": 270.0,
+        "ball_16": 288.0,
+        "ball_17": 306.0,
+        "ball_18": 324.0,
+        "ball_19": 342.0
+      },
+      "ball_component_ids": [
+        "ball_00",
+        "ball_01",
+        "ball_02",
+        "ball_03",
+        "ball_04",
+        "ball_05",
+        "ball_06",
+        "ball_07",
+        "ball_08",
+        "ball_09",
+        "ball_10",
+        "ball_11",
+        "ball_12",
+        "ball_13",
+        "ball_14",
+        "ball_15",
+        "ball_16",
+        "ball_17",
+        "ball_18",
+        "ball_19"
+      ],
+      "ball_count": 20,
+      "ball_diameter": 8.0,
+      "ball_pitch_radius": 40.0,
+      "bearing_width": 18.0,
+      "bore_diameter": 60.0,
+      "edge_chamfer": 0.0,
+      "groove_radius": 4.02,
+      "inner_axis_connector_id": "inner_axis",
+      "inner_component_id": "inner_ring",
+      "inner_groove_root_radius": 35.980000000000004,
+      "inner_wall_thickness": 5.980000000000004,
+      "outer_axis_connector_id": "outer_axis",
+      "outer_component_id": "outer_ring",
+      "outer_diameter": 100.0,
+      "outer_groove_root_radius": 44.019999999999996,
+      "outer_wall_thickness": 5.980000000000004,
+      "raceway_clearance": 0.02,
+      "revolute_constraint_id": "inner_outer_revolute",
+      "rolling_element_fuse_mode": "components",
+      "rolling_element_fuse_overlap": null,
+      "rolling_elements_fused": false
+    },
+    "outer": {
+      "connectors": [
+        "axis"
+      ],
+      "material": null,
+      "shape": {
+        "area": 14769.426523941827,
+        "bbox": [
+          43.0,
+          0.0,
+          -9.0,
+          50.0,
+          0.0,
+          9.0
+        ],
+        "edges": 10,
+        "faces": 6,
+        "tags": [
+          "group.ball_bearing",
+          "role.outer_ring"
+        ],
+        "volume": 35792.236932716914
+      }
+    },
+    "public": [
+      "outer_axis",
+      "inner_axis"
+    ],
+    "ring_meta": {
+      "ball_pitch_radius": 40.0,
+      "bearing_width": 18.0,
+      "edge_chamfer": 0.0,
+      "groove_radius": 4.02,
+      "inner_radius": 43.0,
+      "outer_radius": 50.0,
+      "raceway_mouth_z": 2.67589237451733,
+      "role": "outer_ring"
+    }
+  },
+  "no_chamfer": {
+    "ball": {
+      "connectors": [],
+      "material": null,
+      "shape": {
+        "area": 38.48451000647496,
+        "bbox": [
+          1.071565949253934e-16,
+          -2.624579619658251e-32,
+          -1.75,
+          1.071565949253934e-16,
+          -2.624579619658251e-32,
+          1.75
+        ],
+        "edges": 3,
+        "faces": 1,
+        "tags": [
+          "geom.primitive.sphere",
+          "group.ball_bearing",
+          "role.rolling_element",
+          "sphere"
+        ],
+        "volume": 22.449297503777025
+      }
+    },
+    "components": [
+      "outer_ring",
+      "inner_ring",
+      "ball_00",
+      "ball_01",
+      "ball_02",
+      "ball_03",
+      "ball_04",
+      "ball_05",
+      "ball_06"
+    ],
+    "constraint": [
+      "revolute",
+      "outer_ring",
+      "axis",
+      "inner_ring",
+      "axis",
+      null
+    ],
+    "constraints": [
+      "inner_outer_revolute"
+    ],
+    "grounded": [],
+    "inner": {
+      "connectors": [
+        "axis"
+      ],
+      "material": null,
+      "shape": {
+        "area": 592.3113438989367,
+        "bbox": [
+          4.0,
+          0.0,
+          -3.5,
+          6.1875,
+          0.0,
+          3.5
+        ],
+        "edges": 10,
+        "faces": 6,
+        "tags": [
+          "group.ball_bearing",
+          "role.inner_ring"
+        ],
+        "volume": 459.0177171065902
+      }
+    },
+    "inner_ring_meta": {
+      "ball_pitch_radius": 7.5,
+      "bearing_width": 7.0,
+      "edge_chamfer": 0.0,
+      "groove_radius": 1.8,
+      "inner_radius": 4.0,
+      "outer_radius": 6.1875,
+      "raceway_mouth_z": 1.2318050779242633,
+      "role": "inner_ring"
+    },
+    "meta": {
+      "axial_clearance": 1.7,
+      "axis_connector_id": "axis",
+      "ball_angles_degrees": {
+        "ball_00": 0.0,
+        "ball_01": 51.42857142857143,
+        "ball_02": 102.85714285714286,
+        "ball_03": 154.28571428571428,
+        "ball_04": 205.71428571428572,
+        "ball_05": 257.14285714285717,
+        "ball_06": 308.57142857142856
+      },
+      "ball_component_ids": [
+        "ball_00",
+        "ball_01",
+        "ball_02",
+        "ball_03",
+        "ball_04",
+        "ball_05",
+        "ball_06"
+      ],
+      "ball_count": 7,
+      "ball_diameter": 3.5,
+      "ball_pitch_radius": 7.5,
+      "bearing_width": 7.0,
+      "bore_diameter": 8.0,
+      "edge_chamfer": 0.0,
+      "groove_radius": 1.8,
+      "inner_axis_connector_id": "inner_axis",
+      "inner_component_id": "inner_ring",
+      "inner_groove_root_radius": 5.7,
+      "inner_wall_thickness": 1.7000000000000002,
+      "outer_axis_connector_id": "outer_axis",
+      "outer_component_id": "outer_ring",
+      "outer_diameter": 22.0,
+      "outer_groove_root_radius": 9.3,
+      "outer_wall_thickness": 1.6999999999999993,
+      "raceway_clearance": 0.05,
+      "revolute_constraint_id": "inner_outer_revolute",
+      "rolling_element_fuse_mode": "components",
+      "rolling_element_fuse_overlap": null,
+      "rolling_elements_fused": false
+    },
+    "outer": {
+      "connectors": [
+        "axis"
+      ],
+      "material": null,
+      "shape": {
+        "area": 1163.0237932729185,
+        "bbox": [
+          8.8125,
+          0.0,
+          -3.5,
+          11.0,
+          0.0,
+          3.5
+        ],
+        "edges": 10,
+        "faces": 6,
+        "tags": [
+          "group.ball_bearing",
+          "role.outer_ring"
+        ],
+        "volume": 906.37617936066
+      }
+    },
+    "public": [
+      "outer_axis",
+      "inner_axis"
+    ],
+    "ring_meta": {
+      "ball_pitch_radius": 7.5,
+      "bearing_width": 7.0,
+      "edge_chamfer": 0.0,
+      "groove_radius": 1.8,
+      "inner_radius": 8.8125,
+      "outer_radius": 11.0,
+      "raceway_mouth_z": 1.2318050779242633,
+      "role": "outer_ring"
+    }
+  }
+}

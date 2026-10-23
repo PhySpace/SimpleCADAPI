@@ -1,0 +1,128 @@
+{
+  "bad_assembly": {
+    "how_to_fix": [
+      "Create connector refs with make_connector_ref_rconnectorref.",
+      "Add connectors to Parts or Assemblies before adding constrained components.",
+      "Use unique constraint ids within one Assembly."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "add_fixed_constraint_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "A connector ref references a missing component or connector.",
+      "The constraint_id is duplicated in the Assembly.",
+      "A drive value violates its scalar limit."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: assembly must be an Assembly",
+    "what_happened": "Failed to add the assembly constraint."
+  },
+  "bad_ref": {
+    "exception": "TypeError",
+    "message": "connector_a must be a ConnectorRef"
+  },
+  "belt_negative": {
+    "exception": "ValueError",
+    "message": "pulley_radius_b must be positive"
+  },
+  "duplicate_id": {
+    "how_to_fix": [
+      "Create connector refs with make_connector_ref_rconnectorref.",
+      "Add connectors to Parts or Assemblies before adding constrained components.",
+      "Use unique constraint ids within one Assembly."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "add_fixed_constraint_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "A connector ref references a missing component or connector.",
+      "The constraint_id is duplicated in the Assembly.",
+      "A drive value violates its scalar limit."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: duplicate constraint_id in assembly: f",
+    "what_happened": "Failed to add the assembly constraint."
+  },
+  "gear_bad_assembly": {
+    "how_to_fix": [
+      "Create connector refs with make_connector_ref_rconnectorref.",
+      "Add connectors to Parts or Assemblies before adding constrained components.",
+      "Use unique constraint ids within one Assembly."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "add_gear_constraint_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "A connector ref references a missing component or connector.",
+      "The constraint_id is duplicated in the Assembly.",
+      "A drive value violates its scalar limit."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: assembly must be an Assembly",
+    "what_happened": "Failed to add the assembly constraint."
+  },
+  "gear_zero": {
+    "exception": "ValueError",
+    "message": "pitch_radius_a must be positive"
+  },
+  "limit_ok": {
+    "angle_limit": null,
+    "connector_a": {
+      "component_id": "a",
+      "connector_id": "axis"
+    },
+    "connector_b": {
+      "component_id": "b",
+      "connector_id": "axis"
+    },
+    "constraint_id": "x",
+    "constraint_kind": "prismatic",
+    "distance_limit": {
+      "lower_value": 0.0,
+      "upper_value": 1.0
+    },
+    "drive_angle_degrees": null,
+    "drive_distance": 1.0,
+    "name": null,
+    "phase_offset": null,
+    "pitch_radius": null,
+    "pitch_radius_a": null,
+    "pitch_radius_b": null,
+    "pulley_radius_a": null,
+    "pulley_radius_b": null
+  },
+  "missing_connector": {
+    "how_to_fix": [
+      "Create connector refs with make_connector_ref_rconnectorref.",
+      "Add connectors to Parts or Assemblies before adding constrained components.",
+      "Use unique constraint ids within one Assembly."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "add_fixed_constraint_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "A connector ref references a missing component or connector.",
+      "The constraint_id is duplicated in the Assembly.",
+      "A drive value violates its scalar limit."
+    ],
+    "repair": [],
+    "technical_details": "KeyError: \"part has no connector_id 'ghost'\"",
+    "what_happened": "Failed to add the assembly constraint."
+  },
+  "rack_zero": {
+    "exception": "ValueError",
+    "message": "pitch_radius must be positive"
+  },
+  "revolute_distance_limit": {
+    "exception": "TypeError",
+    "message": "angle_limit must be a ScalarLimit"
+  },
+  "same_ref": {
+    "exception": "ValueError",
+    "message": "constraint cannot connect the same connector ref twice"
+  }
+}

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_edge_connector_rconnector(connector_id: str, edge: Edge, name: Optional[str] = None, flip: bool = False) -> Connector
+def make_edge_connector_rconnector(connector_id, edge, name=None, flip=False)
 ```
 
 *Source: operators/product.py*

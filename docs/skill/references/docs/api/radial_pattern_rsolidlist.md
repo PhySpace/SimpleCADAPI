@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def radial_pattern_rsolidlist(shape: AnyShape, center: Tuple[float, float, float], axis: Tuple[float, float, float], count: int, total_rotation_angle: float) -> List[Solid]
+def radial_pattern_rsolidlist(shape, center, axis, count, total_rotation_angle)
 ```
 
 *Source: operators/transform.py*

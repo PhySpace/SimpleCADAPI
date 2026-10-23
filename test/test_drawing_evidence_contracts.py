@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 
 import pytest
-from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
+from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakeBox
 
 from simplecadapi.inspect import drawing
 from simplecadapi.inspect.drawing._provenance import file_hash

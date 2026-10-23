@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def measure_constraint_residual_rconstraintresidual(assembly: Assembly, constraint_id: str) -> ConstraintResidual
+def measure_constraint_residual_rconstraintresidual(assembly, constraint_id)
 ```
 
 *Source: operators/product.py*

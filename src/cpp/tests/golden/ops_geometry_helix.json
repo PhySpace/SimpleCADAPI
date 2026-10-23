@@ -1,0 +1,220 @@
+{
+  "alias": {
+    "bbox": [
+      -0.4999995617195211,
+      -0.5000000706099897,
+      -9.999999988897769e-08,
+      0.5000001,
+      0.5000000706099889,
+      2.000000099999998
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": {
+      "edge_index": 0
+    },
+    "length": 6.5938173271140466,
+    "tags": [
+      "edge.boundary"
+    ],
+    "track": {
+      "op": "make_helix_redge"
+    },
+    "type": "Edge",
+    "vertices": 2
+  },
+  "alias_wire": {
+    "bbox": [
+      -0.4999995617195211,
+      -0.5000000706099897,
+      -9.999999988897769e-08,
+      0.5000001,
+      0.5000000706099889,
+      2.000000099999998
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 6.5938173271140466,
+    "tags": [],
+    "track": {
+      "op": "make_helix_wire"
+    },
+    "type": "Wire",
+    "vertices": 2
+  },
+  "handedness": {
+    "how_to_fix": [
+      "Use positive pitch, height, and radius values.",
+      "Pass a valid center and a non-zero direction vector.",
+      "Inspect the evaluated helix parameters before retrying."
+    ],
+    "operation": "make_helix_redge",
+    "possible_causes": [
+      "Pitch, height, or radius is not positive.",
+      "The center or direction vector is invalid.",
+      "The kernel rejected the helix definition."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create a helix edge."
+  },
+  "left": {
+    "bbox": [
+      -3.0000001080776273,
+      -3.000000108077546,
+      -1e-07,
+      3.000000108077548,
+      3.000000108077554,
+      10.00000009999998
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": {
+      "edge_index": 0
+    },
+    "length": 94.77681115449555,
+    "tags": [
+      "edge.boundary"
+    ],
+    "track": {
+      "op": "make_helix_redge"
+    },
+    "type": "Edge",
+    "vertices": 2
+  },
+  "negative_pitch": {
+    "how_to_fix": [
+      "Use positive pitch, height, and radius values.",
+      "Pass a valid center and a non-zero direction vector.",
+      "Inspect the evaluated helix parameters before retrying."
+    ],
+    "operation": "make_helix_redge",
+    "possible_causes": [
+      "Pitch, height, or radius is not positive.",
+      "The center or direction vector is invalid.",
+      "The kernel rejected the helix definition."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create a helix edge."
+  },
+  "negative_radius": {
+    "how_to_fix": [
+      "Use positive pitch, height, and radius values.",
+      "Pass a valid center and a non-zero direction vector.",
+      "Inspect the evaluated helix parameters before retrying."
+    ],
+    "operation": "make_helix_redge",
+    "possible_causes": [
+      "Pitch, height, or radius is not positive.",
+      "The center or direction vector is invalid.",
+      "The kernel rejected the helix definition."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create a helix edge."
+  },
+  "right": {
+    "bbox": [
+      -3.0000001080776273,
+      -3.000000108077554,
+      -1e-07,
+      3.000000108077548,
+      3.000000108077546,
+      10.00000009999998
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": {
+      "edge_index": 0
+    },
+    "length": 94.77681115449555,
+    "tags": [
+      "edge.boundary"
+    ],
+    "track": {
+      "op": "make_helix_redge"
+    },
+    "type": "Edge",
+    "vertices": 2
+  },
+  "tilted": {
+    "bbox": [
+      0.9999998999999999,
+      1.499999875275257,
+      2.4999996615039293,
+      4.0000000999999985,
+      2.5000001247247483,
+      3.50000033849605
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": {
+      "edge_index": 0
+    },
+    "length": 9.890724576562832,
+    "tags": [
+      "edge.boundary"
+    ],
+    "track": {
+      "op": "make_helix_redge"
+    },
+    "type": "Edge",
+    "vertices": 2
+  },
+  "wire": {
+    "bbox": [
+      -0.5000003384960471,
+      -0.500000124724913,
+      -1e-07,
+      0.5000003384960473,
+      0.5000001247247449,
+      3.0000000999999976
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 9.890724576562771,
+    "tags": [],
+    "track": {
+      "op": "make_helix_wire"
+    },
+    "type": "Wire",
+    "vertices": 2
+  },
+  "zero_height": {
+    "how_to_fix": [
+      "Use positive pitch, height, and radius values.",
+      "Pass a valid center and a non-zero direction vector.",
+      "Inspect the evaluated helix parameters before retrying."
+    ],
+    "operation": "make_helix_redge",
+    "possible_causes": [
+      "Pitch, height, or radius is not positive.",
+      "The center or direction vector is invalid.",
+      "The kernel rejected the helix definition."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create a helix edge."
+  }
+}

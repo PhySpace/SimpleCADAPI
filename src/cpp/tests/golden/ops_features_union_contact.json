@@ -1,0 +1,425 @@
+{
+  "bad_tol": [
+    {
+      "how_to_fix": [
+        "Pass only valid Solid objects or sequences of Solid objects.",
+        "For intended face contact, make the solids share a finite-area face and retry; no artificial overlap is required.",
+        "For a real small gap, pass an explicit tol only when approximating that gap is acceptable.",
+        "Do not expect glue or tol to turn point-, edge-, or tangent-only contact into a valid single solid."
+      ],
+      "inventory": [],
+      "measurements": [
+        {
+          "name": "min_gap",
+          "unit": "mm",
+          "value": 0.0
+        },
+        {
+          "name": "closest_point_a",
+          "unit": "mm",
+          "value": [
+            0.5,
+            -0.5,
+            1.0
+          ]
+        },
+        {
+          "name": "closest_point_b",
+          "unit": "mm",
+          "value": [
+            0.5,
+            -0.5,
+            1.0
+          ]
+        }
+      ],
+      "operation": "union_rsolid",
+      "possible_causes": [
+        "The operands touch without a finite-area face or positive-volume overlap."
+      ],
+      "repair": [
+        "Give the contact a positive-volume overlap: translate one operand along (0, 0, 0) by a working overlap (e.g. 0.5 mm beyond touch) and retry.",
+        "For intended face contact, make the shared face finite in area and coincident; no artificial overlap is required."
+      ],
+      "technical_details": "ValueError: tol must be a finite non-negative number",
+      "what_happened": "operands meet only along an edge, vertex, or tangent (measured gap 0 mm \u2264 tol 0), which is not one manifold solid"
+    },
+    {
+      "how_to_fix": [
+        "Pass only valid Solid objects or sequences of Solid objects.",
+        "For intended face contact, make the solids share a finite-area face and retry; no artificial overlap is required.",
+        "For a real small gap, pass an explicit tol only when approximating that gap is acceptable.",
+        "Do not expect glue or tol to turn point-, edge-, or tangent-only contact into a valid single solid."
+      ],
+      "inventory": [],
+      "measurements": [
+        {
+          "name": "min_gap",
+          "unit": "mm",
+          "value": 0.0
+        },
+        {
+          "name": "closest_point_a",
+          "unit": "mm",
+          "value": [
+            0.5,
+            -0.5,
+            1.0
+          ]
+        },
+        {
+          "name": "closest_point_b",
+          "unit": "mm",
+          "value": [
+            0.5,
+            -0.5,
+            1.0
+          ]
+        }
+      ],
+      "operation": "union_rsolid",
+      "possible_causes": [
+        "The operands touch without a finite-area face or positive-volume overlap."
+      ],
+      "repair": [
+        "Give the contact a positive-volume overlap: translate one operand along (0, 0, 0) by a working overlap (e.g. 0.5 mm beyond touch) and retry.",
+        "For intended face contact, make the shared face finite in area and coincident; no artificial overlap is required."
+      ],
+      "technical_details": "ValueError: tol must be a finite non-negative number",
+      "what_happened": "operands meet only along an edge, vertex, or tangent (measured gap 0 mm \u2264 tol 0), which is not one manifold solid"
+    },
+    {
+      "how_to_fix": [
+        "Pass only valid Solid objects or sequences of Solid objects.",
+        "For intended face contact, make the solids share a finite-area face and retry; no artificial overlap is required.",
+        "For a real small gap, pass an explicit tol only when approximating that gap is acceptable.",
+        "Do not expect glue or tol to turn point-, edge-, or tangent-only contact into a valid single solid."
+      ],
+      "inventory": [],
+      "measurements": [
+        {
+          "name": "min_gap",
+          "unit": "mm",
+          "value": 0.0
+        },
+        {
+          "name": "closest_point_a",
+          "unit": "mm",
+          "value": [
+            0.5,
+            -0.5,
+            1.0
+          ]
+        },
+        {
+          "name": "closest_point_b",
+          "unit": "mm",
+          "value": [
+            0.5,
+            -0.5,
+            1.0
+          ]
+        }
+      ],
+      "operation": "union_rsolid",
+      "possible_causes": [
+        "The operands touch without a finite-area face or positive-volume overlap."
+      ],
+      "repair": [
+        "Give the contact a positive-volume overlap: translate one operand along (0, 0, 0) by a working overlap (e.g. 0.5 mm beyond touch) and retry.",
+        "For intended face contact, make the shared face finite in area and coincident; no artificial overlap is required."
+      ],
+      "technical_details": "ValueError: tol must be a finite non-negative number",
+      "what_happened": "operands meet only along an edge, vertex, or tangent (measured gap 0 mm \u2264 tol 0), which is not one manifold solid"
+    }
+  ],
+  "gap_fails": {
+    "how_to_fix": [
+      "Pass only valid Solid objects or sequences of Solid objects.",
+      "For intended face contact, make the solids share a finite-area face and retry; no artificial overlap is required.",
+      "For a real small gap, pass an explicit tol only when approximating that gap is acceptable.",
+      "Do not expect glue or tol to turn point-, edge-, or tangent-only contact into a valid single solid."
+    ],
+    "inventory": [],
+    "measurements": [
+      {
+        "name": "min_gap",
+        "unit": "mm",
+        "value": 9.999999999998899e-05
+      },
+      {
+        "name": "closest_point_a",
+        "unit": "mm",
+        "value": [
+          0.5,
+          -0.5,
+          1.0
+        ]
+      },
+      {
+        "name": "closest_point_b",
+        "unit": "mm",
+        "value": [
+          0.5001,
+          -0.5,
+          1.0
+        ]
+      },
+      {
+        "name": "closure_vector_a_to_b",
+        "unit": "mm",
+        "value": [
+          9.999999999998899e-05,
+          0.0,
+          0.0
+        ]
+      }
+    ],
+    "operation": "union_rsolid",
+    "possible_causes": [
+      "The operands are separated in space, so the union cannot produce exactly one solid.",
+      "A placement/translation moved one operand away from the other."
+    ],
+    "repair": [
+      "Move operand 2 by (0.0001, 0, 0) (\u2265 0.0001 mm) so the operands touch, or extend one operand across the gap.",
+      "If the pieces are meant to stay separate, build an assembly (make_assembly_rassembly) instead of a single-solid union."
+    ],
+    "technical_details": "ValueError: union produced 2 separated solids; nearest detected gap is about 0.0001, which exceeds tol=2.44957e-07",
+    "what_happened": "separated solids: operand 1 and operand 2 never touch; nearest detected gap is 0.0001 mm (tolerance 2.45e-07)"
+  },
+  "gap_tol": {
+    "area": 10.000399999999999,
+    "bbox": [
+      -0.5,
+      -0.5,
+      0.0,
+      1.5001,
+      0.5,
+      1.0
+    ],
+    "edges": 12,
+    "faces": 6,
+    "tags": [],
+    "volume": 2.0000999999999993
+  },
+  "glue": {
+    "area": 596.9026039949651,
+    "bbox": [
+      3.061616997868383e-16,
+      -1.102182119232618e-15,
+      -5.0,
+      9.0,
+      0.0,
+      5.0
+    ],
+    "edges": 9,
+    "faces": 2,
+    "tags": [],
+    "volume": 1039.6053689534394
+  },
+  "touching": {
+    "area": 10.0,
+    "bbox": [
+      -0.5,
+      -0.5,
+      0.0,
+      1.5,
+      0.5,
+      1.0
+    ],
+    "edge_rows": [
+      [
+        [
+          1.0,
+          -0.5,
+          -0.5,
+          0.5
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          1.0,
+          -0.5,
+          0.0,
+          0.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          1.0,
+          -0.5,
+          0.0,
+          1.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          1.0,
+          -0.5,
+          0.5,
+          0.5
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          1.0,
+          1.5,
+          -0.5,
+          0.5
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          1.0,
+          1.5,
+          0.0,
+          0.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          1.0,
+          1.5,
+          0.0,
+          1.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          1.0,
+          1.5,
+          0.5,
+          0.5
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          2.0,
+          0.5,
+          -0.5,
+          0.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          2.0,
+          0.5,
+          -0.5,
+          1.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          2.0,
+          0.5,
+          0.5,
+          0.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          2.0,
+          0.5,
+          0.5,
+          1.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ]
+    ],
+    "edges": 12,
+    "face_rows": [
+      [
+        [
+          1.0,
+          -0.5,
+          0.0,
+          0.5
+        ],
+        []
+      ],
+      [
+        [
+          1.0,
+          1.5,
+          0.0,
+          0.5
+        ],
+        []
+      ],
+      [
+        [
+          2.0,
+          0.5,
+          -0.5,
+          0.5
+        ],
+        []
+      ],
+      [
+        [
+          2.0,
+          0.5,
+          0.0,
+          0.0
+        ],
+        []
+      ],
+      [
+        [
+          2.0,
+          0.5,
+          0.0,
+          1.0
+        ],
+        []
+      ],
+      [
+        [
+          2.0,
+          0.5,
+          0.5,
+          0.5
+        ],
+        []
+      ]
+    ],
+    "faces": 6,
+    "tags": [],
+    "volume": 1.9999999999999993
+  }
+}

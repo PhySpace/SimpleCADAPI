@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from ....topology import OperationNode
+from simplecadapi._cpp import OperationNode
 
 EMITTER_METHOD_BY_OP: Dict[str, str] = {
     "make_box_rsolid": "_emit_primitives",

@@ -1,0 +1,254 @@
+{
+  "errors": [
+    {
+      "how_to_fix": [
+        "Use count >= 1.",
+        "Use spacing > 0.",
+        "Pass a valid finite direction vector."
+      ],
+      "inventory": [],
+      "measurements": [],
+      "operation": "linear_pattern_rsolidlist",
+      "possible_causes": [
+        "The count is not a positive integer.",
+        "The spacing is not positive.",
+        "The direction vector is invalid."
+      ],
+      "repair": [],
+      "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+      "what_happened": "Failed to create the linear pattern."
+    },
+    {
+      "how_to_fix": [
+        "Use count >= 1.",
+        "Use spacing > 0.",
+        "Pass a valid finite direction vector."
+      ],
+      "inventory": [],
+      "measurements": [],
+      "operation": "linear_pattern_rsolidlist",
+      "possible_causes": [
+        "The count is not a positive integer.",
+        "The spacing is not positive.",
+        "The direction vector is invalid."
+      ],
+      "repair": [],
+      "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+      "what_happened": "Failed to create the linear pattern."
+    },
+    {
+      "how_to_fix": [
+        "Use count >= 1.",
+        "Use spacing > 0.",
+        "Pass a valid finite direction vector."
+      ],
+      "inventory": [],
+      "measurements": [],
+      "operation": "linear_pattern_rsolidlist",
+      "possible_causes": [
+        "The count is not a positive integer.",
+        "The spacing is not positive.",
+        "The direction vector is invalid."
+      ],
+      "repair": [],
+      "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+      "what_happened": "Failed to create the linear pattern."
+    },
+    {
+      "how_to_fix": [
+        "Use count >= 1.",
+        "Use a total rotation angle greater than zero.",
+        "Pass a valid center point and a non-zero axis vector."
+      ],
+      "inventory": [],
+      "measurements": [],
+      "operation": "radial_pattern_rsolidlist",
+      "possible_causes": [
+        "The count is not a positive integer.",
+        "The total rotation angle is not positive.",
+        "The center or axis is invalid."
+      ],
+      "repair": [],
+      "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+      "what_happened": "Failed to create the radial pattern."
+    },
+    {
+      "how_to_fix": [
+        "Use count >= 1.",
+        "Use a total rotation angle greater than zero.",
+        "Pass a valid center point and a non-zero axis vector."
+      ],
+      "inventory": [],
+      "measurements": [],
+      "operation": "radial_pattern_rsolidlist",
+      "possible_causes": [
+        "The count is not a positive integer.",
+        "The total rotation angle is not positive.",
+        "The center or axis is invalid."
+      ],
+      "repair": [],
+      "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+      "what_happened": "Failed to create the radial pattern."
+    }
+  ],
+  "linear": [
+    {
+      "center": [
+        0.0,
+        0.0,
+        0.25
+      ],
+      "geo": {
+        "index": 1,
+        "type": "linear"
+      },
+      "tags": [
+        "solid.pattern.linear"
+      ]
+    },
+    {
+      "center": [
+        1.0,
+        0.0,
+        0.25
+      ],
+      "geo": {
+        "index": 2,
+        "type": "linear"
+      },
+      "tags": [
+        "solid.pattern.linear"
+      ]
+    },
+    {
+      "center": [
+        2.0,
+        0.0,
+        0.25
+      ],
+      "geo": {
+        "index": 3,
+        "type": "linear"
+      },
+      "tags": [
+        "solid.pattern.linear"
+      ]
+    },
+    {
+      "center": [
+        3.0,
+        0.0,
+        0.25
+      ],
+      "geo": {
+        "index": 4,
+        "type": "linear"
+      },
+      "tags": [
+        "solid.pattern.linear"
+      ]
+    },
+    {
+      "center": [
+        4.0,
+        0.0,
+        0.25
+      ],
+      "geo": {
+        "index": 5,
+        "type": "linear"
+      },
+      "tags": [
+        "solid.pattern.linear"
+      ]
+    }
+  ],
+  "radial": [
+    {
+      "center": [
+        2.0,
+        0.0,
+        0.5
+      ],
+      "geo": {
+        "index": 1,
+        "type": "radial"
+      },
+      "tags": [
+        "box",
+        "geom.primitive.box",
+        "solid.pattern.radial"
+      ]
+    },
+    {
+      "center": [
+        1.0,
+        1.732051,
+        0.5
+      ],
+      "geo": {
+        "index": 2,
+        "type": "radial"
+      },
+      "tags": [
+        "solid.pattern.radial"
+      ]
+    },
+    {
+      "center": [
+        -1.0,
+        1.732051,
+        0.5
+      ],
+      "geo": {
+        "index": 3,
+        "type": "radial"
+      },
+      "tags": [
+        "solid.pattern.radial"
+      ]
+    },
+    {
+      "center": [
+        -2.0,
+        0.0,
+        0.5
+      ],
+      "geo": {
+        "index": 4,
+        "type": "radial"
+      },
+      "tags": [
+        "solid.pattern.radial"
+      ]
+    },
+    {
+      "center": [
+        -1.0,
+        -1.732051,
+        0.5
+      ],
+      "geo": {
+        "index": 5,
+        "type": "radial"
+      },
+      "tags": [
+        "solid.pattern.radial"
+      ]
+    },
+    {
+      "center": [
+        1.0,
+        -1.732051,
+        0.5
+      ],
+      "geo": {
+        "index": 6,
+        "type": "radial"
+      },
+      "tags": [
+        "solid.pattern.radial"
+      ]
+    }
+  ]
+}

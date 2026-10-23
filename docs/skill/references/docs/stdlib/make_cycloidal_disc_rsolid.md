@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_cycloidal_disc_rsolid(n_lobes: int, ring_pin_pitch_radius: float, roller_radius: float, eccentricity: float, gear_height: float = 6.0, *, bore_radius: float = 0.0, output_pin_count: int = 0, output_pin_pitch_radius: float = 0.0, output_pin_clearance_radius: float = 0.0, output_pin_phase: float = 0.0, sample_count_per_lobe: int = 33, spline_tolerance: float = 0.005, max_control_points: int = 20) -> Solid
+def make_cycloidal_disc_rsolid(n_lobes, ring_pin_pitch_radius, roller_radius, eccentricity, gear_height=6.0, *, bore_radius=0.0, output_pin_count=0, output_pin_pitch_radius=0.0, output_pin_clearance_radius=0.0, output_pin_phase=0.0, sample_count_per_lobe=33, spline_tolerance=0.005, max_control_points=20)
 ```
 
 *Source: std/gear.py*

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def add_circle_rsketch(sketch: Sketch, entity_id: str, center: Union[SketchRef, str], radius: ScalarLike, *, construction: bool = False) -> Sketch
+def add_circle_rsketch(sketch, entity_id, center, radius, *, construction=False)
 ```
 
 *Source: operators/sketch.py*

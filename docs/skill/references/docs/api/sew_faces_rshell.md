@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def sew_faces_rshell(faces: Sequence[Face], *, tolerance: float = 1e-06, tag_prefix: Optional[str] = None) -> Shell
+def sew_faces_rshell(faces, *, tolerance=1e-06, tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

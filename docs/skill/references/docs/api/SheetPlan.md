@@ -14,9 +14,9 @@ class SheetPlan(decl: SheetDecl)
 
 ## Description
 
-标注方案求解器：SheetDecl → solve() → resolved/accepted/report() → render()。
+The dimensioning-plan solver: SheetDecl → solve() → resolved/accepted/report() → render().
 
-求解流程：视图布局(第一角投影、align 对正) → 基准安放 → 线性尺寸
-(按视图/侧/行/大外小内排序) → 直径/半径尺寸 → 引出说明 → 参数覆盖检查。
-所有冲突处理遵循"最少调整"：优先顺延候选位置并记入 Resolved.adjust，
-放不下则记入 R1 警告，绝不静默丢弃。
+Solving: view layout (first-angle projection, align) → datum placement → linear dimensions
+(ordered by view/side/row, large outside, small inside) → diameter/radius dimensions → leaders → parameter-coverage check.
+Every conflict follows "minimum adjustment": candidate positions are shifted first and recorded in Resolved.adjust;
+when nothing fits it is recorded as an R1 warning, never silently dropped.

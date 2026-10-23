@@ -1,0 +1,527 @@
+{
+  "ball": {
+    "bbox": [
+      -10.0,
+      -10.0,
+      -10.0,
+      10.0,
+      10.0,
+      10.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.surface"
+      ]
+    ],
+    "faces": 1,
+    "geo": {
+      "center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "radius": 10.0,
+      "type": "sphere"
+    },
+    "tags": [
+      "geom.primitive.sphere",
+      "sphere"
+    ],
+    "track": {
+      "op": "make_sphere_rsolid"
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 4188.790204786379
+  },
+  "box": {
+    "bbox": [
+      -5.0,
+      -1.0,
+      10.0,
+      5.0,
+      1.0,
+      12.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 12,
+    "face_tags": [
+      [
+        "face.back",
+        "face.box.left"
+      ],
+      [
+        "face.bottom",
+        "face.box.bottom"
+      ],
+      [
+        "face.box.back",
+        "face.left"
+      ],
+      [
+        "face.box.front",
+        "face.right"
+      ],
+      [
+        "face.box.right",
+        "face.front"
+      ],
+      [
+        "face.box.top",
+        "face.top"
+      ]
+    ],
+    "faces": 6,
+    "geo": {
+      "bottom_face_center": [
+        0,
+        0,
+        10.0
+      ],
+      "size": {
+        "x": 10.0,
+        "y": 2.0,
+        "z": 2.0
+      },
+      "type": "box"
+    },
+    "tags": [
+      "box",
+      "geom.primitive.box"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 6,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_box_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 8,
+    "volume": 39.99999999999999
+  },
+  "graph": [
+    {
+      "inputs": [],
+      "op": "make_line_redge",
+      "param_exprs": {
+        "end": [
+          {
+            "expr_id": "expr_da15a863c809abf7"
+          },
+          {
+            "expr_id": "expr_5ed8aa7f3036d30e"
+          },
+          {
+            "expr_id": "expr_55cd110487805609"
+          }
+        ],
+        "start": [
+          {
+            "expr_id": "expr_30a7dcf8a9317acc"
+          },
+          {
+            "expr_id": "expr_150d5a57036b2178"
+          },
+          {
+            "expr_id": "expr_1a5f9e91aea3ffcc"
+          }
+        ]
+      },
+      "params": {
+        "end": [
+          6.0,
+          8.0,
+          0.0
+        ],
+        "start": [
+          -4.0,
+          8.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_line_redge",
+      "param_exprs": {
+        "end": [
+          {
+            "expr_id": "expr_1ec776c47230c2f1"
+          },
+          {
+            "expr_id": "expr_4d4fa18888eab3b7"
+          },
+          {
+            "expr_id": "expr_5c2f700b20c01c23"
+          }
+        ],
+        "start": [
+          {
+            "expr_id": "expr_da15a863c809abf7"
+          },
+          {
+            "expr_id": "expr_5ed8aa7f3036d30e"
+          },
+          {
+            "expr_id": "expr_55cd110487805609"
+          }
+        ]
+      },
+      "params": {
+        "end": [
+          6.0,
+          12.0,
+          0.0
+        ],
+        "start": [
+          6.0,
+          8.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_line_redge",
+      "param_exprs": {
+        "end": [
+          {
+            "expr_id": "expr_4251ee23475de5df"
+          },
+          {
+            "expr_id": "expr_fe0a17b3eed79b10"
+          },
+          {
+            "expr_id": "expr_3ba24394d22ca61d"
+          }
+        ],
+        "start": [
+          {
+            "expr_id": "expr_1ec776c47230c2f1"
+          },
+          {
+            "expr_id": "expr_4d4fa18888eab3b7"
+          },
+          {
+            "expr_id": "expr_5c2f700b20c01c23"
+          }
+        ]
+      },
+      "params": {
+        "end": [
+          -4.0,
+          12.0,
+          0.0
+        ],
+        "start": [
+          6.0,
+          12.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_line_redge",
+      "param_exprs": {
+        "end": [
+          {
+            "expr_id": "expr_30a7dcf8a9317acc"
+          },
+          {
+            "expr_id": "expr_150d5a57036b2178"
+          },
+          {
+            "expr_id": "expr_1a5f9e91aea3ffcc"
+          }
+        ],
+        "start": [
+          {
+            "expr_id": "expr_4251ee23475de5df"
+          },
+          {
+            "expr_id": "expr_fe0a17b3eed79b10"
+          },
+          {
+            "expr_id": "expr_3ba24394d22ca61d"
+          }
+        ]
+      },
+      "params": {
+        "end": [
+          -4.0,
+          8.0,
+          0.0
+        ],
+        "start": [
+          -4.0,
+          12.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "inputs": [
+        "node_00000001",
+        "node_00000002",
+        "node_00000003",
+        "node_00000004"
+      ],
+      "op": "make_wire_from_edges_rwire",
+      "param_exprs": {},
+      "params": {
+        "edge_count": 4
+      }
+    },
+    {
+      "inputs": [
+        "node_00000005"
+      ],
+      "op": "make_face_from_wire_rface",
+      "param_exprs": {},
+      "params": {
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_box_rsolid",
+      "param_exprs": {
+        "bottom_face_center": [
+          null,
+          null,
+          {
+            "expr_id": "var_eca783f99b63315a"
+          }
+        ],
+        "depth": {
+          "expr_id": "expr_bca3d784643b0fd6"
+        },
+        "width": {
+          "expr_id": "var_eca783f99b63315a"
+        }
+      },
+      "params": {
+        "bottom_face_center": [
+          0.0,
+          0.0,
+          10.0
+        ],
+        "depth": 2.0,
+        "height": 2.0,
+        "width": 10.0
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_spline_redge",
+      "param_exprs": {
+        "control_points": [
+          null,
+          [
+            null,
+            {
+              "expr_id": "var_eca783f99b63315a"
+            },
+            null
+          ],
+          null,
+          null
+        ],
+        "weights": [
+          null,
+          {
+            "expr_id": "var_31e8b20cc3461ed8"
+          },
+          null,
+          null
+        ]
+      },
+      "params": {
+        "control_points": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            10.0,
+            0.0
+          ],
+          [
+            2.0,
+            1.0,
+            0.0
+          ],
+          [
+            3.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "degree": 3,
+        "knots": [
+          0.0,
+          1.0
+        ],
+        "multiplicities": [
+          4,
+          4
+        ],
+        "periodic": false,
+        "weights": [
+          1.0,
+          4.0,
+          1.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "inputs": [
+        "node_00000008"
+      ],
+      "op": "make_wire_from_edges_rwire",
+      "param_exprs": {},
+      "params": {
+        "edge_count": 1
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_sphere_rsolid",
+      "param_exprs": {
+        "radius": {
+          "expr_id": "var_eca783f99b63315a"
+        }
+      },
+      "params": {
+        "center": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "radius": 10.0
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_angle_arc_redge",
+      "param_exprs": {
+        "end_angle": {
+          "expr_id": "var_31e8b20cc3461ed8"
+        },
+        "radius": {
+          "expr_id": "var_eca783f99b63315a"
+        }
+      },
+      "params": {
+        "center": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "end_angle": 4.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "radius": 10.0,
+        "start_angle": 0.0
+      }
+    }
+  ],
+  "rect": {
+    "area": 39.99999999999999,
+    "bbox": [
+      -4.0,
+      8.0,
+      0.0,
+      6.0,
+      12.0,
+      0.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [],
+    "track": {
+      "op": "make_face_from_wire_rface"
+    },
+    "type": "Face",
+    "vertices": 4
+  }
+}

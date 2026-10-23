@@ -1,0 +1,135 @@
+{
+  "bad_assembly": {
+    "how_to_fix": [
+      "Add the direct child component before exposing its connector.",
+      "Create the connector on the child Part or expose it on the child Assembly first.",
+      "Expose each public connector ID at most once per Assembly."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "set_public_connector_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "The component is not a direct child of the Assembly.",
+      "The connector does not exist on the child component.",
+      "The public connector ID is already used in the Assembly."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: assembly must be an Assembly",
+    "what_happened": "Failed to expose the component connector publicly."
+  },
+  "child": {
+    "assembly_id": "public_child",
+    "components": [
+      {
+        "component_id": "inner",
+        "item_id": "public_inner_part",
+        "item_kind": "part",
+        "name": null,
+        "placement": {
+          "origin": [
+            5.0,
+            0.0,
+            0.0
+          ],
+          "x_axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "y_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "z_axis": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      }
+    ],
+    "constraints": [],
+    "grounded_component_ids": [],
+    "name": null,
+    "public_connectors": [
+      {
+        "component_id": "inner",
+        "connector_id": "axis",
+        "name": "Axis",
+        "public_connector_id": "public_axis"
+      }
+    ]
+  },
+  "duplicate": {
+    "how_to_fix": [
+      "Add the direct child component before exposing its connector.",
+      "Create the connector on the child Part or expose it on the child Assembly first.",
+      "Expose each public connector ID at most once per Assembly."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "set_public_connector_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "The component is not a direct child of the Assembly.",
+      "The connector does not exist on the child component.",
+      "The public connector ID is already used in the Assembly."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: duplicate public_connector_id in assembly: public_axis",
+    "what_happened": "Failed to expose the component connector publicly."
+  },
+  "ids": [
+    "public_axis"
+  ],
+  "missing_component": {
+    "how_to_fix": [
+      "Add the direct child component before exposing its connector.",
+      "Create the connector on the child Part or expose it on the child Assembly first.",
+      "Expose each public connector ID at most once per Assembly."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "set_public_connector_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "The component is not a direct child of the Assembly.",
+      "The connector does not exist on the child component.",
+      "The public connector ID is already used in the Assembly."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: missing component or connector for public connector: \"assembly has no component_id 'ghost'\"",
+    "what_happened": "Failed to expose the component connector publicly."
+  },
+  "missing_connector": {
+    "how_to_fix": [
+      "Add the direct child component before exposing its connector.",
+      "Create the connector on the child Part or expose it on the child Assembly first.",
+      "Expose each public connector ID at most once per Assembly."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "set_public_connector_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "The component is not a direct child of the Assembly.",
+      "The connector does not exist on the child component.",
+      "The public connector ID is already used in the Assembly."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: missing component or connector for public connector: \"part has no connector_id 'ghost'\"",
+    "what_happened": "Failed to expose the component connector publicly."
+  },
+  "missing_public": {
+    "exception": "KeyError",
+    "message": "\"assembly has no public_connector_id 'ghost'\""
+  },
+  "public": {
+    "component_id": "inner",
+    "connector_id": "axis",
+    "name": "Axis",
+    "public_connector_id": "public_axis"
+  }
+}

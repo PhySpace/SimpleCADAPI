@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def helical_sweep_rsolid(profile: Wire, pitch: float, height: float, radius: float, center: Tuple[float, float, float] = (0, 0, 0), dir: Tuple[float, float, float] = (0, 0, 1), *, handedness: str = 'Right') -> Solid
+def helical_sweep_rsolid(profile, pitch, height, radius, center=(0, 0, 0), dir=(0, 0, 1), *, handedness='Right')
 ```
 
 *Source: operators/features.py*

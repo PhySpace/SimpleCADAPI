@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_ruled_surface_rface(edge_a: Edge, edge_b: Edge, *, tag_prefix: Optional[str] = None) -> Face
+def make_ruled_surface_rface(edge_a, edge_b, *, tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

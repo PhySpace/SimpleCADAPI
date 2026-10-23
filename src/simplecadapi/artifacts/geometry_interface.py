@@ -1,31 +1,13 @@
-"""Stable geometry-interface descriptors independent of raw BRep bytes."""
+"""Stable geometry-interface descriptors independent of raw BRep bytes (computed from what the C++ handles measure)."""
 
 from __future__ import annotations
 
-import math
-from collections import Counter
-from typing import Any
+from collections import Counter, OrderedDict
+from typing import Any, Dict, List, Tuple
 
-from OCP.Bnd import Bnd_Box
-from OCP.BRep import BRep_Tool
-from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
-from OCP.BRepBndLib import BRepBndLib
-from OCP.BRepGProp import BRepGProp
-from OCP.GProp import GProp_GProps
-from OCP.TopAbs import (
-    TopAbs_EDGE,
-    TopAbs_FACE,
-    TopAbs_SHELL,
-    TopAbs_SOLID,
-    TopAbs_VERTEX,
-    TopAbs_WIRE,
-)
-from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopoDS import TopoDS, TopoDS_Shape
-from OCP.TopTools import TopTools_IndexedMapOfShape
+import simplecadapi._cpp as _n
 
-from ..core import Solid
-from ..kernel.ocp_topology import vertex_point
+from . import canonical as _canonical
 from .canonical import canonical_bytes, content_hash
 
 _GEOMETRY_INTERFACE_PROFILE = "simplecad-geometry-interface-1"
@@ -76,538 +58,158 @@ def _json_safe(value: Any) -> Any:
 
 
 def _hash(payload: Any) -> str:
+    if _canonical._NATIVE is not None:
+        fast = _canonical._NATIVE.canonical_hash(payload, (), True)
+        if fast is not None:
+            return fast
     return content_hash(_json_safe(payload), omit=())
 
 
-def _raw_direction(values: Any, tolerance: float) -> list[float]:
-    vector = [float(value) for value in values]
-    magnitude = math.sqrt(sum(value * value for value in vector))
-    if magnitude <= tolerance:
-        raise ValueError("cannot canonicalize a zero direction")
-    return [value / magnitude for value in vector]
 
 
-def _canonical_direction(values: Any, tolerance: float) -> tuple[int, ...]:
-    vector = _raw_direction(values, tolerance)
-    for value in vector:
-        if abs(value) > tolerance:
-            if value < 0.0:
-                vector = [-item for item in vector]
-            break
-    return _qvec(vector, tolerance)
+def _vec(value: Any) -> Tuple[float, float, float]:
+    return (float(value.x), float(value.y), float(value.z))
 
 
-def _canonical_axis(
-    point: Any, direction: Any, tolerance: float
-) -> tuple[tuple[int, ...], tuple[int, ...]]:
-    unit = _raw_direction(direction, tolerance)
-    for value in unit:
-        if abs(value) > tolerance:
-            if value < 0.0:
-                unit = [-item for item in unit]
-            break
-    raw_point = [float(value) for value in point]
-    projection = sum(raw_point[index] * unit[index] for index in range(3))
-    closest = [raw_point[index] - projection * unit[index] for index in range(3)]
-    return _qvec(closest, tolerance), _qvec(unit, tolerance)
-
-
-def _canonical_plane(
-    point: Any, normal: Any, tolerance: float
-) -> tuple[tuple[int, ...], int]:
-    unit = _raw_direction(normal, tolerance)
-    distance = sum(float(point[index]) * unit[index] for index in range(3))
-    for value in unit:
-        if abs(value) > tolerance:
-            if value < 0.0:
-                unit = [-item for item in unit]
-                distance = -distance
-            break
-    return _qvec(unit, tolerance), _q(distance, tolerance)
-
-
-def _mass(shape: TopoDS_Shape, kind: str) -> tuple[float, tuple[float, float, float]]:
-    properties = GProp_GProps()
-    if kind == "volume":
-        BRepGProp.VolumeProperties_s(shape, properties)
-    elif kind == "area":
-        BRepGProp.SurfaceProperties_s(shape, properties)
-    elif kind == "length":
-        BRepGProp.LinearProperties_s(shape, properties)
-    else:
-        raise ValueError(f"unsupported mass property kind: {kind}")
-    point = properties.CentreOfMass()
-    return float(properties.Mass()), (
-        float(point.X()),
-        float(point.Y()),
-        float(point.Z()),
-    )
-
-
-def _bounds(shape: TopoDS_Shape, tolerance: float) -> tuple[Any, ...]:
-    # Bounds are extents, not dimensional definitions: AddOptimal's result
-    # wobbles by up to one shape-tolerance quantum between a freshly built
-    # shape and the same shape read back from BRep bytes, so the quantization
-    # grid must be far coarser than that wobble or the fingerprint flips on
-    # every round-trip (observed as whole-graph refined-hash cascades).
-    del tolerance
-    box = Bnd_Box()
-    box.SetGap(0.0)
-    BRepBndLib.AddOptimal_s(shape, box, False, False)
-    xmin, ymin, zmin, xmax, ymax, zmax = (float(value) for value in box.Get())
+def _union(boxes: List[Tuple[float, ...]]) -> Tuple[float, ...]:
     return (
-        _qvec((xmin, ymin, zmin), _BOUNDS_QUANTUM),
-        _qvec((xmax, ymax, zmax), _BOUNDS_QUANTUM),
+        min(b[0] for b in boxes),
+        min(b[1] for b in boxes),
+        min(b[2] for b in boxes),
+        max(b[3] for b in boxes),
+        max(b[4] for b in boxes),
+        max(b[5] for b in boxes),
     )
 
 
-def _point(value: Any) -> tuple[float, float, float]:
-    return float(value.X()), float(value.Y()), float(value.Z())
+def _raw_bounds(handle: Any, cache: Dict[Any, Tuple[float, ...]] | None = None) -> Tuple[float, ...]:
+    """The shape's box.  A solid / shell / wire box is exactly (bitwise: checked on every arm6 shape) the union
+    of its faces' / edges' boxes, because ``AddOptimal`` measures each face and edge on its own; the faces
+    of a drilled torus take 14 ms each, so a body measured on its own repeats all of them."""
+
+    kind = type(handle).__name__
+    if kind in ("Solid", "Shell"):
+        parts = [_raw_bounds(face, cache) for face in handle._iter_faces()]
+    elif kind == "Wire":
+        parts = [_raw_bounds(edge, cache) for edge in handle._iter_edges()]
+    else:
+        parts = []
+    if parts:
+        return _union(parts)
+    if cache is None:
+        return tuple(handle._bounds())
+    key = (kind, handle.topo_id)
+    box = cache.get(key)
+    if box is None:
+        box = cache[key] = tuple(handle._bounds())
+    return box
 
 
-def _direction(value: Any) -> tuple[float, float, float]:
-    return float(value.X()), float(value.Y()), float(value.Z())
+def _bounds(handle: Any, tolerance: float, cache: Dict[Any, Tuple[float, ...]] | None = None) -> Tuple[int, ...]:
+    return tuple(_q(v, _BOUNDS_QUANTUM) for v in _raw_bounds(handle, cache))
 
 
-def _surface_definition_hash(
-    adaptor: BRepAdaptor_Surface, kind: str, tolerance: float
-) -> str:
-    surface = adaptor.BSpline() if kind == "BSplineSurface" else adaptor.Bezier()
-    u_count = int(surface.NbUPoles())
-    v_count = int(surface.NbVPoles())
-    rational = bool(surface.IsURational() or surface.IsVRational())
-    payload: dict[str, Any] = {
-        "kind": kind,
-        "u_degree": int(surface.UDegree()),
-        "v_degree": int(surface.VDegree()),
-        "u_periodic": bool(surface.IsUPeriodic()),
-        "v_periodic": bool(surface.IsVPeriodic()),
-        "poles": [
-            [
-                _qvec(_point(surface.Pole(u, v)), tolerance)
-                for v in range(1, v_count + 1)
-            ]
-            for u in range(1, u_count + 1)
-        ],
-        "weights": (
-            [
-                [_q(surface.Weight(u, v), tolerance) for v in range(1, v_count + 1)]
-                for u in range(1, u_count + 1)
-            ]
-            if rational
-            else None
-        ),
-    }
-    if kind == "BSplineSurface":
-        payload.update(
-            u_knots=[
-                _q(surface.UKnot(index), tolerance)
-                for index in range(1, surface.NbUKnots() + 1)
-            ],
-            v_knots=[
-                _q(surface.VKnot(index), tolerance)
-                for index in range(1, surface.NbVKnots() + 1)
-            ],
-            u_multiplicities=[
-                int(surface.UMultiplicity(index))
-                for index in range(1, surface.NbUKnots() + 1)
-            ],
-            v_multiplicities=[
-                int(surface.VMultiplicity(index))
-                for index in range(1, surface.NbVKnots() + 1)
-            ],
-        )
-    return _hash(payload)
-
-
-def _curve_definition_hash(
-    adaptor: BRepAdaptor_Curve, kind: str, tolerance: float
-) -> str:
-    curve = adaptor.BSpline() if kind == "BSplineCurve" else adaptor.Bezier()
-    rational = bool(curve.IsRational())
-    payload: dict[str, Any] = {
-        "kind": kind,
-        "degree": int(curve.Degree()),
-        "periodic": bool(curve.IsPeriodic()),
-        "poles": [
-            _qvec(_point(curve.Pole(index)), tolerance)
-            for index in range(1, curve.NbPoles() + 1)
-        ],
-        "weights": (
-            [
-                _q(curve.Weight(index), tolerance)
-                for index in range(1, curve.NbPoles() + 1)
-            ]
-            if rational
-            else None
-        ),
-    }
-    if kind == "BSplineCurve":
-        payload.update(
-            knots=[
-                _q(curve.Knot(index), tolerance)
-                for index in range(1, curve.NbKnots() + 1)
-            ],
-            multiplicities=[
-                int(curve.Multiplicity(index))
-                for index in range(1, curve.NbKnots() + 1)
-            ],
-        )
-    return _hash(payload)
-
-
-def _surface_samples(adaptor: BRepAdaptor_Surface, tolerance: float) -> tuple[Any, ...]:
-    bounds = (
-        float(adaptor.FirstUParameter()),
-        float(adaptor.LastUParameter()),
-        float(adaptor.FirstVParameter()),
-        float(adaptor.LastVParameter()),
-    )
-    if not all(math.isfinite(value) for value in bounds):
-        return ()
-    u0, u1, v0, v1 = bounds
-    return tuple(
-        _qvec(_point(adaptor.Value(u0 + (u1 - u0) * u, v0 + (v1 - v0) * v)), tolerance)
-        for u in (0.0, 0.5, 1.0)
-        for v in (0.0, 0.5, 1.0)
-    )
-
-
-def _curve_samples(adaptor: BRepAdaptor_Curve, tolerance: float) -> tuple[Any, ...]:
-    first = float(adaptor.FirstParameter())
-    last = float(adaptor.LastParameter())
-    if not math.isfinite(first) or not math.isfinite(last):
-        return ()
-    return tuple(
-        _qvec(_point(adaptor.Value(first + (last - first) * ratio)), tolerance)
-        for ratio in (0.0, 0.25, 0.5, 0.75, 1.0)
-    )
-
-
-def _surface_parameters(face: TopoDS_Shape, tolerance: float) -> tuple[Any, ...]:
-    adaptor = BRepAdaptor_Surface(TopoDS.Face_s(face), True)
-    kind = _enum_suffix(adaptor.GetType(), "GeomAbs_")
-    try:
-        if kind == "Plane":
-            plane = adaptor.Plane()
-            return (
-                kind,
-                _canonical_plane(
-                    _point(plane.Location()),
-                    _direction(plane.Axis().Direction()),
-                    tolerance,
-                ),
-            )
-        if kind == "Cylinder":
-            cylinder = adaptor.Cylinder()
-            return (
-                kind,
-                _q(cylinder.Radius(), tolerance),
-                _canonical_axis(
-                    _point(cylinder.Location()),
-                    _direction(cylinder.Axis().Direction()),
-                    tolerance,
-                ),
-            )
-        if kind == "Cone":
-            cone = adaptor.Cone()
-            return (
-                kind,
-                _q(cone.RefRadius(), tolerance),
-                _q(float(cone.SemiAngle()), tolerance),
-                _canonical_axis(
-                    _point(cone.Location()),
-                    _direction(cone.Axis().Direction()),
-                    tolerance,
-                ),
-                _qvec(_point(cone.Apex()), tolerance),
-            )
-        if kind == "Sphere":
-            sphere = adaptor.Sphere()
-            return (
-                kind,
-                _q(sphere.Radius(), tolerance),
-                _qvec(_point(sphere.Location()), tolerance),
-            )
-        if kind == "Torus":
-            torus = adaptor.Torus()
-            return (
-                kind,
-                _q(torus.MajorRadius(), tolerance),
-                _q(torus.MinorRadius(), tolerance),
-                _qvec(_point(torus.Location()), tolerance),
-                _canonical_direction(_direction(torus.Axis().Direction()), tolerance),
-            )
-        if kind in {"BSplineSurface", "BezierSurface"}:
-            return (kind, _surface_definition_hash(adaptor, kind, tolerance))
-        if kind == "SurfaceOfRevolution":
-            axis = adaptor.AxeOfRevolution()
-            return (
-                kind,
-                _canonical_axis(
-                    _point(axis.Location()), _direction(axis.Direction()), tolerance
-                ),
-                _surface_samples(adaptor, tolerance),
-            )
-        if kind == "SurfaceOfExtrusion":
-            return (
-                kind,
-                _canonical_direction(_direction(adaptor.Direction()), tolerance),
-                _surface_samples(adaptor, tolerance),
-            )
-        if kind == "OffsetSurface":
-            return (
-                kind,
-                _q(adaptor.OffsetValue(), tolerance),
-                _surface_samples(adaptor, tolerance),
-            )
-    except Exception:
-        return (kind, "parameters-unavailable", _surface_samples(adaptor, tolerance))
-    return (kind, _surface_samples(adaptor, tolerance))
-
-
-def _curve_parameters(edge: TopoDS_Shape, tolerance: float) -> tuple[Any, ...]:
-    edge_value = TopoDS.Edge_s(edge)
-    if BRep_Tool.Degenerated_s(edge_value):
-        return ("DEGENERATE",)
-    adaptor = BRepAdaptor_Curve(edge_value)
-    kind = _enum_suffix(adaptor.GetType(), "GeomAbs_")
-    try:
-        if kind == "Line":
-            line = adaptor.Line()
-            return (
-                kind,
-                _canonical_axis(
-                    _point(line.Location()), _direction(line.Direction()), tolerance
-                ),
-            )
-        if kind == "Circle":
-            circle = adaptor.Circle()
-            return (
-                kind,
-                _q(circle.Radius(), tolerance),
-                _qvec(_point(circle.Location()), tolerance),
-                _canonical_direction(_direction(circle.Axis().Direction()), tolerance),
-            )
-        if kind == "Ellipse":
-            ellipse = adaptor.Ellipse()
-            return (
-                kind,
-                _q(ellipse.MajorRadius(), tolerance),
-                _q(ellipse.MinorRadius(), tolerance),
-                _qvec(_point(ellipse.Location()), tolerance),
-                _canonical_direction(_direction(ellipse.Axis().Direction()), tolerance),
-                _canonical_direction(
-                    _direction(ellipse.XAxis().Direction()), tolerance
-                ),
-            )
-        if kind == "Hyperbola":
-            hyperbola = adaptor.Hyperbola()
-            return (
-                kind,
-                _q(hyperbola.MajorRadius(), tolerance),
-                _q(hyperbola.MinorRadius(), tolerance),
-                _qvec(_point(hyperbola.Location()), tolerance),
-                _canonical_direction(
-                    _direction(hyperbola.Axis().Direction()), tolerance
-                ),
-                _canonical_direction(
-                    _direction(hyperbola.XAxis().Direction()), tolerance
-                ),
-            )
-        if kind == "Parabola":
-            parabola = adaptor.Parabola()
-            return (
-                kind,
-                _q(parabola.Focal(), tolerance),
-                _qvec(_point(parabola.Location()), tolerance),
-                _canonical_direction(
-                    _direction(parabola.Axis().Direction()), tolerance
-                ),
-                _canonical_direction(
-                    _direction(parabola.XAxis().Direction()), tolerance
-                ),
-            )
-        if kind in {"BSplineCurve", "BezierCurve"}:
-            return (kind, _curve_definition_hash(adaptor, kind, tolerance))
-    except Exception:
-        return (kind, "parameters-unavailable", _curve_samples(adaptor, tolerance))
-    return (kind, _curve_samples(adaptor, tolerance))
-
-
-def _shape_index_map(shape: TopoDS_Shape, kind: Any) -> TopTools_IndexedMapOfShape:
-    result = TopTools_IndexedMapOfShape()
-    TopExp.MapShapes_s(shape, kind, result)
-    return result
-
-
-def _entity_index(indexed: TopTools_IndexedMapOfShape, shape: TopoDS_Shape) -> int:
-    value = int(indexed.FindIndex(shape))
-    if value <= 0:
-        raise ValueError("shape is not present in indexed topology map")
-    return value - 1
-
-
-def _explore(shape: TopoDS_Shape, kind: Any) -> list[TopoDS_Shape]:
-    explorer = TopExp_Explorer(shape, kind)
-    result: list[TopoDS_Shape] = []
-    while explorer.More():
-        result.append(explorer.Current())
-        explorer.Next()
-    return result
-
-
-def _geometry_label(
-    kind: str, shape: TopoDS_Shape, tolerance: float
-) -> tuple[Any, ...]:
+def _label(kind: str, handle: Any, tolerance: float, cache: Dict[Any, Tuple[float, ...]] | None = None) -> Tuple[Any, ...]:
+    q, qvec = _q, _qvec
     if kind == "body":
-        volume, center = _mass(shape, "volume")
-        area, _ = _mass(shape, "area")
-        return (
-            kind,
-            _q(volume, tolerance),
-            _q(area, tolerance),
-            _qvec(center, tolerance),
-            _bounds(shape, tolerance),
-        )
+        return ("body", q(handle.get_volume(), tolerance), qvec(_vec(handle.get_center()), tolerance), _bounds(handle, tolerance, cache))
     if kind == "face":
-        area, center = _mass(shape, "area")
         return (
-            kind,
-            _surface_parameters(shape, tolerance),
-            _q(area, tolerance),
-            _qvec(center, tolerance),
-            _bounds(shape, tolerance),
+            "face",
+            handle._geom_type(),
+            q(handle.get_area(), tolerance),
+            qvec(_vec(handle.get_center()), tolerance),
+            qvec(_vec(handle.get_normal_at()), tolerance),
+            _bounds(handle, tolerance, cache),
         )
     if kind == "edge":
-        edge = TopoDS.Edge_s(shape)
-        length, center = _mass(shape, "length")
-        vertices = [
-            vertex_point(TopoDS.Vertex_s(vertex))
-            for vertex in _explore(shape, TopAbs_VERTEX)
-        ]
-        samples = ()
-        if not BRep_Tool.Degenerated_s(edge):
-            samples = tuple(sorted(_curve_samples(BRepAdaptor_Curve(edge), tolerance)))
-        return (
-            kind,
-            _curve_parameters(shape, tolerance),
-            _q(length, tolerance),
-            _qvec(center, tolerance),
-            tuple(sorted(_qvec(item, tolerance) for item in vertices)),
-            samples,
+        ends = sorted(
+            qvec(_vec(v.get_coordinates()) if not isinstance(v.get_coordinates(), tuple) else v.get_coordinates(), tolerance)
+            for v in handle._iter_vertices()
         )
-    return (kind, _qvec(vertex_point(TopoDS.Vertex_s(shape)), tolerance))
+        return (
+            "edge",
+            handle._geom_type(),
+            q(handle.get_length(), tolerance),
+            qvec(_vec(handle.get_center()), tolerance),
+            _bounds(handle, tolerance, cache),
+            tuple(ends),
+        )
+    coords = handle.get_coordinates()
+    coords = coords if isinstance(coords, tuple) else _vec(coords)
+    return ("vertex", qvec(coords, tolerance))
 
 
-def stable_topology_entity_hash(
-    shape: TopoDS_Shape,
-    kind: str,
-    *,
-    tolerance_profile: str = "simplecad-default",
-) -> str:
+def stable_topology_entity_hash(handle: Any, kind: str, *, tolerance_profile: str = "simplecad-default") -> str:
     """Hash one topology carrier by normalized geometry, never BRep bytes."""
 
     tolerance = _tolerance_for_profile(tolerance_profile)
-    normalized_kind = str(kind).lower()
-    if normalized_kind == "solid":
-        geometry: Any = _geometry_label("body", shape, tolerance)
-    elif normalized_kind == "shell":
+    cache: Dict[Any, Tuple[float, ...]] = {}
+    normalized = str(kind).lower()
+    if normalized == "solid":
+        geometry: Any = _label("body", handle, tolerance, cache)
+    elif normalized == "shell":
         geometry = (
             "shell",
-            _bounds(shape, tolerance),
-            tuple(
-                sorted(
-                    _geometry_label("face", item, tolerance)
-                    for item in _explore(shape, TopAbs_FACE)
-                )
-            ),
+            _bounds(handle, tolerance, cache),
+            tuple(sorted(_label("face", item, tolerance, cache) for item in handle._iter_faces())),
         )
-    elif normalized_kind == "wire":
+    elif normalized == "wire":
         geometry = (
             "wire",
-            _bounds(shape, tolerance),
-            tuple(
-                sorted(
-                    _geometry_label("edge", item, tolerance)
-                    for item in _explore(shape, TopAbs_EDGE)
-                )
-            ),
+            _bounds(handle, tolerance, cache),
+            tuple(sorted(_label("edge", item, tolerance, cache) for item in handle._iter_edges())),
         )
-    elif normalized_kind in {"face", "edge", "vertex"}:
-        geometry = _geometry_label(normalized_kind, shape, tolerance)
+    elif normalized in {"face", "edge", "vertex"}:
+        geometry = _label(normalized, handle, tolerance, cache)
     else:
         raise ValueError(f"unsupported topology entity kind: {kind}")
-    return _hash(
-        {
-            "profile": "simplecad-topology-entity-1",
-            "kind": normalized_kind,
-            "geometry": geometry,
-        }
-    )
+    return _hash({"profile": "simplecad-topology-entity-1", "kind": normalized, "geometry": geometry})
 
 
-def geometry_interface_descriptor(
-    solid: Solid,
-    *,
-    tolerance_profile: str = "simplecad-default",
-) -> dict[str, Any]:
-    """Return a traversal-independent, non-BRep-byte geometry descriptor."""
+def geometry_interface_descriptor(solid: Any, *, tolerance_profile: str = "simplecad-default") -> Dict[str, Any]:
+    """A traversal-independent, non-BRep-byte geometry descriptor."""
 
-    if not isinstance(solid, Solid):
+    if not isinstance(solid, _n.Solid):
         raise TypeError("solid must be a Solid")
     tolerance = _tolerance_for_profile(tolerance_profile)
-    shape = solid.wrapped
-    maps = {
-        "body": _shape_index_map(shape, TopAbs_SOLID),
-        "face": _shape_index_map(shape, TopAbs_FACE),
-        "edge": _shape_index_map(shape, TopAbs_EDGE),
-        "vertex": _shape_index_map(shape, TopAbs_VERTEX),
-    }
-    nodes: dict[tuple[str, int], dict[str, Any]] = {}
-    adjacency: dict[tuple[str, int], Counter[tuple[str, int]]] = {}
+    nodes: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    cache: Dict[Any, Tuple[float, ...]] = {}
+    adjacency: Dict[Tuple[str, str], Counter] = {}
 
-    def add_node(key: tuple[str, int], label: tuple[Any, ...]) -> None:
-        nodes[key] = {"kind": key[0], "label": label}
-        adjacency.setdefault(key, Counter())
+    def add(key: Tuple[str, str], kind: str, handle: Any) -> None:
+        if key not in nodes:
+            nodes[key] = {"kind": kind, "label": _label(kind, handle, tolerance, cache)}
+            adjacency.setdefault(key, Counter())
 
-    def link(first: tuple[str, int], second: tuple[str, int]) -> None:
+    def link(first: Tuple[str, str], second: Tuple[str, str]) -> None:
         adjacency.setdefault(first, Counter())[second] += 1
         adjacency.setdefault(second, Counter())[first] += 1
 
-    for kind in ("body", "face", "edge", "vertex"):
-        indexed = maps[kind]
-        for index in range(1, indexed.Extent() + 1):
-            add_node(
-                (kind, index - 1),
-                _geometry_label(kind, indexed.FindKey(index), tolerance),
-            )
+    body = ("body", solid.topo_id)
+    add(body, "body", solid)
+    for face in solid._iter_faces():
+        face_key = ("face", face.topo_id)
+        add(face_key, "face", face)
+        link(body, face_key)
+        for edge in face._iter_edges():
+            edge_key = ("edge", edge.topo_id)
+            add(edge_key, "edge", edge)
+            link(face_key, edge_key)
+    for key in [key for key in nodes if key[0] == "edge"]:
+        pass
+    seen_edges = {key[1] for key in nodes if key[0] == "edge"}
+    for face in solid._iter_faces():
+        for edge in face._iter_edges():
+            if ("edge", edge.topo_id) in adjacency and edge.topo_id in seen_edges:
+                seen_edges.discard(edge.topo_id)
+                for vertex in edge._iter_vertices():
+                    vertex_key = ("vertex", vertex.topo_id)
+                    add(vertex_key, "vertex", vertex)
+                    link(("edge", edge.topo_id), vertex_key)
 
-    for body_index in range(maps["body"].Extent()):
-        body = TopoDS.Solid_s(maps["body"].FindKey(body_index + 1))
-        for face in _explore(body, TopAbs_FACE):
-            link(
-                ("body", body_index),
-                ("face", _entity_index(maps["face"], face)),
-            )
-    for face_index in range(maps["face"].Extent()):
-        face = TopoDS.Face_s(maps["face"].FindKey(face_index + 1))
-        for edge in _explore(face, TopAbs_EDGE):
-            link(
-                ("face", face_index),
-                ("edge", _entity_index(maps["edge"], edge)),
-            )
-    for edge_index in range(maps["edge"].Extent()):
-        edge = TopoDS.Edge_s(maps["edge"].FindKey(edge_index + 1))
-        for vertex in _explore(edge, TopAbs_VERTEX):
-            link(
-                ("edge", edge_index),
-                ("vertex", _entity_index(maps["vertex"], vertex)),
-            )
-
-    refined: dict[tuple[str, int], str] = {
-        key: _hash({"kind": value["kind"], "geometry": value["label"]})
-        for key, value in nodes.items()
+    refined: Dict[Tuple[str, str], str] = {
+        key: _hash({"kind": value["kind"], "geometry": value["label"]}) for key, value in nodes.items()
     }
     for _ in range(4):
         refined = {
@@ -625,8 +227,7 @@ def geometry_interface_descriptor(
             )
             for key in nodes
         }
-
-    node_records = [
+    records: List[Dict[str, Any]] = [
         {
             "kind": value["kind"],
             "geometry": _json_safe(value["label"]),
@@ -635,38 +236,47 @@ def geometry_interface_descriptor(
         }
         for key, value in nodes.items()
     ]
-    node_records.sort(key=canonical_bytes)
+    records.sort(key=canonical_bytes)
     counts = Counter(value["kind"] for value in nodes.values())
-    volume, centroid = _mass(shape, "volume")
-    surface_area, _ = _mass(shape, "area")
-    return _json_safe({
-        "profile": _GEOMETRY_INTERFACE_PROFILE,
-        "tolerance_profile": tolerance_profile,
-        "tolerance": tolerance,
-        "body_count": counts["body"],
-        "face_count": counts["face"],
-        "edge_count": counts["edge"],
-        "vertex_count": counts["vertex"],
-        "bounds": _bounds(shape, tolerance),
-        "volume": _q(volume, tolerance),
-        "surface_area": _q(surface_area, tolerance),
-        "centroid": _qvec(centroid, tolerance),
-        "nodes": node_records,
-    })
-
-
-def geometry_interface_fingerprint(
-    solid: Solid,
-    *,
-    tolerance_profile: str = "simplecad-default",
-) -> str:
-    """Hash normalized geometry/topology descriptors, never raw BRep bytes."""
-
-    descriptor = geometry_interface_descriptor(
-        solid,
-        tolerance_profile=tolerance_profile,
+    area = sum(float(face.get_area()) for face in solid._iter_faces())
+    return _json_safe(
+        {
+            "profile": _GEOMETRY_INTERFACE_PROFILE,
+            "tolerance_profile": tolerance_profile,
+            "tolerance": tolerance,
+            "body_count": counts["body"],
+            "face_count": counts["face"],
+            "edge_count": counts["edge"],
+            "vertex_count": counts["vertex"],
+            "bounds": _bounds(solid, tolerance, cache),
+            "volume": _q(solid.get_volume(), tolerance),
+            "surface_area": _q(area, tolerance),
+            "centroid": _qvec(_vec(solid.get_center()), tolerance),
+            "nodes": records,
+        }
     )
-    return _hash(descriptor)
+
+
+# A part is fingerprinted several times (topology snapshot, interface hashes, projection, again after a
+# cache restore of the same handle): the fingerprint depends on the geometry alone, so the last few are
+# kept per OCCT shape identity.  The entry holds the solid, so the identity cannot be reused by another.
+_FINGERPRINTS: "OrderedDict[Tuple[Any, ...], Tuple[Any, str]]" = OrderedDict()
+_FINGERPRINT_MEMO = 64
+
+
+def geometry_interface_fingerprint(solid: Any, *, tolerance_profile: str = "simplecad-default") -> str:
+    if not isinstance(solid, _n.Solid):
+        raise TypeError("solid must be a Solid")
+    key = (solid._shape_key(), tolerance_profile)
+    hit = _FINGERPRINTS.get(key)
+    if hit is not None:
+        _FINGERPRINTS.move_to_end(key)
+        return hit[1]
+    value = _hash(geometry_interface_descriptor(solid, tolerance_profile=tolerance_profile))
+    _FINGERPRINTS[key] = (solid, value)
+    if len(_FINGERPRINTS) > _FINGERPRINT_MEMO:
+        _FINGERPRINTS.popitem(last=False)
+    return value
 
 
 __all__ = [

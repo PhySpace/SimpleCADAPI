@@ -7,7 +7,7 @@ from __future__ import annotations
 import copy
 import os
 from typing import Any, Dict, List, Sequence, Set, Tuple
-from ...topology import OperationGraph
+from simplecadapi._cpp import OperationGraph
 
 _ASSEMBLY_ACTIVE_STATE_PRIORITY = (
     "operating",

@@ -1,0 +1,146 @@
+{
+  "bad_color": {
+    "how_to_fix": [
+      "Use a stable identifier such as 'aluminum_6061'.",
+      "Provide density and density_unit together, or omit both.",
+      "Pass RGB color components as floats between 0.0 and 1.0."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_material_rmaterial",
+    "possible_causes": [
+      "The material_id is empty or uses unsupported characters.",
+      "The density is non-finite, non-positive, or missing a density_unit.",
+      "The color is not a 3-tuple in the [0.0, 1.0] range."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: color components must be in [0.0, 1.0]",
+    "what_happened": "Failed to create the material definition."
+  },
+  "bad_id": {
+    "how_to_fix": [
+      "Use a stable identifier such as 'aluminum_6061'.",
+      "Provide density and density_unit together, or omit both.",
+      "Pass RGB color components as floats between 0.0 and 1.0."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_material_rmaterial",
+    "possible_causes": [
+      "The material_id is empty or uses unsupported characters.",
+      "The density is non-finite, non-positive, or missing a density_unit.",
+      "The color is not a 3-tuple in the [0.0, 1.0] range."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: material_id must start with a letter and contain only letters, digits, underscore, dash, dot, or colon",
+    "what_happened": "Failed to create the material definition."
+  },
+  "density_without_unit": {
+    "how_to_fix": [
+      "Use a stable identifier such as 'aluminum_6061'.",
+      "Provide density and density_unit together, or omit both.",
+      "Pass RGB color components as floats between 0.0 and 1.0."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_material_rmaterial",
+    "possible_causes": [
+      "The material_id is empty or uses unsupported characters.",
+      "The density is non-finite, non-positive, or missing a density_unit.",
+      "The color is not a 3-tuple in the [0.0, 1.0] range."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: density_unit must be explicit when density is provided",
+    "what_happened": "Failed to create the material definition."
+  },
+  "empty_name": {
+    "how_to_fix": [
+      "Use a stable identifier such as 'aluminum_6061'.",
+      "Provide density and density_unit together, or omit both.",
+      "Pass RGB color components as floats between 0.0 and 1.0."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_material_rmaterial",
+    "possible_causes": [
+      "The material_id is empty or uses unsupported characters.",
+      "The density is non-finite, non-positive, or missing a density_unit.",
+      "The color is not a 3-tuple in the [0.0, 1.0] range."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: name must not be empty when provided",
+    "what_happened": "Failed to create the material definition."
+  },
+  "negative_density": {
+    "how_to_fix": [
+      "Use a stable identifier such as 'aluminum_6061'.",
+      "Provide density and density_unit together, or omit both.",
+      "Pass RGB color components as floats between 0.0 and 1.0."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_material_rmaterial",
+    "possible_causes": [
+      "The material_id is empty or uses unsupported characters.",
+      "The density is non-finite, non-positive, or missing a density_unit.",
+      "The color is not a 3-tuple in the [0.0, 1.0] range."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: density must be positive when provided",
+    "what_happened": "Failed to create the material definition."
+  },
+  "non_string_id": {
+    "how_to_fix": [
+      "Use a stable identifier such as 'aluminum_6061'.",
+      "Provide density and density_unit together, or omit both.",
+      "Pass RGB color components as floats between 0.0 and 1.0."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_material_rmaterial",
+    "possible_causes": [
+      "The material_id is empty or uses unsupported characters.",
+      "The density is non-finite, non-positive, or missing a density_unit.",
+      "The color is not a 3-tuple in the [0.0, 1.0] range."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: material_id must be a string",
+    "what_happened": "Failed to create the material definition."
+  },
+  "short_color": {
+    "how_to_fix": [
+      "Use a stable identifier such as 'aluminum_6061'.",
+      "Provide density and density_unit together, or omit both.",
+      "Pass RGB color components as floats between 0.0 and 1.0."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_material_rmaterial",
+    "possible_causes": [
+      "The material_id is empty or uses unsupported characters.",
+      "The density is non-finite, non-positive, or missing a density_unit.",
+      "The color is not a 3-tuple in the [0.0, 1.0] range."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: color must be a 3-element tuple or list",
+    "what_happened": "Failed to create the material definition."
+  },
+  "unit_without_density": {
+    "how_to_fix": [
+      "Use a stable identifier such as 'aluminum_6061'.",
+      "Provide density and density_unit together, or omit both.",
+      "Pass RGB color components as floats between 0.0 and 1.0."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_material_rmaterial",
+    "possible_causes": [
+      "The material_id is empty or uses unsupported characters.",
+      "The density is non-finite, non-positive, or missing a density_unit.",
+      "The color is not a 3-tuple in the [0.0, 1.0] range."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: density_unit requires density",
+    "what_happened": "Failed to create the material definition."
+  }
+}

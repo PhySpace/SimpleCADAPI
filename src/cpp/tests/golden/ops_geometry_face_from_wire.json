@@ -1,0 +1,181 @@
+{
+  "alias": {
+    "area": 4.0,
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      2.0,
+      2.0,
+      0.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [],
+    "track": {
+      "op": "make_face_from_wire_rface"
+    },
+    "type": "Face",
+    "vertices": 4
+  },
+  "circle": {
+    "area": 7.0685834705770345,
+    "bbox": [
+      -1.5,
+      -1.5,
+      0.0,
+      1.5,
+      1.5,
+      0.0
+    ],
+    "edge_tags": [
+      [
+        "c.edge.circle",
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [
+      "disc.face"
+    ],
+    "track": {
+      "op": "make_face_from_wire_rface"
+    },
+    "type": "Face",
+    "vertices": 1
+  },
+  "polyline": {
+    "area": 4.0,
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      2.0,
+      2.0,
+      0.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [],
+    "track": {
+      "op": "make_face_from_wire_rface"
+    },
+    "type": "Face",
+    "vertices": 4
+  },
+  "prefixed": {
+    "area": 2.0,
+    "bbox": [
+      -1.0,
+      -0.5,
+      0.0,
+      1.0,
+      0.5,
+      0.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "frame.edge.a"
+      ],
+      [
+        "edge.boundary",
+        "frame.edge.b"
+      ],
+      [
+        "edge.boundary",
+        "frame.edge.c"
+      ],
+      [
+        "edge.boundary",
+        "frame.edge.d"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [
+      "plate.face"
+    ],
+    "track": {
+      "op": "make_face_from_wire_rface"
+    },
+    "type": "Face",
+    "vertices": 4
+  },
+  "rectangle": {
+    "area": 2.0,
+    "bbox": [
+      -1.0,
+      -0.5,
+      0.0,
+      1.0,
+      0.5,
+      0.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "frame.edge.a"
+      ],
+      [
+        "edge.boundary",
+        "frame.edge.b"
+      ],
+      [
+        "edge.boundary",
+        "frame.edge.c"
+      ],
+      [
+        "edge.boundary",
+        "frame.edge.d"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [],
+    "track": {
+      "op": "make_face_from_wire_rface"
+    },
+    "type": "Face",
+    "vertices": 4
+  }
+}

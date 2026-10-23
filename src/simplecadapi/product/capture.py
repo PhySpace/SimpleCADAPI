@@ -9,8 +9,7 @@ from typing import Any
 from ..artifacts.assembly_definition import AssemblyDefinition
 from ..artifacts.assembly_io import materialize_definition
 from ..artifacts.part_definition import PartDefinition
-from .assembly import Assembly
-from .part import Part
+from simplecadapi._cpp import Assembly, Part
 from .packages import (
     ProductPackage,
     build_product_package,

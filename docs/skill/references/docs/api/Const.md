@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class Const(value: float, expr_id: str = '')
+class Const(value, expr_id='')
 ```
 
 *Source: params/expr.py*

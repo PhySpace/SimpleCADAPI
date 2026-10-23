@@ -8,14 +8,14 @@ from pathlib import Path
 from typing import Any, Sequence
 
 import numpy as np
-from OCP.BRep import BRep_Tool
-from OCP.BRepCheck import BRepCheck_Analyzer
-from OCP.BRepExtrema import BRepExtrema_DistShapeShape
-from OCP.ShapeAnalysis import ShapeAnalysis_ShapeTolerance
-from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_SHAPE
-from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopTools import TopTools_IndexedMapOfShape
-from OCP.TopoDS import TopoDS, TopoDS_Shape
+from simplecadapi._cpp.occt.BRep import BRep_Tool
+from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
+from simplecadapi._cpp.occt.BRepExtrema import BRepExtrema_DistShapeShape
+from simplecadapi._cpp.occt.ShapeAnalysis import ShapeAnalysis_ShapeTolerance
+from simplecadapi._cpp.occt.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_SHAPE
+from simplecadapi._cpp.occt.TopExp import TopExp, TopExp_Explorer
+from simplecadapi._cpp.occt.TopTools import TopTools_IndexedMapOfShape
+from simplecadapi._cpp.occt.TopoDS import TopoDS, TopoDS_Shape
 
 from .model import (
     BRepModel,

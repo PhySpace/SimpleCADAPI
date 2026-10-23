@@ -1,0 +1,178 @@
+{
+  "box": {
+    "bbox": [
+      1.0,
+      3.0,
+      1.5,
+      3.0,
+      7.0,
+      4.5
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 12,
+    "face_tags": [
+      [
+        "face.back",
+        "face.box.bottom"
+      ],
+      [
+        "face.bottom",
+        "face.box.right"
+      ],
+      [
+        "face.box.back",
+        "face.left"
+      ],
+      [
+        "face.box.front",
+        "face.right"
+      ],
+      [
+        "face.box.left",
+        "face.top"
+      ],
+      [
+        "face.box.top",
+        "face.front"
+      ]
+    ],
+    "faces": 6,
+    "geo": {
+      "bottom_face_center": [
+        1,
+        0,
+        1
+      ],
+      "size": {
+        "x": 2.0,
+        "y": 3.0,
+        "z": 4.0
+      },
+      "type": "box"
+    },
+    "tags": [
+      "box",
+      "geom.primitive.box"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 6,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_box_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 8,
+    "volume": 23.999999999999996
+  },
+  "cylinder": {
+    "bbox": [
+      0.0,
+      2.0,
+      1.0,
+      2.0,
+      7.0,
+      3.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "edge.cylinder.end_boundary"
+      ],
+      [
+        "edge.boundary",
+        "edge.cylinder.seam"
+      ],
+      [
+        "edge.boundary",
+        "edge.cylinder.start_boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.bottom",
+        "face.cylinder.start"
+      ],
+      [
+        "face.cylinder.end",
+        "face.top"
+      ],
+      [
+        "face.cylinder.side",
+        "face.side"
+      ]
+    ],
+    "faces": 3,
+    "geo": {
+      "axis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "bottom_face_center": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "height": 5.0,
+      "radius": 1.0,
+      "type": "cylinder"
+    },
+    "tags": [
+      "cylinder",
+      "geom.primitive.cylinder"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 6,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_cylinder_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 15.70796326794893
+  }
+}

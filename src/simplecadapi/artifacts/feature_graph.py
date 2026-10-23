@@ -19,7 +19,8 @@ from jsonschema import Draft202012Validator
 from ..scene.archive import canonical_zip_bytes, preflight_zip_bytes
 from ..recording.source_mapping import canonical_source_payload, finalize_source
 from .._internal.os_compat import with_binary_flag
-from ..topology import OperationGraph, semantic_delta_to_dict, topo_delta_to_dict
+from simplecadapi._cpp import OperationGraph
+from ..topology import semantic_delta_to_dict, topo_delta_to_dict
 from .canonical import (
     DEFAULT_ARTIFACT_LIMITS,
     ArtifactLimits,
@@ -470,9 +471,9 @@ class FeatureGraphArtifact:
     def restore_session(self):
         """Restore a detached GraphSession from the durable payload."""
 
-        from ..params.expr import ExpressionGraph
-        from ..params.frame import FrameGraph
-        from ..recording.graph import GraphSession
+        from simplecadapi._cpp import ExpressionGraph
+        from simplecadapi._cpp import FrameGraph
+        from simplecadapi._glue.session import GraphSession
         from ..params.tolerance import ToleranceGraph
 
         expression_graph = ExpressionGraph.from_dict(dict(self.expression_graph))

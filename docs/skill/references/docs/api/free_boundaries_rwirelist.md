@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def free_boundaries_rwirelist(shell: Shell, *, tolerance: float = 1e-06) -> List[Wire]
+def free_boundaries_rwirelist(shell, *, tolerance=1e-06)
 ```
 
 *Source: operators/geometry.py*

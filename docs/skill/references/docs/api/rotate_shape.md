@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def rotate_shape(shape: AnyShape, angle: ScalarLike, axis: Tuple[float, float, float] = (0, 0, 1), origin: Tuple[float, float, float] = (0, 0, 0)) -> AnyShape
+def rotate_shape(shape, angle, axis=(0, 0, 1), origin=(0, 0, 0))
 ```
 
 *Source: operators/transform.py*

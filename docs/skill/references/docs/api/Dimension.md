@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class Dimension(length: int = 0, angle: int = 0)
+class Dimension(length=0, angle=0)
 ```
 
 *Source: params/units.py*

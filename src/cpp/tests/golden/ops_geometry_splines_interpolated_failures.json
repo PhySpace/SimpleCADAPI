@@ -1,0 +1,92 @@
+{
+  "duplicate": {
+    "how_to_fix": [
+      "Provide at least two open-curve points or three periodic-curve points.",
+      "Remove consecutive duplicate points; a repeated periodic endpoint is optional.",
+      "Use a smaller positive tolerance when nearby points must remain distinct."
+    ],
+    "operation": "make_interpolated_spline_redge",
+    "possible_causes": [
+      "Too few distinct interpolation points were provided.",
+      "Consecutive points are duplicated or contain invalid coordinates.",
+      "The requested periodic interpolation is geometrically inconsistent."
+    ],
+    "technical_details": "ValueError: interpolation points 0 and 1 are within the interpolation tolerance",
+    "what_happened": "Failed to interpolate a B-spline edge through the input points."
+  },
+  "one_point": {
+    "how_to_fix": [
+      "Provide at least two open-curve points or three periodic-curve points.",
+      "Remove consecutive duplicate points; a repeated periodic endpoint is optional.",
+      "Use a smaller positive tolerance when nearby points must remain distinct."
+    ],
+    "operation": "make_interpolated_spline_redge",
+    "possible_causes": [
+      "Too few distinct interpolation points were provided.",
+      "Consecutive points are duplicated or contain invalid coordinates.",
+      "The requested periodic interpolation is geometrically inconsistent."
+    ],
+    "technical_details": "ValueError: interpolation requires at least 2 points",
+    "what_happened": "Failed to interpolate a B-spline edge through the input points."
+  },
+  "periodic_wire": {
+    "how_to_fix": [
+      "Provide at least two open-curve points or three periodic-curve points.",
+      "Remove consecutive duplicate points; a repeated periodic endpoint is optional.",
+      "Use a smaller positive tolerance when nearby points must remain distinct."
+    ],
+    "operation": "make_interpolated_spline_redge",
+    "possible_causes": [
+      "Too few distinct interpolation points were provided.",
+      "Consecutive points are duplicated or contain invalid coordinates.",
+      "The requested periodic interpolation is geometrically inconsistent."
+    ],
+    "technical_details": "ValueError: interpolation requires at least 3 distinct points",
+    "what_happened": "Failed to interpolate a B-spline edge through the input points."
+  },
+  "tolerance": {
+    "how_to_fix": [
+      "Provide at least two open-curve points or three periodic-curve points.",
+      "Remove consecutive duplicate points; a repeated periodic endpoint is optional.",
+      "Use a smaller positive tolerance when nearby points must remain distinct."
+    ],
+    "operation": "make_interpolated_spline_redge",
+    "possible_causes": [
+      "Too few distinct interpolation points were provided.",
+      "Consecutive points are duplicated or contain invalid coordinates.",
+      "The requested periodic interpolation is geometrically inconsistent."
+    ],
+    "technical_details": "ValueError: tolerance must be a finite positive value",
+    "what_happened": "Failed to interpolate a B-spline edge through the input points."
+  },
+  "two_periodic": {
+    "how_to_fix": [
+      "Provide at least two open-curve points or three periodic-curve points.",
+      "Remove consecutive duplicate points; a repeated periodic endpoint is optional.",
+      "Use a smaller positive tolerance when nearby points must remain distinct."
+    ],
+    "operation": "make_interpolated_spline_redge",
+    "possible_causes": [
+      "Too few distinct interpolation points were provided.",
+      "Consecutive points are duplicated or contain invalid coordinates.",
+      "The requested periodic interpolation is geometrically inconsistent."
+    ],
+    "technical_details": "ValueError: interpolation requires at least 3 distinct points",
+    "what_happened": "Failed to interpolate a B-spline edge through the input points."
+  },
+  "wire": {
+    "how_to_fix": [
+      "Provide at least two open-curve points or three periodic-curve points.",
+      "Remove consecutive duplicate points; a repeated periodic endpoint is optional.",
+      "Use a smaller positive tolerance when nearby points must remain distinct."
+    ],
+    "operation": "make_interpolated_spline_redge",
+    "possible_causes": [
+      "Too few distinct interpolation points were provided.",
+      "Consecutive points are duplicated or contain invalid coordinates.",
+      "The requested periodic interpolation is geometrically inconsistent."
+    ],
+    "technical_details": "ValueError: interpolation requires at least 2 points",
+    "what_happened": "Failed to interpolate a B-spline edge through the input points."
+  }
+}

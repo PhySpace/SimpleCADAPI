@@ -1,0 +1,58 @@
+{
+  "face": {
+    "how_to_fix": [
+      "Use positive radii with minor not exceeding major.",
+      "Pass a valid non-zero normal and an in-plane major direction."
+    ],
+    "operation": "make_ellipse_redge",
+    "possible_causes": [
+      "The major or minor radius is not positive.",
+      "The minor radius exceeds the major radius.",
+      "The normal or major direction vector is invalid."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create an ellipse edge."
+  },
+  "minor_larger": {
+    "how_to_fix": [
+      "Use positive radii with minor not exceeding major.",
+      "Pass a valid non-zero normal and an in-plane major direction."
+    ],
+    "operation": "make_ellipse_redge",
+    "possible_causes": [
+      "The major or minor radius is not positive.",
+      "The minor radius exceeds the major radius.",
+      "The normal or major direction vector is invalid."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create an ellipse edge."
+  },
+  "negative": {
+    "how_to_fix": [
+      "Use positive radii with minor not exceeding major.",
+      "Pass a valid non-zero normal and an in-plane major direction."
+    ],
+    "operation": "make_ellipse_redge",
+    "possible_causes": [
+      "The major or minor radius is not positive.",
+      "The minor radius exceeds the major radius.",
+      "The normal or major direction vector is invalid."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create an ellipse edge."
+  },
+  "wire": {
+    "how_to_fix": [
+      "Use positive radii with minor not exceeding major.",
+      "Pass a valid non-zero normal and an in-plane major direction."
+    ],
+    "operation": "make_ellipse_redge",
+    "possible_causes": [
+      "The major or minor radius is not positive.",
+      "The minor radius exceeds the major radius.",
+      "The normal or major direction vector is invalid."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create an ellipse edge."
+  }
+}

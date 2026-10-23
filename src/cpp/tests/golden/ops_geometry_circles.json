@@ -1,0 +1,265 @@
+{
+  "aliases": [
+    {
+      "bbox": [
+        -1.0,
+        -1.0,
+        0.0,
+        1.0,
+        1.0,
+        0.0
+      ],
+      "edge_tags": [],
+      "edges": 1,
+      "face_tags": [],
+      "faces": 0,
+      "geo": null,
+      "length": 6.283185307179586,
+      "tags": [],
+      "track": {
+        "op": "make_circle_redge"
+      },
+      "type": "Edge",
+      "vertices": 1
+    },
+    {
+      "bbox": [
+        -1.0,
+        -1.0,
+        0.0,
+        1.0,
+        1.0,
+        0.0
+      ],
+      "closed": true,
+      "edge_tags": [
+        [
+          "edge.boundary"
+        ]
+      ],
+      "edges": 1,
+      "face_tags": [],
+      "faces": 0,
+      "geo": null,
+      "length": 6.283185307179586,
+      "tags": [],
+      "track": {
+        "op": "make_circle_wire"
+      },
+      "type": "Wire",
+      "vertices": 1
+    },
+    {
+      "area": 3.1415926535897922,
+      "bbox": [
+        -1.0,
+        -1.0,
+        0.0,
+        1.0,
+        1.0,
+        0.0
+      ],
+      "edge_tags": [
+        [
+          "edge.boundary"
+        ]
+      ],
+      "edges": 1,
+      "face_tags": [],
+      "faces": 1,
+      "geo": null,
+      "tags": [],
+      "track": {
+        "op": "make_circle_face"
+      },
+      "type": "Face",
+      "vertices": 1
+    }
+  ],
+  "edge": {
+    "bbox": [
+      -1.0,
+      -1.0,
+      0.0,
+      1.0,
+      1.0,
+      0.0
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 6.283185307179586,
+    "tags": [],
+    "track": {
+      "op": "make_circle_redge"
+    },
+    "type": "Edge",
+    "vertices": 1
+  },
+  "edge_prefixed": {
+    "bbox": [
+      -0.41421356237309515,
+      0.5857864376269049,
+      1.0,
+      2.414213562373095,
+      3.414213562373095,
+      5.0
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 12.566370614359172,
+    "tags": [
+      "rim.edge"
+    ],
+    "track": {
+      "op": "make_circle_redge"
+    },
+    "type": "Edge",
+    "vertices": 1
+  },
+  "face": {
+    "area": 3.1415926535897922,
+    "bbox": [
+      -1.0,
+      -1.0,
+      0.0,
+      1.0,
+      1.0,
+      0.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [],
+    "track": {
+      "op": "make_circle_face"
+    },
+    "type": "Face",
+    "vertices": 1
+  },
+  "face_tagged": {
+    "area": 12.566370614359169,
+    "bbox": [
+      -1.0,
+      2.0,
+      1.0,
+      3.0,
+      2.0,
+      5.0
+    ],
+    "edge_tags": [
+      [
+        "disc.edge.rim",
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [
+      "disc.face"
+    ],
+    "track": {
+      "op": "make_circle_face"
+    },
+    "type": "Face",
+    "vertices": 1
+  },
+  "wire": {
+    "bbox": [
+      -1.0,
+      0.0,
+      3.0,
+      3.0,
+      4.0,
+      3.0
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 12.566370614359172,
+    "tags": [],
+    "track": {
+      "op": "make_circle_wire"
+    },
+    "type": "Wire",
+    "vertices": 1
+  },
+  "wire_edge_tag_only": {
+    "bbox": [
+      -1.0,
+      0.0,
+      3.0,
+      3.0,
+      4.0,
+      3.0
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "outer"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 12.566370614359172,
+    "tags": [],
+    "track": {
+      "op": "make_circle_wire"
+    },
+    "type": "Wire",
+    "vertices": 1
+  },
+  "wire_tagged": {
+    "bbox": [
+      -1.0,
+      0.0,
+      3.0,
+      3.0,
+      4.0,
+      3.0
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "hole.edge.outer"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 12.566370614359172,
+    "tags": [
+      "hole.wire"
+    ],
+    "track": {
+      "op": "make_circle_wire"
+    },
+    "type": "Wire",
+    "vertices": 1
+  }
+}

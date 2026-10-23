@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_straight_bevel_gear_rsolid(n_teeth: int, module: float, pitch_angle: float = 45.0, pressure_angle: float = 20.0, face_width: float = 8.0, *, addendum_factor: float = 1.0, clearance_factor: float = 0.25, backlash: float = 0.0) -> Solid
+def make_straight_bevel_gear_rsolid(n_teeth, module, pitch_angle=45.0, pressure_angle=20.0, face_width=8.0, *, addendum_factor=1.0, clearance_factor=0.25, backlash=0.0)
 ```
 
 *Source: std/gear.py*

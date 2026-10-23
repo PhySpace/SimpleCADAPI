@@ -1,0 +1,454 @@
+{
+  "fixed": {
+    "authored": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "follower": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "placements": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "follower": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "report": {
+      "grounded_component_ids": [
+        "base"
+      ],
+      "residuals": [
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "fixed",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        }
+      ],
+      "solved": true,
+      "solved_component_ids": [
+        "base",
+        "follower"
+      ],
+      "unsolved_component_ids": []
+    }
+  },
+  "hinge": {
+    "authored": {
+      "arm": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "placements": {
+      "arm": {
+        "origin": [
+          2.2551405187698492e-17,
+          -1.734723475976808e-18,
+          0.0
+        ],
+        "x_axis": [
+          6.123233995736766e-17,
+          1.0,
+          0.0
+        ],
+        "y_axis": [
+          -1.0,
+          6.123233995736766e-17,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          -0.0,
+          1.0
+        ]
+      },
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "report": {
+      "grounded_component_ids": [
+        "base"
+      ],
+      "residuals": [
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "hinge",
+          "translation_error": 6.373270656782301e-34,
+          "within_tolerance": true
+        }
+      ],
+      "solved": true,
+      "solved_component_ids": [
+        "base",
+        "arm"
+      ],
+      "unsolved_component_ids": []
+    }
+  },
+  "reverse": {
+    "authored": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "slider": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "placements": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "slider": {
+        "origin": [
+          0.0,
+          0.0,
+          -5.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "report": {
+      "grounded_component_ids": [
+        "base"
+      ],
+      "residuals": [
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "slide",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        }
+      ],
+      "solved": true,
+      "solved_component_ids": [
+        "base",
+        "slider"
+      ],
+      "unsolved_component_ids": []
+    }
+  },
+  "slide": {
+    "authored": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "slider": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "placements": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "slider": {
+        "origin": [
+          0.0,
+          0.0,
+          5.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "report": {
+      "grounded_component_ids": [
+        "base"
+      ],
+      "residuals": [
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "slide",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        }
+      ],
+      "solved": true,
+      "solved_component_ids": [
+        "base",
+        "slider"
+      ],
+      "unsolved_component_ids": []
+    }
+  }
+}

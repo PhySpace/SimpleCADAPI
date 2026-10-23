@@ -1,0 +1,38 @@
+{
+  "inherited": [
+    0,
+    6,
+    6
+  ],
+  "meta_eq_mixed_numeric": 1,
+  "meta_gt": 1,
+  "meta_incomparable": 0,
+  "meta_missing_eq_none": 6,
+  "meta_missing_ne": 6,
+  "op_event": 1,
+  "op_other_event": 0,
+  "order_by_value": [
+    600.0,
+    600.0,
+    300.0,
+    300.0,
+    200.0,
+    200.0
+  ],
+  "origin": 1,
+  "output_role": 1,
+  "prop_meta_prefix": 1,
+  "prop_metadata_path": 1,
+  "role_any": 2,
+  "role_exact": 1,
+  "role_family": 0,
+  "select": [
+    2,
+    [
+      3,
+      2,
+      1
+    ],
+    null
+  ]
+}

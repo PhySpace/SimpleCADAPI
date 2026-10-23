@@ -6,12 +6,12 @@ from pathlib import Path
 from typing import Literal
 
 import numpy as np
-from OCP.BRepCheck import BRepCheck_Analyzer
-from OCP.BRepGProp import BRepGProp
-from OCP.GProp import GProp_GProps
-from OCP.IFSelect import IFSelect_RetDone
-from OCP.STEPControl import STEPControl_Reader
-from OCP.TopoDS import TopoDS_Shape
+from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
+from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+from simplecadapi._cpp.occt.GProp import GProp_GProps
+from simplecadapi._cpp.occt.IFSelect import IFSelect_RetDone
+from simplecadapi._cpp.occt.STEPControl import STEPControl_Reader
+from simplecadapi._cpp.occt.TopoDS import TopoDS_Shape
 
 PropertyKind = Literal["volume", "area", "length"]
 

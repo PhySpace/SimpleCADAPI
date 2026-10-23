@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_solid_from_shell_rsolid(shell: Shell, *, tag_prefix: Optional[str] = None) -> Solid
+def make_solid_from_shell_rsolid(shell, *, tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

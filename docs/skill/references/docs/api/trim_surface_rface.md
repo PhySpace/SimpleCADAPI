@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def trim_surface_rface(carrier: Face, outer: Wire, holes: Sequence[Wire] = (), *, tolerance: float = 1e-07, tag_prefix: Optional[str] = None) -> Face
+def trim_surface_rface(carrier, outer, holes=[], *, tolerance=1e-07, tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

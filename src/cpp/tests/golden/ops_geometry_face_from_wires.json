@@ -1,0 +1,207 @@
+{
+  "alias": {
+    "area": 9.424777960769376,
+    "bbox": [
+      -2.0,
+      -2.0,
+      0.0,
+      2.0,
+      2.0,
+      0.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 2,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [],
+    "track": {
+      "op": "make_face_from_wires_rface"
+    },
+    "type": "Face",
+    "vertices": 2
+  },
+  "inner_not_wire": {
+    "how_to_fix": [
+      "Pass one closed outer Wire and zero or more closed inner Wire objects.",
+      "Ensure every inner wire lies inside the outer wire and does not intersect other loops.",
+      "Use a valid non-zero normal vector."
+    ],
+    "operation": "make_face_from_wires_rface",
+    "possible_causes": [
+      "The outer wire is not a Wire instance or is not closed.",
+      "One or more inner wires are not Wire instances or are not closed.",
+      "The inner wires are not contained by the outer wire or are geometrically invalid.",
+      "The kernel rejected the multi-loop face definition."
+    ],
+    "technical_details": "ValueError: inner_wires must contain only Wire objects",
+    "what_happened": "Failed to create a face from the input outer and inner wires."
+  },
+  "inner_open": {
+    "how_to_fix": [
+      "Pass one closed outer Wire and zero or more closed inner Wire objects.",
+      "Ensure every inner wire lies inside the outer wire and does not intersect other loops.",
+      "Use a valid non-zero normal vector."
+    ],
+    "operation": "make_face_from_wires_rface",
+    "possible_causes": [
+      "The outer wire is not a Wire instance or is not closed.",
+      "One or more inner wires are not Wire instances or are not closed.",
+      "The inner wires are not contained by the outer wire or are geometrically invalid.",
+      "The kernel rejected the multi-loop face definition."
+    ],
+    "technical_details": "ValueError: inner wires must be closed",
+    "what_happened": "Failed to create a face from the input outer and inner wires."
+  },
+  "no_holes": {
+    "area": 12.566370614359169,
+    "bbox": [
+      -2.0,
+      -2.0,
+      0.0,
+      2.0,
+      2.0,
+      0.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [],
+    "track": {
+      "op": "make_face_from_wires_rface"
+    },
+    "type": "Face",
+    "vertices": 1
+  },
+  "outer_not_wire": {
+    "how_to_fix": [
+      "Pass one closed outer Wire and zero or more closed inner Wire objects.",
+      "Ensure every inner wire lies inside the outer wire and does not intersect other loops.",
+      "Use a valid non-zero normal vector."
+    ],
+    "operation": "make_face_from_wires_rface",
+    "possible_causes": [
+      "The outer wire is not a Wire instance or is not closed.",
+      "One or more inner wires are not Wire instances or are not closed.",
+      "The inner wires are not contained by the outer wire or are geometrically invalid.",
+      "The kernel rejected the multi-loop face definition."
+    ],
+    "technical_details": "ValueError: outer_wire must be a Wire",
+    "what_happened": "Failed to create a face from the input outer and inner wires."
+  },
+  "outer_open": {
+    "how_to_fix": [
+      "Pass one closed outer Wire and zero or more closed inner Wire objects.",
+      "Ensure every inner wire lies inside the outer wire and does not intersect other loops.",
+      "Use a valid non-zero normal vector."
+    ],
+    "operation": "make_face_from_wires_rface",
+    "possible_causes": [
+      "The outer wire is not a Wire instance or is not closed.",
+      "One or more inner wires are not Wire instances or are not closed.",
+      "The inner wires are not contained by the outer wire or are geometrically invalid.",
+      "The kernel rejected the multi-loop face definition."
+    ],
+    "technical_details": "ValueError: outer_wire must be closed",
+    "what_happened": "Failed to create a face from the input outer and inner wires."
+  },
+  "plate": {
+    "area": 93.71681469282039,
+    "bbox": [
+      -5.0,
+      -5.0,
+      0.0,
+      5.0,
+      5.0,
+      0.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 6,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [],
+    "track": {
+      "op": "make_face_from_wires_rface"
+    },
+    "type": "Face",
+    "vertices": 6
+  },
+  "ring": {
+    "area": 9.424777960769376,
+    "bbox": [
+      -2.0,
+      -2.0,
+      0.0,
+      2.0,
+      2.0,
+      0.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 2,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [],
+    "track": {
+      "op": "make_face_from_wires_rface"
+    },
+    "type": "Face",
+    "vertices": 2
+  },
+  "zero_normal": {
+    "how_to_fix": [
+      "Pass one closed outer Wire and zero or more closed inner Wire objects.",
+      "Ensure every inner wire lies inside the outer wire and does not intersect other loops.",
+      "Use a valid non-zero normal vector."
+    ],
+    "operation": "make_face_from_wires_rface",
+    "possible_causes": [
+      "The outer wire is not a Wire instance or is not closed.",
+      "One or more inner wires are not Wire instances or are not closed.",
+      "The inner wires are not contained by the outer wire or are geometrically invalid.",
+      "The kernel rejected the multi-loop face definition."
+    ],
+    "technical_details": "ValueError: normal must be a non-zero finite vector",
+    "what_happened": "Failed to create a face from the input outer and inner wires."
+  }
+}

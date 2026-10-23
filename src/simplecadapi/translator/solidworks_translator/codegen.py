@@ -6,7 +6,7 @@ import json
 import pprint
 from typing import Any
 
-from ...topology import OperationNode
+from simplecadapi._cpp import OperationNode
 
 
 def _json_ascii(value: Any) -> str:

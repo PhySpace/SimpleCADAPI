@@ -1,0 +1,35 @@
+{
+  "closed": {
+    "area": 18.849572086011648,
+    "bbox": [
+      -1.0000001,
+      -1.0000001,
+      -1e-07,
+      1.0000001,
+      1.0000001,
+      2.0000001000000003
+    ],
+    "edges": 3,
+    "faces": 3,
+    "kind": "Shell",
+    "valid": false
+  },
+  "is_closed": true,
+  "one": {
+    "area": 15.70797135018541,
+    "bbox": [
+      -1.0000001,
+      -1.0000001,
+      -1e-07,
+      1.0000001,
+      1.0000001,
+      2.0000001
+    ],
+    "edges": 3,
+    "faces": 2,
+    "kind": "Shell",
+    "valid": false
+  },
+  "remaining": 1,
+  "solid_error": "Technical details: ValueError: solid-from-shell requires a valid shell"
+}

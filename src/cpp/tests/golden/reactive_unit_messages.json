@@ -1,0 +1,26 @@
+{
+  "convert": [
+    "UnitValidationError",
+    "Cannot convert Length unit 'mm' to Angle unit 'deg'"
+  ],
+  "nonfinite": [
+    "ValueError",
+    "Value in mm must be finite"
+  ],
+  "range": [
+    "ValueError",
+    "Value in m is outside the supported range"
+  ],
+  "scale": [
+    "ValueError",
+    "Unit scale must be finite and greater than zero"
+  ],
+  "sqrt": [
+    "UnitValidationError",
+    "Cannot take sqrt of Length; every dimension exponent must be even"
+  ],
+  "unknown": [
+    "ValueError",
+    "Unknown unit 'parsec'; supported units: %, 1, cm, cm^2, cm^3, deg, ft, ft^2, ft^3, in, in^2, in^3, m, m^2, m^3, mm, mm^2, mm^3, rad"
+  ]
+}

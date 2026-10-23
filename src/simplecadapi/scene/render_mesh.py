@@ -9,15 +9,8 @@ from typing import Iterable, Sequence
 
 import numpy as np
 
-from OCP.BRepAdaptor import BRepAdaptor_Curve
-from OCP.GCPnts import GCPnts_TangentialDeflection
-from OCP.TopAbs import TopAbs_FORWARD, TopAbs_REVERSED
-from OCP.TopLoc import TopLoc_Location
-from OCP.TopoDS import TopoDS
-
 from .._internal.mesh import DEFAULT_ANGULAR_TOLERANCE, TriMesh, cached_mesh, mesh_error
-from ..core import Solid
-from ..kernel.ocp_properties import bounding_box
+from simplecadapi._cpp import Solid
 from ..scene.glb import profile_cross, profile_f32, profile_f32_bits, profile_normalize
 
 
@@ -153,7 +146,7 @@ def build_edge_mesh(
         raise ValueError("edge entity count does not match the solid topology")
     blocks = tuple(
         _edge_block(
-            edge.wrapped,
+            edge if hasattr(edge, "_polyline") else edge.wrapped,
             entity_id=entity_id,
             linear_tolerance=linear_tolerance,
             angular_tolerance=angular_tolerance,
@@ -193,6 +186,11 @@ def build_edge_mesh(
 
 
 def solid_asset_bounds(solid: Solid) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    if hasattr(solid, "_bounds"):  # the native kernel
+        xmin, ymin, zmin, xmax, ymax, zmax = solid._bounds()
+        return ((float(xmin), float(ymin), float(zmin)), (float(xmax), float(ymax), float(zmax)))
+    from ..kernel.ocp_properties import bounding_box
+
     box = bounding_box(solid.wrapped)
     return (
         (float(box.xmin), float(box.ymin), float(box.zmin)),
@@ -201,12 +199,15 @@ def solid_asset_bounds(solid: Solid) -> tuple[tuple[float, float, float], tuple[
 
 
 def _prepare_shape(shape, *, force_forward: bool):
+    from simplecadapi._cpp.occt.TopAbs import TopAbs_FORWARD
+    from simplecadapi._cpp.occt.TopLoc import TopLoc_Location
+
     oriented = shape.Oriented(TopAbs_FORWARD) if force_forward else shape
     location = oriented.Location()
     unlocated = oriented.Located(TopLoc_Location(), False)
     if location.IsIdentity():
         return unlocated
-    from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform
+    from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_Transform
 
     builder = BRepBuilderAPI_Transform(unlocated, location.Transformation(), True, False)
     builder.Build()
@@ -347,25 +348,36 @@ def _edge_block(
     linear_tolerance: float,
     angular_tolerance: float,
 ) -> CanonicalEdgeBlock:
-    prepared = TopoDS.Edge_s(_prepare_shape(edge, force_forward=True))
-    adaptor = BRepAdaptor_Curve(prepared)
-    try:
-        sampler = GCPnts_TangentialDeflection(
-            adaptor,
-            adaptor.FirstParameter(),
-            adaptor.LastParameter(),
-            float(angular_tolerance),
-            float(linear_tolerance),
-            2,
-            1e-9,
-            1e-7,
+    if hasattr(edge, "_polyline"):  # the native kernel samples the edge itself
+        try:
+            points = edge._polyline(float(linear_tolerance), float(angular_tolerance))
+        except Exception as exc:
+            raise ValueError(f"edge {entity_id} discretization failed") from exc
+        positions = tuple(cad_to_gltf(point) for point in points)
+    else:
+        from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Curve
+        from simplecadapi._cpp.occt.GCPnts import GCPnts_TangentialDeflection
+        from simplecadapi._cpp.occt.TopoDS import TopoDS
+
+        prepared = TopoDS.Edge_s(_prepare_shape(edge, force_forward=True))
+        adaptor = BRepAdaptor_Curve(prepared)
+        try:
+            sampler = GCPnts_TangentialDeflection(
+                adaptor,
+                adaptor.FirstParameter(),
+                adaptor.LastParameter(),
+                float(angular_tolerance),
+                float(linear_tolerance),
+                2,
+                1e-9,
+                1e-7,
+            )
+        except Exception as exc:
+            raise ValueError(f"edge {entity_id} discretization failed") from exc
+        positions = tuple(
+            cad_to_gltf(sampler.Value(index))
+            for index in range(1, sampler.NbPoints() + 1)
         )
-    except Exception as exc:
-        raise ValueError(f"edge {entity_id} discretization failed") from exc
-    positions = tuple(
-        cad_to_gltf(sampler.Value(index))
-        for index in range(1, sampler.NbPoints() + 1)
-    )
     segments = [
         (_position_key(positions[index]), _position_key(positions[index + 1]))
         for index in range(len(positions) - 1)

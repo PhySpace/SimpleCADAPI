@@ -35,14 +35,14 @@ import tower as T
 CHILD = r"""
 import json, sys, time
 import simplecadapi as scad
-from OCP.BRepGProp import BRepGProp
-from OCP.GProp import GProp_GProps
-from OCP.IFSelect import IFSelect_RetDone
-from OCP.STEPControl import STEPControl_Reader
-from OCP.TopAbs import TopAbs_SOLID
-from OCP.TopExp import TopExp_Explorer
-from OCP.Bnd import Bnd_Box
-from OCP.BRepBndLib import BRepBndLib
+from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+from simplecadapi._cpp.occt.GProp import GProp_GProps
+from simplecadapi._cpp.occt.IFSelect import IFSelect_RetDone
+from simplecadapi._cpp.occt.STEPControl import STEPControl_Reader
+from simplecadapi._cpp.occt.TopAbs import TopAbs_SOLID
+from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
+from simplecadapi._cpp.occt.Bnd import Bnd_Box
+from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
 
 def volume(shape):
     g = GProp_GProps(); BRepGProp.VolumeProperties_s(shape, g); return g.Mass()

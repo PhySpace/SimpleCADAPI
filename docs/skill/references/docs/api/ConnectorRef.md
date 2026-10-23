@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class ConnectorRef(component_id: str, connector_id: str)
+class ConnectorRef(component_id, connector_id)
 ```
 
 *Source: product/connector.py*

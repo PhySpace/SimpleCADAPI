@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class GraphSession(graph_id: Optional[str] = None, *, allow_external_definitions: bool = False, namespace: Optional[str] = None, shared_lineage: bool = False)
+class GraphSession()
 ```
 
 *Source: recording/graph.py*

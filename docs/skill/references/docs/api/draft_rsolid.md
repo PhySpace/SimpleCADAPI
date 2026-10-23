@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def draft_rsolid(solid: Solid, faces_to_draft: Sequence[Face] | ShapeSelector, angle: ScalarLike, plane_origin: Sequence[float] = (0, 0, 0), plane_normal: Sequence[float] = (0, 0, 1)) -> Solid
+def draft_rsolid(solid, faces_to_draft, angle, plane_origin=(0, 0, 0), plane_normal=(0, 0, 1))
 ```
 
 *Source: operators/features.py*

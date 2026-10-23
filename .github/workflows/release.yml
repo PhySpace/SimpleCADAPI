@@ -1,5 +1,17 @@
 name: Release
 
+# A release is one distribution, `simplecadapi`, built as four platform wheels per Python version (3.10-3.13):
+#
+#   linux-x86_64   manylinux_2_28
+#   linux-aarch64  manylinux_2_28
+#   macos-arm64    macOS 14+ (Apple silicon)
+#   windows-x86_64
+#
+# Each wheel carries the compiled C++ module (`simplecadapi._cpp`) linked against the same static OpenCASCADE, built from
+# source by src/cpp/tools/build_occt.py, so no OCCT is needed on the user's machine and the kernel behaves identically
+# everywhere.  Building OCCT takes the better part of an hour per platform; the install prefix is cached by the hash of the
+# build script, so only a change to OCCT's version or options pays for it again.
+
 on:
   push:
     tags:
@@ -7,9 +19,14 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing v-prefixed tag to release
+        description: Existing v-prefixed tag to release (a branch or tag name when dry_run is set)
         required: true
         type: string
+      dry_run:
+        description: Build and verify everything, but publish nothing (no GitHub release, no PyPI upload)
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -18,38 +35,37 @@ concurrency:
   group: release-${{ github.ref_name }}
   cancel-in-progress: false
 
-jobs:
-  release:
-    # Releases are built and published from the private repository only.
-    # The public mirror carries the same workflow file, where a tag push
-    # could never succeed (no release credentials); skip it there.
-    if: github.repository == 'So3Lab/CADIR'
-    name: Test, build, and release
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      contents: write
-    env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
 
+jobs:
+  validate:
+    # Releases are built and published from this repository only; a fork carries the same workflow file but
+    # not the release credentials, so it must not try.
+    if: github.repository == 'PhySpace/SimpleCADAPI'
+    name: Validate the tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Check out tagged revision
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ env.RELEASE_TAG }}
-          fetch-depth: 0
 
       - name: Install uv and Python
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           python-version: "3.12"
-          enable-cache: true
-          cache-python: true
 
       - name: Validate tag and project version
         shell: bash
         run: |
           set -euo pipefail
+          if [[ "$DRY_RUN" == "true" ]]; then
+            echo "dry run of $RELEASE_TAG: no tag or version check, nothing will be published"
+            exit 0
+          fi
           if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([ab]|rc)?[0-9]*$ ]]; then
             echo "Invalid release tag: $RELEASE_TAG" >&2
             exit 1
@@ -65,63 +81,307 @@ jobs:
             exit 1
           fi
 
-      - name: Install locked dependencies
-        run: uv sync --locked --group dev
-      - name: Install headless rendering support
-        run: sudo apt-get update && sudo apt-get install --yes xvfb
+  webui:
+    # `sca edit` serves a web UI that is built from editor-web/ and git-ignored: without this step the wheels would ship an
+    # editor with no front end.  Built once, shared with every wheel and the sdist.
+    name: Build the editor web UI
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out tagged revision
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
-
-      - name: Compile package
-        run: uv run python -m compileall -q src/simplecadapi
-
-      - name: Run tests
-        run: xvfb-run --auto-servernum uv run pytest test tests -q
-
-      # `sca edit` serves a web UI that is built from editor-web/ and git-ignored:
-      # without this step the wheel would ship an editor with no front end.
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: editor-web/package-lock.json
+
       - name: Build the editor web UI
         working-directory: editor-web
         run: |
           npm ci
           npm run build
 
-      - name: Build wheel and source distribution
-        run: uv build
+      - name: Keep the built UI
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: webui
+          path: src/simplecadapi/editor/webui
+          if-no-files-found: error
 
-      - name: Verify distributions
-        run: uv run twine check dist/*
+  wheels:
+    name: Wheels (${{ matrix.name }})
+    needs: webui
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+            archs: x86_64
+            occt_cache: /home/runner/occt-cache
+          - name: linux-aarch64
+            os: ubuntu-24.04-arm
+            archs: aarch64
+            occt_cache: /home/runner/occt-cache
+          - name: macos-arm64
+            os: macos-14
+            archs: arm64
+            occt_cache: /tmp/occt
+          - name: windows-x86_64
+            os: windows-2022
+            archs: AMD64
+            occt_cache: C:\occt
+    steps:
+      - name: Check out tagged revision
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
-      - name: Verify the wheel carries the editor, the skill and the example
+      - name: Fetch the built editor web UI
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: webui
+          path: src/simplecadapi/editor/webui
+
+      # The static OpenCASCADE prefix.  On Linux the build runs inside the manylinux container, which gets this directory
+      # mounted at /opt/occt; elsewhere cibuildwheel's before-all writes to the path configured in pyproject.toml.
+      - name: Restore the static OpenCASCADE build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ matrix.occt_cache }}
+          key: occt-${{ matrix.name }}-${{ hashFiles('src/cpp/tools/build_occt.py') }}
+
+      - name: Prepare the OpenCASCADE cache directory (Linux)
+        if: runner.os == 'Linux'
+        run: mkdir -p "${{ matrix.occt_cache }}"
+
+      # Windows: the MSVC environment, so the OpenCASCADE build and the extension use Ninja (every translation unit in
+      # parallel) instead of the Visual Studio generator, which is several times slower for a build this size.
+      - name: Activate the MSVC environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+
+      - name: Build the wheels (Linux)
+        if: runner.os == 'Linux'
+        uses: pypa/cibuildwheel@b9e566a2b284570af229f6c2a33673410d0389a3 # v4.3.4
+        env:
+          CIBW_ARCHS: ${{ matrix.archs }}
+          # share the cached prefix with the container (before-all in pyproject.toml builds OCCT only if it is absent)
+          CIBW_CONTAINER_ENGINE: "docker; create_args: --volume ${{ matrix.occt_cache }}:/opt/occt"
+
+      - name: Build the wheels (macOS, Windows)
+        if: runner.os != 'Linux'
+        uses: pypa/cibuildwheel@b9e566a2b284570af229f6c2a33673410d0389a3 # v4.3.4
+        env:
+          CIBW_ARCHS: ${{ matrix.archs }}
+
+      - name: Keep the wheels
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wheels-${{ matrix.name }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  sdist:
+    name: Source distribution
+    needs: webui
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out tagged revision
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Fetch the built editor web UI
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: webui
+          path: src/simplecadapi/editor/webui
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          python-version: "3.12"
+
+      - name: Build the source distribution
+        run: uv build --sdist --out-dir dist
+
+      - name: Keep the source distribution
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  test:
+    # The full test suite, on the Linux x86_64 wheel of every supported Python (the other platforms run the wheel smoke
+    # test inside cibuildwheel).  The checkout carries the tests only: `simplecadapi` is the installed wheel.
+    name: Tests (Python ${{ matrix.python-version }})
+    needs: wheels
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - name: Check out tagged revision
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Fetch the Linux x86_64 wheels
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: wheels-linux-x86_64
+          path: dist
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-python: true
+
+      - name: Install the test dependencies and the wheel
+        shell: bash
         run: |
           set -euo pipefail
-          wheel="$(ls dist/*.whl)"
-          listing="$(unzip -Z1 "$wheel")"
-          for required in \
-            simplecadapi/editor/webui/index.html \
-            simplecadapi/skill/resources/skillproj.toml \
-            simplecadapi/skill/resources/docs/skill/SKILL.md \
-            simplecadapi/example/resources/u_link_motor_mount/u_link.py \
-            simplecadapi/example/resources/u_link_motor_mount/dimensions.py; do
-            if ! grep -qx "$required" <<<"$listing"; then
-              echo "wheel is missing $required" >&2
+          py="cp${{ matrix.python-version }}"; py="${py/./}"
+          # the locked dev dependencies without the project itself, then the built wheel on top
+          uv sync --locked --group dev --no-install-project
+          uv pip install --no-deps dist/*-"$py"-"$py"-*.whl
+
+      - name: Install headless rendering support
+        run: sudo apt-get update && sudo apt-get install --yes xvfb
+
+      - name: Run tests
+        run: |
+          xvfb-run --auto-servernum .venv/bin/python -m pytest test tests -q
+          xvfb-run --auto-servernum .venv/bin/python -m pytest src/cpp/tests/python -q
+
+  release:
+    name: Build the skill and publish the release
+    needs: [wheels, sdist, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Check out tagged revision
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+
+      - name: Fetch the wheels and the source distribution
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: artifacts
+
+      - name: Gather the distributions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp artifacts/wheels-*/*.whl artifacts/sdist/*.tar.gz dist/
+          ls -l dist
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-python: true
+
+      - name: Verify the distributions
+        shell: bash
+        run: |
+          set -euo pipefail
+          uvx twine check dist/*
+          # four platforms, four Pythons each, plus the sdist
+          wheels="$(ls dist/*.whl | wc -l)"
+          if [[ "$wheels" -ne 16 ]]; then
+            echo "expected 16 wheels (4 platforms x 4 Pythons), found $wheels" >&2
+            ls dist
+            exit 1
+          fi
+          for tag in 'manylinux.*x86_64' 'manylinux.*aarch64' 'macosx.*arm64' 'win_amd64'; do
+            for py in cp310 cp311 cp312 cp313; do
+              if ! ls dist/*-"$py"-"$py"-*.whl | grep -Eq "$tag"; then
+                echo "no wheel for $py / $tag" >&2
+                exit 1
+              fi
+            done
+          done
+
+      - name: Verify every wheel carries the compiled module, the editor, the skill and the example
+        shell: bash
+        run: |
+          set -euo pipefail
+          for wheel in dist/*.whl; do
+            listing="$(unzip -Z1 "$wheel")"
+            for required in \
+              simplecadapi/editor/webui/index.html \
+              simplecadapi/skill/resources/skillproj.toml \
+              simplecadapi/skill/resources/docs/skill/SKILL.md \
+              simplecadapi/example/resources/u_link_motor_mount/u_link.py \
+              simplecadapi/example/resources/u_link_motor_mount/dimensions.py; do
+              if ! grep -qx "$required" <<<"$listing"; then
+                echo "$wheel is missing $required" >&2
+                exit 1
+              fi
+            done
+            # exactly one compiled module, built for the Python this wheel is tagged for
+            extensions="$(grep -E '^simplecadapi/_cpp/_native\..*\.(so|pyd)$' <<<"$listing" || true)"
+            if [[ "$(grep -c . <<<"$extensions")" -ne 1 ]]; then
+              echo "$wheel must carry exactly one compiled module, found:" >&2
+              echo "$extensions" >&2
+              exit 1
+            fi
+            py_tag="$(basename "$wheel" | sed -E 's/^[^-]+-[^-]+-(cp3[0-9]+)-.*/\1/')"
+            if ! grep -q "${py_tag#cp}" <<<"$extensions"; then
+              echo "$wheel is tagged $py_tag but carries $extensions" >&2
               exit 1
             fi
           done
+
+      - name: Install the Linux wheel to build the skill from it
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv sync --locked --group dev --no-install-project
+          uv pip install --no-deps dist/*-cp312-cp312-*manylinux*x86_64*.whl
+
       - name: Build and verify Agent Skill archive
         run: |
-          uv run python tools/auto_docs_gen.py --quiet
-          uv run python tools/skillbuild.py --target omp
-          uv run pytest test/test_skill_build.py -q
+          .venv/bin/python tools/auto_docs_gen.py --quiet
+          .venv/bin/python tools/skillbuild.py --target omp
+          .venv/bin/python -m pytest test/test_skill_build.py -q
           tar -C skills -czf skills/simplecadapi.tar.gz simplecadapi-omp
 
+      - name: Keep the verified distributions
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: |
+            dist/*
+            skills/simplecadapi.tar.gz
+          if-no-files-found: error
 
       - name: Create GitHub release
+        if: env.DRY_RUN != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -134,3 +394,38 @@ jobs:
             --generate-notes \
             --title "$RELEASE_TAG" \
             "${release_flags[@]}"
+
+  publish-pypi:
+    # PyPI keeps a version forever, so this runs last: only after every wheel is built, tested and verified, and the
+    # GitHub release exists.  Uses PyPI trusted publishing (this workflow + the `pypi` environment registered as the
+    # project's trusted publisher); a `PYPI_API_TOKEN` secret, when set, is used instead.
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+    name: Publish to PyPI
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: pypi
+      url: https://pypi.org/p/simplecadapi
+    permissions:
+      id-token: write
+    steps:
+      - name: Fetch the verified distributions
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: artifacts
+
+      - name: Select the files PyPI takes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp artifacts/dist/*.whl artifacts/dist/*.tar.gz dist/
+          ls -l dist
+
+      - name: Upload to PyPI
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: dist
+          password: ${{ secrets.PYPI_API_TOKEN }}

@@ -1,0 +1,227 @@
+{
+  "bad_dimension": {
+    "how_to_fix": [
+      "Pass keyword arguments such as control_points=..., degree=3, knots=..., multiplicities=....",
+      "Use fit_cubic_bspline_control_points(sample_points) for sampled curves, then pass its result fields explicitly.",
+      "Ensure sum(multiplicities) matches the exact B-spline degree/control-count rule."
+    ],
+    "operation": "make_spline_redge",
+    "possible_causes": [
+      "The exact B-spline definition is inconsistent.",
+      "Control points, knots, multiplicities, or weights are invalid.",
+      "A sampled-point list was passed directly instead of fitted control points."
+    ],
+    "technical_details": "ValueError: control point 0 must be 2D or 3D",
+    "what_happened": "Failed to create a spline edge."
+  },
+  "bool_degree": {
+    "how_to_fix": [
+      "Pass keyword arguments such as control_points=..., degree=3, knots=..., multiplicities=....",
+      "Use fit_cubic_bspline_control_points(sample_points) for sampled curves, then pass its result fields explicitly.",
+      "Ensure sum(multiplicities) matches the exact B-spline degree/control-count rule."
+    ],
+    "operation": "make_spline_redge",
+    "possible_causes": [
+      "The exact B-spline definition is inconsistent.",
+      "Control points, knots, multiplicities, or weights are invalid.",
+      "A sampled-point list was passed directly instead of fitted control points."
+    ],
+    "technical_details": "ValueError: degree must be an integer",
+    "what_happened": "Failed to create a spline edge."
+  },
+  "decreasing_knots": {
+    "how_to_fix": [
+      "Pass keyword arguments such as control_points=..., degree=3, knots=..., multiplicities=....",
+      "Use fit_cubic_bspline_control_points(sample_points) for sampled curves, then pass its result fields explicitly.",
+      "Ensure sum(multiplicities) matches the exact B-spline degree/control-count rule."
+    ],
+    "operation": "make_spline_redge",
+    "possible_causes": [
+      "The exact B-spline definition is inconsistent.",
+      "Control points, knots, multiplicities, or weights are invalid.",
+      "A sampled-point list was passed directly instead of fitted control points."
+    ],
+    "technical_details": "ValueError: knots must be non-decreasing when passed as a full knot vector",
+    "what_happened": "Failed to create a spline edge."
+  },
+  "fractional_degree": {
+    "how_to_fix": [
+      "Pass keyword arguments such as control_points=..., degree=3, knots=..., multiplicities=....",
+      "Use fit_cubic_bspline_control_points(sample_points) for sampled curves, then pass its result fields explicitly.",
+      "Ensure sum(multiplicities) matches the exact B-spline degree/control-count rule."
+    ],
+    "operation": "make_spline_redge",
+    "possible_causes": [
+      "The exact B-spline definition is inconsistent.",
+      "Control points, knots, multiplicities, or weights are invalid.",
+      "A sampled-point list was passed directly instead of fitted control points."
+    ],
+    "technical_details": "ValueError: degree must be an integer",
+    "what_happened": "Failed to create a spline edge."
+  },
+  "huge_degree": {
+    "how_to_fix": [
+      "Pass keyword arguments such as control_points=..., degree=3, knots=..., multiplicities=....",
+      "Use fit_cubic_bspline_control_points(sample_points) for sampled curves, then pass its result fields explicitly.",
+      "Ensure sum(multiplicities) matches the exact B-spline degree/control-count rule."
+    ],
+    "operation": "make_spline_redge",
+    "possible_causes": [
+      "The exact B-spline definition is inconsistent.",
+      "Control points, knots, multiplicities, or weights are invalid.",
+      "A sampled-point list was passed directly instead of fitted control points."
+    ],
+    "technical_details": "ValueError: degree must be 25 or lower",
+    "what_happened": "Failed to create a spline edge."
+  },
+  "knot_sum": {
+    "how_to_fix": [
+      "Pass keyword arguments such as control_points=..., degree=3, knots=..., multiplicities=....",
+      "Use fit_cubic_bspline_control_points(sample_points) for sampled curves, then pass its result fields explicitly.",
+      "Ensure sum(multiplicities) matches the exact B-spline degree/control-count rule."
+    ],
+    "operation": "make_spline_redge",
+    "possible_causes": [
+      "The exact B-spline definition is inconsistent.",
+      "Control points, knots, multiplicities, or weights are invalid.",
+      "A sampled-point list was passed directly instead of fitted control points."
+    ],
+    "technical_details": "ValueError: sum(multiplicities) must equal 8 for this non-periodic B-spline",
+    "what_happened": "Failed to create a spline edge."
+  },
+  "length_mismatch": {
+    "how_to_fix": [
+      "Pass keyword arguments such as control_points=..., degree=3, knots=..., multiplicities=....",
+      "Use fit_cubic_bspline_control_points(sample_points) for sampled curves, then pass its result fields explicitly.",
+      "Ensure sum(multiplicities) matches the exact B-spline degree/control-count rule."
+    ],
+    "operation": "make_spline_redge",
+    "possible_causes": [
+      "The exact B-spline definition is inconsistent.",
+      "Control points, knots, multiplicities, or weights are invalid.",
+      "A sampled-point list was passed directly instead of fitted control points."
+    ],
+    "technical_details": "ValueError: knots and multiplicities must have the same length",
+    "what_happened": "Failed to create a spline edge."
+  },
+  "multiplicities_only": {
+    "how_to_fix": [
+      "Pass keyword arguments such as control_points=..., degree=3, knots=..., multiplicities=....",
+      "Use fit_cubic_bspline_control_points(sample_points) for sampled curves, then pass its result fields explicitly.",
+      "Ensure sum(multiplicities) matches the exact B-spline degree/control-count rule."
+    ],
+    "operation": "make_spline_redge",
+    "possible_causes": [
+      "The exact B-spline definition is inconsistent.",
+      "Control points, knots, multiplicities, or weights are invalid.",
+      "A sampled-point list was passed directly instead of fitted control points."
+    ],
+    "technical_details": "ValueError: multiplicities require explicit knots",
+    "what_happened": "Failed to create a spline edge."
+  },
+  "multiplicity_cap": {
+    "how_to_fix": [
+      "Pass keyword arguments such as control_points=..., degree=3, knots=..., multiplicities=....",
+      "Use fit_cubic_bspline_control_points(sample_points) for sampled curves, then pass its result fields explicitly.",
+      "Ensure sum(multiplicities) matches the exact B-spline degree/control-count rule."
+    ],
+    "operation": "make_spline_redge",
+    "possible_causes": [
+      "The exact B-spline definition is inconsistent.",
+      "Control points, knots, multiplicities, or weights are invalid.",
+      "A sampled-point list was passed directly instead of fitted control points."
+    ],
+    "technical_details": "ValueError: multiplicities must not exceed degree + 1",
+    "what_happened": "Failed to create a spline edge."
+  },
+  "no_poles": {
+    "how_to_fix": [
+      "Pass keyword arguments such as control_points=..., degree=3, knots=..., multiplicities=....",
+      "Use fit_cubic_bspline_control_points(sample_points) for sampled curves, then pass its result fields explicitly.",
+      "Ensure sum(multiplicities) matches the exact B-spline degree/control-count rule."
+    ],
+    "operation": "make_spline_redge",
+    "possible_causes": [
+      "The exact B-spline definition is inconsistent.",
+      "Control points, knots, multiplicities, or weights are invalid.",
+      "A sampled-point list was passed directly instead of fitted control points."
+    ],
+    "technical_details": "ValueError: control_points must contain at least one point",
+    "what_happened": "Failed to create a spline edge."
+  },
+  "too_few_poles": {
+    "how_to_fix": [
+      "Pass keyword arguments such as control_points=..., degree=3, knots=..., multiplicities=....",
+      "Use fit_cubic_bspline_control_points(sample_points) for sampled curves, then pass its result fields explicitly.",
+      "Ensure sum(multiplicities) matches the exact B-spline degree/control-count rule."
+    ],
+    "operation": "make_spline_redge",
+    "possible_causes": [
+      "The exact B-spline definition is inconsistent.",
+      "Control points, knots, multiplicities, or weights are invalid.",
+      "A sampled-point list was passed directly instead of fitted control points."
+    ],
+    "technical_details": "ValueError: control point count must be at least degree + 1",
+    "what_happened": "Failed to create a spline edge."
+  },
+  "weights_count": {
+    "how_to_fix": [
+      "Pass keyword arguments such as control_points=..., degree=3, knots=..., multiplicities=....",
+      "Use fit_cubic_bspline_control_points(sample_points) for sampled curves, then pass its result fields explicitly.",
+      "Ensure sum(multiplicities) matches the exact B-spline degree/control-count rule."
+    ],
+    "operation": "make_spline_redge",
+    "possible_causes": [
+      "The exact B-spline definition is inconsistent.",
+      "Control points, knots, multiplicities, or weights are invalid.",
+      "A sampled-point list was passed directly instead of fitted control points."
+    ],
+    "technical_details": "ValueError: weights must contain exactly one value per control point",
+    "what_happened": "Failed to create a spline edge."
+  },
+  "weights_positive": {
+    "how_to_fix": [
+      "Pass keyword arguments such as control_points=..., degree=3, knots=..., multiplicities=....",
+      "Use fit_cubic_bspline_control_points(sample_points) for sampled curves, then pass its result fields explicitly.",
+      "Ensure sum(multiplicities) matches the exact B-spline degree/control-count rule."
+    ],
+    "operation": "make_spline_redge",
+    "possible_causes": [
+      "The exact B-spline definition is inconsistent.",
+      "Control points, knots, multiplicities, or weights are invalid.",
+      "A sampled-point list was passed directly instead of fitted control points."
+    ],
+    "technical_details": "ValueError: weights must be finite positive values",
+    "what_happened": "Failed to create a spline edge."
+  },
+  "wire": {
+    "how_to_fix": [
+      "Pass keyword arguments such as control_points=..., degree=3, knots=..., multiplicities=....",
+      "Use fit_cubic_bspline_control_points(sample_points) for sampled curves, then pass its result fields explicitly.",
+      "Ensure sum(multiplicities) matches the exact B-spline degree/control-count rule."
+    ],
+    "operation": "make_spline_redge",
+    "possible_causes": [
+      "The exact B-spline definition is inconsistent.",
+      "Control points, knots, multiplicities, or weights are invalid.",
+      "A sampled-point list was passed directly instead of fitted control points."
+    ],
+    "technical_details": "ValueError: control point count must be at least degree + 1",
+    "what_happened": "Failed to create a spline edge."
+  },
+  "zero_degree": {
+    "how_to_fix": [
+      "Pass keyword arguments such as control_points=..., degree=3, knots=..., multiplicities=....",
+      "Use fit_cubic_bspline_control_points(sample_points) for sampled curves, then pass its result fields explicitly.",
+      "Ensure sum(multiplicities) matches the exact B-spline degree/control-count rule."
+    ],
+    "operation": "make_spline_redge",
+    "possible_causes": [
+      "The exact B-spline definition is inconsistent.",
+      "Control points, knots, multiplicities, or weights are invalid.",
+      "A sampled-point list was passed directly instead of fitted control points."
+    ],
+    "technical_details": "ValueError: degree must be at least 1",
+    "what_happened": "Failed to create a spline edge."
+  }
+}

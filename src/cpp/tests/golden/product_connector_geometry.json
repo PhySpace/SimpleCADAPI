@@ -1,0 +1,398 @@
+{
+  "edge": {
+    "anchor": {
+      "anchor_kind": "geometry",
+      "geometry_ref": {
+        "flip": false,
+        "geo_selector": {
+          "bbox": {
+            "max": [
+              -1.0,
+              -2.0,
+              6.0
+            ],
+            "min": [
+              -1.0,
+              -2.0,
+              0.0
+            ]
+          },
+          "center": [
+            -1.0,
+            -2.0,
+            3.0
+          ],
+          "end": [
+            -1.0,
+            -2.0,
+            0.0
+          ],
+          "geom_type": "LINE",
+          "kind": "edge",
+          "length": 6.0,
+          "metadata_geo": {
+            "edge_index": 3
+          },
+          "mode": "geo_exact",
+          "start": [
+            -1.0,
+            -2.0,
+            6.0
+          ]
+        },
+        "kind": "edge",
+        "source_node_id": null
+      }
+    },
+    "connector_id": "rail",
+    "geometry_ref": {
+      "flip": false,
+      "geo_selector": {
+        "bbox": {
+          "max": [
+            -1.0,
+            -2.0,
+            6.0
+          ],
+          "min": [
+            -1.0,
+            -2.0,
+            0.0
+          ]
+        },
+        "center": [
+          -1.0,
+          -2.0,
+          3.0
+        ],
+        "end": [
+          -1.0,
+          -2.0,
+          0.0
+        ],
+        "geom_type": "LINE",
+        "kind": "edge",
+        "length": 6.0,
+        "metadata_geo": {
+          "edge_index": 3
+        },
+        "mode": "geo_exact",
+        "start": [
+          -1.0,
+          -2.0,
+          6.0
+        ]
+      },
+      "kind": "edge",
+      "source_node_id": null
+    },
+    "name": null
+  },
+  "edge_frame": {
+    "origin": [
+      -1.0,
+      -2.0,
+      3.0
+    ],
+    "x_axis": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "y_axis": [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    "z_axis": [
+      0.0,
+      0.0,
+      -1.0
+    ]
+  },
+  "face": {
+    "anchor": {
+      "anchor_kind": "geometry",
+      "geometry_ref": {
+        "flip": false,
+        "geo_selector": {
+          "area": 8.0,
+          "bbox": {
+            "max": [
+              1.0,
+              2.0,
+              6.0
+            ],
+            "min": [
+              -1.0,
+              -2.0,
+              6.0
+            ]
+          },
+          "center": [
+            2.42861286636753e-17,
+            4.163336342344337e-17,
+            6.0
+          ],
+          "edge_count": 4,
+          "geom_type": "PLANE",
+          "inner_wire_count": 0,
+          "kind": "face",
+          "metadata_geo": {},
+          "mode": "geo_exact",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "kind": "face",
+        "source_node_id": null
+      }
+    },
+    "connector_id": "top",
+    "geometry_ref": {
+      "flip": false,
+      "geo_selector": {
+        "area": 8.0,
+        "bbox": {
+          "max": [
+            1.0,
+            2.0,
+            6.0
+          ],
+          "min": [
+            -1.0,
+            -2.0,
+            6.0
+          ]
+        },
+        "center": [
+          2.42861286636753e-17,
+          4.163336342344337e-17,
+          6.0
+        ],
+        "edge_count": 4,
+        "geom_type": "PLANE",
+        "inner_wire_count": 0,
+        "kind": "face",
+        "metadata_geo": {},
+        "mode": "geo_exact",
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "kind": "face",
+      "source_node_id": null
+    },
+    "name": null
+  },
+  "face_frame": {
+    "origin": [
+      2.42861286636753e-17,
+      4.163336342344337e-17,
+      6.0
+    ],
+    "x_axis": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "y_axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "z_axis": [
+      0.0,
+      0.0,
+      1.0
+    ]
+  },
+  "flipped": {
+    "anchor": {
+      "anchor_kind": "geometry",
+      "geometry_ref": {
+        "flip": true,
+        "geo_selector": {
+          "area": 8.0,
+          "bbox": {
+            "max": [
+              1.0,
+              2.0,
+              6.0
+            ],
+            "min": [
+              -1.0,
+              -2.0,
+              6.0
+            ]
+          },
+          "center": [
+            2.42861286636753e-17,
+            4.163336342344337e-17,
+            6.0
+          ],
+          "edge_count": 4,
+          "geom_type": "PLANE",
+          "inner_wire_count": 0,
+          "kind": "face",
+          "metadata_geo": {},
+          "mode": "geo_exact",
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "kind": "face",
+        "source_node_id": null
+      }
+    },
+    "connector_id": "top_flipped",
+    "geometry_ref": {
+      "flip": true,
+      "geo_selector": {
+        "area": 8.0,
+        "bbox": {
+          "max": [
+            1.0,
+            2.0,
+            6.0
+          ],
+          "min": [
+            -1.0,
+            -2.0,
+            6.0
+          ]
+        },
+        "center": [
+          2.42861286636753e-17,
+          4.163336342344337e-17,
+          6.0
+        ],
+        "edge_count": 4,
+        "geom_type": "PLANE",
+        "inner_wire_count": 0,
+        "kind": "face",
+        "metadata_geo": {},
+        "mode": "geo_exact",
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "kind": "face",
+      "source_node_id": null
+    },
+    "name": "Top"
+  },
+  "flipped_frame": {
+    "origin": [
+      2.42861286636753e-17,
+      4.163336342344337e-17,
+      6.0
+    ],
+    "x_axis": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "y_axis": [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    "z_axis": [
+      0.0,
+      0.0,
+      -1.0
+    ]
+  },
+  "vertex": {
+    "anchor": {
+      "anchor_kind": "geometry",
+      "geometry_ref": {
+        "flip": true,
+        "geo_selector": {
+          "bbox": {
+            "max": [
+              -1.0,
+              -2.0,
+              6.0
+            ],
+            "min": [
+              -1.0,
+              -2.0,
+              6.0
+            ]
+          },
+          "coordinates": [
+            -1.0,
+            -2.0,
+            6.0
+          ],
+          "kind": "vertex",
+          "metadata_geo": {},
+          "mode": "geo_exact"
+        },
+        "kind": "vertex",
+        "source_node_id": null
+      }
+    },
+    "connector_id": "corner",
+    "geometry_ref": {
+      "flip": true,
+      "geo_selector": {
+        "bbox": {
+          "max": [
+            -1.0,
+            -2.0,
+            6.0
+          ],
+          "min": [
+            -1.0,
+            -2.0,
+            6.0
+          ]
+        },
+        "coordinates": [
+          -1.0,
+          -2.0,
+          6.0
+        ],
+        "kind": "vertex",
+        "metadata_geo": {},
+        "mode": "geo_exact"
+      },
+      "kind": "vertex",
+      "source_node_id": null
+    },
+    "name": null
+  },
+  "vertex_frame": {
+    "origin": [
+      -1.0,
+      -2.0,
+      6.0
+    ],
+    "x_axis": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "y_axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "z_axis": [
+      0.0,
+      0.0,
+      1.0
+    ]
+  }
+}

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def inspect_assembly_constraints_rconstraintreport(assembly: Assembly) -> ConstraintReport
+def inspect_assembly_constraints_rconstraintreport(assembly)
 ```
 
 *Source: operators/product.py*

@@ -1,0 +1,167 @@
+{
+  "alias": {
+    "bbox": [
+      1.6209069176044193,
+      0.0,
+      0.0,
+      3.0,
+      2.5244129544236893,
+      0.0
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 3.0000000000000004,
+    "tags": [],
+    "track": {
+      "op": "make_angle_arc_redge"
+    },
+    "type": "Edge",
+    "vertices": 2
+  },
+  "alias_wire": {
+    "bbox": [
+      1.6209069176044193,
+      0.0,
+      0.0,
+      3.0,
+      2.5244129544236893,
+      0.0
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 3.0000000000000004,
+    "tags": [],
+    "track": {
+      "op": "make_angle_arc_wire"
+    },
+    "type": "Wire",
+    "vertices": 2
+  },
+  "negative_radius": {
+    "how_to_fix": [
+      "Use a positive radius.",
+      "Make sure start_angle and end_angle are different.",
+      "Pass a valid finite center and a non-zero normal vector."
+    ],
+    "operation": "make_angle_arc_redge",
+    "possible_causes": [
+      "The radius is not positive.",
+      "The start and end angles collapse to the same value.",
+      "The center or normal is invalid, or the kernel rejected the arc."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create an angle-defined arc edge."
+  },
+  "quarter": {
+    "bbox": [
+      6.123233995736766e-17,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      0.0
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 1.5707963267948966,
+    "tags": [],
+    "track": {
+      "op": "make_angle_arc_redge"
+    },
+    "type": "Edge",
+    "vertices": 2
+  },
+  "same_angles": {
+    "how_to_fix": [
+      "Use a positive radius.",
+      "Make sure start_angle and end_angle are different.",
+      "Pass a valid finite center and a non-zero normal vector."
+    ],
+    "operation": "make_angle_arc_redge",
+    "possible_causes": [
+      "The radius is not positive.",
+      "The start and end angles collapse to the same value.",
+      "The center or normal is invalid, or the kernel rejected the arc."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create an angle-defined arc edge."
+  },
+  "tilted": {
+    "bbox": [
+      -0.6216386259564564,
+      2.7828986261595308,
+      1.367006838144548,
+      1.849639848047726,
+      3.6329931618554525,
+      3.6443377070737246
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 4.0,
+    "tags": [],
+    "track": {
+      "op": "make_angle_arc_redge"
+    },
+    "type": "Edge",
+    "vertices": 2
+  },
+  "wire": {
+    "bbox": [
+      6.123233995736766e-17,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      0.0
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 1.5707963267948966,
+    "tags": [],
+    "track": {
+      "op": "make_angle_arc_wire"
+    },
+    "type": "Wire",
+    "vertices": 2
+  },
+  "wire_negative_radius": {
+    "how_to_fix": [
+      "Use a positive radius.",
+      "Make sure start_angle and end_angle are different.",
+      "Pass a valid finite center and a non-zero normal vector."
+    ],
+    "operation": "make_angle_arc_redge",
+    "possible_causes": [
+      "The radius is not positive.",
+      "The start and end angles collapse to the same value.",
+      "The center or normal is invalid, or the kernel rejected the arc."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create an angle-defined arc edge."
+  }
+}

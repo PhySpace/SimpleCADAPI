@@ -1,0 +1,300 @@
+{
+  "alias": {
+    "bbox": [
+      -0.5,
+      -0.5,
+      0.0,
+      0.5,
+      0.5,
+      1.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "edge.cylinder.end_boundary"
+      ],
+      [
+        "edge.boundary",
+        "edge.cylinder.seam"
+      ],
+      [
+        "edge.boundary",
+        "edge.cylinder.start_boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.bottom",
+        "face.cylinder.start"
+      ],
+      [
+        "face.cylinder.end",
+        "face.top"
+      ],
+      [
+        "face.cylinder.side",
+        "face.side"
+      ]
+    ],
+    "faces": 3,
+    "geo": {
+      "axis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "bottom_face_center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "height": 1.0,
+      "radius": 0.5,
+      "type": "cylinder"
+    },
+    "tags": [
+      "cylinder",
+      "geom.primitive.cylinder"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 6,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_cylinder_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 0.7853981633974464
+  },
+  "plain": {
+    "bbox": [
+      -1.0,
+      -1.0,
+      0.0,
+      1.0,
+      1.0,
+      2.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "edge.cylinder.end_boundary"
+      ],
+      [
+        "edge.boundary",
+        "edge.cylinder.seam"
+      ],
+      [
+        "edge.boundary",
+        "edge.cylinder.start_boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.bottom",
+        "face.cylinder.start"
+      ],
+      [
+        "face.cylinder.end",
+        "face.top"
+      ],
+      [
+        "face.cylinder.side",
+        "face.side"
+      ]
+    ],
+    "faces": 3,
+    "geo": {
+      "axis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "bottom_face_center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "height": 2.0,
+      "radius": 1.0,
+      "type": "cylinder"
+    },
+    "tags": [
+      "cylinder",
+      "geom.primitive.cylinder"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 6,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_cylinder_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 6.283185307179571
+  },
+  "sideways": {
+    "bbox": [
+      1.0,
+      0.5,
+      1.5,
+      5.0,
+      3.5,
+      4.5
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "edge.cylinder.end_boundary"
+      ],
+      [
+        "edge.boundary",
+        "edge.cylinder.seam"
+      ],
+      [
+        "edge.boundary",
+        "edge.cylinder.start_boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.bottom",
+        "face.cylinder.start"
+      ],
+      [
+        "face.cylinder.end",
+        "face.top"
+      ],
+      [
+        "face.cylinder.side",
+        "face.side"
+      ]
+    ],
+    "faces": 3,
+    "geo": {
+      "axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "bottom_face_center": [
+        1.0,
+        2.0,
+        3.0
+      ],
+      "height": 4.0,
+      "radius": 1.5,
+      "type": "cylinder"
+    },
+    "tags": [
+      "cylinder",
+      "geom.primitive.cylinder"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 6,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_cylinder_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 28.274333882308074
+  },
+  "tagged": {
+    "bbox": [
+      -2.0,
+      -2.0,
+      0.0,
+      2.0,
+      2.0,
+      5.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "edge.cylinder.end_boundary",
+        "role.rim_b",
+        "shaft.edge.end"
+      ],
+      [
+        "edge.boundary",
+        "edge.cylinder.seam",
+        "role.seam",
+        "shaft.edge.seam"
+      ],
+      [
+        "edge.boundary",
+        "edge.cylinder.start_boundary",
+        "role.rim_a",
+        "shaft.edge.start"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.bottom",
+        "face.cylinder.start",
+        "role.base",
+        "shaft.face.start"
+      ],
+      [
+        "face.cylinder.end",
+        "face.top",
+        "role.top",
+        "shaft.face.end"
+      ],
+      [
+        "face.cylinder.side",
+        "face.side",
+        "role.skin",
+        "shaft.face.side"
+      ]
+    ],
+    "faces": 3,
+    "geo": {
+      "axis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "bottom_face_center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "height": 5.0,
+      "radius": 2.0,
+      "type": "cylinder"
+    },
+    "tags": [
+      "cylinder",
+      "geom.primitive.cylinder",
+      "part.shaft",
+      "shaft.solid"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 6,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_cylinder_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 62.83185307179572
+  }
+}

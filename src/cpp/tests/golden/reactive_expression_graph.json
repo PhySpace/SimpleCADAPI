@@ -1,0 +1,213 @@
+{
+  "nodes": [
+    {
+      "expr_id": "const_c51de2f6cbbc2a1e",
+      "kind": "const",
+      "value": 2.0
+    },
+    {
+      "expr_id": "const_052cbc9733f977d9",
+      "kind": "const",
+      "value": 0.1
+    },
+    {
+      "expr_id": "const_47aaa25271a02431",
+      "kind": "const",
+      "value": -0.0
+    },
+    {
+      "default": 5.0,
+      "expr_id": "var_c8fbc9d12f568139",
+      "kind": "var",
+      "name": "r"
+    },
+    {
+      "default": 5.0,
+      "expr_id": "var_1dfda245614375fc",
+      "kind": "var",
+      "name": "r",
+      "unit": "mm"
+    },
+    {
+      "comment": "a 'quoted' comment",
+      "default": 5.0,
+      "expr_id": "var_8652ec181748217b",
+      "kind": "var",
+      "name": "r",
+      "tolerance": {
+        "lower_deviation": -0.1,
+        "upper_deviation": 0.1
+      },
+      "tolerance_unit": "mm",
+      "unit": "in"
+    },
+    {
+      "comment": "c",
+      "default": 1.5,
+      "expr_id": "var_b548982a6a604e86",
+      "kind": "var",
+      "name": "w",
+      "tolerance": {
+        "lower_deviation": -0.1,
+        "upper_deviation": 0.2
+      }
+    },
+    {
+      "args": [
+        "var_1dfda245614375fc",
+        "const_c51de2f6cbbc2a1e"
+      ],
+      "expr_id": "expr_2ece69357ab4b237",
+      "kind": "expr",
+      "op": "mul"
+    },
+    {
+      "expr_id": "const_abdce65477d1247f",
+      "kind": "const",
+      "value": 1.0
+    },
+    {
+      "args": [
+        "expr_2ece69357ab4b237",
+        "const_abdce65477d1247f"
+      ],
+      "expr_id": "expr_d44ad8ebee707556",
+      "kind": "expr",
+      "op": "add"
+    },
+    {
+      "default": 30.0,
+      "expr_id": "var_2aad16705cc1f42a",
+      "kind": "var",
+      "name": "a",
+      "unit": "deg"
+    },
+    {
+      "args": [
+        "var_2aad16705cc1f42a"
+      ],
+      "expr_id": "expr_465b7e98c446938a",
+      "kind": "expr",
+      "op": "sin"
+    },
+    {
+      "default": 4.0,
+      "expr_id": "var_3af0ccae9d08daec",
+      "kind": "var",
+      "name": "x"
+    },
+    {
+      "args": [
+        "var_3af0ccae9d08daec"
+      ],
+      "expr_id": "expr_5f6730f09c073458",
+      "kind": "expr",
+      "op": "sqrt"
+    },
+    {
+      "args": [
+        "expr_5f6730f09c073458",
+        "const_c51de2f6cbbc2a1e"
+      ],
+      "expr_id": "expr_cc57c0408875da7a",
+      "kind": "expr",
+      "op": "pow"
+    },
+    {
+      "default": 1.0,
+      "expr_id": "var_b13c5ced8414a9a3",
+      "kind": "var",
+      "name": "x"
+    },
+    {
+      "args": [
+        "var_b13c5ced8414a9a3"
+      ],
+      "expr_id": "expr_4bdda8041e80e10e",
+      "kind": "expr",
+      "op": "neg"
+    },
+    {
+      "default": -1.0,
+      "expr_id": "var_7d2d4a8354537fb7",
+      "kind": "var",
+      "name": "x"
+    },
+    {
+      "args": [
+        "var_7d2d4a8354537fb7"
+      ],
+      "expr_id": "expr_c794859cd0a9ff40",
+      "kind": "expr",
+      "op": "abs"
+    },
+    {
+      "args": [
+        "const_c51de2f6cbbc2a1e",
+        "var_b13c5ced8414a9a3"
+      ],
+      "expr_id": "expr_509fb870a89f1079",
+      "kind": "expr",
+      "op": "sub"
+    },
+    {
+      "expr_id": "const_e6cbd1828fe2fcec",
+      "kind": "const",
+      "value": 10.0
+    },
+    {
+      "args": [
+        "const_e6cbd1828fe2fcec",
+        "var_3af0ccae9d08daec"
+      ],
+      "expr_id": "expr_0acae79c09e81853",
+      "kind": "expr",
+      "op": "div"
+    },
+    {
+      "default": 3.0,
+      "expr_id": "var_30b7c705db886480",
+      "kind": "var",
+      "name": "x"
+    },
+    {
+      "args": [
+        "const_c51de2f6cbbc2a1e",
+        "var_30b7c705db886480"
+      ],
+      "expr_id": "expr_104861ced245d647",
+      "kind": "expr",
+      "op": "pow"
+    },
+    {
+      "default": 1.0,
+      "expr_id": "var_7a8e317be26f2f90",
+      "kind": "var",
+      "name": "y"
+    },
+    {
+      "args": [
+        "var_7a8e317be26f2f90",
+        "var_b13c5ced8414a9a3"
+      ],
+      "expr_id": "expr_cd2e3ba1f3014ccd",
+      "kind": "expr",
+      "op": "atan2"
+    },
+    {
+      "default": 50.0,
+      "expr_id": "var_a12582b874f80ffe",
+      "kind": "var",
+      "name": "p",
+      "unit": "%"
+    },
+    {
+      "args": [
+        "var_a12582b874f80ffe"
+      ],
+      "expr_id": "expr_448ab3d935256e51",
+      "kind": "expr",
+      "op": "acos"
+    }
+  ]
+}

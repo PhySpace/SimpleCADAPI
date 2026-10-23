@@ -17,8 +17,7 @@ import numpy as np
 from ..artifacts.assembly_io import materialize_definition
 from ..artifacts.canonical import parse_canonical_json
 from ..artifacts.part_definition import PartDefinition
-from ..product.assembly import Assembly
-from ..product.part import Part
+from simplecadapi._cpp import Assembly, Part
 from ..product.placement import Placement, relative_placement
 from ..translator.package_units import (
     ProductPackageInput,
@@ -235,7 +234,7 @@ def _write_obj(
     angular_deflection_degrees: float,
 ) -> tuple[int, int]:
     vertices, triangles = tessellate_solid(
-        solid.wrapped,
+        solid,
         linear_deflection=linear_deflection,
         angular_deflection_degrees=angular_deflection_degrees,
         relative=False,

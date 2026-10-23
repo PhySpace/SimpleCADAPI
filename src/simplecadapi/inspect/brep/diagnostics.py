@@ -11,21 +11,21 @@ import tempfile
 from typing import Any, Mapping, Sequence
 
 import numpy as np
-from OCP.BRep import BRep_Builder, BRep_Tool
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut, BRepAlgoAPI_Section
-from OCP.BRepBuilderAPI import (
+from simplecadapi._cpp.occt.BRep import BRep_Builder, BRep_Tool
+from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut, BRepAlgoAPI_Section
+from simplecadapi._cpp.occt.BRepBuilderAPI import (
     BRepBuilderAPI_MakeFace,
     BRepBuilderAPI_MakeVertex,
 )
-from OCP.BRepCheck import BRepCheck_Analyzer
-from OCP.BRepExtrema import BRepExtrema_DistShapeShape
-from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
-from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
-from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_SOLID, TopAbs_VERTEX
-from OCP.TopExp import TopExp
-from OCP.TopTools import TopTools_IndexedMapOfShape, TopTools_ListOfShape
-from OCP.TopoDS import TopoDS, TopoDS_Compound, TopoDS_Shape
-from OCP.gp import gp_Dir, gp_Pln, gp_Pnt
+from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
+from simplecadapi._cpp.occt.BRepExtrema import BRepExtrema_DistShapeShape
+from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakeBox
+from simplecadapi._cpp.occt.GeomAPI import GeomAPI_ProjectPointOnSurf
+from simplecadapi._cpp.occt.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_SOLID, TopAbs_VERTEX
+from simplecadapi._cpp.occt.TopExp import TopExp
+from simplecadapi._cpp.occt.TopTools import TopTools_IndexedMapOfShape, TopTools_ListOfShape
+from simplecadapi._cpp.occt.TopoDS import TopoDS, TopoDS_Compound, TopoDS_Shape
+from simplecadapi._cpp.occt.gp import gp_Dir, gp_Pln, gp_Pnt
 
 from ...kernel.ocp_export import export_step_shapes
 from ...kernel.ocp_mesh import tessellate_face

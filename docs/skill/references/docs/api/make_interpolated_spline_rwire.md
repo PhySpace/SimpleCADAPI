@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_interpolated_spline_rwire(*, points: Sequence[Sequence[ScalarLike]], periodic: bool = False, tolerance: ScalarLike = 1e-06) -> Wire
+def make_interpolated_spline_rwire(*, points, periodic=False, tolerance=1e-06)
 ```
 
 *Source: operators/geometry.py*

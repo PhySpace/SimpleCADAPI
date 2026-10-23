@@ -6,9 +6,9 @@ import math
 from copy import deepcopy
 from typing import Any, Mapping, Sequence
 
-from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
-from OCP.BRepExtrema import BRepExtrema_DistShapeShape
-from OCP.gp import gp_Pnt
+from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
+from simplecadapi._cpp.occt.BRepExtrema import BRepExtrema_DistShapeShape
+from simplecadapi._cpp.occt.gp import gp_Pnt
 import numpy as np
 
 from ._provenance import RESULT_VERSION, digest

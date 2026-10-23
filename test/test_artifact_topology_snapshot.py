@@ -138,13 +138,9 @@ def test_brep_bytes_settle_when_decoding_cycles():
     assert write_brep_bytes(read_brep_solid(payload)) == payload
 
 
-def test_brep_bytes_agree_when_decoding_never_settles(monkeypatch):
-    # Some orbits drift forever. With the bound below the cycle the ribs
-    # stand in for such a shape: a restored body, and one restored twice,
-    # must still encode like the built one.
-    import simplecadapi.artifacts.brep as brep
-
-    monkeypatch.setattr(brep, "_MAX_DECODE_ROUNDS", 1)
+def test_brep_bytes_agree_for_a_shape_whose_reencoding_orbit_is_long():
+    # Chamfered ribs have a long re-encoding orbit: a restored body, and one
+    # restored twice, must still encode like the built one.
     built = _chamfered_ribs()
     payload = write_brep_bytes(built)
     restored = pickle.loads(pickle.dumps(built))

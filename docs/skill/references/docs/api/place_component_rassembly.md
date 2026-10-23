@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def place_component_rassembly(assembly: Assembly, component_id: str, placement: Placement) -> Assembly
+def place_component_rassembly(assembly, component_id, placement)
 ```
 
 *Source: operators/product.py*

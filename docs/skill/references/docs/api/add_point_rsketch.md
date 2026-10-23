@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def add_point_rsketch(sketch: Sketch, point_id: str, x: ScalarLike, y: ScalarLike) -> Sketch
+def add_point_rsketch(sketch, point_id, x, y)
 ```
 
 *Source: operators/sketch.py*

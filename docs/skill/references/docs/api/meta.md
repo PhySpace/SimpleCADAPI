@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def meta(path: str, op: str, value_: Any) -> SerializablePredicate
+def meta(path, op, value_)
 ```
 
 *Source: ql.py*

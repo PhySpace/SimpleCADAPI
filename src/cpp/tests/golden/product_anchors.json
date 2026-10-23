@@ -1,0 +1,130 @@
+{
+  "anchor": {
+    "anchor_kind": "geometry",
+    "geometry_ref": {
+      "flip": true,
+      "geo_selector": {
+        "center": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "kind": "face",
+      "source_node_id": "n1"
+    }
+  },
+  "bad_anchor_kind": {
+    "exception": "ValueError",
+    "message": "anchor_kind must be geometry or placement"
+  },
+  "bad_kind": {
+    "exception": "ValueError",
+    "message": "kind must be one of: vertex, edge, wire, face, solid"
+  },
+  "bad_selector": {
+    "exception": "TypeError",
+    "message": "geo_selector must be a dict"
+  },
+  "connector": {
+    "anchor": {
+      "anchor_kind": "geometry",
+      "geometry_ref": {
+        "flip": true,
+        "geo_selector": {
+          "center": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "normal": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "kind": "face",
+        "source_node_id": "n1"
+      }
+    },
+    "connector_id": "c",
+    "geometry_ref": {
+      "flip": true,
+      "geo_selector": {
+        "center": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "kind": "face",
+      "source_node_id": "n1"
+    },
+    "name": null
+  },
+  "frame": {
+    "origin": [
+      0.0,
+      0.0,
+      1.0
+    ],
+    "x_axis": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "y_axis": [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    "z_axis": [
+      0.0,
+      0.0,
+      -1.0
+    ]
+  },
+  "geometry_needs_ref": {
+    "exception": "TypeError",
+    "message": "geometry anchors require geometry_ref"
+  },
+  "mixed": {
+    "exception": "ValueError",
+    "message": "geometry_ref is only valid for geometry connectors"
+  },
+  "no_anchor": {
+    "exception": "TypeError",
+    "message": "geometry_ref must be a GeometryRef when anchor is omitted"
+  },
+  "placement_needs_placement": {
+    "exception": "TypeError",
+    "message": "placement anchors require placement"
+  },
+  "ref": {
+    "flip": true,
+    "geo_selector": {
+      "center": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "kind": "face",
+    "source_node_id": "n1"
+  }
+}

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def constrain_distance_x_rsketch(sketch: Sketch, a: Union[SketchRef, str], b: Union[SketchRef, str], value: ScalarLike, *, constraint_id: Optional[str] = None, driving: bool = True) -> Sketch
+def constrain_distance_x_rsketch(sketch, a, b, value, *, constraint_id=None, driving=True)
 ```
 
 *Source: operators/sketch.py*

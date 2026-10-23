@@ -1,0 +1,42 @@
+{
+  "angle": {
+    "how_to_fix": [
+      "Use an angle greater than zero.",
+      "Pass a valid non-zero axis vector and a valid origin point.",
+      "If you revolve a wire, ensure it is closed or convert it to a face first.",
+      "Inspect the evaluated axis, origin, and profile before retrying."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "revolve_rsolid",
+    "possible_causes": [
+      "The angle is not a positive finite scalar.",
+      "The axis or origin is invalid.",
+      "A wire profile was provided but it is not closed.",
+      "The kernel rejected the revolve definition."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to revolve the profile into a solid."
+  },
+  "open": {
+    "how_to_fix": [
+      "Use an angle greater than zero.",
+      "Pass a valid non-zero axis vector and a valid origin point.",
+      "If you revolve a wire, ensure it is closed or convert it to a face first.",
+      "Inspect the evaluated axis, origin, and profile before retrying."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "revolve_rsolid",
+    "possible_causes": [
+      "The angle is not a positive finite scalar.",
+      "The axis or origin is invalid.",
+      "A wire profile was provided but it is not closed.",
+      "The kernel rejected the revolve definition."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to revolve the profile into a solid."
+  }
+}

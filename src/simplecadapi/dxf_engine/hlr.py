@@ -1,26 +1,26 @@
-"""dxf_engine.hlr — OCCT 隐藏线消除投影 (GB/T 4458.1 视图画法)。"""
+"""dxf_engine.hlr — OCCT hidden-line-removal projection (GB/T 4458.1 view drawing)."""
 from __future__ import annotations
 
 import math
 
-from OCP.BRepAdaptor import BRepAdaptor_Curve
-from OCP.GCPnts import GCPnts_QuasiUniformDeflection
-from OCP.GeomAbs import GeomAbs_Circle, GeomAbs_Line
-from OCP.HLRAlgo import HLRAlgo_Projector
-from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
-from OCP.TopAbs import TopAbs_EDGE
-from OCP.TopExp import TopExp_Explorer
-from OCP.TopoDS import TopoDS
-from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
+from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Curve
+from simplecadapi._cpp.occt.GCPnts import GCPnts_QuasiUniformDeflection
+from simplecadapi._cpp.occt.GeomAbs import GeomAbs_Circle, GeomAbs_Line
+from simplecadapi._cpp.occt.HLRAlgo import HLRAlgo_Projector
+from simplecadapi._cpp.occt.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
+from simplecadapi._cpp.occt.TopAbs import TopAbs_EDGE
+from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
+from simplecadapi._cpp.occt.TopoDS import TopoDS
+from simplecadapi._cpp.occt.gp import gp_Ax2, gp_Dir, gp_Pnt
 
 DEG = 180.0 / math.pi
 
 
 def hlr_project(shape, view_dir, x_dir):
-    """单方向隐藏线消除。返回 (visible_edges, hidden_edges)。
+    """Hidden-line removal in one direction. Returns (visible_edges, hidden_edges).
 
-    view_dir: 观察方向朝向物体的轴向; x_dir: 投影面内屏幕右方向。
-    相切过渡线 (Rg1/RgN) 不取 —— 工程图不画光滑缝。
+    view_dir: the axis direction pointing from the viewer towards the object; x_dir: the screen-right direction in the projection plane.
+    Tangent transition lines (Rg1/RgN) are not taken — an engineering drawing does not draw smooth seams.
     """
     algo = HLRBRep_Algo()
     algo.Add(shape)
@@ -45,7 +45,7 @@ def hlr_project(shape, view_dir, x_dir):
 
 
 def discretize_edge(edge, deflection=0.04):
-    """边 -> (adaptor, 采样点列)。"""
+    """Edge -> (adaptor, list of sample points)."""
     ad = BRepAdaptor_Curve(edge)
     t0, t1 = ad.FirstParameter(), ad.LastParameter()
     disc = GCPnts_QuasiUniformDeflection(ad, deflection, t0, t1)
@@ -66,7 +66,7 @@ def discretize_edge(edge, deflection=0.04):
 
 
 def arc_angles(ad, cxy, t0, t1):
-    """DXF 逆时针弧起止角; 采样中点落在弧段内的角度序为准。"""
+    """Start and end angles of a DXF counter-clockwise arc; the angle order is the one in which the sampled midpoint falls inside the arc."""
     cx, cy = cxy
     p0, pm, p1 = ad.Value(t0), ad.Value(t0 + (t1 - t0) * 0.499999), ad.Value(t1)
     a0 = math.atan2(p0.Y() - cy, p0.X() - cx) * DEG

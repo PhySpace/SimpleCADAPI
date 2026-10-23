@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def fillet_rsolid(solid: Solid, edges: Union[Sequence[Edge], ShapeSelector], radius: ScalarLike, *, result_tag: Optional[str] = None, generated_faces_tag: Optional[str] = None) -> Solid
+def fillet_rsolid(solid, edges, radius, *, result_tag=None, generated_faces_tag=None)
 ```
 
 *Source: operators/features.py*

@@ -1,0 +1,88 @@
+{
+  "fillet": [
+    [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        1.558490122507371,
+        0.3051045444789404
+      ],
+      [
+        1.656153718066919,
+        0.46449114442355255
+      ],
+      [
+        2.0,
+        1.0
+      ]
+    ]
+  ],
+  "internal": {
+    "addendum_factor": 1.0,
+    "backlash": 0.12,
+    "backlash_half_angle": 0.0012121212121212121,
+    "base_radius": 46.51478472890247,
+    "clearance_factor": 0.25,
+    "flank_tip_radius": 48.0,
+    "left_base_angle": -0.007683439265919562,
+    "left_root_angle": -0.038128810756526396,
+    "left_tip_angle": -0.01298704157905493,
+    "needs_tip_connectors": false,
+    "pitch_radius": 49.5,
+    "right_base_angle": 0.007683439265919562,
+    "right_root_angle": 0.038128810756526396,
+    "right_tip_angle": 0.01298704157905493,
+    "root_radius": 51.375,
+    "tip_radius": 48.0,
+    "tooth_angle": 0.09519977738150888
+  },
+  "involute": [
+    [
+      11.172953311924744,
+      0.40634257659016626
+    ],
+    0.6633249580710799
+  ],
+  "plain": {
+    "addendum_factor": 1.0,
+    "backlash": 0.0,
+    "base_radius": 12.685850380609764,
+    "clearance_factor": 0.25,
+    "left_start": -0.10217084646705292,
+    "left_tip_angle": -0.03408318920439217,
+    "pitch_radius": 13.5,
+    "prev_right_start": -0.24689500393181296,
+    "right_start": 0.10217084646705292,
+    "right_tip_angle": 0.03408318920439217,
+    "root_radius": 11.625,
+    "tip_radius": 15.0,
+    "tooth_angle": 0.3490658503988659
+  },
+  "radii": [
+    49.5,
+    48.3,
+    50.85,
+    54.85
+  ],
+  "rotate": [
+    0.3642960758029269,
+    2.2061931849125513
+  ],
+  "tuned": {
+    "addendum_factor": 0.8,
+    "backlash": 0.12,
+    "base_radius": 12.685850380609764,
+    "clearance_factor": 0.1,
+    "left_start": -0.09772640202260847,
+    "left_tip_angle": -0.04192881313891823,
+    "pitch_radius": 13.5,
+    "prev_right_start": -0.25133944837625743,
+    "right_start": 0.09772640202260847,
+    "right_tip_angle": 0.04192881313891823,
+    "root_radius": 12.15,
+    "tip_radius": 14.7,
+    "tooth_angle": 0.3490658503988659
+  }
+}

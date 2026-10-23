@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def add_belt_constraint_rassembly(assembly: Assembly, constraint_id: str, connector_a: ConnectorRef, connector_b: ConnectorRef, pulley_radius_a: float, pulley_radius_b: float, phase_offset: Optional[float] = None, name: Optional[str] = None) -> Assembly
+def add_belt_constraint_rassembly(assembly, constraint_id, connector_a, connector_b, pulley_radius_a, pulley_radius_b, phase_offset=None, name=None)
 ```
 
 *Source: operators/product.py*

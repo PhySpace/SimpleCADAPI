@@ -189,7 +189,7 @@ def test_unknown_kernel_solid_is_reported_and_errors_restore_patches():
     original = b.Solid.make_box.__func__
     owned_attributes = set(b.Solid.__dict__)
     trace = trace_source("""from build123d import Solid
-from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
+from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakeBox
 result = Solid(BRepPrimAPI_MakeBox(2, 3, 4).Solid())
 """)
     assert trace["unsupported"]

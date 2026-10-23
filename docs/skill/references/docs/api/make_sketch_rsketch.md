@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_sketch_rsketch(name: Optional[str] = None, *, plane: Any = 'XY', sketch_id: Optional[str] = None) -> Sketch
+def make_sketch_rsketch(name=None, *, plane='XY', sketch_id=None)
 ```
 
 *Source: operators/sketch.py*

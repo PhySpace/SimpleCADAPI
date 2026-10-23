@@ -1,0 +1,242 @@
+{
+  "button": {
+    "meta": {
+      "basic_minor_diameter": 6.646875,
+      "diameter": 8.0,
+      "drive_depth": 1.2320000000000002,
+      "drive_size": 6.912,
+      "drive_style": "cross",
+      "head_across_corners": null,
+      "head_height": 4.4,
+      "head_style": "button",
+      "head_width": 14.4,
+      "length": 24.0,
+      "modeled_minor_diameter": 6.646875,
+      "modeled_thread_length": 22.0,
+      "modeled_thread_start": 2.0,
+      "pitch_diameter": 7.188125,
+      "recommended_mating_hole_chamfer_min": 0.48,
+      "requested_thread_style": "partial",
+      "thread_depth": 0.6765625000000002,
+      "thread_detail": "cosmetic",
+      "thread_form": "v",
+      "thread_length": 22.0,
+      "thread_phase_degrees": 0.0,
+      "thread_pitch": 1.25,
+      "thread_pitch_source": "metric_coarse",
+      "thread_start": 2.0,
+      "thread_style": "partial",
+      "underhead_fillet_radius": 0.48
+    },
+    "shape": {
+      "area": 1048.240679635955,
+      "bbox": [
+        -3.456,
+        -3.456,
+        -4.4,
+        7.2,
+        3.456,
+        24.0
+      ],
+      "edges": 60,
+      "faces": 24,
+      "tags": [
+        "group.fasteners",
+        "role.fastener.bolt"
+      ],
+      "volume": 1689.063619908856
+    }
+  },
+  "countersunk": {
+    "meta": {
+      "basic_minor_diameter": 6.646875,
+      "diameter": 8.0,
+      "drive_depth": 1.344,
+      "drive_size": 7.68,
+      "drive_style": "slot",
+      "head_across_corners": null,
+      "head_height": 4.8,
+      "head_style": "countersunk",
+      "head_width": 16.0,
+      "length": 24.0,
+      "modeled_minor_diameter": 6.646875,
+      "modeled_thread_length": 22.0,
+      "modeled_thread_start": 2.0,
+      "pitch_diameter": 7.188125,
+      "recommended_mating_hole_chamfer_min": 0.0,
+      "requested_thread_style": "partial",
+      "thread_depth": 0.6765625000000002,
+      "thread_detail": "cosmetic",
+      "thread_form": "v",
+      "thread_length": 22.0,
+      "thread_phase_degrees": 0.0,
+      "thread_pitch": 1.25,
+      "thread_pitch_source": "metric_coarse",
+      "thread_start": 2.0,
+      "thread_style": "partial",
+      "underhead_fillet_radius": 0.0
+    },
+    "shape": {
+      "area": 1115.2502674199159,
+      "bbox": [
+        -3.84,
+        -0.8448,
+        -4.8,
+        8.0,
+        0.8448,
+        24.0
+      ],
+      "edges": 17,
+      "faces": 9,
+      "tags": [
+        "group.fasteners",
+        "role.fastener.bolt"
+      ],
+      "volume": 1751.9050664697668
+    }
+  },
+  "cylindrical": {
+    "meta": {
+      "basic_minor_diameter": 6.646875,
+      "diameter": 8.0,
+      "drive_depth": 2.24,
+      "drive_size": 5.76,
+      "drive_style": "hex_socket",
+      "head_across_corners": null,
+      "head_height": 8.0,
+      "head_style": "cylindrical",
+      "head_width": 12.0,
+      "length": 24.0,
+      "modeled_minor_diameter": 6.646875,
+      "modeled_thread_length": 22.0,
+      "modeled_thread_start": 2.0,
+      "pitch_diameter": 7.188125,
+      "recommended_mating_hole_chamfer_min": 0.48,
+      "requested_thread_style": "partial",
+      "thread_depth": 0.6765625000000002,
+      "thread_detail": "cosmetic",
+      "thread_form": "v",
+      "thread_length": 22.0,
+      "thread_phase_degrees": 0.0,
+      "thread_pitch": 1.25,
+      "thread_pitch_source": "metric_coarse",
+      "thread_start": 2.0,
+      "thread_style": "partial",
+      "underhead_fillet_radius": 0.48
+    },
+    "shape": {
+      "area": 1164.6052521746974,
+      "bbox": [
+        -2.4941531628991838,
+        -2.88,
+        -8.0,
+        6.0,
+        2.88,
+        24.0
+      ],
+      "edges": 26,
+      "faces": 13,
+      "tags": [
+        "group.fasteners",
+        "role.fastener.bolt"
+      ],
+      "volume": 2064.1553991428723
+    }
+  },
+  "hex": {
+    "meta": {
+      "basic_minor_diameter": 6.646875,
+      "diameter": 8.0,
+      "drive_depth": 0.0,
+      "drive_size": 0.0,
+      "drive_style": "none",
+      "head_across_corners": 15.011106998930268,
+      "head_height": 5.3,
+      "head_style": "hex",
+      "head_width": 13.0,
+      "length": 24.0,
+      "modeled_minor_diameter": 6.646875,
+      "modeled_thread_length": 22.0,
+      "modeled_thread_start": 2.0,
+      "pitch_diameter": 7.188125,
+      "recommended_mating_hole_chamfer_min": 0.48,
+      "requested_thread_style": "partial",
+      "thread_depth": 0.6765625000000002,
+      "thread_detail": "cosmetic",
+      "thread_form": "v",
+      "thread_length": 22.0,
+      "thread_phase_degrees": 0.0,
+      "thread_pitch": 1.25,
+      "thread_pitch_source": "metric_coarse",
+      "thread_start": 2.0,
+      "thread_style": "partial",
+      "underhead_fillet_radius": 0.48
+    },
+    "shape": {
+      "area": 1129.5036741337435,
+      "bbox": [
+        -6.500000000000001,
+        -7.505553499465134,
+        -5.3,
+        6.500000000000001,
+        7.505553499465134,
+        24.0
+      ],
+      "edges": 23,
+      "faces": 11,
+      "tags": [
+        "group.fasteners",
+        "role.fastener.bolt"
+      ],
+      "volume": 1983.3465117322212
+    }
+  },
+  "square": {
+    "meta": {
+      "basic_minor_diameter": 6.646875,
+      "diameter": 8.0,
+      "drive_depth": 1.568,
+      "drive_size": 5.76,
+      "drive_style": "slot",
+      "head_across_corners": null,
+      "head_height": 5.6,
+      "head_style": "square",
+      "head_width": 12.0,
+      "length": 24.0,
+      "modeled_minor_diameter": 6.646875,
+      "modeled_thread_length": 22.0,
+      "modeled_thread_start": 2.0,
+      "pitch_diameter": 7.188125,
+      "recommended_mating_hole_chamfer_min": 0.48,
+      "requested_thread_style": "partial",
+      "thread_depth": 0.6765625000000002,
+      "thread_detail": "cosmetic",
+      "thread_form": "v",
+      "thread_length": 22.0,
+      "thread_phase_degrees": 0.0,
+      "thread_pitch": 1.25,
+      "thread_pitch_source": "metric_coarse",
+      "thread_start": 2.0,
+      "thread_style": "partial",
+      "underhead_fillet_radius": 0.48
+    },
+    "shape": {
+      "area": 1176.9477855716123,
+      "bbox": [
+        -6.0,
+        -6.0,
+        -5.6,
+        6.0,
+        6.0,
+        24.0
+      ],
+      "edges": 29,
+      "faces": 14,
+      "tags": [
+        "group.fasteners",
+        "role.fastener.bolt"
+      ],
+      "volume": 2002.6026126664988
+    }
+  }
+}

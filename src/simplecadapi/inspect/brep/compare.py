@@ -10,10 +10,10 @@ from pathlib import Path
 from typing import Any, Sequence
 
 import numpy as np
-from OCP.BRep import BRep_Tool
-from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
-from OCP.TopAbs import (
+from simplecadapi._cpp.occt.BRep import BRep_Tool
+from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
+from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Cut
+from simplecadapi._cpp.occt.TopAbs import (
     TopAbs_COMPOUND,
     TopAbs_COMPSOLID,
     TopAbs_EDGE,
@@ -21,9 +21,9 @@ from OCP.TopAbs import (
     TopAbs_SHELL,
     TopAbs_VERTEX,
 )
-from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopTools import TopTools_IndexedMapOfShape, TopTools_ListOfShape
-from OCP.TopoDS import TopoDS, TopoDS_Shape
+from simplecadapi._cpp.occt.TopExp import TopExp, TopExp_Explorer
+from simplecadapi._cpp.occt.TopTools import TopTools_IndexedMapOfShape, TopTools_ListOfShape
+from simplecadapi._cpp.occt.TopoDS import TopoDS, TopoDS_Shape
 
 from .inspect import BRepInspection
 from .io import load_step_rshape, measure_shape_mass_rtuple

@@ -1,0 +1,34 @@
+{
+  "bad_assembly": {
+    "exception": "TypeError",
+    "message": "assembly must be an Assembly"
+  },
+  "phase": 0.0,
+  "report": {
+    "grounded_component_ids": [],
+    "residuals": [
+      {
+        "angular_error_degrees": 0.0,
+        "constraint_id": "mesh",
+        "translation_error": 1e+30,
+        "within_tolerance": false
+      }
+    ],
+    "solved": false,
+    "solved_component_ids": [],
+    "unsolved_component_ids": [
+      "a",
+      "b"
+    ]
+  },
+  "residual": {
+    "angular_error_degrees": 0.0,
+    "constraint_id": "mesh",
+    "translation_error": 1e+30,
+    "within_tolerance": false
+  },
+  "unknown": {
+    "exception": "KeyError",
+    "message": "\"assembly has no constraint_id 'ghost'\""
+  }
+}

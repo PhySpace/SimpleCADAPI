@@ -1,0 +1,46 @@
+{
+  "exprs": {
+    "again": {
+      "x": {
+        "expr_id": "expr_948fe4f24ee6d183"
+      }
+    },
+    "pair": [
+      {
+        "expr_id": "var_4454211ef5a1cb49"
+      },
+      null
+    ],
+    "size": [
+      {
+        "expr_id": "expr_948fe4f24ee6d183"
+      },
+      null
+    ]
+  },
+  "found": [
+    "expr_948fe4f24ee6d183",
+    "var_4454211ef5a1cb49"
+  ],
+  "kinds": {
+    "pair": "tuple",
+    "size": "list"
+  },
+  "numeric": {
+    "again": {
+      "x": 4.0,
+      "y": 3.0
+    },
+    "count": 3,
+    "flag": true,
+    "name": "n",
+    "pair": [
+      3.0,
+      2.0
+    ],
+    "size": [
+      4.0,
+      1.0
+    ]
+  }
+}

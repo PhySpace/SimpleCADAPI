@@ -1,0 +1,244 @@
+{
+  "assembly": {
+    "assembly_id": "c",
+    "components": [
+      {
+        "component_id": "a",
+        "item_id": "p",
+        "item_kind": "part",
+        "name": null,
+        "placement": {
+          "origin": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "x_axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "y_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "z_axis": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      {
+        "component_id": "b",
+        "item_id": "p",
+        "item_kind": "part",
+        "name": null,
+        "placement": {
+          "origin": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "x_axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "y_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "z_axis": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      }
+    ],
+    "constraints": [
+      {
+        "angle_limit": null,
+        "connector_a": {
+          "component_id": "a",
+          "connector_id": "axis"
+        },
+        "connector_b": {
+          "component_id": "b",
+          "connector_id": "axis"
+        },
+        "constraint_id": "f",
+        "constraint_kind": "fixed",
+        "distance_limit": null,
+        "drive_angle_degrees": null,
+        "drive_distance": null,
+        "name": "Weld",
+        "phase_offset": null,
+        "pitch_radius": null,
+        "pitch_radius_a": null,
+        "pitch_radius_b": null,
+        "pulley_radius_a": null,
+        "pulley_radius_b": null
+      },
+      {
+        "angle_limit": {
+          "lower_value": 0.0,
+          "upper_value": 90.0
+        },
+        "connector_a": {
+          "component_id": "a",
+          "connector_id": "axis"
+        },
+        "connector_b": {
+          "component_id": "b",
+          "connector_id": "axis"
+        },
+        "constraint_id": "r",
+        "constraint_kind": "revolute",
+        "distance_limit": null,
+        "drive_angle_degrees": 30.0,
+        "drive_distance": null,
+        "name": null,
+        "phase_offset": null,
+        "pitch_radius": null,
+        "pitch_radius_a": null,
+        "pitch_radius_b": null,
+        "pulley_radius_a": null,
+        "pulley_radius_b": null
+      },
+      {
+        "angle_limit": null,
+        "connector_a": {
+          "component_id": "a",
+          "connector_id": "axis"
+        },
+        "connector_b": {
+          "component_id": "b",
+          "connector_id": "axis"
+        },
+        "constraint_id": "p",
+        "constraint_kind": "prismatic",
+        "distance_limit": {
+          "lower_value": 0.0,
+          "upper_value": 90.0
+        },
+        "drive_angle_degrees": null,
+        "drive_distance": 2.0,
+        "name": null,
+        "phase_offset": null,
+        "pitch_radius": null,
+        "pitch_radius_a": null,
+        "pitch_radius_b": null,
+        "pulley_radius_a": null,
+        "pulley_radius_b": null
+      },
+      {
+        "angle_limit": null,
+        "connector_a": {
+          "component_id": "a",
+          "connector_id": "axis"
+        },
+        "connector_b": {
+          "component_id": "b",
+          "connector_id": "axis"
+        },
+        "constraint_id": "g",
+        "constraint_kind": "gear",
+        "distance_limit": null,
+        "drive_angle_degrees": null,
+        "drive_distance": null,
+        "name": null,
+        "phase_offset": 0.5,
+        "pitch_radius": null,
+        "pitch_radius_a": 1.0,
+        "pitch_radius_b": 2.0,
+        "pulley_radius_a": null,
+        "pulley_radius_b": null
+      },
+      {
+        "angle_limit": null,
+        "connector_a": {
+          "component_id": "a",
+          "connector_id": "axis"
+        },
+        "connector_b": {
+          "component_id": "b",
+          "connector_id": "axis"
+        },
+        "constraint_id": "t",
+        "constraint_kind": "belt",
+        "distance_limit": null,
+        "drive_angle_degrees": null,
+        "drive_distance": null,
+        "name": null,
+        "phase_offset": 0.0,
+        "pitch_radius": null,
+        "pitch_radius_a": null,
+        "pitch_radius_b": null,
+        "pulley_radius_a": 3.0,
+        "pulley_radius_b": 4.0
+      },
+      {
+        "angle_limit": null,
+        "connector_a": {
+          "component_id": "a",
+          "connector_id": "axis"
+        },
+        "connector_b": {
+          "component_id": "b",
+          "connector_id": "axis"
+        },
+        "constraint_id": "k",
+        "constraint_kind": "rack_pinion",
+        "distance_limit": null,
+        "drive_angle_degrees": null,
+        "drive_distance": null,
+        "name": null,
+        "phase_offset": 1.0,
+        "pitch_radius": 2.0,
+        "pitch_radius_a": null,
+        "pitch_radius_b": null,
+        "pulley_radius_a": null,
+        "pulley_radius_b": null
+      }
+    ],
+    "grounded_component_ids": [],
+    "name": null,
+    "public_connectors": []
+  },
+  "constraint": {
+    "angle_limit": null,
+    "connector_a": {
+      "component_id": "a",
+      "connector_id": "axis"
+    },
+    "connector_b": {
+      "component_id": "b",
+      "connector_id": "axis"
+    },
+    "constraint_id": "g",
+    "constraint_kind": "gear",
+    "distance_limit": null,
+    "drive_angle_degrees": null,
+    "drive_distance": null,
+    "name": null,
+    "phase_offset": 0.5,
+    "pitch_radius": null,
+    "pitch_radius_a": 1.0,
+    "pitch_radius_b": 2.0,
+    "pulley_radius_a": null,
+    "pulley_radius_b": null
+  },
+  "equal": true,
+  "ids": [
+    "f",
+    "r",
+    "p",
+    "g",
+    "t",
+    "k"
+  ]
+}

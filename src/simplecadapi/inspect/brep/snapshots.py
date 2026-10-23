@@ -8,11 +8,11 @@ from pathlib import Path
 import tempfile
 from typing import Any, Sequence
 
-import OCP
-from OCP.BRep import BRep_Builder
-from OCP.IFSelect import IFSelect_RetDone
-from OCP.STEPControl import STEPControl_Reader
-from OCP.TopoDS import TopoDS_Shell
+import simplecadapi._cpp.occt as _occt
+from simplecadapi._cpp.occt.BRep import BRep_Builder
+from simplecadapi._cpp.occt.IFSelect import IFSelect_RetDone
+from simplecadapi._cpp.occt.STEPControl import STEPControl_Reader
+from simplecadapi._cpp.occt.TopoDS import TopoDS_Shell
 
 from ..._internal.brep_region import (
     PROFILE,
@@ -92,7 +92,7 @@ def _manifest(
         "schema_version": "1.0",
         "profile": PROFILE,
         "coordinate_system": {"length_unit": "mm"},
-        "generator": {"ocp_version": str(OCP.__version__)},
+        "generator": {"ocp_version": str(_occt.__version__)},
         "source": {
             "format": "step",
             "name": source.name,

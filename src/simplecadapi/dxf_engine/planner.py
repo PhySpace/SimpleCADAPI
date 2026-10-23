@@ -1,15 +1,15 @@
-"""dxf_engine.planner — 标注方案求解器。
+"""dxf_engine.planner — the dimensioning-plan solver.
 
-标注学 mindset (GB/T 4458.4-2003 / GB/T 16675.1 / GB/T 14691):
-  R1 安全区      文本(OBB)/引线/尺寸线 与 图线/其他标注/禁入区 不冲突 (最少调整)
-  R2 字向        文字平行于尺寸线; 字头朝上(水平)/朝左(竖直); 不倒置
-  R3 30°禁用区   倾斜尺寸线靠近铅垂 ±30° 时给警告 (图17; 竖直 90° 本身合法)
-  R4 行槽        同侧尺寸行距 ROW_PITCH, 声明行优先, 碰撞顺延; 大尺寸在外 (自动)
-  R5 参数覆盖    每个模型参数: 被图形尺寸承载(covers/caption) 或 进入技术要求/参数表
-  R6 基准引用    position 尺寸必须声明 datum; datum 字母必须已声明
-  R7 不重复      同视图同类测量不重复
+Dimensioning principles (GB/T 4458.4-2003 / GB/T 16675.1 / GB/T 14691):
+  R1 safe area      text (OBB) / leaders / dimension lines do not clash with figure lines, other annotations or keep-out zones (minimum adjustment)
+  R2 text direction text runs parallel to the dimension line; heads up (horizontal) / left (vertical); never upside down
+  R3 30° exclusion  an inclined dimension line within ±30° of vertical gives a warning (figure 17; exactly vertical 90° is legal)
+  R4 row slots      same-side dimension rows are ROW_PITCH apart, declared rows first, collisions shift on; large dimensions outside (automatic)
+  R5 parameter cover every model parameter is carried by a figure dimension (covers/caption) or enters the technical requirements / parameter table
+  R6 datum reference position dimensions must declare a datum; datum letters must be declared
+  R7 no duplicates the same kind of measurement is not repeated in the same view
 
-旋转文字碰撞用 OBB(分离轴判定), 不用粗糙 AABB。
+Rotated text collides through an OBB (separating-axis test), not a rough AABB.
 """
 from __future__ import annotations
 
@@ -43,8 +43,8 @@ def _text_width(text, h=3.5):
 
 @dataclass
 class Resolved:
-    """一个标注元素在纸面上的求解结果：requested(声明值) → resolved(实际位置) +
-    adjust(最少调整顺延记录) + draw(渲染所需的预计算几何) + rules(触发的规则)。"""
+    """The solved result of one annotation element on the sheet: requested (declared value) → resolved (actual position) +
+    adjust (record of the minimum adjustments) + draw (precomputed geometry for rendering) + rules (the rules that fired)."""
     kind: str
     name: str
     view: str
@@ -61,12 +61,12 @@ ROW_PITCH, BASE_OFF = 11.0, 8.0
 
 
 class SheetPlan:
-    """标注方案求解器：SheetDecl → solve() → resolved/accepted/report() → render()。
+    """The dimensioning-plan solver: SheetDecl → solve() → resolved/accepted/report() → render().
 
-    求解流程：视图布局(第一角投影、align 对正) → 基准安放 → 线性尺寸
-    (按视图/侧/行/大外小内排序) → 直径/半径尺寸 → 引出说明 → 参数覆盖检查。
-    所有冲突处理遵循"最少调整"：优先顺延候选位置并记入 Resolved.adjust，
-    放不下则记入 R1 警告，绝不静默丢弃。
+    Solving: view layout (first-angle projection, align) → datum placement → linear dimensions
+    (ordered by view/side/row, large outside, small inside) → diameter/radius dimensions → leaders → parameter-coverage check.
+    Every conflict follows "minimum adjustment": candidate positions are shifted first and recorded in Resolved.adjust;
+    when nothing fits it is recorded as an R1 warning, never silently dropped.
     """
 
     def __init__(self, decl: SheetDecl):
@@ -82,9 +82,9 @@ class SheetPlan:
         self.coverage: list[tuple[str, str]] = []
         self._zones: list[Box] = []
 
-    # ---------- 几何基元 ----------
+    # ---------- geometry primitives ----------
     def tx(self, view, p):
-        """视图局部模型坐标 → 纸面坐标（含图纸比例）。"""
+        """View-local model coordinates → sheet coordinates (including the drawing scale)."""
         vw = self.views[view]
         return (vw["ox"] + p[0] * self.s, vw["oy"] + p[1] * self.s)
 
@@ -101,7 +101,7 @@ class SheetPlan:
 
     @staticmethod
     def _obb_sat(cx, cy, w, h, rot_deg, box: Box) -> bool:
-        """旋转矩形(OBB) 与 轴对齐盒 分离轴判定。"""
+        """Separating-axis test of a rotated rectangle (OBB) against an axis-aligned box."""
         rr = math.radians(rot_deg)
         ca, sa = math.cos(rr), math.sin(rr)
         axes = ((1.0, 0.0), (0.0, 1.0), (ca, sa), (-sa, ca))
@@ -124,7 +124,7 @@ class SheetPlan:
 
     @staticmethod
     def _obb_obb(cx1, cy1, w1, h1, r1, cx2, cy2, w2, h2, r2):
-        """两旋转矩形分离轴判定。"""
+        """Separating-axis test of two rotated rectangles."""
         corners1 = SheetPlan._obb_corners(cx1, cy1, w1, h1, r1)
         corners2 = SheetPlan._obb_corners(cx2, cy2, w2, h2, r2)
         rr1, rr2 = math.radians(r1), math.radians(r2)
@@ -153,22 +153,22 @@ class SheetPlan:
         why = []
         for z in self._zones:
             if self._obb_sat(cx, cy, w, h, rot, z.inflate(1.0)):
-                why.append("禁入区")
+                why.append("keep-out zone")
         for n, vw in self.views.items():
             if n != skip_view:
                 if self._obb_sat(cx, cy, w, h, rot, vw["bbox"].inflate(0.5)):
-                    why.append(f"视图{n}")
+                    why.append(f"view {n}")
                 for sp, sq in vw["pairs"]:
                     if self._pt_in_obb(sp[0], sp[1], cx, cy, w, h, rot):
-                        why.append(f"图线{n}")
+                        why.append(f"figure line {n}")
                         break
         for k2, cx2, cy2, w2, h2, r2 in self.text_obbs:
             if k2 != key and self._obb_obb(cx, cy, w, h, rot,
                                            cx2, cy2, w2, h2, r2):
-                why.append(f"文本{k2}")
+                why.append(f"text {k2}")
         for k2, sp, sq in self.segments:
             if k2 != key and self._seg_obb(sp, sq, cx, cy, w, h, rot):
-                why.append(f"标线{k2}")
+                why.append(f"dimension line {k2}")
         return why
 
     @staticmethod
@@ -216,7 +216,7 @@ class SheetPlan:
     def _reg_seg(self, key, p, q):
         self.segments.append((key, p, q))
 
-    # ---------- 视图 ----------
+    # ---------- views ----------
     def _solve_views(self):
         by_name = {v.name: v for v in self.d.views}
         order = [self.d.front] + [v.name for v in self.d.views
@@ -233,16 +233,16 @@ class SheetPlan:
                     ys += [p[1] for p in pts]
             if name == self.d.front:
                 ox, oy = v.anchor
-                how = "声明锚点"
+                how = "declared anchor"
             else:
                 base = self.views[v.align["to"]]
                 bb = base["bbox"]
                 if v.align["side"] == "below":
                     ox, oy = base["ox"], bb.y0 - v.align["gap"]
-                    how = f"长对正 gap{v.align['gap']:g}"
+                    how = f"length-aligned gap{v.align['gap']:g}"
                 else:
                     ox, oy = bb.x1 + v.align["gap"], base["oy"]
-                    how = f"高平齐 gap{v.align['gap']:g}"
+                    how = f"height-aligned gap{v.align['gap']:g}"
             bbox = Box(ox + min(xs) * self.s, oy + min(ys) * self.s,
                        ox + max(xs) * self.s, oy + max(ys) * self.s)
             pairs = []
@@ -255,18 +255,18 @@ class SheetPlan:
                 "view", name, name, f"anchor={v.anchor}", f"({ox:.1f},{oy:.1f})",
                 [], {"how": how}))
 
-    # ---------- 文字平行基元 ----------
+    # ---------- text-parallel primitives ----------
     @staticmethod
     def _text_frame(mid, line_angle_deg, above=1.0, h=TEXT_H, w=0.0):
-        """文字平行于尺寸线: 旋转归一(不倒置), 基线偏移到'上方'侧
-        (GB 字头朝上/朝左)。返回 (insert, rot, center, aabb)。"""
+        """Text parallel to the dimension line: rotation normalised (never upside down), baseline offset to the "upper" side
+        (GB: heads up / left). Returns (insert, rot, center, aabb)."""
         rot = line_angle_deg % 180.0
         if rot > 90.0:
             rot -= 180.0
         rr = math.radians(rot)
         n = (-math.sin(rr), math.cos(rr))
         insert = (mid[0] + n[0] * above, mid[1] + n[1] * above)
-        half_h = h * 0.35                      # 基线到字形视觉中心
+        half_h = h * 0.35                      # baseline to the visual centre of the glyphs
         cx, cy = mid[0] + n[0] * (above + half_h), mid[1] + n[1] * (above + half_h)
         ca, sa = math.cos(rr), math.sin(rr)
         ex = abs(ca) * w / 2 + abs(sa) * h / 2
@@ -274,9 +274,9 @@ class SheetPlan:
         return (insert, rot, (cx, cy), Box(cx - ex, cy - ey, cx + ex, cy + ey))
 
     def _arrow(self, msp, tip, direction_deg):
-        pass                                   # 渲染阶段实现 (render.py)
+        pass                                   # implemented in the render stage (render.py)
 
-    # ---------- 尺寸求解 ----------
+    # ---------- dimension solving ----------
     def _solve_dim(self, dcl: DimDecl):
         key = f"dim:{dcl.caption}"
         if dcl.semantic == "linear":
@@ -287,17 +287,17 @@ class SheetPlan:
             self._solve_radius(dcl, self.views[dcl.view], key)
 
     def _lin_geometry(self, dcl, side, row, slide, text):
-        """线性尺寸几何派生 (solver 与 agent 动作共用, 一处派生一处真值):
-        尺寸线在视图 bbox 外第 row 行 (side 侧); 文字只有沿尺寸线方向的
-        1 自由度 (slide, 相对测量中点的纸面偏移); 文字滑出测量段时尺寸线
-        **自动侧延长**覆盖全文 (箭头仍指测量点)。"""
+        """Linear-dimension geometry derivation (shared by the solver and the agent actions: one derivation, one truth):
+        the dimension line sits on row `row` (side `side`) outside the view bbox; the text has one degree of freedom
+        along the dimension line (slide, sheet offset from the measurement midpoint); when the text slides out of the
+        measured segment the dimension line **extends sideways automatically** to cover it (arrows still point at the measured points)."""
         vw = self.views[dcl.view]
         bb = vw["bbox"]
         p1, p2 = self.tx(dcl.view, dcl.p1), self.tx(dcl.view, dcl.p2)
         dx, dy = p2[0] - p1[0], p2[1] - p1[1]
         vertical = abs(dy) >= abs(dx)
         if vertical and p1[1] > p2[1]:
-            p1, p2 = p2, p1                      # 方向归一: 自下而上 (字头朝左)
+            p1, p2 = p2, p1                      # direction normalised: bottom to top (heads left)
         if not vertical and p1[0] > p2[0]:
             p1, p2 = p2, p1
         w = _text_width(text, TEXT_H)
@@ -305,11 +305,11 @@ class SheetPlan:
             xl = (bb.x1 + BASE_OFF + row * ROW_PITCH if side == "right"
                   else bb.x0 - BASE_OFF - row * ROW_PITCH)
             ymid = (p1[1] + p2[1]) / 2 + slide
-            # insert=基线**下端** (文字沿 +y 向上展开, 与渲染 set_placement 一致);
-            # OBB 中心 = insert + u·(w/2) + n·(0.35h), u=(0,1), n=(-1,0)
+            # insert = the **lower end** of the baseline (text runs up along +y, as render set_placement does);
+            # OBB centre = insert + u·(w/2) + n·(0.35h), u=(0,1), n=(-1,0)
             insert = (xl - 1.0, ymid - w / 2)
             rot, center = 90.0, (xl - 1.0 - TEXT_H * 0.35, ymid)
-            lo = min(p1[1], insert[1] - 2.0)      # 文字滑出 → 侧延长
+            lo = min(p1[1], insert[1] - 2.0)      # text slid out → sideways extension
             hi = max(p2[1], insert[1] + w + 2.0)
             line = ((xl, lo), (xl, hi))
             arrows = ((xl, p1[1]), (xl, p2[1]))
@@ -318,7 +318,7 @@ class SheetPlan:
             yl = (bb.y0 - BASE_OFF - row * ROW_PITCH if side == "bottom"
                   else bb.y1 + BASE_OFF + row * ROW_PITCH)
             xmid = (p1[0] + p2[0]) / 2 + slide
-            # insert=基线**左端** (文字沿 +x 展开, 与渲染一致)
+            # insert = the **left end** of the baseline (text runs along +x, as render does)
             insert = (xmid - w / 2, yl + 1.0)
             rot, center = 0.0, (xmid, yl + 1.0 + TEXT_H * 0.35)
             lo = min(p1[0], insert[0] - 2.0)
@@ -345,10 +345,10 @@ class SheetPlan:
         w = _text_width(text, TEXT_H)
         span = abs(dy) if vertical else abs(dx)
         if span >= w + 2.0:
-            # 中点居首 (零位移); 冲突时先滑移 (最小调整), 后顺延行
+            # midpoint first (zero offset); on a conflict slide first (minimum adjustment), then shift rows
             slides = (0.0, w / 2 + 2.0, -(w / 2 + 2.0), w + 6.0, -(w + 6.0))
         else:
-            # 测量段容不下文字: 直接界外放置 + 尺寸线侧延长 (派生)
+            # the measured segment cannot hold the text: place it outside and extend the dimension line (derived)
             off = span / 2 + w / 2 + 2.0
             slides = (off, -off)
         adjust = []
@@ -359,20 +359,20 @@ class SheetPlan:
                 why = self._text_clear(key, g["center"][0], g["center"][1],
                                        w, TEXT_H, g["rot"],
                                        skip_view=dcl.view)
-                # 尺寸线/界线允许压中心线; 但不压他视图图线
+                # dimension and extension lines may cross centre lines, but not figure lines of other views
                 seg_bad = []
                 for seg in [g["line"]] + g["exts"]:
                     seg_bad += self._seg_vs_views(seg, dcl.view)
                 if seg_bad:
-                    why.append(f"线穿视图{'+'.join(seg_bad)}")
+                    why.append(f"line crosses view {'+'.join(seg_bad)}")
                 if not why:
                     notes = []
                     if n_try:
-                        notes.append(f"R1 行顺延 row{row_i}")
+                        notes.append(f"R1 row shifted to row{row_i}")
                     if slide:
-                        notes.append(f"文字沿线滑移 {slide:+g}")
+                        notes.append(f"text slid along the line {slide:+g}")
                     if g["extended"]:
-                        notes.append("尺寸线侧延长")
+                        notes.append("dimension line extended sideways")
                     adjust += notes
                     self.adjust_count += len(notes)
                     self.text_obbs.append((key, g["center"][0], g["center"][1],
@@ -381,7 +381,7 @@ class SheetPlan:
                         self._reg_seg(key, *sg)
                     res = f"{side} row{row_i}"
                     if slide or g["extended"]:
-                        res += f" slide{slide:+g}" + (" 延长" if g["extended"] else "")
+                        res += f" slide{slide:+g}" + (" extended" if g["extended"] else "")
                     self.resolved.append(Resolved(
                         "dim", dcl.caption, dcl.view,
                         f"{side} row{dcl.row}", res, adjust,
@@ -390,7 +390,7 @@ class SheetPlan:
                                            "extended")},
                         "R2/R4"))
                     return
-            adjust.append(f"R1 冲突@row{row_i}({why[0] if why else '线穿视图'})")
+            adjust.append(f"R1 conflict@row{row_i}({why[0] if why else 'line crosses view'})")
             self.adjust_count += 1
         self.resolved.append(Resolved(
             "dim", dcl.caption, dcl.view, f"{side} row{dcl.row}",
@@ -398,9 +398,9 @@ class SheetPlan:
             "R1/R4"))
 
     def _solve_diameter(self, dcl, vw, key):
-        """直径标注 (GB/T 4458.4 图10): 尺寸线过圆心, 双箭头贴圆; at 定向后
-        文字沿直径线 1-DOF (缺省 0.75r 处, 冲突时换位候选), 基线恒在线上方;
-        m1/m2 恒在圆周。"""
+        """Diameter dimension (GB/T 4458.4 figure 10): the dimension line passes through the centre, double arrows touch the circle; once `at` orients it
+        the text has 1 DOF along the diameter line (default at 0.75r, alternative positions on a conflict), baseline always above the line;
+        m1/m2 always lie on the circle."""
         s = self.s
         c = self.tx(dcl.view, dcl.center)
         r = dcl.radius * s
@@ -422,7 +422,7 @@ class SheetPlan:
         w2 = _text_width(text, TEXT_H)
 
         def _anchor_at(uu):
-            """文字基线左端 (0.75r 处线上方) 与 OBB 中心。"""
+            """Left end of the text baseline (above the line at 0.75r) and the OBB centre."""
             ins = (c[0] + 0.75 * r * uu[0] + n[0] * 1.0,
                    c[1] + 0.75 * r * uu[1] + n[1] * 1.0)
             ctr = (ins[0] + uu[0] * w2 / 2 + n[0] * TEXT_H * 0.35,
@@ -445,11 +445,11 @@ class SheetPlan:
                                         skip_view=dcl.view):
                     insert, anchor, u = a2, c2, uu
                     rot = rrot
-                    adjust.append(f"换位 {aa:g}°")
+                    adjust.append(f"moved to {aa:g}°")
                     self.adjust_count += 1
                     break
             else:
-                adjust.append("R1 警告: 文本留于原位")
+                adjust.append("R1 warning: text left in place")
                 self.adjust_count += 1
         self.text_obbs.append((key, anchor[0], anchor[1], w2, TEXT_H, rot))
         for sg in (line, (m1, insert)):
@@ -460,7 +460,7 @@ class SheetPlan:
                                       f"at {dcl.at:g}°", f"rot {rot:g}° 75%r",
                                       adjust, draw, "R2/R5"))
 
-    # ---------- 引出 ----------
+    # ---------- leaders ----------
     def _solve_leaders(self):
         for dcl in self.d.leaders:
             a = self.tx(dcl.view, dcl.anchor)
@@ -478,44 +478,44 @@ class SheetPlan:
                 tx0 = a[0] + off[0]
                 ty0 = a[1] + off[1]
                 box = Box(tx0, ty0 - h, tx0 + w, ty0)
-                # 肘点取框顶上方: 多行文本时框中部肘线会划过第二行字高带
+                # the elbow sits above the box top: a mid-box elbow of a multi-line text would cut through the second line's height band
                 elb_y = ty0 + 0.8
                 near_x = (box.x0 - 1.2) if dcl.dx_dir < 0 else (box.x1 + 1.2)
                 path = [a, (a[0], elb_y), (near_x, elb_y)]
                 why = []
                 for z in self._zones:
                     if box.overlaps(z.inflate(1.0)):
-                        why.append("禁入区")
+                        why.append("keep-out zone")
                 if any(box.overlaps(v["bbox"]) for n, v in self.views.items()
                        if n != dcl.view):
-                    why.append("压他视图bbox")
+                    why.append("over another view bbox")
                 for sp, sq in zip(path, path[1:]):
                     vh = self._seg_vs_views((sp, sq), dcl.view)
                     if vh:
                         mid = ((sp[0] + sq[0]) / 2, (sp[1] + sq[1]) / 2)
                         if math.dist(a, mid) > 15.0:
-                            why.append(f"引线穿{'+'.join(vh)}")
+                            why.append(f"leader crosses {'+'.join(vh)}")
 
                 for kk, cx2, cy2, w2, h2, r2 in self.text_obbs:
                     if f"lead:{dcl.name}" != kk and self._obb_obb(
                             tx0, ty0 - h / 2, w, h, 0.0,
                             cx2, cy2, w2, h2, r2):
-                        why.append(f"文本{kk}")
+                        why.append(f"text {kk}")
                 for i in range(len(path) - 1):
                     seg = (path[i], path[i + 1])
                     for k2, cx2, cy2, w2, h2, r2 in self.text_obbs:
                         if self._seg_obb(seg[0], seg[1], cx2, cy2, w2, h2, r2):
-                            why.append(f"引线压文本{k2}")
+                            why.append(f"leader over text {k2}")
                 for i in range(len(path) - 1):
                     seg = (path[i], path[i + 1])
                     for k2, sp2, sq2 in self.segments:
                         if k2 != f"lead:{dcl.name}" and \
                                 self._seg_cross(*seg, sp2, sq2):
-                            why.append(f"标线{k2}")
+                            why.append(f"dimension line {k2}")
                 if not why:
                     final = (off, box, path)
                     if ci:
-                        adjust.append(f"换位×{ci}")
+                        adjust.append(f"moved ×{ci}")
                         self.adjust_count += 1
                     break
             if final is None:
@@ -525,7 +525,7 @@ class SheetPlan:
                 path = [a, (a[0] + dcl.dx_dir * 12.0, box.y1 + 0.8),
                         (box.x0 - 1.2 if dcl.dx_dir < 0 else box.x1 + 1.2,
                          box.y1 + 0.8)]
-                adjust.append("未找到空位 (警告)")
+                adjust.append("no free slot found (warning)")
                 self.adjust_count += 1
             else:
                 off, box, path = final
@@ -540,7 +540,7 @@ class SheetPlan:
                 adjust, {"anchor": a, "path": path, "lines": dcl.lines,
                          "text_x": box.x0, "text_y_top": box.y1}))
 
-    # ---------- 覆盖 / 规则 ----------
+    # ---------- coverage / rules ----------
     def _solve_coverage_rules(self):
         P = self.d.params
         for k in P:
@@ -563,26 +563,26 @@ class SheetPlan:
                         where = f"notes[{i + 1}]"
                         break
             if where is None:
-                where = "参数表"   # 图纸右下参数表逐项列出, 视为已覆盖
+                where = "parameter table"   # the parameter table at the bottom right of the sheet lists every item: counted as covered
             self.coverage.append((k, where))
             self.rule_log.append(("R5", "ok", f"{k}: {where}"))
         letters = {d.letter for d in self.d.datums}
         for dcl in self.d.dims:
             if dcl.datum and dcl.datum not in letters:
                 self.rule_log.append(("R6", "fail",
-                                      f"{dcl.caption} 引用未声明基准 {dcl.datum}"))
+                                      f"{dcl.caption} references an undeclared datum {dcl.datum}"))
         for r in self.resolved:
             if r.kind == "dim" and "rot" in r.draw:
                 rot = abs(r.draw["rot"]) % 180.0
                 if (60.0 < rot < 90.0) or (90.0 < rot < 120.0):
                     self.rule_log.append(("R3", "warn",
-                                          f"{r.name}: 文字旋回 {rot:g}° "
-                                          "近铅垂禁用区"))
+                                          f"{r.name}: text rotated {rot:g} deg, "
+                                          "inside the near-vertical exclusion zone"))
 
-    # ---------- 总规划 ----------
+    # ---------- overall plan ----------
     def solve(self):
-        """执行完整求解并返回 self。求解后经 resolved/accepted/report() 审计，
-        再由 render() 出图。重复调用会重置重新求解。"""
+        """Run the whole solve and return self. After solving, audit through resolved/accepted/report(),
+        then draw with render(). Calling it again resets and solves again."""
         self._prime()
         self._solve_views()
         self._solve_datums()
@@ -599,15 +599,15 @@ class SheetPlan:
         return self
 
     def _auto_diag(self):
-        """diag_png 声明后: 每次 solve()/apply() 自动刷新冲突诊断图。
-        视觉反馈是 agent-in-the-loop 的一等通道 —— 调用方读图决策, 引擎只供真值。"""
+        """Once diag_png is declared: every solve()/apply() refreshes the conflict diagnostic picture automatically.
+        Visual feedback is a first-class channel of the agent-in-the-loop: the caller reads the picture and decides, the engine only supplies truth."""
         if not getattr(self.d, "diag_png", ""):
             return
         try:
             from .agent import annotate_plan, evaluate_plan
             annotate_plan(self, self.d.diag_png, evaluate_plan(self))
-        except Exception as e:              # 诊断失败不阻塞求解, 如实入日志
-            self.rule_log.append(("R1", "warn", f"诊断图渲染失败: {e}"))
+        except Exception as e:              # a failed diagnostic does not block solving; it goes into the log as it is
+            self.rule_log.append(("R1", "warn", f"diagnostic picture failed to render: {e}"))
 
     def _solve_datums(self):
         for dcl in self.d.datums:
@@ -620,7 +620,7 @@ class SheetPlan:
             adjust = []
             if why:
                 bc = (bc[0], bc[1] - 6.0)
-                adjust.append("下移避让")
+                adjust.append("moved down to avoid")
             self.text_obbs.append((f"datum:{dcl.letter}",
                                    bc[0], bc[1], 6.0, 4.4, 0.0))
             self.resolved.append(Resolved(
@@ -630,21 +630,21 @@ class SheetPlan:
                 "R6"))
 
     def report(self) -> str:
-        """输出可审计的求解报告：基准体系、每个元素的 requested→resolved 与调整、
-        参数覆盖 (R5) 表、规则检查 (R1-R7) 结果。生成图纸后必须审阅。"""
-        lines = [f"── 标注方案报告 · {self.d.title} ({self.d.dwg_no}, "
-                 f"比例 {self.d.scale:g}:1) ──"]
-        lines.append("基准体系: " + "; ".join(
+        """Produce an auditable solve report: the datum system, requested→resolved and the adjustments of every element,
+        the parameter-coverage (R5) table, the rule-check (R1-R7) results. It must be reviewed after a drawing is generated."""
+        lines = [f"── Annotation plan report · {self.d.title} ({self.d.dwg_no}, "
+                 f"scale {self.d.scale:g}:1) ──"]
+        lines.append("datum system: " + "; ".join(
             f"{d.letter}={d.desc or d.kind}" for d in self.d.datums))
         for r in self.resolved:
             flag = " · ".join(r.adjust) if r.adjust else "ok"
             lines.append(f"{r.kind:<7} {r.name:<14} [{r.view:<5}] "
                          f"{r.requested:<22} → {r.resolved:<26} [{flag}]")
-        lines.append("── 参数覆盖 (R5) ──")
+        lines.append("── Parameter coverage (R5) ──")
         for k, where in self.coverage:
-            mark = "ok" if where != "未覆盖!" else "MISS"
+            mark = "ok" if where != "not covered!" else "MISS"
             lines.append(f"  {k:<18} → {where:<26} [{mark}]")
-        lines.append("── 规则检查 ──")
+        lines.append("── Rule checks ──")
         seen = {}
         for rl, st, dt in self.rule_log:
             seen.setdefault(rl, []).append((st, dt))
@@ -656,35 +656,35 @@ class SheetPlan:
                 lines.append(f"  {rl}: ok ({len(entries)})")
             else:
                 bad = [dt for st, dt in entries if st != "ok"]
-                lines.append(f"  {rl}: 警告 {len(bad)} 项: " + "; ".join(bad[:4]))
-        lines.append(f"调整合计: {self.adjust_count}")
+                lines.append(f"  {rl}: {len(bad)} warnings: " + "; ".join(bad[:4]))
+        lines.append(f"total adjustments: {self.adjust_count}")
         if getattr(self.d, "diag_png", ""):
-            lines.append(f"诊断图 DIAG: {self.d.diag_png}")
-            lines.append("  ↑ 每次 solve/apply 自动刷新; 下一步决策前必读 —— "
-                         "灰=ok 红=warn(先读红) 蓝=障碍 绿箭头=元素可滑移方向与距离")
+            lines.append(f"diagnostic picture DIAG: {self.d.diag_png}")
+            lines.append("  ↑ refreshed on every solve/apply; read it before the next decision — "
+                         "grey=ok red=warn (read red first) blue=obstacle green arrow=direction and distance the element can slide")
         return "\n".join(lines)
 
     def render(self, dxf_path, png_path):
-        """按求解结果渲染 DXF + PNG 双产物（委托 render_plan）。"""
+        """Render the DXF + PNG pair from the solved plan (delegates to render_plan)."""
         from .render import render_plan
         return render_plan(self, dxf_path, png_path)
 
-    # ---------- LLM-in-the-loop 评估/执行 (agent.py 承载) ----------
+    # ---------- LLM-in-the-loop evaluation/execution (carried by agent.py) ----------
     def evaluate(self):
-        """结构化冲突报告: 每元素 violations(精确障碍数据)+corridors(自由走廊)。"""
+        """Structured conflict report: per element violations (exact obstacle data) + corridors (free corridors)."""
         from .agent import evaluate_plan
         return evaluate_plan(self)
 
     def apply(self, actions):
-        """执行 LLM 动作序列 (rad/dia/lin/lead/accept), 逐条校验, 拒绝即回滚。"""
+        """Execute an LLM action sequence (rad/dia/lin/lead/accept), validating each one; a rejection rolls back."""
         from .agent import apply_actions
         return apply_actions(self, actions)
 
     def _solve_radius(self, dcl, vw, key):
-        """半径标注 (GB/T 4458.4): 声明只给 at(方位角)。定角后文字仅剩沿引线方向
-        的单一自由度 (起点 s, 引擎按候选搜索), 基线恒在线上方 1mm (法向 n),
-        引线长度 = s+字宽+余量 **派生** —— 文字滑出箭头段时线自动侧延长盖住全文;
-        mpt 恒在圆周 (箭头贴弧), rot 恒等于线向 (R2, 不可声明/覆盖)。"""
+        """Radius dimension (GB/T 4458.4): the declaration gives only `at` (azimuth). Once the angle is fixed the text keeps a single degree of freedom along the leader
+        (start s, searched by the engine over candidates), the baseline is always 1 mm above the line (normal n),
+        leader length = s + text width + margin is **derived** — when the text slides out of the arrow segment the line extends sideways to cover it;
+        mpt always lies on the circle (arrow touches the arc), rot always equals the line direction (R2, cannot be declared/overridden)."""
         s = self.s
         c = self.tx(dcl.view, dcl.center)
         r = dcl.radius * s
@@ -694,21 +694,21 @@ class SheetPlan:
         w = _text_width(text, TEXT_H)
         rot = (dcl.at % 180.0 + 180.0) % 180.0
         if rot > 90.0:
-            rot -= 180.0                                  # 正立化
+            rot -= 180.0                                  # made upright
         rr = math.radians(rot)
         n = (-math.sin(rr), math.cos(rr))
-        mpt = (c[0] + r * u[0], c[1] + r * u[1])          # 弧上箭头点
+        mpt = (c[0] + r * u[0], c[1] + r * u[1])          # arrow point on the arc
         adjust = []
         chosen = None
-        # 候选序: 弧外侧引出 (3,9,...) → 弧内侧 (s<0, 文字沿过圆心的尺寸线置于
-        # 圆内, 箭头自圆心侧指向圆弧) —— GB/T 4458.4 半径尺寸线可过圆心。
-        # 内侧候选递进加深: 圆心近障碍时浅位仍探出, 需过心更远的深位。
+        # Candidate order: leader outside the arc (3, 9, ...) → inside the arc (s<0, the text sits inside the circle along a
+        # dimension line through the centre, the arrow pointing from the centre side at the arc) — a GB/T 4458.4 radius line may pass through the centre.
+        # Inner candidates deepen progressively: when an obstacle is near the centre a shallow position still pokes out, so a deeper one past the centre is needed.
         cands = (tuple(3.0 + 6.0 * k for k in range(5))
                  + (-(w + 4.0), -(w + 10.0), -(w + 18.0)))
-        for s0 in cands:                                  # 文字起点 (1-DOF)
-            inner = (s0 + w) < 0.0                        # 内侧: 文字整段在圆内
-            tail_k = s0 - 1.5 if inner else s0 + w + 1.5  # 引线派生长度
-            insert = (mpt[0] + s0 * u[0] + n[0] * 1.0,    # 基线左端: 线上方 1mm
+        for s0 in cands:                                  # text start (1 DOF)
+            inner = (s0 + w) < 0.0                        # inside: the whole text is within the circle
+            tail_k = s0 - 1.5 if inner else s0 + w + 1.5  # derived leader length
+            insert = (mpt[0] + s0 * u[0] + n[0] * 1.0,    # left end of the baseline: 1 mm above the line
                       mpt[1] + s0 * u[1] + n[1] * 1.0)
             anchor = (insert[0] + u[0] * w / 2 + n[0] * TEXT_H * 0.35,
                       insert[1] + u[1] * w / 2 + n[1] * TEXT_H * 0.35)
@@ -717,31 +717,31 @@ class SheetPlan:
             for z in self._zones:
                 if self._obb_sat(anchor[0], anchor[1], w, TEXT_H, rot,
                                  z.inflate(1.0)):
-                    why.append("禁入区")
+                    why.append("keep-out zone")
             for n_v, vwb in self.views.items():
                 if n_v != dcl.view and self._obb_sat(
                         anchor[0], anchor[1], w, TEXT_H, rot,
                         vwb["bbox"].inflate(0.5)):
-                    why.append(f"视图{n_v}")
+                    why.append(f"view {n_v}")
             for kk, cx2, cy2, w2, h2, r2 in self.text_obbs:
                 if kk != key and self._obb_obb(anchor[0], anchor[1], w, TEXT_H,
                                                rot, cx2, cy2, w2, h2, r2):
-                    why.append(f"文本{kk.split(':')[-1]}")
+                    why.append(f"text {kk.split(':')[-1]}")
             for k2, sp2, sq2 in self.segments:
                 if k2.startswith("cl:") or k2 == key:
-                    continue                               # 与中心线相交属正常
+                    continue                               # crossing a centre line is normal
                 if (self._seg_cross(mpt, tail, sp2, sq2)
                         or self._seg_obb(sp2, sq2, anchor[0], anchor[1],
                                          w, TEXT_H, rot)):
-                    why.append(f"标线{k2}")
+                    why.append(f"dimension line {k2}")
             if not why:
                 chosen = (s0, tail, insert, anchor, inner)
                 if s0 != 3.0:
-                    where = "弧内" if inner else "弧外"
-                    adjust.append(f"文字滑移 {where} s={s0:g}")
+                    where = "inside the arc" if inner else "outside the arc"
+                    adjust.append(f"text slide {where} s={s0:g}")
                     self.adjust_count += 1
                 break
-            adjust.append(f"R1 冲突@{s0:g}({why[0]})")
+            adjust.append(f"R1 conflict@{s0:g}({why[0]})")
         if chosen is None:
             s0, inner = 15.0, False
             tail_k = s0 + w + 1.5
@@ -751,12 +751,12 @@ class SheetPlan:
                       insert[1] + u[1] * w / 2 + n[1] * TEXT_H * 0.35)
             tail = (mpt[0] + tail_k * u[0], mpt[1] + tail_k * u[1])
             chosen = (s0, tail, insert, anchor, inner)
-            adjust.append("R1 未找到理想位 (警告)")
+            adjust.append("R1 no ideal position found (warning)")
             self.adjust_count += 1
         s0, tail, insert, anchor, inner = chosen
         self.text_obbs.append((key, anchor[0], anchor[1], w, TEXT_H, rot))
         self._reg_seg(key, mpt, tail)
-        # 外侧: 箭头自外指向圆弧; 内侧: 箭头自圆心侧指向圆弧
+        # outside: the arrow points at the arc from outside; inside: the arrow points at the arc from the centre side
         arrow_deg = math.degrees(math.atan2(u[1], u[0]))
         if not inner:
             arrow_deg += 180.0
@@ -765,5 +765,5 @@ class SheetPlan:
                 "arrow_deg": arrow_deg}
         self.resolved.append(Resolved("dim", dcl.caption, dcl.view,
                                       f"at {dcl.at:g}°",
-                                      f"{'弧内' if inner else '弧外'} s={s0:g}",
+                                      f"{'inside the arc' if inner else 'outside the arc'} s={s0:g}",
                                       adjust, draw, "R2/R5"))

@@ -75,7 +75,7 @@ class Recorder:
 
     def emit(self, op, inputs, parameters, result, source, **extra):
         import build123d as b
-        from OCP.TopLoc import TopLoc_Location
+        from simplecadapi._cpp.occt.TopLoc import TopLoc_Location
         results = result if isinstance(result, (list, tuple)) else [result]
         solids = [s for obj in results if obj is not None for s in obj.solids()]
         if len(solids) > 1:
@@ -220,8 +220,8 @@ class Recorder:
                 # face, even when no reference face is supplied by the caller.
                 import build123d as b
                 from build123d.topology.three_d import IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher
-                from OCP.TopExp import TopExp
-                from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
+                from simplecadapi._cpp.occt.TopExp import TopExp
+                from simplecadapi._cpp.occt.TopAbs import TopAbs_EDGE, TopAbs_FACE
                 adjacency = IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
                 TopExp.MapShapesAndAncestors_s(receiver.wrapped, TopAbs_EDGE, TopAbs_FACE, adjacency)
                 directions = []
@@ -238,7 +238,7 @@ class Recorder:
                 if name == "scale" and params.get("about") is None:
                     encoded["about"] = geometry.vector(receiver.location.position)
                 if name == "transformed":
-                    from OCP.gp import gp_Trsf, gp_Ax1, gp_Pnt, gp_Dir, gp_Vec
+                    from simplecadapi._cpp.occt.gp import gp_Trsf, gp_Ax1, gp_Pnt, gp_Dir, gp_Vec
                     import math
                     rotation = params["rotate"]
                     if hasattr(rotation, "X"):
@@ -299,7 +299,7 @@ class Recorder:
             if self.depth:
                 return original_boolean(shape, args, tools, operation)
             args, tools = list(args), list(tools)
-            from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut, BRepAlgoAPI_Common
+            from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut, BRepAlgoAPI_Common
             op = next((name for cls, name in ((BRepAlgoAPI_Fuse, "union"),
                        (BRepAlgoAPI_Cut, "cut"), (BRepAlgoAPI_Common, "intersect"))
                        if isinstance(operation, cls)), None)
