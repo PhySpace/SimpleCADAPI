@@ -6,6 +6,22 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+## 2.2.7b1 — 2026-10-24
+
+### Added
+- Prebuilt wheels for Linux x86_64, Linux aarch64, macOS arm64 and Windows x86_64, each for Python 3.10-3.13,
+  built by the release workflow against one static OpenCASCADE 7.9.3.
+
+### Changed
+- The geometry engine is C++ on OpenCASCADE, shipped in the wheel as `simplecadapi._cpp`; one distribution, one
+  import package. The public API and the previous test suite are unchanged.
+- Every message the library writes is English; the tag-validation and semantic-query errors render in full with
+  possible causes and fixes.
+- macOS wheels require macOS 14 or later.
+
+### Removed
+- Dependencies `cadquery-ocp`, `ocp-gordon` and `py-slvs`; the `SCA_BACKEND` switch.
+
 ## 2.2.6.post2 — 2026-10-21
 
 ### Changed

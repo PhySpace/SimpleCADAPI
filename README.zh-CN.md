@@ -133,16 +133,19 @@ CalculiX 静力 FEM（边界面按保真的 `interface.*` 标签选取，仿真�
 
 ---
 
-## 更新日志（2.2.6.post2）
+## 更新日志（2.2.7b1）
 
 > 投入生产前请验证生成的定义、装配约束和制造几何。
 
-- **算子放在自己家族的模块里。** `scale_rsolid`、`transform_rsolid`、`boolean_rsolidlist`、`offset_rsolid`、
-  `draft_rsolid`、`extrude_taper_rsolid`、`extrude_until_rsolid`、`sweep_multisection_rsolid` 搬进了
-  `operators/transform.py`、`boolean.py`、`features.py`。`from simplecadapi import ...` 用法不变；旧的模块路径仍可用，并会给出警告。
-- **每个算子的 API 参考都由生成器生成**，缺文档、或已提交的文档与生成器输出不一致，测试都会失败。
+- **几何引擎改为基于 OpenCASCADE 的 C++，随 wheel 发布。** `pip install simplecadapi` 不再需要 `cadquery-ocp`；
+  公开 API 和此前的整套测试不变。
+- **预编译 wheel**：Linux x86_64 与 aarch64、macOS arm64（14+）、Windows x86_64，Python 3.10-3.13，
+  全部使用同一份 OpenCASCADE 7.9.3。这是 beta，也是第一个带预编译 wheel 的版本。
+- **更快、更小。** 六轴机械臂：冷构建 43.8 s 到 29.1 s，无改动重建 12.8 s 到 6.0 s，
+  `import simplecadapi` 1.6 s / 360 MB 到 0.2 s / 68 MB。
+- **报错全部为英文**，标签与查询类报错和算子报错一样完整渲染。
 
-本版本的完整说明：[`docs/updates/2.2.6.post2.zh-CN.md`](docs/updates/2.2.6.post2.zh-CN.md)。
+本版本的完整说明：[`docs/updates/2.2.7b1.zh-CN.md`](docs/updates/2.2.7b1.zh-CN.md)。
 更早的版本：见[更新日志](CHANGELOG.md)和 [`docs/updates/`](docs/updates/)。
 
 ---
@@ -160,7 +163,7 @@ CalculiX 静力 FEM（边界面按保真的 `interface.*` 标签选取，仿真�
 
 SimpleCADAPI 是一个基于 OCP 的 Python CAD SDK，提供清晰的函数式建模操作和可重放的模型图。它在 OpenCascade 几何内核之上提供精简的公共 API，可用于创建实体、应用特征、添加语义标签、查询拓扑、导出制造文件，以及将记录的模型转换为 FreeCAD 工作流。
 
-当前版本：`simplecadapi==2.2.6.post2`。
+当前版本：`simplecadapi==2.2.7b1`。
 
 ## 核心能力
 
@@ -586,6 +589,7 @@ uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py
 
 ## 文档
 
+- 2.2.7b1 更新说明：[`docs/updates/2.2.7b1.zh-CN.md`](docs/updates/2.2.7b1.zh-CN.md)
 - 2.2.6.post2 更新说明：[`docs/updates/2.2.6.post2.zh-CN.md`](docs/updates/2.2.6.post2.zh-CN.md)
 - 2.2.6.post1 更新说明：[`docs/updates/2.2.6.post1.zh-CN.md`](docs/updates/2.2.6.post1.zh-CN.md)
 - 2.2.6 更新说明：[`docs/updates/2.2.6.zh-CN.md`](docs/updates/2.2.6.zh-CN.md)
