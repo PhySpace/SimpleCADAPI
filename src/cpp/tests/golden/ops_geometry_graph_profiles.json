@@ -1,0 +1,471 @@
+{
+  "arc": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      2.0,
+      1.0,
+      0.0
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 3.141592653589793,
+    "tags": [],
+    "track": {
+      "op": "make_wire_from_edges_rwire"
+    },
+    "type": "Wire",
+    "vertices": 2
+  },
+  "circle": {
+    "bbox": [
+      -2.0,
+      -2.0,
+      0.0,
+      2.0,
+      2.0,
+      0.0
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 12.566370614359172,
+    "tags": [],
+    "track": {
+      "op": "make_wire_from_edges_rwire"
+    },
+    "type": "Wire",
+    "vertices": 1
+  },
+  "graph": [
+    {
+      "inputs": [],
+      "op": "make_circle_redge",
+      "param_exprs": {},
+      "params": {
+        "center": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "radius": 2.0
+      }
+    },
+    {
+      "inputs": [
+        "node_00000001"
+      ],
+      "op": "make_wire_from_edges_rwire",
+      "param_exprs": {},
+      "params": {
+        "edge_count": 1
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_line_redge",
+      "param_exprs": {},
+      "params": {
+        "end": [
+          1.0,
+          -0.5,
+          0.0
+        ],
+        "start": [
+          -1.0,
+          -0.5,
+          0.0
+        ]
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_line_redge",
+      "param_exprs": {},
+      "params": {
+        "end": [
+          1.0,
+          0.5,
+          0.0
+        ],
+        "start": [
+          1.0,
+          -0.5,
+          0.0
+        ]
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_line_redge",
+      "param_exprs": {},
+      "params": {
+        "end": [
+          -1.0,
+          0.5,
+          0.0
+        ],
+        "start": [
+          1.0,
+          0.5,
+          0.0
+        ]
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_line_redge",
+      "param_exprs": {},
+      "params": {
+        "end": [
+          -1.0,
+          -0.5,
+          0.0
+        ],
+        "start": [
+          -1.0,
+          0.5,
+          0.0
+        ]
+      }
+    },
+    {
+      "inputs": [
+        "node_00000003",
+        "node_00000004",
+        "node_00000005",
+        "node_00000006"
+      ],
+      "op": "make_wire_from_edges_rwire",
+      "param_exprs": {},
+      "params": {
+        "edge_count": 4
+      }
+    },
+    {
+      "inputs": [
+        "node_00000007"
+      ],
+      "op": "make_face_from_wire_rface",
+      "param_exprs": {},
+      "params": {
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_line_redge",
+      "param_exprs": {},
+      "params": {
+        "end": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "start": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_line_redge",
+      "param_exprs": {},
+      "params": {
+        "end": [
+          1.0,
+          1.0,
+          0.0
+        ],
+        "start": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_line_redge",
+      "param_exprs": {},
+      "params": {
+        "end": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "start": [
+          1.0,
+          1.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "inputs": [
+        "node_00000009",
+        "node_0000000a",
+        "node_0000000b"
+      ],
+      "op": "make_wire_from_edges_rwire",
+      "param_exprs": {},
+      "params": {
+        "edge_count": 3
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_three_point_arc_redge",
+      "param_exprs": {},
+      "params": {
+        "end": [
+          2.0,
+          0.0,
+          0.0
+        ],
+        "middle": [
+          1.0,
+          1.0,
+          0.0
+        ],
+        "start": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "inputs": [
+        "node_0000000d"
+      ],
+      "op": "make_wire_from_edges_rwire",
+      "param_exprs": {},
+      "params": {
+        "edge_count": 1
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_line_redge",
+      "param_exprs": {},
+      "params": {
+        "end": [
+          0.0,
+          0.0,
+          3.0
+        ],
+        "start": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "inputs": [
+        "node_0000000f"
+      ],
+      "op": "make_wire_from_edges_rwire",
+      "param_exprs": {},
+      "params": {
+        "edge_count": 1
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_circle_redge",
+      "param_exprs": {},
+      "params": {
+        "center": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "radius": 1.0
+      }
+    },
+    {
+      "inputs": [
+        "node_00000011"
+      ],
+      "op": "make_wire_from_edges_rwire",
+      "param_exprs": {},
+      "params": {
+        "edge_count": 1
+      }
+    },
+    {
+      "inputs": [
+        "node_00000002",
+        "node_00000012"
+      ],
+      "op": "make_face_from_wires_rface",
+      "param_exprs": {},
+      "params": {
+        "inner_wire_count": 1.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    }
+  ],
+  "rect": {
+    "area": 2.0,
+    "bbox": [
+      -1.0,
+      -0.5,
+      0.0,
+      1.0,
+      0.5,
+      0.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [],
+    "track": {
+      "op": "make_face_from_wire_rface"
+    },
+    "type": "Face",
+    "vertices": 4
+  },
+  "ring": {
+    "area": 9.424777960769376,
+    "bbox": [
+      -2.0,
+      -2.0,
+      0.0,
+      2.0,
+      2.0,
+      0.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 2,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [],
+    "track": {
+      "op": "make_face_from_wires_rface"
+    },
+    "type": "Face",
+    "vertices": 2
+  },
+  "seg": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      3.0
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 3.0,
+    "tags": [],
+    "track": {
+      "op": "make_wire_from_edges_rwire"
+    },
+    "type": "Wire",
+    "vertices": 2
+  },
+  "tri": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      0.0
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 3.414213562373095,
+    "tags": [],
+    "track": {
+      "op": "make_wire_from_edges_rwire"
+    },
+    "type": "Wire",
+    "vertices": 3
+  }
+}

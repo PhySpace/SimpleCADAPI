@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_interpolated_spline_redge(*, points: Sequence[Sequence[ScalarLike]], periodic: bool = False, tolerance: ScalarLike = 1e-06) -> Edge
+def make_interpolated_spline_redge(*, points, periodic=False, tolerance=1e-06)
 ```
 
 *Source: operators/geometry.py*

@@ -1,0 +1,212 @@
+{
+  "bad_connector": {
+    "how_to_fix": [
+      "Create a connector with make_face_connector_rconnector, make_edge_connector_rconnector, or make_vertex_connector_rconnector.",
+      "Use unique connector ids within one Part."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "add_connector_rpart",
+    "possible_causes": [
+      "The part input is not a Part.",
+      "The connector input is not a Connector.",
+      "The connector_id is duplicated in the Part."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: connector must be a Connector",
+    "what_happened": "Failed to add the connector to the Part."
+  },
+  "bad_id": {
+    "how_to_fix": [
+      "Create placements with make_placement_rplacement.",
+      "Use a stable connector_id such as 'bearing_axis'."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_placement_connector_rconnector",
+    "possible_causes": [
+      "The connector_id is empty or malformed.",
+      "The placement input is not a Placement."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: connector_id must start with a letter and contain only letters, digits, underscore, dash, dot, or colon",
+    "what_happened": "Failed to create the placement connector."
+  },
+  "bad_part": {
+    "how_to_fix": [
+      "Create a connector with make_face_connector_rconnector, make_edge_connector_rconnector, or make_vertex_connector_rconnector.",
+      "Use unique connector ids within one Part."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "add_connector_rpart",
+    "possible_causes": [
+      "The part input is not a Part.",
+      "The connector input is not a Connector.",
+      "The connector_id is duplicated in the Part."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: part must be a Part",
+    "what_happened": "Failed to add the connector to the Part."
+  },
+  "bad_placement": {
+    "how_to_fix": [
+      "Create placements with make_placement_rplacement.",
+      "Use a stable connector_id such as 'bearing_axis'."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_placement_connector_rconnector",
+    "possible_causes": [
+      "The connector_id is empty or malformed.",
+      "The placement input is not a Placement."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: placement must be a Placement",
+    "what_happened": "Failed to create the placement connector."
+  },
+  "connector": {
+    "anchor": {
+      "anchor_kind": "placement",
+      "placement": {
+        "origin": [
+          1.0,
+          2.0,
+          3.0
+        ],
+        "x_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "y_axis": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          -0.0,
+          1.0
+        ]
+      }
+    },
+    "connector_id": "axis",
+    "name": "Main axis"
+  },
+  "duplicate": {
+    "how_to_fix": [
+      "Create a connector with make_face_connector_rconnector, make_edge_connector_rconnector, or make_vertex_connector_rconnector.",
+      "Use unique connector ids within one Part."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "add_connector_rpart",
+    "possible_causes": [
+      "The part input is not a Part.",
+      "The connector input is not a Connector.",
+      "The connector_id is duplicated in the Part."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: duplicate connector_id in part: axis",
+    "what_happened": "Failed to add the connector to the Part."
+  },
+  "frame": {
+    "origin": [
+      1.0,
+      2.0,
+      3.0
+    ],
+    "x_axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "y_axis": [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    "z_axis": [
+      0.0,
+      -0.0,
+      1.0
+    ]
+  },
+  "kind": "placement",
+  "lookup": {
+    "anchor": {
+      "anchor_kind": "placement",
+      "placement": {
+        "origin": [
+          1.0,
+          2.0,
+          3.0
+        ],
+        "x_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "y_axis": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          -0.0,
+          1.0
+        ]
+      }
+    },
+    "connector_id": "axis",
+    "name": "Main axis"
+  },
+  "missing": {
+    "exception": "KeyError",
+    "message": "\"part has no connector_id 'nope'\""
+  },
+  "original": {
+    "connectors": [],
+    "material": null,
+    "name": null,
+    "part_id": "p"
+  },
+  "part": {
+    "connectors": [
+      {
+        "anchor": {
+          "anchor_kind": "placement",
+          "placement": {
+            "origin": [
+              1.0,
+              2.0,
+              3.0
+            ],
+            "x_axis": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "y_axis": [
+              -1.0,
+              0.0,
+              0.0
+            ],
+            "z_axis": [
+              0.0,
+              -0.0,
+              1.0
+            ]
+          }
+        },
+        "connector_id": "axis",
+        "name": "Main axis"
+      }
+    ],
+    "material": null,
+    "name": null,
+    "part_id": "p"
+  }
+}

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def identity_placement_rplacement() -> Placement
+def identity_placement_rplacement()
 ```
 
 *Source: operators/product.py*

@@ -13,13 +13,13 @@ import uuid
 
 def _volume(shape):
     if not _solid_count(shape):
-        from OCP.TopAbs import TopAbs_FACE
-        from OCP.TopExp import TopExp_Explorer
+        from simplecadapi._cpp.occt.TopAbs import TopAbs_FACE
+        from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
         if TopExp_Explorer(shape, TopAbs_FACE).More():
             raise ValueError("volume result has faces but no closed solid")
         return 0.0
-    from OCP.BRepGProp import BRepGProp
-    from OCP.GProp import GProp_GProps
+    from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+    from simplecadapi._cpp.occt.GProp import GProp_GProps
     properties = GProp_GProps()
     error = BRepGProp.VolumePropertiesGK_s(shape, properties, 1e-9, True, True)
     if error < 0:
@@ -28,11 +28,11 @@ def _volume(shape):
 
 
 def _area(shape):
-    from OCP.BRepGProp import BRepGProp
-    from OCP.BRepBuilderAPI import BRepBuilderAPI_Copy
-    from OCP.GeomAbs import GeomAbs_C1
-    from OCP.GProp import GProp_GProps
-    from OCP.ShapeUpgrade import ShapeUpgrade_ShapeDivideContinuity
+    from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+    from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_Copy
+    from simplecadapi._cpp.occt.GeomAbs import GeomAbs_C1
+    from simplecadapi._cpp.occt.GProp import GProp_GProps
+    from simplecadapi._cpp.occt.ShapeUpgrade import ShapeUpgrade_ShapeDivideContinuity
     # Integration must respect C0 knot boundaries. Work on independent geometry
     # so this numerical conditioning never changes the FTC or exported STEP.
     copied = BRepBuilderAPI_Copy(shape, True, False).Shape()
@@ -50,8 +50,8 @@ def _area(shape):
 
 
 def _solid_count(shape):
-    from OCP.TopAbs import TopAbs_SOLID
-    from OCP.TopExp import TopExp_Explorer
+    from simplecadapi._cpp.occt.TopAbs import TopAbs_SOLID
+    from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
     explorer = TopExp_Explorer(shape, TopAbs_SOLID)
     count = 0
     while explorer.More():
@@ -61,9 +61,9 @@ def _solid_count(shape):
 
 
 def _read_step(step):
-    from OCP.BRepCheck import BRepCheck_Analyzer
-    from OCP.IFSelect import IFSelect_RetDone
-    from OCP.STEPControl import STEPControl_Reader
+    from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
+    from simplecadapi._cpp.occt.IFSelect import IFSelect_RetDone
+    from simplecadapi._cpp.occt.STEPControl import STEPControl_Reader
     if not step.is_file():
         raise FileNotFoundError(f"reference STEP does not exist: {step}")
     reader = STEPControl_Reader()
@@ -72,9 +72,9 @@ def _read_step(step):
     reference = reader.OneShape()
     if reference.IsNull() or not BRepCheck_Analyzer(reference).IsValid() or not _solid_count(reference):
         raise ValueError("reference STEP contains no valid solids")
-    from OCP.BRepClass3d import BRepClass3d_SolidClassifier
-    from OCP.TopAbs import TopAbs_SOLID, TopAbs_OUT
-    from OCP.TopExp import TopExp_Explorer
+    from simplecadapi._cpp.occt.BRepClass3d import BRepClass3d_SolidClassifier
+    from simplecadapi._cpp.occt.TopAbs import TopAbs_SOLID, TopAbs_OUT
+    from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
     explorer = TopExp_Explorer(reference, TopAbs_SOLID)
     while explorer.More():
         classifier = BRepClass3d_SolidClassifier(explorer.Current())
@@ -90,8 +90,8 @@ def _compare_reference(shapes, step):
 
 
 def _compare_shapes(shapes, reference):
-    from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
-    from OCP.BRepCheck import BRepCheck_Analyzer
+    from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
+    from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
     # Treat body groups as a geometric set. Fuse disjoint bodies too, avoiding double
     # counting overlap when comparing a multi-body result to STEP assemblies.
     actual = shapes[0]
@@ -119,11 +119,11 @@ def _compare_shapes(shapes, reference):
 
 
 def _cut(left, right, tolerance):
-    from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
+    from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Cut
     try:
-        from OCP.TopTools import TopTools_ListOfShape as ShapeList
+        from simplecadapi._cpp.occt.TopTools import TopTools_ListOfShape as ShapeList
     except ImportError:
-        from OCP.collections import List_TopoDS_Shape as ShapeList
+        from simplecadapi._cpp.occt.collections import List_TopoDS_Shape as ShapeList
     arguments, tools = ShapeList(), ShapeList()
     arguments.Append(left)
     tools.Append(right)
@@ -137,11 +137,11 @@ def _cut(left, right, tolerance):
 
 
 def _kernel_tolerance(*shapes):
-    from OCP.BRep import BRep_Tool
-    from OCP.Precision import Precision
-    from OCP.TopAbs import TopAbs_VERTEX, TopAbs_EDGE
-    from OCP.TopExp import TopExp_Explorer
-    from OCP.TopoDS import TopoDS
+    from simplecadapi._cpp.occt.BRep import BRep_Tool
+    from simplecadapi._cpp.occt.Precision import Precision
+    from simplecadapi._cpp.occt.TopAbs import TopAbs_VERTEX, TopAbs_EDGE
+    from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
+    from simplecadapi._cpp.occt.TopoDS import TopoDS
     tolerance = float(Precision.Confusion_s())
     for shape in shapes:
         for kind, name in ((TopAbs_VERTEX, "Vertex"), (TopAbs_EDGE, "Edge")):
@@ -157,9 +157,9 @@ def _kernel_tolerance(*shapes):
 
 
 def _export_step(shapes, path, options=None):
-    from OCP.STEPControl import STEPControl_Writer, STEPControl_AsIs
-    from OCP.Interface import Interface_Static
-    from OCP.IFSelect import IFSelect_RetDone
+    from simplecadapi._cpp.occt.STEPControl import STEPControl_Writer, STEPControl_AsIs
+    from simplecadapi._cpp.occt.Interface import Interface_Static
+    from simplecadapi._cpp.occt.IFSelect import IFSelect_RetDone
     writer = STEPControl_Writer()
     options = options or {}
     pcurves = options.get("write_pcurves", True)
@@ -186,8 +186,8 @@ def _returned_shapes(value, placement=None):
     """Extract world-space topology from the actual build result."""
     from simplecadapi import Solid, Part, Assembly, PartBuildResult, AssemblyBuildResult
     from simplecadapi.product.placement import identity_placement
-    from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform
-    from OCP.gp import gp_Trsf
+    from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_Transform
+    from simplecadapi._cpp.occt.gp import gp_Trsf
     if isinstance(value, (PartBuildResult, AssemblyBuildResult)):
         value = value.value
     if isinstance(value, Part):
@@ -207,11 +207,11 @@ def _returned_shapes(value, placement=None):
 
 
 def run(ftc_path, staging_dir, reference_step=None, export_step=None, export_options=None):
-    import OCP
-    from OCP.Bnd import Bnd_Box
-    from OCP.BRepBndLib import BRepBndLib
-    from OCP.BRepCheck import BRepCheck_Analyzer
-    from OCP.TopoDS import TopoDS_Shape
+    from simplecadapi._cpp import occt as _occt
+    from simplecadapi._cpp.occt.Bnd import Bnd_Box
+    from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
+    from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
+    from simplecadapi._cpp.occt.TopoDS import TopoDS_Shape
     # An isolated path keeps imports/artifacts away from original outputs and
     # provides a fresh module/global BODIES namespace on every validation.
     staged = staging_dir / (ftc_path.stem + "_" + uuid.uuid4().hex + ".py")
@@ -258,7 +258,7 @@ def run(ftc_path, staging_dir, reference_step=None, export_step=None, export_opt
               "solid_count": sum(_solid_count(shape) for shape in shapes),
               "is_valid": all(BRepCheck_Analyzer(shape).IsValid() for shape in shapes),
               "volume": volume, "area": sum(_area(shape) for shape in shapes), "bbox": bbox,
-              "build_kernel": getattr(OCP, "__version__", "unknown"),
+              "build_kernel": _occt.__version__,
               "volume_method": "Gauss-Kronrod, epsilon=1e-9, closed shells, BSpline spans",
               "area_method": "Independent geometry copy, C1 continuity spans, adaptive epsilon=1e-10"}
     if reference_step is not None:

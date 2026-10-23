@@ -203,6 +203,7 @@ class CellCache(CachedLifecycle):
         self.restored: set[CellId_t] = set()
         self._used: dict[str, None] = {}
 
+
     @property
     def used(self) -> set[str]:
         """Digests of the cells this lifecycle has run or restored."""
@@ -233,8 +234,21 @@ class CellCache(CachedLifecycle):
         self._active[cell.cell_id] = loader
         decision = super().setup(cell, glbls)
         if isinstance(decision, Skip):
+            if not self._load_lineage(cell, digest):
+                # The nodes behind the values are missing: run the cell and record them again.
+                self._active.pop(cell.cell_id, None)
+                return None
             self.restored.add(cell.cell_id)
         return decision
+
+    def _load_lineage(self, cell: CellImpl, digest: str) -> bool:
+        from . import lineage
+
+        try:
+            return lineage.load(self._root / digest, str(cell.cell_id))
+        except Exception:  # noqa: BLE001 - an unreadable record is a miss, never a failure
+            return False
+
 
     def teardown(self, cell: CellImpl, glbls: MutableGlobals, run_result: RunResult) -> None:
         loader = self._active.pop(cell.cell_id, None)
@@ -254,6 +268,17 @@ class CellCache(CachedLifecycle):
                     glbls[name] = None
                     glbls[f"_cell_{cell.cell_id}_{name[1:]}"] = None
         super().teardown(cell, glbls, run_result)
+        if run_result.exception is None:
+            self._save_lineage(cell, loader)
+
+    def _save_lineage(self, cell: CellImpl, loader: LazyLoader) -> None:
+        from . import executor, lineage
+
+        session = executor.take_session(cell.cell_id)
+        digest = self._digest_for(cell)
+        if session is None or digest is None:
+            return
+        lineage.save(self._root / digest, str(cell.cell_id), session)
 
     def _invalidate(self, cell_id: CellId_t) -> None:
         # The producer's entry lives in the store of its own digest.

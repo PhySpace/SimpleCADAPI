@@ -1,0 +1,135 @@
+{
+  "capabilities": {
+    "assembly_graph": true,
+    "display_payload": true,
+    "durable_topology_parent_refs": true,
+    "expression_graph": true,
+    "geo_select_nodes": true,
+    "operation_output_roles": true,
+    "product_semantics": true,
+    "scalar_field_graph": false,
+    "selection_ref_strategies": true,
+    "selector_hint_fallback": true,
+    "semantic_tag_bindings": true,
+    "sketch_constraints": true,
+    "sketch_solve_snapshots": true,
+    "source_mapping": true,
+    "source_mapping_schema": "1.0",
+    "tag_binding_schema": "1.0",
+    "topology_delta_entries": true,
+    "topology_delta_summary": false
+  },
+  "edges": [
+    [
+      "node_00000001",
+      "node_00000002"
+    ],
+    [
+      "node_00000001",
+      "node_00000003"
+    ],
+    [
+      "node_00000002",
+      "node_00000003"
+    ]
+  ],
+  "graph_id": "serial",
+  "nodes": [
+    {
+      "display": {
+        "category": "primitive",
+        "label": "Box Rsolid",
+        "summary": "width=1.5, depth=2, tags=['x', 'y']"
+      },
+      "inputs": [],
+      "node_id": "node_00000001",
+      "op": "make_box_rsolid",
+      "output_count": 1,
+      "params": {
+        "depth": 2.0,
+        "tags": [
+          "x",
+          "y"
+        ],
+        "width": 1.5
+      },
+      "tags": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "display": {
+        "category": "transform",
+        "label": "Translate",
+        "summary": "vector=[1.0, 2.0, 3.0]"
+      },
+      "inputs": [],
+      "node_id": "node_00000004",
+      "op": "translate",
+      "output_count": 1,
+      "param_exprs": {
+        "vector": [
+          {
+            "expr_id": "e1"
+          },
+          null,
+          null
+        ]
+      },
+      "params": {
+        "vector": [
+          1.0,
+          2.0,
+          3.0
+        ]
+      },
+      "tags": []
+    },
+    {
+      "display": {
+        "category": "selection",
+        "label": "Select Rface",
+        "summary": "target_kind=face, source_output_slot=0"
+      },
+      "inputs": [
+        "node_00000001"
+      ],
+      "node_id": "node_00000002",
+      "op": "make_select_rface",
+      "output_count": 1,
+      "params": {
+        "source_output_slot": 0,
+        "target_kind": "face"
+      },
+      "tags": []
+    },
+    {
+      "display": {
+        "category": "detail",
+        "label": "Fillet Rsolid",
+        "selection_count": 2,
+        "summary": "radius=0.25, name=f, ok=True"
+      },
+      "inputs": [
+        "node_00000001",
+        "node_00000002"
+      ],
+      "node_id": "node_00000003",
+      "op": "make_fillet_rsolid",
+      "output_count": 1,
+      "params": {
+        "name": "f",
+        "ok": true,
+        "radius": 0.25,
+        "selected_edges": [
+          1,
+          2
+        ]
+      },
+      "tags": []
+    }
+  ],
+  "producer_version": "2.2.6.post2",
+  "schema_version": "2.0"
+}

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_angle_arc_rwire(center: Tuple[float, float, float], radius: float, start_angle: float, end_angle: float, normal: Tuple[float, float, float] = (0, 0, 1)) -> Wire
+def make_angle_arc_rwire(center, radius, start_angle, end_angle, normal=(0, 0, 1))
 ```
 
 *Source: operators/geometry.py*

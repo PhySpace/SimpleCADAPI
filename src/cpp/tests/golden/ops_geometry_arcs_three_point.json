@@ -1,0 +1,130 @@
+{
+  "alias": {
+    "bbox": [
+      -1.0,
+      0.0,
+      0.0,
+      0.9999999999999999,
+      1.0,
+      0.0
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 3.141592653589793,
+    "tags": [],
+    "track": {
+      "op": "make_three_point_arc_redge"
+    },
+    "type": "Edge",
+    "vertices": 2
+  },
+  "alias_wire": {
+    "bbox": [
+      -1.0,
+      0.0,
+      0.0,
+      0.9999999999999999,
+      1.0,
+      0.0
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 3.141592653589793,
+    "tags": [],
+    "track": {
+      "op": "make_three_point_arc_wire"
+    },
+    "type": "Wire",
+    "vertices": 2
+  },
+  "collinear": {
+    "how_to_fix": [
+      "Pass three finite 3D points.",
+      "Make sure the three points do not lie on the same straight line.",
+      "If points are computed dynamically, log them before retrying."
+    ],
+    "operation": "make_three_point_arc_redge",
+    "possible_causes": [
+      "One or more points are invalid.",
+      "The three points are collinear or nearly collinear.",
+      "The kernel rejected the derived arc geometry."
+    ],
+    "technical_details": "Standard_Failure: GC_MakeArcOfCircle::Value() - no result",
+    "what_happened": "Failed to create a three-point arc edge."
+  },
+  "collinear_wire": {
+    "how_to_fix": [
+      "Pass three finite 3D points.",
+      "Make sure the three points do not lie on the same straight line.",
+      "If points are computed dynamically, log them before retrying."
+    ],
+    "operation": "make_three_point_arc_redge",
+    "possible_causes": [
+      "One or more points are invalid.",
+      "The three points are collinear or nearly collinear.",
+      "The kernel rejected the derived arc geometry."
+    ],
+    "technical_details": "Standard_Failure: GC_MakeArcOfCircle::Value() - no result",
+    "what_happened": "Failed to create a three-point arc edge."
+  },
+  "edge": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      2.0,
+      1.0,
+      0.0
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 3.141592653589793,
+    "tags": [],
+    "track": {
+      "op": "make_three_point_arc_redge"
+    },
+    "type": "Edge",
+    "vertices": 2
+  },
+  "wire": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      2.0,
+      1.0,
+      0.0
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 3.141592653589793,
+    "tags": [],
+    "track": {
+      "op": "make_three_point_arc_wire"
+    },
+    "type": "Wire",
+    "vertices": 2
+  }
+}

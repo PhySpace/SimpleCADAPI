@@ -35,8 +35,8 @@ PLATE = SimpleNamespace(params=dm.params, assert_params=dm.check_plate)
 def tight_bbox(solid) -> tuple:
     """Exact bbox (AddOptimal, no gap). brep.bounding_box carries a ~0.12 tolerance
     gap (s1_hypothesis H4) and cannot discriminate 0.05 mm errors."""
-    from OCP.Bnd import Bnd_Box
-    from OCP.BRepBndLib import BRepBndLib
+    from simplecadapi._cpp.occt.Bnd import Bnd_Box
+    from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
 
     box = Bnd_Box()
     box.SetGap(0.0)
@@ -47,8 +47,8 @@ def tight_bbox(solid) -> tuple:
 def precise_volume(solid, eps: float = 1e-9) -> float:
     """GProp volume with an explicit tolerance. Solid.get_volume() (default GProp) is off by ~0.1 mm^3
     per cylinder-cylinder BSpline trim (s8 finding: radial pilot through a disk rim)."""
-    from OCP.BRepGProp import BRepGProp
-    from OCP.GProp import GProp_GProps
+    from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+    from simplecadapi._cpp.occt.GProp import GProp_GProps
 
     props = GProp_GProps()
     BRepGProp.VolumeProperties_s(solid.wrapped, props, eps)
@@ -59,9 +59,9 @@ def point_classifier(solid, strict: bool = False):
     """inside(x,y,z) -> bool (IN or ON; strict=True: IN only). Sampling classifier (U-link
     lesson: sample interference/emptiness instead of intersect_rsolid, which can fail on
     touching faces)."""
-    from OCP.BRepClass3d import BRepClass3d_SolidClassifier
-    from OCP.gp import gp_Pnt
-    from OCP.TopAbs import TopAbs_IN, TopAbs_ON
+    from simplecadapi._cpp.occt.BRepClass3d import BRepClass3d_SolidClassifier
+    from simplecadapi._cpp.occt.gp import gp_Pnt
+    from simplecadapi._cpp.occt.TopAbs import TopAbs_IN, TopAbs_ON
 
     cls = BRepClass3d_SolidClassifier(solid.wrapped)
     states = (TopAbs_IN,) if strict else (TopAbs_IN, TopAbs_ON)
@@ -1526,7 +1526,7 @@ def _world_frame(solved, cid: str, connector_id: str):
 
 
 def _trsf(placement):
-    from OCP.gp import gp_Trsf
+    from simplecadapi._cpp.occt.gp import gp_Trsf
 
     o, x, y, z = placement.origin, placement.x_axis, placement.y_axis, placement.z_axis
     t = gp_Trsf()
@@ -1535,15 +1535,15 @@ def _trsf(placement):
 
 
 def world_shape(solved, cid: str):
-    from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform
+    from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_Transform
 
     comp = solved.get_component(cid)
     return BRepBuilderAPI_Transform(comp.item.body.wrapped, _trsf(comp.placement), True).Shape()
 
 
 def _shape_volume(shape) -> float:
-    from OCP.BRepGProp import BRepGProp
-    from OCP.GProp import GProp_GProps
+    from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+    from simplecadapi._cpp.occt.GProp import GProp_GProps
 
     props = GProp_GProps()
     BRepGProp.VolumeProperties_s(shape, props, 1e-9)
@@ -1551,7 +1551,7 @@ def _shape_volume(shape) -> float:
 
 
 def common_volume(a, b) -> float:
-    from OCP.BRepAlgoAPI import BRepAlgoAPI_Common
+    from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Common
 
     op = BRepAlgoAPI_Common(a, b)
     op.Build()
@@ -1561,8 +1561,8 @@ def common_volume(a, b) -> float:
 
 
 def _bbox(shape):
-    from OCP.Bnd import Bnd_Box
-    from OCP.BRepBndLib import BRepBndLib
+    from simplecadapi._cpp.occt.Bnd import Bnd_Box
+    from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
 
     box = Bnd_Box()
     box.SetGap(0.0)

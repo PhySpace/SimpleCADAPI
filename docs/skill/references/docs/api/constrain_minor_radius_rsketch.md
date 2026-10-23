@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def constrain_minor_radius_rsketch(sketch: Sketch, ellipse: Union[SketchRef, str], value: ScalarLike, *, constraint_id: Optional[str] = None, driving: bool = True) -> Sketch
+def constrain_minor_radius_rsketch(sketch, ellipse, value, *, constraint_id=None, driving=True)
 ```
 
 *Source: operators/sketch.py*

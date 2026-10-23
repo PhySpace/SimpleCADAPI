@@ -1,0 +1,37 @@
+{
+  "closed": true,
+  "free_of_box": 0,
+  "free_of_open": [
+    4.0
+  ],
+  "shell": {
+    "area": 22.0,
+    "bbox": [
+      -0.5,
+      -1.0,
+      0.0,
+      0.5,
+      1.0,
+      3.0
+    ],
+    "edges": 12,
+    "faces": 6,
+    "kind": "Shell",
+    "valid": true
+  },
+  "solid": {
+    "bbox": [
+      -0.5,
+      -1.0,
+      0.0,
+      0.5,
+      1.0,
+      3.0
+    ],
+    "edges": 12,
+    "faces": 6,
+    "kind": "Solid",
+    "valid": true,
+    "volume": 5.999999999999999
+  }
+}

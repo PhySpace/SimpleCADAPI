@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def canonical_unit_for_dimension(dimension: Dimension) -> Unit
+def canonical_unit_for_dimension(dimension)
 ```
 
 *Source: params/units.py*

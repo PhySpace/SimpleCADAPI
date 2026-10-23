@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def add_ellipse_rsketch(sketch: Sketch, entity_id: str, center: Union[SketchRef, str], major_point: Union[SketchRef, str], minor_point: Union[SketchRef, str], *, construction: bool = False) -> Sketch
+def add_ellipse_rsketch(sketch, entity_id, center, major_point, minor_point, *, construction=False)
 ```
 
 *Source: operators/sketch.py*

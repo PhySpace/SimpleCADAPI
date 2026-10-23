@@ -1,0 +1,90 @@
+{
+"test/test_product_assembly.py::test_material_validation_and_assignment_are_separate_from_part_creation": [
+"internal",
+"asserts Python object identity (assigned.body is body); C++ values are copied, identity of the wrapper object is not part of the contract"
+],
+"test/test_rearchitecture_2_0_contract.py::TestRearchitecture20KernelContracts::test_geometry_wrappers_accept_raw_occ_shapes_and_expose_wrapped_storage": [
+"internal",
+"uses a private helper or wrapper internal of the Python implementation: TypeError: simplecadapi._cpp._native.Solid: No constructor defined!"
+],
+"test/test_rearchitecture_2_0_kernel_builders.py::TestOcpPrimitiveBuilders::test_kernel_ocp_builders_module_exposes_core_solid_builders": [
+"internal",
+"uses a private helper or wrapper internal of the Python implementation: TypeError: simplecadapi._cpp._native.Solid: No constructor defined!"
+],
+"test/test_rearchitecture_2_0_ops.py::TestRearchitecture20CoreOps::test_graph_booleans_do_not_call_topology_history_helpers": [
+"internal",
+"patches the Python helpers tracked_cut / fuse_shapes_with_history to prove they are not called; the C++ operators never go through a Python attribute. The behaviour (a graph-policy boolean asks the kernel for no history) is asserted by src/cpp/tests/cpp/ops_features/test_booleans.cpp via tracking::history_query_count()"
+],
+"test/test_render_screenshot_multiview.py::TestRenderScreenshotMultiView::test_default_routes_to_multiview_engine_with_annotations": [
+"internal",
+"patches the VTK engine's inspect.brep.render._prepare_polydata_render to see which engine a request is routed to; the native screenshot is the C++ renderer, there is no second engine. The routing contract (default = 4-panel grid, view= = one panel, views= = custom grid) is asserted by src/cpp/tests/python/test_render_screenshot_routing.py"
+],
+"test/test_shape_restore_cost.py::TestLazyRestore::test_a_restored_shape_is_built_on_first_use": [
+"internal",
+"tests the Python wrappers' internals (OperationNode dataclass/pickle, _TopoEntity, shape restore cost), which the C++ port does not have"
+],
+"test/test_shape_restore_cost.py::TestLazyRestore::test_pickling_a_shape_nobody_used_does_not_build_it": [
+"internal",
+"tests the Python wrappers' internals (OperationNode dataclass/pickle, _TopoEntity, shape restore cost), which the C++ port does not have"
+],
+"test/test_shape_restore_cost.py::TestLazyRestore::test_two_threads_first_using_a_shape_build_it_once": [
+"internal",
+"tests the Python wrappers' internals (OperationNode dataclass/pickle, _TopoEntity, shape restore cost), which the C++ port does not have"
+],
+"test/test_shape_restore_cost.py::TestShapePayload::test_an_entry_stored_before_compression_is_still_read": [
+"internal",
+"tests the Python wrappers' internals (OperationNode dataclass/pickle, _TopoEntity, shape restore cost), which the C++ port does not have"
+],
+"test/test_shape_restore_cost.py::TestShapePayload::test_the_stored_geometry_is_compressed": [
+"internal",
+"tests the Python wrappers' internals (OperationNode dataclass/pickle, _TopoEntity, shape restore cost), which the C++ port does not have"
+],
+"test/test_sketch_api.py::TestSketchApi::test_default_solver_backend_is_py_slvs_and_persisted_in_snapshot": [
+"internal",
+"deliberate difference (src/cpp/docs/sketch-solver.md): the default backend is scad-native, py-slvs (GPL libslvs) is not linked"
+],
+"test/test_stdlib_gear.py::TestSpurGear::test_external_gear_builds_only_two_canonical_root_fillets": [
+"internal",
+"counts calls of a patched Python helper; asserted in C++ by src/cpp/tests/cpp/std/test_gears.cpp (stdlib::root_fillet_call_count)"
+],
+"test/test_stdlib_gear.py::TestSpurGear::test_involute_bspline_uses_shared_fit_helper": [
+"internal",
+"counts calls of a patched Python helper; asserted in C++ by src/cpp/tests/cpp/std/test_gears.cpp (stdlib::involute_fit_call_count)"
+],
+"test/test_surface_api.py::TestSurfaceApi::test_solidification_isolates_cache_and_preserves_subshape_state": [
+"internal",
+"reads the private Python _topology_cache of the shape wrappers"
+],
+"test/test_tagging_refactor.py::TestTaggingRefactor::test_apply_tag_mutates_without_cloning_semantic_topology": [
+"internal",
+"patches the Python helper clone_semantic_shape_view to count calls; the C++ operators never go through a Python attribute. Asserted in src/cpp/tests/cpp/semantic/test_selection.cpp via Shape::clone_view_count()"
+],
+"test/test_tagging_refactor.py::TestTaggingRefactor::test_apply_tag_rselection_keeps_independent_clone": [
+"internal",
+"patches the Python helper clone_semantic_shape_view to count calls; the C++ operators never go through a Python attribute. Asserted in src/cpp/tests/cpp/semantic/test_selection.cpp via Shape::clone_view_count()"
+],
+"test/test_tolerance.py::TestDimensionToleranceDeclaration::test_expression_registration_rejects_cycles_without_mutation": [
+"internal",
+"builds a cyclic expression by mutating a frozen node with object.__setattr__; a C++ ExprNode is immutable, so the state cannot exist"
+],
+"tests/test_topology_identity.py::test_non_topology_tagged_objects_keep_standalone_state": [
+"internal",
+"tests the Python wrappers' internals (OperationNode dataclass/pickle, _TopoEntity, shape restore cost), which the C++ port does not have"
+],
+"tests/test_topology_identity.py::test_semantic_shape_clone_keeps_independent_entity_state": [
+"internal",
+"tests the Python wrappers' internals (OperationNode dataclass/pickle, _TopoEntity, shape restore cost), which the C++ port does not have"
+],
+"tests/test_topology_identity.py::test_shared_edge_occurrences_keep_entity_state_after_whole_assignment": [
+"internal",
+"tests the Python wrappers' internals (OperationNode dataclass/pickle, _TopoEntity, shape restore cost), which the C++ port does not have"
+],
+"test/test_render_screenshot_multiview.py::TestRenderScreenshotMultiView::test_custom_views_reach_the_grid_engine": [
+"internal",
+"patches the VTK engine's inspect.brep.render._prepare_polydata_render to see which engine a request is routed to; the native screenshot is the C++ renderer, there is no second engine. The routing contract (default = 4-panel grid, view= = one panel, views= = custom grid) is asserted by src/cpp/tests/python/test_render_screenshot_routing.py"
+],
+"test/test_render_screenshot_multiview.py::TestRenderScreenshotMultiView::test_explicit_view_routes_through_the_grid_engine": [
+"internal",
+"patches the VTK engine's inspect.brep.render._prepare_polydata_render to see which engine a request is routed to; the native screenshot is the C++ renderer, there is no second engine. The routing contract (default = 4-panel grid, view= = one panel, views= = custom grid) is asserted by src/cpp/tests/python/test_render_screenshot_routing.py"
+]
+}

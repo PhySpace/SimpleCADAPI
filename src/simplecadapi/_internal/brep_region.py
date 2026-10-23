@@ -12,8 +12,8 @@ import struct
 from typing import Any
 
 from ..errors import SimpleCADMessageError
-import OCP
-from OCP.TopAbs import TopAbs_SHELL, TopAbs_SOLID
+import simplecadapi._cpp.occt as _occt
+from simplecadapi._cpp.occt.TopAbs import TopAbs_SHELL, TopAbs_SOLID
 
 from .canonical_json import canonical_json_bytes, parse_canonical_json
 from ..kernel.ocp_brep_snapshot import (
@@ -30,7 +30,7 @@ MAGIC = b"SCADBREP"
 HEADER = struct.Struct(">8sHHIQQ")
 MAJOR_VERSION = 1
 MINOR_VERSION = 0
-PROFILE = f"scadbrep-1-ocp-{OCP.__version__}-bintools-v4-no-mesh"
+PROFILE = f"scadbrep-1-ocp-{_occt.__version__}-bintools-v4-no-mesh"
 MAX_ARTIFACT_BYTES = 64 * 1024 * 1024
 MAX_MANIFEST_BYTES = 8 * 1024 * 1024
 BINTOOLS_V4_PREAMBLE = b"\nOpen CASCADE Topology V4, (c) Open Cascade\n"
@@ -145,7 +145,7 @@ def _validate_manifest(manifest: Any, payload: bytes) -> tuple[dict[str, Any], R
     generator = _require_exact_keys(
         "generator", manifest["generator"], required={"ocp_version"}
     )
-    if generator["ocp_version"] != str(OCP.__version__):
+    if generator["ocp_version"] != str(_occt.__version__):
         raise BRepRegionError(
             "BREP region snapshot OCP version does not match this runtime profile"
         )

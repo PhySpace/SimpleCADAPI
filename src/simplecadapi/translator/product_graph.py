@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..topology import OperationGraph
+from simplecadapi._cpp import OperationGraph
 from .package_units import ProductPackageInput, read_product_package_translation_units
 
 

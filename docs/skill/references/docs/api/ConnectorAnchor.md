@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class ConnectorAnchor(anchor_kind: str, geometry_ref: Optional[GeometryRef] = None, placement: Optional[Placement] = None)
+class ConnectorAnchor(anchor_kind, geometry_ref=None, placement=None)
 ```
 
 *Source: product/connector.py*

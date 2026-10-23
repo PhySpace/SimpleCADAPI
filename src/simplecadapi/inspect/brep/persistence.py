@@ -8,7 +8,7 @@ from pathlib import Path
 import tempfile
 from typing import Any
 
-from OCP.TopoDS import TopoDS_Shape
+from simplecadapi._cpp.occt.TopoDS import TopoDS_Shape
 
 from ...kernel.ocp_export import export_step_shapes
 from .io import load_step_rshape

@@ -14,8 +14,8 @@ class SheetDecl(title: str, dwg_no: str, scale: float, front: str, anchor: tuple
 
 ## Description
 
-一张图纸的完整声明：图幅信息 + 视图 + 基准 + 尺寸 + 中心线 + 引出说明 + 参数表。
+The complete declaration of one sheet: sheet information + views + datums + dimensions + centre lines + leaders + parameter table.
 
-调用方只声明"要表达什么"，不指定任何纸面坐标；布局与标注位置由
-SheetPlan.solve() 求解。front/anchor 定义主视图锚定，其余视图经
-ViewDecl.align 相对主视图对正（第一角投影，长对正/高平齐）。
+The caller declares only "what to express" and no sheet coordinate; the layout and the annotation positions are
+solved by SheetPlan.solve(). front/anchor anchors the main view, the other views align to it through
+ViewDecl.align (first-angle projection, length-aligned / height-aligned).

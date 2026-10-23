@@ -1,0 +1,15 @@
+{
+  "assembly": {
+    "details": "ValueError: duplicate assembly id in active GraphSession: same",
+    "operation": "make_assembly_rassembly"
+  },
+  "material": {
+    "details": "ValueError: duplicate material id in active GraphSession: same",
+    "operation": "make_material_rmaterial"
+  },
+  "outside_a_session": true,
+  "part": {
+    "details": "ValueError: duplicate part id in active GraphSession: same_part",
+    "operation": "make_part_rpart"
+  }
+}

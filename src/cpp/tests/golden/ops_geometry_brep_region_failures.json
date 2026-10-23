@@ -1,0 +1,75 @@
+{
+  "bad_prefix": {
+    "how_to_fix": [
+      "Create the snapshot with copy_step_region_rpath(...).",
+      "Pass the SHA-256 of the complete .scadbrep file.",
+      "Keep the sidecar at the same path when replaying model JSON."
+    ],
+    "operation": "load_brep_region_rsolid",
+    "possible_causes": [
+      "The snapshot path does not exist or is not readable.",
+      "The supplied SHA-256 does not match the snapshot bytes.",
+      "The snapshot is corrupt, unsupported, invalid, or not one solid."
+    ],
+    "technical_details": "ValueError: tag 'Bad Prefix' is not normalized",
+    "what_happened": "Failed to load the BREP region snapshot."
+  },
+  "colon": {
+    "how_to_fix": [
+      "Create the snapshot with copy_step_region_rpath(...).",
+      "Pass the SHA-256 of the complete .scadbrep file.",
+      "Keep the sidecar at the same path when replaying model JSON."
+    ],
+    "operation": "load_brep_region_rsolid",
+    "possible_causes": [
+      "The snapshot path does not exist or is not readable.",
+      "The supplied SHA-256 does not match the snapshot bytes.",
+      "The snapshot is corrupt, unsupported, invalid, or not one solid."
+    ],
+    "technical_details": "ValueError: .scadbrep filenames must not contain ':'",
+    "what_happened": "Failed to load the BREP region snapshot."
+  },
+  "extension": {
+    "how_to_fix": [
+      "Create the snapshot with copy_step_region_rpath(...).",
+      "Pass the SHA-256 of the complete .scadbrep file.",
+      "Keep the sidecar at the same path when replaying model JSON."
+    ],
+    "operation": "load_brep_region_rsolid",
+    "possible_causes": [
+      "The snapshot path does not exist or is not readable.",
+      "The supplied SHA-256 does not match the snapshot bytes.",
+      "The snapshot is corrupt, unsupported, invalid, or not one solid."
+    ],
+    "technical_details": "ValueError: path must end in .scadbrep",
+    "what_happened": "Failed to load the BREP region snapshot."
+  },
+  "missing": {
+    "how_to_fix": [],
+    "operation": "brep_region",
+    "possible_causes": [],
+    "technical_details": null,
+    "what_happened": "Could not inspect BREP region snapshot: <dir>/none.scadbrep"
+  },
+  "shell_as_solid": {
+    "how_to_fix": [],
+    "operation": "brep_region",
+    "possible_causes": [],
+    "technical_details": null,
+    "what_happened": "BREP region snapshot contains shell, expected solid"
+  },
+  "solid_as_shell": {
+    "how_to_fix": [],
+    "operation": "brep_region",
+    "possible_causes": [],
+    "technical_details": null,
+    "what_happened": "BREP region snapshot contains solid, expected shell"
+  },
+  "wrong_hash": {
+    "how_to_fix": [],
+    "operation": "brep_region",
+    "possible_causes": [],
+    "technical_details": null,
+    "what_happened": "BREP region snapshot SHA-256 mismatch: expected sha256:0000000000000000000000000000000000000000000000000000000000000000, got sha256:cb1bb097fe16a4fcf3e41b5d9d841eda4d6003b7a8c30d16c4edb3890c1354f2"
+  }
+}

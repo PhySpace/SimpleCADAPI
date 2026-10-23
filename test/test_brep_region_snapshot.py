@@ -606,7 +606,7 @@ def test_semantically_tagged_face_replays_as_sewing_input(tmp_path: Path) -> Non
 def test_kettle_bspline_regions_roundtrip_as_two_exact_shells(tmp_path: Path) -> None:
     from collections import deque
 
-    from OCP.BRepAdaptor import BRepAdaptor_Surface
+    from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Surface
 
     target = Path(str(KETTLE_STEP))
     model = brep.load_step_rbrepmodel(target)

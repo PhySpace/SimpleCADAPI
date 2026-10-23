@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def var(name: str, default: int | float, comment: str | None = None, tolerance: ToleranceLike | None = None, *, unit: UnitLike | None = None, tolerance_unit: UnitLike | None = None) -> Var
+def var(name, default, comment=None, tolerance=None, *, unit=None, tolerance_unit=None, ui=None, control=None, min=None, max=None, step=None, label=None, group=None)
 ```
 
 *Source: params/expr.py*

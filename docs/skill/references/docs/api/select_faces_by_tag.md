@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def select_faces_by_tag(solid: Solid, tag: str, scope: str | TagScope = TagScope.EFFECTIVE) -> List[Face]
+def select_faces_by_tag(solid, tag, scope=<EFFECTIVE: 'effective'>)
 ```
 
 *Source: operators/selection.py*

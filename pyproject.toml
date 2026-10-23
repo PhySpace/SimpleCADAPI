@@ -1,7 +1,7 @@
 [project]
 name = "simplecadapi"
 version = "2.2.6.post2"
-description = "A simplified OCP-native CAD modeling Python API"
+description = "A simplified OpenCASCADE-native CAD modeling Python API"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "倪旌哲", email = "nijingzhe@zju.edu.cn" }]
@@ -24,14 +24,12 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.21.0",
+    "pillow>=10.0",  # the software renderer encodes PNG and draws the screenshot text
     "rich>=14.0.0",
-    "cadquery-ocp>=7.9.3.1",
     "jsonschema>=4.25.1,<5.0.0",
     "rfc8785>=0.1.4,<0.2.0",
     "typing-extensions>=4.12,<5",
     "tomli>=2.0,<3; python_version < '3.11'",
-    "py-slvs==1.0.6",
-    "ocp-gordon>=0.2,<0.3",
     "ezdxf>=1.4.4",
     "marimo>=0.25.0",
     "plotly>=7.1.0",
@@ -76,60 +74,72 @@ Documentation = "https://github.com/PhySpace/SimpleCADAPI#readme"
 Issues = "https://github.com/PhySpace/SimpleCADAPI/issues"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+# One distribution: the Python package and the compiled C++ module (``simplecadapi._cpp``, src/cpp/) it runs on.
+requires = ["scikit-build-core>=0.10", "pybind11>=2.13"]
+build-backend = "scikit_build_core.build"
 
-[tool.hatch.build.targets.wheel]
-# Metadata-Version 2.5 is newer than what twine 6.x validates; keep the
-# published metadata at 2.4 until the toolchain accepts 2.5.
-core-metadata-version = "2.4"
-# Ship harness-neutral source; sca skill compiles it on the user's machine.
-packages = ["src/simplecadapi"]
-include = ["src/**/*"]
-# The built webui (`cd editor-web && npm run build`) is git-ignored; ship it
-# with `sca edit` when it has been built.
-artifacts = ["src/simplecadapi/editor/webui/**"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"docs/skill" = "simplecadapi/skill/resources/docs/skill"
-"skillproj.toml" = "simplecadapi/skill/resources/skillproj.toml"
-# The notebooks `sca example u_link` copies out.
-"examples/u_link_motor_mount/u_link.py" = "simplecadapi/example/resources/u_link_motor_mount/u_link.py"
-"examples/u_link_motor_mount/shell.py" = "simplecadapi/example/resources/u_link_motor_mount/shell.py"
-"examples/u_link_motor_mount/u_link_motor_mount.py" = "simplecadapi/example/resources/u_link_motor_mount/u_link_motor_mount.py"
-"examples/u_link_motor_mount/dimensions.py" = "simplecadapi/example/resources/u_link_motor_mount/dimensions.py"
-"examples/u_link_motor_mount/common.py" = "simplecadapi/example/resources/u_link_motor_mount/common.py"
-
-[tool.hatch.build.targets.sdist]
-core-metadata-version = "2.4"
-# The release builds its wheel from this sdist, so the built webui has to be in it.
-artifacts = ["src/simplecadapi/editor/webui/**"]
-include = [
-  "/README.md",
-  "/LICENSE",
-  "/pyproject.toml",
-  "/MANIFEST.in",
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+cmake.source-dir = "src/cpp"
+cmake.version = ">=3.20"
+cmake.build-type = "Release"
+build-dir = "src/cpp/build/wheel/{wheel_tag}"
+# The Python package is copied as it is (the built web UI included, it is git-ignored); the CMake install() rules add the
+# compiled module ``simplecadapi/_cpp/`` and the resource files (skill, example notebooks) listed in src/cpp/CMakeLists.txt.
+wheel.packages = ["src/simplecadapi"]
+wheel.exclude = ["**/__pycache__/**", "**/*.pyc"]
+sdist.include = [
+  "/src/simplecadapi/editor/webui",
   "/skillproj.toml",
-  "/src",
-  "/docs",
+  "/docs/skill",
+  "/examples/u_link_motor_mount/u_link.py",
+  "/examples/u_link_motor_mount/shell.py",
+  "/examples/u_link_motor_mount/u_link_motor_mount.py",
+  "/examples/u_link_motor_mount/dimensions.py",
+  "/examples/u_link_motor_mount/common.py",
 ]
-exclude = [
+sdist.exclude = [
   "/.python-version",
   "/uv.lock",
   "/test",
   "/tests",
   "/skills",
-  "/examples",
+  "/examples/[!u]*",
+  "/src/cpp/build",
 ]
 
-# The sdist leaves out /examples, but `sca example u_link` builds its wheel
-# from these five notebooks (the wheel is built from the sdist on release).
-[tool.hatch.build.targets.sdist.force-include]
-"examples/u_link_motor_mount/u_link.py" = "examples/u_link_motor_mount/u_link.py"
-"examples/u_link_motor_mount/shell.py" = "examples/u_link_motor_mount/shell.py"
-"examples/u_link_motor_mount/u_link_motor_mount.py" = "examples/u_link_motor_mount/u_link_motor_mount.py"
-"examples/u_link_motor_mount/dimensions.py" = "examples/u_link_motor_mount/dimensions.py"
-"examples/u_link_motor_mount/common.py" = "examples/u_link_motor_mount/common.py"
+[tool.scikit-build.cmake.define]
+SCAD_BUILD_TESTS = "OFF"
+SCAD_BUILD_PYTHON = "ON"
+
+[tool.cibuildwheel]
+# Four targets: Linux x86_64, Linux aarch64, macOS arm64, Windows x86_64 (see .github/workflows/release.yml), each for
+# Python 3.10-3.13.  Every wheel links the same static OCCT built by src/cpp/tools/build_occt.py, so the kernel (and its
+# behaviour) is identical everywhere and the wheel needs no OCCT on the user's machine.
+build = "cp310-* cp311-* cp312-* cp313-*"
+skip = "*-musllinux_* *-win32 *_i686 pp*"
+build-verbosity = 1
+# Runs in a clean environment with only the wheel installed (no checkout on the path).
+test-command = "python {project}/src/cpp/tests/wheel_smoke.py"
+
+[tool.cibuildwheel.linux]
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+before-all = "python3 -m pip install cmake ninja && python3 src/cpp/tools/build_occt.py --prefix /opt/occt"
+environment = { SCAD_OCCT_PREFIX = "/opt/occt", CMAKE_ARGS = "-DSCAD_OCCT_PREFIX=/opt/occt" }
+
+[tool.cibuildwheel.macos]
+archs = ["arm64"]
+# 14.0: the C++ module formats numbers with std::to_chars (floating point), which libc++ provides from macOS 13.3, and the
+# wheel tag only knows whole versions (macosx_14_0), so the binary must require what its tag promises.
+environment = { MACOSX_DEPLOYMENT_TARGET = "14.0", SCAD_OCCT_PREFIX = "/tmp/occt", CMAKE_ARGS = "-DSCAD_OCCT_PREFIX=/tmp/occt" }
+# before-all runs on the host without the `environment` above, so OCCT gets the same deployment target explicitly.
+before-all = "MACOSX_DEPLOYMENT_TARGET=14.0 python3 src/cpp/tools/build_occt.py --prefix /tmp/occt"
+
+[tool.cibuildwheel.windows]
+archs = ["AMD64"]
+before-all = "python -m pip install cmake ninja && python src/cpp/tools/build_occt.py --prefix C:/occt"
+environment = { SCAD_OCCT_PREFIX = "C:/occt", CMAKE_ARGS = "-DSCAD_OCCT_PREFIX=C:/occt" }
 
 [dependency-groups]
 dev = [
@@ -162,7 +172,7 @@ unresolved-import = "ignore"
 unresolved-reference = "ignore"
 
 [tool.ty.rules]
-# OCP/VTK are compiled C-extension bindings that ship no .pyi stubs, and
+# VTK is a compiled C-extension binding that ships no .pyi stubs, and
 # example scripts import sibling modules — import resolution is
 # environmental noise in this repo, not signal. Real import typos surface
 # at runtime and in the test suite.

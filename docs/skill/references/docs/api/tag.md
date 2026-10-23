@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def tag(pattern: str, scope: str | TagScope = TagScope.EFFECTIVE) -> SerializablePredicate
+def tag(pattern, scope='effective')
 ```
 
 *Source: ql.py*

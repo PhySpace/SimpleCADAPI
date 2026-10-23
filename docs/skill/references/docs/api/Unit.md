@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class Unit(symbol: str, dimension: Dimension, scale_to_canonical: float)
+class Unit(symbol, dimension, scale_to_canonical)
 ```
 
 *Source: params/units.py*

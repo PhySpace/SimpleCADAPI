@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import math
 import pytest
-from OCP.BRep import BRep_Builder
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
-from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
-from OCP.TopoDS import TopoDS_Compound
-from OCP.gp import gp_Pnt
+from simplecadapi._cpp.occt.BRep import BRep_Builder
+from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Cut
+from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakeBox
+from simplecadapi._cpp.occt.TopoDS import TopoDS_Compound
+from simplecadapi._cpp.occt.gp import gp_Pnt
 
 from simplecadapi.inspect import brep
 
@@ -234,9 +234,9 @@ def test_compare_material_region_rejects_invalid_region():
 
 
 def test_compare_material_region_rejects_invalid_zero_volume_solid():
-    from OCP.BRep import BRep_Builder
-    from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid
-    from OCP.TopoDS import TopoDS_Shell
+    from simplecadapi._cpp.occt.BRep import BRep_Builder
+    from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_MakeSolid
+    from simplecadapi._cpp.occt.TopoDS import TopoDS_Shell
 
     shell = TopoDS_Shell()
     BRep_Builder().MakeShell(shell)

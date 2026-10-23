@@ -1,0 +1,18 @@
+{
+  "dof": 0,
+  "points": {
+    "a": [
+      0.0,
+      0.0
+    ],
+    "b": [
+      1.0,
+      0.0
+    ]
+  },
+  "scalars": {
+    "circle:left:radius": 2.0,
+    "circle:right:radius": 1.0
+  },
+  "status": "solved"
+}

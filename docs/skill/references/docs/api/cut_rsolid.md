@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def cut_rsolid(*solids: Union[Solid, Sequence[Solid]], skip_non_intersecting: bool = True, tracking_policy: TrackingPolicy | str = TrackingPolicy.FULL) -> Solid
+def cut_rsolid(*solids, skip_non_intersecting=True, tracking_policy='full')
 ```
 
 *Source: operators/boolean.py*

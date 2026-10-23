@@ -6,7 +6,7 @@ import math
 import unittest
 
 import simplecadapi as scad
-from OCP.BRepAdaptor import BRepAdaptor_Curve
+from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Curve
 
 
 def _helix_turns_and_rise(edge):

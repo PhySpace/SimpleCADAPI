@@ -65,27 +65,6 @@ from .validation import (
     json_resource_issues,
     resource_count_issues,
 )
-from .compiler import (
-    CompiledScenePackage,
-    SceneCompileOptions,
-    SceneRoot,
-    SceneSource,
-    compile_scene,
-    export_scene,
-)
-from .glb_writer import write_line_glb, write_triangle_glb
-from .render_mesh import (
-    CanonicalEdgeBlock,
-    CanonicalTriangleBlock,
-    RenderEdgeMesh,
-    RenderGroup,
-    RenderMesh,
-    build_edge_mesh,
-    build_render_mesh,
-    cad_direction_to_gltf,
-    cad_to_gltf,
-    solid_asset_bounds,
-)
 
 
 def __getattr__(name: str):
@@ -100,7 +79,23 @@ def __getattr__(name: str):
         from . import product_scene
 
         return getattr(product_scene, name)
-    raise AttributeError(name)
+    return _lazy_name(name)
+
+
+_LAZY = {'CompiledScenePackage': 'compiler', 'SceneCompileOptions': 'compiler', 'SceneRoot': 'compiler', 'SceneSource': 'compiler', 'compile_scene': 'compiler', 'export_scene': 'compiler', 'write_line_glb': 'glb_writer', 'write_triangle_glb': 'glb_writer', 'CanonicalEdgeBlock': 'render_mesh', 'CanonicalTriangleBlock': 'render_mesh', 'RenderEdgeMesh': 'render_mesh', 'RenderGroup': 'render_mesh', 'RenderMesh': 'render_mesh', 'build_edge_mesh': 'render_mesh', 'build_render_mesh': 'render_mesh', 'cad_direction_to_gltf': 'render_mesh', 'cad_to_gltf': 'render_mesh', 'solid_asset_bounds': 'render_mesh'}
+"""Names served from the submodules that need OCP (tessellation, face geometry), imported on first use."""
+
+
+def _lazy_name(name: str):
+    module = _LAZY.get(name)
+    if module is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    import importlib
+
+    value = getattr(importlib.import_module(f".{module}", __name__), name)
+    globals()[name] = value
+    return value
+
 
 __all__ = [
     "ArchiveInfo",

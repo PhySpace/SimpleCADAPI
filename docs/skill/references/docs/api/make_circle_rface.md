@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_circle_rface(center: Tuple[float, float, float], radius: ScalarLike, normal: Tuple[float, float, float] = (0, 0, 1), *, tag_prefix: Optional[str] = None, edge_tag: Optional[str] = None) -> Face
+def make_circle_rface(center, radius, normal=(0, 0, 1), *, tag_prefix=None, edge_tag=None)
 ```
 
 *Source: operators/geometry.py*

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def apply_tag_rselection(scope: AnyShape, targets: Union[ShapeSelector, Sequence[AnyShape]], tag: str, topology_propagation: str | TopologyPropagation = TopologyPropagation.LOCAL, lineage_policy: str | LineagePolicy = LineagePolicy.CONTINUATION_FRAGMENT) -> AnyShape
+def apply_tag_rselection(scope, targets, tag, topology_propagation=<LOCAL: 'local'>, lineage_policy=<CONTINUATION_FRAGMENT: 'continuation_fragment'>)
 ```
 
 *Source: operators/selection.py*

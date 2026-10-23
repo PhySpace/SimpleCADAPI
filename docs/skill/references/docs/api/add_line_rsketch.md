@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def add_line_rsketch(sketch: Sketch, entity_id: str, start: Union[SketchRef, str], end: Union[SketchRef, str], *, construction: bool = False) -> Sketch
+def add_line_rsketch(sketch, entity_id, start, end, *, construction=False)
 ```
 
 *Source: operators/sketch.py*

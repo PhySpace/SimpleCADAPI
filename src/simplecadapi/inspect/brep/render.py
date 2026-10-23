@@ -18,37 +18,37 @@ from typing import Any, Literal, Mapping, Sequence, Union
 import numpy as np
 
 from ...errors import raise_harness_error
-from OCP.BRep import BRep_Builder, BRep_Tool
-from OCP.BRepAdaptor import BRepAdaptor_Curve
-from OCP.BRepBuilderAPI import BRepBuilderAPI_Copy
-from OCP.BRepMesh import BRepMesh_IncrementalMesh
-from OCP.GCPnts import GCPnts_QuasiUniformDeflection
-from OCP.TopAbs import (
+from simplecadapi._cpp.occt.BRep import BRep_Builder, BRep_Tool
+from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Curve
+from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_Copy
+from simplecadapi._cpp.occt.BRepMesh import BRepMesh_IncrementalMesh
+from simplecadapi._cpp.occt.GCPnts import GCPnts_QuasiUniformDeflection
+from simplecadapi._cpp.occt.TopAbs import (
     TopAbs_EDGE,
     TopAbs_FACE,
     TopAbs_REVERSED,
     TopAbs_SOLID,
     TopAbs_VERTEX,
 )
-from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopTools import TopTools_IndexedMapOfShape
-from OCP.TopoDS import TopoDS, TopoDS_Compound, TopoDS_Edge, TopoDS_Shape
-from OCP.IFSelect import IFSelect_RetDone
-from OCP.Quantity import Quantity_ColorRGBA
-from OCP.STEPCAFControl import STEPCAFControl_Reader
-from OCP.TCollection import TCollection_ExtendedString
-from OCP.TDocStd import TDocStd_Document
-from OCP.TopLoc import TopLoc_Location
-from OCP.XCAFApp import XCAFApp_Application
-from OCP.XCAFDoc import XCAFDoc_DocumentTool, XCAFDoc_ShapeTool
-from OCP.XCAFPrs import (
+from simplecadapi._cpp.occt.TopExp import TopExp, TopExp_Explorer
+from simplecadapi._cpp.occt.TopTools import TopTools_IndexedMapOfShape
+from simplecadapi._cpp.occt.TopoDS import TopoDS, TopoDS_Compound, TopoDS_Edge, TopoDS_Shape
+from simplecadapi._cpp.occt.IFSelect import IFSelect_RetDone
+from simplecadapi._cpp.occt.Quantity import Quantity_ColorRGBA
+from simplecadapi._cpp.occt.STEPCAFControl import STEPCAFControl_Reader
+from simplecadapi._cpp.occt.TCollection import TCollection_ExtendedString
+from simplecadapi._cpp.occt.TDocStd import TDocStd_Document
+from simplecadapi._cpp.occt.TopLoc import TopLoc_Location
+from simplecadapi._cpp.occt.XCAFApp import XCAFApp_Application
+from simplecadapi._cpp.occt.XCAFDoc import XCAFDoc_DocumentTool, XCAFDoc_ShapeTool
+from simplecadapi._cpp.occt.XCAFPrs import (
     XCAFPrs,
     XCAFPrs_DocumentExplorer,
     XCAFPrs_DocumentExplorerFlags_OnlyLeafNodes,
     XCAFPrs_IndexedDataMapOfShapeStyle,
 )
-from OCP.TDF import TDF_LabelSequence
-from OCP.TDataStd import TDataStd_Name
+from simplecadapi._cpp.occt.TDF import TDF_LabelSequence
+from simplecadapi._cpp.occt.TDataStd import TDataStd_Name
 
 from .io import load_step_rshape
 from .model import BRepModel, index_shape_rbrepmodel, load_step_rbrepmodel
@@ -834,7 +834,7 @@ def _prepare_sdk_screenshot(
     elif isinstance(view, str) and view.strip().lower() == "auto":
         normalized_views = tuple(SCREENSHOT_VIEWS)
     else:
-        # 一个显式 view（预设名或 (elev, azim)）= 单格网格
+        # one explicit view (a preset name or (elev, azim)) = a single-cell grid
         elevation, azimuth = _screenshot_view_angles(view, (1.0, 1.0, 1.0))
         label = view.strip().lower() if isinstance(view, str) else "view"
         normalized_views = ((elevation, azimuth, label),)
@@ -854,7 +854,7 @@ def _prepare_sdk_screenshot(
             labels.get(tag, tag),
             point,
             tag_colors.get(tag, (0.95, 0.55, 0.2)),
-            # 遮挡重锚候选：该标签自己的高亮面网格（数据集通道，worker 可序列化）
+        # occlusion re-anchor candidates: the label's own highlighted-face mesh (dataset channel, serialisable by the worker)
             tag_dataset.get(str(tag)),
         )
         for tag, point in label_points.items()
@@ -1099,7 +1099,7 @@ def _view_ray_occluded(renderer, locator, point: Sequence[float], span: float) -
     )
     if cell_id < 0:
         return False
-    # 命中参数 t∈[0,1]；命中点距目标小于表面容差视为命中自身
+    # hit parameter t in [0,1]; a hit closer to the target than the surface tolerance counts as hitting itself
     hit_distance = (1.0 - t.get()) * reach
     return hit_distance > max(span * 0.002, 1e-6)
 
@@ -1134,7 +1134,7 @@ def _select_panel_callouts(renderer, callouts, locator, datasets, span: float):
             continue
         stride = max(1, count // 400)
         reach = max(span * 10.0, 1.0)
-        # 屏幕距离度量：沿视线方向的垂直距离 + 深度（取离相机更近者优先）
+    # screen-distance measure: perpendicular distance along the view direction + depth (the one closer to the camera wins)
         anchor_vec = _np.asarray(anchor, dtype=float)
         best = None
         best_score = None

@@ -1,0 +1,92 @@
+{
+  "errors": [
+    [
+      "ValueError",
+      "scale factors must be nonzero"
+    ],
+    [
+      "ValueError",
+      "value must be finite"
+    ],
+    [
+      "ValueError",
+      "factors must contain three finite numbers"
+    ],
+    [
+      "ValueError",
+      "value must be finite"
+    ],
+    [
+      "ValueError",
+      "perspective transforms cannot define an affine solid"
+    ],
+    [
+      "ValueError",
+      "perspective transforms cannot define an affine solid"
+    ],
+    [
+      "ValueError",
+      "matrix must be a finite 4x4 affine matrix"
+    ]
+  ],
+  "mirror_matrix": {
+    "area": 855.9999999999999,
+    "bbox": [
+      -5.0,
+      -6.0,
+      0.0,
+      5.0,
+      6.0,
+      14.0
+    ],
+    "edges": 12,
+    "faces": 6,
+    "tags": [],
+    "volume": 1679.9999999999995
+  },
+  "nonuniform": {
+    "area": 2223.999999999999,
+    "bbox": [
+      -15.0,
+      -30.0,
+      3.5,
+      5.0,
+      6.0,
+      10.5
+    ],
+    "edges": 12,
+    "faces": 6,
+    "tags": [],
+    "volume": 5039.999999999999
+  },
+  "shear": {
+    "area": 870.7942986993945,
+    "bbox": [
+      -1.7999999999999998,
+      -4.0,
+      0.0,
+      11.8,
+      8.0,
+      14.0
+    ],
+    "edges": 12,
+    "faces": 6,
+    "tags": [],
+    "volume": 1679.9999999999995
+  },
+  "uniform": {
+    "area": 208.0,
+    "bbox": [
+      -3.0,
+      -4.0,
+      -1.0,
+      1.0,
+      2.0,
+      7.0
+    ],
+    "edges": 12,
+    "faces": 6,
+    "tags": [],
+    "volume": 191.99999999999994
+  }
+}

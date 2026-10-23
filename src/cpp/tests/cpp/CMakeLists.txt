@@ -1,0 +1,22 @@
+# One doctest executable per area: test_<area> links only scad_<area>.
+add_library(scad_test_main OBJECT test_main.cpp)
+target_include_directories(scad_test_main PUBLIC "${PROJECT_SOURCE_DIR}/third_party/doctest")
+
+function(scad_add_test area)
+  file(GLOB_RECURSE _tests CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${area}/*.cpp")
+  if(NOT _tests)
+    return()
+  endif()
+  add_executable(test_${area} ${_tests} $<TARGET_OBJECTS:scad_test_main>)
+  scad_apply_compile_options(test_${area})
+  target_include_directories(test_${area} PRIVATE "${PROJECT_SOURCE_DIR}/third_party/doctest")
+  target_link_libraries(test_${area} PRIVATE scad_${area} ${ARGN})
+  add_test(NAME ${area} COMMAND test_${area})
+endfunction()
+
+scad_add_test(core)
+scad_add_test(kernel)
+scad_add_test(topo)
+foreach(_area ${SCAD_AREAS})
+  scad_add_test(${_area})
+endforeach()

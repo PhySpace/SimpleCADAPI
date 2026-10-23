@@ -6,21 +6,21 @@ from pathlib import Path
 
 import pytest
 import simplecadapi as scad
-from OCP.BRep import BRep_Builder
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
-from OCP.BRepBuilderAPI import (
+from simplecadapi._cpp.occt.BRep import BRep_Builder
+from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Cut
+from simplecadapi._cpp.occt.BRepBuilderAPI import (
     BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeFace,
     BRepBuilderAPI_Transform,
 )
-from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
-from OCP.Geom import Geom_BezierSurface
-from OCP.IFSelect import IFSelect_RetDone
-from OCP.STEPControl import STEPControl_AsIs, STEPControl_Writer
-from OCP.TColStd import TColStd_Array2OfReal
-from OCP.TColgp import TColgp_Array2OfPnt
-from OCP.TopoDS import TopoDS_Compound
-from OCP.gp import gp_Ax2, gp_Dir, gp_Elips, gp_Pnt, gp_Trsf, gp_Vec
+from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakeBox
+from simplecadapi._cpp.occt.Geom import Geom_BezierSurface
+from simplecadapi._cpp.occt.IFSelect import IFSelect_RetDone
+from simplecadapi._cpp.occt.STEPControl import STEPControl_AsIs, STEPControl_Writer
+from simplecadapi._cpp.occt.TColStd import TColStd_Array2OfReal
+from simplecadapi._cpp.occt.TColgp import TColgp_Array2OfPnt
+from simplecadapi._cpp.occt.TopoDS import TopoDS_Compound
+from simplecadapi._cpp.occt.gp import gp_Ax2, gp_Dir, gp_Elips, gp_Pnt, gp_Trsf, gp_Vec
 from simplecadapi.kernel.ocp_export import export_step_shapes
 from simplecadapi.inspect import brep
 import simplecadapi.inspect.brep.compare as compare_module

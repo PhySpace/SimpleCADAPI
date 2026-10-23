@@ -196,7 +196,13 @@ def test_message_error_contract_keys_present():
     assert payload["evidence"] == []
     assert payload["repair"] == []
     assert payload["inventory"] == []
-    assert str(error) == "tag already bound"
+    # a family with designed guidance renders in full, like every operator error
+    assert error.message == "tag already bound"
+    assert payload["what_happened"] == "tag already bound"
+    text = str(error)
+    for section in ("Operation: tagging", "What happened: tag already bound", "Possible causes:", "How to fix:"):
+        assert section in text, text
+    assert payload["possible_causes"] and payload["how_to_fix"]
     assert isinstance(error, SimpleCADMessageError)
 
 

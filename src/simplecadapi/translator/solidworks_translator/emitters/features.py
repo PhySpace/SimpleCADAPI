@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List
 
-from ....topology import OperationNode
+from simplecadapi._cpp import OperationNode
 from ..codegen import _emit_node_lines
 
 

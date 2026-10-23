@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def twisted_sweep_rsolid(profile: Face, distance: ScalarLike, twist_angle: ScalarLike, axis: Tuple[float, float, float] = (0.0, 0.0, 1.0), origin: Tuple[float, float, float] = (0.0, 0.0, 0.0), *, guide_radius: ScalarLike = 1.0, tag_prefix: Optional[str] = None, result_tag: Optional[str] = None, start_face_tag: Optional[str] = None, end_face_tag: Optional[str] = None, side_faces_tag: Optional[str] = None) -> Solid
+def twisted_sweep_rsolid(profile, distance, twist_angle, axis=(0, 0, 1), origin=(0, 0, 0), *, guide_radius=1.0, tag_prefix=None, result_tag=None, start_face_tag=None, end_face_tag=None, side_faces_tag=None)
 ```
 
 *Source: operators/features.py*

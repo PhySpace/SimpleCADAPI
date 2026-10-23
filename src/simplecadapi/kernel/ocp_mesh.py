@@ -1,78 +1,25 @@
-"""OCP-native mesh/shell construction and tessellation helpers."""
+"""Face tessellation helpers over the bound OCCT classes."""
 
 from __future__ import annotations
 
 import math
 from typing import Iterable, List, Sequence, Tuple
 
-from OCP.BRep import BRep_Builder, BRep_Tool
-from OCP.BRepCheck import BRepCheck_Analyzer
-from OCP.BRepBuilderAPI import (
-    BRepBuilderAPI_MakeFace,
-    BRepBuilderAPI_MakePolygon,
-    BRepBuilderAPI_MakeSolid,
-    BRepBuilderAPI_Transform,
-)
-from OCP.BRepLib import BRepLib
-from OCP.BRepGProp import BRepGProp
-from OCP.GProp import GProp_GProps
-from OCP.BRepMesh import BRepMesh_IncrementalMesh
-from OCP.BRepTools import BRepTools
-from OCP.Poly import Poly_Triangulation
-from OCP.TopAbs import TopAbs_FORWARD, TopAbs_REVERSED
-from OCP.TopLoc import TopLoc_Location
-from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Shell
-from OCP.gp import gp_Pnt
+from simplecadapi._cpp.occt.BRep import BRep_Builder, BRep_Tool
+from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
+from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_Transform
+from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+from simplecadapi._cpp.occt.GProp import GProp_GProps
+from simplecadapi._cpp.occt.BRepMesh import BRepMesh_IncrementalMesh
+from simplecadapi._cpp.occt.BRepTools import BRepTools
+from simplecadapi._cpp.occt.Poly import Poly_Triangulation
+from simplecadapi._cpp.occt.TopAbs import TopAbs_FORWARD, TopAbs_REVERSED
+from simplecadapi._cpp.occt.TopLoc import TopLoc_Location
+from simplecadapi._cpp.occt.TopoDS import TopoDS, TopoDS_Face, TopoDS_Shell
+from simplecadapi._cpp.occt.gp import gp_Pnt
 
 from .ocp_properties import bounding_box
 from .ocp_topology import faces_of
-
-
-def make_triangle_face(points: Sequence[Sequence[float]]) -> TopoDS_Face:
-    if len(points) != 3:
-        raise ValueError("Triangle face requires exactly three points")
-    polygon = BRepBuilderAPI_MakePolygon()
-    for p in points:
-        polygon.Add(gp_Pnt(float(p[0]), float(p[1]), float(p[2])))
-    polygon.Close()
-    if not polygon.IsDone():
-        raise ValueError("OCP polygon builder failed")
-    face = BRepBuilderAPI_MakeFace(polygon.Wire(), True)
-    if not face.IsDone():
-        raise ValueError("OCP triangle face builder failed")
-    return face.Face()
-
-
-def shell_metric(shell) -> tuple[int, float]:
-    bb = bounding_box(shell)
-    volume = bb.xlen * bb.ylen * bb.zlen
-    return (len(faces_of(shell)), float(volume))
-
-
-def shell_is_closed(shell) -> bool:
-    return bool(BRep_Tool.IsClosed_s(TopoDS.Shell_s(shell)))
-
-
-def solid_from_shell(shell):
-    source = TopoDS.Shell_s(shell)
-    if not BRep_Tool.IsClosed_s(source):
-        raise ValueError("solid-from-shell requires a closed shell")
-    if not BRepCheck_Analyzer(source).IsValid():
-        raise ValueError("solid-from-shell requires a valid shell")
-    maker = BRepBuilderAPI_MakeSolid(source)
-    if not maker.IsDone():
-        raise ValueError("OCP solid-from-shell builder failed")
-    solid = maker.Solid()
-    if solid.IsNull() or not BRepLib.OrientClosedSolid_s(solid):
-        raise ValueError("OCP could not orient the closed solid")
-    if not BRepCheck_Analyzer(solid).IsValid():
-        raise ValueError("solid created from shell is invalid")
-    properties = GProp_GProps()
-    BRepGProp.VolumeProperties_s(solid, properties)
-    volume = float(properties.Mass())
-    if not math.isfinite(volume) or volume <= 0.0:
-        raise ValueError("solid created from shell must have positive finite volume")
-    return solid
 
 
 def tessellate_face(face: TopoDS_Face, tolerance: float = 0.35, angular_tolerance: float = 0.22):

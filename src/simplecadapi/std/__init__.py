@@ -1,16 +1,20 @@
-"""SimpleCAD standard parts library.
+"""Standard parts.
 
-Each sub-module provides parameterised standard mechanical components
-built entirely from the public SimpleCAD modelling API surface.
-
-Modules:
-    gear    — involute spur / straight-bevel / helical / herringbone gears
-    bearing — ball bearing standard assemblies
-    chain   — roller-chain sprockets
-    fastener — parameterized bolts and nuts
-    pin     — (future) dowel pins, flat keys, split pins
+Forwarding module: nothing is defined here.  The names below are implemented in C++ and re-exported under the
+import path the SDK has always had.
 """
 
-from . import bearing, chain, fastener, gear
+from __future__ import annotations
 
-__all__ = ["bearing", "chain", "fastener", "gear"]
+
+from . import bearing  # noqa: F401
+from . import chain  # noqa: F401
+from . import fastener  # noqa: F401
+from . import gear  # noqa: F401
+
+__all__ = [
+    "bearing",
+    "chain",
+    "fastener",
+    "gear",
+]

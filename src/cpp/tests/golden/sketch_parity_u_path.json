@@ -1,0 +1,44 @@
+{
+  "dof": 0,
+  "points": {
+    "b1": [
+      -23.0,
+      0.0
+    ],
+    "b2": [
+      23.0,
+      0.0
+    ],
+    "cl": [
+      -23.0,
+      17.0
+    ],
+    "cr": [
+      23.0,
+      17.0
+    ],
+    "l1": [
+      -40.0,
+      17.0
+    ],
+    "lt": [
+      -40.0,
+      20.0
+    ],
+    "r1": [
+      40.0,
+      17.0
+    ],
+    "rt": [
+      40.0,
+      20.0
+    ]
+  },
+  "scalars": {
+    "arc:corner_l:diameter": 34.0,
+    "arc:corner_l:radius": 17.0,
+    "arc:corner_r:diameter": 34.0,
+    "arc:corner_r:radius": 17.0
+  },
+  "status": "solved"
+}

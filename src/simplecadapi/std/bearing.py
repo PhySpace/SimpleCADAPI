@@ -12,16 +12,15 @@ import math
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from ..product.assembly import Assembly
-from ..product.material import Material
-from ..product.part import Part
-from ..operators import (
+from simplecadapi._cpp import (
     add_component_rassembly,
     add_connector_rpart,
     add_revolute_constraint_rassembly,
     apply_tag,
+    Assembly,
     assign_material_rpart,
     chamfer_rsolid,
+    Face,
     ground_component_rassembly,
     identity_placement_rplacement,
     make_assembly_rassembly,
@@ -34,11 +33,13 @@ from ..operators import (
     make_sphere_rsolid,
     make_three_point_arc_redge,
     make_wire_from_edges_rwire,
+    Material,
+    Part,
     revolve_rsolid,
     set_public_connector_rassembly,
+    Solid,
     union_rsolid,
 )
-from ..core import Face, Solid
 from ..topology.tracking import graph_tracking_scope
 
 __all__ = ["build_ball_bearing", "make_ball_bearing_rassembly"]

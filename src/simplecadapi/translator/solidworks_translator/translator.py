@@ -14,13 +14,10 @@ import os
 import zlib
 from typing import Any, Dict, List, Optional, Sequence, Set
 
-from OCP.BRepAdaptor import BRepAdaptor_Curve
-from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
 
-from ...kernel.ocp_curves import make_interpolated_bspline_edge
 from ...recording.serializer import import_model_json
 from ...errors import ErrorGuidance
-from ...topology import OperationGraph, OperationNode
+from simplecadapi._cpp import OperationGraph, OperationNode
 from ..base import BaseTranslator
 from ..errors import TranslationRequestError
 from ..types import (
@@ -82,19 +79,51 @@ def _supported_ops() -> Set[str]:
 def _curve_params_with_kernel_axes(params: Dict[str, Any]) -> Dict[str, Any]:
     """Add the source OCC periodic basis without mutating graph parameters."""
 
-    from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
-
     enriched = dict(params)
     normal = enriched.get("normal", (0.0, 0.0, 1.0))
-    axis = gp_Ax2(
-        gp_Pnt(0.0, 0.0, 0.0),
-        gp_Dir(float(normal[0]), float(normal[1]), float(normal[2])),
-    )
-    x_axis = axis.XDirection()
-    y_axis = axis.YDirection()
-    enriched["_kernel_x_axis"] = [x_axis.X(), x_axis.Y(), x_axis.Z()]
-    enriched["_kernel_y_axis"] = [y_axis.X(), y_axis.Y(), y_axis.Z()]
+    x_axis, y_axis = _occ_default_axes(normal)
+    enriched["_kernel_x_axis"] = list(x_axis)
+    enriched["_kernel_y_axis"] = list(y_axis)
     return enriched
+
+
+def _occ_default_axes(normal: Any) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    """The X and Y directions OpenCASCADE's ``gp_Ax2(origin, Dir(normal))`` picks.
+
+    Same selection as ``gp_Ax2::gp_Ax2(P, V)``: the axis least aligned with the normal decides the
+    perpendicular direction; Y is Z x X.
+    """
+
+    import math
+
+    nx, ny, nz = (float(normal[0]), float(normal[1]), float(normal[2]))
+    length = math.sqrt(nx * nx + ny * ny + nz * nz)
+    if length <= 1e-300:
+        raise ValueError("normal must not be the zero vector")
+    zx, zy, zz = nx / length, ny / length, nz / length
+    a, b, c = abs(zx), abs(zy), abs(zz)
+    if b <= a and b <= c:
+        x = (-zz, 0.0, zx) if a > c else (zz, 0.0, -zx)
+    elif a <= b and a <= c:
+        x = (0.0, -zz, zy) if b > c else (0.0, zz, -zy)
+    else:
+        x = (-zy, zx, 0.0) if a > b else (zy, -zx, 0.0)
+    xl = math.sqrt(x[0] ** 2 + x[1] ** 2 + x[2] ** 2)
+    x = (x[0] / xl, x[1] / xl, x[2] / xl)
+    y = (zy * x[2] - zz * x[1], zz * x[0] - zx * x[2], zx * x[1] - zy * x[0])
+    return x, y
+
+
+def make_interpolated_bspline_edge(points: Any, *, periodic: bool = False, tolerance: float = 1.0e-6) -> Any:
+    """An interpolating B-spline edge on the active backend."""
+
+    from simplecadapi._cpp import _native as native
+
+    return native._interpolated_bspline_edge(
+        [tuple(float(v) for v in p) for p in points],
+        periodic=periodic,
+        tolerance=tolerance,
+    )
 
 
 def _interpolated_curve_params(
@@ -129,31 +158,27 @@ def _interpolated_curve_params(
             periodic=bool(params.get("periodic", False)),
             tolerance=float(params.get("tolerance", 1.0e-6)),
         )
-        curve = BRepAdaptor_Curve(edge).BSpline()
+        exact = _exact_bspline_data(edge)
     except Exception:
         return dict(params)
     enriched = dict(params)
-    enriched["_exact_bspline"] = {
-        "control_points": [
-            [
-                float(curve.Pole(index).X()),
-                float(curve.Pole(index).Y()),
-                float(curve.Pole(index).Z()),
-            ]
-            for index in range(1, curve.NbPoles() + 1)
-        ],
-        "degree": int(curve.Degree()),
-        "knots": [float(curve.Knot(index)) for index in range(1, curve.NbKnots() + 1)],
-        "multiplicities": [
-            int(curve.Multiplicity(index)) for index in range(1, curve.NbKnots() + 1)
-        ],
-        "weights": (
-            [float(curve.Weight(index)) for index in range(1, curve.NbPoles() + 1)]
-            if curve.IsRational()
-            else []
-        ),
-    }
+    enriched["_exact_bspline"] = exact
     return enriched
+
+
+def _exact_bspline_data(edge: Any) -> Dict[str, Any]:
+    """Poles, degree, knots, multiplicities and weights of an edge's B-spline curve."""
+
+    from simplecadapi._cpp import _native as native
+
+    data = native._bspline_curve_of(edge)
+    return {
+        "control_points": [[float(v) for v in point] for point in data["control_points"]],
+        "degree": int(data["degree"]),
+        "knots": [float(v) for v in data["knots"]],
+        "multiplicities": [int(v) for v in data["multiplicities"]],
+        "weights": [float(v) for v in data["weights"]] if data["rational"] else [],
+    }
 
 
 def _clamped_spline_params(params: Dict[str, Any]) -> Dict[str, Any]:
@@ -174,10 +199,10 @@ def _clamped_spline_params(params: Dict[str, Any]) -> Dict[str, Any]:
     if int(mults[0]) >= degree + 1 and int(mults[-1]) >= degree + 1:
         return params
     try:
-        from OCP.TColgp import TColgp_Array1OfPnt
-        from OCP.TColStd import TColStd_Array1OfInteger, TColStd_Array1OfReal
-        from OCP.Geom import Geom_BSplineCurve
-        from OCP.gp import gp_Pnt
+        from simplecadapi._cpp.occt.TColgp import TColgp_Array1OfPnt
+        from simplecadapi._cpp.occt.TColStd import TColStd_Array1OfInteger, TColStd_Array1OfReal
+        from simplecadapi._cpp.occt.Geom import Geom_BSplineCurve
+        from simplecadapi._cpp.occt.gp import gp_Pnt
 
         poles = TColgp_Array1OfPnt(1, len(control_points))
         for index, point in enumerate(control_points, 1):

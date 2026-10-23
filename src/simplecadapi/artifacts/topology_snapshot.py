@@ -5,8 +5,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Mapping
 
-from ..core import Solid
-from ..topology.tagging import TagBinding, TagLineageWitness, normalize_tag
+from simplecadapi._cpp import Solid, TagBinding, TagLineageWitness
+from ..topology.tagging import normalize_tag
 from ..topology import TopoKind, TopoRef, topo_ref_to_dict
 from .geometry_interface import (
     geometry_interface_fingerprint,
@@ -34,7 +34,7 @@ _METADATA_EXCLUDED = {
 
 def _semantic_metadata(metadata: Mapping[str, Any], path: str) -> dict[str, Any]:
     """Project runtime metadata into canonical JSON-safe values."""
-    from ..params.expr import Expr, Var
+    from simplecadapi._cpp import Expr, Var
 
     def project(value: Any) -> Any:
         if isinstance(value, (Var, Expr)):

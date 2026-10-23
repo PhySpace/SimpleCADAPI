@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, Sequence, Set
 
 from ...errors import ErrorGuidance
-from ...topology import OperationGraph
+from simplecadapi._cpp import OperationGraph
 from ..base import BaseTranslator
 from ..errors import TranslationRequestError
 from ..package_units import ProductPackageInput

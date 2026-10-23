@@ -1,0 +1,355 @@
+{
+  "angled": [
+    {
+      "area": 597.4053206873584,
+      "bbox": [
+        -5.0,
+        -5.0,
+        0.0,
+        5.0,
+        5.0,
+        10.0
+      ],
+      "edges": 15,
+      "faces": 7,
+      "tags": [],
+      "volume": 998.6602540378442
+    },
+    {
+      "area": 595.1961524227065,
+      "bbox": [
+        -5.0,
+        -5.0,
+        0.0,
+        5.0,
+        5.0,
+        10.0
+      ],
+      "edges": 15,
+      "faces": 7,
+      "tags": [],
+      "volume": 997.1132486540516
+    },
+    {
+      "area": 587.5844741683051,
+      "bbox": [
+        -5.0,
+        -5.0,
+        0.0,
+        5.0,
+        5.0,
+        10.0
+      ],
+      "edges": 15,
+      "faces": 7,
+      "tags": [],
+      "volume": 981.3397459621553
+    }
+  ],
+  "bad_angle": [
+    {
+      "how_to_fix": [
+        "Use a positive chamfer distance.",
+        "Select at least one valid edge or use a selector that resolves to edges.",
+        "If the kernel rejects the chamfer, try a smaller distance or fewer edges."
+      ],
+      "inventory": [],
+      "measurements": [],
+      "operation": "chamfer_rsolid",
+      "possible_causes": [
+        "The distance is not a positive finite scalar.",
+        "No valid edges were selected.",
+        "The selected edges are incompatible with the requested chamfer size."
+      ],
+      "repair": [],
+      "technical_details": "ValueError: Chamfer angle must be between 0 and 90 degrees",
+      "what_happened": "Failed to apply the chamfer operation."
+    },
+    {
+      "how_to_fix": [
+        "Use a positive chamfer distance.",
+        "Select at least one valid edge or use a selector that resolves to edges.",
+        "If the kernel rejects the chamfer, try a smaller distance or fewer edges."
+      ],
+      "inventory": [],
+      "measurements": [],
+      "operation": "chamfer_rsolid",
+      "possible_causes": [
+        "The distance is not a positive finite scalar.",
+        "No valid edges were selected.",
+        "The selected edges are incompatible with the requested chamfer size."
+      ],
+      "repair": [],
+      "technical_details": "ValueError: Chamfer angle must be between 0 and 90 degrees",
+      "what_happened": "Failed to apply the chamfer operation."
+    }
+  ],
+  "no_reference": {
+    "how_to_fix": [
+      "Use a positive chamfer distance.",
+      "Select at least one valid edge or use a selector that resolves to edges.",
+      "If the kernel rejects the chamfer, try a smaller distance or fewer edges."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "chamfer_rsolid",
+    "possible_causes": [
+      "The distance is not a positive finite scalar.",
+      "No valid edges were selected.",
+      "The selected edges are incompatible with the requested chamfer size."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: An angled chamfer requires reference_direction to pick the face anchoring the distance",
+    "what_happened": "Failed to apply the chamfer operation."
+  },
+  "plain": {
+    "area": 593.142135623731,
+    "bbox": [
+      -5.0,
+      -5.0,
+      0.0,
+      5.0,
+      5.0,
+      10.0
+    ],
+    "edge_rows": [
+      [
+        [
+          1.4142,
+          -5.0,
+          -4.5,
+          9.5
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          1.4142,
+          5.0,
+          -4.5,
+          9.5
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          9.0,
+          -5.0,
+          -5.0,
+          4.5
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          9.0,
+          -5.0,
+          0.5,
+          10.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          9.0,
+          5.0,
+          -5.0,
+          4.5
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          9.0,
+          5.0,
+          0.5,
+          10.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          10.0,
+          -5.0,
+          0.0,
+          0.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          10.0,
+          -5.0,
+          5.0,
+          5.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          10.0,
+          0.0,
+          -5.0,
+          0.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          10.0,
+          0.0,
+          -5.0,
+          9.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          10.0,
+          0.0,
+          -4.0,
+          10.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          10.0,
+          0.0,
+          5.0,
+          0.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          10.0,
+          0.0,
+          5.0,
+          10.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          10.0,
+          5.0,
+          0.0,
+          0.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          10.0,
+          5.0,
+          5.0,
+          5.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ]
+    ],
+    "edges": 15,
+    "face_rows": [
+      [
+        [
+          14.1421,
+          -0.0,
+          -4.5,
+          9.5
+        ],
+        [
+          "face.chamfer.patch",
+          "role.bevel"
+        ]
+      ],
+      [
+        [
+          90.0,
+          0.0,
+          -5.0,
+          4.5
+        ],
+        []
+      ],
+      [
+        [
+          90.0,
+          -0.0,
+          0.5,
+          10.0
+        ],
+        []
+      ],
+      [
+        [
+          99.5,
+          -5.0,
+          0.023,
+          4.977
+        ],
+        []
+      ],
+      [
+        [
+          99.5,
+          5.0,
+          0.023,
+          4.977
+        ],
+        []
+      ],
+      [
+        [
+          100.0,
+          -0.0,
+          0.0,
+          0.0
+        ],
+        []
+      ],
+      [
+        [
+          100.0,
+          0.0,
+          5.0,
+          5.0
+        ],
+        []
+      ]
+    ],
+    "faces": 7,
+    "tags": [],
+    "volume": 994.9999999999998
+  }
+}

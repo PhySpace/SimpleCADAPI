@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def add_revolute_constraint_rassembly(assembly: Assembly, constraint_id: str, connector_a: ConnectorRef, connector_b: ConnectorRef, drive_angle_degrees: Optional[float] = None, angle_limit: Optional[ScalarLimit] = None, name: Optional[str] = None) -> Assembly
+def add_revolute_constraint_rassembly(assembly, constraint_id, connector_a, connector_b, drive_angle_degrees=None, angle_limit=None, name=None)
 ```
 
 *Source: operators/product.py*

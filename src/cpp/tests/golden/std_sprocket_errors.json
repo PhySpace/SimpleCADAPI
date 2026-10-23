@@ -1,0 +1,39 @@
+[
+  [
+    "ValueError",
+    "n_teeth must be an integer of at least 6"
+  ],
+  [
+    "ValueError",
+    "n_teeth must be an integer of at least 6"
+  ],
+  [
+    "ValueError",
+    "n_teeth must be an integer of at least 6"
+  ],
+  [
+    "ValueError",
+    "chain_pitch must be positive and finite"
+  ],
+  [
+    "ValueError",
+    "roller_diameter must be smaller than chain_pitch"
+  ],
+  [
+    "ValueError",
+    "sprocket_thickness must be positive and finite"
+  ],
+  [
+    "ValueError",
+    "bore_radius must be smaller than the sprocket root radius"
+  ],
+  [
+    "ValueError",
+    "bore_radius must be non-negative and finite"
+  ],
+  [
+    "ValueError",
+    "roller_clearance must be non-negative and finite"
+  ],
+  null
+]

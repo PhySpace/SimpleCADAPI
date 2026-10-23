@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class SketchRef(sketch_id: str, entity_id: str, *, kind: str, subentity: str = 'geometry')
+class SketchRef(sketch_id, entity_id, *, kind, subentity='geometry')
 ```
 
 *Source: sketch.py*

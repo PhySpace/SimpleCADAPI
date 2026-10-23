@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_part_rpart(part_id: str, body: Solid, name: Optional[str] = None) -> Part
+def make_part_rpart(part_id, body, name=None)
 ```
 
 *Source: operators/product.py*

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_ellipse_redge(center: Tuple[float, float, float], major_radius: ScalarLike, minor_radius: ScalarLike, normal: Tuple[float, float, float] = (0, 0, 1), *, major_direction: Optional[Tuple[float, float, float]] = None, tag_prefix: Optional[str] = None) -> Edge
+def make_ellipse_redge(center, major_radius, minor_radius, normal=(0, 0, 1), *, major_direction=None, tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

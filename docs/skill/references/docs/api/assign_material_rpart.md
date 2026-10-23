@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def assign_material_rpart(part: Part, material: Material) -> Part
+def assign_material_rpart(part, material)
 ```
 
 *Source: operators/product.py*

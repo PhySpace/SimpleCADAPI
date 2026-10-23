@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_line_redge(start: Tuple[ScalarLike, ScalarLike, ScalarLike], end: Tuple[ScalarLike, ScalarLike, ScalarLike], *, tag_prefix: Optional[str] = None) -> Edge
+def make_line_redge(start, end, *, tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

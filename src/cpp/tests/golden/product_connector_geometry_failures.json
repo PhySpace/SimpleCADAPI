@@ -1,0 +1,66 @@
+{
+  "bad_id": {
+    "how_to_fix": [
+      "Use a stable connector_id such as 'mount_face'.",
+      "Select a face via ql.faces().where(...).resolve(solid), or an indexed pick solid.get_faces(index)."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_face_connector_rconnector",
+    "possible_causes": [
+      "The connector_id is empty or malformed.",
+      "The face is not a valid Face object."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: connector_id must start with a letter and contain only letters, digits, underscore, dash, dot, or colon",
+    "what_happened": "Failed to create the face connector."
+  },
+  "edge_not_edge": {
+    "how_to_fix": [
+      "Use a stable connector_id such as 'hinge_axis'.",
+      "Select an edge via ql.edges().where(...).resolve(solid), or an indexed pick solid.get_edges(index)."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_edge_connector_rconnector",
+    "possible_causes": [
+      "The connector_id is empty or malformed.",
+      "The edge is not a valid Edge object."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: edge must be an Edge",
+    "what_happened": "Failed to create the edge connector."
+  },
+  "face_not_face": {
+    "how_to_fix": [
+      "Use a stable connector_id such as 'mount_face'.",
+      "Select a face via ql.faces().where(...).resolve(solid), or an indexed pick solid.get_faces(index)."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_face_connector_rconnector",
+    "possible_causes": [
+      "The connector_id is empty or malformed.",
+      "The face is not a valid Face object."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: face must be a Face",
+    "what_happened": "Failed to create the face connector."
+  },
+  "vertex_not_vertex": {
+    "how_to_fix": [
+      "Use a stable connector_id such as 'pivot_point'.",
+      "Select a vertex via ql.vertices().where(...).resolve(solid), or an indexed pick solid.get_vertices(index)."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_vertex_connector_rconnector",
+    "possible_causes": [
+      "The connector_id is empty or malformed.",
+      "The vertex is not a valid Vertex object."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: vertex must be a Vertex",
+    "what_happened": "Failed to create the vertex connector."
+  }
+}

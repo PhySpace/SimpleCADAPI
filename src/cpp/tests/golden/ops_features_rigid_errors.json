@@ -1,0 +1,55 @@
+{
+  "mirror_zero": {
+    "how_to_fix": [
+      "Pass a valid plane origin and a non-zero plane normal.",
+      "Validate the shape before mirroring.",
+      "If the plane is computed dynamically, inspect the evaluated values first."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "mirror_shape",
+    "possible_causes": [
+      "The plane origin or plane normal is invalid.",
+      "The plane normal is zero-length.",
+      "The kernel rejected the mirror transform."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to mirror the shape across the plane."
+  },
+  "rotate_axis": {
+    "how_to_fix": [
+      "Pass a valid shape and a finite rotation angle.",
+      "Use a non-zero axis vector and a valid origin point.",
+      "Log the evaluated angle, axis, and origin before retrying."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "rotate_shape",
+    "possible_causes": [
+      "The shape is invalid.",
+      "The rotation angle is invalid or non-finite.",
+      "The axis or origin is not a valid finite 3D vector."
+    ],
+    "repair": [],
+    "what_happened": "Failed to rotate the shape."
+  },
+  "translate": {
+    "how_to_fix": [
+      "Pass a valid SimpleCAD shape object.",
+      "Pass vector as a finite 3-element tuple or expression-backed vector.",
+      "Inspect the shape and vector values before retrying."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "translate_shape",
+    "possible_causes": [
+      "The shape is invalid or has been corrupted by an earlier operation.",
+      "The translation vector is not a valid finite 3D vector.",
+      "The kernel rejected the transform."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: value must be finite",
+    "what_happened": "Failed to translate the shape."
+  }
+}

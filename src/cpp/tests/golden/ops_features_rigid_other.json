@@ -1,0 +1,31 @@
+{
+  "mirror_face": {
+    "center": [
+      0.0,
+      0.0,
+      2.0
+    ],
+    "kind": "Face",
+    "tags": [
+      "solid.transform.mirrored"
+    ]
+  },
+  "rotate_wire": {
+    "center": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "kind": "Wire",
+    "tags": []
+  },
+  "translate_face": {
+    "center": [
+      1.0,
+      2.0,
+      3.0
+    ],
+    "kind": "Face",
+    "tags": []
+  }
+}

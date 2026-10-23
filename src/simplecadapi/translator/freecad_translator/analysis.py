@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import AbstractSet, Set
 import math
 
-from ...topology import OperationGraph, OperationNode
+from simplecadapi._cpp import OperationGraph, OperationNode
 
 
 def _contains_expr_refs(value: object) -> bool:

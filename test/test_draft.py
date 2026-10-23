@@ -2,7 +2,7 @@
 import math
 
 import pytest
-from OCP.BRepCheck import BRepCheck_Analyzer
+from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
 
 import simplecadapi as s
 from simplecadapi import ql

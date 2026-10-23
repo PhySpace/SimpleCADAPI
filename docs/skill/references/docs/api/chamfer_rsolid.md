@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def chamfer_rsolid(solid: Solid, edges: Union[Sequence[Edge], ShapeSelector], distance: ScalarLike, *, angle: Optional[float] = None, reference_direction: Optional[Tuple[float, float, float]] = None, result_tag: Optional[str] = None, generated_faces_tag: Optional[str] = None) -> Solid
+def chamfer_rsolid(solid, edges, distance, *, angle=None, reference_direction=None, result_tag=None, generated_faces_tag=None)
 ```
 
 *Source: operators/features.py*

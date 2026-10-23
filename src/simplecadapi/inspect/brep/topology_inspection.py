@@ -7,10 +7,10 @@ import math
 from pathlib import Path
 from typing import Any
 
-from OCP.BRep import BRep_Tool
-from OCP.BRepCheck import BRepCheck_Analyzer, BRepCheck_Shell
-from OCP.ShapeAnalysis import ShapeAnalysis_ShapeTolerance
-from OCP.TopAbs import (
+from simplecadapi._cpp.occt.BRep import BRep_Tool
+from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer, BRepCheck_Shell
+from simplecadapi._cpp.occt.ShapeAnalysis import ShapeAnalysis_ShapeTolerance
+from simplecadapi._cpp.occt.TopAbs import (
     TopAbs_EDGE,
     TopAbs_FACE,
     TopAbs_FORWARD,
@@ -20,9 +20,9 @@ from OCP.TopAbs import (
     TopAbs_VERTEX,
     TopAbs_WIRE,
 )
-from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopTools import TopTools_IndexedMapOfShape
-from OCP.TopoDS import TopoDS, TopoDS_Shape
+from simplecadapi._cpp.occt.TopExp import TopExp, TopExp_Explorer
+from simplecadapi._cpp.occt.TopTools import TopTools_IndexedMapOfShape
+from simplecadapi._cpp.occt.TopoDS import TopoDS, TopoDS_Shape
 
 from .io import measure_shape_mass_rtuple
 from .model import BRepModel, index_shape_rbrepmodel, load_step_rbrepmodel

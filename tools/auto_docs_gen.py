@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import argparse
 import ast
+import re
+import json
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
@@ -273,8 +275,24 @@ class APIDocumentGenerator:
 
         extracted: List[ApiInfo] = []
         exported_names = self.exported_names
+        native_by_module = self._native_names_by_module()
         for file_path in self.source_files:
-            if not file_path.exists():
+            if not file_path.exists() or self._is_forwarding_module(file_path):
+                package_root = _package_root_from(None)
+                try:
+                    module_name = file_path.resolve().relative_to(package_root.resolve()).as_posix()
+                except ValueError:
+                    module_name = self._module_name_for(file_path)
+                natives = native_by_module.get(module_name)
+                if natives is not None:
+                    found = [
+                        info
+                        for name in natives
+                        if (info := self._extract_native_api(name, module_name, exported_names))
+                    ]
+                    extracted.extend(found)
+                    self.log(f"    从 C++ 模块提取 {module_name}: {len(found)} 个API")
+                    continue
                 self.log(f"警告: 找不到文件 {file_path}，跳过。")
                 continue
 
@@ -298,7 +316,90 @@ class APIDocumentGenerator:
         self.log(f"成功总共提取到 {len(self.apis)} 个API")
         return self.apis
 
+    @staticmethod
+    def _is_forwarding_module(file_path: Path) -> bool:
+        """A module that only re-exports the C++ module's names (no definitions of its own)."""
+        try:
+            tree = ast.parse(file_path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            return False
+        return not any(isinstance(n, (ast.FunctionDef, ast.ClassDef)) for n in tree.body)
+
+    @staticmethod
+    def _native_names_by_module() -> Dict[str, List[str]]:
+        """The public names the C++ module serves, grouped by the (former) Python module that documented them."""
+        table_path = Path(__file__).resolve().parents[1] / "src/simplecadapi/_glue/modules.json"
+        if not table_path.is_file():
+            return {}
+        grouped: Dict[str, List[str]] = {}
+        for name, dotted in json.loads(table_path.read_text(encoding="utf-8")).items():
+            relative = dotted.removeprefix("simplecadapi.").replace(".", "/") + ".py"
+            grouped.setdefault(relative, []).append(name)
+        return {module: sorted(names) for module, names in grouped.items()}
+
+    _QUALIFIED = re.compile(r"\b(?:[A-Za-z_]\w*\.)+([A-Za-z_]\w*)")
+
+    def _extract_native_api(self, name: str, module_name: str, exported_names: set[str]) -> ApiInfo | None:
+        """An API of the C++ module: signature and docstring come from the live object."""
+        import inspect
+
+        import simplecadapi
+
+        import importlib
+
+        owner = importlib.import_module("simplecadapi." + module_name.removesuffix(".py").replace("/", "."))
+        obj = getattr(owner, name, None)
+        if obj is None:
+            obj = getattr(simplecadapi, name, None)
+        if obj is None:
+            return None
+        if inspect.isclass(obj):
+            if not self._should_include_class(name, module_name, exported_names):
+                return None
+            kind = "class"
+        elif callable(obj):
+            if not self._should_include_function(name, module_name, exported_names):
+                return None
+            kind = "function"
+        else:
+            return None
+        docstring = inspect.getdoc(obj) or ""
+        if docstring.startswith(name + "("):  # pybind prepends the signature line
+            docstring = docstring.split("\n\n", 1)[1] if "\n\n" in docstring else ""
+        if not docstring:
+            return None
+        raw = obj.__doc__ or ""
+        if kind == "class":
+            from simplecadapi._glue.compat import signature_of
+
+            found = signature_of(obj)  # the constructor: pybind11 writes it in __init__'s docstring
+            signature = str(found) if found is not None else "()"
+        elif raw.startswith(name + "(") and "\n" in raw:
+            signature = raw.split("\n", 1)[0][len(name):]  # pybind writes the annotated signature
+        else:
+            try:
+                signature = str(inspect.signature(obj))
+            except (TypeError, ValueError):
+                signature = "()"
+        signature = re.sub(r'typing\.Annotated\[(.*?), "[^"]*"\]', r"\1", signature)
+        signature = self._QUALIFIED.sub(r"\1", signature)
+        signature = re.sub(r"SupportsInt \| SupportsIndex", "int", signature)
+        signature = re.sub(r"SupportsFloat \| SupportsIndex", "float", signature)
+        head = "def" if kind == "function" else "class"
+        return ApiInfo(
+            name=name,
+            kind=kind,
+            signature=f"{head} {name}{signature}" if kind == "function" else f"class {name}{signature}",
+            source_file=module_name,
+            parsed_doc=self._parse_docstring(docstring),
+            import_surface=self._import_surface_for(name, module_name),
+        )
+
     def _module_name_for(self, file_path: Path) -> str:
+        try:  # a file of the package: its path below the package root
+            return file_path.resolve().relative_to(_package_root_from(None).resolve()).as_posix()
+        except ValueError:
+            pass
         # Climb to the topmost package directory containing this file (the
         # highest ancestor still holding an __init__.py) and express the
         # module relative to it; fall back to the basename for loose files.

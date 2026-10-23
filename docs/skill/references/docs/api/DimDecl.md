@@ -14,4 +14,4 @@ class DimDecl(kind: str, view: str, semantic: str, caption: str, value: float | 
 
 ## Description
 
-一条尺寸声明。kind=定位(position)尺寸必须在 datum 里引用已声明基准。
+One dimension declaration. A position dimension (kind=position) must reference a declared datum in `datum`.

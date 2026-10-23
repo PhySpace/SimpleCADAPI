@@ -8,14 +8,6 @@ import inspect
 from typing import Any, Iterable, Optional, Sequence, Tuple, NoReturn
 
 
-_TECHNICAL_DETAIL_TRANSLATIONS = {
-    "宽度、高度和深度必须大于0": "width, height, and depth must be greater than zero.",
-    "如果传入线框作为拉伸对象，那么线框必须是闭合的, 而你的线框没有闭合，请检查构成线框的点是否正确": (
-        "wire profiles must be closed before extrusion; check the points that form the wire."
-    ),
-}
-
-
 def _contains_cjk(value: str) -> bool:
     return any("\u3400" <= char <= "\u9fff" or "\uf900" <= char <= "\ufaff" for char in value)
 
@@ -27,8 +19,6 @@ def _normalize_lines(values: Iterable[str]) -> Tuple[str, ...]:
 def _technical_details_from_error(error: BaseException) -> str:
     message = str(error).strip()
     if message:
-        for source, target in _TECHNICAL_DETAIL_TRANSLATIONS.items():
-            message = message.replace(source, target)
         if _contains_cjk(message):
             message = "The underlying validation failed; use the structured guidance above to repair the operation."
         return f"{type(error).__name__}: {message}"
@@ -231,25 +221,33 @@ class SimpleCADMessageError(SimpleCADError):
     """Message-first SDK error that still carries the structured payload.
 
     Sole sanctioned base for message-style error families: raise sites keep
-    their legacy ``Error("message")`` call shape and plain ``str()`` display
-    while the structured channel (guidance, ``to_dict``) becomes available
-    family-wide. Guidance fields beyond ``what_happened`` stay empty until
-    each family's designed guidance lands.
+    their legacy ``Error("message")`` call shape while the structured channel
+    (guidance, ``to_dict``) becomes available family-wide.
+
+    A family declares its designed guidance with the class attributes
+    ``possible_causes`` and ``how_to_fix``; the error then renders in full
+    (operation, what happened, possible causes, how to fix) like every
+    operator error, and ``str()`` carries all of it for the agent that reads
+    it.  A family that has none yet keeps the plain one-line display.
     """
 
     operation = "simplecadapi"
+    possible_causes: Tuple[str, ...] = ()
+    how_to_fix: Tuple[str, ...] = ()
 
     def __init__(self, message: str) -> None:
         self.message = str(message)
-        self._display = self.message
-        super().__init__(
-            type(self).operation,
-            ErrorGuidance(
-                what_happened=self._display,
-                possible_causes=(),
-                how_to_fix=(),
-            ),
+        guidance = ErrorGuidance(
+            what_happened=self.message,
+            possible_causes=tuple(type(self).possible_causes),
+            how_to_fix=tuple(type(self).how_to_fix),
         )
+        self._display = (
+            format_llm_error(type(self).operation, guidance)
+            if guidance.possible_causes or guidance.how_to_fix
+            else self.message
+        )
+        super().__init__(type(self).operation, guidance)
         self.args = (self._display,)
 
     def __str__(self) -> str:

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def fit_point_grid_rface(points: Sequence[Sequence[Sequence[float]]], *, tolerance: float = 0.001, degree_min: int = 3, degree_max: int = 8, smoothing: Optional[Tuple[float, float, float]] = None, tag_prefix: Optional[str] = None) -> Face
+def fit_point_grid_rface(points, *, tolerance=0.001, degree_min=3, degree_max=8, smoothing=None, tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

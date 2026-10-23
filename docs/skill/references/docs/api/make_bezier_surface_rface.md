@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_bezier_surface_rface(control_points: Sequence[Sequence[Sequence[float]]], weights: Optional[Sequence[Sequence[float]]] = None, *, tag_prefix: Optional[str] = None) -> Face
+def make_bezier_surface_rface(control_points, weights=None, *, tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_segment_redge(start: Tuple[float, float, float], end: Tuple[float, float, float]) -> Edge
+def make_segment_redge(start, end)
 ```
 
 *Source: operators/geometry.py*

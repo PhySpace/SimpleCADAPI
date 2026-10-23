@@ -122,8 +122,8 @@ class TestBallBearingAssembly(unittest.TestCase):
             inner_ring_meta["raceway_mouth_z"], inner_ring_meta["groove_radius"]
         )
 
-        from OCP.BRepAdaptor import BRepAdaptor_Surface
-        from OCP.GeomAbs import GeomAbs_Sphere, GeomAbs_Torus
+        from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Surface
+        from simplecadapi._cpp.occt.GeomAbs import GeomAbs_Sphere, GeomAbs_Torus
 
         self.assertTrue(
             any(

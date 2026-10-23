@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def get_active_session() -> Optional[GraphSession]
+def get_active_session()
 ```
 
 *Source: recording/graph.py*

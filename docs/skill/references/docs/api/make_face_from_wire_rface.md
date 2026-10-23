@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_face_from_wire_rface(wire: Wire, normal: Tuple[float, float, float] = (0, 0, 1), *, tag_prefix: Optional[str] = None) -> Face
+def make_face_from_wire_rface(wire, normal=(0, 0, 1), *, tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

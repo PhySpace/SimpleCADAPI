@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def render_screenshot_rpath(shapes: Union[Solid, Sequence[Solid], Any], output_path: str, highlight_tags: Optional[Sequence[str]] = None, tag_labels: Optional[Dict[str, str]] = None, image_size: Tuple[int, int] = (1400, 900), view: Union[Tuple[float, float], str] = 'auto', views: Optional[Sequence[Tuple[float, float, str]]] = None, show_axes: bool = True, show_legend: bool = True, zoom: float = 4.0, show_callouts: bool = True, linear_deflection: Optional[float] = None, angular_deflection: Optional[float] = None, style: str = 'studio', edge_width_scale: Optional[float] = None, view_up: Optional[Sequence[float]] = None, supersample: int = 2, highlight_edges: Optional[Sequence[Any]] = None, highlight_edge_width: float = 4.5) -> str
+def render_screenshot_rpath(shapes: 'Any', output_path: 'str', highlight_tags: 'Optional[Sequence[str]]' = None, tag_labels: 'Optional[Dict[str, str]]' = None, image_size: 'Tuple[int, int]' = (1400, 900), view: 'Union[Tuple[float, float], str]' = 'auto', views: 'Optional[Sequence[Tuple[float, float, str]]]' = None, show_axes: 'bool' = True, show_legend: 'bool' = True, zoom: 'float' = 4.0, show_callouts: 'bool' = True, linear_deflection: 'Optional[float]' = None, angular_deflection: 'Optional[float]' = None, style: 'str' = 'studio', edge_width_scale: 'Optional[float]' = None, view_up: 'Optional[Sequence[float]]' = None, supersample: 'int' = 2, highlight_edges: 'Optional[Sequence[Any]]' = None, highlight_edge_width: 'float' = 4.5) -> 'str'
 ```
 
 *Source: operators/features.py*

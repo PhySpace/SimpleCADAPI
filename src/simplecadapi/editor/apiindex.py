@@ -39,7 +39,12 @@ def _parameters(obj: Any) -> list[dict[str, Any]] | None:
     try:
         signature = inspect.signature(obj)
     except (TypeError, ValueError):
-        return None
+        signature = None
+        from .._glue.compat import signature_of  # pybind11 callables carry their signature in the docstring
+
+        signature = signature_of(obj)
+        if signature is None:
+            return None
     rows: list[dict[str, Any]] = []
     for parameter in signature.parameters.values():
         if parameter.name == "self" or parameter.name.startswith("_"):

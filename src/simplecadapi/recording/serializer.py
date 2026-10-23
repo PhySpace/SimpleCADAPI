@@ -28,32 +28,34 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, cast
 
 from ..errors import raise_harness_error
 
-from ..core import (
+from simplecadapi._cpp import (
     AnyShape,
+    Assembly,
     Compound,
+    Connector,
+    ConnectorRef,
+    constraint_reports_match,
     Edge,
     Face,
+    GeometryRef,
+    Material,
+    Part,
+    ScalarLimit,
     Shell,
+    Sketch,
     Solid,
+    suspend_graph_recording,
+    TagBinding,
+    TagTargetKind,
     Vertex,
     Wire,
-    clone_semantic_shape_view,
-    use_coordinate_system,
 )
-from .graph import (
-    GraphSession,
-    attach_graph_node,
-    attach_semantic_graph_node,
-    suspend_graph_recording,
-)
+from simplecadapi._glue.compat import use_coordinate_system
+from ..core import clone_semantic_shape_view
+from simplecadapi._glue.session import GraphSession
+from .graph import attach_graph_node, attach_semantic_graph_node
 from ..ql import output_role, selector_from_dict
-from ..sketch import Sketch
-from ..product.assembly import Assembly, _restore_component_occurrence_placements
-from ..product.solver import constraint_reports_match
-from ..product.connector import Connector, ConnectorRef, GeometryRef
-from ..product.constraint import ScalarLimit
-from ..product.material import Material
-from ..product.part import Part
+from ..product.assembly import _restore_component_occurrence_placements
 from ..product.placement import Placement, placement_ticks
 from ..topology.model import (
     GRAPH_SCHEMA_VERSION,
@@ -64,9 +66,7 @@ from ..topology.model import (
     topo_ref_to_dict,
     topo_ref_from_dict,
 )
-from ..topology.tagging import TagBinding, TagTargetKind
 from .. import operators as ops
-from ..kernel.ocp_properties import bounding_box
 
 
 MODEL_SCHEMA_VERSION = "2.0"
@@ -857,8 +857,8 @@ def import_session_json(json_str: str) -> Dict[str, Any]:
 
     import json
 
-    from ..params.expr import ExpressionGraph
-    from ..params.frame import FrameGraph
+    from simplecadapi._cpp import ExpressionGraph
+    from simplecadapi._cpp import FrameGraph
     from ..params.tolerance import ToleranceGraph
 
     try:
@@ -1557,9 +1557,12 @@ def _candidate_shapes_for_geo_selection(source: AnyShape, kind: str) -> List[Any
 
 
 def _shape_geom_type(shape: AnyShape) -> Optional[str]:
+    if hasattr(shape, "_geom_type"):  # the native kernel names the type itself
+        found = shape._geom_type()
+        return None if found is None else str(found)
     try:
-        from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
-        from OCP.GeomAbs import (
+        from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
+        from simplecadapi._cpp.occt.GeomAbs import (
             GeomAbs_BSplineCurve,
             GeomAbs_BSplineSurface,
             GeomAbs_BezierCurve,
@@ -1605,12 +1608,25 @@ def _shape_geom_type(shape: AnyShape) -> Optional[str]:
     return None
 
 
+def _shape_bounding_box(shape: AnyShape) -> Any:
+    """The axis-aligned box of *shape* (``xmin`` ... ``zmax``), measured by whichever kernel built it."""
+
+    if hasattr(shape, "_bounds"):  # the native kernel
+        from types import SimpleNamespace
+
+        xmin, ymin, zmin, xmax, ymax, zmax = shape._bounds()
+        return SimpleNamespace(xmin=xmin, ymin=ymin, zmin=zmin, xmax=xmax, ymax=ymax, zmax=zmax)
+    from ..kernel.ocp_properties import bounding_box
+
+    return bounding_box(shape.wrapped)
+
+
 def _bbox_score(shape: AnyShape, selector: Dict[str, Any]) -> float:
     bbox = selector.get("bbox")
     if not isinstance(bbox, dict):
         return 0.0
     try:
-        actual = bounding_box(shape.wrapped)
+        actual = _shape_bounding_box(shape)
         expected_min = _tuple3_from_any(bbox.get("min"))
         expected_max = _tuple3_from_any(bbox.get("max"))
         if expected_min is None or expected_max is None:

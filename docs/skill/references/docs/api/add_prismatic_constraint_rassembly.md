@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def add_prismatic_constraint_rassembly(assembly: Assembly, constraint_id: str, connector_a: ConnectorRef, connector_b: ConnectorRef, drive_distance: Optional[float] = None, distance_limit: Optional[ScalarLimit] = None, name: Optional[str] = None) -> Assembly
+def add_prismatic_constraint_rassembly(assembly, constraint_id, connector_a, connector_b, drive_distance=None, distance_limit=None, name=None)
 ```
 
 *Source: operators/product.py*

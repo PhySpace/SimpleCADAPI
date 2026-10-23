@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def offset_rsolid(solid: Solid, amount: ScalarLike, openings: Sequence[Face] | ShapeSelector = (), *, tolerance: float = 0.0001, kind: str = 'ARC') -> Solid
+def offset_rsolid(solid, amount, openings=(), *, tolerance=0.0001, kind='ARC')
 ```
 
 *Source: operators/features.py*

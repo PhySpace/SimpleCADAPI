@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def select_edges_by_tag(shape: Union[Face, Solid], tag: str, scope: str | TagScope = TagScope.EFFECTIVE) -> List[Edge]
+def select_edges_by_tag(shape, tag, scope=<EFFECTIVE: 'effective'>)
 ```
 
 *Source: operators/selection.py*

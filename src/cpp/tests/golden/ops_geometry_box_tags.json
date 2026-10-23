@@ -1,0 +1,119 @@
+{
+  "bbox": [
+    -1.0,
+    -1.5,
+    0.0,
+    1.0,
+    1.5,
+    4.0
+  ],
+  "edge_tags": [
+    [
+      "edge.boundary"
+    ],
+    [
+      "edge.boundary"
+    ],
+    [
+      "edge.boundary"
+    ],
+    [
+      "edge.boundary"
+    ],
+    [
+      "edge.boundary"
+    ],
+    [
+      "edge.boundary"
+    ],
+    [
+      "edge.boundary"
+    ],
+    [
+      "edge.boundary"
+    ],
+    [
+      "edge.boundary"
+    ],
+    [
+      "edge.boundary"
+    ],
+    [
+      "edge.boundary"
+    ],
+    [
+      "edge.boundary"
+    ]
+  ],
+  "edges": 12,
+  "face_tags": [
+    [
+      "anchor.base",
+      "face.bottom",
+      "face.box.bottom",
+      "housing.face.bottom"
+    ],
+    [
+      "face.back",
+      "face.box.left",
+      "housing.face.left",
+      "role.left"
+    ],
+    [
+      "face.box.back",
+      "face.left",
+      "housing.face.back",
+      "role.back"
+    ],
+    [
+      "face.box.front",
+      "face.right",
+      "housing.face.front",
+      "role.front"
+    ],
+    [
+      "face.box.right",
+      "face.front",
+      "housing.face.right",
+      "role.mounting_surface"
+    ],
+    [
+      "face.box.top",
+      "face.top",
+      "housing.face.top",
+      "role.lid"
+    ]
+  ],
+  "faces": 6,
+  "geo": {
+    "bottom_face_center": [
+      0,
+      0,
+      0
+    ],
+    "size": {
+      "x": 2.0,
+      "y": 3.0,
+      "z": 4.0
+    },
+    "type": "box"
+  },
+  "tags": [
+    "box",
+    "geom.primitive.box",
+    "housing.solid",
+    "part.housing"
+  ],
+  "track": {
+    "deleted": 0,
+    "entry_count": 6,
+    "generated": 0,
+    "has_delta": true,
+    "modified": 0,
+    "op": "make_box_rsolid",
+    "preserved": 0
+  },
+  "type": "Solid",
+  "vertices": 8,
+  "volume": 23.999999999999993
+}

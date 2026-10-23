@@ -1,11 +1,11 @@
-"""dxf_engine.agent — LLM-in-the-loop 评估/执行接口。
+"""dxf_engine.agent — the LLM-in-the-loop evaluation/execution interface.
 
-角色分工 (评估器 + 提示器, 决策权在 LLM):
-  引擎(确定性)  精确冲突数据 / 自由走廊度量 / 动作校验落地 (拒绝即回滚)
-  LLM(决策)     在评估数据上选点/取舍, 经 apply 提交动作, 引擎全量复检
-几何真值不出代码: LLM 永不提供裸顶点之外的算术结果, mpt/箭头等语义约束
-由引擎从 (at,out,rot) 重推导 —— 箭头恒落在真实圆周上。
-评估政策与各求解器一致: 文本/标线不查本视图图线 (标注可压自身视图)。
+Division of roles (evaluator + prompter, the LLM decides):
+  engine (deterministic)  exact conflict data / free-corridor measures / action validation and landing (a rejection rolls back)
+  LLM (decision)          picks points / trade-offs on the evaluation data and submits actions through apply; the engine re-checks everything
+Geometric truth never leaves the code: the LLM never supplies an arithmetic result beyond bare vertices; semantic constraints such as mpt/arrows
+are re-derived by the engine from (at,out,rot) — an arrow always lands on the real circle.
+The evaluation policy matches every solver: text/dimension lines do not check the own view's figure lines (an annotation may overlap its own view).
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ def _r(v, nd=1):
 
 
 def _element_geom(r):
-    """Resolved → (key, view, cx, cy, w, h, rot, segs)；几何不全返回 None。"""
+    """Resolved → (key, view, cx, cy, w, h, rot, segs); None when the geometry is incomplete."""
     dr = r.draw
     if r.kind == "dim":
         text = dr.get("text", "")
@@ -52,8 +52,8 @@ def _element_geom(r):
 
 
 def _proper_cross(a, b, c, d, eps=0.5):
-    """严格 X 交叉: 两段互相跨立且无共端点。共端点(共用测量点)/共线(共用界线)/
-    丁字(界线端点落在他人线上)均为 GB 正常画法, 不计冲突。"""
+    """Strict X crossing: two segments straddle each other and share no endpoint. A shared endpoint (shared measured point) / collinear (shared
+    extension line) / T-junction (an extension-line end on another line) are normal GB drawing practice and do not count as conflicts."""
     if min(math.dist(a, c), math.dist(a, d),
            math.dist(b, c), math.dist(b, d)) < eps:
         return False
@@ -68,26 +68,26 @@ def _proper_cross(a, b, c, d, eps=0.5):
 
 
 def _conflicts(plan, key, view, cx, cy, w, h, rot, segs):
-    """单元素放置的确定性冲突检测, 返回结构化障碍数据 (纸面坐标 mm)。"""
+    """Deterministic conflict check of one element placement; returns structured obstacle data (sheet coordinates, mm)."""
     out = []
     for i, z in enumerate(plan._zones):
         if plan._obb_sat(cx, cy, w, h, rot, z.inflate(1.0)):
-            out.append({"rule": "R1", "type": "禁入区", "id": f"zone{i}",
+            out.append({"rule": "R1", "type": "keep-out zone", "id": f"zone{i}",
                         "bbox": [_r(z.x0), _r(z.y0), _r(z.x1), _r(z.y1)]})
     for n, vw in plan.views.items():
         bb = vw["bbox"]
         if n != view and plan._obb_sat(cx, cy, w, h, rot, bb.inflate(0.5)):
-            out.append({"rule": "R1", "type": "视图bbox", "id": f"view:{n}",
+            out.append({"rule": "R1", "type": "view bbox", "id": f"view:{n}",
                         "bbox": [_r(bb.x0), _r(bb.y0), _r(bb.x1), _r(bb.y1)]})
         if n != view:
             nh = sum(1 for sp, _sq in vw["pairs"]
                      if plan._pt_in_obb(sp[0], sp[1], cx, cy, w, h, rot))
             if nh:
-                out.append({"rule": "R1", "type": "图线", "id": f"figure:{n}",
+                out.append({"rule": "R1", "type": "figure line", "id": f"figure:{n}",
                             "points": nh})
     for k2, cx2, cy2, w2, h2, r2 in plan.text_obbs:
         if k2 != key and plan._obb_obb(cx, cy, w, h, rot, cx2, cy2, w2, h2, r2):
-            out.append({"rule": "R1", "type": "文本", "id": k2,
+            out.append({"rule": "R1", "type": "text", "id": k2,
                         "center": [_r(cx2), _r(cy2)], "w": _r(w2), "h": _r(h2),
                         "rot": _r(r2)})
     for k2, sp, sq in plan.segments:
@@ -95,16 +95,16 @@ def _conflicts(plan, key, view, cx, cy, w, h, rot, segs):
             continue
         if (plan._seg_obb(sp, sq, cx, cy, w, h, rot)
                 or any(_proper_cross(s[0], s[1], sp, sq) for s in segs)):
-            out.append({"rule": "R1", "type": "标线", "id": k2,
+            out.append({"rule": "R1", "type": "dimension line", "id": k2,
                         "seg": [[_r(sp[0]), _r(sp[1])], [_r(sq[0]), _r(sq[1])]]})
     for s in segs:
         for n in plan._seg_vs_views(s, view):
-            out.append({"rule": "R1", "type": "标线穿他视图图线", "id": f"figure:{n}"})
+            out.append({"rule": "R1", "type": "dimension line crosses another view's figure line", "id": f"figure:{n}"})
     return out
 
 
 def _corridors(plan, key, view, cx, cy, w, h, rot, maxd=60.0, step=1.0):
-    """文本 OBB 沿 ±x/±y 平移的最大无冲突距离 (仅文本碰撞, 不含标线)。"""
+    """Largest conflict-free distance a text OBB can be translated along ±x/±y (text collisions only, dimension lines excluded)."""
     res = {}
     for label, dx, dy in (("+x", 1, 0), ("-x", -1, 0), ("+y", 0, 1), ("-y", 0, -1)):
         d = 0.0
@@ -120,7 +120,7 @@ def evaluate_plan(plan):
     accepted = getattr(plan, "accepted", {})
     elements = []
     for r in plan.resolved:
-        if r.kind == "view":                      # 视图非标注元素, 不评估
+        if r.kind == "view":                      # a view is not an annotation element: not evaluated
             continue
         g = _element_geom(r)
         key = g[0] if g else f"{r.kind}:{r.name}"
@@ -133,7 +133,7 @@ def evaluate_plan(plan):
         conf = _conflicts(plan, key, view, cx, cy, w, h, rot, segs)
         rules = sorted({c["rule"] for c in conf})
         if (60.0 < rot % 180.0 < 90.0) or (90.0 < rot % 180.0 < 120.0):
-            rules.append("R3")                    # 竖直 90° 本身合法 (GB 图17)
+            rules.append("R3")                    # exactly vertical 90° is legal (GB figure 17)
         entry.update(text=r.draw.get("text")
                      or (r.draw.get("lines") and " / ".join(r.draw["lines"])),
                      anchor=[_r(cx), _r(cy)], w=_r(w), h=_r(h), rot=_r(rot))
@@ -199,9 +199,9 @@ def _norm_rot(at):
 
 
 def _apply_rad(plan, act):
-    """半径: 动作只仲裁 at(方位角, 可选 s 滑移提示; s<0 为弧内侧——文字沿过圆心
-    的尺寸线置于圆内, 箭头自圆心侧指弧)。基线恒在线上方、引线派生延长;
-    rot 恒等于线向 (R2 不可覆盖), mpt 恒取 c+r·u —— 箭头必在圆周。"""
+    """Radius: the action only arbitrates `at` (azimuth, optional slide hint s; s<0 means the inside of the arc — the text sits inside the circle along a
+    dimension line through the centre, the arrow pointing at the arc from the centre side). Baseline always above the line, leader length derived;
+    rot always equals the line direction (R2 cannot be overridden), mpt is always c+r·u — the arrow is always on the circle."""
     dcl = _find_dim(plan, act["name"])
     key = f"dim:{dcl.caption}"
     dr = _find_resolved(plan, key).draw
@@ -240,7 +240,7 @@ def _apply_rad(plan, act):
             dr.update(mpt=mpt, tail=tail, insert=insert, anchor=anchor, rot=rot,
                       arrow_deg=arrow_deg)
             _commit(plan, key, anchor[0], anchor[1], w, TEXT_H, rot, segs)
-            _log(plan, key, f"at={at:g}° {'弧内' if inner else '弧外'} s={s0:g}")
+            _log(plan, key, f"at={at:g}° {'inside the arc' if inner else 'outside the arc'} s={s0:g}")
             return {"op": "rad", "element": key, "ok": True,
                     "anchor": [_r(anchor[0]), _r(anchor[1])], "rot": _r(rot)}
     if anchor is None:
@@ -251,8 +251,8 @@ def _apply_rad(plan, act):
 
 
 def _apply_dia(plan, act):
-    """直径: at(尺寸线方位)。尺寸线过圆心, 文字锚 0.75r 线上方
-    (insert=基线左端, anchor=OBB 中心), rot 恒等于线向 (R2)。"""
+    """Diameter: `at` (dimension-line azimuth). The dimension line passes through the centre, the text anchors above the line at 0.75r
+    (insert=left end of the baseline, anchor=OBB centre), rot always equals the line direction (R2)."""
     dcl = _find_dim(plan, act["name"])
     key = f"dim:{dcl.caption}"
     dr = _find_resolved(plan, key).draw
@@ -284,8 +284,8 @@ def _apply_dia(plan, act):
 
 
 def _apply_lin(plan, act):
-    """线性: side/row 结构位 + slide 沿线 1-DOF。几何与 solver 共用
-    _lin_geometry 派生 (文字滑出测量段时尺寸线自动侧延长), 不存在自由文本位。"""
+    """Linear: side/row structural slot + slide along the line (1 DOF). Geometry is derived with the solver through
+    _lin_geometry (when the text slides out of the measured segment the dimension line extends sideways automatically); there is no free text position."""
     dcl = _find_dim(plan, act["name"])
     key = f"dim:{dcl.caption}"
     dr = _find_resolved(plan, key).draw
@@ -308,14 +308,14 @@ def _apply_lin(plan, act):
               insert=g["insert"], rot=g["rot"])
     _commit(plan, key, g["center"][0], g["center"][1], w, TEXT_H, g["rot"], segs)
     _log(plan, key, f"{side} row{row} slide{slide:+g}"
-         + (" 线延长" if g["extended"] else ""))
+         + (" line extended" if g["extended"] else ""))
     return {"op": "lin", "element": key, "ok": True,
             "anchor": [_r(g["center"][0]), _r(g["center"][1])],
             "rot": _r(g["rot"])}
 
 
 def _apply_lead(plan, act):
-    """引出: off=[dx,dy] 文本框相对锚点偏移 (纸面 mm)。路径随框重推。"""
+    """Leader: off=[dx,dy] offset of the text box from the anchor (sheet mm). The path is re-derived from the box."""
     dcl = next((d for d in plan.d.leaders
                 if (d.name or d.lines[0][:12]) == act["name"]), None)
     if dcl is None:
@@ -328,7 +328,7 @@ def _apply_lead(plan, act):
     off = act.get("off", [dr["text_x"] - a[0], dr["text_y_top"] - a[1]])
     tx0, ty0 = a[0] + off[0], a[1] + off[1]
     box = Box(tx0, ty0 - h, tx0 + w, ty0)
-    # 肘点取框顶上方: 多行文本时框中部肘线会划过第二行字高带
+    # the elbow sits above the box top: a mid-box elbow of a multi-line text would cut through the second line's height band
     elb_y = ty0 + 0.8
     near_x = (box.x0 - 1.2) if dcl.dx_dir < 0 else (box.x1 + 1.2)
     path = [a, (a[0], elb_y), (near_x, elb_y)]
@@ -346,7 +346,7 @@ def _apply_lead(plan, act):
 
 
 def _apply_accept(plan, act):
-    """接受某元素的现存冲突并记录理由 —— 显式取舍, 非静默放行。"""
+    """Accept the existing conflicts of an element and record the reason — an explicit trade-off, not a silent pass."""
     if not hasattr(plan, "accepted"):
         plan.accepted = {}
     plan.accepted[act["name"]] = act.get("reason", "")
@@ -363,7 +363,7 @@ def _log(plan, key, desc):
 
 
 def _cjk_font_path():
-    """matplotlib 用 CJK 字体全路径 (与 render._cjk_font_name 同一候选序)。"""
+    """Full path of a CJK font for matplotlib (the same candidate order as render._cjk_font_name)."""
     import glob
     import os
 
@@ -381,13 +381,13 @@ def _cjk_font_path():
 
 
 def annotate_plan(plan, png_path, ev=None, crop_warn=True):
-    """冲突可视化: 元素 OBB 打标 + 障碍叠加 (browser-use DOM 打标的制图版)。
+    """Conflict visualisation: elements are marked by OBB and obstacles overlaid (the drawing version of browser-use DOM marking).
 
-    徽标 [N] 对应 evaluate() 输出 elements[N] 的 id, 供 LLM 图文对齐:
-    灰边=ok / 红边红底=warn / 橙=accepted; 蓝=障碍 (bbox 虚线框, 标线实线);
-    黑点线=视图 bbox, 灰细线=视图图线。统一纸面坐标 (mm)。
-    crop_warn=True 时对每个 warn 元素另存局部放大图 `<stem>__<id>.png`
-    (视野 = 元素 OBB ∪ 障碍范围 外扩)。"""
+    Badge [N] matches the id of elements[N] in the evaluate() output, aligning picture and text for the LLM:
+    grey edge=ok / red edge and fill=warn / orange=accepted; blue=obstacle (bbox dashed frame, dimension line solid);
+    black dotted line=view bbox, thin grey line=view figure lines. Uniform sheet coordinates (mm).
+    crop_warn=True also saves a local enlargement `<stem>__<id>.png` for every warn element
+    (field of view = element OBB ∪ obstacle extent, expanded)."""
     from pathlib import Path
 
     ev = ev or evaluate_plan(plan)
@@ -447,7 +447,7 @@ def annotate_plan(plan, png_path, ev=None, crop_warn=True):
                             zorder=2)
             for lbl, d in (e.get("corridors") or {}).items():
                 if d <= 0:
-                    continue                                  # 无自由度不画
+                    continue                                  # no degree of freedom: not drawn
                 dx, dy = dirs[lbl]
                 ax.annotate("", xy=(cx + dx * d, cy + dy * d), xytext=(cx, cy),
                             arrowprops=dict(arrowstyle="->", color="#009944",
@@ -459,8 +459,8 @@ def annotate_plan(plan, png_path, ev=None, crop_warn=True):
     draw()
     ax.set_aspect("equal")
     ax.autoscale()
-    ax.set_title(f"{plan.d.title} · 冲突标注: 红=warn 橙=accepted 蓝=障碍 "
-                 f"黑点线=视图bbox")
+    ax.set_title(f"{plan.d.title} · conflict marking: red=warn orange=accepted blue=obstacle "
+                 f"black dotted line=view bbox")
     ax.set_axis_off()
     fig.tight_layout()
     fig.savefig(png_path)
@@ -480,7 +480,7 @@ def annotate_plan(plan, png_path, ev=None, crop_warn=True):
                     xs += [p[0] for p in v["seg"]]
                     ys += [p[1] for p in v["seg"]]
             for lbl, d in (e.get("corridors") or {}).items():
-                if d > 0:                                 # 走廊箭头纳入视野
+                if d > 0:                                 # corridor arrows enter the field of view
                     dx, dy = dirs[lbl]
                     dd = min(d, 25.0)
                     xs.append(cx + dx * dd)
@@ -504,21 +504,21 @@ def apply_actions(plan, actions):
         fn = _OPS.get(act.get("op"))
         if fn is None:
             results.append({"op": act.get("op"), "ok": False,
-                            "error": f"未知 op {act.get('op')!r}"})
+                            "error": f"unknown op {act.get('op')!r}"})
             continue
         try:
             results.append(fn(plan, act))
         except KeyError as e:
             results.append({"op": act.get("op"), "ok": False, "error": str(e)})
     out = {"results": results, "eval": evaluate_plan(plan)}
-    # agent-in-the-loop: 每次 apply 自动刷新诊断图, 返回文本要求调用方先读图
+    # agent-in-the-loop: every apply refreshes the diagnostic picture; the returned text asks the caller to read the picture first
     if getattr(plan.d, "diag_png", ""):
         try:
             annotate_plan(plan, plan.d.diag_png, out["eval"])
             out["diag"] = plan.d.diag_png
-            out["instruction"] = ("诊断图已刷新, 提交下一组动作前必读: "
-                                  "灰=ok 红=warn(先读红) 蓝=障碍 "
-                                  "绿箭头=元素可滑移方向与距离")
-        except Exception as e:                # 诊断失败不阻塞动作结果
+            out["instruction"] = ("diagnostic picture refreshed; read it before submitting the next actions: "
+                                  "grey=ok red=warn (read red first) blue=obstacle "
+                                  "green arrow=direction and distance the element can slide")
+        except Exception as e:                # a failed diagnostic does not block the action result
             out["diag_error"] = str(e)
     return out

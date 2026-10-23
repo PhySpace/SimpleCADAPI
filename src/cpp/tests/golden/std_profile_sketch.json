@@ -1,0 +1,72 @@
+{
+  "constraint_kinds": [
+    "concentric",
+    "concentric",
+    "fix",
+    "radius",
+    "radius",
+    "radius"
+  ],
+  "entity_count": 220,
+  "fixes": [
+    "center"
+  ],
+  "internal_fixes": [
+    "center"
+  ],
+  "internal_has_external_names": false,
+  "internal_kinds": [
+    "bspline",
+    "bspline"
+  ],
+  "kinds": {
+    "arc_tip_0": "arc",
+    "bspline_left_0": "bspline",
+    "fillet_left_0": "bspline",
+    "fillet_right_0": "bspline"
+  },
+  "left_degree": 3,
+  "left_poles": [
+    [
+      12.619694913,
+      -1.293870234
+    ],
+    [
+      12.625506186,
+      -1.29450222
+    ],
+    [
+      12.687208582,
+      -1.297629515
+    ],
+    [
+      12.84842708,
+      -1.292234515
+    ],
+    [
+      13.126898839,
+      -1.254909146
+    ],
+    [
+      13.387391137,
+      -1.19521086
+    ],
+    [
+      13.943742886,
+      -1.034942608
+    ],
+    [
+      14.455528158,
+      -0.812221402
+    ],
+    [
+      14.903260608,
+      -0.562768899
+    ],
+    [
+      14.991288365,
+      -0.511148861
+    ]
+  ],
+  "no_line_patch": true
+}

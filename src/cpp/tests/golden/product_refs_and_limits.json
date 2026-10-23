@@ -1,0 +1,74 @@
+{
+  "bad_component": {
+    "how_to_fix": [
+      "Use stable ids from the owning Assembly and component item."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_connector_ref_rconnectorref",
+    "possible_causes": [
+      "The component_id or connector_id is empty or malformed."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: component_id must not be empty",
+    "what_happened": "Failed to create the connector reference."
+  },
+  "bad_connector": {
+    "how_to_fix": [
+      "Use stable ids from the owning Assembly and component item."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_connector_ref_rconnectorref",
+    "possible_causes": [
+      "The component_id or connector_id is empty or malformed."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: connector_id must start with a letter and contain only letters, digits, underscore, dash, dot, or colon",
+    "what_happened": "Failed to create the connector reference."
+  },
+  "contains": [
+    true,
+    true,
+    false
+  ],
+  "equal": true,
+  "limit": {
+    "lower_value": -1.0,
+    "upper_value": 5.0
+  },
+  "nan": {
+    "how_to_fix": [
+      "Pass finite lower and upper values in increasing order."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_scalar_limit_rscalarlimit",
+    "possible_causes": [
+      "One of the limit values is non-finite.",
+      "lower_value is greater than upper_value."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: lower_value must be finite",
+    "what_happened": "Failed to create the scalar limit."
+  },
+  "ref": {
+    "component_id": "base",
+    "connector_id": "axis"
+  },
+  "reversed": {
+    "how_to_fix": [
+      "Pass finite lower and upper values in increasing order."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_scalar_limit_rscalarlimit",
+    "possible_causes": [
+      "One of the limit values is non-finite.",
+      "lower_value is greater than upper_value."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: lower_value must be less than or equal to upper_value",
+    "what_happened": "Failed to create the scalar limit."
+  }
+}

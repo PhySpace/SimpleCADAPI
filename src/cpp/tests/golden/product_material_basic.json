@@ -1,0 +1,45 @@
+{
+  "assigned": {
+    "connectors": [],
+    "material": {
+      "color": [
+        0.7,
+        0.7,
+        0.75
+      ],
+      "density": 2.7e-06,
+      "density_unit": "kg/mm^3",
+      "material_id": "aluminum_6061",
+      "name": "Aluminum 6061"
+    },
+    "name": "Base plate",
+    "part_id": "base_plate"
+  },
+  "assigned_material_equal": true,
+  "bare": {
+    "color": null,
+    "density": null,
+    "density_unit": null,
+    "material_id": "bare",
+    "name": null
+  },
+  "equal": true,
+  "material": {
+    "color": [
+      0.7,
+      0.7,
+      0.75
+    ],
+    "density": 2.7e-06,
+    "density_unit": "kg/mm^3",
+    "material_id": "aluminum_6061",
+    "name": "Aluminum 6061"
+  },
+  "original_unchanged": true,
+  "part": {
+    "connectors": [],
+    "material": null,
+    "name": "Base plate",
+    "part_id": "base_plate"
+  }
+}

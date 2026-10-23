@@ -40,7 +40,7 @@ JOINT_TOL = 0.5 * 10.0 ** -L.TYPE_ROUND_DIGITS + TOL
 
 
 def _valid(body) -> bool:
-    from OCP.BRepCheck import BRepCheck_Analyzer
+    from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
     return BRepCheck_Analyzer(body.wrapped).IsValid()
 
 

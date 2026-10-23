@@ -14,4 +14,4 @@ class ViewDecl(name: str, shape: object, n: tuple, xd: tuple, align: dict = fiel
 
 ## Description
 
-HLR 投影视图。n=观察方向, xd=投影面内屏幕右方向; align 定义布局约束。
+An HLR projected view. n = viewing direction, xd = screen-right direction in the projection plane; align defines the layout constraint.

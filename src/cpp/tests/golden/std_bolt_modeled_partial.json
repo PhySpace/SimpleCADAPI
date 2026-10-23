@@ -1,0 +1,49 @@
+{
+  "meta": {
+    "basic_minor_diameter": 6.646875,
+    "diameter": 8.0,
+    "drive_depth": 1.2320000000000002,
+    "drive_size": 6.912,
+    "drive_style": "cross",
+    "head_across_corners": null,
+    "head_height": 4.4,
+    "head_style": "button",
+    "head_width": 14.4,
+    "length": 24.0,
+    "modeled_minor_diameter": 6.7,
+    "modeled_thread_length": 18.0,
+    "modeled_thread_start": 6.0,
+    "pitch_diameter": 7.188125,
+    "recommended_mating_hole_chamfer_min": 0.48,
+    "requested_thread_style": "partial",
+    "thread_depth": 0.65,
+    "thread_detail": "modeled",
+    "thread_form": "v",
+    "thread_length": 18.0,
+    "thread_phase_degrees": 0.0,
+    "thread_pitch": 1.25,
+    "thread_pitch_source": "explicit",
+    "thread_start": 6.0,
+    "thread_style": "partial",
+    "underhead_fillet_radius": 0.48
+  },
+  "shape": {
+    "area": 1266.2540155735323,
+    "bbox": [
+      -3.9217632405518623,
+      -3.456,
+      -4.4,
+      7.2,
+      3.973120521750724,
+      24.00000000000001
+    ],
+    "edges": 114,
+    "faces": 42,
+    "tags": [
+      "group.fasteners",
+      "role.fastener.bolt",
+      "solid.boolean.cut"
+    ],
+    "volume": 1568.70014208786
+  }
+}

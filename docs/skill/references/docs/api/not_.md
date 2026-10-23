@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def not_(predicate: Predicate) -> Predicate
+def not_(predicate)
 ```
 
 *Source: ql.py*

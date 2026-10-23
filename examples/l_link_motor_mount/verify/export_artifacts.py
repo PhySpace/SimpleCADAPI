@@ -19,12 +19,12 @@ import struct
 import sys
 from pathlib import Path
 
-from OCP.Bnd import Bnd_Box
-from OCP.BRepBndLib import BRepBndLib
-from OCP.BRepGProp import BRepGProp
-from OCP.GProp import GProp_GProps
-from OCP.TopAbs import TopAbs_SOLID
-from OCP.TopExp import TopExp_Explorer
+from simplecadapi._cpp.occt.Bnd import Bnd_Box
+from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
+from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+from simplecadapi._cpp.occt.GProp import GProp_GProps
+from simplecadapi._cpp.occt.TopAbs import TopAbs_SOLID
+from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
 
 import simplecadapi as scad
 from simplecadapi.inspect import brep

@@ -45,7 +45,7 @@ class DrawingMeasurements:
 
     Every entry keeps its native ``length_pt``; ``length_mm`` is populated
     only when a calibration is supplied. Millimetre values derived here are
-    〔推算〕-grade claims: they must be cross-checked against annotated
+    "inferred"-grade claims: they must be cross-checked against annotated
     dimensions before they harden into facts.
     """
 

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_surface_patch_rface(boundaries: Sequence[SurfaceBoundary], *, points: Sequence[Sequence[float]] = (), settings: Optional[SurfaceFillingSettings] = None, holes: Sequence[Wire] = (), tag_prefix: Optional[str] = None) -> Face
+def make_surface_patch_rface(boundaries, *, points=[], settings=None, holes=[], tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

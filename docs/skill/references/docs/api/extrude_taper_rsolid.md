@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def extrude_taper_rsolid(profile: Face, vector: Sequence[float], taper: float, flip_inner: bool = True) -> Solid
+def extrude_taper_rsolid(profile, vector, taper, flip_inner=True)
 ```
 
 *Source: operators/features.py*

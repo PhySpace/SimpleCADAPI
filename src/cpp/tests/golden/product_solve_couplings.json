@@ -1,0 +1,719 @@
+{
+  "angles": {
+    "belt_b": 44.99999999999999,
+    "gear_b": -44.99999999999999,
+    "rack_z": -3.141592653589793
+  },
+  "belt": {
+    "authored": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "gear_a": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "gear_b": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "placements": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "gear_a": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          6.123233995736766e-17,
+          1.0,
+          0.0
+        ],
+        "y_axis": [
+          -1.0,
+          6.123233995736766e-17,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          -0.0,
+          1.0
+        ]
+      },
+      "gear_b": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          0.7071067811865476,
+          0.7071067811865475,
+          0.0
+        ],
+        "y_axis": [
+          -0.7071067811865475,
+          0.7071067811865476,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          -0.0,
+          1.0
+        ]
+      }
+    },
+    "report": {
+      "grounded_component_ids": [
+        "base"
+      ],
+      "residuals": [
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "drive_a",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        },
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "free_b",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        },
+        {
+          "angular_error_degrees": 6.3611093629270335e-15,
+          "constraint_id": "belt",
+          "translation_error": 2.220446049250313e-16,
+          "within_tolerance": true
+        }
+      ],
+      "solved": true,
+      "solved_component_ids": [
+        "base",
+        "gear_a",
+        "gear_b"
+      ],
+      "unsolved_component_ids": []
+    }
+  },
+  "gear": {
+    "authored": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "gear_a": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "gear_b": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "placements": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "gear_a": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          6.123233995736766e-17,
+          1.0,
+          0.0
+        ],
+        "y_axis": [
+          -1.0,
+          6.123233995736766e-17,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          -0.0,
+          1.0
+        ]
+      },
+      "gear_b": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          0.7071067811865476,
+          -0.7071067811865475,
+          0.0
+        ],
+        "y_axis": [
+          0.7071067811865475,
+          0.7071067811865476,
+          0.0
+        ],
+        "z_axis": [
+          -0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "report": {
+      "grounded_component_ids": [
+        "base"
+      ],
+      "residuals": [
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "drive_a",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        },
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "free_b",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        },
+        {
+          "angular_error_degrees": 6.3611093629270335e-15,
+          "constraint_id": "mesh",
+          "translation_error": 2.220446049250313e-16,
+          "within_tolerance": true
+        }
+      ],
+      "solved": true,
+      "solved_component_ids": [
+        "base",
+        "gear_a",
+        "gear_b"
+      ],
+      "unsolved_component_ids": []
+    }
+  },
+  "phases": {
+    "belt": 0.0,
+    "gear": 0.0,
+    "rack": 0.0,
+    "reverse": 0.25
+  },
+  "rack": {
+    "authored": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "pinion": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "rack": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "placements": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "pinion": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          6.123233995736766e-17,
+          1.0,
+          0.0
+        ],
+        "y_axis": [
+          -1.0,
+          6.123233995736766e-17,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          -0.0,
+          1.0
+        ]
+      },
+      "rack": {
+        "origin": [
+          0.0,
+          0.0,
+          -3.141592653589793
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "report": {
+      "grounded_component_ids": [
+        "base"
+      ],
+      "residuals": [
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "rack_slide",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        },
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "pinion_axis",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        },
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "rack_mesh",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        }
+      ],
+      "solved": true,
+      "solved_component_ids": [
+        "base",
+        "rack",
+        "pinion"
+      ],
+      "unsolved_component_ids": []
+    }
+  },
+  "residuals": {
+    "belt": {
+      "angular_error_degrees": 6.3611093629270335e-15,
+      "constraint_id": "belt",
+      "translation_error": 2.220446049250313e-16,
+      "within_tolerance": true
+    },
+    "gear": {
+      "angular_error_degrees": 6.3611093629270335e-15,
+      "constraint_id": "mesh",
+      "translation_error": 2.220446049250313e-16,
+      "within_tolerance": true
+    },
+    "rack": {
+      "angular_error_degrees": 0.0,
+      "constraint_id": "rack_mesh",
+      "translation_error": 0.0,
+      "within_tolerance": true
+    },
+    "reverse": {
+      "angular_error_degrees": 4.2407395752846885e-15,
+      "constraint_id": "mesh",
+      "translation_error": 1.1102230246251565e-16,
+      "within_tolerance": true
+    }
+  },
+  "reverse": {
+    "authored": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "gear_a": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "gear_b": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "placements": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "gear_a": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          0.9649003889646879,
+          -0.26261614454521687,
+          0.0
+        ],
+        "y_axis": [
+          0.26261614454521687,
+          0.9649003889646879,
+          0.0
+        ],
+        "z_axis": [
+          -0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "gear_b": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          0.7660444431189781,
+          0.6427876096865394,
+          0.0
+        ],
+        "y_axis": [
+          -0.6427876096865394,
+          0.7660444431189781,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          -0.0,
+          1.0
+        ]
+      }
+    },
+    "report": {
+      "grounded_component_ids": [
+        "base"
+      ],
+      "residuals": [
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "free_a",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        },
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "drive_b",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        },
+        {
+          "angular_error_degrees": 4.2407395752846885e-15,
+          "constraint_id": "mesh",
+          "translation_error": 1.1102230246251565e-16,
+          "within_tolerance": true
+        }
+      ],
+      "solved": true,
+      "solved_component_ids": [
+        "base",
+        "gear_a",
+        "gear_b"
+      ],
+      "unsolved_component_ids": []
+    }
+  }
+}

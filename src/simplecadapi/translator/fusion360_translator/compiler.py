@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from ...product.placement import placement_frame_mm
 from ...recording.serializer import _execute_graph
-from ...topology import OperationGraph, OperationNode
+from simplecadapi._cpp import OperationGraph, OperationNode
 
 
 def _json_ascii(value: Any) -> str:
@@ -62,9 +62,9 @@ def _normalized_spline_params(params: Dict[str, Any]) -> Dict[str, Any]:
     if result.get("control_points") or not result.get("points"):
         return result
     try:
-        from OCP.GeomAPI import GeomAPI_Interpolate
-        from OCP.TColgp import TColgp_HArray1OfPnt
-        from OCP.gp import gp_Pnt
+        from simplecadapi._cpp.occt.GeomAPI import GeomAPI_Interpolate
+        from simplecadapi._cpp.occt.TColgp import TColgp_HArray1OfPnt
+        from simplecadapi._cpp.occt.gp import gp_Pnt
 
         points = [tuple(float(value) for value in point) for point in result["points"]]
         point_array = TColgp_HArray1OfPnt(1, len(points))
@@ -107,7 +107,7 @@ def _curve_params_with_kernel_axes(
 ) -> Dict[str, Any]:
     """Add the canonical OCC periodic frame without mutating graph parameters."""
 
-    from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
+    from simplecadapi._cpp.occt.gp import gp_Ax2, gp_Dir, gp_Pnt
 
     result = dict(params)
     axis_value = result.get(axis_key, (0.0, 0.0, 1.0))
@@ -215,9 +215,9 @@ def _dominant_result_node_id(
         return None
 
     try:
-        from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse
-        from OCP.BRepGProp import BRepGProp
-        from OCP.GProp import GProp_GProps
+        from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Fuse
+        from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+        from simplecadapi._cpp.occt.GProp import GProp_GProps
 
         replay_graph = copy.deepcopy(graph)
         for node in replay_graph.nodes:
@@ -528,12 +528,12 @@ def _source_kernel_step_payloads(
     for node_id, result in zip(node_ids, results):
         path: Optional[str] = None
         try:
-            from OCP.Bnd import Bnd_Box
-            from OCP.BRepBndLib import BRepBndLib
-            from OCP.BRepGProp import BRepGProp
-            from OCP.GProp import GProp_GProps
-            from OCP.IFSelect import IFSelect_RetDone
-            from OCP.STEPControl import STEPControl_AsIs, STEPControl_Writer
+            from simplecadapi._cpp.occt.Bnd import Bnd_Box
+            from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
+            from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+            from simplecadapi._cpp.occt.GProp import GProp_GProps
+            from simplecadapi._cpp.occt.IFSelect import IFSelect_RetDone
+            from simplecadapi._cpp.occt.STEPControl import STEPControl_AsIs, STEPControl_Writer
 
             wrapped = getattr(result, "wrapped", None)
             if wrapped is None:

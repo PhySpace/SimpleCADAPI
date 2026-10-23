@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def explain_tag(shape: AnyShape, tag: str, scope: str | TagScope = TagScope.EFFECTIVE) -> List[Dict[str, Any]]
+def explain_tag(shape, tag, scope=<EFFECTIVE: 'effective'>)
 ```
 
 *Source: operators/selection.py*

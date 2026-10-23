@@ -144,10 +144,10 @@ class GeometryTests(unittest.TestCase):
             spec.loader.exec_module(module)
             module.build()
             self.assertEqual(len(module.BODIES), payload.get('solid_count', 1))
-            from OCP.BRepCheck import BRepCheck_Analyzer
+            from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
             self.assertTrue(all(BRepCheck_Analyzer(body.wrapped).IsValid() for body in module.BODIES))
-            from OCP.BRepGProp import BRepGProp
-            from OCP.GProp import GProp_GProps
+            from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+            from simplecadapi._cpp.occt.GProp import GProp_GProps
             def accurate_volume(body):
                 props = GProp_GProps()
                 BRepGProp.VolumePropertiesGK_s(body.wrapped, props, 1e-9, True, True)

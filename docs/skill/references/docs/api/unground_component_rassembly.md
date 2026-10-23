@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def unground_component_rassembly(assembly: Assembly, component_id: str) -> Assembly
+def unground_component_rassembly(assembly, component_id)
 ```
 
 *Source: operators/product.py*

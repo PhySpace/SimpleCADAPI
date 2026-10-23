@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_wire_from_edges_rwire(edges: List[Edge], *, tag_prefix: Optional[str] = None) -> Wire
+def make_wire_from_edges_rwire(edges, *, tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

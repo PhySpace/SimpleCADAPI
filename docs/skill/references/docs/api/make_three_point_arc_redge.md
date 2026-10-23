@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_three_point_arc_redge(start: Tuple[float, float, float], middle: Tuple[float, float, float], end: Tuple[float, float, float]) -> Edge
+def make_three_point_arc_redge(start, middle, end)
 ```
 
 *Source: operators/geometry.py*

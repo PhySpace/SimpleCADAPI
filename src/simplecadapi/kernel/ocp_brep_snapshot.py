@@ -6,24 +6,28 @@ import io
 import math
 from typing import Any, Literal
 
-from OCP.BinTools import BinTools, BinTools_FormatVersion_VERSION_4
-from OCP.BRep import BRep_Tool
-from OCP.BRepAdaptor import BRepAdaptor_Surface
-from OCP.BRepCheck import BRepCheck_Analyzer
-from OCP.BRepGProp import BRepGProp
-from OCP.GProp import GProp_GProps
-from OCP.TopAbs import (
+from simplecadapi._cpp.occt.BinTools import BinTools, BinTools_FormatVersion_VERSION_4
+from simplecadapi._cpp.occt.BRep import BRep_Tool
+from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Surface
+from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
+from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+from simplecadapi._cpp.occt.GProp import GProp_GProps
+from simplecadapi._cpp.occt.TopAbs import (
     TopAbs_EDGE,
     TopAbs_FACE,
     TopAbs_SHELL,
     TopAbs_SOLID,
     TopAbs_VERTEX,
 )
-from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopLoc import TopLoc_Location
-from OCP.TopTools import TopTools_IndexedMapOfShape
-from OCP.TopoDS import TopoDS, TopoDS_Shape, TopoDS_Shell, TopoDS_Solid
-
+from simplecadapi._cpp.occt.TopExp import TopExp, TopExp_Explorer
+from simplecadapi._cpp.occt.TopLoc import TopLoc_Location
+from simplecadapi._cpp.occt.TopoDS import (
+    TopoDS,
+    TopoDS_Shape,
+    TopoDS_Shell,
+    TopoDS_Solid,
+)
+from simplecadapi._cpp.occt.TopTools import TopTools_IndexedMapOfShape
 
 RootKind = Literal["shell", "solid"]
 
@@ -31,9 +35,12 @@ RootKind = Literal["shell", "solid"]
 def has_triangulation(shape: TopoDS_Shape) -> bool:
     explorer = TopExp_Explorer(shape, TopAbs_FACE)
     while explorer.More():
-        if BRep_Tool.Triangulation_s(
-            TopoDS.Face_s(explorer.Current()), TopLoc_Location(), 0
-        ) is not None:
+        if (
+            BRep_Tool.Triangulation_s(
+                TopoDS.Face_s(explorer.Current()), TopLoc_Location(), 0
+            )
+            is not None
+        ):
             return True
         explorer.Next()
     return False
@@ -83,7 +90,9 @@ def require_single_valid_shell(shape: TopoDS_Shape) -> TopoDS_Shell:
             shells.append(TopoDS.Shell_s(explorer.Current()))
             explorer.Next()
     if len(shells) != 1:
-        raise ValueError(f"BREP region must contain exactly one shell, got {len(shells)}")
+        raise ValueError(
+            f"BREP region must contain exactly one shell, got {len(shells)}"
+        )
     shell = shells[0]
     if _shape_count(shape, TopAbs_FACE) != _shape_count(shell, TopAbs_FACE):
         raise ValueError("BREP region contains faces outside its single shell")
@@ -103,7 +112,9 @@ def require_single_valid_solid(shape: TopoDS_Shape) -> TopoDS_Solid:
             solids.append(TopoDS.Solid_s(explorer.Current()))
             explorer.Next()
     if len(solids) != 1:
-        raise ValueError(f"BREP region must contain exactly one solid, got {len(solids)}")
+        raise ValueError(
+            f"BREP region must contain exactly one solid, got {len(solids)}"
+        )
     solid = solids[0]
     if any(
         _shape_count(shape, kind) != _shape_count(solid, kind)

@@ -1,0 +1,137 @@
+{
+  "bad_policy": {
+    "how_to_fix": [
+      "Pass at least two Wire or endpoint Vertex sections.",
+      "Keep Wire topology compatible across sections.",
+      "If loft fails, inspect each section individually and simplify its geometry."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "loft_rsolid",
+    "possible_causes": [
+      "Fewer than two sections were provided.",
+      "A Vertex section was used away from the start or end.",
+      "One or more Wire/Vertex sections are invalid or incompatible.",
+      "The kernel rejected the loft because the section geometry is inconsistent."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: 'bogus' is not a valid TrackingPolicy",
+    "what_happened": "Failed to loft the input profiles into a solid."
+  },
+  "coincident": {
+    "how_to_fix": [
+      "Check every station against its Inventory row (edges / closure / centroid)."
+    ],
+    "inventory": [
+      {
+        "description": "4 edges, closed, planar, centroid (0, 0, 0)",
+        "status": "implicated",
+        "symbol": "S1"
+      },
+      {
+        "description": "4 edges, closed, planar, centroid (0, 0, 0)",
+        "status": "implicated",
+        "symbol": "S2"
+      }
+    ],
+    "measurements": [],
+    "operation": "loft_rsolid",
+    "possible_causes": [
+      "Two adjacent sections sit at the same location (no generation direction to skin across).",
+      "Edge counts differ too much across stations for the kernel to establish point correspondence.",
+      "A section is open, or the list order disagrees with the generation direction."
+    ],
+    "repair": [
+      "S1 and S2 sit at the same location: a loft needs its sections distributed along the generation direction \u2014 remove the duplicate section or fix the station placements"
+    ],
+    "technical_details": "kernel reported: loft build did not complete; section count=2",
+    "what_happened": "the loft_rsolid kernel build did not complete; the section compatibility check found: S2 coincides with S1 (centroid distance 0 mm)"
+  },
+  "graph_tag": {
+    "how_to_fix": [
+      "Pass at least two Wire or endpoint Vertex sections.",
+      "Keep Wire topology compatible across sections.",
+      "If loft fails, inspect each section individually and simplify its geometry."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "loft_rsolid",
+    "possible_causes": [
+      "Fewer than two sections were provided.",
+      "A Vertex section was used away from the start or end.",
+      "One or more Wire/Vertex sections are invalid or incompatible.",
+      "The kernel rejected the loft because the section geometry is inconsistent."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: GRAPH tracking does not provide loft face-role evidence; use FULL tracking for tag_prefix, start_face_tag, end_face_tag, or side_faces_tag",
+    "what_happened": "Failed to loft the input profiles into a solid."
+  },
+  "one": {
+    "how_to_fix": [
+      "Pass at least two Wire or endpoint Vertex sections.",
+      "Keep Wire topology compatible across sections.",
+      "If loft fails, inspect each section individually and simplify its geometry."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "loft_rsolid",
+    "possible_causes": [
+      "Fewer than two sections were provided.",
+      "A Vertex section was used away from the start or end.",
+      "One or more Wire/Vertex sections are invalid or incompatible.",
+      "The kernel rejected the loft because the section geometry is inconsistent."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: loft_rsolid requires at least two sections",
+    "what_happened": "Failed to loft the input profiles into a solid."
+  },
+  "open": {
+    "how_to_fix": [
+      "Check every station against its Inventory row (edges / closure / centroid)."
+    ],
+    "inventory": [
+      {
+        "description": "4 edges, closed, planar, centroid (0, 0, 0)",
+        "status": "ok",
+        "symbol": "S1"
+      },
+      {
+        "description": "4 edges, OPEN, planar, centroid (5, 3.1, 0)",
+        "status": "implicated",
+        "symbol": "S2"
+      }
+    ],
+    "measurements": [],
+    "operation": "loft_rsolid",
+    "possible_causes": [
+      "Two adjacent sections sit at the same location (no generation direction to skin across).",
+      "Edge counts differ too much across stations for the kernel to establish point correspondence.",
+      "A section is open, or the list order disagrees with the generation direction."
+    ],
+    "repair": [
+      "S2 is an open wire: close that section before lofting"
+    ],
+    "technical_details": "kernel reported: loft build did not complete; section count=2",
+    "what_happened": "the loft_rsolid kernel build did not complete; the section compatibility check found: S2 is not closed"
+  },
+  "order": null,
+  "vertex_tag": {
+    "how_to_fix": [
+      "Pass at least two Wire or endpoint Vertex sections.",
+      "Keep Wire topology compatible across sections.",
+      "If loft fails, inspect each section individually and simplify its geometry."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "loft_rsolid",
+    "possible_causes": [
+      "Fewer than two sections were provided.",
+      "A Vertex section was used away from the start or end.",
+      "One or more Wire/Vertex sections are invalid or incompatible.",
+      "The kernel rejected the loft because the section geometry is inconsistent."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: start_face_tag requires a Wire start section",
+    "what_happened": "Failed to loft the input profiles into a solid."
+  }
+}

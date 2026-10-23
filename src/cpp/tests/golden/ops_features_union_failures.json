@@ -1,0 +1,292 @@
+{
+  "cluster": {
+    "how_to_fix": [
+      "Pass only valid Solid objects or sequences of Solid objects.",
+      "For intended face contact, make the solids share a finite-area face and retry; no artificial overlap is required.",
+      "For a real small gap, pass an explicit tol only when approximating that gap is acceptable.",
+      "Do not expect glue or tol to turn point-, edge-, or tangent-only contact into a valid single solid."
+    ],
+    "inventory": [],
+    "measurements": [
+      {
+        "name": "min_gap",
+        "unit": "mm",
+        "value": 11.0
+      },
+      {
+        "name": "closest_point_a",
+        "unit": "mm",
+        "value": [
+          8.0,
+          -2.0,
+          4.0
+        ]
+      },
+      {
+        "name": "closest_point_b",
+        "unit": "mm",
+        "value": [
+          19.0,
+          -2.0,
+          4.0
+        ]
+      },
+      {
+        "name": "closure_vector_a_to_b",
+        "unit": "mm",
+        "value": [
+          11.0,
+          0.0,
+          0.0
+        ]
+      }
+    ],
+    "operation": "union_rsolid",
+    "possible_causes": [
+      "The operands are separated in space, so the union cannot produce exactly one solid.",
+      "A placement/translation moved one operand away from the other."
+    ],
+    "repair": [
+      "Move operand 3 by (11, 0, 0) (\u2265 11 mm) so the operands touch, or extend one operand across the gap.",
+      "If the pieces are meant to stay separate, build an assembly (make_assembly_rassembly) instead of a single-solid union."
+    ],
+    "technical_details": "ValueError: union produced 2 separated solids; nearest detected gap is about 11, which exceeds tol=2.66083e-06",
+    "what_happened": "separated solids: operand 2 and operand 3 never touch; nearest detected gap is 11 mm (tolerance 2.661e-06)"
+  },
+  "disjoint": {
+    "how_to_fix": [
+      "Pass only valid Solid objects or sequences of Solid objects.",
+      "For intended face contact, make the solids share a finite-area face and retry; no artificial overlap is required.",
+      "For a real small gap, pass an explicit tol only when approximating that gap is acceptable.",
+      "Do not expect glue or tol to turn point-, edge-, or tangent-only contact into a valid single solid."
+    ],
+    "inventory": [],
+    "measurements": [
+      {
+        "name": "min_gap",
+        "unit": "mm",
+        "value": 14.0
+      },
+      {
+        "name": "closest_point_a",
+        "unit": "mm",
+        "value": [
+          5.0,
+          -2.0,
+          4.0
+        ]
+      },
+      {
+        "name": "closest_point_b",
+        "unit": "mm",
+        "value": [
+          19.0,
+          -2.0,
+          4.0
+        ]
+      },
+      {
+        "name": "closure_vector_a_to_b",
+        "unit": "mm",
+        "value": [
+          14.0,
+          0.0,
+          0.0
+        ]
+      }
+    ],
+    "operation": "union_rsolid",
+    "possible_causes": [
+      "The operands are separated in space, so the union cannot produce exactly one solid.",
+      "A placement/translation moved one operand away from the other."
+    ],
+    "repair": [
+      "Move operand 2 by (14, 0, 0) (\u2265 14 mm) so the operands touch, or extend one operand across the gap.",
+      "If the pieces are meant to stay separate, build an assembly (make_assembly_rassembly) instead of a single-solid union."
+    ],
+    "technical_details": "ValueError: union produced 2 separated solids; nearest detected gap is about 14, which exceeds tol=2.66083e-06",
+    "what_happened": "separated solids: operand 1 and operand 2 never touch; nearest detected gap is 14 mm (tolerance 2.661e-06)"
+  },
+  "edge_contact": {
+    "how_to_fix": [
+      "Pass only valid Solid objects or sequences of Solid objects.",
+      "For intended face contact, make the solids share a finite-area face and retry; no artificial overlap is required.",
+      "For a real small gap, pass an explicit tol only when approximating that gap is acceptable.",
+      "Do not expect glue or tol to turn point-, edge-, or tangent-only contact into a valid single solid."
+    ],
+    "inventory": [],
+    "measurements": [
+      {
+        "name": "min_gap",
+        "unit": "mm",
+        "value": 0.0
+      },
+      {
+        "name": "closest_point_a",
+        "unit": "mm",
+        "value": [
+          1.0,
+          1.0,
+          2.0
+        ]
+      },
+      {
+        "name": "closest_point_b",
+        "unit": "mm",
+        "value": [
+          1.0,
+          1.0,
+          2.0
+        ]
+      }
+    ],
+    "operation": "union_rsolid",
+    "possible_causes": [
+      "The operands touch without a finite-area face or positive-volume overlap."
+    ],
+    "repair": [
+      "Give the contact a positive-volume overlap: translate one operand along (0, 0, 0) by a working overlap (e.g. 0.5 mm beyond touch) and retry.",
+      "For intended face contact, make the shared face finite in area and coincident; no artificial overlap is required."
+    ],
+    "technical_details": "ValueError: union produced 2 solids at zero detected gap; the inputs likely meet only along an edge, vertex, tangent point, or tangent curve, which is not one manifold solid",
+    "what_happened": "operands meet only along an edge, vertex, or tangent (measured gap 0 mm \u2264 tol 6e-07), which is not one manifold solid"
+  },
+  "empty": {
+    "how_to_fix": [
+      "Pass only valid Solid objects or sequences of Solid objects.",
+      "For intended face contact, make the solids share a finite-area face and retry; no artificial overlap is required.",
+      "For a real small gap, pass an explicit tol only when approximating that gap is acceptable.",
+      "Do not expect glue or tol to turn point-, edge-, or tangent-only contact into a valid single solid."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "union_rsolid",
+    "possible_causes": [
+      "One or more inputs are not Solid objects.",
+      "At least one input solid is null or invalid.",
+      "The inputs are separated beyond tol, so the kernel cannot produce exactly one solid.",
+      "The inputs meet only along an edge, vertex, tangent point, or tangent curve, so their union is not one manifold solid."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to compute the boolean union."
+  },
+  "nearest_pair": {
+    "how_to_fix": [
+      "Pass only valid Solid objects or sequences of Solid objects.",
+      "For intended face contact, make the solids share a finite-area face and retry; no artificial overlap is required.",
+      "For a real small gap, pass an explicit tol only when approximating that gap is acceptable.",
+      "Do not expect glue or tol to turn point-, edge-, or tangent-only contact into a valid single solid."
+    ],
+    "inventory": [],
+    "measurements": [
+      {
+        "name": "min_gap",
+        "unit": "mm",
+        "value": 4.0
+      },
+      {
+        "name": "closest_point_a",
+        "unit": "mm",
+        "value": [
+          0.5,
+          -0.5,
+          1.0
+        ]
+      },
+      {
+        "name": "closest_point_b",
+        "unit": "mm",
+        "value": [
+          4.5,
+          -0.5,
+          1.0
+        ]
+      },
+      {
+        "name": "closure_vector_a_to_b",
+        "unit": "mm",
+        "value": [
+          4.0,
+          0.0,
+          0.0
+        ]
+      }
+    ],
+    "operation": "union_rsolid",
+    "possible_causes": [
+      "The operands are separated in space, so the union cannot produce exactly one solid.",
+      "A placement/translation moved one operand away from the other."
+    ],
+    "repair": [
+      "Move operand 2 by (4, 0, 0) (\u2265 4 mm) so the operands touch, or extend one operand across the gap.",
+      "If the pieces are meant to stay separate, build an assembly (make_assembly_rassembly) instead of a single-solid union."
+    ],
+    "technical_details": "ValueError: union produced 3 separated solids; nearest detected gap is about 4, which exceeds tol=8.544e-07",
+    "what_happened": "separated solids: operand 1 and operand 2 never touch; nearest detected gap is 4 mm (tolerance 8.544e-07)"
+  },
+  "not_solid": {
+    "how_to_fix": [
+      "Pass only valid Solid objects or sequences of Solid objects.",
+      "For intended face contact, make the solids share a finite-area face and retry; no artificial overlap is required.",
+      "For a real small gap, pass an explicit tol only when approximating that gap is acceptable.",
+      "Do not expect glue or tol to turn point-, edge-, or tangent-only contact into a valid single solid."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "union_rsolid",
+    "possible_causes": [
+      "One or more inputs are not Solid objects.",
+      "At least one input solid is null or invalid.",
+      "The inputs are separated beyond tol, so the kernel cannot produce exactly one solid.",
+      "The inputs meet only along an edge, vertex, tangent point, or tangent curve, so their union is not one manifold solid."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to compute the boolean union."
+  },
+  "tangent": {
+    "how_to_fix": [
+      "Pass only valid Solid objects or sequences of Solid objects.",
+      "For intended face contact, make the solids share a finite-area face and retry; no artificial overlap is required.",
+      "For a real small gap, pass an explicit tol only when approximating that gap is acceptable.",
+      "Do not expect glue or tol to turn point-, edge-, or tangent-only contact into a valid single solid."
+    ],
+    "inventory": [],
+    "measurements": [
+      {
+        "name": "min_gap",
+        "unit": "mm",
+        "value": 1.83697019872103e-15
+      },
+      {
+        "name": "closest_point_a",
+        "unit": "mm",
+        "value": [
+          5.0,
+          -1.2246467991473533e-15,
+          0.0
+        ]
+      },
+      {
+        "name": "closest_point_b",
+        "unit": "mm",
+        "value": [
+          5.0,
+          6.123233995736766e-16,
+          0.0
+        ]
+      }
+    ],
+    "operation": "union_rsolid",
+    "possible_causes": [
+      "The operands touch without a finite-area face or positive-volume overlap."
+    ],
+    "repair": [
+      "Give the contact a positive-volume overlap: translate one operand along (0, 1.837e-15, 0) by a working overlap (e.g. 0.5 mm beyond touch) and retry.",
+      "For intended face contact, make the shared face finite in area and coincident; no artificial overlap is required."
+    ],
+    "technical_details": "ValueError: union produced 2 solids at zero detected gap; the inputs likely meet only along an edge, vertex, tangent point, or tangent curve, which is not one manifold solid",
+    "what_happened": "operands meet only along an edge, vertex, or tangent (measured gap 1.837e-15 mm \u2264 tol 0.1), which is not one manifold solid"
+  }
+}

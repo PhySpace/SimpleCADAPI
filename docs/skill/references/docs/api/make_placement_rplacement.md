@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_placement_rplacement(origin: Tuple[float, float, float], x_axis: Tuple[float, float, float] = (1.0, 0.0, 0.0), y_axis: Tuple[float, float, float] = (0.0, 1.0, 0.0)) -> Placement
+def make_placement_rplacement(origin, x_axis=(1.0, 0.0, 0.0), y_axis=(0.0, 1.0, 0.0))
 ```
 
 *Source: operators/product.py*

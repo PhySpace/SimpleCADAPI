@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def scale_rsolid(solid: Solid, factors: Sequence[float], center: Sequence[float] = (0, 0, 0)) -> Solid
+def scale_rsolid(solid, factors, center=(0, 0, 0))
 ```
 
 *Source: operators/transform.py*

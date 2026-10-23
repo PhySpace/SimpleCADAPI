@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def operation_event(op_name: str, event: str = '*') -> SerializablePredicate
+def operation_event(op_name, event='*')
 ```
 
 *Source: ql.py*

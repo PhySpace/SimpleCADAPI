@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_polyline_rwire(points: List[Tuple[ScalarLike, ScalarLike, ScalarLike]], closed: bool = False) -> Wire
+def make_polyline_rwire(points, closed=False)
 ```
 
 *Source: operators/geometry.py*

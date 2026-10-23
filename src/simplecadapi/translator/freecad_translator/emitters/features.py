@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from ....topology import OperationNode
+from simplecadapi._cpp import OperationNode
 from ..codegen import *
 from ..analysis import unwrap_transparent_geometry_node
 

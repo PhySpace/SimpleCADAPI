@@ -1,0 +1,62 @@
+{
+  "errors": [
+    {
+      "how_to_fix": [
+        "Use positive pitch, height, and radius values.",
+        "Pass a valid profile wire that can be turned into a face.",
+        "Validate the center and direction inputs before retrying.",
+        "If the sweep still fails, try the explicit macro path: helix wire -> face from profile -> sweep."
+      ],
+      "inventory": [],
+      "measurements": [],
+      "operation": "helical_sweep_rsolid",
+      "possible_causes": [
+        "Pitch, height, or radius is not positive.",
+        "The input profile wire is invalid or cannot form a face.",
+        "The center or direction vector is invalid.",
+        "The underlying helix or sweep construction failed."
+      ],
+      "repair": [],
+      "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+      "what_happened": "Failed to create the helical sweep solid."
+    },
+    {
+      "how_to_fix": [
+        "Use positive pitch, height, and radius values.",
+        "Pass a valid profile wire that can be turned into a face.",
+        "Validate the center and direction inputs before retrying.",
+        "If the sweep still fails, try the explicit macro path: helix wire -> face from profile -> sweep."
+      ],
+      "inventory": [],
+      "measurements": [],
+      "operation": "helical_sweep_rsolid",
+      "possible_causes": [
+        "Pitch, height, or radius is not positive.",
+        "The input profile wire is invalid or cannot form a face.",
+        "The center or direction vector is invalid.",
+        "The underlying helix or sweep construction failed."
+      ],
+      "repair": [],
+      "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+      "what_happened": "Failed to create the helical sweep solid."
+    }
+  ],
+  "left_volume": 1.6964608611671859,
+  "right": {
+    "area": 146.17569777903606,
+    "bbox": [
+      6.699999999990674,
+      -8.762273882023663e-07,
+      2.220446049250313e-16,
+      6.6999999999999975,
+      8.881784197001252e-16,
+      6.000008258244623
+    ],
+    "edges": 3,
+    "faces": 3,
+    "tags": [
+      "solid.feature.helical_sweep"
+    ],
+    "volume": 1.6964608611671859
+  }
+}

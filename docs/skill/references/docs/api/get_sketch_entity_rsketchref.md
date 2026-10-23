@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def get_sketch_entity_rsketchref(sketch: Sketch, entity_id: str) -> SketchRef
+def get_sketch_entity_rsketchref(sketch, entity_id)
 ```
 
 *Source: operators/sketch.py*

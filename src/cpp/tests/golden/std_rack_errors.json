@@ -1,0 +1,14 @@
+[
+  [
+    "ValueError",
+    "module must be positive"
+  ],
+  [
+    "ValueError",
+    "n_teeth must be at least 1"
+  ],
+  [
+    "ValueError",
+    "rack_height must be positive"
+  ]
+]

@@ -1,63 +1,380 @@
-"""Unified operator exports for the SimpleCAD modeling API.
+"""The operators of the C++ module, grouped as the SDK documents them.
 
-Implementation modules are organized by capability domain (geometry, features,
-booleans, transforms, selection/tagging, sketch, product/assembly). This
-package aggregates them into one import surface::
+Forwarding module: nothing is defined here.  The names below are implemented in C++ and re-exported under the
+import path the SDK has always had.
 
-    from simplecadapi.operators import make_box_rsolid, fillet_rsolid
+Where to read the source (``src/cpp/bindings/python/<file>.cpp`` declares the Python name, the implementation
+is behind it):
+  * ``bind_ops_features.cpp`` -> ``src/cpp/src/ops/features``
+  * ``bind_ops_geometry.cpp`` -> ``src/cpp/src/ops/geometry``
+  * ``bind_product.cpp`` -> ``src/cpp/src/product``
+  * ``bind_semantic.cpp`` -> ``src/cpp/src/semantic``
+  * ``bind_sketch.cpp`` -> ``src/cpp/src/sketch``
+  * ``bind_surface.cpp`` -> ``src/cpp/src/surface``
 
-Each implementation module re-exports its shared helpers from ``_support``;
-the aggregated ``__all__`` is the union of the implementation ``__all__``s.
-Assignments to symbols on this package (e.g. ``mock.patch.object``) are
-mirrored into the implementation modules so monkeypatch-based integrations
-keep observing the executed binding.
+Names that carry Python-side behaviour (recording wrappers, typing aliases) come from
+``simplecadapi/_native/glue.py``.
 """
 
-import sys as _sys
-from types import ModuleType as _ModuleType
+from __future__ import annotations
 
-from . import _support, geometry, transform, boolean, product, sketch, selection, features
-from ._support import *
-from .geometry import *
-from .transform import *
-from .boolean import *
-from .product import *
-from .sketch import *
-from .selection import *
-from .features import *
-
-_IMPLEMENTATION_MODULES = (
-    _support,
-    geometry,
-    transform,
-    boolean,
-    product,
-    sketch,
-    selection,
-    features,
+from simplecadapi._cpp import (
+    # bind_ops_features.cpp
+    assert_blend_volume_monotonic,
+    boolean_rsolidlist,
+    chamfer_rsolid,
+    cut_rsolid,
+    diagnose_blend_failure,
+    diagnose_boolean_failure,
+    draft_rsolid,
+    extrude_rsolid,
+    extrude_taper_rsolid,
+    extrude_until_rsolid,
+    fillet_rsolid,
+    helical_sweep_rsolid,
+    intersect_rsolid,
+    linear_pattern_rsolidlist,
+    loft_rsolid,
+    mirror_shape,
+    offset_rsolid,
+    radial_pattern_rsolidlist,
+    raise_loft_failure_if_diagnosed,
+    revolve_rsolid,
+    rotate_shape,
+    scale_rsolid,
+    shell_rsolid,
+    sweep_multisection_rsolid,
+    sweep_rsolid,
+    transform_rsolid,
+    translate_shape,
+    twisted_sweep_rsolid,
+    union_rsolid,
+    # bind_ops_geometry.cpp
+    load_brep_region_rshell,
+    load_brep_region_rsolid,
+    make_angle_arc_redge,
+    make_angle_arc_rwire,
+    make_box_rsolid,
+    make_circle_redge,
+    make_circle_rface,
+    make_circle_rwire,
+    make_cone_rsolid,
+    make_cylinder_rsolid,
+    make_ellipse_redge,
+    make_ellipse_rface,
+    make_ellipse_rwire,
+    make_face_from_wire_rface,
+    make_face_from_wires_rface,
+    make_helix_redge,
+    make_helix_rwire,
+    make_interpolated_spline_redge,
+    make_interpolated_spline_rwire,
+    make_line_redge,
+    make_periodic_spline_rwire,
+    make_point_rvertex,
+    make_polyline_rwire,
+    make_rectangle_rface,
+    make_rectangle_rwire,
+    make_segment_redge,
+    make_segment_rwire,
+    make_sphere_rsolid,
+    make_spline_redge,
+    make_spline_rwire,
+    make_three_point_arc_redge,
+    make_three_point_arc_rwire,
+    make_wire_from_edges_rwire,
+    # bind_product.cpp
+    add_belt_constraint_rassembly,
+    add_component_rassembly,
+    add_connector_rpart,
+    add_fixed_constraint_rassembly,
+    add_gear_constraint_rassembly,
+    add_prismatic_constraint_rassembly,
+    add_rack_pinion_constraint_rassembly,
+    add_revolute_constraint_rassembly,
+    assign_material_rpart,
+    ground_component_rassembly,
+    identity_placement_rplacement,
+    inspect_assembly_constraints_rconstraintreport,
+    make_assembly_rassembly,
+    make_compound_from_assembly_rcompound,
+    make_connector_ref_rconnectorref,
+    make_edge_connector_rconnector,
+    make_face_connector_rconnector,
+    make_material_rmaterial,
+    make_part_rpart,
+    make_placement_connector_rconnector,
+    make_placement_rplacement,
+    make_scalar_limit_rscalarlimit,
+    make_vertex_connector_rconnector,
+    measure_constraint_residual_rconstraintresidual,
+    place_component_rassembly,
+    set_public_connector_rassembly,
+    solve_assembly_constraints_rassembly,
+    unground_component_rassembly,
+    # bind_semantic.cpp
+    apply_tag,
+    apply_tag_rselection,
+    explain_tag,
+    list_tags,
+    select_edges_by_tag,
+    select_faces_by_tag,
+    # bind_sketch.cpp
+    add_arc_rsketch,
+    add_bspline_rsketch,
+    add_circle_rsketch,
+    add_ellipse_rsketch,
+    add_line_rsketch,
+    add_point_rsketch,
+    constrain_midpoint_points_rsketch,
+    constrain_mirror_rsketch,
+    constrain_symmetric_rsketch,
+    constrain_tangent_rsketch,
+    get_sketch_entity_rsketchref,
+    get_sketch_point_rsketchref,
+    inspect_sketch_rsketchresult,
+    make_face_from_sketch_rface,
+    make_sketch_rsketch,
+    make_wire_from_sketch_rwire,
+    # bind_surface.cpp
+    SurfaceBoundary,
+    SurfaceFillingSettings,
+    fill_holes_rshell,
+    fit_point_grid_rface,
+    free_boundaries_rwirelist,
+    loft_rshell,
+    make_bezier_surface_rface,
+    make_cylindrical_surface_rface,
+    make_gordon_surface_rface,
+    make_ruled_surface_rface,
+    make_solid_from_shell_rsolid,
+    make_surface_patch_rface,
+    sew_faces_rshell,
+    trim_surface_rface,
+    # (defined by the module itself)
+    BlendDiagnosis,
+    BooleanDiagnosis,
+    constrain_angle_rsketch,
+    constrain_coincident_rsketch,
+    constrain_collinear_rsketch,
+    constrain_concentric_rsketch,
+    constrain_connect_rsketch,
+    constrain_diameter_rsketch,
+    constrain_distance_rsketch,
+    constrain_distance_x_rsketch,
+    constrain_distance_y_rsketch,
+    constrain_equal_length_rsketch,
+    constrain_equal_radius_rsketch,
+    constrain_fix_rsketch,
+    constrain_horizontal_rsketch,
+    constrain_length_rsketch,
+    constrain_line_distance_rsketch,
+    constrain_major_radius_rsketch,
+    constrain_midpoint_rsketch,
+    constrain_minor_radius_rsketch,
+    constrain_normal_rsketch,
+    constrain_parallel_rsketch,
+    constrain_perpendicular_rsketch,
+    constrain_point_on_rsketch,
+    constrain_points_horizontal_rsketch,
+    constrain_points_vertical_rsketch,
+    constrain_radius_rsketch,
+    constrain_vertical_rsketch,
+    make_2d_cut_rface,
+    make_2d_intersect_rface,
+    make_2d_union_rface,
 )
 
-__all__ = tuple(
-    dict.fromkeys(
-        name
-        for module in _IMPLEMENTATION_MODULES
-        for name in module.__all__
-    )
-)
+# simplecadapi/_native/glue.py
+from simplecadapi._glue import names as _glue
 
-_SYMBOL_MODULES = {
-    name: tuple(
-        module for module in _IMPLEMENTATION_MODULES if name in vars(module)
-    )
-    for name in __all__
-}
+SCREENSHOT_VIEWS = _glue.SCREENSHOT_VIEWS
+_OPERATION_OUTPUT_ROLE_CARDINALITY = _glue._OPERATION_OUTPUT_ROLE_CARDINALITY
+_RENDER_DEDUP = _glue._RENDER_DEDUP
+_assert_sketch_solve_snapshot_dict_matches = _glue._assert_sketch_solve_snapshot_dict_matches
+_brep_region_path = _glue._brep_region_path
+_constrain_rsketch = _glue._constrain_rsketch
+_execute_screenshot_render = _glue._execute_screenshot_render
+_load_brep_region_rshape = _glue._load_brep_region_rshape
+_prepare_screenshot_render = _glue._prepare_screenshot_render
+_screenshot_views = _glue._screenshot_views
+diagnostics_dir = _glue.diagnostics_dir
+render_screenshot_rpath = _glue.render_screenshot_rpath
 
+from . import geometry  # noqa: F401
+from . import features  # noqa: F401
+from . import boolean  # noqa: F401
+from . import transform  # noqa: F401
+from . import selection  # noqa: F401
+from . import product  # noqa: F401
+from . import sketch  # noqa: F401
 
-class _OperatorsFacade(_ModuleType):
-    def __setattr__(self, name, value):
-        for module in self.__dict__.get("_SYMBOL_MODULES", {}).get(name, ()):
-            setattr(module, name, value)
-        super().__setattr__(name, value)
-
-
-_sys.modules[__name__].__class__ = _OperatorsFacade
+__all__ = [
+    "BlendDiagnosis",
+    "BooleanDiagnosis",
+    "SCREENSHOT_VIEWS",
+    "SurfaceBoundary",
+    "SurfaceFillingSettings",
+    "add_arc_rsketch",
+    "add_belt_constraint_rassembly",
+    "add_bspline_rsketch",
+    "add_circle_rsketch",
+    "add_component_rassembly",
+    "add_connector_rpart",
+    "add_ellipse_rsketch",
+    "add_fixed_constraint_rassembly",
+    "add_gear_constraint_rassembly",
+    "add_line_rsketch",
+    "add_point_rsketch",
+    "add_prismatic_constraint_rassembly",
+    "add_rack_pinion_constraint_rassembly",
+    "add_revolute_constraint_rassembly",
+    "apply_tag",
+    "apply_tag_rselection",
+    "assert_blend_volume_monotonic",
+    "assign_material_rpart",
+    "boolean",
+    "boolean_rsolidlist",
+    "chamfer_rsolid",
+    "constrain_angle_rsketch",
+    "constrain_coincident_rsketch",
+    "constrain_collinear_rsketch",
+    "constrain_concentric_rsketch",
+    "constrain_connect_rsketch",
+    "constrain_diameter_rsketch",
+    "constrain_distance_rsketch",
+    "constrain_distance_x_rsketch",
+    "constrain_distance_y_rsketch",
+    "constrain_equal_length_rsketch",
+    "constrain_equal_radius_rsketch",
+    "constrain_fix_rsketch",
+    "constrain_horizontal_rsketch",
+    "constrain_length_rsketch",
+    "constrain_line_distance_rsketch",
+    "constrain_major_radius_rsketch",
+    "constrain_midpoint_points_rsketch",
+    "constrain_midpoint_rsketch",
+    "constrain_minor_radius_rsketch",
+    "constrain_mirror_rsketch",
+    "constrain_normal_rsketch",
+    "constrain_parallel_rsketch",
+    "constrain_perpendicular_rsketch",
+    "constrain_point_on_rsketch",
+    "constrain_points_horizontal_rsketch",
+    "constrain_points_vertical_rsketch",
+    "constrain_radius_rsketch",
+    "constrain_symmetric_rsketch",
+    "constrain_tangent_rsketch",
+    "constrain_vertical_rsketch",
+    "cut_rsolid",
+    "diagnose_blend_failure",
+    "diagnose_boolean_failure",
+    "diagnostics_dir",
+    "draft_rsolid",
+    "explain_tag",
+    "extrude_rsolid",
+    "extrude_taper_rsolid",
+    "extrude_until_rsolid",
+    "features",
+    "fill_holes_rshell",
+    "fillet_rsolid",
+    "fit_point_grid_rface",
+    "free_boundaries_rwirelist",
+    "geometry",
+    "get_sketch_entity_rsketchref",
+    "get_sketch_point_rsketchref",
+    "ground_component_rassembly",
+    "helical_sweep_rsolid",
+    "identity_placement_rplacement",
+    "inspect_assembly_constraints_rconstraintreport",
+    "inspect_sketch_rsketchresult",
+    "intersect_rsolid",
+    "linear_pattern_rsolidlist",
+    "list_tags",
+    "load_brep_region_rshell",
+    "load_brep_region_rsolid",
+    "loft_rshell",
+    "loft_rsolid",
+    "make_2d_cut_rface",
+    "make_2d_intersect_rface",
+    "make_2d_union_rface",
+    "make_angle_arc_redge",
+    "make_angle_arc_rwire",
+    "make_assembly_rassembly",
+    "make_bezier_surface_rface",
+    "make_box_rsolid",
+    "make_circle_redge",
+    "make_circle_rface",
+    "make_circle_rwire",
+    "make_compound_from_assembly_rcompound",
+    "make_cone_rsolid",
+    "make_connector_ref_rconnectorref",
+    "make_cylinder_rsolid",
+    "make_cylindrical_surface_rface",
+    "make_edge_connector_rconnector",
+    "make_ellipse_redge",
+    "make_ellipse_rface",
+    "make_ellipse_rwire",
+    "make_face_connector_rconnector",
+    "make_face_from_sketch_rface",
+    "make_face_from_wire_rface",
+    "make_face_from_wires_rface",
+    "make_gordon_surface_rface",
+    "make_helix_redge",
+    "make_helix_rwire",
+    "make_interpolated_spline_redge",
+    "make_interpolated_spline_rwire",
+    "make_line_redge",
+    "make_material_rmaterial",
+    "make_part_rpart",
+    "make_periodic_spline_rwire",
+    "make_placement_connector_rconnector",
+    "make_placement_rplacement",
+    "make_point_rvertex",
+    "make_polyline_rwire",
+    "make_rectangle_rface",
+    "make_rectangle_rwire",
+    "make_ruled_surface_rface",
+    "make_scalar_limit_rscalarlimit",
+    "make_segment_redge",
+    "make_segment_rwire",
+    "make_sketch_rsketch",
+    "make_solid_from_shell_rsolid",
+    "make_sphere_rsolid",
+    "make_spline_redge",
+    "make_spline_rwire",
+    "make_surface_patch_rface",
+    "make_three_point_arc_redge",
+    "make_three_point_arc_rwire",
+    "make_vertex_connector_rconnector",
+    "make_wire_from_edges_rwire",
+    "make_wire_from_sketch_rwire",
+    "measure_constraint_residual_rconstraintresidual",
+    "mirror_shape",
+    "offset_rsolid",
+    "place_component_rassembly",
+    "product",
+    "radial_pattern_rsolidlist",
+    "raise_loft_failure_if_diagnosed",
+    "render_screenshot_rpath",
+    "revolve_rsolid",
+    "rotate_shape",
+    "scale_rsolid",
+    "select_edges_by_tag",
+    "select_faces_by_tag",
+    "selection",
+    "set_public_connector_rassembly",
+    "sew_faces_rshell",
+    "shell_rsolid",
+    "sketch",
+    "solve_assembly_constraints_rassembly",
+    "sweep_multisection_rsolid",
+    "sweep_rsolid",
+    "transform",
+    "transform_rsolid",
+    "translate_shape",
+    "trim_surface_rface",
+    "twisted_sweep_rsolid",
+    "unground_component_rassembly",
+    "union_rsolid",
+]

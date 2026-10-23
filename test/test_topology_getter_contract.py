@@ -13,7 +13,6 @@ import unittest
 import simplecadapi as scad
 from simplecadapi import ql
 from simplecadapi.core import Compound
-from simplecadapi.kernel.ocp_export import make_compound_always
 
 
 class TestTopologyGetterContract(unittest.TestCase):
@@ -23,9 +22,7 @@ class TestTopologyGetterContract(unittest.TestCase):
         self.wire = self.face.get_outer_wire()
         self.edge = ql.edges().resolve(self.wire)[0]
         self.shell = scad.sew_faces_rshell(self.box._iter_faces())
-        self.compound = Compound(
-            make_compound_always([self.box.wrapped, self.box.wrapped])
-        )
+        self.compound = Compound([self.box, self.box])
 
     def _assert_enumeration_forbidden(self, owner, method_name):
         with self.assertRaises(scad.SimpleCADError) as ctx:

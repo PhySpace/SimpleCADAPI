@@ -1,0 +1,740 @@
+{
+  "at_most_edges": {
+    "documentation_hint": "For full usage details, run help(ql.edge.resolve).",
+    "how_to_fix": [
+      "Read the inventory: hit = matched, near_miss = what exists instead.",
+      "Re-derive selectors from the newest shape after topology-changing ops."
+    ],
+    "inventory": [
+      {
+        "description": "line, length 30 mm",
+        "status": "hit",
+        "symbol": "E1"
+      },
+      {
+        "description": "line, length 20 mm",
+        "status": "hit",
+        "symbol": "E2"
+      },
+      {
+        "description": "line, length 30 mm",
+        "status": "hit",
+        "symbol": "E3"
+      },
+      {
+        "description": "line, length 20 mm",
+        "status": "hit",
+        "symbol": "E4"
+      },
+      {
+        "description": "line, length 30 mm",
+        "status": "hit",
+        "symbol": "E5"
+      },
+      {
+        "description": "line, length 20 mm",
+        "status": "hit",
+        "symbol": "E6"
+      },
+      {
+        "description": "line, length 30 mm",
+        "status": "hit",
+        "symbol": "E7"
+      },
+      {
+        "description": "line, length 20 mm",
+        "status": "hit",
+        "symbol": "E8"
+      },
+      {
+        "description": "line, length 10 mm",
+        "status": "hit",
+        "symbol": "E9"
+      },
+      {
+        "description": "line, length 10 mm",
+        "status": "hit",
+        "symbol": "E10"
+      },
+      {
+        "description": "line, length 10 mm",
+        "status": "hit",
+        "symbol": "E11"
+      },
+      {
+        "description": "line, length 10 mm",
+        "status": "hit",
+        "symbol": "E12"
+      }
+    ],
+    "measurements": [
+      {
+        "name": "matched_count",
+        "unit": "",
+        "value": 12.0
+      },
+      {
+        "name": "candidate_count",
+        "unit": "",
+        "value": 12.0
+      },
+      {
+        "name": "expected_count",
+        "unit": "",
+        "value": 3.0
+      }
+    ],
+    "operation": "ql.edge.resolve",
+    "possible_causes": [
+      "The predicate does not match the actual geometry values.",
+      "OCCT split one logical face into several at a seam after a boolean.",
+      "The selector was resolved against an older shape state."
+    ],
+    "repair": [
+      "Tighten the predicate (position/axis/tag constraints) or take an explicit member with .first()/.take(n) instead of exactly()."
+    ],
+    "signature": null,
+    "technical_details": null,
+    "what_happened": "QL selector expected at most 3 edge(s), got 12"
+  },
+  "capped_near_misses": {
+    "documentation_hint": "For full usage details, run help(ql.edge.resolve).",
+    "how_to_fix": [
+      "Read the inventory: hit = matched, near_miss = what exists instead.",
+      "Re-derive selectors from the newest shape after topology-changing ops."
+    ],
+    "inventory": [
+      {
+        "description": "line, length 30 mm",
+        "status": "near_miss",
+        "symbol": "E1"
+      },
+      {
+        "description": "line, length 20 mm",
+        "status": "near_miss",
+        "symbol": "E2"
+      },
+      {
+        "description": "line, length 30 mm",
+        "status": "near_miss",
+        "symbol": "E3"
+      },
+      {
+        "description": "line, length 20 mm",
+        "status": "hit",
+        "symbol": "E4"
+      },
+      {
+        "description": "line, length 30 mm",
+        "status": "near_miss",
+        "symbol": "E5"
+      },
+      {
+        "description": "line, length 20 mm",
+        "status": "near_miss",
+        "symbol": "E6"
+      },
+      {
+        "description": "line, length 30 mm",
+        "status": "near_miss",
+        "symbol": "E7"
+      },
+      {
+        "description": "line, length 20 mm",
+        "status": "hit",
+        "symbol": "E8"
+      },
+      {
+        "description": "line, length 10 mm",
+        "status": "hit",
+        "symbol": "E9"
+      },
+      {
+        "description": "line, length 10 mm",
+        "status": "near_miss",
+        "symbol": "E10"
+      },
+      {
+        "description": "line, length 10 mm",
+        "status": "hit",
+        "symbol": "E11"
+      },
+      {
+        "description": "line, length 10 mm",
+        "status": "near_miss",
+        "symbol": "E12"
+      }
+    ],
+    "measurements": [
+      {
+        "name": "matched_count",
+        "unit": "",
+        "value": 4.0
+      },
+      {
+        "name": "candidate_count",
+        "unit": "",
+        "value": 12.0
+      },
+      {
+        "name": "expected_count",
+        "unit": "",
+        "value": 1.0
+      }
+    ],
+    "operation": "ql.edge.resolve",
+    "possible_causes": [
+      "The predicate does not match the actual geometry values.",
+      "OCCT split one logical face into several at a seam after a boolean.",
+      "The selector was resolved against an older shape state."
+    ],
+    "repair": [
+      "Tighten the predicate (position/axis/tag constraints) or take an explicit member with .first()/.take(n) instead of exactly()."
+    ],
+    "signature": null,
+    "technical_details": null,
+    "what_happened": "QL selector expected exactly 1 edge(s), got 4"
+  },
+  "exactly_box": {
+    "documentation_hint": "For full usage details, run help(ql.face.resolve).",
+    "how_to_fix": [
+      "Read the inventory: hit = matched, near_miss = what exists instead.",
+      "Re-derive selectors from the newest shape after topology-changing ops."
+    ],
+    "inventory": [
+      {
+        "description": "plane, normal (1, 0, -0), spans z=[0, 30]",
+        "status": "hit",
+        "symbol": "F1"
+      },
+      {
+        "description": "plane, normal (1, 0, -0), spans z=[0, 30]",
+        "status": "hit",
+        "symbol": "F2"
+      },
+      {
+        "description": "plane, normal (-0, 1, 0), spans z=[0, 30]",
+        "status": "near_miss",
+        "symbol": "F3"
+      },
+      {
+        "description": "plane, normal (-0, 1, 0), spans z=[0, 30]",
+        "status": "near_miss",
+        "symbol": "F4"
+      },
+      {
+        "description": "plane, normal (0, 0, 1), spans y=[0, 20]",
+        "status": "near_miss",
+        "symbol": "F5"
+      },
+      {
+        "description": "plane, normal (0, 0, 1), spans y=[0, 20]",
+        "status": "near_miss",
+        "symbol": "F6"
+      }
+    ],
+    "measurements": [
+      {
+        "name": "matched_count",
+        "unit": "",
+        "value": 2.0
+      },
+      {
+        "name": "candidate_count",
+        "unit": "",
+        "value": 6.0
+      },
+      {
+        "name": "expected_count",
+        "unit": "",
+        "value": 1.0
+      }
+    ],
+    "operation": "ql.face.resolve",
+    "possible_causes": [
+      "The predicate does not match the actual geometry values.",
+      "OCCT split one logical face into several at a seam after a boolean.",
+      "The selector was resolved against an older shape state."
+    ],
+    "repair": [
+      "Tighten the predicate (position/axis/tag constraints) or take an explicit member with .first()/.take(n) instead of exactly()."
+    ],
+    "signature": null,
+    "technical_details": null,
+    "what_happened": "QL selector expected exactly 1 face(s), got 2"
+  },
+  "plain_faces_no_group": {
+    "documentation_hint": "For full usage details, run help(ql.face.resolve).",
+    "how_to_fix": [
+      "Read the inventory: hit = matched, near_miss = what exists instead.",
+      "Re-derive selectors from the newest shape after topology-changing ops."
+    ],
+    "inventory": [
+      {
+        "description": "plane, normal (1, 0, -0), spans z=[0, 30]",
+        "status": "hit",
+        "symbol": "F1"
+      },
+      {
+        "description": "plane, normal (1, 0, -0), spans z=[0, 30]",
+        "status": "hit",
+        "symbol": "F2"
+      },
+      {
+        "description": "plane, normal (-0, 1, 0), spans z=[0, 30]",
+        "status": "hit",
+        "symbol": "F3"
+      },
+      {
+        "description": "plane, normal (-0, 1, 0), spans z=[0, 30]",
+        "status": "hit",
+        "symbol": "F4"
+      },
+      {
+        "description": "plane, normal (0, 0, 1), spans y=[0, 20]",
+        "status": "hit",
+        "symbol": "F5"
+      },
+      {
+        "description": "plane, normal (0, 0, 1), spans y=[0, 20]",
+        "status": "hit",
+        "symbol": "F6"
+      }
+    ],
+    "measurements": [
+      {
+        "name": "matched_count",
+        "unit": "",
+        "value": 6.0
+      },
+      {
+        "name": "candidate_count",
+        "unit": "",
+        "value": 6.0
+      },
+      {
+        "name": "expected_count",
+        "unit": "",
+        "value": 5.0
+      }
+    ],
+    "operation": "ql.face.resolve",
+    "possible_causes": [
+      "The predicate does not match the actual geometry values.",
+      "OCCT split one logical face into several at a seam after a boolean.",
+      "The selector was resolved against an older shape state."
+    ],
+    "repair": [
+      "Tighten the predicate (position/axis/tag constraints) or take an explicit member with .first()/.take(n) instead of exactly()."
+    ],
+    "signature": null,
+    "technical_details": null,
+    "what_happened": "QL selector expected exactly 5 face(s), got 6"
+  },
+  "rod_edges": {
+    "documentation_hint": "For full usage details, run help(ql.edge.resolve).",
+    "how_to_fix": [
+      "Read the inventory: hit = matched, near_miss = what exists instead.",
+      "Re-derive selectors from the newest shape after topology-changing ops."
+    ],
+    "inventory": [
+      {
+        "description": "circular arc r=2, length 12.57 mm",
+        "status": "hit",
+        "symbol": "E1"
+      },
+      {
+        "description": "line, length 5 mm",
+        "status": "hit",
+        "symbol": "E2"
+      },
+      {
+        "description": "circular arc r=2, length 12.57 mm",
+        "status": "hit",
+        "symbol": "E3"
+      }
+    ],
+    "measurements": [
+      {
+        "name": "matched_count",
+        "unit": "",
+        "value": 3.0
+      },
+      {
+        "name": "candidate_count",
+        "unit": "",
+        "value": 3.0
+      },
+      {
+        "name": "expected_count",
+        "unit": "",
+        "value": 1.0
+      }
+    ],
+    "operation": "ql.edge.resolve",
+    "possible_causes": [
+      "The predicate does not match the actual geometry values.",
+      "OCCT split one logical face into several at a seam after a boolean.",
+      "The selector was resolved against an older shape state."
+    ],
+    "repair": [
+      "Tighten the predicate (position/axis/tag constraints) or take an explicit member with .first()/.take(n) instead of exactly()."
+    ],
+    "signature": null,
+    "technical_details": null,
+    "what_happened": "QL selector expected exactly 1 edge(s), got 3"
+  },
+  "solids": {
+    "documentation_hint": "For full usage details, run help(ql.solid.resolve).",
+    "how_to_fix": [
+      "Read the inventory: hit = matched, near_miss = what exists instead.",
+      "Re-derive selectors from the newest shape after topology-changing ops."
+    ],
+    "inventory": [
+      {
+        "description": "solid",
+        "status": "hit",
+        "symbol": "S1"
+      }
+    ],
+    "measurements": [
+      {
+        "name": "matched_count",
+        "unit": "",
+        "value": 1.0
+      },
+      {
+        "name": "candidate_count",
+        "unit": "",
+        "value": 1.0
+      },
+      {
+        "name": "expected_count",
+        "unit": "",
+        "value": 2.0
+      }
+    ],
+    "operation": "ql.solid.resolve",
+    "possible_causes": [
+      "The predicate does not match the actual geometry values.",
+      "OCCT split one logical face into several at a seam after a boolean.",
+      "The selector was resolved against an older shape state."
+    ],
+    "repair": [
+      "No entity satisfies the full predicate; the near-miss inventory above lists what actually exists \u2014 align predicate values with those measured geometries.",
+      "Booleans and fillets re-split topology; re-derive the selector from the newest shape instead of reusing one resolved earlier."
+    ],
+    "signature": null,
+    "technical_details": null,
+    "what_happened": "QL selector expected exactly 2 solid(s), got 1"
+  },
+  "split_edges": {
+    "documentation_hint": "For full usage details, run help(ql.edge.resolve).",
+    "how_to_fix": [
+      "Read the inventory: hit = matched, near_miss = what exists instead.",
+      "Re-derive selectors from the newest shape after topology-changing ops."
+    ],
+    "inventory": [
+      {
+        "description": "line, length 7 mm",
+        "status": "hit",
+        "symbol": "E1"
+      },
+      {
+        "description": "circular arc r=10, length 62.83 mm",
+        "status": "hit",
+        "symbol": "E2"
+      },
+      {
+        "description": "circular arc r=10, length 62.83 mm",
+        "status": "hit",
+        "symbol": "E3"
+      },
+      {
+        "description": "circular arc r=9, length 56.55 mm",
+        "status": "hit",
+        "symbol": "E4"
+      },
+      {
+        "description": "line, length 6 mm",
+        "status": "hit",
+        "symbol": "E5"
+      },
+      {
+        "description": "circular arc r=9, length 56.55 mm",
+        "status": "hit",
+        "symbol": "E6"
+      },
+      {
+        "description": "circular arc r=10, length 62.83 mm",
+        "status": "hit",
+        "symbol": "E7"
+      },
+      {
+        "description": "line, length 7 mm",
+        "status": "hit",
+        "symbol": "E8"
+      },
+      {
+        "description": "circular arc r=10, length 62.83 mm",
+        "status": "hit",
+        "symbol": "E9"
+      }
+    ],
+    "measurements": [
+      {
+        "name": "matched_count",
+        "unit": "",
+        "value": 9.0
+      },
+      {
+        "name": "candidate_count",
+        "unit": "",
+        "value": 9.0
+      },
+      {
+        "name": "expected_count",
+        "unit": "",
+        "value": 1.0
+      }
+    ],
+    "operation": "ql.edge.resolve",
+    "possible_causes": [
+      "The predicate does not match the actual geometry values.",
+      "OCCT split one logical face into several at a seam after a boolean.",
+      "The selector was resolved against an older shape state."
+    ],
+    "repair": [
+      "Tighten the predicate (position/axis/tag constraints) or take an explicit member with .first()/.take(n) instead of exactly()."
+    ],
+    "signature": null,
+    "technical_details": null,
+    "what_happened": "QL selector expected exactly 1 edge(s), got 9"
+  },
+  "split_group": {
+    "documentation_hint": "For full usage details, run help(ql.face.resolve).",
+    "how_to_fix": [
+      "Read the inventory: hit = matched, near_miss = what exists instead.",
+      "Re-derive selectors from the newest shape after topology-changing ops."
+    ],
+    "inventory": [
+      {
+        "description": "cylinder r=10, axis (0,0,1) @ (0,0,0), spans z=[13, 20]",
+        "status": "hit",
+        "symbol": "F1"
+      },
+      {
+        "description": "plane, normal (0, 0, 1), spans x=[-10, 10]",
+        "status": "near_miss",
+        "symbol": "F2"
+      },
+      {
+        "description": "plane, normal (0, 0, 1), spans x=[-10, 10]",
+        "status": "near_miss",
+        "symbol": "F3"
+      },
+      {
+        "description": "cylinder r=9, axis (0,0,1) @ (0,0,5), spans z=[7, 13]",
+        "status": "hit",
+        "symbol": "F4"
+      },
+      {
+        "description": "plane, normal (0, 0, 1), spans x=[-10, 10]",
+        "status": "near_miss",
+        "symbol": "F5"
+      },
+      {
+        "description": "cylinder r=10, axis (0,0,1) @ (0,0,0), spans z=[0, 7]",
+        "status": "hit",
+        "symbol": "F6"
+      },
+      {
+        "description": "plane, normal (0, 0, 1), spans x=[-10, 10]",
+        "status": "near_miss",
+        "symbol": "F7"
+      }
+    ],
+    "measurements": [
+      {
+        "name": "matched_count",
+        "unit": "",
+        "value": 3.0
+      },
+      {
+        "name": "candidate_count",
+        "unit": "",
+        "value": 7.0
+      },
+      {
+        "name": "expected_count",
+        "unit": "",
+        "value": 1.0
+      }
+    ],
+    "operation": "ql.face.resolve",
+    "possible_causes": [
+      "The predicate does not match the actual geometry values.",
+      "OCCT split one logical face into several at a seam after a boolean.",
+      "The selector was resolved against an older shape state."
+    ],
+    "repair": [
+      "F1+F6 lie on one logical surface split by a seam \u2014 select the whole group (drop the exactly(1) assertion) or target it via a role tag.",
+      "Tighten the predicate (position/axis/tag constraints) or take an explicit member with .first()/.take(n) instead of exactly()."
+    ],
+    "signature": null,
+    "technical_details": null,
+    "what_happened": "QL selector expected exactly 1 face(s), got 3; the matched faces include 1 logical surface group(s) split by seams"
+  },
+  "vertices": {
+    "documentation_hint": "For full usage details, run help(ql.vertex.resolve).",
+    "how_to_fix": [
+      "Read the inventory: hit = matched, near_miss = what exists instead.",
+      "Re-derive selectors from the newest shape after topology-changing ops."
+    ],
+    "inventory": [
+      {
+        "description": "(0, 0, 30)",
+        "status": "hit",
+        "symbol": "V1"
+      },
+      {
+        "description": "(0, 0, 0)",
+        "status": "hit",
+        "symbol": "V2"
+      },
+      {
+        "description": "(0, 20, 30)",
+        "status": "hit",
+        "symbol": "V3"
+      },
+      {
+        "description": "(0, 20, 0)",
+        "status": "hit",
+        "symbol": "V4"
+      },
+      {
+        "description": "(10, 0, 30)",
+        "status": "hit",
+        "symbol": "V5"
+      },
+      {
+        "description": "(10, 0, 0)",
+        "status": "hit",
+        "symbol": "V6"
+      },
+      {
+        "description": "(10, 20, 30)",
+        "status": "hit",
+        "symbol": "V7"
+      },
+      {
+        "description": "(10, 20, 0)",
+        "status": "hit",
+        "symbol": "V8"
+      }
+    ],
+    "measurements": [
+      {
+        "name": "matched_count",
+        "unit": "",
+        "value": 8.0
+      },
+      {
+        "name": "candidate_count",
+        "unit": "",
+        "value": 8.0
+      },
+      {
+        "name": "expected_count",
+        "unit": "",
+        "value": 2.0
+      }
+    ],
+    "operation": "ql.vertex.resolve",
+    "possible_causes": [
+      "The predicate does not match the actual geometry values.",
+      "OCCT split one logical face into several at a seam after a boolean.",
+      "The selector was resolved against an older shape state."
+    ],
+    "repair": [
+      "Tighten the predicate (position/axis/tag constraints) or take an explicit member with .first()/.take(n) instead of exactly()."
+    ],
+    "signature": null,
+    "technical_details": null,
+    "what_happened": "QL selector expected exactly 2 vertex(s), got 8"
+  },
+  "zero_sphere": {
+    "documentation_hint": "For full usage details, run help(ql.face.resolve).",
+    "how_to_fix": [
+      "Read the inventory: hit = matched, near_miss = what exists instead.",
+      "Re-derive selectors from the newest shape after topology-changing ops."
+    ],
+    "inventory": [
+      {
+        "description": "cylinder r=10, axis (0,0,1) @ (0,0,0), spans z=[13, 20]",
+        "status": "near_miss",
+        "symbol": "F1"
+      },
+      {
+        "description": "plane, normal (0, 0, 1), spans x=[-10, 10]",
+        "status": "near_miss",
+        "symbol": "F2"
+      },
+      {
+        "description": "plane, normal (0, 0, 1), spans x=[-10, 10]",
+        "status": "near_miss",
+        "symbol": "F3"
+      },
+      {
+        "description": "cylinder r=9, axis (0,0,1) @ (0,0,5), spans z=[7, 13]",
+        "status": "near_miss",
+        "symbol": "F4"
+      },
+      {
+        "description": "plane, normal (0, 0, 1), spans x=[-10, 10]",
+        "status": "near_miss",
+        "symbol": "F5"
+      },
+      {
+        "description": "cylinder r=10, axis (0,0,1) @ (0,0,0), spans z=[0, 7]",
+        "status": "near_miss",
+        "symbol": "F6"
+      },
+      {
+        "description": "plane, normal (0, 0, 1), spans x=[-10, 10]",
+        "status": "near_miss",
+        "symbol": "F7"
+      }
+    ],
+    "measurements": [
+      {
+        "name": "matched_count",
+        "unit": "",
+        "value": 0.0
+      },
+      {
+        "name": "candidate_count",
+        "unit": "",
+        "value": 7.0
+      },
+      {
+        "name": "expected_count",
+        "unit": "",
+        "value": 1.0
+      }
+    ],
+    "operation": "ql.face.resolve",
+    "possible_causes": [
+      "The predicate does not match the actual geometry values.",
+      "OCCT split one logical face into several at a seam after a boolean.",
+      "The selector was resolved against an older shape state."
+    ],
+    "repair": [
+      "No entity satisfies the full predicate; the near-miss inventory above lists what actually exists \u2014 align predicate values with those measured geometries.",
+      "Booleans and fillets re-split topology; re-derive the selector from the newest shape instead of reusing one resolved earlier."
+    ],
+    "signature": null,
+    "technical_details": null,
+    "what_happened": "QL selector expected at least 1 face(s), got 0"
+  }
+}

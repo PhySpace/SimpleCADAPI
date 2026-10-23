@@ -6,10 +6,10 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from OCP.BRepAdaptor import BRepAdaptor_Surface
-from OCP.BRepTools import BRepTools
-from OCP.TopoDS import TopoDS, TopoDS_Shape
-from OCP.gp import gp_Pnt, gp_Vec
+from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Surface
+from simplecadapi._cpp.occt.BRepTools import BRepTools
+from simplecadapi._cpp.occt.TopoDS import TopoDS, TopoDS_Shape
+from simplecadapi._cpp.occt.gp import gp_Pnt, gp_Vec
 
 from .model import BRepModel, index_shape_rbrepmodel, load_step_rbrepmodel
 

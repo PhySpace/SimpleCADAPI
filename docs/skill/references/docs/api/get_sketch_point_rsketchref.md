@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def get_sketch_point_rsketchref(sketch: Sketch, point_path: str) -> SketchRef
+def get_sketch_point_rsketchref(sketch, point_path)
 ```
 
 *Source: operators/sketch.py*

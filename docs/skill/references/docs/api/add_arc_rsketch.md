@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def add_arc_rsketch(sketch: Sketch, entity_id: str, start: Union[SketchRef, str], end: Union[SketchRef, str], center: Union[SketchRef, str], *, construction: bool = False) -> Sketch
+def add_arc_rsketch(sketch, entity_id, start, end, center, *, construction=False)
 ```
 
 *Source: operators/sketch.py*

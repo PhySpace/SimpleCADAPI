@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_point_rvertex(x: ScalarLike, y: ScalarLike, z: ScalarLike) -> Vertex
+def make_point_rvertex(x, y, z)
 ```
 
 *Source: operators/geometry.py*

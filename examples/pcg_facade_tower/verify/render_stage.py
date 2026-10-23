@@ -312,9 +312,9 @@ def render_s4() -> list[str]:
 
 def _clip(shape, lo: tuple, hi: tuple):
     """Diagnostic: shape ∩ axis box (for close-ups of whole-plan slabs)."""
-    from OCP.BRepAlgoAPI import BRepAlgoAPI_Common
-    from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
-    from OCP.gp import gp_Pnt
+    from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Common
+    from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakeBox
+    from simplecadapi._cpp.occt.gp import gp_Pnt
 
     return BRepAlgoAPI_Common(shape, BRepPrimAPI_MakeBox(gp_Pnt(*lo), gp_Pnt(*hi)).Shape()).Shape()
 

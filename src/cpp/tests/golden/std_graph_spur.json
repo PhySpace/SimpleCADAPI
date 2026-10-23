@@ -1,0 +1,16 @@
+{
+  "counts": {
+    "add_arc_rsketch": 24,
+    "add_bspline_rsketch": 48,
+    "add_circle_rsketch": 3,
+    "add_point_rsketch": 73,
+    "make_constrain_concentric_rsketch": 2,
+    "make_constrain_fix_rsketch": 1,
+    "make_constrain_radius_rsketch": 3,
+    "make_extrude_rsolid": 1,
+    "make_face_from_sketch_rface": 1,
+    "make_sketch_rsketch": 1
+  },
+  "has_fix": true,
+  "with_delta": []
+}

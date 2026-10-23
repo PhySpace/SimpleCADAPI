@@ -1,0 +1,421 @@
+{
+  "adapter": {
+    "bbox": [
+      -2.0,
+      -2.0,
+      0.0,
+      2.0,
+      2.0,
+      4.0
+    ],
+    "edge_tags": [
+      [
+        "adapter.edge.end",
+        "edge.boundary",
+        "edge.cone.end_boundary"
+      ],
+      [
+        "adapter.edge.seam",
+        "edge.boundary",
+        "edge.cone.seam",
+        "role.seam"
+      ],
+      [
+        "adapter.edge.start",
+        "edge.boundary",
+        "edge.cone.start_boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "adapter.face.end",
+        "face.cone.end",
+        "role.outlet"
+      ],
+      [
+        "adapter.face.side",
+        "face.cone.side"
+      ],
+      [
+        "adapter.face.start",
+        "anchor.base",
+        "face.cone.start"
+      ]
+    ],
+    "faces": 3,
+    "geo": {
+      "axis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "bottom_face_center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bottom_radius": 2.0,
+      "height": 4.0,
+      "top_radius": 1.0,
+      "type": "cone"
+    },
+    "tags": [
+      "adapter.solid",
+      "cone",
+      "geom.primitive.cone",
+      "part.adapter"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 6,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_cone_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 29.321531433504667
+  },
+  "cone": {
+    "bbox": [
+      -2.0,
+      -2.0,
+      0.0,
+      2.0,
+      2.0,
+      3.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "edge.cone.end_boundary"
+      ],
+      [
+        "edge.boundary",
+        "edge.cone.seam"
+      ],
+      [
+        "edge.boundary",
+        "edge.cone.start_boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.cone.side"
+      ],
+      [
+        "face.cone.start"
+      ]
+    ],
+    "faces": 2,
+    "geo": {
+      "axis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "bottom_face_center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bottom_radius": 2.0,
+      "height": 3.0,
+      "top_radius": 0.0,
+      "type": "cone"
+    },
+    "tags": [
+      "cone",
+      "geom.primitive.cone"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 5,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_cone_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 12.566370614359144
+  },
+  "frustum": {
+    "bbox": [
+      -3.0,
+      -3.0,
+      0.0,
+      3.0,
+      3.0,
+      4.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "edge.cone.end_boundary"
+      ],
+      [
+        "edge.boundary",
+        "edge.cone.seam"
+      ],
+      [
+        "edge.boundary",
+        "edge.cone.start_boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.cone.end"
+      ],
+      [
+        "face.cone.side"
+      ],
+      [
+        "face.cone.start"
+      ]
+    ],
+    "faces": 3,
+    "geo": {
+      "axis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "bottom_face_center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bottom_radius": 3.0,
+      "height": 4.0,
+      "top_radius": 1.0,
+      "type": "cone"
+    },
+    "tags": [
+      "cone",
+      "geom.primitive.cone"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 6,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_cone_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 54.45427266222295
+  },
+  "horizontal": {
+    "bbox": [
+      0.0,
+      -1.0,
+      -1.0,
+      3.0000000000000004,
+      1.0,
+      1.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "edge.cone.end_boundary"
+      ],
+      [
+        "edge.boundary",
+        "edge.cone.seam"
+      ],
+      [
+        "edge.boundary",
+        "edge.cone.start_boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.cone.side"
+      ],
+      [
+        "face.cone.start"
+      ]
+    ],
+    "faces": 2,
+    "geo": {
+      "axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "bottom_face_center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bottom_radius": 1.0,
+      "height": 3.0,
+      "top_radius": 0.0,
+      "type": "cone"
+    },
+    "tags": [
+      "cone",
+      "geom.primitive.cone"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 5,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_cone_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 3.141592653589785
+  },
+  "offset": {
+    "bbox": [
+      0.5,
+      0.5,
+      0.0,
+      3.5,
+      3.5,
+      2.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "edge.cone.end_boundary"
+      ],
+      [
+        "edge.boundary",
+        "edge.cone.seam"
+      ],
+      [
+        "edge.boundary",
+        "edge.cone.start_boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.cone.side"
+      ],
+      [
+        "face.cone.start"
+      ]
+    ],
+    "faces": 2,
+    "geo": {
+      "axis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "bottom_face_center": [
+        2.0,
+        2.0,
+        0.0
+      ],
+      "bottom_radius": 1.5,
+      "height": 2.0,
+      "top_radius": 0.0,
+      "type": "cone"
+    },
+    "tags": [
+      "cone",
+      "geom.primitive.cone"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 5,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_cone_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 4.712388980384678
+  },
+  "tip": {
+    "bbox": [
+      -2.0,
+      -2.0,
+      0.0,
+      2.0,
+      2.0,
+      4.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "edge.cone.end_boundary",
+        "tip.edge.end"
+      ],
+      [
+        "edge.boundary",
+        "edge.cone.seam",
+        "tip.edge.seam"
+      ],
+      [
+        "edge.boundary",
+        "edge.cone.start_boundary",
+        "tip.edge.start"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.cone.side",
+        "tip.face.side"
+      ],
+      [
+        "face.cone.start",
+        "tip.face.start"
+      ]
+    ],
+    "faces": 2,
+    "geo": {
+      "axis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "bottom_face_center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bottom_radius": 2.0,
+      "height": 4.0,
+      "top_radius": 0.0,
+      "type": "cone"
+    },
+    "tags": [
+      "cone",
+      "geom.primitive.cone",
+      "tip.solid"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 5,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_cone_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 16.75516081914552
+  }
+}

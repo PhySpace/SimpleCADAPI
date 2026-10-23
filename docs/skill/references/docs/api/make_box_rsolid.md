@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_box_rsolid(width: ScalarLike, height: ScalarLike, depth: ScalarLike, bottom_face_center: Tuple[float, float, float] = (0, 0, 0), *, tag_prefix: Optional[str] = None, result_tag: Optional[str] = None, bottom_face_tag: Optional[str] = None, top_face_tag: Optional[str] = None, front_face_tag: Optional[str] = None, back_face_tag: Optional[str] = None, left_face_tag: Optional[str] = None, right_face_tag: Optional[str] = None) -> Solid
+def make_box_rsolid(width, height, depth, bottom_face_center=(0, 0, 0), *, tag_prefix=None, result_tag=None, bottom_face_tag=None, top_face_tag=None, front_face_tag=None, back_face_tag=None, left_face_tag=None, right_face_tag=None)
 ```
 
 *Source: operators/geometry.py*

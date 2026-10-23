@@ -4,16 +4,16 @@ import json
 from copy import deepcopy
 
 import pytest
-from OCP.BRep import BRep_Builder
-from OCP.BRepBuilderAPI import (
+from simplecadapi._cpp.occt.BRep import BRep_Builder
+from simplecadapi._cpp.occt.BRepBuilderAPI import (
     BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeFace,
     BRepBuilderAPI_MakeVertex,
     BRepBuilderAPI_MakeWire,
 )
-from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
-from OCP.TopoDS import TopoDS_Compound
-from OCP.gp import gp_Pnt
+from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakeBox
+from simplecadapi._cpp.occt.TopoDS import TopoDS_Compound
+from simplecadapi._cpp.occt.gp import gp_Pnt
 
 from simplecadapi.inspect import brep
 

@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class DimensionTolerance(lower_deviation: float, upper_deviation: float)
+class DimensionTolerance(lower_deviation, upper_deviation)
 ```
 
 *Source: params/expr.py*

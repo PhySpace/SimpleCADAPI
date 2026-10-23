@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class PublicConnectorRef(public_connector_id: str, component_id: str, connector_id: str, name: Optional[str] = None)
+class PublicConnectorRef(public_connector_id, component_id, connector_id, name=None)
 ```
 
 *Source: product/assembly.py*

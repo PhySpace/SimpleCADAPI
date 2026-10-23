@@ -55,11 +55,11 @@ def test_reference_failure_reports_basic_geometry_separately(tmp_path, monkeypat
 
 
 def test_rational_circle_cylinder_has_mathematical_area_four_pi():
-    from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace
-    from OCP.BRepPrimAPI import BRepPrimAPI_MakePrism
-    from OCP.Geom import Geom_Circle
-    from OCP.GeomConvert import GeomConvert
-    from OCP.gp import gp_Ax2, gp_Pnt, gp_Dir, gp_Vec
+    from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace
+    from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakePrism
+    from simplecadapi._cpp.occt.Geom import Geom_Circle
+    from simplecadapi._cpp.occt.GeomConvert import GeomConvert
+    from simplecadapi._cpp.occt.gp import gp_Ax2, gp_Pnt, gp_Dir, gp_Vec
     from b3ftc._validate_worker import _area, _volume
 
     circle = Geom_Circle(gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), 1)
@@ -174,11 +174,11 @@ def test_missing_trace_rejected_but_other_cases_continue(tmp_path):
 
 
 def test_reference_step_detects_equal_volume_equal_bbox_different_holes(tmp_path):
-    from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
-    from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder
-    from OCP.gp import gp_Pnt, gp_Ax2, gp_Dir
-    from OCP.STEPControl import STEPControl_Writer, STEPControl_AsIs
-    from OCP.IFSelect import IFSelect_RetDone
+    from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Cut
+    from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder
+    from simplecadapi._cpp.occt.gp import gp_Pnt, gp_Ax2, gp_Dir
+    from simplecadapi._cpp.occt.STEPControl import STEPControl_Writer, STEPControl_AsIs
+    from simplecadapi._cpp.occt.IFSelect import IFSelect_RetDone
 
     box = BRepPrimAPI_MakeBox(gp_Pnt(-5, -5, 0), 10, 10, 10).Shape()
     hole = BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(2, 0, 0), gp_Dir(0, 0, 1)), 1, 10).Shape()

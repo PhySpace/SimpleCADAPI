@@ -1,0 +1,203 @@
+{
+  "assembly": {
+    "assembly_id": "fixture",
+    "components": [
+      {
+        "component_id": "bolt_left",
+        "item_id": "bolt",
+        "item_kind": "part",
+        "name": null,
+        "placement": {
+          "origin": [
+            -5.0,
+            0.0,
+            0.0
+          ],
+          "x_axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "y_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "z_axis": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      {
+        "component_id": "bolt_right",
+        "item_id": "bolt",
+        "item_kind": "part",
+        "name": null,
+        "placement": {
+          "origin": [
+            5.0,
+            0.0,
+            0.0
+          ],
+          "x_axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "y_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "z_axis": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      }
+    ],
+    "constraints": [],
+    "grounded_component_ids": [],
+    "name": "Fixture",
+    "public_connectors": []
+  },
+  "empty": {
+    "assembly_id": "fixture",
+    "components": [],
+    "constraints": [],
+    "grounded_component_ids": [],
+    "name": "Fixture",
+    "public_connectors": []
+  },
+  "ids": [
+    "bolt_left",
+    "bolt_right"
+  ],
+  "moved": {
+    "assembly_id": "fixture",
+    "components": [
+      {
+        "component_id": "bolt_left",
+        "item_id": "bolt",
+        "item_kind": "part",
+        "name": null,
+        "placement": {
+          "origin": [
+            -9.0,
+            0.0,
+            0.0
+          ],
+          "x_axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "y_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "z_axis": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      {
+        "component_id": "bolt_right",
+        "item_id": "bolt",
+        "item_kind": "part",
+        "name": null,
+        "placement": {
+          "origin": [
+            5.0,
+            0.0,
+            0.0
+          ],
+          "x_axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "y_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "z_axis": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      }
+    ],
+    "constraints": [],
+    "grounded_component_ids": [],
+    "name": "Fixture",
+    "public_connectors": []
+  },
+  "named": {
+    "assembly_id": "fixture",
+    "components": [
+      {
+        "component_id": "named",
+        "item_id": "bolt",
+        "item_kind": "part",
+        "name": "Nut",
+        "placement": {
+          "origin": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "x_axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "y_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "z_axis": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      }
+    ],
+    "constraints": [],
+    "grounded_component_ids": [],
+    "name": "Fixture",
+    "public_connectors": []
+  },
+  "original_unmoved": {
+    "origin": [
+      -5.0,
+      0.0,
+      0.0
+    ],
+    "x_axis": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "y_axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "z_axis": [
+      0.0,
+      0.0,
+      1.0
+    ]
+  }
+}

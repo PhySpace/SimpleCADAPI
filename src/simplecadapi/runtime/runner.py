@@ -35,7 +35,7 @@ from typing import Any, Literal, TypeVar
 from ..artifacts.assembly_io import attached_definition
 from ..artifacts.canonical import validate_logical_id
 from ..build.definition import Definition
-from ..recording.graph import isolated_recording
+from simplecadapi._cpp import isolated_recording
 from ._marimo import (
     AppScriptRunner,
     CellId_t,

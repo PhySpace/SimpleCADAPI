@@ -1,0 +1,43 @@
+{
+  "coincident": {
+    "how_to_fix": [
+      "Pass start and end as 3-element numeric tuples or valid expressions.",
+      "Ensure the two points are distinct and finite."
+    ],
+    "operation": "make_line_redge",
+    "possible_causes": [
+      "The start or end point is not a valid finite 3D point.",
+      "The transformed points are degenerate or rejected by the kernel."
+    ],
+    "technical_details": "Standard_Failure: BRep_API: command not done",
+    "what_happened": "Failed to create a line edge."
+  },
+  "one_point": {
+    "how_to_fix": [
+      "Pass at least two finite 3D points.",
+      "If closed=True, ensure the sequence describes a valid loop.",
+      "Inspect the evaluated points before retrying."
+    ],
+    "operation": "make_polyline_rwire",
+    "possible_causes": [
+      "Fewer than two points were provided.",
+      "One or more points are invalid or non-finite.",
+      "The kernel rejected the resulting polyline geometry."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create a polyline wire."
+  },
+  "segment_coincident": {
+    "how_to_fix": [
+      "Pass start and end as 3-element numeric tuples or valid expressions.",
+      "Ensure the two points are distinct and finite."
+    ],
+    "operation": "make_line_redge",
+    "possible_causes": [
+      "The start or end point is not a valid finite 3D point.",
+      "The transformed points are degenerate or rejected by the kernel."
+    ],
+    "technical_details": "Standard_Failure: BRep_API: command not done",
+    "what_happened": "Failed to create a line edge."
+  }
+}

@@ -1,0 +1,131 @@
+{
+  "alias": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      0.0
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 3.0,
+    "tags": [],
+    "track": {
+      "op": "make_polyline_wire"
+    },
+    "type": "Wire",
+    "vertices": 4
+  },
+  "closed": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      0.0
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 4.0,
+    "tags": [],
+    "track": {
+      "op": "make_polyline_wire"
+    },
+    "type": "Wire",
+    "vertices": 4
+  },
+  "open": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      0.0
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 3.0,
+    "tags": [],
+    "track": {
+      "op": "make_polyline_wire"
+    },
+    "type": "Wire",
+    "vertices": 4
+  },
+  "two_points_closed": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 1.0,
+    "tags": [],
+    "track": {
+      "op": "make_polyline_wire"
+    },
+    "type": "Wire",
+    "vertices": 2
+  }
+}

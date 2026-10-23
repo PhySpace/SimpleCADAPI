@@ -59,8 +59,8 @@ def pixel_transform(scale, x, y) -> dict:
 
 
 def model_metadata(model) -> dict:
-    from OCP.BRepTools import BRepTools
-    from OCP.TopTools import TopTools_FormatVersion
+    from simplecadapi._cpp.occt.BRepTools import BRepTools
+    from simplecadapi._cpp.occt.TopTools import TopTools_FormatVersion
     from ..brep.queries import _model
 
     indexed = _model(model)

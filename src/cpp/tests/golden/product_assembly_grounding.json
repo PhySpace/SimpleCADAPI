@@ -1,0 +1,128 @@
+{
+  "both": [
+    "base",
+    "other"
+  ],
+  "ground_bad_assembly": {
+    "how_to_fix": [
+      "Use a component_id already added to the Assembly."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "ground_component_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "The component_id does not exist in the Assembly."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: assembly must be an Assembly",
+    "what_happened": "Failed to ground the assembly component."
+  },
+  "ground_missing": {
+    "how_to_fix": [
+      "Use a component_id already added to the Assembly."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "ground_component_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "The component_id does not exist in the Assembly."
+    ],
+    "repair": [],
+    "technical_details": "KeyError: \"assembly has no component_id 'ghost'\"",
+    "what_happened": "Failed to ground the assembly component."
+  },
+  "grounded": [
+    "base"
+  ],
+  "to_dict": {
+    "assembly_id": "g",
+    "components": [
+      {
+        "component_id": "base",
+        "item_id": "p",
+        "item_kind": "part",
+        "name": null,
+        "placement": {
+          "origin": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "x_axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "y_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "z_axis": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      },
+      {
+        "component_id": "other",
+        "item_id": "p",
+        "item_kind": "part",
+        "name": null,
+        "placement": {
+          "origin": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "x_axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "y_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "z_axis": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      }
+    ],
+    "constraints": [],
+    "grounded_component_ids": [
+      "base",
+      "other"
+    ],
+    "name": null,
+    "public_connectors": []
+  },
+  "twice": [
+    "base"
+  ],
+  "unground_missing": {
+    "how_to_fix": [
+      "Use a component_id already added to the Assembly."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "unground_component_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "The component_id does not exist in the Assembly."
+    ],
+    "repair": [],
+    "technical_details": "KeyError: \"assembly has no component_id 'ghost'\"",
+    "what_happened": "Failed to unground the assembly component."
+  },
+  "ungrounded": [
+    "other"
+  ]
+}

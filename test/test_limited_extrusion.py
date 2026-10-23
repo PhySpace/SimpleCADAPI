@@ -3,13 +3,24 @@ from __future__ import annotations
 
 import json
 import pytest
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
+from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Cut
 
 import simplecadapi as s
-from simplecadapi.kernel.ocp_booleans import solids_of
+from simplecadapi._cpp.occt.TopAbs import TopAbs_SOLID
+from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
+from simplecadapi._cpp.occt.TopoDS import TopoDS
 from simplecadapi.kernel.ocp_properties import center_of_mass, volume
 from simplecadapi import extrude_until_rsolid
 from simplecadapi.recording.graph import GraphSession
+
+
+def solids_of(shape):
+    out = []
+    explorer = TopExp_Explorer(shape, TopAbs_SOLID)
+    while explorer.More():
+        out.append(TopoDS.Solid_s(explorer.Current()))
+        explorer.Next()
+    return out
 
 
 @pytest.mark.parametrize("until,height", [("NEXT", 5), ("LAST", 7)])

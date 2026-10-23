@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class ScalarLimit(lower_value: float, upper_value: float)
+class ScalarLimit(lower_value, upper_value)
 ```
 
 *Source: product/constraint.py*

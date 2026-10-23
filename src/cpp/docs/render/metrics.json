@@ -1,0 +1,62 @@
+{
+ "box-studio-ss2-4v": {
+  "silhouette_iou": 0.9998,
+  "mad_union": 0.88,
+  "mad_both": 0.88,
+  "edge_f1": 1.0,
+  "edge_precision": 1.0,
+  "edge_recall": 1.0,
+  "vtk_ink_px": 21622,
+  "soft_ink_px": 21657
+ },
+ "fillet-studio-ss2-4v": {
+  "silhouette_iou": 0.9998,
+  "mad_union": 1.43,
+  "mad_both": 1.42,
+  "edge_f1": 0.984,
+  "edge_precision": 0.996,
+  "edge_recall": 0.972,
+  "vtk_ink_px": 22958,
+  "soft_ink_px": 22295
+ },
+ "gear-studio-ss2-4v": {
+  "silhouette_iou": 0.999,
+  "mad_union": 1.89,
+  "mad_both": 1.89,
+  "edge_f1": 0.955,
+  "edge_precision": 0.926,
+  "edge_recall": 0.986,
+  "vtk_ink_px": 10879,
+  "soft_ink_px": 11812
+ },
+ "bolt-studio-ss2-4v": {
+  "silhouette_iou": 0.9999,
+  "mad_union": 2.41,
+  "mad_both": 2.41,
+  "edge_f1": 0.994,
+  "edge_precision": 0.998,
+  "edge_recall": 0.99,
+  "vtk_ink_px": 31280,
+  "soft_ink_px": 30760
+ },
+ "gear-standard-ss2-4v": {
+  "silhouette_iou": 0.9972,
+  "mad_union": 1.86,
+  "mad_both": 1.84,
+  "edge_f1": 0.95,
+  "edge_precision": 0.906,
+  "edge_recall": 0.999,
+  "vtk_ink_px": 7378,
+  "soft_ink_px": 8372
+ },
+ "fillet-standard-ss1-1v": {
+  "silhouette_iou": 0.9972,
+  "mad_union": 0.73,
+  "mad_both": 0.61,
+  "edge_f1": 0.998,
+  "edge_precision": 0.997,
+  "edge_recall": 1.0,
+  "vtk_ink_px": 16986,
+  "soft_ink_px": 18020
+ }
+}

@@ -1,0 +1,228 @@
+{
+  "again": {
+    "authored": {
+      "arm": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "base": {
+        "origin": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "placements": {
+      "arm": {
+        "origin": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          0.838670567945424,
+          0.5446390350150271,
+          0.0
+        ],
+        "y_axis": [
+          -0.5446390350150271,
+          0.838670567945424,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          -0.0,
+          1.0
+        ]
+      },
+      "base": {
+        "origin": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "report": {
+      "grounded_component_ids": [
+        "base"
+      ],
+      "residuals": [
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "hinge",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        }
+      ],
+      "solved": true,
+      "solved_component_ids": [
+        "base",
+        "arm"
+      ],
+      "unsolved_component_ids": []
+    }
+  },
+  "once": {
+    "authored": {
+      "arm": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "base": {
+        "origin": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "placements": {
+      "arm": {
+        "origin": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          0.838670567945424,
+          0.5446390350150271,
+          0.0
+        ],
+        "y_axis": [
+          -0.5446390350150271,
+          0.838670567945424,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          -0.0,
+          1.0
+        ]
+      },
+      "base": {
+        "origin": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "report": {
+      "grounded_component_ids": [
+        "base"
+      ],
+      "residuals": [
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "hinge",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        }
+      ],
+      "solved": true,
+      "solved_component_ids": [
+        "base",
+        "arm"
+      ],
+      "unsolved_component_ids": []
+    }
+  }
+}

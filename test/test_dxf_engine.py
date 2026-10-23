@@ -104,7 +104,7 @@ class TestRadOneDOF(unittest.TestCase):
         self.assertAlmostEqual(dr["arrow_deg"],
                                math.degrees(math.atan2(u[1], u[0])), places=6)
         r_res = next(x for x in plan.resolved if x.name == "r")
-        self.assertIn("弧内", r_res.resolved)
+        self.assertIn("inside the arc", r_res.resolved)
 
     def test_solver_falls_back_inner_when_outer_blocked(self):
         # 圆心沉入 notes 禁入区下方: at=270° 弧外候选全部进禁入区,
@@ -114,8 +114,8 @@ class TestRadOneDOF(unittest.TestCase):
             DimDecl("size", "front", "radius", "r", center=c, radius=8.0,
                     value=8.0, at=270.0)])).solve()
         r_res = next(x for x in plan.resolved if x.name == "r")
-        self.assertIn("弧内", r_res.resolved, r_res.resolved)
-        self.assertIn("滑移", "".join(r_res.adjust))
+        self.assertIn("inside the arc", r_res.resolved, r_res.resolved)
+        self.assertIn("slide", "".join(r_res.adjust))
 
     def test_rot_is_line_direction_not_overridable(self):
         plan = SheetPlan(_sheet(dims=[
@@ -168,7 +168,7 @@ class TestLinearSlide(unittest.TestCase):
         dr = _lin(plan, "t")
         self.assertTrue(dr.get("extended"))
         r_res = next(x for x in plan.resolved if x.name == "t")
-        self.assertTrue(any(("滑移" in a or "延长" in a) for a in r_res.adjust),
+        self.assertTrue(any(("slid" in a or "extended" in a) for a in r_res.adjust),
                         r_res.adjust)
 
     def test_apply_lin_slide(self):
@@ -237,7 +237,7 @@ class TestLeaderFixes(unittest.TestCase):
                                 off=(40.0, 0.0), name="L")],
             notes_zone=(25.0, 5.0, 415.0, 292.0))).solve()
         r = next(x for x in plan.resolved if x.kind == "leader")
-        self.assertTrue(any("未找到空位" in a for a in r.adjust), r.adjust)
+        self.assertTrue(any("no free slot found" in a for a in r.adjust), r.adjust)
 
     def test_leader_seg_over_text_no_crash(self):
         # 引线段穿过已注册文本 OBB (旧实现该分支引用未定义名 kk2 → NameError)
@@ -260,8 +260,8 @@ class TestAutoDiag(unittest.TestCase):
                         p1=(-10.0, 0.0), p2=(10.0, 0.0), side="bottom",
                         row=0)], diag_png=str(png))).solve()
             self.assertTrue(png.exists() and png.stat().st_size > 0)
-            self.assertIn("诊断图 DIAG", plan.report())
-            self.assertIn("必读", plan.report())
+            self.assertIn("diagnostic picture DIAG", plan.report())
+            self.assertIn("read it before", plan.report())
 
     def test_apply_returns_instruction(self):
         with tempfile.TemporaryDirectory() as td:
@@ -272,7 +272,7 @@ class TestAutoDiag(unittest.TestCase):
                         row=0)], diag_png=str(png))).solve()
             out = plan.apply([{"op": "lin", "name": "w", "slide": 5.0}])
             self.assertEqual(out.get("diag"), str(png))
-            self.assertIn("必读", out.get("instruction", ""))
+            self.assertIn("read it before", out.get("instruction", ""))
 
 
 class TestMiscContracts(unittest.TestCase):
@@ -289,7 +289,7 @@ class TestMiscContracts(unittest.TestCase):
                           row=0)],
             params={"w": 20.0, "unannotated": 3.0})).solve()
         cov = dict(plan.coverage)
-        self.assertEqual(cov["unannotated"], "参数表")
+        self.assertEqual(cov["unannotated"], "parameter table")
 
     def test_double_render_deterministic(self):
         import ezdxf

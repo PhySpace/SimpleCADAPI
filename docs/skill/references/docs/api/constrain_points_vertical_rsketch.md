@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def constrain_points_vertical_rsketch(sketch: Sketch, a: Union[SketchRef, str], b: Union[SketchRef, str], *, constraint_id: Optional[str] = None) -> Sketch
+def constrain_points_vertical_rsketch(sketch, a, b, *, constraint_id=None)
 ```
 
 *Source: operators/sketch.py*

@@ -1,0 +1,31 @@
+{
+  "meta": {
+    "addendum_factor": 1.0,
+    "axial_width": 12.727922061357857,
+    "backlash": 0.0,
+    "clearance_factor": 0.25,
+    "face_width": 18.0,
+    "inner_scale": 0.6464466094067263,
+    "module": 4.0,
+    "n_teeth": 18,
+    "outer_cone_distance": 50.91168824543143,
+    "outer_pitch_radius": 36.0,
+    "pitch_angle": 45.0,
+    "pressure_angle": 20.0
+  },
+  "shape": {
+    "area": 11529.083540911986,
+    "bbox": [
+      -39.97676897329065,
+      -39.60612554045899,
+      0.0,
+      39.97676897329065,
+      39.60612554045898,
+      12.727922061357857
+    ],
+    "edges": 324,
+    "faces": 110,
+    "tags": [],
+    "volume": 34402.364464437356
+  }
+}

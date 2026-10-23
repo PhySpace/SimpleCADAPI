@@ -1,0 +1,46 @@
+{
+  "q.length * legacy": [
+    "UnitValidationError",
+    "Expression operation 'mul' mixes unit-declared variables with legacy variables that have no unit"
+  ],
+  "q.length ** 0.25": [
+    "UnitValidationError",
+    "Dimensioned powers currently support integer exponents or 0.5"
+  ],
+  "q.length ** legacy": [
+    "UnitValidationError",
+    "Expression operation 'pow' mixes unit-declared variables with legacy variables that have no unit"
+  ],
+  "q.length ** q.angle": [
+    "UnitValidationError",
+    "A physical quantity exponent must be dimensionless"
+  ],
+  "q.length ** q.scalar": [
+    "UnitValidationError",
+    "A dimensioned expression requires a constant numeric exponent"
+  ],
+  "q.length + legacy": [
+    "UnitValidationError",
+    "Expression operation 'add' mixes unit-declared variables with legacy variables that have no unit"
+  ],
+  "q.length + q.angle": [
+    "UnitValidationError",
+    "Expression operation 'add' requires matching dimensions; got Length and Angle"
+  ],
+  "q.length + q.scalar": [
+    "UnitValidationError",
+    "Expression operation 'add' requires matching dimensions; got Length and Dimensionless"
+  ],
+  "scad.asin(q.length)": [
+    "UnitValidationError",
+    "Expression operation 'asin' requires a Dimensionless input"
+  ],
+  "scad.atan2(q.length, q.angle)": [
+    "UnitValidationError",
+    "Expression operation 'atan2' requires matching dimensions; got Length and Angle"
+  ],
+  "scad.sin(q.length)": [
+    "UnitValidationError",
+    "Expression operation 'sin' requires an Angle input"
+  ]
+}

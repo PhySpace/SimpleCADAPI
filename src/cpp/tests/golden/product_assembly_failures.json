@@ -1,0 +1,177 @@
+{
+  "bad_assembly": {
+    "how_to_fix": [
+      "Wrap solids explicitly with make_part_rpart before adding them to assemblies.",
+      "Use a unique component_id within the parent assembly.",
+      "Create placements with make_placement_rplacement or identity_placement_rplacement."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "add_component_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "The item input is not a Part or Assembly.",
+      "The component_id is empty, malformed, or duplicated in the assembly.",
+      "The placement is invalid or missing.",
+      "Adding this subassembly would create an assembly cycle."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: assembly must be an Assembly",
+    "what_happened": "Failed to add the component to the assembly."
+  },
+  "bad_assembly_id": {
+    "how_to_fix": [
+      "Pass a stable assembly_id such as 'fixture_assembly'."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_assembly_rassembly",
+    "possible_causes": [
+      "The assembly_id is empty or uses unsupported characters.",
+      "An Assembly with the same assembly_id already exists in the active GraphSession."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: assembly_id must start with a letter and contain only letters, digits, underscore, dash, dot, or colon",
+    "what_happened": "Failed to create the assembly."
+  },
+  "bad_id": {
+    "how_to_fix": [
+      "Wrap solids explicitly with make_part_rpart before adding them to assemblies.",
+      "Use a unique component_id within the parent assembly.",
+      "Create placements with make_placement_rplacement or identity_placement_rplacement."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "add_component_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "The item input is not a Part or Assembly.",
+      "The component_id is empty, malformed, or duplicated in the assembly.",
+      "The placement is invalid or missing.",
+      "Adding this subassembly would create an assembly cycle."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: component_id must start with a letter and contain only letters, digits, underscore, dash, dot, or colon",
+    "what_happened": "Failed to add the component to the assembly."
+  },
+  "bad_placement": {
+    "how_to_fix": [
+      "Wrap solids explicitly with make_part_rpart before adding them to assemblies.",
+      "Use a unique component_id within the parent assembly.",
+      "Create placements with make_placement_rplacement or identity_placement_rplacement."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "add_component_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "The item input is not a Part or Assembly.",
+      "The component_id is empty, malformed, or duplicated in the assembly.",
+      "The placement is invalid or missing.",
+      "Adding this subassembly would create an assembly cycle."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: placement must be a Placement",
+    "what_happened": "Failed to add the component to the assembly."
+  },
+  "cycle": {
+    "how_to_fix": [
+      "Wrap solids explicitly with make_part_rpart before adding them to assemblies.",
+      "Use a unique component_id within the parent assembly.",
+      "Create placements with make_placement_rplacement or identity_placement_rplacement."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "add_component_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "The item input is not a Part or Assembly.",
+      "The component_id is empty, malformed, or duplicated in the assembly.",
+      "The placement is invalid or missing.",
+      "Adding this subassembly would create an assembly cycle."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: assembly cycle detected for 'root'",
+    "what_happened": "Failed to add the component to the assembly."
+  },
+  "duplicate": {
+    "how_to_fix": [
+      "Wrap solids explicitly with make_part_rpart before adding them to assemblies.",
+      "Use a unique component_id within the parent assembly.",
+      "Create placements with make_placement_rplacement or identity_placement_rplacement."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "add_component_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "The item input is not a Part or Assembly.",
+      "The component_id is empty, malformed, or duplicated in the assembly.",
+      "The placement is invalid or missing.",
+      "Adding this subassembly would create an assembly cycle."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: duplicate component_id in assembly: box",
+    "what_happened": "Failed to add the component to the assembly."
+  },
+  "get_component_missing": {
+    "exception": "KeyError",
+    "message": "\"assembly has no component_id 'ghost'\""
+  },
+  "place_bad_assembly": {
+    "how_to_fix": [
+      "Use add_component_rassembly before placing a component.",
+      "Use a component_id returned in assembly.component_ids().",
+      "Create placements with make_placement_rplacement."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "place_component_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "The component_id does not exist in the assembly.",
+      "The placement is invalid or missing."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: assembly must be an Assembly",
+    "what_happened": "Failed to place the assembly component."
+  },
+  "place_missing": {
+    "how_to_fix": [
+      "Use add_component_rassembly before placing a component.",
+      "Use a component_id returned in assembly.component_ids().",
+      "Create placements with make_placement_rplacement."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "place_component_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "The component_id does not exist in the assembly.",
+      "The placement is invalid or missing."
+    ],
+    "repair": [],
+    "technical_details": "KeyError: \"assembly has no component_id 'ghost'\"",
+    "what_happened": "Failed to place the assembly component."
+  },
+  "raw_solid": {
+    "how_to_fix": [
+      "Wrap solids explicitly with make_part_rpart before adding them to assemblies.",
+      "Use a unique component_id within the parent assembly.",
+      "Create placements with make_placement_rplacement or identity_placement_rplacement."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "add_component_rassembly",
+    "possible_causes": [
+      "The assembly input is not an Assembly.",
+      "The item input is not a Part or Assembly.",
+      "The component_id is empty, malformed, or duplicated in the assembly.",
+      "The placement is invalid or missing.",
+      "Adding this subassembly would create an assembly cycle."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: item must be a Part or Assembly",
+    "what_happened": "Failed to add the component to the assembly."
+  }
+}
