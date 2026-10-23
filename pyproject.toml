@@ -55,6 +55,8 @@ editor = [
 ]
 inspect = [
     "matplotlib>=3.7.0",
+    # BREP rendering (simplecadapi.inspect.brep): cadquery-ocp used to bring VTK in
+    "vtk>=9.3",
 ]
 whucad = [
     "h5py>=3.8",
@@ -155,6 +157,7 @@ dev = [
     "matplotlib>=3.10.8",
     "numpy-stl>=3.2.0",
     "trimesh>=4.11.3",
+    "vtk>=9.3",
     "datamodel-code-generator==0.32.0",
     "ty>=0.0.18",
 ]

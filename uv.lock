@@ -3020,6 +3020,7 @@ gmsh = [
 ]
 inspect = [
     { name = "matplotlib" },
+    { name = "vtk" },
 ]
 whucad = [
     { name = "h5py" },
@@ -3039,6 +3040,7 @@ dev = [
     { name = "twine" },
     { name = "ty" },
     { name = "uvicorn" },
+    { name = "vtk" },
     { name = "websockets", version = "16.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "websockets", version = "17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
@@ -3070,6 +3072,7 @@ requires-dist = [
     { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0,<3" },
     { name = "typing-extensions", specifier = ">=4.12,<5" },
     { name = "uvicorn", marker = "extra == 'editor'", specifier = ">=0.54.0" },
+    { name = "vtk", marker = "extra == 'inspect'", specifier = ">=9.3" },
     { name = "websockets", marker = "extra == 'editor'", specifier = ">=16.1.1" },
 ]
 provides-extras = ["dev", "drawing", "editor", "inspect", "whucad", "gmsh", "fem"]
@@ -3088,6 +3091,7 @@ dev = [
     { name = "twine", specifier = ">=6.1.0" },
     { name = "ty", specifier = ">=0.0.18" },
     { name = "uvicorn", specifier = ">=0.54.0" },
+    { name = "vtk", specifier = ">=9.3" },
     { name = "websockets", specifier = ">=16.1.1" },
 ]
 
