@@ -41,10 +41,9 @@ env:
 
 jobs:
   validate:
-    # Releases are built and published from the private repository only.
-    # The public mirror carries the same workflow file, where a tag push
-    # could never succeed (no release credentials); skip it there.
-    if: github.repository == 'So3Lab/CADIR'
+    # Releases are built and published from this repository only; a fork carries the same workflow file but
+    # not the release credentials, so it must not try.
+    if: github.repository == 'PhySpace/SimpleCADAPI'
     name: Validate the tag
     runs-on: ubuntu-latest
     timeout-minutes: 10
