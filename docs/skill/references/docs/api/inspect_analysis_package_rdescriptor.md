@@ -19,9 +19,10 @@ Check whether a saved analysis package may start STEP reconstruction.
 This is the R0 gate of ``step-reconstruction.md``. It reads the package
 written by ``step-computational-geometry-analysis.md`` and the target STEP,
 and never reruns recognition. Hard failures mean the package must be
-regenerated; soft gaps are budget-skipped per-feature visuals and
-``incomplete`` loft/sweep specialist entries declared under
-``complete_with_gaps``.
+regenerated; soft gaps are budget-skipped per-feature visuals or
+sections and ``incomplete`` loft/sweep specialist entries declared under
+``complete_with_gaps``. Every face the catalog's ``coverage`` reports as
+unowned must be listed in ``unresolved-features.md``.
 
 ## Parameters
 

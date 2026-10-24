@@ -6,6 +6,15 @@ from typing import Any
 
 
 RECONSTRUCTION_SCHEMA_VERSION = "1.0"
+# End conditions that need no extra API support; "implied_by_ruled" tangents
+# follow from the sections of a ruled loft.
+_UNCONSTRAINED_CONDITION_TYPES = {
+    None,
+    "free",
+    "unknown",
+    "singular",
+    "implied_by_ruled",
+}
 
 
 def _operation_candidates(
@@ -20,7 +29,7 @@ def _operation_candidates(
         endpoint
         for endpoint, condition in boundary_conditions.items()
         if isinstance(condition, dict)
-        and condition.get("type") not in {None, "free", "unknown", "singular"}
+        and condition.get("type") not in _UNCONSTRAINED_CONDITION_TYPES
     ]
     candidates: list[dict[str, Any]] = []
     if category == "sweep":
@@ -130,7 +139,7 @@ def build_reconstruction_contract(
     boundary_conditions = specialist.get("boundary_conditions") or {}
     boundary_proxy_required = category == "loft" and any(
         isinstance(condition, dict)
-        and condition.get("type") not in {None, "free", "unknown", "singular"}
+        and condition.get("type") not in _UNCONSTRAINED_CONDITION_TYPES
         for condition in boundary_conditions.values()
     )
     path_proxy_required = (

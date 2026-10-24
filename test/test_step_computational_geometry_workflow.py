@@ -314,7 +314,7 @@ def test_analysis_workflow_declares_versions_gap_status_and_render_budget():
     prose = re.sub(r"\s+", " ", text.replace("`", ""))
 
     assert "Accepted schema versions" in text
-    assert '`feature-index.json` `schema_version`: `"4.1"`' in text
+    assert '`feature-index.json` `schema_version`: `"4.2"`' in text
     assert '`reconstruction` handoff `schema_version`: `"1.0"`' in text
     assert "`complete_with_gaps`" in text
     assert "render budget" in prose
@@ -823,3 +823,17 @@ def test_minimal_analysis_artifact_package_ends_before_reconstruction(tmp_path):
         "*iteration*",
     )
     assert all(not list(output.rglob(pattern)) for pattern in forbidden_patterns)
+
+
+def test_analysis_workflow_lists_unowned_faces_and_budgets_sections():
+    text = _read(WORKFLOW)
+    prose = re.sub(r"\s+", " ", text.replace("`", ""))
+    reconstruction = _read(SKILL / "references" / "workflows" / "step-reconstruction.md")
+
+    assert "even when recognition reported no diagnostic" in prose
+    assert "either owned by a feature or listed in unresolved-features.md" in prose
+    assert "section budget" in prose
+    assert "section_skipped" in text
+    assert 'status: "computed"|"skipped"' in text
+    r0 = reconstruction[reconstruction.index("### R0:") : reconstruction.index("### R1:")]
+    assert "coverage" in r0 and "unresolved-features.md" in r0

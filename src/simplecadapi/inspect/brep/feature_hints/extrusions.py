@@ -143,6 +143,242 @@ def _section_consistency(
     }
 
 
+def _is_hole_loop(
+    model, loop: dict[str, Any], cap_id: str, hole_face_ids: set[str]
+) -> bool:
+    walls = set(loop_wall_ids(model, loop, cap_id))
+    return loop["role"] == "inner" and bool(walls) and walls <= hole_face_ids
+
+
+def _whole_body_prism_hint(
+    model,
+    facts: dict[str, dict[str, Any]],
+    *,
+    body_id: str,
+    local_face_ids: list[str],
+    first_id: str,
+    second_id: str,
+    direction: np.ndarray,
+    length: float,
+    linear: float,
+    angular: float,
+    hole_face_ids: set[str],
+    subtract_holes: bool,
+) -> dict[str, Any] | None:
+    first = facts[first_id]
+    first_loops = face_loops(model, first_id)
+    second_loops = face_loops(model, second_id)
+    subtracted: set[str] = set()
+    if subtract_holes:
+        # A later hole may break the cap loops (countersink, counterbore); judge
+        # the base prism without the closed negative spaces the hole owns.
+        kept_first = [
+            loop
+            for loop in first_loops
+            if not _is_hole_loop(model, loop, first_id, hole_face_ids)
+        ]
+        kept_second = [
+            loop
+            for loop in second_loops
+            if not _is_hole_loop(model, loop, second_id, hole_face_ids)
+        ]
+        if len(kept_first) == len(first_loops) and len(kept_second) == len(
+            second_loops
+        ):
+            return None
+        if not kept_first or not kept_second:
+            return None
+        first_loops, second_loops = kept_first, kept_second
+        subtracted = {
+            face_id
+            for face_id in local_face_ids
+            if face_id in hole_face_ids and face_id not in {first_id, second_id}
+        }
+    pairing = pair_loop_sets(
+        first_loops,
+        second_loops,
+        transform="translation",
+        linear_tolerance=linear,
+        expected_direction=direction,
+    )
+    if (
+        not pairing["matches"]
+        or pairing["unmatched_first"]
+        or pairing["unmatched_second"]
+    ):
+        return None
+    if any(
+        abs(float(np.linalg.norm(match["translation"])) - length)
+        > max(20.0 * linear, 1.0e-7 * length)
+        for match in pairing["matches"]
+    ):
+        return None
+    side_face_ids = [
+        face_id
+        for face_id in local_face_ids
+        if face_id not in {first_id, second_id} and face_id not in subtracted
+    ]
+    if not side_face_ids or any(
+        not face_is_side(facts[face_id], direction, angular)
+        for face_id in side_face_ids
+    ):
+        return None
+    first_walls = {
+        face_id
+        for loop in first_loops
+        for face_id in loop_wall_ids(model, loop, first_id)
+    }
+    second_walls = {
+        face_id
+        for loop in second_loops
+        for face_id in loop_wall_ids(model, loop, second_id)
+    }
+    if set(side_face_ids) != first_walls or set(side_face_ids) != second_walls:
+        return None
+    try:
+        section_consistency = _section_consistency(
+            model=model,
+            reference_loops=first_loops,
+            side_face_ids=side_face_ids,
+            direction=direction,
+            length=length,
+            linear_tolerance=linear,
+        )
+    except ValueError:
+        return None
+    section_limit = max(
+        50.0 * linear,
+        1.0e-3
+        * max(
+            measure_loop(
+                first_loops[0],
+                origin=first["centroid"],
+                normal=direction,
+                linear_tolerance=linear,
+            )["maximum_caliper"],
+            1.0,
+        ),
+    )
+    if section_consistency["maximum_correspondence_error"] > section_limit:
+        return None
+    outer = next(
+        (loop for loop in first_loops if loop["role"] == "outer"),
+        first_loops[0],
+    )
+    profile = measure_loop(
+        outer,
+        origin=first["centroid"],
+        normal=direction,
+        linear_tolerance=linear,
+    )
+    boundary_error = max(item["maximum_deviation"] for item in pairing["matches"])
+    loop_refs = [
+        {
+            "face_id": loop["face_id"],
+            "role": loop["role"],
+            "loop_index": loop["loop_index"],
+            "edge_ids": list(loop["edge_ids"]),
+        }
+        for loop in first_loops
+    ]
+    inner_edge_ids = {
+        edge_id
+        for loop in loop_refs
+        if loop["role"] == "inner"
+        for edge_id in loop["edge_ids"]
+    }
+    ambiguous_hole_faces = {
+        face_id
+        for face_id in hole_face_ids
+        if inner_edge_ids.intersection(facts[face_id]["edges"])
+    }
+    second = facts[second_id]
+    geometry = {
+        "form": "whole_body_prism",
+        "region_role": "neutral",
+        "direction": vector(direction),
+        "length": length,
+        "start_face_id": first_id,
+        "end_face_id": second_id,
+        "side_face_ids": entity_ids(side_face_ids),
+        "profile_loop_refs": loop_refs,
+        "profile": profile,
+        "section_consistency": section_consistency,
+    }
+    candidate_evidence = [
+        evidence(
+            "extrusion.parallel_support_faces",
+            entity_ids_value=[first_id, second_id],
+            observed={"length": length},
+            criterion={"angular_tolerance_degrees": angular},
+        ),
+        evidence(
+            "extrusion.translated_loop_correspondence",
+            entity_ids_value=[first_id, second_id],
+            observed={
+                "matched_loop_count": len(pairing["matches"]),
+                "maximum_deviation": boundary_error,
+                "unmatched_first": pairing["unmatched_first"],
+                "unmatched_second": pairing["unmatched_second"],
+            },
+            criterion={"maximum_deviation": max(20.0 * linear, 1.0e-7)},
+        ),
+        evidence(
+            "extrusion.side_direction_and_complete_coverage",
+            entity_ids_value=side_face_ids,
+        ),
+        evidence(
+            "extrusion.section_correspondence",
+            entity_ids_value=side_face_ids,
+            observed=section_consistency,
+            criterion={"maximum_error": section_limit},
+        ),
+        evidence(
+            "extrusion.face_area_similarity",
+            entity_ids_value=[first_id, second_id],
+            observed={
+                "support_face_area": first["area"],
+                "terminal_face_area": second["area"],
+                "absolute_difference": abs(first["area"] - second["area"]),
+            },
+            required=False,
+        ),
+    ]
+    if ambiguous_hole_faces:
+        geometry["history_ambiguity"] = "profile_inner_loop_or_later_hole"
+        candidate_evidence.append(
+            evidence(
+                "extrusion.inner_loop_history_ambiguity",
+                entity_ids_value=entity_ids(ambiguous_hole_faces),
+                required=False,
+            )
+        )
+    if subtracted:
+        geometry["subtracted_hole_face_ids"] = entity_ids(subtracted)
+        candidate_evidence.append(
+            evidence(
+                "extrusion.subtracted_hole_regions",
+                entity_ids_value=entity_ids(subtracted),
+                observed={"subtracted_face_count": len(subtracted)},
+                criterion={"owned_by": "hole_region_candidate"},
+            )
+        )
+    owned = entity_ids(
+        [face_id for face_id in local_face_ids if face_id not in subtracted]
+    )
+    return {
+        "kind": "extrusion_region_candidate",
+        "claim": "geometric_candidate",
+        "body_id": body_id,
+        "entity_ids": owned,
+        "highlight_entity_ids": owned,
+        "support_entity_ids": [],
+        "geometry": geometry,
+        "confidence": confidence("strong"),
+        "evidence": candidate_evidence,
+    }
+
+
 def _whole_body_hints(
     model,
     facts: dict[str, dict[str, Any]],
@@ -173,186 +409,24 @@ def _whole_body_hints(
                 )
                 if abs(signed_length) <= max(20.0 * linear, 1.0e-7):
                     continue
-                direction = normal if signed_length > 0.0 else -normal
-                length = abs(signed_length)
-                first_loops = face_loops(model, first_id)
-                second_loops = face_loops(model, second_id)
-                pairing = pair_loop_sets(
-                    first_loops,
-                    second_loops,
-                    transform="translation",
-                    linear_tolerance=linear,
-                    expected_direction=direction,
-                )
-                if (
-                    not pairing["matches"]
-                    or pairing["unmatched_first"]
-                    or pairing["unmatched_second"]
-                ):
-                    continue
-                if any(
-                    abs(float(np.linalg.norm(match["translation"])) - length)
-                    > max(20.0 * linear, 1.0e-7 * length)
-                    for match in pairing["matches"]
-                ):
-                    continue
-                side_face_ids = [
-                    face_id
-                    for face_id in local_face_ids
-                    if face_id not in {first_id, second_id}
-                ]
-                if not side_face_ids or any(
-                    not face_is_side(facts[face_id], direction, angular)
-                    for face_id in side_face_ids
-                ):
-                    continue
-                first_walls = {
-                    face_id
-                    for loop in first_loops
-                    for face_id in loop_wall_ids(model, loop, first_id)
+                options = {
+                    "body_id": body_id,
+                    "local_face_ids": local_face_ids,
+                    "first_id": first_id,
+                    "second_id": second_id,
+                    "direction": normal if signed_length > 0.0 else -normal,
+                    "length": abs(signed_length),
+                    "linear": linear,
+                    "angular": angular,
+                    "hole_face_ids": hole_face_ids,
                 }
-                second_walls = {
-                    face_id
-                    for loop in second_loops
-                    for face_id in loop_wall_ids(model, loop, second_id)
-                }
-                if (
-                    set(side_face_ids) != first_walls
-                    or set(side_face_ids) != second_walls
-                ):
-                    continue
-                try:
-                    section_consistency = _section_consistency(
-                        model=model,
-                        reference_loops=first_loops,
-                        side_face_ids=side_face_ids,
-                        direction=direction,
-                        length=length,
-                        linear_tolerance=linear,
-                    )
-                except ValueError:
-                    continue
-                section_limit = max(
-                    50.0 * linear,
-                    1.0e-3
-                    * max(
-                        measure_loop(
-                            first_loops[0],
-                            origin=first["centroid"],
-                            normal=direction,
-                            linear_tolerance=linear,
-                        )["maximum_caliper"],
-                        1.0,
-                    ),
+                hint = _whole_body_prism_hint(
+                    model, facts, subtract_holes=False, **options
+                ) or _whole_body_prism_hint(
+                    model, facts, subtract_holes=True, **options
                 )
-                if section_consistency["maximum_correspondence_error"] > section_limit:
-                    continue
-                outer = next(
-                    (loop for loop in first_loops if loop["role"] == "outer"),
-                    first_loops[0],
-                )
-                profile = measure_loop(
-                    outer,
-                    origin=first["centroid"],
-                    normal=direction,
-                    linear_tolerance=linear,
-                )
-                boundary_error = max(
-                    item["maximum_deviation"] for item in pairing["matches"]
-                )
-                loop_refs = [
-                    {
-                        "face_id": loop["face_id"],
-                        "role": loop["role"],
-                        "loop_index": loop["loop_index"],
-                        "edge_ids": list(loop["edge_ids"]),
-                    }
-                    for loop in first_loops
-                ]
-                inner_edge_ids = {
-                    edge_id
-                    for loop in loop_refs
-                    if loop["role"] == "inner"
-                    for edge_id in loop["edge_ids"]
-                }
-                ambiguous_hole_faces = {
-                    face_id
-                    for face_id in hole_face_ids
-                    if inner_edge_ids.intersection(facts[face_id]["edges"])
-                }
-                geometry = {
-                    "form": "whole_body_prism",
-                    "region_role": "neutral",
-                    "direction": vector(direction),
-                    "length": length,
-                    "start_face_id": first_id,
-                    "end_face_id": second_id,
-                    "side_face_ids": entity_ids(side_face_ids),
-                    "profile_loop_refs": loop_refs,
-                    "profile": profile,
-                    "section_consistency": section_consistency,
-                }
-                candidate_evidence = [
-                    evidence(
-                        "extrusion.parallel_support_faces",
-                        entity_ids_value=[first_id, second_id],
-                        observed={"length": length},
-                        criterion={"angular_tolerance_degrees": angular},
-                    ),
-                    evidence(
-                        "extrusion.translated_loop_correspondence",
-                        entity_ids_value=[first_id, second_id],
-                        observed={
-                            "matched_loop_count": len(pairing["matches"]),
-                            "maximum_deviation": boundary_error,
-                            "unmatched_first": pairing["unmatched_first"],
-                            "unmatched_second": pairing["unmatched_second"],
-                        },
-                        criterion={"maximum_deviation": max(20.0 * linear, 1.0e-7)},
-                    ),
-                    evidence(
-                        "extrusion.side_direction_and_complete_coverage",
-                        entity_ids_value=side_face_ids,
-                    ),
-                    evidence(
-                        "extrusion.section_correspondence",
-                        entity_ids_value=side_face_ids,
-                        observed=section_consistency,
-                        criterion={"maximum_error": section_limit},
-                    ),
-                    evidence(
-                        "extrusion.face_area_similarity",
-                        entity_ids_value=[first_id, second_id],
-                        observed={
-                            "support_face_area": first["area"],
-                            "terminal_face_area": second["area"],
-                            "absolute_difference": abs(first["area"] - second["area"]),
-                        },
-                        required=False,
-                    ),
-                ]
-                if ambiguous_hole_faces:
-                    geometry["history_ambiguity"] = "profile_inner_loop_or_later_hole"
-                    candidate_evidence.append(
-                        evidence(
-                            "extrusion.inner_loop_history_ambiguity",
-                            entity_ids_value=entity_ids(ambiguous_hole_faces),
-                            required=False,
-                        )
-                    )
-                result.append(
-                    {
-                        "kind": "extrusion_region_candidate",
-                        "claim": "geometric_candidate",
-                        "body_id": body_id,
-                        "entity_ids": entity_ids(local_face_ids),
-                        "highlight_entity_ids": entity_ids(local_face_ids),
-                        "support_entity_ids": [],
-                        "geometry": geometry,
-                        "confidence": confidence("strong"),
-                        "evidence": candidate_evidence,
-                    }
-                )
+                if hint is not None:
+                    result.append(hint)
     return result
 
 

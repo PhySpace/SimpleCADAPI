@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import json
+import re
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -210,6 +211,20 @@ def _check_catalog(
                 f"feature-index.json schema_version {version!r} is not accepted",
             )
         )
+    coverage = catalog.get("coverage")
+    if not isinstance(coverage, dict):
+        failures.append(
+            _issue("coverage_missing", "feature-index.json has no face coverage")
+        )
+    elif coverage.get("owned_face_count", -1) + len(
+        coverage.get("unowned_face_ids", ())
+    ) != coverage.get("face_count"):
+        failures.append(
+            _issue(
+                "coverage_inconsistent",
+                "owned and unowned faces do not add up to face_count",
+            )
+        )
     if catalog.get("truncated") is not False or catalog.get("complete") is not True:
         failures.append(
             _issue(
@@ -298,13 +313,48 @@ def _check_manifest(
     return len(artifacts)
 
 
+def _check_unowned_faces_listed(
+    root: Path,
+    catalog: Mapping[str, Any] | None,
+    failures: list[dict[str, Any]],
+) -> None:
+    coverage = (catalog or {}).get("coverage")
+    path = root / "unresolved-features.md"
+    if not isinstance(coverage, dict) or not path.is_file():
+        return
+    listed = set(re.findall(r"face:\d+", path.read_text(encoding="utf-8")))
+    missing = [
+        face_id
+        for face_id in coverage.get("unowned_face_ids", ())
+        if face_id not in listed
+    ]
+    if missing:
+        failures.append(
+            _issue(
+                "unowned_face_unlisted",
+                f"{len(missing)} face(s) owned by no feature are missing from "
+                f"unresolved-features.md, e.g. {', '.join(missing[:5])}",
+            )
+        )
+
+
 def _collect_gaps(
     status: Mapping[str, Any] | None,
     visual_index: Mapping[str, Any] | None,
     specialist: Mapping[str, Any] | None,
+    section_index: Mapping[str, Any] | None,
     failures: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     gaps: list[dict[str, Any]] = []
+    for entry in (section_index or {}).get("sections", ()):
+        if entry.get("status") == "skipped":
+            gaps.append(
+                _issue(
+                    "section_skipped",
+                    str(entry.get("reason", "")),
+                    feature_id=entry.get("feature_id"),
+                )
+            )
     for entry in (visual_index or {}).get("visuals", ()):
         if entry.get("status") == "skipped":
             gaps.append(
@@ -379,9 +429,10 @@ def inspect_analysis_package_rdescriptor(
     This is the R0 gate of ``step-reconstruction.md``. It reads the package
     written by ``step-computational-geometry-analysis.md`` and the target STEP,
     and never reruns recognition. Hard failures mean the package must be
-    regenerated; soft gaps are budget-skipped per-feature visuals and
-    ``incomplete`` loft/sweep specialist entries declared under
-    ``complete_with_gaps``.
+    regenerated; soft gaps are budget-skipped per-feature visuals or
+    sections and ``incomplete`` loft/sweep specialist entries declared under
+    ``complete_with_gaps``. Every face the catalog's ``coverage`` reports as
+    unowned must be listed in ``unresolved-features.md``.
 
     Parameters
     ----------
@@ -438,10 +489,14 @@ def inspect_analysis_package_rdescriptor(
         checked = _check_manifest(
             root, documents.get("artifact-manifest.json"), failures
         )
+        _check_unowned_faces_listed(
+            root, documents.get("feature-index.json"), failures
+        )
         gaps = _collect_gaps(
             documents.get("run-status.json"),
             documents.get("visual-index.json"),
             documents.get("loft-sweep-specialist.json"),
+            documents.get("section-index.json"),
             failures,
         )
         catalog = documents.get("feature-index.json")

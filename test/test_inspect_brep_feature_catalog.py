@@ -169,7 +169,7 @@ def test_revolution_catalog_uses_existing_top_level_contract_and_axis_dimensions
         if item["subtype"] == "whole_body_partial_revolution"
     )
 
-    assert report["schema_version"] == "4.1"
+    assert report["schema_version"] == "4.2"
     assert set(feature) == REQUIRED_FIELDS
     assert feature["category"] == "revolution"
     assert feature["location"]["axis"]["direction"] == pytest.approx([0.0, 1.0, 0.0])
@@ -238,8 +238,9 @@ def test_v4_catalog_exposes_loft_and_sweep_instances_with_section_visuals():
     assert loft_feature["reconstruction"]["recommended_operation"]["api"] == (
         "loft_rsolid"
     )
+    # Two sections give bilinear side patches, so the loft is ruled.
     assert loft_feature["reconstruction"]["recommended_operation"]["parameters"] == {
-        "ruled": False
+        "ruled": True
     }
 
     profile = scad.make_rectangle_rface(4.0, 2.0)
@@ -257,3 +258,30 @@ def test_v4_catalog_exposes_loft_and_sweep_instances_with_section_visuals():
     assert sweep_feature["reconstruction"]["recommended_operation"]["capability"] == (
         "native"
     )
+
+
+def test_coverage_lists_every_face_no_feature_owns():
+    box = scad.make_box_rsolid(
+        width=10.0, height=8.0, depth=6.0, bottom_face_center=(0.0, 0.0, 0.0)
+    )
+
+    unexplained = brep.inspect_geometric_features_rdescriptor(
+        box.wrapped, feature_kinds=("sheet_metal",)
+    )
+    explained = brep.inspect_geometric_features_rdescriptor(box.wrapped)
+
+    assert unexplained["features"] == []
+    assert unexplained["coverage"] == {
+        "face_count": 6,
+        "owned_face_count": 0,
+        "unowned_face_ids": [f"face:{index}" for index in range(6)],
+        "unowned_by_surface_type": {"PLANE": 6},
+    }
+    owned = {
+        entity_id
+        for feature in explained["features"]
+        for entity_id in feature["entity_ids"]
+    }
+    coverage = explained["coverage"]
+    assert coverage["owned_face_count"] + len(coverage["unowned_face_ids"]) == 6
+    assert not owned.intersection(coverage["unowned_face_ids"])

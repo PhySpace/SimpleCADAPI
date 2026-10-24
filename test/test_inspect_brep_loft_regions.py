@@ -146,3 +146,60 @@ def test_whole_body_loft_rejects_incomplete_cap_wall_coverage_before_pairing(
         )
         == []
     )
+
+
+def _rectangle_points(scale: float, z: float):
+    return [
+        (-8.0 * scale, -5.0 * scale, z),
+        (8.0 * scale, -5.0 * scale, z),
+        (8.0 * scale, 5.0 * scale, z),
+        (-8.0 * scale, 5.0 * scale, z),
+    ]
+
+
+def _loft_contract(shape):
+    report = brep.inspect_geometric_features_rdescriptor(
+        shape.wrapped, feature_kinds=("loft",)
+    )
+    feature = next(
+        item for item in report["features"] if item["category"] == "loft"
+    )
+    return feature["reconstruction"]
+
+
+def test_two_section_frustum_with_bilinear_sides_is_a_native_ruled_loft():
+    shape = scad.loft_rsolid(
+        [
+            scad.make_polyline_rwire(points=_rectangle_points(1.0, 0.0), closed=True),
+            scad.make_polyline_rwire(points=_rectangle_points(0.65, 16.0), closed=True),
+        ]
+    )
+
+    contract = _loft_contract(shape)
+
+    assert contract["interpolation"] == "ruled"
+    assert contract["reconstruction_support"] == "native"
+    assert contract["exactness"] == "tolerance_fit"
+    for endpoint in ("start", "end"):
+        condition = contract["boundary_conditions"][endpoint]
+        assert condition["type"] == "implied_by_ruled"
+        assert condition["measured_type"] == "fitted_direction"
+    assert contract["operation_candidates"][0]["capability"] == "native"
+
+
+def test_three_section_smooth_polygon_loft_is_not_called_ruled():
+    shape = scad.loft_rsolid(
+        [
+            scad.make_polyline_rwire(points=_rectangle_points(1.0, 0.0), closed=True),
+            scad.make_polyline_rwire(points=_rectangle_points(0.5, 8.0), closed=True),
+            scad.make_polyline_rwire(points=_rectangle_points(0.9, 16.0), closed=True),
+        ]
+    )
+
+    contract = _loft_contract(shape)
+
+    assert contract["interpolation"] == "smooth"
+    assert contract["reconstruction_support"] == "emulated"
+    assert {
+        condition["type"] for condition in contract["boundary_conditions"].values()
+    } != {"implied_by_ruled"}

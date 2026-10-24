@@ -243,3 +243,63 @@ def test_closed_negative_space_is_owned_by_hole_not_local_extrusion():
         )
         for item in report["hints"]
     )
+
+
+def test_countersunk_base_is_a_whole_body_prism_with_the_hole_subtracted():
+    body = scad.cut_rsolid(
+        _base(depth=16.0),
+        scad.make_cylinder_rsolid(
+            radius=3.5,
+            height=18.0,
+            bottom_face_center=(0.0, 0.0, -1.0),
+            axis=(0.0, 0.0, 1.0),
+        ),
+    )
+    body = scad.cut_rsolid(
+        body,
+        scad.make_cone_rsolid(
+            bottom_radius=3.5,
+            height=4.0,
+            top_radius=7.5,
+            bottom_face_center=(0.0, 0.0, 12.0),
+            axis=(0.0, 0.0, 1.0),
+        ),
+    )
+
+    report = brep.inspect_geometric_features_rdescriptor(
+        body.wrapped, feature_kinds=("hole", "extrusion")
+    )
+    by_subtype = {feature["subtype"]: feature for feature in report["features"]}
+    prism = by_subtype["whole_body_prism"]
+    hole = by_subtype["countersink"]
+
+    assert not set(prism["entity_ids"]).intersection(hole["entity_ids"])
+    assert report["coverage"]["unowned_face_ids"] == []
+    assert "extrusion.subtracted_hole_regions" in {
+        item["code"] for item in prism["evidence"]
+    }
+    assert prism["dimensions"]["length"]["value"] == pytest.approx(16.0)
+
+
+def test_plain_through_hole_base_keeps_the_hole_wall_in_the_prism():
+    body = scad.cut_rsolid(
+        _base(depth=16.0),
+        scad.make_cylinder_rsolid(
+            radius=3.5,
+            height=18.0,
+            bottom_face_center=(0.0, 0.0, -1.0),
+            axis=(0.0, 0.0, 1.0),
+        ),
+    )
+
+    report = brep.inspect_geometric_features_rdescriptor(
+        body.wrapped, feature_kinds=("hole", "extrusion")
+    )
+    prism = next(
+        item for item in report["features"] if item["subtype"] == "whole_body_prism"
+    )
+
+    assert len(prism["entity_ids"]) == 7
+    assert "extrusion.subtracted_hole_regions" not in {
+        item["code"] for item in prism["evidence"]
+    }

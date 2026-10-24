@@ -198,11 +198,12 @@ that establishes:
    `may_start_reconstruction` is true. Hard gates: target
    hash, recognition parameters in `analysis-config.json`, catalog and
    `reconstruction` `schema_version`, SDK version, file hashes in
-   `artifact-manifest.json`, `truncated=false`, and `complete=true`. Any
-   mismatch reruns Phases 1-9; never patch the package. Soft gate: under
-   `complete_with_gaps`, features with skipped visuals or `incomplete`
-   specialist entries may enter Phase 3 with lowered confidence and are
-   reported at delivery.
+   `artifact-manifest.json`, `truncated=false`, `complete=true`, and every
+   face the catalog `coverage` reports as unowned listed in
+   `unresolved-features.md`. Any mismatch reruns Phases 1-9; never patch the
+   package. Soft gate: under `complete_with_gaps`, features with skipped
+   visuals or sections, or `incomplete` specialist entries, may enter Phase 3
+   with lowered confidence and are reported at delivery.
 3. Load `feature-index.json`, `reconstruction-hypotheses.json`,
    `loft-sweep-specialist.json`, `section-index.json`, `parse-report.md`, and
    `unresolved-features.md`.

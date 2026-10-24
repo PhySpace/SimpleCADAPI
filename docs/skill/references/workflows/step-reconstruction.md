@@ -99,10 +99,13 @@ Hard gate (any failure means rerun Phase 1-9; never patch a stale package):
 - `truncated=false`, `complete=true`, and every entity ID resolves on the
   target;
 - every file in `artifact-manifest.json` exists with matching bytes and
-  SHA-256.
+  SHA-256;
+- the catalog carries `coverage`, and every face it reports as owned by no
+  feature is listed in `unresolved-features.md`.
 
-Soft gate: under `complete_with_gaps`, skipped per-feature visuals and
-`incomplete` loft/sweep entries do not block R1 when each is listed in
+Soft gate: under `complete_with_gaps`, skipped per-feature visuals or
+sections and `incomplete` loft/sweep entries do not block R1 when each is
+listed in
 `run-status.json` `gaps` (result `status="pass_with_gaps"`); carry each gap
 into R1 as lowered confidence and report it in R7.
 

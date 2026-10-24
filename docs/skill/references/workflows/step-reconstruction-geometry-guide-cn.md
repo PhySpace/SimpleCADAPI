@@ -175,9 +175,10 @@ manifest 必须位于用户指定的绝对输出目录内。没有输出目录�
    `may_start_reconstruction` 为真才继续。硬门禁：目标哈希、
    `analysis-config.json` 中的识别参数、目录与 `reconstruction` 的
    `schema_version`、SDK 版本、`artifact-manifest.json` 中的文件哈希、
-   `truncated=false` 与 `complete=true`。任一不符就重跑 Phase 1-9，不做局部修补。
-   软门禁：`run-status.json` 为 `complete_with_gaps` 时，缺图实例和专项复核
-   `incomplete` 的实例可以进入阶段 3，但置信度降级并在交付时说明。
+   `truncated=false` 与 `complete=true`、目录 `coverage` 报告的每个未覆盖面都已
+   写进 `unresolved-features.md`。任一不符就重跑 Phase 1-9，不做局部修补。
+   软门禁：`run-status.json` 为 `complete_with_gaps` 时，缺图或缺剖面的实例和
+   专项复核 `incomplete` 的实例可以进入阶段 3，但置信度降级并在交付时说明。
 3. 读取 `feature-index.json`、`reconstruction-hypotheses.json`、
    `loft-sweep-specialist.json`、`section-index.json`、`parse-report.md` 和
    `unresolved-features.md`。

@@ -275,6 +275,31 @@ def _adaptive_station_plan(
     }
 
 
+def _implied_by_ruled(conditions: dict[str, Any]) -> dict[str, Any]:
+    """Mark end tangents of a ruled loft as consequences, not extra constraints.
+
+    On a ruled span the side direction at each end is the straight ruling to
+    the next section, so the sections alone reproduce it. The measured values
+    stay as evidence under ``measured_type``.
+    """
+
+    result = {}
+    for endpoint, condition in conditions.items():
+        if isinstance(condition, dict) and condition.get("type") not in {
+            None,
+            "free",
+            "unknown",
+            "singular",
+        }:
+            condition = {
+                **condition,
+                "type": "implied_by_ruled",
+                "measured_type": condition.get("type"),
+            }
+        result[endpoint] = condition
+    return result
+
+
 def analyze_loft_sweep_family(
     model,
     facts: dict[str, dict[str, Any]],
@@ -284,8 +309,13 @@ def analyze_loft_sweep_family(
     angular_tolerance_degrees: float,
     feature_family: str,
     side_types: Sequence[str],
+    interpolation: str | None = None,
 ) -> dict[str, Any]:
-    """Run the bounded specialist pass after coarse family recognition."""
+    """Run the bounded specialist pass after coarse family recognition.
+
+    ``interpolation`` is the caller's ruled/smooth decision; without it the
+    side carrier types decide (planes only means ruled).
+    """
 
     section_family = family.get("section_family") or {}
     alignment = align_section_sequence(section_family)
@@ -310,7 +340,11 @@ def analyze_loft_sweep_family(
         control_mode = "sections_only"
         strategy = "section_only"
     station_count = len(section_family.get("stations") or [])
-    interpolation = "ruled" if set(side_types) <= {"PLANE"} else "smooth"
+    if interpolation is None:
+        interpolation = "ruled" if set(side_types) <= {"PLANE"} else "smooth"
+    boundary_conditions = guides["boundary_conditions"]
+    if interpolation == "ruled" and feature_family == "loft":
+        boundary_conditions = _implied_by_ruled(boundary_conditions)
     adaptive_station_plan = _adaptive_station_plan(section_family, alignment)
     frame_law = {
         "type": (
@@ -346,7 +380,7 @@ def analyze_loft_sweep_family(
         "spine": path,
         "guides": guides["guides"],
         "guide_attachment_map": guides["guide_attachment_map"],
-        "boundary_conditions": guides["boundary_conditions"],
+        "boundary_conditions": boundary_conditions,
         "guide_recovery_status": guides["status"],
         "specialist_trigger": {
             "decision": "accepted" if station_count >= 2 else "incomplete",

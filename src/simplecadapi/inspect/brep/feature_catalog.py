@@ -9,11 +9,14 @@ import math
 from pathlib import Path
 from typing import Any, Sequence
 
+from OCP.BRepAdaptor import BRepAdaptor_Surface
+
 from .manufacturing import ModelInput, _model, inspect_manufacturing_hints_rdescriptor
+from .model import _surface_type
 from .reconstruction_contract import build_reconstruction_contract
 
 
-CATALOG_SCHEMA_VERSION = "4.1"
+CATALOG_SCHEMA_VERSION = "4.2"
 FEATURE_CATEGORIES = (
     "hole",
     "extrusion",
@@ -608,6 +611,32 @@ def _visuals(category: str, feature_id: str) -> dict[str, str | None]:
     }
 
 
+def _face_coverage(model, features: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """List faces that no returned feature explains, so none is silently dropped."""
+
+    owned = {
+        entity_id
+        for feature in features
+        for entity_id in feature["entity_ids"]
+        if entity_id.startswith("face:")
+    }
+    unowned = [
+        f"face:{index}"
+        for index in range(len(model.faces))
+        if f"face:{index}" not in owned
+    ]
+    by_type = Counter(
+        _surface_type(BRepAdaptor_Surface(model.faces[_entity_index(face_id)]))
+        for face_id in unowned
+    )
+    return {
+        "face_count": len(model.faces),
+        "owned_face_count": len(model.faces) - len(unowned),
+        "unowned_face_ids": unowned,
+        "unowned_by_surface_type": dict(sorted(by_type.items())),
+    }
+
+
 def inspect_geometric_features_rdescriptor(
     model_or_path: ModelInput,
     *,
@@ -622,7 +651,8 @@ def inspect_geometric_features_rdescriptor(
     one subtype. ``revolution`` covers whole and local, full and partial-angle
     geometry. Circular and non-circular closed negative spaces remain under the
     ``hole`` category. Values describe final geometry, not original CAD history
-    or manufacturing intent.
+    or manufacturing intent. ``coverage`` lists every face that no returned
+    feature owns; those faces belong in the unresolved-region list.
     """
 
     if max_features < 1:
@@ -768,6 +798,7 @@ def inspect_geometric_features_rdescriptor(
             "subtype_counts": dict(sorted(subtype_counts.items())),
         },
         "diagnostics": list(raw["diagnostics"]),
+        "coverage": _face_coverage(model, features),
         "truncated": bool(truncated),
         "complete": not truncated,
         "omitted_feature_count": omitted,

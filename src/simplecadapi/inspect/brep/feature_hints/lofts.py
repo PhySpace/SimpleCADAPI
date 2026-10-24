@@ -6,6 +6,7 @@ from typing import Any, Sequence
 
 from .common import confidence, evidence
 from .loft_sweep_specialist import analyze_loft_sweep_family
+from .ruled_sides import side_faces_are_ruled
 from .section_families import (
     local_section_families,
     whole_body_point_families,
@@ -80,7 +81,13 @@ def loft_hints(
             )
             continue
         side_types = {facts[face_id]["type"] for face_id in family["side_face_ids"]}
-        interpolation = "ruled" if side_types <= {"PLANE"} else "smooth"
+        interpolation = (
+            "ruled"
+            if side_faces_are_ruled(
+                facts, family, linear_tolerance=float(tolerances["linear"])
+            )
+            else "smooth"
+        )
         specialist = analyze_loft_sweep_family(
             model,
             facts,
@@ -89,6 +96,7 @@ def loft_hints(
             angular_tolerance_degrees=float(tolerances["angular_degrees"]),
             feature_family="loft",
             side_types=sorted(side_types),
+            interpolation=interpolation,
         )
         level = (
             "strong"
@@ -183,6 +191,13 @@ def loft_hints(
             else "local_lofted_cut"
         )
         side_types = {facts[value]["type"] for value in family["side_face_ids"]}
+        interpolation = (
+            "ruled"
+            if side_faces_are_ruled(
+                facts, family, linear_tolerance=float(tolerances["linear"])
+            )
+            else "smooth"
+        )
         specialist = analyze_loft_sweep_family(
             model,
             facts,
@@ -191,6 +206,7 @@ def loft_hints(
             angular_tolerance_degrees=float(tolerances["angular_degrees"]),
             feature_family="loft",
             side_types=sorted(side_types),
+            interpolation=interpolation,
         )
         hints.append(
             {
@@ -205,11 +221,7 @@ def loft_hints(
                     "coverage": "local",
                     "region_role": family["region_role"],
                     "terminal_kind": "profile",
-                    "interpolation": (
-                        "ruled"
-                        if side_types <= {"PLANE"}
-                        else "smooth"
-                    ),
+                    "interpolation": interpolation,
                     "variation_law": _variation_law(family),
                     "start_face_id": family["start_face_id"],
                     "end_face_id": family["end_face_id"],

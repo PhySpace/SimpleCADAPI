@@ -87,25 +87,28 @@ def _write_manifest(package: Path, target_sha256: str) -> None:
     )
 
 
-def _build_package(target: Path, package: Path) -> dict:
+def _build_package(target: Path, package: Path, config: dict = CONFIG) -> dict:
     """Write a prelude package in the shapes the analysis workflow defines."""
 
     target_sha256 = _sha256(target)
     catalog = brep.inspect_geometric_features_rdescriptor(
         target,
-        feature_kinds=CONFIG["feature_kinds"],
-        tolerance=CONFIG["linear_tolerance"],
-        angular_tolerance_degrees=CONFIG["angular_tolerance_degrees"],
-        max_features=CONFIG["max_features"],
+        feature_kinds=config["feature_kinds"],
+        tolerance=config["linear_tolerance"],
+        angular_tolerance_degrees=config["angular_tolerance_degrees"],
+        max_features=config["max_features"],
     )
     features = catalog["features"]
     package.mkdir(parents=True)
     for name in PACKAGE_TEXT_FILES:
         (package / name).write_text(f"# {name}\n", encoding="utf-8")
+    with (package / "unresolved-features.md").open("a", encoding="utf-8") as stream:
+        for face_id in catalog["coverage"]["unowned_face_ids"]:
+            stream.write(f"- `{face_id}` owned by no feature\n")
     _write_json(
         package / "analysis-config.json",
         {
-            **CONFIG,
+            **config,
             "route": "reconstruction_prelude",
             "target_sha256": target_sha256,
             "render_budget": {"max_feature_visual_sets": 10, "timeout_seconds": 60},
@@ -230,7 +233,7 @@ def test_complete_package_may_start_reconstruction(hole_package):
         PACKAGE_TEXT_FILES
     )
     assert result["accepted_schema_versions"] == {
-        "catalog": ["4.1"],
+        "catalog": ["4.2"],
         "reconstruction": ["1.0"],
     }
 
@@ -249,7 +252,7 @@ def test_loft_package_carries_matching_reconstruction_handoffs(tmp_path):
     _edit(
         package,
         "reconstruction-hypotheses.json",
-        lambda value: value["hypotheses"][first].update(reconstruction_support="native"),
+        lambda value: value["hypotheses"][first].update(reconstruction_support="planned"),
     )
     assert "hypothesis_changed" in _codes(_check(package, target))
 
@@ -429,3 +432,69 @@ def test_analysis_only_route_cannot_use_gap_status(hole_package):
     )
 
     assert "gap_status_wrong_route" in _codes(_check(package, target))
+
+
+def test_unowned_faces_must_be_listed_as_unresolved(tmp_path):
+    target = _write_step(_box_with_hole(), tmp_path / "target" / "box.step")
+    package = tmp_path / "out" / "analysis"
+    narrow = {**CONFIG, "feature_kinds": ["sheet_metal"]}
+    catalog = _build_package(target, package, narrow)
+    unowned = catalog["coverage"]["unowned_face_ids"]
+
+    assert unowned and catalog["coverage"]["owned_face_count"] == 0
+    assert _check(package, target, expected_config=narrow)["status"] == "pass"
+
+    (package / "unresolved-features.md").write_text("# none\n", encoding="utf-8")
+    _write_manifest(package, catalog["target_sha256"])
+    result = _check(package, target, expected_config=narrow)
+
+    assert "unowned_face_unlisted" in _codes(result)
+    assert unowned[0] in next(
+        failure["detail"]
+        for failure in result["hard_failures"]
+        if failure["code"] == "unowned_face_unlisted"
+    )
+
+
+def test_catalog_without_coverage_blocks_reconstruction(hole_package):
+    target, package, _ = hole_package
+    _edit(package, "feature-index.json", lambda value: value.pop("coverage"))
+
+    assert "coverage_missing" in _codes(_check(package, target))
+
+
+def test_declared_section_gap_passes_as_soft_gate(hole_package):
+    target, package, catalog = hole_package
+    feature_id = catalog["features"][0]["feature_id"]
+    _edit(
+        package,
+        "section-index.json",
+        lambda value: value["sections"].append(
+            {
+                "section_id": None,
+                "feature_id": feature_id,
+                "status": "skipped",
+                "reason": "section budget exceeded",
+            }
+        ),
+    )
+    assert "undeclared_gaps" in _codes(_check(package, target))
+
+    _edit(
+        package,
+        "run-status.json",
+        lambda value: value.update(
+            status="complete_with_gaps",
+            gaps=[
+                {
+                    "code": "section_skipped",
+                    "feature_id": feature_id,
+                    "reason": "section budget exceeded",
+                }
+            ],
+        ),
+    )
+    result = _check(package, target)
+
+    assert result["status"] == "pass_with_gaps"
+    assert [gap["code"] for gap in result["soft_gaps"]] == ["section_skipped"]

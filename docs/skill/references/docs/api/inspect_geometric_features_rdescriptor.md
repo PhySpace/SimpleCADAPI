@@ -20,4 +20,5 @@ Return the normalized v4 catalog for final-BREP geometric candidates.
 one subtype. ``revolution`` covers whole and local, full and partial-angle
 geometry. Circular and non-circular closed negative spaces remain under the
 ``hole`` category. Values describe final geometry, not original CAD history
-or manufacturing intent.
+or manufacturing intent. ``coverage`` lists every face that no returned
+feature owns; those faces belong in the unresolved-region list.

@@ -76,8 +76,9 @@ itself never writes into `reconstruction/`.
 - optional user section planes and recorded automatic section rules;
 - deterministic rendering options;
 - route: `analysis_only` or `reconstruction_prelude`;
-- for `reconstruction_prelude` only, a render budget: the maximum number of
-  per-feature visual sets and the per-render timeout.
+- for `reconstruction_prelude` only, a render budget (the maximum number of
+  per-feature visual sets and the per-render timeout) and a section budget
+  (the maximum number of features that get per-feature sections).
 
 Persist every default in `analysis-config.json` before analysis.
 
@@ -109,7 +110,7 @@ Validate target existence, suffix, readability, and output isolation. Compute
 the target hash. Write `requirement-brief.md`, `analysis-config.json`, and an
 initial `run-status.json` with units, SDK version/platform/time, route,
 feature kinds, tolerances, `max_features`, section stations, render options,
-and the render budget when the route is `reconstruction_prelude`.
+and the render and section budgets when the route is `reconstruction_prelude`.
 
 Record recognition parameters in `analysis-config.json` under exactly these
 keys so R0 can compare them: `feature_kinds`, `linear_tolerance`,
@@ -175,7 +176,11 @@ Call `inspect_geometric_features_rdescriptor` once with every enabled kind.
 - Sheet metal: `flat_sheet_body`, `formed_sheet_body`, `cylindrical_bend`.
 
 Write returned `raw_feature_hints` unchanged to `raw-feature-hints.json`;
-write unsupported or insufficient evidence to `unresolved-features.md`.
+write unsupported or insufficient evidence to `unresolved-features.md`. The
+returned `coverage` lists every face no feature owns; write each of those face
+IDs into `unresolved-features.md`, grouped by surface type, even when
+recognition reported no diagnostic. A face that is neither owned nor listed is
+silently dropped geometry.
 
 **Gate:** a hole has a closed entry, material-side evidence, continuous walls,
 and exit or bottom. An extrusion region has parallel carrier planes, at least
@@ -278,13 +283,14 @@ their hypotheses from evidence in R1.
 
 Accepted schema versions, which R0 of `step-reconstruction.md` checks:
 
-- `feature-index.json` `schema_version`: `"4.1"`;
+- `feature-index.json` `schema_version`: `"4.2"` (adds `coverage`);
 - `reconstruction` handoff `schema_version`: `"1.0"`.
 
 Change this list in the same commit as any schema change.
 
 **Gate:** `truncated=false`, `complete=true`; all IDs resolve and every feature
-has its subtype-specific dimensions, evidence, and planned links.
+has its subtype-specific dimensions, evidence, and planned links; every face is
+either owned by a feature or listed in `unresolved-features.md`.
 
 ### Phase 7: Plan and compute deterministic sections
 
@@ -302,6 +308,13 @@ may use the longitudinal helix fit as primary evidence when one plane intersects
 multiple turns. Deduplicate by recorded tolerances. Call
 `inspect_section_rdescriptor(..., compact=False)` and save descriptors under
 `sections/data/`.
+
+Under `reconstruction_prelude`, the three global sections are always computed,
+but per-feature sections stop at the recorded section budget, in catalog
+order. Each feature beyond the budget gets one `section-index.json` entry with
+`status="skipped"` and the reason; its sections are neither computed nor
+saved. Sections dominate run time and package size on large models, so never
+lift the budget silently.
 
 **Gate:** normals are finite/unit length; contours retain `samples_2d`; an
 empty section remains an explicit empty panel.
@@ -338,7 +351,8 @@ dimensions with units, topology, evidence, confidence, clickable relative
 visuals, and limitations. Write `artifact-manifest.json` with relative path,
 role, bytes, SHA-256, and target hash. Set `run-status.json` to `complete`,
 or to `complete_with_gaps` when the only shortfalls are budget-skipped or
-failed per-feature visuals and Phase 4b `incomplete` entries; list every gap
+failed per-feature visuals, budget-skipped per-feature sections, and Phase 4b
+`incomplete` entries; list every gap
 in `run-status.json` and in the affected report sections. `analysis_only` runs
 never use `complete_with_gaps`: any missing visual leaves them incomplete.
 
@@ -358,7 +372,8 @@ for `analysis_only`; for `reconstruction_prelude`, return to R0 of
 | Entity/hash mismatch | Reject stale report; do not render |
 | No supported feature | Preserve empty indexes; render global sections |
 | Ownership is ambiguous | Record unresolved/alternative; do not guess |
-| Missing visual or detailed section | `analysis_only`: mark the run incomplete. `reconstruction_prelude`: a missing overview or global section marks it incomplete; a skipped or failed per-feature visual is recorded as a gap under `complete_with_gaps` |
+| Missing visual or detailed section | `analysis_only`: mark the run incomplete. `reconstruction_prelude`: a missing overview or global section marks it incomplete; a skipped or failed per-feature visual, or a budget-skipped per-feature section, is recorded as a gap under `complete_with_gaps` |
+| Face owned by no feature | List it in `unresolved-features.md`; never leave it out because recognition returned no diagnostic |
 | Manifest or link mismatch | Write failed status and stop |
 
 ## 7. Deliverables
@@ -401,6 +416,8 @@ run-status.json                 {status, route, sdk_version, failed_phase, error
                                  target_sha256, gaps: [{code, feature_id, reason}]}
 visual-index.json               {target_sha256, visuals: [{feature_id, status: "rendered"|"skipped",
                                  reason, paths, image_sha256, entity_ids}]}
+section-index.json              {target_sha256, atlas, sections: [{section_id, feature_id,
+                                 status: "computed"|"skipped", reason, data_path}]}
 loft-sweep-specialist.json      {target_sha256, entries: [{feature_id, hint_id, roi_entity_ids,
                                  specialist_trigger, status: "complete"|"incomplete", reason,
                                  specialist_analysis}]}
@@ -408,7 +425,7 @@ reconstruction-hypotheses.json  {target_sha256, hypotheses: {<feature_id>: <reco
 artifact-manifest.json          {target_sha256, artifacts: [{path, role, bytes, sha256, target_sha256}]}
 ```
 
-Gap codes in `run-status.json` are `visual_skipped` and
+Gap codes in `run-status.json` are `visual_skipped`, `section_skipped`, and
 `specialist_incomplete`. The manifest lists every package file except itself.
 
 ## 8. Completion gate
