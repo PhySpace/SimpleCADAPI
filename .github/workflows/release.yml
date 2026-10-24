@@ -216,7 +216,11 @@ jobs:
           CIBW_ARCHS: ${{ matrix.archs }}
           # the MSVC environment is active (above): Ninja, every translation unit in parallel, and keep going after a
           # failure so one run reports all the compiler errors rather than the first
-          CIBW_ENVIRONMENT_WINDOWS: SCAD_OCCT_PREFIX=C:/occt CMAKE_ARGS=-DSCAD_OCCT_PREFIX=C:/occt CMAKE_GENERATOR=Ninja SKBUILD_BUILD_TOOL_ARGS=-k;0
+          CIBW_ENVIRONMENT_WINDOWS: >-
+            SCAD_OCCT_PREFIX="C:/occt"
+            CMAKE_ARGS="-DSCAD_OCCT_PREFIX=C:/occt"
+            CMAKE_GENERATOR="Ninja"
+            SKBUILD_BUILD_TOOL_ARGS="-k;0"
 
       - name: Save the static OpenCASCADE build
         if: always() && steps.occt.outputs.cache-hit != 'true'
