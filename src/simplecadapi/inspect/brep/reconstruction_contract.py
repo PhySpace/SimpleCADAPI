@@ -5,6 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 
+RECONSTRUCTION_SCHEMA_VERSION = "1.0"
+
+
 def _operation_candidates(
     category: str, geometry: dict[str, Any], specialist: dict[str, Any]
 ) -> list[dict[str, Any]]:
@@ -150,7 +153,7 @@ def build_reconstruction_contract(
         }
     )
     return {
-        "schema_version": "1.0",
+        "schema_version": RECONSTRUCTION_SCHEMA_VERSION,
         "feature_id": feature_id,
         "family": category,
         "subtype": geometry.get("form"),
@@ -238,4 +241,4 @@ def build_reconstruction_contract(
     }
 
 
-__all__ = ["build_reconstruction_contract"]
+__all__ = ["RECONSTRUCTION_SCHEMA_VERSION", "build_reconstruction_contract"]

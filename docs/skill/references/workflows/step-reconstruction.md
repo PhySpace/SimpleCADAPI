@@ -76,6 +76,15 @@ package invalidates every result in `reconstruction/` derived from it.
 
 ### R0: Validate and load the analysis package
 
+Read `references/docs/api/inspect_analysis_package_rdescriptor.md`, then call
+`inspect_analysis_package_rdescriptor` with the `analysis/` directory, the
+target STEP, and this request's recognition parameters as `expected_config`
+(keys `feature_kinds`, `linear_tolerance`, `angular_tolerance_degrees`,
+`max_features`, `section_rule`). Save its result as
+`reconstruction/analysis-package-check.json`. Continue only when
+`may_start_reconstruction` is true; never edit package files to make it pass.
+The function implements the gates below.
+
 Hard gate (any failure means rerun Phase 1-9; never patch a stale package):
 
 - the target's current SHA-256 equals `target_sha256` in `feature-index.json`
@@ -93,8 +102,9 @@ Hard gate (any failure means rerun Phase 1-9; never patch a stale package):
   SHA-256.
 
 Soft gate: under `complete_with_gaps`, skipped per-feature visuals and
-`incomplete` loft/sweep entries do not block R1; carry each gap into R1 as
-lowered confidence and report it in R7.
+`incomplete` loft/sweep entries do not block R1 when each is listed in
+`run-status.json` `gaps` (result `status="pass_with_gaps"`); carry each gap
+into R1 as lowered confidence and report it in R7.
 
 A package from an earlier `analysis_only` run may be reused when every hard
 gate passes; record its original path in `reconstruction/` as reused.

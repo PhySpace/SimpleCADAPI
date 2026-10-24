@@ -111,6 +111,10 @@ initial `run-status.json` with units, SDK version/platform/time, route,
 feature kinds, tolerances, `max_features`, section stations, render options,
 and the render budget when the route is `reconstruction_prelude`.
 
+Record recognition parameters in `analysis-config.json` under exactly these
+keys so R0 can compare them: `feature_kinds`, `linear_tolerance`,
+`angular_tolerance_degrees`, `max_features`, and `section_rule`.
+
 **Gate:** no hidden defaults; absolute paths, route, and target hash are on
 disk.
 
@@ -388,6 +392,24 @@ for `analysis_only`; for `reconstruction_prelude`, return to R0 of
 Forbidden deliverables include a candidate STEP, model JSON, operation
 sequence, model audit, strict replay, roundtrip report, target/candidate
 comparison, and reconstruction iteration output.
+
+Handoff files read by `inspect_analysis_package_rdescriptor` use these JSON
+shapes (other keys may be added):
+
+```text
+run-status.json                 {status, route, sdk_version, failed_phase, error_summary,
+                                 target_sha256, gaps: [{code, feature_id, reason}]}
+visual-index.json               {target_sha256, visuals: [{feature_id, status: "rendered"|"skipped",
+                                 reason, paths, image_sha256, entity_ids}]}
+loft-sweep-specialist.json      {target_sha256, entries: [{feature_id, hint_id, roi_entity_ids,
+                                 specialist_trigger, status: "complete"|"incomplete", reason,
+                                 specialist_analysis}]}
+reconstruction-hypotheses.json  {target_sha256, hypotheses: {<feature_id>: <reconstruction>}}
+artifact-manifest.json          {target_sha256, artifacts: [{path, role, bytes, sha256, target_sha256}]}
+```
+
+Gap codes in `run-status.json` are `visual_skipped` and
+`specialist_incomplete`. The manifest lists every package file except itself.
 
 ## 8. Completion gate
 

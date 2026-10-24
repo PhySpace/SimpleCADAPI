@@ -71,7 +71,9 @@ Read the exact page under `references/docs/api/` for every API used:
 - Legacy manufacturing candidates: `inspect_manufacturing_hints_rdescriptor`,
   `render_manufacturing_hints_rpath`.
 - Workflow-ready per-instance catalog: `inspect_geometric_features_rdescriptor`;
-  saved-catalog overview rendering: `render_geometric_features_rpath`.
+  saved-catalog overview rendering: `render_geometric_features_rpath`;
+  reconstruction R0 gate over a saved analysis package:
+  `inspect_analysis_package_rdescriptor`.
 - Benchmark/evaluation harness — a separate import surface at
   `simplecadapi.inverse_engineer.brep` (not `inspect.brep`):
   `EvaluationConfig`, `SectionEvaluationConfig`, `classify_benchmark_result`,
@@ -90,6 +92,7 @@ the current hypothesis; escalate only when the question requires it:
 | Assembly tree visualization | `inspect_step_components_rdescriptorlist`, `render_step_components_rpath` |
 | Complete per-instance feature list and dimensions | `inspect_geometric_features_rdescriptor` with all requested categories |
 | Render the exact saved catalog without recognition drift | `render_geometric_features_rpath` |
+| May a saved analysis package start reconstruction (R0) | `inspect_analysis_package_rdescriptor` |
 | Where the difference is | `compare_material_rdescriptor`, `inspect_difference_regions_rdescriptor` |
 | Local geometric error | `compare_boundary_distance_rdescriptor`, `compare_entities_rdescriptor` |
 | Final exact-BREP gate | `compare_shapes_rbrepcomparison`, `compare_steps_rbrepcomparison` |

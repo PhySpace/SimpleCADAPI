@@ -37,6 +37,7 @@ from .manufacturing import (
 )
 from .feature_catalog import inspect_geometric_features_rdescriptor
 from .feature_visualization import render_geometric_features_rpath
+from .analysis_package import inspect_analysis_package_rdescriptor
 from .section_tracking import track_section_contours_rdescriptor
 from .model import (
     BRepEntityError,
@@ -115,6 +116,7 @@ __all__ = [
     "evaluate_reconstruction_rdescriptor",
     "fit_face_analytic_rdescriptor",
     "index_shape_rbrepmodel",
+    "inspect_analysis_package_rdescriptor",
     "inspect_difference_regions_rdescriptor",
     "inspect_face_boundaries_rdescriptor",
     "inspect_geometric_features_rdescriptor",

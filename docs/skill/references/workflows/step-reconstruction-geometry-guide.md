@@ -192,7 +192,10 @@ that establishes:
    `<absolute-output-directory>/analysis/`, all eight feature kinds, and a
    recorded render budget. That workflow owns required reading, recognition,
    sections, visuals, and packaging; a failed phase stops reconstruction.
-2. Validate the package per R0 of `step-reconstruction.md`. Hard gates: target
+2. Validate the package per R0 of `step-reconstruction.md` by calling
+   `inspect_analysis_package_rdescriptor`; save its result as
+   `reconstruction/analysis-package-check.json` and continue only when
+   `may_start_reconstruction` is true. Hard gates: target
    hash, recognition parameters in `analysis-config.json`, catalog and
    `reconstruction` `schema_version`, SDK version, file hashes in
    `artifact-manifest.json`, `truncated=false`, and `complete=true`. Any

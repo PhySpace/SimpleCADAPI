@@ -13,6 +13,7 @@ from .manufacturing import ModelInput, _model, inspect_manufacturing_hints_rdesc
 from .reconstruction_contract import build_reconstruction_contract
 
 
+CATALOG_SCHEMA_VERSION = "4.1"
 FEATURE_CATEGORIES = (
     "hole",
     "extrusion",
@@ -752,7 +753,7 @@ def inspect_geometric_features_rdescriptor(
     subtype_counts = Counter(feature["subtype"] for feature in features)
     omitted = max(len(sortable) - max_features, 0) + int(raw["omitted_hint_count"])
     return {
-        "schema_version": "4.1",
+        "schema_version": CATALOG_SCHEMA_VERSION,
         "units": dict(raw["units"]),
         "target_sha256": target_sha256,
         "feature_kinds": list(requested),
@@ -774,6 +775,7 @@ def inspect_geometric_features_rdescriptor(
 
 
 __all__ = [
+    "CATALOG_SCHEMA_VERSION",
     "FEATURE_CATEGORIES",
     "FEATURE_FIELDS",
     "inspect_geometric_features_rdescriptor",

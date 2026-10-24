@@ -356,6 +356,11 @@ def test_reconstruction_r0_lists_hard_and_soft_gates():
     ):
         assert required in r0
     assert "Hard gate" in r0 and "Soft gate" in r0
+    assert "inspect_analysis_package_rdescriptor" in r0
+    assert "may_start_reconstruction" in r0
+    assert (
+        SKILL / "references" / "docs" / "api" / "inspect_analysis_package_rdescriptor.md"
+    ).is_file()
     assert "rerun Phase 1-9" in prose
     assert "never patch a stale package" in prose
     r2 = text[text.index("### R2:") : text.index("### R3:")]

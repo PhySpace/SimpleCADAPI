@@ -215,6 +215,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [evaluate_reconstruction_rdescriptor](evaluate_reconstruction_rdescriptor.md) *(from inspect/brep/diagnostics.py)* `inspection namespace`
 - [fit_face_analytic_rdescriptor](fit_face_analytic_rdescriptor.md) *(from inspect/brep/fitting.py)* `inspection namespace`
 - [index_shape_rbrepmodel](index_shape_rbrepmodel.md) *(from inspect/brep/model.py)* `inspection namespace`
+- [inspect_analysis_package_rdescriptor](inspect_analysis_package_rdescriptor.md) *(from inspect/brep/analysis_package.py)* `inspection namespace`
 - [inspect_difference_regions_rdescriptor](inspect_difference_regions_rdescriptor.md) *(from inspect/brep/diagnostics.py)* `inspection namespace`
 - [inspect_face_boundaries_rdescriptor](inspect_face_boundaries_rdescriptor.md) *(from inspect/brep/queries.py)* `inspection namespace`
 - [inspect_geometric_features_rdescriptor](inspect_geometric_features_rdescriptor.md) *(from inspect/brep/feature_catalog.py)* `inspection namespace`

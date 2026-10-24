@@ -170,7 +170,9 @@ manifest 必须位于用户指定的绝对输出目录内。没有输出目录�
    八类特征和记录在案的渲染预算，完整执行
    `references/workflows/step-computational-geometry-analysis.md` 的 Phase 1-9。
    该流程负责必读文档、识别、截面、可视化和封包；任一阶段失败即停止重建。
-2. 按 `step-reconstruction.md` 的 R0 校验解析包。硬门禁：目标哈希、
+2. 按 `step-reconstruction.md` 的 R0 调用 `inspect_analysis_package_rdescriptor`
+   校验解析包，结果保存为 `reconstruction/analysis-package-check.json`，只有
+   `may_start_reconstruction` 为真才继续。硬门禁：目标哈希、
    `analysis-config.json` 中的识别参数、目录与 `reconstruction` 的
    `schema_version`、SDK 版本、`artifact-manifest.json` 中的文件哈希、
    `truncated=false` 与 `complete=true`。任一不符就重跑 Phase 1-9，不做局部修补。
