@@ -36,3 +36,7 @@ sequences, and returns a single `Solid`.
 ## Returns
 
 Solid: The cut result solid.
+
+## Raises
+
+- **SimpleCADError**: The cut produced no solid, or split the body into several (a slot through a bar). Use ``cut_rsolid_list`` to keep every piece.

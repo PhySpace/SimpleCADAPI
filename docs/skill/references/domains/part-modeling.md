@@ -79,6 +79,10 @@ consult their own documentation before the first call.
 - `cut_rsolid` skips non-intersecting tools by default
   (`skip_non_intersecting=True`); pass `skip_non_intersecting=False` for strict
   diagnostics — a skipped cut is never a completed feature.
+- A cut can split a body (a slot through a bar leaves two parts) or consume it
+  (a tool that encloses the whole body). `cut_rsolid` returns one `Solid`, so it
+  raises instead of dropping parts; use `cut_rsolid_list(base, tools)` to get
+  every piece as a list (empty when nothing is left).
 
 ## Validation gates
 

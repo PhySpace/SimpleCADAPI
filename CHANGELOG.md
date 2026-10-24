@@ -6,6 +6,14 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+### Added
+- `cut_rsolid_list(base, *tools)`: the boolean cut that keeps every piece. A slot through a bar returns both halves, a
+  tool that encloses the body returns an empty list. Recorded as `make_cut_rsolid_list` and replayable.
+
+### Fixed
+- `cut_rsolid` no longer drops pieces silently. When a cut split the body it returned only the first piece (a slot
+  through a 100x20x10 bar reported half the volume); it now raises and points to `cut_rsolid_list`.
+
 ## 2.2.7b1 — 2026-10-24
 
 ### Added

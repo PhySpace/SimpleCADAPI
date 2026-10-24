@@ -96,6 +96,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 ## Boolean Operations
 
 - [cut_rsolid](cut_rsolid.md) *(from operators/boolean.py)* `top-level`
+- [cut_rsolid_list](cut_rsolid_list.md) *(from operators/boolean.py)* `top-level`
 - [intersect_rsolid](intersect_rsolid.md) *(from operators/boolean.py)* `top-level`
 - [union_rsolid](union_rsolid.md) *(from operators/boolean.py)* `top-level`
 

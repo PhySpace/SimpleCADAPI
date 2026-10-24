@@ -1,6 +1,7 @@
 {
  "aggregate": "values",
  "cut_rsolid": "solids",
+ "cut_rsolid_list": "solids",
  "intersect_rsolid": "solids",
  "union_rsolid": "solids"
 }

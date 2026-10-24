@@ -5,6 +5,7 @@
 
 #include <map>
 #include <optional>
+#include <vector>
 #include <string>
 
 #include "scad/core/value.hpp"
@@ -43,7 +44,8 @@ struct TrackedResult {
 
 // A tracked boolean.  `solid` is empty when the boolean produced no solid.
 struct TrackedBooleanResult {
-  std::optional<Solid> solid;
+  std::optional<Solid> solid;  // the first solid of the kernel's answer
+  std::vector<Solid> solids;   // every solid of the answer (a cut can split the body)
   TopoDelta delta;
   DeltaEntries delta_entries;
 };
