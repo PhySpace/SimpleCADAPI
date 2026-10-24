@@ -22,6 +22,11 @@ on:
         description: Existing v-prefixed tag to release (a branch or tag name when dry_run is set)
         required: true
         type: string
+      platforms:
+        description: "Wheel platforms to build: all, or a comma list of linux-x86_64, linux-aarch64, macos-arm64, windows-x86_64"
+        required: false
+        default: all
+        type: string
       dry_run:
         description: Build and verify everything, but publish nothing (no GitHub release, no PyPI upload)
         required: false
@@ -115,31 +120,46 @@ jobs:
           path: src/simplecadapi/editor/webui
           if-no-files-found: error
 
+  plan:
+    # Which wheels to build.  A release builds all four; a dry run may pick some (to iterate on one platform).
+    name: Plan the wheels
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Select the platforms
+        id: matrix
+        shell: bash
+        env:
+          PLATFORMS: ${{ github.event_name == 'workflow_dispatch' && inputs.platforms || 'all' }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          every = [
+              {"name": "linux-x86_64", "os": "ubuntu-latest", "archs": "x86_64", "occt_cache": "/home/runner/occt-cache"},
+              {"name": "linux-aarch64", "os": "ubuntu-24.04-arm", "archs": "aarch64", "occt_cache": "/home/runner/occt-cache"},
+              {"name": "macos-arm64", "os": "macos-14", "archs": "arm64", "occt_cache": "/tmp/occt"},
+              {"name": "windows-x86_64", "os": "windows-2022", "archs": "AMD64", "occt_cache": "C:\\occt"},
+          ]
+          wanted = [p.strip() for p in os.environ["PLATFORMS"].split(",") if p.strip()]
+          chosen = every if wanted in ([], ["all"]) else [e for e in every if e["name"] in wanted]
+          unknown = [p for p in wanted if p != "all" and p not in {e["name"] for e in every}]
+          if unknown or not chosen:
+              raise SystemExit(f"unknown platforms {unknown}; choose from {[e['name'] for e in every]}")
+          print("matrix=" + json.dumps({"include": chosen}))
+          PY
+
   wheels:
     name: Wheels (${{ matrix.name }})
-    needs: webui
+    needs: [webui, plan]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 240
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: linux-x86_64
-            os: ubuntu-latest
-            archs: x86_64
-            occt_cache: /home/runner/occt-cache
-          - name: linux-aarch64
-            os: ubuntu-24.04-arm
-            archs: aarch64
-            occt_cache: /home/runner/occt-cache
-          - name: macos-arm64
-            os: macos-14
-            archs: arm64
-            occt_cache: /tmp/occt
-          - name: windows-x86_64
-            os: windows-2022
-            archs: AMD64
-            occt_cache: C:\occt
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - name: Check out tagged revision
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -154,8 +174,11 @@ jobs:
 
       # The static OpenCASCADE prefix.  On Linux the build runs inside the manylinux container, which gets this directory
       # mounted at /opt/occt; elsewhere cibuildwheel's before-all writes to the path configured in pyproject.toml.
+      # Restored here and saved by the explicit step after the build, which runs even when the wheel build fails:
+      # the default post-step saves only a successful job, and rebuilding OCCT costs the better part of an hour.
       - name: Restore the static OpenCASCADE build
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: occt
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.occt_cache }}
           key: occt-${{ matrix.name }}-${{ hashFiles('src/cpp/tools/build_occt.py') }}
@@ -180,11 +203,28 @@ jobs:
           # share the cached prefix with the container (before-all in pyproject.toml builds OCCT only if it is absent)
           CIBW_CONTAINER_ENGINE: "docker; create_args: --volume ${{ matrix.occt_cache }}:/opt/occt"
 
-      - name: Build the wheels (macOS, Windows)
-        if: runner.os != 'Linux'
+      - name: Build the wheels (macOS)
+        if: runner.os == 'macOS'
         uses: pypa/cibuildwheel@b9e566a2b284570af229f6c2a33673410d0389a3 # v4.3.4
         env:
           CIBW_ARCHS: ${{ matrix.archs }}
+
+      - name: Build the wheels (Windows)
+        if: runner.os == 'Windows'
+        uses: pypa/cibuildwheel@b9e566a2b284570af229f6c2a33673410d0389a3 # v4.3.4
+        env:
+          CIBW_ARCHS: ${{ matrix.archs }}
+          # the MSVC environment is active (above): Ninja, every translation unit in parallel, and keep going after a
+          # failure so one run reports all the compiler errors rather than the first
+          CIBW_ENVIRONMENT_WINDOWS: SCAD_OCCT_PREFIX=C:/occt CMAKE_ARGS=-DSCAD_OCCT_PREFIX=C:/occt CMAKE_GENERATOR=Ninja SKBUILD_BUILD_TOOL_ARGS=-k;0
+
+      - name: Save the static OpenCASCADE build
+        if: always() && steps.occt.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ matrix.occt_cache }}
+          key: occt-${{ matrix.name }}-${{ hashFiles('src/cpp/tools/build_occt.py') }}
 
       - name: Keep the wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

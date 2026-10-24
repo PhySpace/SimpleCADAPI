@@ -99,7 +99,7 @@ std::string join(const std::vector<std::string>& parts, const std::string& separ
 // is related in purple (diagnostic_image: drawn by whoever registered a provider; nothing without one).
 static std::optional<ErrorEvidence> sketch_picture(const Sketch& sketch, const SketchSolveResult& result,
                                             const std::string& mode, const std::string& caption,
-                                            const std::set<std::string>& highlight, const std::set<std::string>& near,
+                                            const std::set<std::string>& highlight, const std::set<std::string>& neighbours,
                                             const std::vector<std::pair<std::string, std::string>>& constraint_labels,
                                             const std::string& dedup_key) {
   DiagnosticImage image;
@@ -134,7 +134,7 @@ static std::optional<ErrorEvidence> sketch_picture(const Sketch& sketch, const S
   for (const auto& [id, value] : result.solved_scalars) scalars.set(id, Value(value));
   image.payload.set("solved_scalars", std::move(scalars));
   image.payload.set("highlight", names(highlight));
-  image.payload.set("near", names(near));
+  image.payload.set("near", names(neighbours));
   image.payload.set("constraint_labels", std::move(labels));
   return diagnostic_image(image);
 }
@@ -229,12 +229,12 @@ void raise_sketch_solve_failure(const Sketch& sketch, const SketchSolveResult& r
 
   std::vector<ErrorEvidence> evidence;
   {
-    std::set<std::string> near;
+    std::set<std::string> neighbours;
     for (const SketchConstraint* constraint : related) {
       const auto ids = target_ids(*constraint);
-      near.insert(ids.begin(), ids.end());
+      neighbours.insert(ids.begin(), ids.end());
     }
-    for (const std::string& id : implicated) near.erase(id);
+    for (const std::string& id : implicated) neighbours.erase(id);
     std::vector<std::pair<std::string, std::string>> labels;
     std::vector<std::string> failed_names;
     for (const SketchConstraint* constraint : failed) {
@@ -246,7 +246,7 @@ void raise_sketch_solve_failure(const Sketch& sketch, const SketchSolveResult& r
                                 ": orange = entities implicated by failed constraints (" +
                                 (failed_names.empty() ? std::string("solver did not name any") : join(failed_names, ", ")) +
                                 "), purple = related constraints sharing those entities";
-    if (auto picture = sketch_picture(sketch, result, result.status, caption, implicated, near, labels,
+    if (auto picture = sketch_picture(sketch, result, result.status, caption, implicated, neighbours, labels,
                                       "sketch:" + sketch.sketch_id() + ":" + result.status + ":" + join(failed_names, ",")))
       evidence.push_back(std::move(*picture));
   }

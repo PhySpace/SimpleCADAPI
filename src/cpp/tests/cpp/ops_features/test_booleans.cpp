@@ -31,8 +31,8 @@ TEST_CASE("union across a small gap needs a tolerance") {
 }
 
 TEST_CASE("union failures carry measurements and repair") {
-  const Solid base = box(10, 4, 4), far = box(2, 4, 4, scalar3(20, 0, 0));
-  const Error disjoint = failure_of([&] { (void)union_rsolid({base, far}); });
+  const Solid base = box(10, 4, 4), distant = box(2, 4, 4, scalar3(20, 0, 0));
+  const Error disjoint = failure_of([&] { (void)union_rsolid({base, distant}); });
   CHECK(disjoint.operation() == "union_rsolid");
   CHECK(measurement(disjoint, "min_gap") == Approx(14.0));
   const std::string text = disjoint.what();
@@ -43,7 +43,7 @@ TEST_CASE("union failures carry measurements and repair") {
   CHECK(edge.guidance().what_happened.find("edge, vertex, or tangent") != std::string::npos);
 
   const Solid b = box(10, 4, 4, scalar3(3, 0, 0));
-  const Error cluster = failure_of([&] { (void)union_rsolid({base, b, far}); });
+  const Error cluster = failure_of([&] { (void)union_rsolid({base, b, distant}); });
   CHECK(cluster.guidance().what_happened.find("operand 2 and operand 3") != std::string::npos);
   CHECK(measurement(cluster, "min_gap") == Approx(11.0));
 
@@ -61,12 +61,12 @@ TEST_CASE("cut and intersect") {
   CHECK(has_tag(intersect_rsolid({cube, hole}), "solid.boolean.intersect"));
   CHECK(cut_rsolid({cube, hole}, {.tracking_policy = "graph"}).volume() == Approx(6000.0 - through));
 
-  const Solid far = box(2, 4, 4, scalar3(50, 0, 0));
-  CHECK(cut_rsolid({cube, far}).volume() == Approx(6000.0));
-  const Error strict = failure_of([&] { (void)cut_rsolid({cube, far}, {.skip_non_intersecting = false}); });
+  const Solid distant = box(2, 4, 4, scalar3(50, 0, 0));
+  CHECK(cut_rsolid({cube, distant}).volume() == Approx(6000.0));
+  const Error strict = failure_of([&] { (void)cut_rsolid({cube, distant}, {.skip_non_intersecting = false}); });
   CHECK(strict.operation() == "cut_rsolid");
   CHECK(!strict.guidance().repair.empty());
-  CHECK(failure_of([&] { (void)intersect_rsolid({cube, far}); }).operation() == "intersect_rsolid");
+  CHECK(failure_of([&] { (void)intersect_rsolid({cube, distant}); }).operation() == "intersect_rsolid");
 }
 
 TEST_CASE("the set boolean keeps every piece") {

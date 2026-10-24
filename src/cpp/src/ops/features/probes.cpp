@@ -38,9 +38,9 @@ gp_Pnt midpoint_of(const TopoDS_Edge& edge) {
 }
 
 // The normal of `face` at the point nearest `near`, flipped to point out of the solid.
-std::optional<Vec3> outward_normal_at(const TopoDS_Face& face, const gp_Pnt& near) {
+std::optional<Vec3> outward_normal_at(const TopoDS_Face& face, const gp_Pnt& target) {
   ShapeAnalysis_Surface projector(BRep_Tool::Surface(face));
-  const gp_Pnt2d uv = projector.ValueOfUV(near, 1e-6);
+  const gp_Pnt2d uv = projector.ValueOfUV(target, 1e-6);
   BRepLProp_SLProps props(BRepAdaptor_Surface(face), uv.X(), uv.Y(), 1, 1e-6);
   if (!props.IsNormalDefined()) return std::nullopt;
   const gp_Dir normal = props.Normal();
