@@ -19,8 +19,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  occt:
+    # The C++ module links a static OpenCASCADE built from source (the same build the release wheels use).  It is built
+    # once per version of the build script and cached; the jobs below restore it.
+    name: Static OpenCASCADE
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Restore the static OpenCASCADE build
+        id: cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/occt
+          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py') }}
+
+      - name: Build OpenCASCADE
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: python3 src/cpp/tools/build_occt.py --prefix "$HOME/occt"
+
   test:
     name: Python ${{ matrix.python-version }}
+    needs: occt
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -43,8 +65,15 @@ jobs:
           enable-cache: true
           cache-python: true
 
-      - name: Install locked dependencies
-        run: uv sync --locked --group dev
+      - name: Restore the static OpenCASCADE build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/occt
+          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py') }}
+          fail-on-cache-miss: true
+
+      - name: Install locked dependencies and build the C++ module
+        run: CMAKE_ARGS="-DSCAD_OCCT_PREFIX=$HOME/occt" uv sync --locked --group dev
       - name: Verify headless rendering support
         run: command -v xvfb-run
 
@@ -56,6 +85,7 @@ jobs:
         run: xvfb-run --auto-servernum uv run pytest test tests -q
 
   editor-e2e:
+    needs: occt
     # The editor tests that boot a real marimo kernel (about a minute); the main
     # job runs the rest of test/test_editor.py without it.
     name: Editor end to end
@@ -75,8 +105,15 @@ jobs:
           enable-cache: true
           cache-python: true
 
-      - name: Install locked dependencies
-        run: uv sync --locked --group dev
+      - name: Restore the static OpenCASCADE build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/occt
+          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py') }}
+          fail-on-cache-miss: true
+
+      - name: Install locked dependencies and build the C++ module
+        run: CMAKE_ARGS="-DSCAD_OCCT_PREFIX=$HOME/occt" uv sync --locked --group dev
 
       - name: Run the editor tests, kernel included
         run: uv run pytest test/test_editor.py -q

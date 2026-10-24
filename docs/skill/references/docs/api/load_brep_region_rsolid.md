@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def load_brep_region_rsolid(path: str | Path, sha256: str, *, tag_prefix: Optional[str] = None) -> Solid
+def load_brep_region_rsolid(path, sha256, *, tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

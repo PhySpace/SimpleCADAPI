@@ -1,0 +1,129 @@
+{
+  "bad_tag": {
+    "how_to_fix": [
+      "Use a distance greater than zero.",
+      "Pass a valid finite direction vector.",
+      "If you extrude a wire, make sure the wire is closed or convert it to a face first.",
+      "Inspect the evaluated profile and direction before retrying."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "extrude_rsolid",
+    "possible_causes": [
+      "The distance is not a positive finite scalar.",
+      "The direction vector is invalid.",
+      "A wire profile was provided but it is not closed.",
+      "The kernel rejected the profile or the extrusion direction."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: tag 'Not A Tag' is not normalized",
+    "what_happened": "Failed to extrude the profile into a solid."
+  },
+  "direction": {
+    "how_to_fix": [
+      "Use a distance greater than zero.",
+      "Pass a valid finite direction vector.",
+      "If you extrude a wire, make sure the wire is closed or convert it to a face first.",
+      "Inspect the evaluated profile and direction before retrying."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "extrude_rsolid",
+    "possible_causes": [
+      "The distance is not a positive finite scalar.",
+      "The direction vector is invalid.",
+      "A wire profile was provided but it is not closed.",
+      "The kernel rejected the profile or the extrusion direction."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to extrude the profile into a solid."
+  },
+  "distance": {
+    "how_to_fix": [
+      "Use a distance greater than zero.",
+      "Pass a valid finite direction vector.",
+      "If you extrude a wire, make sure the wire is closed or convert it to a face first.",
+      "Inspect the evaluated profile and direction before retrying."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "extrude_rsolid",
+    "possible_causes": [
+      "The distance is not a positive finite scalar.",
+      "The direction vector is invalid.",
+      "A wire profile was provided but it is not closed.",
+      "The kernel rejected the profile or the extrusion direction."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to extrude the profile into a solid."
+  },
+  "open": {
+    "how_to_fix": [
+      "Locate the gap ends from the P1/P2 coordinates in Measurements and bridge them."
+    ],
+    "inventory": [],
+    "measurements": [
+      {
+        "name": "gap",
+        "unit": "mm",
+        "value": 0.8
+      },
+      {
+        "name": "gap end P1",
+        "unit": "mm",
+        "value": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "name": "gap end P2",
+        "unit": "mm",
+        "value": [
+          0.0,
+          0.8,
+          0.0
+        ]
+      },
+      {
+        "name": "edge count",
+        "unit": "",
+        "value": 4
+      }
+    ],
+    "operation": "extrude_rsolid",
+    "possible_causes": [
+      "The wire's endpoints do not meet head-to-tail, leaving a gap.",
+      "The wire consists of several disconnected pieces.",
+      "A sketch profile was promoted before it was closed."
+    ],
+    "repair": [
+      "the gap is 0.8 mm between (0, 0, 0) and (0, 0.8, 0): add a segment (or arc) across the two ends to close the profile, then retry"
+    ],
+    "technical_details": null,
+    "what_happened": "the given wire is not closed, so it cannot be used to extrude it into a solid; measured gap 0.8 mm"
+  },
+  "wrong_kind": {
+    "how_to_fix": [
+      "Use a distance greater than zero.",
+      "Pass a valid finite direction vector.",
+      "If you extrude a wire, make sure the wire is closed or convert it to a face first.",
+      "Inspect the evaluated profile and direction before retrying."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "extrude_rsolid",
+    "possible_causes": [
+      "The distance is not a positive finite scalar.",
+      "The direction vector is invalid.",
+      "A wire profile was provided but it is not closed.",
+      "The kernel rejected the profile or the extrusion direction."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to extrude the profile into a solid."
+  }
+}

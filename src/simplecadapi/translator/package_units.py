@@ -14,7 +14,7 @@ from ..product.packages import (
     read_product_package,
     validate_product_package,
 )
-from ..topology import OperationGraph
+from simplecadapi._cpp import OperationGraph
 
 Definition = PartDefinition | AssemblyDefinition
 ProductPackageInput = ProductPackage | bytes | bytearray | memoryview | str | Path

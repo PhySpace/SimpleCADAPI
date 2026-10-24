@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_2d_intersect_rface(face_a: Face, face_b: Face) -> Face
+def make_2d_intersect_rface(face_a, face_b)
 ```
 
 *Source: operators/boolean.py*

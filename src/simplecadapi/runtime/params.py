@@ -557,7 +557,7 @@ _NO_REPLACEMENT = object()
 
 
 def _replace(current: Any, saved: float | int | bool) -> Any:
-    from ..params.expr import Var
+    from simplecadapi._cpp import Var
 
     if isinstance(current, Var):
         if isinstance(saved, bool):

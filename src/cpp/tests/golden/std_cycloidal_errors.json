@@ -1,0 +1,38 @@
+[
+  [
+    "ValueError",
+    "n_lobes must be at least 2"
+  ],
+  [
+    "ValueError",
+    "output_pin_pitch_radius must be positive when output holes are requested"
+  ],
+  [
+    "ValueError",
+    "output_pin_clearance_radius must be positive when output holes are requested"
+  ],
+  [
+    "ValueError",
+    "output_pin_count must be non-negative"
+  ],
+  [
+    "ValueError",
+    "sample_count_per_lobe must be at least 8"
+  ],
+  [
+    "ValueError",
+    "spline_tolerance must be positive"
+  ],
+  [
+    "ValueError",
+    "max_control_points must be at least 4"
+  ],
+  [
+    "ValueError",
+    "output_pin_phase must be finite"
+  ],
+  [
+    "ValueError",
+    "bore_radius must be non-negative"
+  ]
+]

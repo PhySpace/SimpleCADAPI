@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def source_topology(topo_id: str) -> SerializablePredicate
+def source_topology(topo_id)
 ```
 
 *Source: ql.py*

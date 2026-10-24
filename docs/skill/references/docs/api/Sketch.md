@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class Sketch(curves: Iterable[Edge | Wire] | None = None, *, name: Optional[str] = None, plane: Any = 'XY', sketch_id: Optional[str] = None)
+class Sketch(curves=None, *, name=None, plane='XY', sketch_id=None)
 ```
 
 *Source: sketch.py*

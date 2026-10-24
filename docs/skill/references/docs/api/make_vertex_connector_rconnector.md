@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_vertex_connector_rconnector(connector_id: str, vertex: Vertex, name: Optional[str] = None, flip: bool = False) -> Connector
+def make_vertex_connector_rconnector(connector_id, vertex, name=None, flip=False)
 ```
 
 *Source: operators/product.py*

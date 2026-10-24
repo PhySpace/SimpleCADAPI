@@ -1,0 +1,498 @@
+{
+  "island": {
+    "how_to_fix": [
+      "Add a ground or a connecting constraint for the [unsolved] components so they are reachable from a grounded one",
+      "Inspect the component inventory: [grounded]/[reachable]/[unsolved] is the connectivity verdict."
+    ],
+    "inventory": [
+      {
+        "description": "1 connecting constraint(s)",
+        "status": "grounded",
+        "symbol": "base"
+      },
+      {
+        "description": "1 connecting constraint(s)",
+        "status": "reachable",
+        "symbol": "floating"
+      },
+      {
+        "description": "0 connecting constraint(s)",
+        "status": "unsolved",
+        "symbol": "island"
+      }
+    ],
+    "measurements": [
+      {
+        "name": "component count",
+        "unit": "",
+        "value": 3
+      },
+      {
+        "name": "constraint count",
+        "unit": "",
+        "value": 1
+      },
+      {
+        "name": "grounded components",
+        "unit": "",
+        "value": 1
+      }
+    ],
+    "operation": "solve_assembly_constraints",
+    "possible_causes": [
+      "No grounding path reaches a constrained component.",
+      "The constraint graph splits into disconnected islands.",
+      "A closed loop cannot be satisfied within its scalar limits."
+    ],
+    "repair": [
+      "Add a ground or a connecting constraint for the [unsolved] components so they are reachable from a grounded one"
+    ],
+    "technical_details": "assembly_id=structural_fixture, kind=unsolved_components",
+    "what_happened": "components unreachable from any grounded component through the constraint graph: island"
+  },
+  "island_lenient": {
+    "authored": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "floating": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "island": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "placements": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "floating": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "island": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "report": {
+      "grounded_component_ids": [
+        "base"
+      ],
+      "residuals": [
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "link",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        }
+      ],
+      "solved": false,
+      "solved_component_ids": [
+        "base",
+        "floating"
+      ],
+      "unsolved_component_ids": [
+        "island"
+      ]
+    }
+  },
+  "no_constraints": {
+    "assembly_id": "plain",
+    "components": [
+      {
+        "component_id": "only",
+        "item_id": "p",
+        "item_kind": "part",
+        "name": null,
+        "placement": {
+          "origin": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "x_axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "y_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "z_axis": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      }
+    ],
+    "constraints": [],
+    "grounded_component_ids": [],
+    "name": null,
+    "public_connectors": []
+  },
+  "not_an_assembly": {
+    "how_to_fix": [
+      "Ground at least one component with ground_component_rassembly.",
+      "Ensure every constrained component has the required connectors.",
+      "Inspect constraint residuals before strict solving."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "solve_assembly_constraints_rassembly",
+    "possible_causes": [
+      "No component is grounded.",
+      "A constraint graph references missing connectors.",
+      "A connected component cannot be reached from a grounded component.",
+      "A closed-loop residual exceeds tolerance."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: assembly must be an Assembly",
+    "what_happened": "Failed to solve the assembly constraints."
+  },
+  "orphan": {
+    "how_to_fix": [
+      "Add or widen a ScalarLimit on that constraint (angle_limit / distance_limit), or delete one constraint on the loop to break it open",
+      "Inspect the component inventory: [grounded]/[reachable]/[unsolved] is the connectivity verdict."
+    ],
+    "inventory": [
+      {
+        "description": "0 connecting constraint(s)",
+        "status": "grounded",
+        "symbol": "base"
+      },
+      {
+        "description": "1 connecting constraint(s)",
+        "status": "reachable",
+        "symbol": "x"
+      },
+      {
+        "description": "1 connecting constraint(s)",
+        "status": "reachable",
+        "symbol": "y"
+      }
+    ],
+    "measurements": [
+      {
+        "name": "component count",
+        "unit": "",
+        "value": 3
+      },
+      {
+        "name": "constraint count",
+        "unit": "",
+        "value": 1
+      },
+      {
+        "name": "grounded components",
+        "unit": "",
+        "value": 1
+      }
+    ],
+    "operation": "solve_assembly_constraints",
+    "possible_causes": [
+      "No grounding path reaches a constrained component.",
+      "The constraint graph splits into disconnected islands.",
+      "A closed loop cannot be satisfied within its scalar limits."
+    ],
+    "repair": [
+      "Add or widen a ScalarLimit on that constraint (angle_limit / distance_limit), or delete one constraint on the loop to break it open",
+      "Let a nested subassembly solve the loop internally and have the parent consume its public interface"
+    ],
+    "technical_details": "assembly_id=unreachable, kind=unresolvable_loop",
+    "what_happened": "constraint 'orphan' (fixed x\u2194y) forms a closed loop with no feasible scalar inside its limits"
+  },
+  "orphan_lenient": {
+    "authored": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "x": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "y": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "placements": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "x": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "y": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "report": {
+      "grounded_component_ids": [
+        "base"
+      ],
+      "residuals": [
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "orphan",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        }
+      ],
+      "solved": false,
+      "solved_component_ids": [
+        "base"
+      ],
+      "unsolved_component_ids": [
+        "x",
+        "y"
+      ]
+    }
+  },
+  "ungrounded": {
+    "how_to_fix": [
+      "Ground at least one component with ground_component_rassembly.",
+      "Ensure every constrained component has the required connectors.",
+      "Inspect constraint residuals before strict solving."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "solve_assembly_constraints_rassembly",
+    "possible_causes": [
+      "No component is grounded.",
+      "A constraint graph references missing connectors.",
+      "A connected component cannot be reached from a grounded component.",
+      "A closed-loop residual exceeds tolerance."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: assembly constraints require at least one grounded component",
+    "what_happened": "Failed to solve the assembly constraints."
+  }
+}

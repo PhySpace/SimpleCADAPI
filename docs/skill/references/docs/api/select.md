@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def select(items: Iterable[Any]) -> Query
+def select(items)
 ```
 
 *Source: ql.py*

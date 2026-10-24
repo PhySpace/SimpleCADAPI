@@ -11,14 +11,14 @@ import unittest
 
 import numpy as np
 import trimesh
-from OCP.IFSelect import IFSelect_RetDone
-from OCP.STEPCAFControl import STEPCAFControl_Reader
-from OCP.StepRepr import StepRepr_DescriptiveRepresentationItem
-from OCP.TCollection import TCollection_ExtendedString
-from OCP.TDataStd import TDataStd_Name
-from OCP.TDocStd import TDocStd_Document
-from OCP.XCAFApp import XCAFApp_Application
-from OCP.XCAFPrs import XCAFPrs_DocumentExplorer
+from simplecadapi._cpp.occt.IFSelect import IFSelect_RetDone
+from simplecadapi._cpp.occt.STEPCAFControl import STEPCAFControl_Reader
+from simplecadapi._cpp.occt.StepRepr import StepRepr_DescriptiveRepresentationItem
+from simplecadapi._cpp.occt.TCollection import TCollection_ExtendedString
+from simplecadapi._cpp.occt.TDataStd import TDataStd_Name
+from simplecadapi._cpp.occt.TDocStd import TDocStd_Document
+from simplecadapi._cpp.occt.XCAFApp import XCAFApp_Application
+from simplecadapi._cpp.occt.XCAFPrs import XCAFPrs_DocumentExplorer
 
 import simplecadapi as scad
 from simplecadapi.inspect.brep.render import _load_step_xcaf

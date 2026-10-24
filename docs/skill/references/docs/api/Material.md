@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class Material(material_id: str, name: Optional[str] = None, density: Optional[float] = None, density_unit: Optional[str] = None, color: Optional[Vec3] = None)
+class Material(material_id, name=None, density=None, density_unit=None, color=None)
 ```
 
 *Source: product/material.py*

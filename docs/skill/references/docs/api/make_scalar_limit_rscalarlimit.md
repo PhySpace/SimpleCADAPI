@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_scalar_limit_rscalarlimit(lower_value: float, upper_value: float) -> ScalarLimit
+def make_scalar_limit_rscalarlimit(lower_value, upper_value)
 ```
 
 *Source: operators/product.py*

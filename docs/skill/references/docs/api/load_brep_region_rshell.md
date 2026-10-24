@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def load_brep_region_rshell(path: str | Path, sha256: str, *, tag_prefix: Optional[str] = None) -> Shell
+def load_brep_region_rshell(path, sha256, *, tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

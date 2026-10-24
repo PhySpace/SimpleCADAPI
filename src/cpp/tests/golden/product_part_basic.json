@@ -1,0 +1,95 @@
+{
+  "bad_id": {
+    "how_to_fix": [
+      "Pass a stable part_id such as 'base_plate'.",
+      "Union intended multiple bodies into one Solid before creating the Part.",
+      "Do not pass material to make_part_rpart; use assign_material_rpart instead."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_part_rpart",
+    "possible_causes": [
+      "The part_id is empty or uses unsupported characters.",
+      "The body is not a Solid.",
+      "A Part with the same part_id already exists in the active GraphSession."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: part_id must not be empty",
+    "what_happened": "Failed to create the single-body Part."
+  },
+  "bad_material": {
+    "how_to_fix": [
+      "Create parts with make_part_rpart(...).",
+      "Create materials with make_material_rmaterial(...)."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "assign_material_rpart",
+    "possible_causes": [
+      "The part input is not a Part.",
+      "The material input is not a Material."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: material must be a Material",
+    "what_happened": "Failed to assign the material to the Part."
+  },
+  "bad_name": {
+    "how_to_fix": [
+      "Pass a stable part_id such as 'base_plate'.",
+      "Union intended multiple bodies into one Solid before creating the Part.",
+      "Do not pass material to make_part_rpart; use assign_material_rpart instead."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_part_rpart",
+    "possible_causes": [
+      "The part_id is empty or uses unsupported characters.",
+      "The body is not a Solid.",
+      "A Part with the same part_id already exists in the active GraphSession."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: name must not be empty when provided",
+    "what_happened": "Failed to create the single-body Part."
+  },
+  "bad_part": {
+    "how_to_fix": [
+      "Create parts with make_part_rpart(...).",
+      "Create materials with make_material_rmaterial(...)."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "assign_material_rpart",
+    "possible_causes": [
+      "The part input is not a Part.",
+      "The material input is not a Material."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: part must be a Part",
+    "what_happened": "Failed to assign the material to the Part."
+  },
+  "ids": [],
+  "non_solid": {
+    "how_to_fix": [
+      "Pass a stable part_id such as 'base_plate'.",
+      "Union intended multiple bodies into one Solid before creating the Part.",
+      "Do not pass material to make_part_rpart; use assign_material_rpart instead."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_part_rpart",
+    "possible_causes": [
+      "The part_id is empty or uses unsupported characters.",
+      "The body is not a Solid.",
+      "A Part with the same part_id already exists in the active GraphSession."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: body must be a Solid",
+    "what_happened": "Failed to create the single-body Part."
+  },
+  "part": {
+    "connectors": [],
+    "material": null,
+    "name": "Plate",
+    "part_id": "base_plate"
+  }
+}

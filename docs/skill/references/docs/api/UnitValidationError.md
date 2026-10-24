@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class UnitValidationError
+class UnitValidationError()
 ```
 
 *Source: params/units.py*

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def constrain_length_rsketch(sketch: Sketch, line: Union[SketchRef, str], value: ScalarLike, *, constraint_id: Optional[str] = None, driving: bool = True) -> Sketch
+def constrain_length_rsketch(sketch, line, value, *, constraint_id=None, driving=True)
 ```
 
 *Source: operators/sketch.py*

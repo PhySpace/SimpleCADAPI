@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_circle_redge(center: Tuple[float, float, float], radius: ScalarLike, normal: Tuple[float, float, float] = (0, 0, 1), *, tag_prefix: Optional[str] = None) -> Edge
+def make_circle_redge(center, radius, normal=(0, 0, 1), *, tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

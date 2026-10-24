@@ -93,3 +93,8 @@ design-docs/
 # local, not part of the SDK
 examples/workspace/
 phase2-contract-review.md
+
+# the C++ extension built in place (see src/cpp/bindings/python/CMakeLists.txt)
+src/simplecadapi/_cpp/*.so
+src/simplecadapi/_cpp/*.pyd
+src/simplecadapi/_cpp/*.dylib

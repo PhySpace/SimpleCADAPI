@@ -89,7 +89,9 @@ def state_dir(config: NotebookConfig) -> Path:
     theirs apart.
     """
 
-    return notebook_output_dir(config.path) / "simplecad" / config.path.name / config.id
+    # The native backend pickles other classes: its entries live apart from the ocp backend's.
+    root = "simplecad-native"
+    return notebook_output_dir(config.path) / root / config.path.name / config.id
 
 
 _held: set[str] = set()

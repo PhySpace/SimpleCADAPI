@@ -1,0 +1,155 @@
+{
+  "alias": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 1.0,
+    "tags": [],
+    "track": {
+      "op": "make_wire_from_edges_rwire"
+    },
+    "type": "Wire",
+    "vertices": 2
+  },
+  "empty": {
+    "how_to_fix": [
+      "Pass a non-empty list of Edge objects.",
+      "Ensure consecutive edges share matching endpoints.",
+      "Inspect the edge order if the wire should form a closed loop."
+    ],
+    "operation": "make_wire_from_edges_rwire",
+    "possible_causes": [
+      "The edge list is empty.",
+      "One or more items are invalid edges.",
+      "The edges do not connect into a valid wire chain."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to assemble a wire from the input edges."
+  },
+  "gap": {
+    "how_to_fix": [
+      "Pass a non-empty list of Edge objects.",
+      "Ensure consecutive edges share matching endpoints.",
+      "Inspect the edge order if the wire should form a closed loop."
+    ],
+    "operation": "make_wire_from_edges_rwire",
+    "possible_causes": [
+      "The edge list is empty.",
+      "One or more items are invalid edges.",
+      "The edges do not connect into a valid wire chain."
+    ],
+    "technical_details": "Standard_Failure: BRep_API: command not done",
+    "what_happened": "Failed to assemble a wire from the input edges."
+  },
+  "identity_tags": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      2.0,
+      2.0,
+      0.0
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "a.edge",
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 2,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 4.0,
+    "tags": [],
+    "track": {
+      "op": "make_wire_from_edges_rwire"
+    },
+    "type": "Wire",
+    "vertices": 3
+  },
+  "prefixed": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      0.0
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 2,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 2.0,
+    "tags": [
+      "path.wire"
+    ],
+    "track": {
+      "op": "make_wire_from_edges_rwire"
+    },
+    "type": "Wire",
+    "vertices": 3
+  },
+  "triangle": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      0.0
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 3.414213562373095,
+    "tags": [],
+    "track": {
+      "op": "make_wire_from_edges_rwire"
+    },
+    "type": "Wire",
+    "vertices": 3
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "codes": [
+    "residual_too_large"
+  ],
+  "dof": 0,
+  "failed": [
+    "B",
+    "C"
+  ],
+  "points": {
+    "p1": [
+      0.0,
+      0.0
+    ],
+    "p2": [
+      10.0,
+      0.0
+    ]
+  },
+  "scalars": {},
+  "status": "conflicting"
+}

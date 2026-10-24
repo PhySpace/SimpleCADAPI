@@ -54,8 +54,8 @@ def _fetch_truth(uid: str, truth_dir: Path) -> Optional[Path]:
 
 
 def _bbox_diagonal(solid) -> float:
-    from OCP.Bnd import Bnd_Box
-    from OCP.BRepBndLib import BRepBndLib
+    from simplecadapi._cpp.occt.Bnd import Bnd_Box
+    from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
 
     box = Bnd_Box()
     box.SetGap(0.0)
@@ -68,8 +68,8 @@ def _bbox_diagonal(solid) -> float:
 
 
 def _solid_volume(shape) -> float:
-    from OCP.BRepGProp import BRepGProp
-    from OCP.GProp import GProp_GProps
+    from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+    from simplecadapi._cpp.occt.GProp import GProp_GProps
 
     props = GProp_GProps()
     BRepGProp.VolumeProperties_s(shape, props)
@@ -77,10 +77,10 @@ def _solid_volume(shape) -> float:
 
 
 def _step_volume(path: Path) -> Optional[float]:
-    from OCP.IFSelect import IFSelect_RetDone
-    from OCP.STEPControl import STEPControl_Reader
-    from OCP.TopAbs import TopAbs_SOLID
-    from OCP.TopExp import TopExp_Explorer
+    from simplecadapi._cpp.occt.IFSelect import IFSelect_RetDone
+    from simplecadapi._cpp.occt.STEPControl import STEPControl_Reader
+    from simplecadapi._cpp.occt.TopAbs import TopAbs_SOLID
+    from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
 
     reader = STEPControl_Reader()
     try:
@@ -182,10 +182,10 @@ def evaluate_case(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _step_diagonal(path: Path) -> Optional[float]:
-    from OCP.Bnd import Bnd_Box
-    from OCP.BRepBndLib import BRepBndLib
-    from OCP.IFSelect import IFSelect_RetDone
-    from OCP.STEPControl import STEPControl_Reader
+    from simplecadapi._cpp.occt.Bnd import Bnd_Box
+    from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
+    from simplecadapi._cpp.occt.IFSelect import IFSelect_RetDone
+    from simplecadapi._cpp.occt.STEPControl import STEPControl_Reader
 
     reader = STEPControl_Reader()
     try:

@@ -1,11 +1,21 @@
-"""Topology tracking data model and semantic tagging.
+"""Topology references, the semantic model and tagging.
 
-``model`` holds the serializable topology data model (``TopoRef``,
-``TopoDelta``, ``OperationNode``, ``OperationGraph``, ``SemanticRef``, ...).
-Its public symbols are re-exported here so ``from simplecadapi.topology
-import ...`` keeps resolving the same names as the former ``topology``
-module. ``tagging``/``tracking``/``autotag`` implement the semantic
-projection pipeline on top of it.
+Forwarding module: nothing is defined here.  The names below are implemented in C++ and re-exported under the
+import path the SDK has always had.
 """
 
+from __future__ import annotations
+
+
+from . import model  # noqa: F401
+from . import tagging  # noqa: F401
+from . import tracking  # noqa: F401
 from .model import *  # noqa: F401,F403
+
+__all__ = [
+    "model",
+    "tagging",
+    "tracking",
+]
+
+__all__ += [n for n in dir() if not n.startswith('_') and n not in __all__]

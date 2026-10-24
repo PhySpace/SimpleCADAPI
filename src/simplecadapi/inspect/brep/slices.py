@@ -8,10 +8,10 @@ from pathlib import Path
 from typing import Any, Iterable, Literal, Sequence
 
 import numpy as np
-from OCP.BRepClass3d import BRepClass3d_SolidClassifier
-from OCP.TopAbs import TopAbs_IN, TopAbs_ON
-from OCP.TopoDS import TopoDS_Shape
-from OCP.gp import gp_Pnt
+from simplecadapi._cpp.occt.BRepClass3d import BRepClass3d_SolidClassifier
+from simplecadapi._cpp.occt.TopAbs import TopAbs_IN, TopAbs_ON
+from simplecadapi._cpp.occt.TopoDS import TopoDS_Shape
+from simplecadapi._cpp.occt.gp import gp_Pnt
 
 from .inspect import inspect_shape_rbrepinspection
 from .io import load_step_rshape

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def solve_assembly_constraints_rassembly(assembly: Assembly, strict: bool = True) -> Assembly
+def solve_assembly_constraints_rassembly(assembly, strict=True)
 ```
 
 *Source: operators/product.py*

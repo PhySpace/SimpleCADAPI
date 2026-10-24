@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class SurfaceBoundary(edge: Edge, continuity: str = 'C0', support: Optional[Face] = None)
+class SurfaceBoundary(edge, continuity='C0', support=None)
 ```
 
 *Source: operators/geometry.py*

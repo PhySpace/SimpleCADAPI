@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Set
 
-from ...topology import OperationGraph, OperationNode
+from simplecadapi._cpp import OperationGraph, OperationNode
 from ..base import BaseTranslator
 from ..types import BackendCapabilities, TranslationArtifact
 from .analysis import (
@@ -52,7 +52,7 @@ from .semantic import build_freecad_semantic_plan
 def _curve_params_with_kernel_axes(params: Dict[str, Any]) -> Dict[str, Any]:
     """Add the source OCC periodic basis without mutating graph parameters."""
 
-    from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
+    from simplecadapi._cpp.occt.gp import gp_Ax2, gp_Dir, gp_Pnt
 
     enriched = dict(params)
     normal = enriched.get("normal", (0.0, 0.0, 1.0))
@@ -72,9 +72,9 @@ def _interpolated_curve_params(
 ) -> Dict[str, Any]:
     """Freeze the source OCC interpolation result for exact FreeCAD reconstruction."""
 
-    from OCP.BRepAdaptor import BRepAdaptor_Curve
+    from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Curve
 
-    from ...kernel.ocp_curves import make_interpolated_bspline_edge
+    from simplecadapi._cpp import _native as native
 
     context = dict(context or {})
     origin = context.get("origin", (0.0, 0.0, 0.0))
@@ -95,12 +95,12 @@ def _interpolated_curve_params(
         ]
 
     global_points = [world_point(point) for point in params.get("points", ())]
-    edge = make_interpolated_bspline_edge(
-        global_points,
+    edge = native._interpolated_bspline_edge(
+        [tuple(float(v) for v in p) for p in global_points],
         periodic=bool(params.get("periodic", False)),
         tolerance=float(params.get("tolerance", 1.0e-6)),
     )
-    curve = BRepAdaptor_Curve(edge).BSpline()
+    curve = BRepAdaptor_Curve(getattr(edge, "wrapped", edge)).BSpline()
     enriched = dict(params)
     enriched["_freecad_exact_bspline"] = {
         "control_points": [
@@ -675,7 +675,7 @@ class _FreeCADCompiler(
                     f"_apply_graph_assignment_name(GRAPH_OUTPUTS.get({_json_ascii(node.node_id)}, []), node_id={_json_ascii(node.node_id)}, assignment_targets={_py_literal(assignment_targets)}, op={_json_ascii(node.op)})"
                 )
             return lines
-        raise ValueError(f"Unsupported FreeCAD native graph translation op: {node.op}")
+        raise ValueError(f"Unsupported FreeCAD native graph translation op: {node.op} (inputs={list(getattr(node, 'inputs', []))!r})")
 
     def _emit_native_node(
         self,
@@ -762,7 +762,14 @@ class _FreeCADCompiler(
         }
 
     def _dataclass_ref_dict(self, ref: Any) -> Dict[str, Any]:
-        payload = dict(ref.__dict__)
+        if hasattr(ref, "__dict__"):
+            payload = dict(ref.__dict__)
+        else:  # a value of the native backend: its public fields
+            payload = {
+                name: getattr(ref, name)
+                for name in dir(ref)
+                if not name.startswith("_") and not callable(getattr(ref, name))
+            }
         if "kind" in payload and hasattr(payload["kind"], "name"):
             payload["kind"] = payload["kind"].name
         return payload

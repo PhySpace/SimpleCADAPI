@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def fit_cubic_bspline_control_points(sample_points: Sequence[Sequence[float]], *, tolerance: float = 0.001, max_control_points: Optional[int] = None, fairing: float = 1e-06, duplicate_tolerance: float = 1e-12, knot_tolerance: float = 1e-09, raise_on_failure: bool = True) -> BSplineFitResult
+def fit_cubic_bspline_control_points(sample_points, *, tolerance=0.001, max_control_points=None, fairing=1e-06, duplicate_tolerance=1e-12, knot_tolerance=1e-09, raise_on_failure=True)
 ```
 
 *Source: math.py*

@@ -1,0 +1,238 @@
+{
+  "errors": [
+    {
+      "how_to_fix": [
+        "Pass a valid planar Face without inner wires.",
+        "Use a positive distance and guide radius with a non-zero axis.",
+        "Reduce the twist angle or simplify the profile."
+      ],
+      "inventory": [],
+      "measurements": [],
+      "operation": "twisted_sweep_rsolid",
+      "possible_causes": [
+        "The profile is invalid or contains inner wires.",
+        "The distance, twist angle, axis, or guide radius is invalid.",
+        "The requested twist causes self-intersection or kernel failure."
+      ],
+      "repair": [],
+      "technical_details": "ValueError: distance must be a finite positive number",
+      "what_happened": "Failed to sweep the profile with a linear axial rotation."
+    },
+    {
+      "how_to_fix": [
+        "Pass a valid planar Face without inner wires.",
+        "Use a positive distance and guide radius with a non-zero axis.",
+        "Reduce the twist angle or simplify the profile."
+      ],
+      "inventory": [],
+      "measurements": [],
+      "operation": "twisted_sweep_rsolid",
+      "possible_causes": [
+        "The profile is invalid or contains inner wires.",
+        "The distance, twist angle, axis, or guide radius is invalid.",
+        "The requested twist causes self-intersection or kernel failure."
+      ],
+      "repair": [],
+      "technical_details": "ValueError: axis must be a finite non-zero vector",
+      "what_happened": "Failed to sweep the profile with a linear axial rotation."
+    },
+    {
+      "how_to_fix": [
+        "Pass a valid planar Face without inner wires.",
+        "Use a positive distance and guide radius with a non-zero axis.",
+        "Reduce the twist angle or simplify the profile."
+      ],
+      "inventory": [],
+      "measurements": [],
+      "operation": "twisted_sweep_rsolid",
+      "possible_causes": [
+        "The profile is invalid or contains inner wires.",
+        "The distance, twist angle, axis, or guide radius is invalid.",
+        "The requested twist causes self-intersection or kernel failure."
+      ],
+      "repair": [],
+      "technical_details": "TypeError: profile must be a Face",
+      "what_happened": "Failed to sweep the profile with a linear axial rotation."
+    }
+  ],
+  "frenet": {
+    "area": 60.62030429100524,
+    "bbox": [
+      1.0,
+      -2.4492935982947064e-16,
+      0.0,
+      3.9999999999999996,
+      0.0,
+      8.0
+    ],
+    "edges": 5,
+    "faces": 4,
+    "tags": [],
+    "volume": 25.13274122871829
+  },
+  "sweep": {
+    "area": 60.62030429100524,
+    "bbox": [
+      1.0,
+      -2.4492935982947064e-16,
+      0.0,
+      3.9999999999999996,
+      0.0,
+      8.0
+    ],
+    "edge_rows": [
+      [
+        [
+          4.2426,
+          2.5,
+          0.0,
+          6.5
+        ],
+        [
+          "edge.boundary",
+          "pipe.face.side"
+        ]
+      ],
+      [
+        [
+          5.0,
+          1.0,
+          0.0,
+          2.5
+        ],
+        [
+          "edge.boundary",
+          "pipe.face.side"
+        ]
+      ],
+      [
+        [
+          6.2832,
+          0.0,
+          -0.0,
+          0.0
+        ],
+        [
+          "edge.boundary",
+          "pipe.face.side",
+          "pipe.face.start"
+        ]
+      ],
+      [
+        [
+          6.2832,
+          0.0,
+          -0.0,
+          5.0
+        ],
+        [
+          "edge.boundary",
+          "pipe.face.side"
+        ]
+      ],
+      [
+        [
+          6.2832,
+          3.0,
+          -0.0,
+          8.0
+        ],
+        [
+          "edge.boundary",
+          "pipe.face.end",
+          "pipe.face.side"
+        ]
+      ]
+    ],
+    "edges": 5,
+    "face_rows": [
+      [
+        [
+          3.1416,
+          -0.0,
+          0.0,
+          0.0
+        ],
+        [
+          "face.sweep.start",
+          "pipe.face.start",
+          "role.s"
+        ]
+      ],
+      [
+        [
+          3.1416,
+          3.0,
+          0.0,
+          8.0
+        ],
+        [
+          "face.sweep.end",
+          "pipe.face.end",
+          "role.e"
+        ]
+      ],
+      [
+        [
+          22.9212,
+          1.5,
+          0.0,
+          6.5
+        ],
+        [
+          "face.sweep.side",
+          "pipe.face.side"
+        ]
+      ],
+      [
+        [
+          31.4159,
+          0.0,
+          -0.0,
+          2.5
+        ],
+        [
+          "face.sweep.side",
+          "pipe.face.side"
+        ]
+      ]
+    ],
+    "faces": 4,
+    "tags": [
+      "pipe.solid"
+    ],
+    "volume": 25.13274122871829
+  },
+  "twisted": {
+    "area": 28.453319451183635,
+    "bbox": [
+      -1.0,
+      -1.0000000000000002,
+      -2.220446049250313e-16,
+      1.0,
+      1.0000000000000002,
+      4.0
+    ],
+    "edges": 12,
+    "faces": 6,
+    "tags": [
+      "twist.solid"
+    ],
+    "volume": 7.999999873968381
+  },
+  "twisted_axis": {
+    "area": 22.152795381575007,
+    "bbox": [
+      -1.0606601717798214,
+      -1.0606601717798212,
+      0.9999999999999998,
+      1.0606601717798214,
+      1.0606601717798212,
+      4.0
+    ],
+    "edges": 12,
+    "faces": 6,
+    "tags": [],
+    "volume": 6.000001606024231
+  }
+}

@@ -1,0 +1,326 @@
+{
+  "closed": {
+    "authored": {
+      "bearing": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "housing": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "shaft": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "y_axis": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          -0.0,
+          1.0
+        ]
+      }
+    },
+    "placements": {
+      "bearing": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "housing": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "shaft": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "y_axis": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          -0.0,
+          1.0
+        ]
+      }
+    },
+    "report": {
+      "grounded_component_ids": [
+        "housing",
+        "shaft"
+      ],
+      "residuals": [
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "outer_ring_to_housing",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        },
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "inner_ring_to_shaft",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        }
+      ],
+      "solved": true,
+      "solved_component_ids": [
+        "housing",
+        "shaft",
+        "bearing"
+      ],
+      "unsolved_component_ids": []
+    }
+  },
+  "nested_placements": {
+    "inner_ring": {
+      "origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "x_axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "y_axis": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "z_axis": [
+        0.0,
+        -0.0,
+        1.0
+      ]
+    },
+    "outer_ring": {
+      "origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "x_axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "y_axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "z_axis": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    }
+  },
+  "public": {
+    "authored": {
+      "base": {
+        "origin": [
+          10.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "child": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "placements": {
+      "base": {
+        "origin": [
+          10.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "child": {
+        "origin": [
+          3.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "report": {
+      "grounded_component_ids": [
+        "base"
+      ],
+      "residuals": [
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "bind_public_axis",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        }
+      ],
+      "solved": true,
+      "solved_component_ids": [
+        "base",
+        "child"
+      ],
+      "unsolved_component_ids": []
+    }
+  }
+}

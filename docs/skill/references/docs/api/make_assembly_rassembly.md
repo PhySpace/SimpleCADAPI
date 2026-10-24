@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_assembly_rassembly(assembly_id: str, name: Optional[str] = None) -> Assembly
+def make_assembly_rassembly(assembly_id, name=None)
 ```
 
 *Source: operators/product.py*

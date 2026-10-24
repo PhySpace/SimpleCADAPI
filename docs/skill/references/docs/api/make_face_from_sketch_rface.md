@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_face_from_sketch_rface(sketch: Sketch, profile: int | str = 0, *, inner_profiles: Sequence[int | str] = (), require_fully_constrained: bool = False, strict: bool = True, tolerance: float = 1e-07, max_iterations: int = 80) -> Face
+def make_face_from_sketch_rface(sketch, profile=0, *, inner_profiles=[], require_fully_constrained=False, strict=True, tolerance=1e-07, max_iterations=80)
 ```
 
 *Source: operators/sketch.py*

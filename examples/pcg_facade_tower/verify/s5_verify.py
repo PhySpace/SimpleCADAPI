@@ -65,7 +65,7 @@ def realize(component) -> dict:
     """World shapes of one tower component: band pieces keyed by their band id, a part by ''."""
     outer = trsf(component.placement)
     if isinstance(component.item, Part):
-        from OCP.TopLoc import TopLoc_Location
+        from simplecadapi._cpp.occt.TopLoc import TopLoc_Location
         return {"": component.item.body.wrapped.Moved(TopLoc_Location(outer))}
     return {c.component_id: placed(c, outer) for c in component.item.components}
 
@@ -141,8 +141,8 @@ def check_levels(sched: L.FacadeSchedule, asm) -> list[str]:
 
 def check_projection(sched: L.FacadeSchedule, asm) -> tuple[list[str], dict]:
     """T1: the SDK's flattened tower vs definition volumes x counts."""
-    from OCP.TopAbs import TopAbs_SOLID
-    from OCP.TopExp import TopExp_Explorer
+    from simplecadapi._cpp.occt.TopAbs import TopAbs_SOLID
+    from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
 
     bad, p = [], sched.params
     vol_by_item, want_vol, want_solids = {}, 0.0, 0

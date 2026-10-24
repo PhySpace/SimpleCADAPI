@@ -1,0 +1,364 @@
+{
+  "bore_mouth": {
+    "how_to_fix": [
+      "Use a positive fillet radius.",
+      "Select at least one valid edge or use a selector that resolves to edges.",
+      "If the kernel rejects the fillet, try a smaller radius or a simpler edge set."
+    ],
+    "inventory": [],
+    "measurements": [
+      {
+        "name": "radius",
+        "unit": "mm",
+        "value": 6.0
+      },
+      {
+        "name": "available_face_room",
+        "unit": "mm",
+        "value": 6.0
+      },
+      {
+        "name": "edge_start",
+        "unit": "mm",
+        "value": [
+          10.0,
+          -2.4492935982947065e-15,
+          10.0
+        ]
+      },
+      {
+        "name": "edge_end",
+        "unit": "mm",
+        "value": [
+          10.0,
+          -2.4492935982947065e-15,
+          10.0
+        ]
+      }
+    ],
+    "operation": "fillet_rsolid",
+    "possible_causes": [
+      "The fillet radius is larger than the adjacent face can carry.",
+      "The selected edge runs along a narrow face."
+    ],
+    "repair": [
+      "Reduce the radius to below 6 mm (e.g. 5.7) and retry.",
+      "Or select a different edge with more room on its adjacent faces."
+    ],
+    "technical_details": "ValueError: Fillet failed: OCC build did not complete",
+    "what_happened": "radius 6 mm meets or exceeds the 6 mm of face room between the failing edge and the opposite boundary of an adjacent face"
+  },
+  "chamfer_room": {
+    "how_to_fix": [
+      "Use a positive chamfer distance.",
+      "Select at least one valid edge or use a selector that resolves to edges.",
+      "If the kernel rejects the chamfer, try a smaller distance or fewer edges."
+    ],
+    "inventory": [],
+    "measurements": [
+      {
+        "name": "distance",
+        "unit": "mm",
+        "value": 12.0
+      },
+      {
+        "name": "available_face_room",
+        "unit": "mm",
+        "value": 10.0
+      },
+      {
+        "name": "edge_start",
+        "unit": "mm",
+        "value": [
+          -5.0,
+          -5.0,
+          10.0
+        ]
+      },
+      {
+        "name": "edge_end",
+        "unit": "mm",
+        "value": [
+          -5.0,
+          -5.0,
+          0.0
+        ]
+      }
+    ],
+    "operation": "chamfer_rsolid",
+    "possible_causes": [
+      "The leg distance is larger than the adjacent face can carry.",
+      "The selected edge runs along a narrow face."
+    ],
+    "repair": [
+      "Reduce the distance to below 10 mm (e.g. 9.5) and retry.",
+      "Or select a different edge with more room on its adjacent faces."
+    ],
+    "technical_details": "ValueError: Chamfer failed: OCC build did not complete",
+    "what_happened": "distance 12 mm meets or exceeds the 10 mm of face room between the failing edge and the opposite boundary of an adjacent face"
+  },
+  "critical": {
+    "how_to_fix": [
+      "Use a positive fillet radius.",
+      "Select at least one valid edge or use a selector that resolves to edges.",
+      "If the kernel rejects the fillet, try a smaller radius or a simpler edge set."
+    ],
+    "inventory": [],
+    "measurements": [
+      {
+        "name": "radius",
+        "unit": "mm",
+        "value": 5.0
+      },
+      {
+        "name": "combined_blend_width",
+        "unit": "mm",
+        "value": 10.0
+      },
+      {
+        "name": "available_face_room",
+        "unit": "mm",
+        "value": 10.0
+      },
+      {
+        "name": "edge_start",
+        "unit": "mm",
+        "value": [
+          -5.0,
+          -5.0,
+          10.0
+        ]
+      },
+      {
+        "name": "edge_end",
+        "unit": "mm",
+        "value": [
+          -5.0,
+          -5.0,
+          0.0
+        ]
+      }
+    ],
+    "operation": "fillet_rsolid",
+    "possible_causes": [
+      "Blending many edges with the same radius consumes the shared faces entirely.",
+      "The critical size equals half the narrowest adjacent face."
+    ],
+    "repair": [
+      "Reduce the radius below 5 mm (half the narrowest shared face) so adjacent blend surfaces leave material between them.",
+      "Or blend the edges in two passes with different sizes."
+    ],
+    "technical_details": "ValueError: Fillet failed: OCC build did not complete",
+    "what_happened": "adjacent fillet surfaces meet tangentially: 2\u00d7radius = 10 mm equals or exceeds the 10 mm face room between opposite edges, leaving a zero-width face strip (degenerate)"
+  },
+  "fillet_room": {
+    "how_to_fix": [
+      "Use a positive fillet radius.",
+      "Select at least one valid edge or use a selector that resolves to edges.",
+      "If the kernel rejects the fillet, try a smaller radius or a simpler edge set."
+    ],
+    "inventory": [],
+    "measurements": [
+      {
+        "name": "radius",
+        "unit": "mm",
+        "value": 12.0
+      },
+      {
+        "name": "available_face_room",
+        "unit": "mm",
+        "value": 10.0
+      },
+      {
+        "name": "edge_start",
+        "unit": "mm",
+        "value": [
+          -5.0,
+          -5.0,
+          10.0
+        ]
+      },
+      {
+        "name": "edge_end",
+        "unit": "mm",
+        "value": [
+          -5.0,
+          -5.0,
+          0.0
+        ]
+      }
+    ],
+    "operation": "fillet_rsolid",
+    "possible_causes": [
+      "The fillet radius is larger than the adjacent face can carry.",
+      "The selected edge runs along a narrow face."
+    ],
+    "repair": [
+      "Reduce the radius to below 10 mm (e.g. 9.5) and retry.",
+      "Or select a different edge with more room on its adjacent faces."
+    ],
+    "technical_details": "ValueError: Fillet failed: OCC build did not complete",
+    "what_happened": "radius 12 mm meets or exceeds the 10 mm of face room between the failing edge and the opposite boundary of an adjacent face"
+  },
+  "garbage": {
+    "how_to_fix": [
+      "Use a positive fillet radius.",
+      "Select at least one valid edge or use a selector that resolves to edges.",
+      "If the kernel rejects the fillet, try a smaller radius or a simpler edge set."
+    ],
+    "inventory": [],
+    "measurements": [
+      {
+        "name": "radius",
+        "unit": "mm",
+        "value": 6.0
+      },
+      {
+        "name": "combined_blend_width",
+        "unit": "mm",
+        "value": 12.0
+      },
+      {
+        "name": "available_face_room",
+        "unit": "mm",
+        "value": 10.0
+      },
+      {
+        "name": "edge_start",
+        "unit": "mm",
+        "value": [
+          -5.0,
+          -5.0,
+          10.0
+        ]
+      },
+      {
+        "name": "edge_end",
+        "unit": "mm",
+        "value": [
+          -5.0,
+          -5.0,
+          0.0
+        ]
+      }
+    ],
+    "operation": "fillet_rsolid",
+    "possible_causes": [
+      "Blending many edges with the same radius consumes the shared faces entirely.",
+      "The critical size equals half the narrowest adjacent face."
+    ],
+    "repair": [
+      "Reduce the radius below 5 mm (half the narrowest shared face) so adjacent blend surfaces leave material between them.",
+      "Or blend the edges in two passes with different sizes."
+    ],
+    "technical_details": "BlendVolumeViolation: fillet result volume is 0: the kernel returned an empty/degenerate solid (size=6.0, selected_edges=12)",
+    "what_happened": "fillet result volume is 0: the kernel returned an empty/degenerate solid (size=6.0, selected_edges=12); probes indicate: adjacent fillet surfaces meet tangentially: 2\u00d7radius = 12 mm equals or exceeds the 10 mm face room between opposite edges, leaving a zero-width face strip (degenerate)"
+  },
+  "no_edges": {
+    "how_to_fix": [
+      "Use a positive fillet radius.",
+      "Select at least one valid edge or use a selector that resolves to edges.",
+      "If the kernel rejects the fillet, try a smaller radius or a simpler edge set."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "fillet_rsolid",
+    "possible_causes": [
+      "The radius is not a positive finite scalar.",
+      "No valid edges were selected.",
+      "The selected edges are incompatible with the requested fillet radius."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to apply the fillet operation."
+  },
+  "radius": {
+    "how_to_fix": [
+      "Use a positive fillet radius.",
+      "Select at least one valid edge or use a selector that resolves to edges.",
+      "If the kernel rejects the fillet, try a smaller radius or a simpler edge set."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "fillet_rsolid",
+    "possible_causes": [
+      "The radius is not a positive finite scalar.",
+      "No valid edges were selected.",
+      "The selected edges are incompatible with the requested fillet radius."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to apply the fillet operation."
+  },
+  "shell": {
+    "how_to_fix": [
+      "Use a positive shell thickness.",
+      "Select at least one valid face to remove.",
+      "If the shell fails, try a smaller thickness or a different face selection."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "shell_rsolid",
+    "possible_causes": [
+      "The thickness is not a positive finite scalar.",
+      "No valid faces were selected for removal.",
+      "The requested shell thickness is incompatible with the current solid."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to apply the shell operation."
+  },
+  "shell_role": {
+    "how_to_fix": [],
+    "inventory": [],
+    "measurements": [],
+    "operation": "semantic_query",
+    "possible_causes": [],
+    "repair": [],
+    "technical_details": null,
+    "what_happened": "operation output role 'shell.body_face' requires at least one kernel-proven result"
+  },
+  "tangent": {
+    "how_to_fix": [
+      "Use a positive fillet radius.",
+      "Select at least one valid edge or use a selector that resolves to edges.",
+      "If the kernel rejects the fillet, try a smaller radius or a simpler edge set."
+    ],
+    "inventory": [],
+    "measurements": [
+      {
+        "name": "dihedral_angle",
+        "unit": "deg",
+        "value": 180.0
+      },
+      {
+        "name": "edge_start",
+        "unit": "mm",
+        "value": [
+          0.0,
+          5.0,
+          0.0
+        ]
+      },
+      {
+        "name": "edge_end",
+        "unit": "mm",
+        "value": [
+          0.0,
+          5.0,
+          8.0
+        ]
+      }
+    ],
+    "operation": "fillet_rsolid",
+    "possible_causes": [
+      "The profile or upstream blend produced a smooth (G1) junction; there is no corner for the blend to fill."
+    ],
+    "repair": [
+      "Remove that junction edge from the selection: there is no corner to blend.",
+      "If a visual transition is required there, it already exists \u2014 the faces are tangent by construction."
+    ],
+    "technical_details": "Standard_Failure: There are no suitable edges for chamfer or fillet",
+    "what_happened": "the faces meeting at a selected edge are already tangent (interior angle 180.00\u00b0), so the fillet surface degenerates to zero width for any radius"
+  }
+}

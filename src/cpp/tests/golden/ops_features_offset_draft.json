@@ -1,0 +1,139 @@
+{
+  "draft_plane": {
+    "area": 856.6417327072822,
+    "bbox": [
+      -5.0,
+      -6.0,
+      0.0,
+      5.612420644681467,
+      6.0,
+      14.0
+    ],
+    "edges": 12,
+    "faces": 6,
+    "tags": [],
+    "volume": 1679.999999999999
+  },
+  "drafts": [
+    {
+      "area": 794.4086498189239,
+      "bbox": [
+        -5.0,
+        -6.0,
+        -2.1206476837703787e-17,
+        5.000000000000001,
+        6.000000000000002,
+        14.0
+      ],
+      "edges": 12,
+      "faces": 6,
+      "tags": [],
+      "volume": 1472.639470686845
+    },
+    {
+      "area": 922.7746917746863,
+      "bbox": [
+        -5.0,
+        -6.0,
+        0.0,
+        7.468577729918511,
+        6.000000000000002,
+        14.0
+      ],
+      "edges": 12,
+      "faces": 6,
+      "tags": [],
+      "volume": 1887.3605293131545
+    },
+    {
+      "area": 855.9999999999999,
+      "bbox": [
+        -5.0,
+        -6.0,
+        0.0,
+        5.0,
+        6.0,
+        14.0
+      ],
+      "edges": 12,
+      "faces": 6,
+      "tags": [],
+      "volume": 1679.9999999999995
+    }
+  ],
+  "errors": [
+    [
+      "ValueError",
+      "amount must be finite and nonzero"
+    ],
+    [
+      "ValueError",
+      "tolerance must be finite and positive"
+    ],
+    [
+      "ValueError",
+      "kind must be ARC or INTERSECTION"
+    ],
+    [
+      "ValueError",
+      "draft requires at least one selected face"
+    ],
+    [
+      "ValueError",
+      "angle must be finite and strictly between -90 and 90 degrees"
+    ],
+    [
+      "ValueError",
+      "plane_normal must be nonzero"
+    ],
+    [
+      "ValueError",
+      "selected draft faces must belong to the input solid"
+    ]
+  ],
+  "grown": {
+    "area": 1094.7610416779396,
+    "bbox": [
+      -6.0,
+      -7.0,
+      -1.0,
+      6.0,
+      7.0,
+      15.0
+    ],
+    "edges": 48,
+    "faces": 26,
+    "tags": [],
+    "volume": 2653.286125707179
+  },
+  "open_in": {
+    "area": 1323.9999999999998,
+    "bbox": [
+      -5.0,
+      -6.0,
+      0.0,
+      5.0,
+      6.0,
+      14.0
+    ],
+    "edges": 24,
+    "faces": 11,
+    "tags": [],
+    "volume": 639.9999999999999
+  },
+  "open_out": {
+    "area": 1731.9999999999998,
+    "bbox": [
+      -6.0,
+      -7.0,
+      -1.0,
+      6.0,
+      7.0,
+      14.0
+    ],
+    "edges": 24,
+    "faces": 11,
+    "tags": [],
+    "volume": 839.9999999999997
+  }
+}

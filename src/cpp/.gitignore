@@ -1,0 +1,14 @@
+build/
+.venv/
+.setup/
+__pycache__/
+*.pyc
+*.so
+*.pyd
+*.dylib
+.cache/
+compile_commands.json
+.DS_Store
+dist/
+_skbuild/
+*.egg-info/

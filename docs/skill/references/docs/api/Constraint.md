@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class Constraint(constraint_id: str, constraint_kind: ConstraintKind, connector_a: ConnectorRef, connector_b: ConnectorRef, drive_distance: Optional[float] = None, distance_limit: Optional[ScalarLimit] = None, drive_angle_degrees: Optional[float] = None, angle_limit: Optional[ScalarLimit] = None, pitch_radius_a: Optional[float] = None, pitch_radius_b: Optional[float] = None, pulley_radius_a: Optional[float] = None, pulley_radius_b: Optional[float] = None, pitch_radius: Optional[float] = None, phase_offset: Optional[float] = None, name: Optional[str] = None)
+class Constraint(constraint_id, constraint_kind, connector_a, connector_b, drive_distance=None, distance_limit=None, drive_angle_degrees=None, angle_limit=None, pitch_radius_a=None, pitch_radius_b=None, pulley_radius_a=None, pulley_radius_b=None, pitch_radius=None, phase_offset=None, name=None)
 ```
 
 *Source: product/constraint.py*

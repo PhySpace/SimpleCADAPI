@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import math
 import pytest
-from OCP.BRep import BRep_Builder
-from OCP.BRepBuilderAPI import (
+from simplecadapi._cpp.occt.BRep import BRep_Builder
+from simplecadapi._cpp.occt.BRepBuilderAPI import (
     BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeFace,
     BRepBuilderAPI_MakeWire,
 )
-from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeSphere
-from OCP.TopoDS import TopoDS_Compound
-from OCP.gp import gp_Pnt
+from simplecadapi._cpp.occt.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeSphere
+from simplecadapi._cpp.occt.TopoDS import TopoDS_Compound
+from simplecadapi._cpp.occt.gp import gp_Pnt
 
 from simplecadapi.inspect import brep
 

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_2d_cut_rface(body: Face, tool: Face) -> Face
+def make_2d_cut_rface(body, tool)
 ```
 
 *Source: operators/boolean.py*

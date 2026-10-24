@@ -149,19 +149,20 @@ the full crank cycle sweeps clean in the same sim ·
 
 ---
 
-## Update Notes (2.2.6.post2)
+## Update Notes (2.2.7b1)
 
 > Validate generated definitions, assembly constraints, and manufacturing
 > geometry before production use.
 
-- **Operators live with their family.** `scale_rsolid`, `transform_rsolid`, `boolean_rsolidlist`,
-  `offset_rsolid`, `draft_rsolid`, `extrude_taper_rsolid`, `extrude_until_rsolid` and
-  `sweep_multisection_rsolid` moved into `operators/transform.py`, `boolean.py` and `features.py`.
-  `from simplecadapi import ...` is unchanged; the old module paths warn and still work.
-- **Every operator's API reference is generated**, and tests fail when one has no doc or the
-  committed docs differ from the generator's output.
+- **The geometry engine is C++ on OpenCASCADE, inside the wheel.** `pip install simplecadapi` needs no
+  `cadquery-ocp`; the public API and the previous test suite are unchanged.
+- **Prebuilt wheels** for Linux x86_64 and aarch64, macOS arm64 (14+) and Windows x86_64, Python 3.10-3.13,
+  all on the same OpenCASCADE 7.9.3. This is a beta: the first release with prebuilt wheels.
+- **Faster and smaller.** On the six-axis arm: cold build 43.8 s to 29.1 s, rebuild with nothing changed
+  12.8 s to 6.0 s, `import simplecadapi` 1.6 s / 360 MB to 0.2 s / 68 MB.
+- **Errors are English** and the tag and query errors render in full, like operator errors.
 
-Full notes for this version: [`docs/updates/2.2.6.post2.md`](docs/updates/2.2.6.post2.md).
+Full notes for this version: [`docs/updates/2.2.7b1.md`](docs/updates/2.2.7b1.md).
 Earlier versions: the [changelog](CHANGELOG.md) and [`docs/updates/`](docs/updates/).
 
 ---
@@ -176,13 +177,13 @@ Earlier versions: the [changelog](CHANGELOG.md) and [`docs/updates/`](docs/updat
 
 ---
 
-SimpleCADAPI is an OCP-native Python SDK for building CAD models with clear,
+SimpleCADAPI is an OpenCASCADE-native Python SDK for building CAD models with clear,
 functional operations and replayable model graphs. It wraps OpenCascade geometry
 in a compact public API for creating solids, applying features, tagging semantic
 intent, querying topology, exporting manufacturing files, and translating recorded
 models into FreeCAD workflows.
 
-Current release: `simplecadapi==2.2.6.post2`.
+Current release: `simplecadapi==2.2.7b1`.
 
 ## What It Provides
 
@@ -191,7 +192,7 @@ Current release: `simplecadapi==2.2.6.post2`.
   incremental headless runs (`sca run`), and notebook composition (`scad.use`).
 - A code-first web editor, `sca edit`: live model, parameter controls, viewport
   picks written back as selection code, built for working alongside an agent.
-- OCP-native shape types: `Vertex`, `Edge`, `Wire`, `Face`, and `Solid`.
+- OpenCASCADE-native shape types: `Vertex`, `Edge`, `Wire`, `Face`, and `Solid`.
 - Functional modeling operations for primitives, profiles, extrude, revolve,
   loft, sweep, booleans, transforms, patterns, fillets, chamfers, and shells.
 - Canonical `.scadpkg` product packages generated from the notebooks for
@@ -697,6 +698,7 @@ and the [STEP reconstruction workflow](docs/skill/references/workflows/step-reco
 
 ## Documentation
 
+- 2.2.7b1 update notes: [`docs/updates/2.2.7b1.md`](docs/updates/2.2.7b1.md)
 - 2.2.6.post2 update notes: [`docs/updates/2.2.6.post2.md`](docs/updates/2.2.6.post2.md)
 - 2.2.6.post1 update notes: [`docs/updates/2.2.6.post1.md`](docs/updates/2.2.6.post1.md)
 - 2.2.6 update notes: [`docs/updates/2.2.6.md`](docs/updates/2.2.6.md)

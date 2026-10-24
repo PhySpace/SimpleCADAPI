@@ -1,0 +1,509 @@
+{
+  "cut": {
+    "area": 2853.4512719466766,
+    "bbox": [
+      -5.0,
+      -10.0,
+      0.0,
+      5.0,
+      10.0,
+      30.0
+    ],
+    "edge_rows": [
+      [
+        [
+          10.0,
+          0.0,
+          -10.0,
+          0.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          10.0,
+          0.0,
+          -10.0,
+          30.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          10.0,
+          0.0,
+          10.0,
+          0.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          10.0,
+          0.0,
+          10.0,
+          30.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          20.0,
+          -5.0,
+          0.0,
+          0.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          20.0,
+          -5.0,
+          0.0,
+          30.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          20.0,
+          5.0,
+          0.0,
+          0.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          20.0,
+          5.0,
+          0.0,
+          30.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          25.1327,
+          0.0,
+          -0.0,
+          0.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          25.1327,
+          0.0,
+          -0.0,
+          30.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          30.0,
+          -5.0,
+          -10.0,
+          15.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          30.0,
+          -5.0,
+          10.0,
+          15.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          30.0,
+          4.0,
+          -0.0,
+          15.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          30.0,
+          5.0,
+          -10.0,
+          15.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          30.0,
+          5.0,
+          10.0,
+          15.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ]
+    ],
+    "edges": 15,
+    "face_rows": [
+      [
+        [
+          149.7345,
+          -0.0,
+          0.0,
+          0.0
+        ],
+        []
+      ],
+      [
+        [
+          149.7345,
+          -0.0,
+          0.0,
+          30.0
+        ],
+        []
+      ],
+      [
+        [
+          300.0,
+          -0.0,
+          -10.0,
+          15.0
+        ],
+        []
+      ],
+      [
+        [
+          300.0,
+          -0.0,
+          10.0,
+          15.0
+        ],
+        []
+      ],
+      [
+        [
+          600.0,
+          -5.0,
+          -0.0,
+          15.0
+        ],
+        []
+      ],
+      [
+        [
+          600.0,
+          5.0,
+          -0.0,
+          15.0
+        ],
+        []
+      ],
+      [
+        [
+          753.9822,
+          0.0,
+          -0.0,
+          15.0
+        ],
+        []
+      ]
+    ],
+    "faces": 7,
+    "tags": [
+      "solid.boolean.cut"
+    ],
+    "volume": 4492.035526276903
+  },
+  "cut_not_solid": {
+    "how_to_fix": [
+      "Pass a valid base solid followed by valid tool solids.",
+      "Check whether the tool geometry actually intersects the base solid.",
+      "If the cut depends on earlier union results, verify those results first."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "cut_rsolid",
+    "possible_causes": [
+      "One or more inputs are not Solid objects.",
+      "The base solid or tool solids are invalid.",
+      "The kernel could not compute a valid cut result for the current geometry."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to compute the boolean cut."
+  },
+  "cut_two": {
+    "area": 2853.4512719466766,
+    "bbox": [
+      -5.0,
+      -10.0,
+      0.0,
+      5.0,
+      10.0,
+      30.0
+    ],
+    "edges": 15,
+    "faces": 7,
+    "tags": [
+      "solid.boolean.cut"
+    ],
+    "volume": 4492.035526276903
+  },
+  "graph": {
+    "area": 2853.4512719466766,
+    "bbox": [
+      -5.0,
+      -10.0,
+      0.0,
+      5.0,
+      10.0,
+      30.0
+    ],
+    "edges": 15,
+    "faces": 7,
+    "tags": [
+      "solid.boolean.cut"
+    ],
+    "volume": 4492.035526276903
+  },
+  "intersect": {
+    "area": 854.5132017764236,
+    "bbox": [
+      4.0,
+      -9.797174393178826e-16,
+      0.0,
+      4.0,
+      -9.797174393178826e-16,
+      30.0
+    ],
+    "edge_rows": [
+      [
+        [
+          25.1327,
+          0.0,
+          -0.0,
+          0.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          25.1327,
+          0.0,
+          -0.0,
+          30.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ],
+      [
+        [
+          30.0,
+          4.0,
+          -0.0,
+          15.0
+        ],
+        [
+          "edge.boundary"
+        ]
+      ]
+    ],
+    "edges": 3,
+    "face_rows": [
+      [
+        [
+          50.2655,
+          0.0,
+          0.0,
+          0.0
+        ],
+        []
+      ],
+      [
+        [
+          50.2655,
+          0.0,
+          0.0,
+          30.0
+        ],
+        []
+      ],
+      [
+        [
+          753.9822,
+          0.0,
+          -0.0,
+          15.0
+        ],
+        []
+      ]
+    ],
+    "faces": 3,
+    "tags": [
+      "solid.boolean.intersect"
+    ],
+    "volume": 1507.9644737230972
+  },
+  "intersect_disjoint": {
+    "how_to_fix": [
+      "Pass only valid Solid objects.",
+      "Verify that the solids truly overlap in space.",
+      "Move the solids so they share a meaningful overlap volume before intersecting."
+    ],
+    "inventory": [],
+    "measurements": [
+      {
+        "name": "min_gap",
+        "unit": "mm",
+        "value": 44.0
+      },
+      {
+        "name": "closest_point_a",
+        "unit": "mm",
+        "value": [
+          5.0,
+          -2.0,
+          0.0
+        ]
+      },
+      {
+        "name": "closest_point_b",
+        "unit": "mm",
+        "value": [
+          49.0,
+          -2.0,
+          0.0
+        ]
+      },
+      {
+        "name": "closure_vector_a_to_b",
+        "unit": "mm",
+        "value": [
+          44.0,
+          0.0,
+          0.0
+        ]
+      }
+    ],
+    "operation": "intersect_rsolid",
+    "possible_causes": [
+      "The operands are separated in space, so the intersection is empty.",
+      "A placement/translation moved one operand away from the other."
+    ],
+    "repair": [
+      "Move operand 2 by (44, 0, 0) (\u2265 44 mm) so the operands share a positive-volume overlap."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "separated solids: operand 1 and operand 2 never touch; nearest detected gap is 44 mm (tolerance 0)"
+  },
+  "single_is_same": true,
+  "skip": {
+    "area": 2200.0,
+    "bbox": [
+      -5.0,
+      -10.0,
+      0.0,
+      5.0,
+      10.0,
+      30.0
+    ],
+    "edges": 12,
+    "faces": 6,
+    "tags": [
+      "box",
+      "geom.primitive.box",
+      "solid.boolean.cut"
+    ],
+    "volume": 5999.999999999999
+  },
+  "strict": {
+    "how_to_fix": [
+      "Pass a valid base solid followed by valid tool solids.",
+      "Check whether the tool geometry actually intersects the base solid.",
+      "If the cut depends on earlier union results, verify those results first."
+    ],
+    "inventory": [],
+    "measurements": [
+      {
+        "name": "min_gap",
+        "unit": "mm",
+        "value": 44.0
+      },
+      {
+        "name": "closest_point_a",
+        "unit": "mm",
+        "value": [
+          5.0,
+          -2.0,
+          0.0
+        ]
+      },
+      {
+        "name": "closest_point_b",
+        "unit": "mm",
+        "value": [
+          49.0,
+          -2.0,
+          0.0
+        ]
+      },
+      {
+        "name": "closure_vector_a_to_b",
+        "unit": "mm",
+        "value": [
+          44.0,
+          0.0,
+          0.0
+        ]
+      }
+    ],
+    "operation": "cut_rsolid",
+    "possible_causes": [
+      "The tool never reaches the base solid, so the cut removes nothing.",
+      "A placement/translation moved the tool away from the base solid."
+    ],
+    "repair": [
+      "Move the tool operand 2 by (44, 0, 0) (\u2265 44 mm) so it reaches inside the base solid, or extend the tool across the gap.",
+      "Check the intended removal region: with this gap the cut is a no-op on the base solid."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "separated solids: operand 1 and operand 2 never touch; nearest detected gap is 44 mm (tolerance 0)"
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "centers": [
+    [
+      -5.0,
+      2.6753634559188753e-17,
+      1.0
+    ],
+    [
+      5.0,
+      2.6753634559188753e-17,
+      1.0
+    ]
+  ],
+  "empty": {
+    "how_to_fix": [
+      "Create an assembly with make_assembly_rassembly and add at least one component.",
+      "Ensure every component references a valid Part or subassembly.",
+      "Validate placements before projection."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_compound_from_assembly_rcompound",
+    "possible_causes": [
+      "The input is not an Assembly.",
+      "The assembly has no components.",
+      "A component placement is invalid.",
+      "The kernel could not transform or combine the component bodies."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: assembly must contain at least one component to project",
+    "what_happened": "Failed to project the assembly into a Compound."
+  },
+  "nested_centers": [
+    [
+      12.0,
+      1.2721305490496585e-17,
+      0.5
+    ]
+  ],
+  "nested_projection": {
+    "assembly_id": "root_assembly",
+    "component_count": 1,
+    "solid_count": 1
+  },
+  "nested_volume": 0.9999999999999997,
+  "not_assembly": {
+    "how_to_fix": [
+      "Create an assembly with make_assembly_rassembly and add at least one component.",
+      "Ensure every component references a valid Part or subassembly.",
+      "Validate placements before projection."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_compound_from_assembly_rcompound",
+    "possible_causes": [
+      "The input is not an Assembly.",
+      "The assembly has no components.",
+      "A component placement is invalid.",
+      "The kernel could not transform or combine the component bodies."
+    ],
+    "repair": [],
+    "technical_details": "TypeError: assembly must be an Assembly",
+    "what_happened": "Failed to project the assembly into a Compound."
+  },
+  "projection": {
+    "assembly_id": "fixture",
+    "component_count": 2,
+    "solid_count": 2
+  },
+  "single_volume": 6.283185307179571,
+  "volume": 12.566370614359142
+}

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def add_fixed_constraint_rassembly(assembly: Assembly, constraint_id: str, connector_a: ConnectorRef, connector_b: ConnectorRef, name: Optional[str] = None) -> Assembly
+def add_fixed_constraint_rassembly(assembly, constraint_id, connector_a, connector_b, name=None)
 ```
 
 *Source: operators/product.py*

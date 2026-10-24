@@ -55,31 +55,26 @@ from ..artifacts.topology_snapshot import (
     validate_connector_entity_bindings,
 )
 from ..artifacts.validation import validate_artifact_blobs
-from ..core import Solid
-from ..product.assembly import (
-    _AUTHORED_PLACEMENTS_RUNTIME_KEY,
+from simplecadapi._cpp import (
     Assembly,
-    PublicConnectorRef,
-    _component_occurrence_placements,
-)
-from ..product.connector import (
     Connector,
     ConnectorRef,
+    inspect_assembly_constraints,
+    Material,
+    Part,
+    PublicConnectorRef,
     resolve_connector_placement,
     resolve_connector_ref_placement,
-)
-from ..product.material import Material
-from ..product.part import Part
-from ..product.placement import canonical_frame, placement_ticks
-from ..product.solver import inspect_assembly_constraints, solve_assembly_constraints
-from ..recording.graph import (
-    GraphSession,
-    attach_graph_node,
-    attach_semantic_graph_node,
-    record_operation_if_active,
+    SemanticDelta,
+    SemanticRef,
+    Solid,
+    solve_assembly_constraints,
     suspend_graph_recording,
 )
-from ..topology import SemanticDelta, SemanticRef
+from ..product.assembly import _AUTHORED_PLACEMENTS_RUNTIME_KEY, _component_occurrence_placements
+from ..product.placement import canonical_frame, placement_ticks
+from simplecadapi._glue.session import GraphSession, record_operation_if_active
+from ..recording.graph import attach_graph_node, attach_semantic_graph_node
 from .keys import generator_profile
 from .results import AssemblyBuildResult, PartBuildResult
 

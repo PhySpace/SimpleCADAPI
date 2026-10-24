@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class ConstraintResidual(constraint_id: str, translation_error: float, angular_error_degrees: float, within_tolerance: bool)
+class ConstraintResidual(constraint_id, translation_error, angular_error_degrees, within_tolerance)
 ```
 
 *Source: product/constraint.py*

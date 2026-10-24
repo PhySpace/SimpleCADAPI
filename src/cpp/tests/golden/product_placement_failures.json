@@ -1,0 +1,46 @@
+{
+  "direct_zero": {
+    "exception": "ValueError",
+    "message": "x_axis must be a non-zero vector"
+  },
+  "parallel": {
+    "how_to_fix": [
+      "Pass origin, x_axis, and y_axis as finite 3-element tuples.",
+      "Use one canonical representation; do not mix Euler, quaternion, or axis-angle payloads.",
+      "Make sure x_axis and y_axis form a right-handed frame."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_placement_rplacement",
+    "possible_causes": [
+      "The origin is not a finite 3D point.",
+      "One of the axes is zero-length or non-finite.",
+      "x_axis and y_axis are not orthogonal."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: x_axis and y_axis must be orthogonal",
+    "what_happened": "Failed to create the placement."
+  },
+  "short_origin": {
+    "exception": "ValueError",
+    "message": "origin must be a 3-element tuple or list"
+  },
+  "zero_axis": {
+    "how_to_fix": [
+      "Pass origin, x_axis, and y_axis as finite 3-element tuples.",
+      "Use one canonical representation; do not mix Euler, quaternion, or axis-angle payloads.",
+      "Make sure x_axis and y_axis form a right-handed frame."
+    ],
+    "inventory": [],
+    "measurements": [],
+    "operation": "make_placement_rplacement",
+    "possible_causes": [
+      "The origin is not a finite 3D point.",
+      "One of the axes is zero-length or non-finite.",
+      "x_axis and y_axis are not orthogonal."
+    ],
+    "repair": [],
+    "technical_details": "ValueError: x_axis must be a non-zero vector",
+    "what_happened": "Failed to create the placement."
+  }
+}

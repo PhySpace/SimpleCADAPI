@@ -10,13 +10,13 @@ from pathlib import Path
 import re
 from typing import Any, Literal, Sequence
 
-from OCP.BRep import BRep_Tool
-from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse
-from OCP.BRepBndLib import BRepBndLib
-from OCP.BRepCheck import BRepCheck_Analyzer
-from OCP.Bnd import Bnd_Box
-from OCP.TopAbs import (
+from simplecadapi._cpp.occt.BRep import BRep_Tool
+from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
+from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Fuse
+from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
+from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
+from simplecadapi._cpp.occt.Bnd import Bnd_Box
+from simplecadapi._cpp.occt.TopAbs import (
     TopAbs_COMPOUND,
     TopAbs_COMPSOLID,
     TopAbs_EDGE,
@@ -28,9 +28,9 @@ from OCP.TopAbs import (
     TopAbs_VERTEX,
     TopAbs_WIRE,
 )
-from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopTools import TopTools_IndexedMapOfShape, TopTools_ListOfShape
-from OCP.TopoDS import (
+from simplecadapi._cpp.occt.TopExp import TopExp, TopExp_Explorer
+from simplecadapi._cpp.occt.TopTools import TopTools_IndexedMapOfShape, TopTools_ListOfShape
+from simplecadapi._cpp.occt.TopoDS import (
     TopoDS,
     TopoDS_Edge,
     TopoDS_Face,
@@ -38,7 +38,7 @@ from OCP.TopoDS import (
     TopoDS_Solid,
     TopoDS_Vertex,
 )
-from OCP.gp import gp_Pnt, gp_Vec
+from simplecadapi._cpp.occt.gp import gp_Pnt, gp_Vec
 
 from ...errors import SimpleCADMessageError
 from ...kernel.ocp_properties import face_normal_at

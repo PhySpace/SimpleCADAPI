@@ -26,9 +26,8 @@ from ..artifacts.feature_graph import (
     load_feature_graph_artifact,
 )
 from ..artifacts.part_io import encode_part_definition, load_part_definition
-from ..core import Edge, Face, Solid, Vertex
+from simplecadapi._cpp import Edge, Face, Solid, Vertex
 from ..errors import SimpleCADMessageError
-from ..kernel.ocp_properties import center_of_mass
 from ..product.placement import Placement, identity_placement, placement_from_canonical
 from .archive import canonical_zip_bytes, preflight_zip_bytes
 from .canonical import (
@@ -45,7 +44,8 @@ from .compiler import (
     _edge_endpoints,
     _frame,
     _normalize,
-    _orientation,
+    _center_of_mass,
+    _face_orientation,
     _shape_bounds,
     _surface_geometry,
     _vec,
@@ -395,7 +395,7 @@ def _part_geometry(
                 "bounds": _bounds(solid_asset_bounds(body)),
                 "volume": body.get_volume(),
                 "surface_area": sum(face.get_area() for face in faces),
-                "centroid": list(_vec(center_of_mass(body.wrapped))),
+                "centroid": list(_vec(_center_of_mass(body))),
             },
             "tags": sorted(body._list_tags()),
         }
@@ -417,7 +417,7 @@ def _part_geometry(
                     "bounds": _bounds(_shape_bounds(face)),
                     "area": face.get_area(),
                     "centroid": list(center),
-                    "orientation": _orientation(face.wrapped.Orientation()),
+                    "orientation": _face_orientation(face),
                     "connector_frame": _frame(center, _vec(face.get_normal_at())),
                 },
                 "tags": sorted(face._list_tags()),

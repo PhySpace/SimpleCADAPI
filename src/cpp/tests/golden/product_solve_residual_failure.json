@@ -1,0 +1,169 @@
+{
+  "failure": {
+    "how_to_fix": [
+      "Fix the connector frame definitions named in the repair lines, not the placements.",
+      "For closed loops, remove one redundant constraint or solve the loop internally in a subassembly."
+    ],
+    "inventory": [
+      {
+        "description": "fixed base\u2194moving: \u0394t=15 mm, \u0394\u03b8=0 deg",
+        "status": "exceeded",
+        "symbol": "hold2"
+      }
+    ],
+    "measurements": [
+      {
+        "name": "placement tolerance",
+        "unit": "mm",
+        "value": 1e-07
+      },
+      {
+        "name": "angular tolerance",
+        "unit": "deg",
+        "value": 1e-06
+      },
+      {
+        "name": "hold2 translation error",
+        "unit": "mm",
+        "value": 15.0
+      },
+      {
+        "name": "hold2 angular error",
+        "unit": "deg",
+        "value": 0.0
+      }
+    ],
+    "operation": "solve_assembly_constraints",
+    "possible_causes": [
+      "A connector's local frame (datum or axis orientation) does not match the intended mating geometry.",
+      "A closed kinematic loop is overconstrained: each constraint alone fits, the combination cannot.",
+      "A nested subassembly still owns internal degrees of freedom that the parent cannot close."
+    ],
+    "repair": [
+      "The worst-residual constraint is hold2 (dt=15 mm, dtheta=0 deg): check the local frame definitions (datum and interface orientation) of the connectors on both ends of that constraint first \u2014 not the component placements",
+      "Closed-loop constraints that each fit but do not fit together are overconstrained: break the loop (delete one redundant constraint), or let a nested subassembly solve internally and have the parent consume only its public interface",
+      "Rerun inspect_assembly_constraints_rassembly(assembly) to review all residuals before touching the constraint set"
+    ],
+    "technical_details": "assembly_id=residual_fixture, grounded=['base']",
+    "what_happened": "1 of 1 constraint(s) exceed tolerance at the forwarded pass: hold2"
+  },
+  "lenient": {
+    "authored": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "moving": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "placements": {
+      "base": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "moving": {
+        "origin": [
+          -5.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "report": {
+      "grounded_component_ids": [
+        "base"
+      ],
+      "residuals": [
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "hold",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        },
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "hold2",
+          "translation_error": 15.0,
+          "within_tolerance": false
+        }
+      ],
+      "solved": false,
+      "solved_component_ids": [
+        "base",
+        "moving"
+      ],
+      "unsolved_component_ids": []
+    }
+  }
+}

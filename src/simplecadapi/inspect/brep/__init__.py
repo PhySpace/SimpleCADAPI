@@ -148,7 +148,7 @@ from functools import wraps as _wraps
 from inspect import isfunction as _isfunction
 import sys as _sys
 
-from ...recording.graph import get_active_session as _get_active_session
+from simplecadapi._cpp import get_active_session as _get_active_session
 
 
 def _outside_model_graph(function):

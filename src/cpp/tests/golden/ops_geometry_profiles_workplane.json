@@ -1,0 +1,98 @@
+{
+  "circle": {
+    "area": 12.566370614359172,
+    "bbox": [
+      0.0,
+      2.0,
+      0.0,
+      4.0,
+      2.0,
+      4.0
+    ],
+    "edge_tags": [
+      [
+        "c.edge.circle",
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [
+      "c.face"
+    ],
+    "track": {
+      "op": "make_circle_face"
+    },
+    "type": "Face",
+    "vertices": 1
+  },
+  "ellipse": {
+    "area": 9.424777960769378,
+    "bbox": [
+      -2.0,
+      2.0,
+      2.0,
+      4.0,
+      2.0,
+      4.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [],
+    "track": {
+      "op": "make_ellipse_face"
+    },
+    "type": "Face",
+    "vertices": 1
+  },
+  "rectangle": {
+    "area": 6.0,
+    "bbox": [
+      1.0,
+      2.0,
+      1.5,
+      3.0,
+      2.0,
+      4.5
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "r.edge.line1"
+      ],
+      [
+        "edge.boundary",
+        "r.edge.line2"
+      ],
+      [
+        "edge.boundary",
+        "r.edge.line3"
+      ],
+      [
+        "edge.boundary",
+        "r.edge.line4"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [
+      "r.face"
+    ],
+    "track": {
+      "op": "make_rectangle_face"
+    },
+    "type": "Face",
+    "vertices": 4
+  }
+}

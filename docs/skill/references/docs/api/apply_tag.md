@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def apply_tag(shape: AnyShape, tag: str) -> AnyShape
+def apply_tag(shape, tag)
 ```
 
 *Source: operators/selection.py*

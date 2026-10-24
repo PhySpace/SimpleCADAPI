@@ -1,8 +1,25 @@
-"""SimpleCAD API: a simplified OCP-native Python CAD modeling API."""
+"""SimpleCAD API: a simplified OpenCASCADE-native Python CAD modeling API.
+
+Where things live:
+
+* The modeling API (shapes, operators, sketches, products, queries, expressions) is C++: ``src/cpp/src/`` implements it,
+  ``src/cpp/bindings/python/bind_*.cpp`` declares it to Python as the module ``simplecadapi._cpp``.  The import block below
+  says which binding file declares each name.
+* ``simplecadapi.core``, ``simplecadapi.operators.*``, ``simplecadapi.ql``, ... are forwarding modules: they only
+  re-export those names under the paths the SDK has always had (each one lists its sources in its docstring).
+* ``simplecadapi/_native/`` is the Python glue around the C++ module (``compat.py`` wraps and documents it,
+  ``session.py`` records graph nodes for the layers written in Python, ``glue.py`` lists the extra names).
+* Everything else (runtime, build, artifacts, editor, inspect, exporter, translators, scene) is Python.
+"""
 
 import sys
 from pathlib import Path
 from typing import Any
+
+from ._glue import install as _install_cpp_backend
+
+# Prepare the C++ module (error classes, signature wrappers, recording wrappers) before anything imports it.
+_install_cpp_backend()
 
 from ._internal.mapping_pickle import install_mapping_proxy_pickle
 from ._internal.os_compat import harden_console_streams
@@ -16,7 +33,22 @@ harden_console_streams((sys.stdout, sys.stderr))
 # with the products that carry them.
 install_mapping_proxy_pickle()
 
-from . import exporter, inspect, math, ql, std, surface, translator
+from . import math, ql, std, surface
+
+# Features that read OpenCASCADE shapes load on first use.
+_LAZY_SUBMODULES = ("exporter", "inspect", "translator")
+
+
+def __getattr__(name: str) -> Any:
+    if name in _LAZY_SUBMODULES:
+        import importlib
+
+        module = importlib.import_module(f".{name}", __name__)
+        globals()[name] = module
+        return module
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 from .artifacts import (
     ArtifactLimits,
     ArtifactValidationError,
@@ -53,73 +85,20 @@ from .build import (
     file_input,
     part,
 )
-from .core import (
-    WORLD_CS,
-    AnyShape,
-    Compound,  # 核心类; 坐标系函数
-    CoordinateSystem,
-    Edge,
-    Face,
-    Shell,
-    SimpleWorkplane,
-    Solid,
-    TaggedMixin,
-    Vertex,
-    Wire,
-    get_current_cs,
-)
-from .errors import SimpleCADError
-from .operators.boolean import boolean_rsolidlist
-from .operators.features import (
-    draft_rsolid,
-    extrude_taper_rsolid,
-    extrude_until_rsolid,
-    offset_rsolid,
-    sweep_multisection_rsolid,
-)
-from .operators.transform import scale_rsolid, transform_rsolid
-from .params.expr import (
-    Const,
-    DimensionTolerance,
-    Expr,
-    ExpressionGraph,
-    Var,
+# The geometry, sketch, product, query and reactive API is implemented in C++ (src/cpp/src/..., declared to Python by
+# src/cpp/bindings/python/bind_*.cpp); the names below are grouped by the binding file that declares them.
+from simplecadapi._cpp import (
+    # (defined in Python, or by the module itself)
     acos,
+    ANGLE,
+    AREA,
     asin,
+    Assembly,
     atan,
-    atan2,
-    const,
-    cos,
-    sin,
-    sqrt,
-    tan,
-    var,
-)
-from .recording.graph import (
-    GraphSession,
-    get_active_session,
-    suspend_graph_recording,
-)
-from .math import BSplineFitResult, fit_cubic_bspline_control_points
-from .operators import (  # 基础几何创建; 变换操作; 3D操作; 标签和选择; 布尔运算; 导出; 高级特征操作; 其他
-    add_arc_rsketch,
-    add_belt_constraint_rassembly,
-    add_bspline_rsketch,
-    add_circle_rsketch,
-    add_ellipse_rsketch,
-    add_component_rassembly,
-    add_connector_rpart,
-    add_fixed_constraint_rassembly,
-    add_gear_constraint_rassembly,
-    add_line_rsketch,
-    add_point_rsketch,
-    add_prismatic_constraint_rassembly,
-    add_rack_pinion_constraint_rassembly,
-    add_revolute_constraint_rassembly,
-    apply_tag,
-    apply_tag_rselection,
-    assign_material_rpart,
-    chamfer_rsolid,
+    CM,
+    Connector,
+    ConnectorAnchor,
+    ConnectorRef,
     constrain_angle_rsketch,
     constrain_coincident_rsketch,
     constrain_collinear_rsketch,
@@ -136,10 +115,8 @@ from .operators import (  # 基础几何创建; 变换操作; 3D操作; 标签�
     constrain_length_rsketch,
     constrain_line_distance_rsketch,
     constrain_major_radius_rsketch,
-    constrain_midpoint_points_rsketch,
     constrain_midpoint_rsketch,
     constrain_minor_radius_rsketch,
-    constrain_mirror_rsketch,
     constrain_normal_rsketch,
     constrain_parallel_rsketch,
     constrain_perpendicular_rsketch,
@@ -147,45 +124,97 @@ from .operators import (  # 基础几何创建; 变换操作; 3D操作; 标签�
     constrain_points_horizontal_rsketch,
     constrain_points_vertical_rsketch,
     constrain_radius_rsketch,
-    constrain_symmetric_rsketch,
-    constrain_tangent_rsketch,
     constrain_vertical_rsketch,
-    cut_rsolid,
-    explain_tag,
-    extrude_rsolid,
-    fillet_rsolid,
-    set_public_connector_rassembly,
-    get_sketch_entity_rsketchref,
-    get_sketch_point_rsketchref,
-    ground_component_rassembly,
-    helical_sweep_rsolid,
-    identity_placement_rplacement,
-    inspect_assembly_constraints_rconstraintreport,
-    inspect_sketch_rsketchresult,
-    intersect_rsolid,
-    linear_pattern_rsolidlist,
-    list_tags,
-    loft_rsolid,
+    Constraint,
+    cos,
+    CUBIC_CM,
+    CUBIC_FOOT,
+    CUBIC_INCH,
+    CUBIC_M,
+    CUBIC_MM,
+    DEGREE,
+    DIMENSIONLESS,
+    FOOT,
+    GeometryRef,
+    INCH,
+    LENGTH,
+    LineageDerivation,
+    LineagePolicy,
+    M,
     make_2d_cut_rface,
     make_2d_intersect_rface,
     make_2d_union_rface,
+    Material,
+    MM,
+    ONE,
+    Part,
+    PERCENT,
+    RADIAN,
+    ScalarLimit,
+    sin,
+    sqrt,
+    SQUARE_CM,
+    SQUARE_FOOT,
+    SQUARE_INCH,
+    SQUARE_M,
+    SQUARE_MM,
+    TagAttachment,
+    TagCertainty,
+    TagEvidenceKind,
+    TagLifecycle,
+    TagProducerKind,
+    TagScope,
+    TagTargetKind,
+    tan,
+    TopologyPropagation,
+    TrackingPolicy,
+    UnitValidationError,
+    VOLUME,
+    WORLD_CS,
+    # bind_core.cpp
+    CoordinateSystem,
+    get_current_cs,
+    SimpleWorkplane,
+    # bind_ops_features.cpp
+    boolean_rsolidlist,
+    chamfer_rsolid,
+    cut_rsolid,
+    draft_rsolid,
+    extrude_rsolid,
+    extrude_taper_rsolid,
+    extrude_until_rsolid,
+    fillet_rsolid,
+    helical_sweep_rsolid,
+    intersect_rsolid,
+    linear_pattern_rsolidlist,
+    loft_rsolid,
+    mirror_shape,
+    offset_rsolid,
+    radial_pattern_rsolidlist,
+    revolve_rsolid,
+    rotate_shape,
+    scale_rsolid,
+    shell_rsolid,
+    sweep_multisection_rsolid,
+    sweep_rsolid,
+    transform_rsolid,
+    translate_shape,
+    twisted_sweep_rsolid,
+    union_rsolid,
+    # bind_ops_geometry.cpp
+    load_brep_region_rshell,
+    load_brep_region_rsolid,
     make_angle_arc_redge,
     make_angle_arc_rwire,
-    make_assembly_rassembly,
     make_box_rsolid,
     make_circle_redge,
     make_circle_rface,
     make_circle_rwire,
-    make_compound_from_assembly_rcompound,
     make_cone_rsolid,
-    make_connector_ref_rconnectorref,
     make_cylinder_rsolid,
-    make_ellipse_rface,
     make_ellipse_redge,
+    make_ellipse_rface,
     make_ellipse_rwire,
-    make_edge_connector_rconnector,
-    make_face_connector_rconnector,
-    make_face_from_sketch_rface,
     make_face_from_wire_rface,
     make_face_from_wires_rface,
     make_helix_redge,
@@ -193,51 +222,151 @@ from .operators import (  # 基础几何创建; 变换操作; 3D操作; 标签�
     make_interpolated_spline_redge,
     make_interpolated_spline_rwire,
     make_line_redge,
-    make_material_rmaterial,
-    make_part_rpart,
     make_periodic_spline_rwire,
-    make_placement_connector_rconnector,
-    make_placement_rplacement,
     make_point_rvertex,
     make_polyline_rwire,
     make_rectangle_rface,
     make_rectangle_rwire,
-    make_scalar_limit_rscalarlimit,
     make_segment_redge,
     make_segment_rwire,
-    make_sketch_rsketch,
     make_sphere_rsolid,
     make_spline_redge,
     make_spline_rwire,
     make_three_point_arc_redge,
     make_three_point_arc_rwire,
-    make_vertex_connector_rconnector,
     make_wire_from_edges_rwire,
-    make_wire_from_sketch_rwire,
+    # bind_product.cpp
+    add_belt_constraint_rassembly,
+    add_component_rassembly,
+    add_connector_rpart,
+    add_fixed_constraint_rassembly,
+    add_gear_constraint_rassembly,
+    add_prismatic_constraint_rassembly,
+    add_rack_pinion_constraint_rassembly,
+    add_revolute_constraint_rassembly,
+    assign_material_rpart,
+    ground_component_rassembly,
+    identity_placement_rplacement,
+    inspect_assembly_constraints_rconstraintreport,
+    make_assembly_rassembly,
+    make_compound_from_assembly_rcompound,
+    make_connector_ref_rconnectorref,
+    make_edge_connector_rconnector,
+    make_face_connector_rconnector,
+    make_material_rmaterial,
+    make_part_rpart,
+    make_placement_connector_rconnector,
+    make_placement_rplacement,
+    make_scalar_limit_rscalarlimit,
+    make_vertex_connector_rconnector,
     measure_constraint_residual_rconstraintresidual,
-    mirror_shape,
     place_component_rassembly,
-    radial_pattern_rsolidlist,
-    render_screenshot_rpath,
-    revolve_rsolid,
-    rotate_shape,
+    set_public_connector_rassembly,
+    solve_assembly_constraints_rassembly,
+    unground_component_rassembly,
+    # bind_product_values.cpp
+    Component,
+    ConstraintReport,
+    ConstraintResidual,
+    PublicConnectorRef,
+    # bind_reactive_exprs.cpp
+    atan2,
+    Const,
+    const,
+    DimensionTolerance,
+    Expr,
+    expression_uses_units,
+    ExpressionGraph,
+    infer_dimension,
+    Var,
+    var,
+    # bind_reactive_math.cpp
+    BSplineFitResult,
+    fit_cubic_bspline_control_points,
+    # bind_reactive_session.cpp
+    get_active_session,
+    suspend_graph_recording,
+    # bind_reactive_units.cpp
+    canonical_unit_for_dimension,
+    convert_value,
+    Dimension,
+    get_unit,
+    Unit,
+    # bind_semantic.cpp
+    apply_tag,
+    apply_tag_rselection,
+    explain_tag,
+    list_tags,
     select_edges_by_tag,
     select_faces_by_tag,
-    shell_rsolid,
-    load_brep_region_rsolid,
-    load_brep_region_rshell,
-    solve_assembly_constraints_rassembly,
-    sweep_rsolid,
-    translate_shape,
-    twisted_sweep_rsolid,
-    unground_component_rassembly,
-    union_rsolid,
+    SemanticDelta,
+    SemanticRef,
+    TagBinding,
+    TagBindingScope,
+    TagEvidence,
+    tagging,
+    TagLineageWitness,
+    TagProducer,
+    TagPropagation,
+    TagTarget,
+    # bind_sketch.cpp
+    add_arc_rsketch,
+    add_bspline_rsketch,
+    add_circle_rsketch,
+    add_ellipse_rsketch,
+    add_line_rsketch,
+    add_point_rsketch,
+    constrain_midpoint_points_rsketch,
+    constrain_mirror_rsketch,
+    constrain_symmetric_rsketch,
+    constrain_tangent_rsketch,
+    get_default_sketch_solver_backend,
+    get_sketch_entity_rsketchref,
+    get_sketch_point_rsketchref,
+    get_sketch_solver_backend,
+    inspect_sketch_rsketchresult,
+    make_face_from_sketch_rface,
+    make_sketch_rsketch,
+    make_wire_from_sketch_rwire,
+    register_sketch_solver_backend,
+    set_default_sketch_solver_backend,
+    Sketch,
+    sketch_solver_backend,
+    SketchConstraint,
+    SketchConstraintDiagnostic,
+    SketchRef,
+    SketchSolverBackend,
+    SketchSolveResult,
+    SketchSolverOptions,
+    # bind_surface.cpp
+    fill_holes_rshell,
+    fit_point_grid_rface,
+    free_boundaries_rwirelist,
+    loft_rshell,
+    make_bezier_surface_rface,
+    make_cylindrical_surface_rface,
+    make_gordon_surface_rface,
+    make_ruled_surface_rface,
+    make_solid_from_shell_rsolid,
+    make_surface_patch_rface,
+    sew_faces_rshell,
+    SurfaceBoundary,
+    SurfaceFillingSettings,
+    trim_surface_rface,
+    # bind_topo.cpp
+    AnyShape,
+    Compound,
+    Edge,
+    Face,
+    Shell,
+    Solid,
+    Vertex,
+    Wire,
 )
-from .product.assembly import Assembly, Component, PublicConnectorRef
-from .product.connector import Connector, ConnectorAnchor, ConnectorRef, GeometryRef
-from .product.constraint import Constraint, ConstraintReport, ConstraintResidual, ScalarLimit
-from .product.material import Material
-from .product.part import Part
+from .core import TaggedMixin
+from .errors import SimpleCADError
+from simplecadapi._glue.session import GraphSession
+from .operators import render_screenshot_rpath
 from .product.placement import Placement
 from .product.capture import CaptureResult, capture
 from .product.packages import (
@@ -260,58 +389,6 @@ from .recording.serializer import (
     replay_graph,
     replay_model_json,
 )
-from .sketch import (
-    Sketch,
-    SketchConstraint,
-    SketchConstraintDiagnostic,
-    SketchRef,
-    SketchSolveResult,
-)
-from .sketch_solver import (
-    SketchSolverBackend,
-    SketchSolverOptions,
-    get_default_sketch_solver_backend,
-    get_sketch_solver_backend,
-    register_sketch_solver_backend,
-    set_default_sketch_solver_backend,
-    sketch_solver_backend,
-)
-from .surface import (
-    SurfaceBoundary,
-    SurfaceFillingSettings,
-    fill_holes_rshell,
-    fit_point_grid_rface,
-    free_boundaries_rwirelist,
-    loft_rshell,
-    make_bezier_surface_rface,
-    make_cylindrical_surface_rface,
-    make_gordon_surface_rface,
-    make_ruled_surface_rface,
-    make_surface_patch_rface,
-    make_solid_from_shell_rsolid,
-    sew_faces_rshell,
-    trim_surface_rface,
-)
-from .topology import tagging  # noqa: F401  (visible namespace: simplecadapi.tagging)
-from .topology.tagging import (
-    LineageDerivation,
-    LineagePolicy,
-    TagAttachment,
-    TagBinding,
-    TagBindingScope,
-    TagCertainty,
-    TagEvidence,
-    TagEvidenceKind,
-    TagLifecycle,
-    TagLineageWitness,
-    TagProducer,
-    TagProducerKind,
-    TagPropagation,
-    TagScope,
-    TagTarget,
-    TagTargetKind,
-    TopologyPropagation,
-)
 from .params.tolerance import (
     ToleranceAnalysis,
     ToleranceAnalysisError,
@@ -325,43 +402,7 @@ from .params.tolerance import (
     analyze_tolerance,
     check_tolerance,
 )
-from .topology import SemanticDelta, SemanticRef
-from .topology.tracking import TrackingPolicy
-from .params.units import (
-    ANGLE,
-    AREA,
-    CM,
-    CUBIC_CM,
-    CUBIC_FOOT,
-    CUBIC_INCH,
-    CUBIC_M,
-    CUBIC_MM,
-    DEGREE,
-    DIMENSIONLESS,
-    FOOT,
-    INCH,
-    LENGTH,
-    MM,
-    ONE,
-    PERCENT,
-    RADIAN,
-    SQUARE_CM,
-    SQUARE_FOOT,
-    SQUARE_INCH,
-    SQUARE_M,
-    SQUARE_MM,
-    VOLUME,
-    Dimension,
-    M,
-    Unit,
-    UnitLike,
-    UnitValidationError,
-    canonical_unit_for_dimension,
-    convert_value,
-    expression_uses_units,
-    get_unit,
-    infer_dimension,
-)
+from .params.units import UnitLike
 
 # Avoid advertising internal implementation submodules from the top-level package
 # namespace. They remain importable as `simplecadapi.<module>` when needed.
@@ -369,12 +410,12 @@ for _name in ("topology", "recording", "params", "product", "_internal"):
     globals().pop(_name, None)
 
 __author__ = "SimpleCAD API Team"
-__description__ = "Simplified OCP-native CAD modeling Python API"
+__description__ = "Simplified OpenCASCADE-native CAD modeling Python API"
 
-# 便于使用的别名
+# Convenience aliases
 Workplane = SimpleWorkplane
 
-# 创建函数别名
+# Creation-function aliases
 create_angle_arc = make_angle_arc_redge
 create_angle_arc_wire = make_angle_arc_rwire
 create_arc = make_three_point_arc_redge
@@ -403,15 +444,15 @@ create_spline = make_spline_redge
 create_spline_wire = make_spline_rwire
 create_wire_from_edges = make_wire_from_edges_rwire
 
-# 变换操作别名
+# Transform aliases
 rotate = rotate_shape
 translate = translate_shape
 
-# 3D操作别名
+# 3D operation aliases
 extrude = extrude_rsolid
 revolve = revolve_rsolid
 
-# 布尔运算别名
+# Boolean aliases
 cut = cut_rsolid
 intersect = intersect_rsolid
 union = union_rsolid
@@ -443,7 +484,7 @@ def notebook_id() -> str:
 
 __all__ = [
     "exporter",
-    # 核心类
+    # Core classes
     "CoordinateSystem",
     "SimpleWorkplane",
     "Workplane",
@@ -471,10 +512,10 @@ __all__ = [
     "free_boundaries_rwirelist",
     "fill_holes_rshell",
     "TaggedMixin",
-    # 坐标系
+    # Coordinate systems
     "get_current_cs",
     "WORLD_CS",
-    # 基础几何创建
+    # Basic geometry creation
     "make_angle_arc_redge",
     "make_angle_arc_rwire",
     "make_box_rsolid",
@@ -579,13 +620,13 @@ __all__ = [
     "get_sketch_entity_rsketchref",
     "get_sketch_point_rsketchref",
     "inspect_sketch_rsketchresult",
-    # 变换操作
+    # Transform operations
     "mirror_shape",
     "rotate_shape",
     "scale_rsolid",
     "transform_rsolid",
     "translate_shape",
-    # 3D操作
+    # 3D operations
     "draft_rsolid",
     "extrude_rsolid",
     "extrude_taper_rsolid",
@@ -597,14 +638,14 @@ __all__ = [
     "sweep_multisection_rsolid",
     "sweep_rsolid",
     "twisted_sweep_rsolid",
-    # 标签和选择
+    # Tags and selection
     "apply_tag",
     "apply_tag_rselection",
     "explain_tag",
     "list_tags",
     "select_edges_by_tag",
     "select_faces_by_tag",
-    # 布尔运算
+    # Boolean operations
     "boolean_rsolidlist",
     "cut_rsolid",
     "make_2d_cut_rface",
@@ -612,14 +653,14 @@ __all__ = [
     "make_2d_intersect_rface",
     "union_rsolid",
     "make_2d_union_rface",
-    # 导出
+    # Export
     "replay_model_json",
     "render_screenshot_rpath",
-    # 高级特征操作
+    # Advanced feature operations
     "chamfer_rsolid",
     "fillet_rsolid",
     "shell_rsolid",
-    # 其他
+    # Other
     "linear_pattern_rsolidlist",
     "inspect",
     "math",
@@ -789,7 +830,7 @@ __all__ = [
     "Part",
     "Placement",
     "ScalarLimit",
-    # 别名
+    # Aliases
     "create_angle_arc",
     "create_angle_arc_wire",
     "create_arc",
@@ -825,3 +866,9 @@ __all__ = [
     "translate",
     "union",
 ]
+
+
+from ._glue import compat as _compat  # noqa: E402
+
+_compat.apply_docstrings(__import__(__name__, fromlist=["_"]))
+del _compat

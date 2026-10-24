@@ -15,32 +15,22 @@ from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 from urllib.parse import quote
 
-from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
-from OCP.GeomAbs import (
-    GeomAbs_BSplineCurve,
-    GeomAbs_BSplineSurface,
-    GeomAbs_Circle,
-    GeomAbs_Cone,
-    GeomAbs_Cylinder,
-    GeomAbs_Ellipse,
-    GeomAbs_Line,
-    GeomAbs_Plane,
-    GeomAbs_Sphere,
-    GeomAbs_Torus,
+from simplecadapi._cpp import (
+    Assembly,
+    Compound,
+    Connector,
+    Edge,
+    Face,
+    Material,
+    OperationGraph,
+    OperationNode,
+    Part,
+    PublicConnectorRef,
+    resolve_connector_placement,
+    resolve_item_connector_placement,
+    Solid,
+    Vertex,
 )
-from OCP.TopAbs import (
-    TopAbs_EXTERNAL,
-    TopAbs_FORWARD,
-    TopAbs_INTERNAL,
-    TopAbs_REVERSED,
-)
-
-from ..core import Compound, Edge, Face, Solid, Vertex
-from ..kernel.ocp_properties import center_of_mass
-from ..product.assembly import Assembly, PublicConnectorRef
-from ..product.connector import Connector, resolve_connector_placement, resolve_item_connector_placement
-from ..product.material import Material
-from ..product.part import Part
 from ..product.placement import Placement, identity_placement
 from ..recording.serializer import _candidate_shapes_for_geo_selection, _geo_selector_score
 from ..scene.archive import canonical_zip_bytes
@@ -49,7 +39,6 @@ from ..scene.documents import EntityDocument, NormalizedProductDocument, SceneDo
 from ..scene.glb_writer import write_line_glb, write_triangle_glb
 from ..scene.render_mesh import ASSET_TO_SCENE, RenderEdgeMesh, RenderMesh, build_edge_mesh, build_render_mesh, solid_asset_bounds
 from ..scene.validation import validate_scene_package
-from ..topology import OperationGraph, OperationNode
 
 
 DEFAULT_LINEAR_TOLERANCE = 0.1
@@ -407,14 +396,14 @@ def _entity_asset(*, definition_id: str, definition_kind: str, geometry_asset_id
     entities: list[dict[str, Any]] = []
     entity_source = _entity_source(source, definition_source)
     solid_bounds = _bounds(solid_asset_bounds(solid))
-    entities.append({"entity_id": "entity/solid/0", "kind": "solid", "parent_entity_ids": [], "child_entity_ids": sorted(face_id.values(), key=lambda item: item.encode("utf-8")), "source": entity_source, "geometry": {"type": "brep_solid"}, "properties": {"quality": "kernel_evaluated", "bounds": solid_bounds, "volume": solid.get_volume(), "surface_area": sum(face.get_area() for face in faces), "centroid": list(_vec(center_of_mass(solid.wrapped)))}, "sdk_connector_frame": None, "render_status": "rendered", "connector_binding_status": "not_applicable", "semantic_binding_ids": [], "evaluated_tags": [], "sdk_metadata": {}})
+    entities.append({"entity_id": "entity/solid/0", "kind": "solid", "parent_entity_ids": [], "child_entity_ids": sorted(face_id.values(), key=lambda item: item.encode("utf-8")), "source": entity_source, "geometry": {"type": "brep_solid"}, "properties": {"quality": "kernel_evaluated", "bounds": solid_bounds, "volume": solid.get_volume(), "surface_area": sum(face.get_area() for face in faces), "centroid": list(_vec(_center_of_mass(solid)))}, "sdk_connector_frame": None, "render_status": "rendered", "connector_binding_status": "not_applicable", "semantic_binding_ids": [], "evaluated_tags": [], "sdk_metadata": {}})
     for face in faces:
         entity_id = face_id[face.topo_id]
         normal = _vec(face.get_normal_at())
         center = _vec(face.get_center())
         geometry = _surface_geometry(face)
         connector_frame = _frame(center, normal)
-        entities.append({"entity_id": entity_id, "kind": "face", "parent_entity_ids": ["entity/solid/0"], "child_entity_ids": sorted({edge_id[edge.topo_id] for edge in face._iter_edges()}, key=lambda item: item.encode("utf-8")), "source": entity_source, "geometry": geometry, "properties": {"quality": "kernel_evaluated", "bounds": _bounds(_shape_bounds(face)), "area": face.get_area(), "centroid": list(center), "orientation": _orientation(face.wrapped.Orientation())}, "sdk_connector_frame": _frame(center, normal), "render_status": "rendered", "connector_binding_status": "owner_not_part" if definition_kind != "part" else "source_not_model", "semantic_binding_ids": [], "evaluated_tags": sorted(face._list_tags(), key=lambda item: item.encode("utf-8")), "sdk_metadata": _metadata(face)})
+        entities.append({"entity_id": entity_id, "kind": "face", "parent_entity_ids": ["entity/solid/0"], "child_entity_ids": sorted({edge_id[edge.topo_id] for edge in face._iter_edges()}, key=lambda item: item.encode("utf-8")), "source": entity_source, "geometry": geometry, "properties": {"quality": "kernel_evaluated", "bounds": _bounds(_shape_bounds(face)), "area": face.get_area(), "centroid": list(center), "orientation": _face_orientation(face)}, "sdk_connector_frame": _frame(center, normal), "render_status": "rendered", "connector_binding_status": "owner_not_part" if definition_kind != "part" else "source_not_model", "semantic_binding_ids": [], "evaluated_tags": sorted(face._list_tags(), key=lambda item: item.encode("utf-8")), "sdk_metadata": _metadata(face)})
         entities[-1]["sdk_connector_frame"] = connector_frame
         entities[-1]["connector_binding_status"] = _binding_status(source, definition_kind, connector_frame)
     for edge in edges:
@@ -630,7 +619,9 @@ def _generator() -> dict[str, Any]:
 
 
 def _ocp_version() -> str:
-    return importlib.metadata.version("cadquery-ocp")
+    from simplecadapi._cpp import occt
+
+    return str(occt.__version__)
 
 
 def _appearance(material: Material | None, root_id: str, appearances: dict[str, dict[str, Any]]) -> str:
@@ -964,8 +955,8 @@ def _scene_bounds_from_glb(bounds: tuple[tuple[float, float, float], tuple[float
 
 
 def _shape_bounds(shape: Any) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
-    box = __import__("simplecadapi.kernel.ocp_properties", fromlist=["bounding_box"]).bounding_box(shape.wrapped)
-    return ((box.xmin, box.ymin, box.zmin), (box.xmax, box.ymax, box.zmax))
+    xmin, ymin, zmin, xmax, ymax, zmax = shape._bounds()
+    return ((xmin, ymin, zmin), (xmax, ymax, zmax))
 
 
 def _bounds(value: tuple[tuple[float, float, float], tuple[float, float, float]]) -> dict[str, list[float]]:
@@ -1002,48 +993,35 @@ def _edge_endpoints(edge: Edge) -> tuple[tuple[float, float, float] | None, tupl
         return None, None
 
 
-def _orientation(value: Any) -> str:
-    return {TopAbs_FORWARD: "forward", TopAbs_REVERSED: "reversed", TopAbs_INTERNAL: "internal", TopAbs_EXTERNAL: "external"}.get(value, "forward")
+def _center_of_mass(shape: Any) -> Any:
+    center = shape.get_center()
+    return (center.x, center.y, center.z)
+
+
+def _face_orientation(face: Any) -> str:
+    return face._orientation()
 
 
 def _surface_geometry(face: Face) -> dict[str, Any]:
-    adaptor = BRepAdaptor_Surface(face.wrapped, True)
-    kind = adaptor.GetType()
+    kind = face._geom_type()
     center = _vec(face.get_center())
     normal = _vec(face.get_normal_at())
-    x_direction = _frame(center, normal)["x_axis"]
-    if kind == GeomAbs_Plane:
-        return {"type": "plane", "origin": list(center), "normal": list(normal), "x_direction": x_direction}
-    if kind == GeomAbs_Cylinder:
-        value = adaptor.Cylinder()
-        return {"type": "cylinder", "origin": [value.Location().X(), value.Location().Y(), value.Location().Z()], "axis": [value.Axis().Direction().X(), value.Axis().Direction().Y(), value.Axis().Direction().Z()], "x_direction": [value.XAxis().Direction().X(), value.XAxis().Direction().Y(), value.XAxis().Direction().Z()], "radius": value.Radius()}
-    if kind == GeomAbs_Sphere:
-        value = adaptor.Sphere()
-        return {"type": "sphere", "center": [value.Location().X(), value.Location().Y(), value.Location().Z()], "axis": [value.Position().Direction().X(), value.Position().Direction().Y(), value.Position().Direction().Z()], "x_direction": [value.XAxis().Direction().X(), value.XAxis().Direction().Y(), value.XAxis().Direction().Z()], "radius": value.Radius()}
-    if kind == GeomAbs_Torus:
-        value = adaptor.Torus()
-        return {"type": "torus", "center": [value.Location().X(), value.Location().Y(), value.Location().Z()], "axis": [value.Axis().Direction().X(), value.Axis().Direction().Y(), value.Axis().Direction().Z()], "x_direction": [value.XAxis().Direction().X(), value.XAxis().Direction().Y(), value.XAxis().Direction().Z()], "major_radius": max(value.MajorRadius(), value.MinorRadius()), "minor_radius": min(value.MajorRadius(), value.MinorRadius())}
-    return {"type": "other_surface", "engine_type": str(kind)}
+    if kind == "PLANE":
+        return {"type": "plane", "origin": list(center), "normal": list(normal), "x_direction": _frame(center, normal)["x_axis"]}
+    parameters = face._geometry()
+    names = {"CYLINDER": "cylinder", "SPHERE": "sphere", "TORUS": "torus"}
+    if kind in names and parameters is not None:
+        return {"type": names[kind], **{key: list(value) if isinstance(value, tuple) else value for key, value in parameters.items()}}
+    return {"type": "other_surface", "engine_type": kind}
 
 
 def _curve_geometry(edge: Edge) -> dict[str, Any]:
-    adaptor = BRepAdaptor_Curve(edge.wrapped)
-    kind = adaptor.GetType()
-    start, _end = _edge_endpoints(edge)
-    start = start or _vec(edge.get_center())
-    if kind == GeomAbs_Line:
-        value = adaptor.Line()
-        return {"type": "line", "origin": [value.Location().X(), value.Location().Y(), value.Location().Z()], "direction": [value.Direction().X(), value.Direction().Y(), value.Direction().Z()]}
-    if kind == GeomAbs_Circle:
-        value = adaptor.Circle()
-        return {"type": "circle", "center": [value.Location().X(), value.Location().Y(), value.Location().Z()], "normal": [value.Axis().Direction().X(), value.Axis().Direction().Y(), value.Axis().Direction().Z()], "x_direction": [value.XAxis().Direction().X(), value.XAxis().Direction().Y(), value.XAxis().Direction().Z()], "radius": value.Radius()}
-    if kind == GeomAbs_Ellipse:
-        value = adaptor.Ellipse()
-        return {"type": "ellipse", "center": [value.Location().X(), value.Location().Y(), value.Location().Z()], "normal": [value.Axis().Direction().X(), value.Axis().Direction().Y(), value.Axis().Direction().Z()], "x_direction": [value.XAxis().Direction().X(), value.XAxis().Direction().Y(), value.XAxis().Direction().Z()], "major_radius": value.MajorRadius(), "minor_radius": value.MinorRadius()}
-    if kind == GeomAbs_BSplineCurve:
-        value = adaptor.BSpline()
-        return {"type": "bspline_curve", "degree": value.Degree(), "rational": value.IsRational(), "periodic": value.IsPeriodic(), "poles_count": value.NbPoles(), "knots_count": value.NbKnots()}
-    return {"type": "other_curve", "engine_type": str(kind)}
+    kind = edge._geom_type()
+    parameters = edge._geometry()
+    names = {"LINE": "line", "CIRCLE": "circle", "ELLIPSE": "ellipse", "BSPLINE": "bspline_curve"}
+    if kind in names and parameters is not None:
+        return {"type": names[kind], **{key: list(value) if isinstance(value, tuple) else value for key, value in parameters.items()}}
+    return {"type": "other_curve", "engine_type": kind}
 
 
 def _metadata(value: Any) -> dict[str, Any]:

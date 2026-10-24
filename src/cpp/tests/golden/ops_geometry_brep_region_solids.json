@@ -1,0 +1,360 @@
+{
+  "box": {
+    "bbox": [
+      0.0,
+      -10.0,
+      0.0,
+      10.0,
+      10.0,
+      30.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 12,
+    "face_tags": [
+      [
+        "provenance.exact_transcription"
+      ],
+      [
+        "provenance.exact_transcription"
+      ],
+      [
+        "provenance.exact_transcription"
+      ],
+      [
+        "provenance.exact_transcription"
+      ],
+      [
+        "provenance.exact_transcription"
+      ],
+      [
+        "provenance.exact_transcription"
+      ]
+    ],
+    "faces": 6,
+    "geo": null,
+    "tags": [
+      "imported",
+      "provenance.exact_transcription",
+      "sidecar",
+      "solid"
+    ],
+    "track": {
+      "op": "load_brep_region_rsolid"
+    },
+    "type": "Solid",
+    "vertices": 8,
+    "volume": 5999.999999999999
+  },
+  "box_provenance": {
+    "face_tags": [
+      [
+        "provenance.exact_transcription"
+      ],
+      [
+        "provenance.exact_transcription"
+      ],
+      [
+        "provenance.exact_transcription"
+      ],
+      [
+        "provenance.exact_transcription"
+      ],
+      [
+        "provenance.exact_transcription"
+      ],
+      [
+        "provenance.exact_transcription"
+      ]
+    ],
+    "faces": [
+      {
+        "artifact_sha256": "sha256:cb1bb097fe16a4fcf3e41b5d9d841eda4d6003b7a8c30d16c4edb3890c1354f2",
+        "construction": "exact_transcription",
+        "profile": "scadbrep-1-ocp-7.9.3.1-bintools-v4-no-mesh",
+        "runtime_dependency": "embedded_target_derived",
+        "source_face_id": "face:0",
+        "source_face_ids": [
+          "face:0",
+          "face:1",
+          "face:2",
+          "face:3",
+          "face:4",
+          "face:5"
+        ],
+        "source_name": "box.step",
+        "source_sha256": "sha256:9b90a81f9be03a4934feac6ba12459c646fa61ffb010e904b2aa42ef26af3e42",
+        "topology_origin": "retained"
+      },
+      {
+        "artifact_sha256": "sha256:cb1bb097fe16a4fcf3e41b5d9d841eda4d6003b7a8c30d16c4edb3890c1354f2",
+        "construction": "exact_transcription",
+        "profile": "scadbrep-1-ocp-7.9.3.1-bintools-v4-no-mesh",
+        "runtime_dependency": "embedded_target_derived",
+        "source_face_id": "face:1",
+        "source_face_ids": [
+          "face:0",
+          "face:1",
+          "face:2",
+          "face:3",
+          "face:4",
+          "face:5"
+        ],
+        "source_name": "box.step",
+        "source_sha256": "sha256:9b90a81f9be03a4934feac6ba12459c646fa61ffb010e904b2aa42ef26af3e42",
+        "topology_origin": "retained"
+      },
+      {
+        "artifact_sha256": "sha256:cb1bb097fe16a4fcf3e41b5d9d841eda4d6003b7a8c30d16c4edb3890c1354f2",
+        "construction": "exact_transcription",
+        "profile": "scadbrep-1-ocp-7.9.3.1-bintools-v4-no-mesh",
+        "runtime_dependency": "embedded_target_derived",
+        "source_face_id": "face:2",
+        "source_face_ids": [
+          "face:0",
+          "face:1",
+          "face:2",
+          "face:3",
+          "face:4",
+          "face:5"
+        ],
+        "source_name": "box.step",
+        "source_sha256": "sha256:9b90a81f9be03a4934feac6ba12459c646fa61ffb010e904b2aa42ef26af3e42",
+        "topology_origin": "retained"
+      },
+      {
+        "artifact_sha256": "sha256:cb1bb097fe16a4fcf3e41b5d9d841eda4d6003b7a8c30d16c4edb3890c1354f2",
+        "construction": "exact_transcription",
+        "profile": "scadbrep-1-ocp-7.9.3.1-bintools-v4-no-mesh",
+        "runtime_dependency": "embedded_target_derived",
+        "source_face_id": "face:3",
+        "source_face_ids": [
+          "face:0",
+          "face:1",
+          "face:2",
+          "face:3",
+          "face:4",
+          "face:5"
+        ],
+        "source_name": "box.step",
+        "source_sha256": "sha256:9b90a81f9be03a4934feac6ba12459c646fa61ffb010e904b2aa42ef26af3e42",
+        "topology_origin": "retained"
+      },
+      {
+        "artifact_sha256": "sha256:cb1bb097fe16a4fcf3e41b5d9d841eda4d6003b7a8c30d16c4edb3890c1354f2",
+        "construction": "exact_transcription",
+        "profile": "scadbrep-1-ocp-7.9.3.1-bintools-v4-no-mesh",
+        "runtime_dependency": "embedded_target_derived",
+        "source_face_id": "face:4",
+        "source_face_ids": [
+          "face:0",
+          "face:1",
+          "face:2",
+          "face:3",
+          "face:4",
+          "face:5"
+        ],
+        "source_name": "box.step",
+        "source_sha256": "sha256:9b90a81f9be03a4934feac6ba12459c646fa61ffb010e904b2aa42ef26af3e42",
+        "topology_origin": "retained"
+      },
+      {
+        "artifact_sha256": "sha256:cb1bb097fe16a4fcf3e41b5d9d841eda4d6003b7a8c30d16c4edb3890c1354f2",
+        "construction": "exact_transcription",
+        "profile": "scadbrep-1-ocp-7.9.3.1-bintools-v4-no-mesh",
+        "runtime_dependency": "embedded_target_derived",
+        "source_face_id": "face:5",
+        "source_face_ids": [
+          "face:0",
+          "face:1",
+          "face:2",
+          "face:3",
+          "face:4",
+          "face:5"
+        ],
+        "source_name": "box.step",
+        "source_sha256": "sha256:9b90a81f9be03a4934feac6ba12459c646fa61ffb010e904b2aa42ef26af3e42",
+        "topology_origin": "retained"
+      }
+    ],
+    "region": {
+      "artifact_sha256": "sha256:cb1bb097fe16a4fcf3e41b5d9d841eda4d6003b7a8c30d16c4edb3890c1354f2",
+      "profile": "scadbrep-1-ocp-7.9.3.1-bintools-v4-no-mesh",
+      "provenance": {
+        "construction": "exact_transcription",
+        "evidence_origin": "copied",
+        "runtime_dependency": "embedded_target_derived",
+        "target_step_required_at_replay": false,
+        "topology_origin": "retained"
+      },
+      "source_face_ids": [
+        "face:0",
+        "face:1",
+        "face:2",
+        "face:3",
+        "face:4",
+        "face:5"
+      ]
+    }
+  },
+  "cylinder": {
+    "bbox": [
+      -4.0,
+      -4.0,
+      0.0,
+      4.0,
+      4.0,
+      10.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "provenance.exact_transcription"
+      ],
+      [
+        "provenance.exact_transcription"
+      ],
+      [
+        "provenance.exact_transcription"
+      ]
+    ],
+    "faces": 3,
+    "geo": null,
+    "tags": [
+      "imported",
+      "provenance.exact_transcription",
+      "shaft.solid",
+      "sidecar",
+      "solid"
+    ],
+    "track": {
+      "op": "load_brep_region_rsolid"
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 502.65482457436576
+  },
+  "cylinder_provenance": {
+    "face_tags": [
+      [
+        "provenance.exact_transcription"
+      ],
+      [
+        "provenance.exact_transcription"
+      ],
+      [
+        "provenance.exact_transcription"
+      ]
+    ],
+    "faces": [
+      {
+        "artifact_sha256": "sha256:90e3de3834a743f6ac2277f10c9a23089c26a63655be09cec31d034e18f6a303",
+        "construction": "exact_transcription",
+        "profile": "scadbrep-1-ocp-7.9.3.1-bintools-v4-no-mesh",
+        "runtime_dependency": "embedded_target_derived",
+        "source_face_id": "face:0",
+        "source_face_ids": [
+          "face:0",
+          "face:1",
+          "face:2"
+        ],
+        "source_name": "cylinder.step",
+        "source_sha256": "sha256:345d0da01ab94de030278c2e40c64e7c1a6dc43c7686fb5df299be5114387570",
+        "topology_origin": "retained"
+      },
+      {
+        "artifact_sha256": "sha256:90e3de3834a743f6ac2277f10c9a23089c26a63655be09cec31d034e18f6a303",
+        "construction": "exact_transcription",
+        "profile": "scadbrep-1-ocp-7.9.3.1-bintools-v4-no-mesh",
+        "runtime_dependency": "embedded_target_derived",
+        "source_face_id": "face:1",
+        "source_face_ids": [
+          "face:0",
+          "face:1",
+          "face:2"
+        ],
+        "source_name": "cylinder.step",
+        "source_sha256": "sha256:345d0da01ab94de030278c2e40c64e7c1a6dc43c7686fb5df299be5114387570",
+        "topology_origin": "retained"
+      },
+      {
+        "artifact_sha256": "sha256:90e3de3834a743f6ac2277f10c9a23089c26a63655be09cec31d034e18f6a303",
+        "construction": "exact_transcription",
+        "profile": "scadbrep-1-ocp-7.9.3.1-bintools-v4-no-mesh",
+        "runtime_dependency": "embedded_target_derived",
+        "source_face_id": "face:2",
+        "source_face_ids": [
+          "face:0",
+          "face:1",
+          "face:2"
+        ],
+        "source_name": "cylinder.step",
+        "source_sha256": "sha256:345d0da01ab94de030278c2e40c64e7c1a6dc43c7686fb5df299be5114387570",
+        "topology_origin": "retained"
+      }
+    ],
+    "region": {
+      "artifact_sha256": "sha256:90e3de3834a743f6ac2277f10c9a23089c26a63655be09cec31d034e18f6a303",
+      "profile": "scadbrep-1-ocp-7.9.3.1-bintools-v4-no-mesh",
+      "provenance": {
+        "construction": "exact_transcription",
+        "evidence_origin": "copied",
+        "runtime_dependency": "embedded_target_derived",
+        "target_step_required_at_replay": false,
+        "topology_origin": "retained"
+      },
+      "source_face_ids": [
+        "face:0",
+        "face:1",
+        "face:2"
+      ]
+    }
+  }
+}

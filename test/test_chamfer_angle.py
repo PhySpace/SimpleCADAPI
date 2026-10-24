@@ -45,8 +45,8 @@ class TestAngledChamfer(unittest.TestCase):
                 self.assertAlmostEqual(self._removed(solid), expected, places=6)
 
     def test_distance_lands_on_reference_face(self):
-        from OCP.Bnd import Bnd_Box
-        from OCP.BRepBndLib import BRepBndLib
+        from simplecadapi._cpp.occt.Bnd import Bnd_Box
+        from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
 
         solid = scad.chamfer_rsolid(
             self.box,

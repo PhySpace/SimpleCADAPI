@@ -1,0 +1,344 @@
+{
+  "allows": {
+    "continuation": {
+      "boundary": false,
+      "continuation": true,
+      "fragment": false,
+      "intersection": false,
+      "merge": false,
+      "replacement": false
+    },
+    "continuation_fragment": {
+      "boundary": false,
+      "continuation": true,
+      "fragment": true,
+      "intersection": false,
+      "merge": false,
+      "replacement": false
+    },
+    "none": {
+      "boundary": false,
+      "continuation": false,
+      "fragment": false,
+      "intersection": false,
+      "merge": false,
+      "replacement": false
+    }
+  },
+  "allows_explicit": {
+    "boundary": false,
+    "continuation": false,
+    "fragment": false,
+    "intersection": true,
+    "merge": true,
+    "replacement": false
+  },
+  "anchors": {
+    "  ": [],
+    "anchor.pin": [
+      "role.pin",
+      "anchor.pin",
+      "face.pin",
+      "edge.pin",
+      "wire.pin",
+      "vertex.pin",
+      "solid.pin",
+      "legacy.pin",
+      "pin"
+    ],
+    "custom.thing": [
+      "custom.thing"
+    ],
+    "face.top": [
+      "role.top",
+      "anchor.top",
+      "face.top",
+      "edge.top",
+      "wire.top",
+      "vertex.top",
+      "solid.top",
+      "legacy.top",
+      "top"
+    ],
+    "legacy.old": [
+      "role.old",
+      "anchor.old",
+      "face.old",
+      "edge.old",
+      "wire.old",
+      "vertex.old",
+      "solid.old",
+      "legacy.old",
+      "old"
+    ],
+    "mounting_surface": [
+      "role.mounting_surface",
+      "anchor.mounting_surface",
+      "face.mounting_surface",
+      "edge.mounting_surface",
+      "wire.mounting_surface",
+      "vertex.mounting_surface",
+      "solid.mounting_surface",
+      "legacy.mounting_surface",
+      "mounting_surface"
+    ],
+    "role.datum": [
+      "role.datum",
+      "anchor.datum",
+      "face.datum",
+      "edge.datum",
+      "wire.datum",
+      "vertex.datum",
+      "solid.datum",
+      "legacy.datum",
+      "datum"
+    ]
+  },
+  "internal": {
+    "attachment": "local",
+    "binding_id": "tag_binding_fixed",
+    "certainty": "proven",
+    "evidence": {
+      "extra": 1,
+      "kind": "legacy_snapshot",
+      "source": "internal_annotation"
+    },
+    "lifecycle": "snapshot",
+    "producer": {
+      "kind": "auto_rule",
+      "node_id": null,
+      "rule_id": "simplecad.compat.internal_annotation",
+      "rule_version": "1.0"
+    },
+    "propagation": {
+      "lineage": "none",
+      "topology": "downward"
+    },
+    "schema_version": "1.0",
+    "scope": {
+      "node_id": null,
+      "output_slot": 0
+    },
+    "tag": "face.top",
+    "target": {
+      "kind": "scope_root"
+    }
+  },
+  "is_normalized": [
+    true,
+    false,
+    false,
+    false,
+    true,
+    false
+  ],
+  "legacy": {
+    "attachment": "effective_legacy",
+    "binding_id": "tag_binding_fixed",
+    "certainty": "asserted",
+    "evidence": {
+      "imported_tags": [
+        "legacy.thing"
+      ],
+      "kind": "legacy_snapshot",
+      "migration_diagnostic": "old"
+    },
+    "lifecycle": "snapshot",
+    "producer": {
+      "kind": "legacy_import",
+      "node_id": null,
+      "rule_id": null,
+      "rule_version": null
+    },
+    "propagation": {
+      "lineage": "none",
+      "topology": "local"
+    },
+    "schema_version": "1.0",
+    "scope": {
+      "node_id": null,
+      "output_slot": 0
+    },
+    "tag": "legacy.thing",
+    "target": {
+      "kind": "legacy_effective"
+    }
+  },
+  "normalized": [
+    "hello_world_x.y",
+    "face.top",
+    "a_b"
+  ],
+  "policy": {
+    "anchor.a": true,
+    "face.top": false,
+    "group.g": true,
+    "misc": false,
+    "role.mount": true,
+    "solid.x": false,
+    "top": true
+  },
+  "projected": {
+    "attachment": "local",
+    "binding_id": "tag_binding_975bbc819e815a9bad4724acfcfcabf4",
+    "certainty": "proven",
+    "evidence": {
+      "evidence_method": "Generated",
+      "kind": "topology_change",
+      "operation": "make_extrude_rsolid",
+      "result_role": "extrusion.side",
+      "source_binding_id": "tag_binding_fixed",
+      "source_topo_id": "edge_1",
+      "target_topo_id": "face_2"
+    },
+    "lifecycle": "recompute",
+    "producer": {
+      "kind": "auto_rule",
+      "node_id": null,
+      "rule_id": "simplecad.feature_source_tag_projection",
+      "rule_version": "1.0"
+    },
+    "propagation": {
+      "lineage": "continuation_fragment",
+      "topology": "local"
+    },
+    "schema_version": "1.0",
+    "scope": {
+      "node_id": null,
+      "output_slot": 0
+    },
+    "tag": "role.datum",
+    "target": {
+      "kind": "scope_root"
+    }
+  },
+  "projected_twice": {
+    "attachment": "local",
+    "binding_id": "tag_binding_7bf00cfe7e8454fea3cf8999543bb94d",
+    "certainty": "proven",
+    "evidence": {
+      "evidence_method": "Modified",
+      "kind": "topology_change",
+      "operation": "make_translate_rshape",
+      "result_role": "modified",
+      "source_binding_id": "tag_binding_fixed",
+      "source_topo_id": "edge_1",
+      "target_topo_id": "face_9"
+    },
+    "lifecycle": "recompute",
+    "producer": {
+      "kind": "auto_rule",
+      "node_id": null,
+      "rule_id": "simplecad.feature_source_tag_projection",
+      "rule_version": "1.0"
+    },
+    "propagation": {
+      "lineage": "continuation_fragment",
+      "topology": "downward"
+    },
+    "schema_version": "1.0",
+    "scope": {
+      "node_id": null,
+      "output_slot": 0
+    },
+    "tag": "role.datum",
+    "target": {
+      "kind": "scope_root"
+    }
+  },
+  "role": {
+    "attachment": "local",
+    "binding_id": "tag_binding_87d1b369bb7b59a9aa02f73c288c88d2",
+    "certainty": "proven",
+    "evidence": {
+      "evidence_method": "Generated",
+      "kind": "topology_change",
+      "operation": "make_box_rsolid",
+      "result_role": "box.top",
+      "target_topo_id": "face_3"
+    },
+    "lifecycle": "recompute",
+    "producer": {
+      "kind": "auto_rule",
+      "node_id": null,
+      "rule_id": "simplecad.operation_output_role",
+      "rule_version": "1.0"
+    },
+    "propagation": {
+      "lineage": "continuation_fragment",
+      "topology": "local"
+    },
+    "schema_version": "1.0",
+    "scope": {
+      "node_id": null,
+      "output_slot": 0
+    },
+    "tag": "face.box.top",
+    "target": {
+      "kind": "scope_root"
+    }
+  },
+  "roundtrip_equal": true,
+  "user": {
+    "attachment": "local",
+    "binding_id": "tag_binding_fixed",
+    "certainty": "asserted",
+    "evidence": {
+      "kind": "query_execution",
+      "selected_count": 2,
+      "selected_refs": []
+    },
+    "lifecycle": "assertion",
+    "producer": {
+      "kind": "user_operation",
+      "node_id": "n_7",
+      "rule_id": null,
+      "rule_version": null
+    },
+    "propagation": {
+      "lineage": "continuation_fragment",
+      "topology": "downward"
+    },
+    "schema_version": "1.0",
+    "scope": {
+      "node_id": "n_3",
+      "output_slot": 1
+    },
+    "tag": "role.datum",
+    "target": {
+      "kind": "selection_query",
+      "selector": {
+        "target_kind": "face"
+      }
+    }
+  },
+  "user_default": {
+    "attachment": "local",
+    "binding_id": "tag_binding_fixed",
+    "certainty": "asserted",
+    "evidence": {
+      "authoring_source": "simplecadapi.apply_tag",
+      "kind": "user_assertion"
+    },
+    "lifecycle": "assertion",
+    "producer": {
+      "kind": "user_operation",
+      "node_id": "n_1",
+      "rule_id": null,
+      "rule_version": null
+    },
+    "propagation": {
+      "lineage": "continuation_fragment",
+      "topology": "local"
+    },
+    "schema_version": "1.0",
+    "scope": {
+      "node_id": "n_1",
+      "output_slot": 0
+    },
+    "tag": "role.mount",
+    "target": {
+      "kind": "scope_root"
+    }
+  }
+}

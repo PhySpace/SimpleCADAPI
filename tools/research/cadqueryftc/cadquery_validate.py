@@ -100,8 +100,8 @@ def validate_row(ftc_path: Path, trace_path: Path, workdir: Path) -> dict:
     bbox_err = None
     if volume is not None and cq_bbox and status == "ok":
         try:
-            from OCP.Bnd import Bnd_Box
-            from OCP.BRepBndLib import BRepBndLib
+            from simplecadapi._cpp.occt.Bnd import Bnd_Box
+            from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
 
             box = Bnd_Box()
             for body in module.BODIES:

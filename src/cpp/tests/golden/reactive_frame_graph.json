@@ -1,0 +1,56 @@
+{
+  "nodes": [
+    {
+      "frame_id": "a",
+      "metadata": {
+        "node_id": "n"
+      },
+      "origin": [
+        1.0,
+        2.0,
+        3.0
+      ],
+      "parent_frame_id": null,
+      "x_axis": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "y_axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "z_axis": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "frame_id": "b",
+      "metadata": {},
+      "origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "parent_frame_id": "a",
+      "x_axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "y_axis": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "z_axis": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    }
+  ]
+}

@@ -1,0 +1,171 @@
+{
+  "report": {
+    "grounded_component_ids": [
+      "base"
+    ],
+    "residuals": [
+      {
+        "angular_error_degrees": 0.0,
+        "constraint_id": "fixed",
+        "translation_error": 0.0,
+        "within_tolerance": true
+      }
+    ],
+    "solved": true,
+    "solved_component_ids": [
+      "base",
+      "follower"
+    ],
+    "unsolved_component_ids": []
+  },
+  "report_fields": [
+    true,
+    [
+      "base"
+    ],
+    [
+      "base",
+      "follower"
+    ],
+    [],
+    1
+  ],
+  "residual": {
+    "angular_error_degrees": 0.0,
+    "constraint_id": "fixed",
+    "translation_error": 0.0,
+    "within_tolerance": true
+  },
+  "solved": {
+    "authored": {
+      "base": {
+        "origin": [
+          1.0,
+          2.0,
+          3.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "follower": {
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "placements": {
+      "base": {
+        "origin": [
+          1.0,
+          2.0,
+          3.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      "follower": {
+        "origin": [
+          1.0,
+          2.0,
+          3.0
+        ],
+        "x_axis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "y_axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "z_axis": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "report": {
+      "grounded_component_ids": [
+        "base"
+      ],
+      "residuals": [
+        {
+          "angular_error_degrees": 0.0,
+          "constraint_id": "fixed",
+          "translation_error": 0.0,
+          "within_tolerance": true
+        }
+      ],
+      "solved": true,
+      "solved_component_ids": [
+        "base",
+        "follower"
+      ],
+      "unsolved_component_ids": []
+    }
+  },
+  "unsolved_report": {
+    "grounded_component_ids": [
+      "base"
+    ],
+    "residuals": [
+      {
+        "angular_error_degrees": 0.0,
+        "constraint_id": "fixed",
+        "translation_error": 3.7416573867739413,
+        "within_tolerance": false
+      }
+    ],
+    "solved": false,
+    "solved_component_ids": [
+      "base",
+      "follower"
+    ],
+    "unsolved_component_ids": []
+  }
+}

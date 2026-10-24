@@ -1,0 +1,160 @@
+{
+  "edge": {
+    "bbox": [
+      -3.0,
+      -1.0,
+      0.0,
+      3.0,
+      1.0,
+      0.0
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 13.424400900478185,
+    "tags": [],
+    "track": {
+      "op": "make_ellipse_redge"
+    },
+    "type": "Edge",
+    "vertices": 1
+  },
+  "edge_direction": {
+    "bbox": [
+      -1.0,
+      -2.0,
+      1.0,
+      3.0,
+      4.0,
+      1.0
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 15.869698772210649,
+    "tags": [
+      "e.edge"
+    ],
+    "track": {
+      "op": "make_ellipse_redge"
+    },
+    "type": "Edge",
+    "vertices": 1
+  },
+  "face": {
+    "area": 9.42477796076938,
+    "bbox": [
+      -2.23606797749979,
+      -2.23606797749979,
+      0.0,
+      2.23606797749979,
+      2.23606797749979,
+      0.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [],
+    "track": {
+      "op": "make_ellipse_face"
+    },
+    "type": "Face",
+    "vertices": 1
+  },
+  "face_tagged": {
+    "area": 6.2831853071795845,
+    "bbox": [
+      -2.0,
+      -1.0,
+      0.0,
+      2.0,
+      1.0,
+      0.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "lens.edge.ellipse"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 1,
+    "geo": null,
+    "tags": [
+      "lens.face"
+    ],
+    "track": {
+      "op": "make_ellipse_face"
+    },
+    "type": "Face",
+    "vertices": 1
+  },
+  "wire": {
+    "bbox": [
+      -3.0,
+      -1.0,
+      0.0,
+      3.0,
+      1.0,
+      0.0
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 13.424400900478185,
+    "tags": [],
+    "track": {
+      "op": "make_ellipse_wire"
+    },
+    "type": "Wire",
+    "vertices": 1
+  },
+  "wire_tagged": {
+    "bbox": [
+      -3.0,
+      -1.0,
+      0.0,
+      3.0,
+      1.0,
+      0.0
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "slot.edge.outline"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 13.424400900478185,
+    "tags": [
+      "slot.wire"
+    ],
+    "track": {
+      "op": "make_ellipse_wire"
+    },
+    "type": "Wire",
+    "vertices": 1
+  }
+}

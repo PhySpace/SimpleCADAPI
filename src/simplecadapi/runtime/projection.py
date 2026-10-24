@@ -36,9 +36,8 @@ from ..build.definition import (
 )
 from ..build.dependencies import snapshot_file_inputs
 from ..build.results import AssemblyBuildResult, PartBuildResult
-from ..product.assembly import Assembly
-from ..product.part import Part
-from ..recording.graph import GraphSession, isolated_recording
+from simplecadapi._cpp import Assembly, isolated_recording, Part
+from simplecadapi._glue.session import GraphSession
 from ..recording.source_mapping import cell_sources
 from .cells import NotebookCells, bound_requirements
 from .config import NotebookConfig

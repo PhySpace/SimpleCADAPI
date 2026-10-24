@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def constrain_midpoint_rsketch(sketch: Sketch, point: Union[SketchRef, str], line: Union[SketchRef, str], *, constraint_id: Optional[str] = None) -> Sketch
+def constrain_midpoint_rsketch(sketch, point, line, *, constraint_id=None)
 ```
 
 *Source: operators/sketch.py*

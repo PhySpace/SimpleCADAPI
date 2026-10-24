@@ -7,19 +7,8 @@ import math
 from typing import Any, Sequence
 
 import numpy as np
-from OCP.BRep import BRep_Tool
-from OCP.BRepMesh import BRepMesh_IncrementalMesh
-from OCP.BRepTools import BRepTools
-from OCP.TopAbs import TopAbs_FACE, TopAbs_REVERSED
-from OCP.TopExp import TopExp_Explorer
-from OCP.TopLoc import TopLoc_Location
-from OCP.TopoDS import TopoDS
-
 from ..artifacts.assembly_io import materialize_definition
-from ..kernel.ocp_booleans import solids_of
-from ..operators import make_compound_from_assembly_rcompound
-from ..product.assembly import Assembly
-from ..product.part import Part
+from simplecadapi._cpp import Assembly, make_compound_from_assembly_rcompound, Part
 from ..translator.package_units import (
     ProductPackageInput,
     read_product_package_translation_units,
@@ -53,9 +42,9 @@ class TessellatedSurfaceMesh:
 
 def _product_solids(value: Part | Assembly) -> tuple[Any, ...]:
     if isinstance(value, Part):
-        return (value.body.wrapped,)
+        return (value.body,)
     projection = make_compound_from_assembly_rcompound(assembly=value)
-    solids = tuple(solids_of(projection.wrapped))
+    solids = tuple(projection.solids())
     if not solids:
         raise ValueError("Product assembly produced no solids for mesh export")
     return solids
@@ -86,69 +75,22 @@ def _is_collapsed_triangle(
     return area_squared <= relative_floor
 
 
-def _tessellate_solid_impl(
+def _tessellate_native(
     solid: Any,
     *,
     linear_deflection: float,
-    angular_deflection_radians: float,
+    angular_deflection_degrees: float,
     relative: bool,
 ) -> tuple[np.ndarray, np.ndarray]:
-    BRepTools.Clean_s(solid, False)
-    mesher = BRepMesh_IncrementalMesh(
+    import simplecadapi._cpp as native
+
+    vertices, triangles = native.tessellate_solid(
         solid,
-        linear_deflection,
-        relative,
-        angular_deflection_radians,
-        False,
+        linear_deflection=linear_deflection,
+        angular_deflection_degrees=angular_deflection_degrees,
+        relative=relative,
     )
-    mesher.Perform()
-    if not mesher.IsDone():
-        raise RuntimeError("OpenCASCADE failed to tessellate product geometry")
-
-    weld_tolerance = max(min(linear_deflection * 1.0e-7, 1.0e-7), 1.0e-9)
-    vertices: list[tuple[float, float, float]] = []
-    vertex_indices: dict[tuple[int, int, int], int] = {}
-    triangles: list[tuple[int, int, int]] = []
-    explorer = TopExp_Explorer(solid, TopAbs_FACE)
-    while explorer.More():
-        face = TopoDS.Face_s(explorer.Current())
-        location = TopLoc_Location()
-        triangulation = BRep_Tool.Triangulation_s(face, location, 0)
-        if triangulation is None or triangulation.NbTriangles() == 0:
-            raise RuntimeError("OpenCASCADE produced an empty face triangulation")
-        transform = location.Transformation()
-        local_indices: dict[int, int] = {}
-        for node_index in range(1, triangulation.NbNodes() + 1):
-            point = triangulation.Node(node_index).Transformed(transform)
-            coordinates = (float(point.X()), float(point.Y()), float(point.Z()))
-            if not all(math.isfinite(value) for value in coordinates):
-                raise RuntimeError("OpenCASCADE produced a non-finite mesh vertex")
-            key = _vertex_key(coordinates, weld_tolerance)
-            global_index = vertex_indices.get(key)
-            if global_index is None:
-                global_index = len(vertices)
-                vertex_indices[key] = global_index
-                vertices.append(coordinates)
-            local_indices[node_index] = global_index
-
-        reversed_face = face.Orientation() == TopAbs_REVERSED
-        for triangle_index in range(1, triangulation.NbTriangles() + 1):
-            a, b, c = triangulation.Triangle(triangle_index).Get()
-            indices = (
-                (local_indices[a], local_indices[c], local_indices[b])
-                if reversed_face
-                else (local_indices[a], local_indices[b], local_indices[c])
-            )
-            if len(set(indices)) == 3 and not _is_collapsed_triangle(vertices, indices):
-                triangles.append(indices)
-        explorer.Next()
-
-    if not vertices or not triangles:
-        raise RuntimeError("OpenCASCADE produced no product surface triangles")
-    return (
-        np.asarray(vertices, dtype=np.float64).reshape((-1, 3)),
-        np.asarray(triangles, dtype=np.int32).reshape((-1, 3)),
-    )
+    return np.asarray(vertices, dtype=np.float64), np.asarray(triangles, dtype=np.int32)
 
 
 def tessellate_solid(
@@ -171,10 +113,10 @@ def tessellate_solid(
         raise ValueError("angular_deflection_degrees must be in (0, 180]")
     if not isinstance(relative, bool):
         raise TypeError("relative must be a bool")
-    return _tessellate_solid_impl(
+    return _tessellate_native(
         solid,
         linear_deflection=linear,
-        angular_deflection_radians=math.radians(angular_degrees),
+        angular_deflection_degrees=angular_degrees,
         relative=relative,
     )
 

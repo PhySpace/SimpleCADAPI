@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def constrain_fix_rsketch(sketch: Sketch, target: Union[SketchRef, str], *, constraint_id: Optional[str] = None) -> Sketch
+def constrain_fix_rsketch(sketch, target, *, constraint_id=None)
 ```
 
 *Source: operators/sketch.py*

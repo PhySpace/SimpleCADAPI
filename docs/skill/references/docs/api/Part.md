@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class Part(part_id: str, body: Solid, name: Optional[str] = None, material: Optional[Material] = None, connectors: Tuple[Connector, ...] = ())
+class Part(part_id, body, name=None, material=None, connectors=())
 ```
 
 *Source: product/part.py*

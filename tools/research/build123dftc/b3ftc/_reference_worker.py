@@ -9,16 +9,16 @@ from _validate_worker import _compare_reference, _read_step, _solid_count, _volu
 
 
 def run(actual_step, reference_step):
-    import OCP
-    from OCP.Bnd import Bnd_Box
-    from OCP.BRepBndLib import BRepBndLib
+    from simplecadapi._cpp import occt as _occt
+    from simplecadapi._cpp.occt.Bnd import Bnd_Box
+    from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
     actual = _read_step(actual_step)
     bounds = Bnd_Box()
     BRepBndLib.AddOptimal_s(actual, bounds, False, False)
     low, high = bounds.CornerMin(), bounds.CornerMax()
     bbox = [float(getattr(point, axis)()) for point in (low, high) for axis in "XYZ"]
     return {"status": "ok", **_compare_reference([actual], reference_step),
-            "reference_kernel": getattr(OCP, "__version__", "unknown"),
+            "reference_kernel": _occt.__version__,
             "roundtrip_actual_volume": _volume(actual),
             "roundtrip_actual_bbox": bbox,
             "roundtrip_actual_solid_count": _solid_count(actual),

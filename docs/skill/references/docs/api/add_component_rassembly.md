@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def add_component_rassembly(assembly: Assembly, item: Union[Part, Assembly], component_id: str, placement: Placement, name: Optional[str] = None) -> Assembly
+def add_component_rassembly(assembly, item, component_id, placement, name=None)
 ```
 
 *Source: operators/product.py*

@@ -1,0 +1,39 @@
+{
+  "cone_height": {
+    "how_to_fix": [
+      "Use a positive bottom radius and a positive height.",
+      "Pass a valid center point and non-zero axis vector.",
+      "If top_radius is used, make sure it is a finite scalar."
+    ],
+    "operation": "make_cone_rsolid",
+    "possible_causes": [
+      "Bottom radius or height is not a positive finite scalar.",
+      "The bottom face center or axis is not a valid finite 3D vector.",
+      "The kernel rejected the cone dimensions or orientation."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create a cone or truncated cone solid."
+  },
+  "cylinder_radius": {
+    "how_to_fix": [
+      "Use radius and height values greater than zero.",
+      "Pass a valid bottom_face_center and a non-zero axis vector.",
+      "If the axis is computed dynamically, inspect its evaluated numeric value."
+    ],
+    "operation": "make_cylinder_rsolid",
+    "possible_causes": [
+      "Radius or height is not a positive finite scalar.",
+      "The bottom face center or axis is not a valid finite 3D vector.",
+      "The axis is degenerate or rejected by the kernel."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create a cylinder solid."
+  },
+  "pointed_cone_end_tag": {
+    "how_to_fix": [],
+    "operation": "semantic_query",
+    "possible_causes": [],
+    "technical_details": null,
+    "what_happened": "operation output role 'cone.end' requires exactly one kernel-proven result, got 0"
+  }
+}

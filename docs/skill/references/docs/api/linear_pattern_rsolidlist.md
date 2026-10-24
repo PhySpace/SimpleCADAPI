@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def linear_pattern_rsolidlist(shape: AnyShape, direction: Tuple[float, float, float], count: int, spacing: float) -> List[Solid]
+def linear_pattern_rsolidlist(shape, direction, count, spacing)
 ```
 
 *Source: operators/transform.py*

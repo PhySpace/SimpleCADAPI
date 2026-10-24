@@ -8,21 +8,21 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from OCP.BRep import BRep_Tool
-from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
-from OCP.BRepBndLib import BRepBndLib
-from OCP.BRepCheck import BRepCheck_Analyzer
-from OCP.Bnd import Bnd_Box
-from OCP.TopAbs import (
+from simplecadapi._cpp.occt.BRep import BRep_Tool
+from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
+from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
+from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
+from simplecadapi._cpp.occt.Bnd import Bnd_Box
+from simplecadapi._cpp.occt.TopAbs import (
     TopAbs_EDGE,
     TopAbs_FACE,
     TopAbs_SHELL,
     TopAbs_SOLID,
     TopAbs_VERTEX,
 )
-from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopTools import TopTools_IndexedMapOfShape
-from OCP.TopoDS import TopoDS, TopoDS_Shape
+from simplecadapi._cpp.occt.TopExp import TopExp, TopExp_Explorer
+from simplecadapi._cpp.occt.TopTools import TopTools_IndexedMapOfShape
+from simplecadapi._cpp.occt.TopoDS import TopoDS, TopoDS_Shape
 
 from .io import direction, load_step_rshape, measure_shape_mass_rtuple, xyz
 

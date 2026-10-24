@@ -1,0 +1,9 @@
+{
+  "bevel_loft": 1,
+  "bevel_wires": 2,
+  "cyc_lines": 0,
+  "cyc_splines": 8,
+  "rack_fix": false,
+  "ring_2d_cut": false,
+  "ring_wires_face": true
+}

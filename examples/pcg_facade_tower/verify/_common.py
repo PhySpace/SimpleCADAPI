@@ -13,8 +13,8 @@ OUT = Path(__file__).resolve().parent / "renders"
 
 def tight_bbox(shape) -> tuple:
     """Exact bbox (AddOptimal, no gap); accepts a SimpleCAD shape or a raw TopoDS_Shape."""
-    from OCP.Bnd import Bnd_Box
-    from OCP.BRepBndLib import BRepBndLib
+    from simplecadapi._cpp.occt.Bnd import Bnd_Box
+    from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
 
     box = Bnd_Box()
     box.SetGap(0.0)
@@ -46,7 +46,7 @@ def place_shape(shape, frame: dict):
 
 
 def min_distance(a, b) -> float:
-    from OCP.BRepExtrema import BRepExtrema_DistShapeShape
+    from simplecadapi._cpp.occt.BRepExtrema import BRepExtrema_DistShapeShape
 
     dist = BRepExtrema_DistShapeShape(getattr(a, "wrapped", a), getattr(b, "wrapped", b))
     dist.Perform()

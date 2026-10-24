@@ -1,0 +1,816 @@
+{
+  "arc": {
+    "bbox": [
+      0.0707372016677029,
+      0.0,
+      0.0,
+      1.0,
+      0.9974949866040544,
+      0.0
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 1.5,
+    "tags": [],
+    "track": {
+      "op": "make_wire_from_edges_rwire"
+    },
+    "type": "Wire",
+    "vertices": 2
+  },
+  "ball": {
+    "bbox": [
+      -0.5,
+      0.5,
+      1.5,
+      2.5,
+      3.5,
+      4.5
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.surface"
+      ]
+    ],
+    "faces": 1,
+    "geo": {
+      "center": [
+        1.0,
+        2.0,
+        3.0
+      ],
+      "radius": 1.5,
+      "type": "sphere"
+    },
+    "tags": [
+      "geom.primitive.sphere",
+      "sphere"
+    ],
+    "track": {
+      "op": "make_sphere_rsolid"
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 14.13716694115404
+  },
+  "box": {
+    "bbox": [
+      -1.0,
+      -1.5,
+      0.0,
+      1.0,
+      1.5,
+      4.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 12,
+    "face_tags": [
+      [
+        "anchor.base",
+        "face.bottom",
+        "face.box.bottom",
+        "housing.face.bottom"
+      ],
+      [
+        "face.back",
+        "face.box.left",
+        "housing.face.left"
+      ],
+      [
+        "face.box.back",
+        "face.left",
+        "housing.face.back"
+      ],
+      [
+        "face.box.front",
+        "face.right",
+        "housing.face.front"
+      ],
+      [
+        "face.box.right",
+        "face.front",
+        "housing.face.right"
+      ],
+      [
+        "face.box.top",
+        "face.top",
+        "housing.face.top"
+      ]
+    ],
+    "faces": 6,
+    "geo": {
+      "bottom_face_center": [
+        0,
+        0,
+        0
+      ],
+      "size": {
+        "x": 2.0,
+        "y": 3.0,
+        "z": 4.0
+      },
+      "type": "box"
+    },
+    "tags": [
+      "box",
+      "geom.primitive.box",
+      "housing.solid",
+      "part.housing"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 6,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_box_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 8,
+    "volume": 23.999999999999993
+  },
+  "cone": {
+    "bbox": [
+      -2.0,
+      -2.0,
+      0.0,
+      2.0,
+      2.0,
+      4.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "edge.cone.end_boundary"
+      ],
+      [
+        "edge.boundary",
+        "edge.cone.seam"
+      ],
+      [
+        "edge.boundary",
+        "edge.cone.start_boundary"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.cone.end"
+      ],
+      [
+        "face.cone.side"
+      ],
+      [
+        "face.cone.start"
+      ]
+    ],
+    "faces": 3,
+    "geo": {
+      "axis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "bottom_face_center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bottom_radius": 2.0,
+      "height": 4.0,
+      "top_radius": 1.0,
+      "type": "cone"
+    },
+    "tags": [
+      "cone",
+      "geom.primitive.cone"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 6,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_cone_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 29.321531433504667
+  },
+  "cyl": {
+    "bbox": [
+      -2.0,
+      -2.0,
+      0.0,
+      2.0,
+      2.0,
+      5.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary",
+        "edge.cylinder.end_boundary",
+        "shaft.edge.end"
+      ],
+      [
+        "edge.boundary",
+        "edge.cylinder.seam",
+        "role.seam",
+        "shaft.edge.seam"
+      ],
+      [
+        "edge.boundary",
+        "edge.cylinder.start_boundary",
+        "shaft.edge.start"
+      ]
+    ],
+    "edges": 3,
+    "face_tags": [
+      [
+        "face.bottom",
+        "face.cylinder.start",
+        "shaft.face.start"
+      ],
+      [
+        "face.cylinder.end",
+        "face.top",
+        "shaft.face.end"
+      ],
+      [
+        "face.cylinder.side",
+        "face.side",
+        "shaft.face.side"
+      ]
+    ],
+    "faces": 3,
+    "geo": {
+      "axis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "bottom_face_center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "height": 5.0,
+      "radius": 2.0,
+      "type": "cylinder"
+    },
+    "tags": [
+      "cylinder",
+      "geom.primitive.cylinder",
+      "shaft.solid"
+    ],
+    "track": {
+      "deleted": 0,
+      "entry_count": 6,
+      "generated": 0,
+      "has_delta": true,
+      "modified": 0,
+      "op": "make_cylinder_rsolid",
+      "preserved": 0
+    },
+    "type": "Solid",
+    "vertices": 2,
+    "volume": 62.83185307179572
+  },
+  "ellipse": {
+    "bbox": [
+      -1.0,
+      -3.0,
+      0.0,
+      1.0,
+      3.0,
+      0.0
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "e.edge.ellipse",
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 13.424400900478185,
+    "tags": [
+      "e.wire"
+    ],
+    "track": {
+      "op": "make_wire_from_edges_rwire"
+    },
+    "type": "Wire",
+    "vertices": 1
+  },
+  "graph": [
+    {
+      "inputs": [],
+      "op": "make_box_rsolid",
+      "param_exprs": {},
+      "params": {
+        "bottom_face_center": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "depth": 4.0,
+        "height": 3.0,
+        "width": 2.0
+      }
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "anchor.base"
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "part.housing"
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "housing.solid"
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "housing.face.bottom"
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "housing.face.top"
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "housing.face.front"
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "housing.face.back"
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "housing.face.left"
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "housing.face.right"
+    },
+    {
+      "inputs": [],
+      "op": "make_cylinder_rsolid",
+      "param_exprs": {},
+      "params": {
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "bottom_face_center": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "height": 5.0,
+        "radius": 2.0
+      }
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "role.seam"
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "shaft.solid"
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "shaft.face.start"
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "shaft.face.end"
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "shaft.face.side"
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "shaft.edge.start"
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "shaft.edge.end"
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "shaft.edge.seam"
+    },
+    {
+      "inputs": [],
+      "op": "make_cone_rsolid",
+      "param_exprs": {},
+      "params": {
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "bottom_face_center": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bottom_radius": 2.0,
+        "height": 4.0,
+        "top_radius": 1.0
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_sphere_rsolid",
+      "param_exprs": {},
+      "params": {
+        "center": [
+          1.0,
+          2.0,
+          3.0
+        ],
+        "radius": 1.5
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_point_rvertex",
+      "param_exprs": {},
+      "params": {
+        "x": 1.0,
+        "y": 2.0,
+        "z": 3.0
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_ellipse_redge",
+      "param_exprs": {},
+      "params": {
+        "center": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "major_direction": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "major_radius": 3.0,
+        "minor_radius": 1.0,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "inputs": [
+        "node_00000017"
+      ],
+      "op": "make_wire_from_edges_rwire",
+      "param_exprs": {},
+      "params": {
+        "edge_count": 1
+      }
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "e.wire"
+    },
+    {
+      "op": "apply_tag_rselection",
+      "tag": "e.edge.ellipse"
+    },
+    {
+      "inputs": [],
+      "op": "make_helix_redge",
+      "param_exprs": {},
+      "params": {
+        "center": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dir": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "handedness": "Left",
+        "height": 6.0,
+        "pitch": 2.0,
+        "radius": 3.0
+      }
+    },
+    {
+      "inputs": [
+        "node_0000001b"
+      ],
+      "op": "make_wire_from_edges_rwire",
+      "param_exprs": {},
+      "params": {
+        "edge_count": 1
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_spline_redge",
+      "param_exprs": {},
+      "params": {
+        "control_points": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            1.0,
+            0.0
+          ],
+          [
+            2.0,
+            1.0,
+            0.0
+          ],
+          [
+            3.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "degree": 3,
+        "knots": [
+          0.0,
+          1.0
+        ],
+        "multiplicities": [
+          4,
+          4
+        ],
+        "periodic": false,
+        "weights": [
+          1.0,
+          2.0,
+          2.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "inputs": [
+        "node_0000001d"
+      ],
+      "op": "make_wire_from_edges_rwire",
+      "param_exprs": {},
+      "params": {
+        "edge_count": 1
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_interpolated_spline_redge",
+      "param_exprs": {},
+      "params": {
+        "periodic": true,
+        "points": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            2.0,
+            0.0,
+            0.0
+          ],
+          [
+            2.0,
+            2.0,
+            0.0
+          ],
+          [
+            0.0,
+            2.0,
+            0.0
+          ]
+        ],
+        "tolerance": 1e-06
+      }
+    },
+    {
+      "inputs": [
+        "node_0000001f"
+      ],
+      "op": "make_wire_from_edges_rwire",
+      "param_exprs": {},
+      "params": {
+        "edge_count": 1
+      }
+    },
+    {
+      "inputs": [],
+      "op": "make_angle_arc_redge",
+      "param_exprs": {},
+      "params": {
+        "center": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "end_angle": 1.5,
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "radius": 1.0,
+        "start_angle": 0.0
+      }
+    },
+    {
+      "inputs": [
+        "node_00000021"
+      ],
+      "op": "make_wire_from_edges_rwire",
+      "param_exprs": {},
+      "params": {
+        "edge_count": 1
+      }
+    }
+  ],
+  "helix": {
+    "bbox": [
+      -3.000000158082846,
+      -3.000000158082844,
+      -1e-07,
+      3.0000001580828446,
+      3.000000158082847,
+      6.000000100000008
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 56.86608691833186,
+    "tags": [],
+    "track": {
+      "op": "make_wire_from_edges_rwire"
+    },
+    "type": "Wire",
+    "vertices": 2
+  },
+  "loop": {
+    "bbox": [
+      -0.6231868078375368,
+      -0.5116197578339307,
+      -1e-07,
+      2.29524923091636,
+      2.330524651523753,
+      1e-07
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 9.041483009114307,
+    "tags": [],
+    "track": {
+      "op": "make_wire_from_edges_rwire"
+    },
+    "type": "Wire",
+    "vertices": 1
+  },
+  "point": {
+    "bbox": [
+      1.0,
+      2.0,
+      3.0,
+      1.0,
+      2.0,
+      3.0
+    ],
+    "edge_tags": [],
+    "edges": 0,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "tags": [],
+    "track": {
+      "op": "make_point_rvertex"
+    },
+    "type": "Vertex",
+    "vertices": 1
+  },
+  "spline": {
+    "bbox": [
+      -1e-07,
+      -1e-07,
+      -1e-07,
+      3.0000000999999985,
+      0.857142957142857,
+      1e-07
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 3.545637778317948,
+    "tags": [],
+    "track": {
+      "op": "make_wire_from_edges_rwire"
+    },
+    "type": "Wire",
+    "vertices": 2
+  }
+}

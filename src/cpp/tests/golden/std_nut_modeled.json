@@ -1,0 +1,80 @@
+{
+  "hex": {
+    "meta": {
+      "basic_minor_diameter": 6.646875,
+      "diameter": 8.0,
+      "height": 6.5,
+      "hole_depth": 6.5,
+      "hole_start": 0.0,
+      "hole_style": "through",
+      "knurl_count": 24,
+      "modeled_minor_diameter": 6.646875,
+      "nut_style": "hex",
+      "pitch_diameter": 7.188125,
+      "thread_depth": 0.6765625000000002,
+      "thread_detail": "modeled",
+      "thread_form": "v",
+      "thread_phase_degrees": 15.0,
+      "thread_pitch": 1.25,
+      "thread_pitch_source": "metric_coarse",
+      "width": 13.0
+    },
+    "shape": {
+      "area": 743.7361043181021,
+      "bbox": [
+        -6.500000000000001,
+        -7.505553499465134,
+        -4.175908203923969e-17,
+        6.500000000000001,
+        7.505553499465134,
+        6.500000000000002
+      ],
+      "edges": 48,
+      "faces": 18,
+      "tags": [
+        "group.fasteners",
+        "role.fastener.nut"
+      ],
+      "volume": 667.9465078218597
+    }
+  },
+  "knurled": {
+    "meta": {
+      "basic_minor_diameter": 6.646875,
+      "diameter": 8.0,
+      "height": 7.0,
+      "hole_depth": 5.5,
+      "hole_start": 1.5,
+      "hole_style": "blind",
+      "knurl_count": 18,
+      "modeled_minor_diameter": 6.7,
+      "nut_style": "knurled",
+      "pitch_diameter": 7.188125,
+      "thread_depth": 0.65,
+      "thread_detail": "modeled",
+      "thread_form": "trapezoidal",
+      "thread_phase_degrees": 0.0,
+      "thread_pitch": 1.25,
+      "thread_pitch_source": "explicit",
+      "width": 13.0
+    },
+    "shape": {
+      "area": 745.5847230644855,
+      "bbox": [
+        -6.5,
+        -6.401250394579353,
+        0.0,
+        6.5,
+        6.401250394579352,
+        7.0
+      ],
+      "edges": 135,
+      "faces": 48,
+      "tags": [
+        "group.fasteners",
+        "role.fastener.nut"
+      ],
+      "volume": 641.4380688591543
+    }
+  }
+}

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_helical_rack_rsolid(module: float, n_teeth: int = 10, pressure_angle: float = 20.0, helix_angle: float = 25.0, rack_height: float = 8.0) -> Solid
+def make_helical_rack_rsolid(module, n_teeth=10, pressure_angle=20.0, helix_angle=25.0, rack_height=8.0)
 ```
 
 *Source: std/gear.py*

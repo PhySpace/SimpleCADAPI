@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_face_connector_rconnector(connector_id: str, face: Face, name: Optional[str] = None, flip: bool = False) -> Connector
+def make_face_connector_rconnector(connector_id, face, name=None, flip=False)
 ```
 
 *Source: operators/product.py*

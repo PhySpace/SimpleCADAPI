@@ -1,0 +1,42 @@
+{
+  "meta": {
+    "basic_minor_diameter": 4.9175,
+    "diameter": 6.0,
+    "height": 5.0,
+    "hole_depth": 5.0,
+    "hole_start": 0.0,
+    "hole_style": "through",
+    "knurl_count": 24,
+    "modeled_minor_diameter": 5.1,
+    "nut_style": "hex",
+    "pitch_diameter": 5.3505,
+    "thread_depth": 0.45,
+    "thread_detail": "modeled",
+    "thread_form": "trapezoidal",
+    "thread_phase_degrees": 90.0,
+    "thread_pitch": 1.0,
+    "thread_pitch_source": "explicit",
+    "width": 10.0
+  },
+  "rotations": 1,
+  "shape": {
+    "area": 428.4630351591882,
+    "bbox": [
+      -5.000000000000001,
+      -5.773502691896257,
+      0.0,
+      5.000000000000001,
+      5.773502691896257,
+      5.000000000000001
+    ],
+    "edges": 45,
+    "faces": 17,
+    "tags": [
+      "group.fasteners",
+      "role.fastener.nut"
+    ],
+    "volume": 314.8755488264909
+  },
+  "sweeps": 1,
+  "unions": 1
+}

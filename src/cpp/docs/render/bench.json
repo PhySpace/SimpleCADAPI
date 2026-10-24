@@ -1,0 +1,118 @@
+{
+ "box": {
+  "soft ss1": {
+   "warm_wall_ms": 17.6,
+   "warm_cpu_self_ms": 33.3,
+   "warm_parts_ms": {
+    "mesh": 0.5,
+    "render": 4.8,
+    "encode_or_vtk": 12.2
+   },
+   "cold_process_wall_ms": 165.7,
+   "cold_process_cpu_ms": 179.6,
+   "runs": 5
+  },
+  "soft ss2": {
+   "warm_wall_ms": 36.0,
+   "warm_cpu_self_ms": 135.3,
+   "warm_parts_ms": {
+    "mesh": 0.5,
+    "render": 22.3,
+    "encode_or_vtk": 13.3
+   },
+   "cold_process_wall_ms": 190.6,
+   "cold_process_cpu_ms": 288.2,
+   "runs": 5
+  },
+  "soft ss3": {
+   "warm_wall_ms": 58.9,
+   "warm_cpu_self_ms": 263.1,
+   "warm_parts_ms": {
+    "mesh": 0.5,
+    "render": 44.4,
+    "encode_or_vtk": 13.7
+   },
+   "cold_process_wall_ms": 215.8,
+   "cold_process_cpu_ms": 410.2,
+   "runs": 5
+  },
+  "vtk in-process ss2": {
+   "warm_wall_ms": 177.2,
+   "warm_cpu_self_ms": 174.7,
+   "warm_parts_ms": {
+    "mesh": 0.6,
+    "render": 0.0,
+    "encode_or_vtk": 176.6
+   },
+   "cold_process_wall_ms": 3154.3,
+   "cold_process_cpu_ms": 3034.2,
+   "runs": 5
+  },
+  "sdk render_screenshot_rpath": {
+   "warm_wall_ms": 2789.0,
+   "warm_cpu_self_ms": 8.5,
+   "warm_parts_ms": {},
+   "cold_process_wall_ms": 5221.9,
+   "cold_process_cpu_ms": 5178.2,
+   "runs": 5
+  }
+ },
+ "gear": {
+  "soft ss1": {
+   "warm_wall_ms": 65.7,
+   "warm_cpu_self_ms": 193.3,
+   "warm_parts_ms": {
+    "mesh": 41.0,
+    "render": 9.2,
+    "encode_or_vtk": 15.0
+   },
+   "cold_process_wall_ms": 237.7,
+   "cold_process_cpu_ms": 368.0,
+   "runs": 5
+  },
+  "soft ss2": {
+   "warm_wall_ms": 75.7,
+   "warm_cpu_self_ms": 283.0,
+   "warm_parts_ms": {
+    "mesh": 37.0,
+    "render": 24.1,
+    "encode_or_vtk": 15.9
+   },
+   "cold_process_wall_ms": 262.0,
+   "cold_process_cpu_ms": 479.0,
+   "runs": 5
+  },
+  "soft ss3": {
+   "warm_wall_ms": 106.8,
+   "warm_cpu_self_ms": 407.4,
+   "warm_parts_ms": {
+    "mesh": 39.3,
+    "render": 51.4,
+    "encode_or_vtk": 16.1
+   },
+   "cold_process_wall_ms": 279.5,
+   "cold_process_cpu_ms": 583.7,
+   "runs": 5
+  },
+  "vtk in-process ss2": {
+   "warm_wall_ms": 221.1,
+   "warm_cpu_self_ms": 324.7,
+   "warm_parts_ms": {
+    "mesh": 38.8,
+    "render": 0.0,
+    "encode_or_vtk": 182.5
+   },
+   "cold_process_wall_ms": 3239.0,
+   "cold_process_cpu_ms": 3316.2,
+   "runs": 5
+  },
+  "sdk render_screenshot_rpath": {
+   "warm_wall_ms": 2942.2,
+   "warm_cpu_self_ms": 223.4,
+   "warm_parts_ms": {},
+   "cold_process_wall_ms": 5562.0,
+   "cold_process_cpu_ms": 5598.1,
+   "runs": 5
+  }
+ }
+}

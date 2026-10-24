@@ -35,12 +35,12 @@ _TOLERANCE = 1e-3  # relative volume error
 
 
 def _step_volume(step_bytes: bytes) -> Optional[float]:
-    from OCP.BRepGProp import BRepGProp
-    from OCP.GProp import GProp_GProps
-    from OCP.IFSelect import IFSelect_RetDone
-    from OCP.STEPControl import STEPControl_Reader
-    from OCP.TopAbs import TopAbs_SOLID
-    from OCP.TopExp import TopExp_Explorer
+    from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+    from simplecadapi._cpp.occt.GProp import GProp_GProps
+    from simplecadapi._cpp.occt.IFSelect import IFSelect_RetDone
+    from simplecadapi._cpp.occt.STEPControl import STEPControl_Reader
+    from simplecadapi._cpp.occt.TopAbs import TopAbs_SOLID
+    from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
 
     with tempfile.NamedTemporaryFile(suffix=".step", delete=False) as handle:
         handle.write(step_bytes)
@@ -79,8 +79,8 @@ def _build_volume(source: str) -> Optional[float]:
         spec.loader.exec_module(module)
         result = module.build()
 
-        from OCP.BRepGProp import BRepGProp
-        from OCP.GProp import GProp_GProps
+        from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+        from simplecadapi._cpp.occt.GProp import GProp_GProps
 
         def _volume(solid) -> float:
             props = GProp_GProps()

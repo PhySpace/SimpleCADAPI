@@ -1,0 +1,46 @@
+[
+  [
+    "ValueError",
+    "width leaves insufficient wall around the nut hole"
+  ],
+  [
+    "ValueError",
+    "nut_style must be one of: hex, knurled, round, square"
+  ],
+  [
+    "ValueError",
+    "hole_style must be one of: blind, through"
+  ],
+  [
+    "ValueError",
+    "hole_depth is only valid when hole_style='blind'"
+  ],
+  [
+    "ValueError",
+    "blind hole_depth must be smaller than height"
+  ],
+  [
+    "ValueError",
+    "knurl_count must be an integer of at least 8"
+  ],
+  [
+    "ValueError",
+    "knurl_count must be an integer of at least 8"
+  ],
+  [
+    "ValueError",
+    "thread_pitch is required when diameter is outside the metric coarse series"
+  ],
+  [
+    "ValueError",
+    "thread_depth must be smaller than the nut hole radius"
+  ],
+  [
+    "ValueError",
+    "height must be positive and finite"
+  ],
+  [
+    "ValueError",
+    "modeled thread depth must be greater than thread_pitch"
+  ]
+]

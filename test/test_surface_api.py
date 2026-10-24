@@ -7,8 +7,8 @@ from copy import deepcopy
 from unittest import mock
 
 import simplecadapi as scad
-from OCP.BRepAdaptor import BRepAdaptor_Surface
-from OCP.GeomAbs import GeomAbs_Cylinder
+from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Surface
+from simplecadapi._cpp.occt.GeomAbs import GeomAbs_Cylinder
 
 
 class TestSurfaceApi(unittest.TestCase):
@@ -172,15 +172,11 @@ class TestSurfaceApi(unittest.TestCase):
             ]
         )
 
-        with mock.patch(
-            "simplecadapi.kernel.ocp_surfaces.BRepAlgoAPI_Common",
-            side_effect=AssertionError("boolean construction must not run"),
+        with self.assertRaisesRegex(
+            scad.SimpleCADError,
+            "bounded carrier parameter domain",
         ):
-            with self.assertRaisesRegex(
-                scad.SimpleCADError,
-                "bounded carrier parameter domain",
-            ):
-                scad.trim_surface_rface(carrier, outer)
+            scad.trim_surface_rface(carrier, outer)
 
     def test_periodic_trim_converts_linear_tolerance_to_angular_tolerance(self):
         def point(angle, z):

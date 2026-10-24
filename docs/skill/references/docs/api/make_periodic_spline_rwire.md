@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_periodic_spline_rwire(*, points: Sequence[Sequence[ScalarLike]], tolerance: ScalarLike = 1e-06) -> Wire
+def make_periodic_spline_rwire(*, points, tolerance=1e-06)
 ```
 
 *Source: operators/geometry.py*

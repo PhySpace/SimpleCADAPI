@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def shells() -> ShapeSelector
+def shells()
 ```
 
 *Source: ql.py*

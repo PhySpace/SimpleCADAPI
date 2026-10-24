@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def origin_role(role_name: str) -> SerializablePredicate
+def origin_role(role_name)
 ```
 
 *Source: ql.py*

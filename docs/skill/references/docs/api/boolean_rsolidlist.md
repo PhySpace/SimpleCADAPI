@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def boolean_rsolidlist(left: Sequence[Solid], right: Sequence[Solid], operation: str) -> list[Solid]
+def boolean_rsolidlist(left, right, operation)
 ```
 
 *Source: operators/boolean.py*

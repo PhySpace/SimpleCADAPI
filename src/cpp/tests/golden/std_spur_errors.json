@@ -1,0 +1,42 @@
+[
+  [
+    "ValueError",
+    "n_teeth must be at least 3"
+  ],
+  [
+    "ValueError",
+    "module must be positive"
+  ],
+  [
+    "ValueError",
+    "gear_height must be positive"
+  ],
+  [
+    "ValueError",
+    "backlash must be non-negative"
+  ],
+  [
+    "ValueError",
+    "addendum_factor must be positive"
+  ],
+  [
+    "ValueError",
+    "pressure_angle must be greater than 0 and less than 90 degrees"
+  ],
+  [
+    "ValueError",
+    "pressure_angle must be greater than 0 and less than 90 degrees"
+  ],
+  [
+    "ValueError",
+    "clearance_factor must be non-negative"
+  ],
+  [
+    "ValueError",
+    "backlash must be smaller than the circular tooth thickness"
+  ],
+  [
+    "ValueError",
+    "all sample point coordinates must be finite"
+  ]
+]

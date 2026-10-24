@@ -1,0 +1,212 @@
+{
+  "aliases": [
+    {
+      "bbox": [
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "edge_tags": [],
+      "edges": 0,
+      "face_tags": [],
+      "faces": 0,
+      "geo": null,
+      "tags": [],
+      "track": {
+        "op": "make_point_rvertex"
+      },
+      "type": "Vertex",
+      "vertices": 1
+    },
+    {
+      "bbox": [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "edge_tags": [],
+      "edges": 1,
+      "face_tags": [],
+      "faces": 0,
+      "geo": null,
+      "length": 1.7320508075688772,
+      "tags": [],
+      "track": {
+        "op": "make_line_redge"
+      },
+      "type": "Edge",
+      "vertices": 2
+    },
+    {
+      "bbox": [
+        0.0,
+        0.0,
+        0.0,
+        2.0,
+        0.0,
+        0.0
+      ],
+      "edge_tags": [],
+      "edges": 1,
+      "face_tags": [],
+      "faces": 0,
+      "geo": null,
+      "length": 2.0,
+      "tags": [],
+      "track": {
+        "op": "make_line_redge"
+      },
+      "type": "Edge",
+      "vertices": 2
+    },
+    {
+      "bbox": [
+        0.0,
+        0.0,
+        0.0,
+        2.0,
+        0.0,
+        0.0
+      ],
+      "closed": false,
+      "edge_tags": [
+        [
+          "edge.boundary"
+        ]
+      ],
+      "edges": 1,
+      "face_tags": [],
+      "faces": 0,
+      "geo": null,
+      "length": 2.0,
+      "tags": [],
+      "track": {
+        "op": "make_segment_wire"
+      },
+      "type": "Wire",
+      "vertices": 2
+    }
+  ],
+  "line": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      3.0,
+      4.0,
+      0.0
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 5.0,
+    "tags": [],
+    "track": {
+      "op": "make_line_redge"
+    },
+    "type": "Edge",
+    "vertices": 2
+  },
+  "line_prefixed": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      2.0
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 2.0,
+    "tags": [
+      "axis.edge"
+    ],
+    "track": {
+      "op": "make_line_redge"
+    },
+    "type": "Edge",
+    "vertices": 2
+  },
+  "point": {
+    "bbox": [
+      1.0,
+      2.0,
+      3.0,
+      1.0,
+      2.0,
+      3.0
+    ],
+    "edge_tags": [],
+    "edges": 0,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "tags": [],
+    "track": {
+      "op": "make_point_rvertex"
+    },
+    "type": "Vertex",
+    "vertices": 1
+  },
+  "segment_edge": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 1.0,
+    "tags": [],
+    "track": {
+      "op": "make_line_redge"
+    },
+    "type": "Edge",
+    "vertices": 2
+  },
+  "segment_wire": {
+    "bbox": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      5.0,
+      0.0
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 5.0,
+    "tags": [],
+    "track": {
+      "op": "make_segment_wire"
+    },
+    "type": "Wire",
+    "vertices": 2
+  }
+}

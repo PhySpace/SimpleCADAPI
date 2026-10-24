@@ -14,7 +14,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..params.expr import Const, Expr, ScalarExprBase, Var, _expr_signature
+from simplecadapi._cpp import Const, Expr, Var
+from ..params.expr import ScalarExprBase, _expr_signature
 from ._marimo import CustomStub, register_stub
 
 

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_spur_rack_rsolid(module: float, n_teeth: int = 10, pressure_angle: float = 20.0, rack_height: float = 6.0) -> Solid
+def make_spur_rack_rsolid(module, n_teeth=10, pressure_angle=20.0, rack_height=6.0)
 ```
 
 *Source: std/gear.py*

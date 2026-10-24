@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class SketchSolveResult(sketch_id: str, status: str, dof: int, residual_norm: float, iterations: int, solved_points: Dict[str, Tuple[float, float]], solved_scalars: Dict[str, float], solved_entities: Dict[str, Dict[str, Any]] = field(default_factory=dict), diagnostics: Tuple[SketchConstraintDiagnostic, ...] = (), backend: str = 'unknown', backend_version: str = 'unknown', backend_status_code: Optional[int] = None)
+class SketchSolveResult(sketch_id, status, dof, residual_norm, iterations, solved_points, solved_scalars, solved_entities=None, diagnostics=None, backend='unknown', backend_version='unknown', backend_status_code=None)
 ```
 
 *Source: sketch.py*

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import importlib.metadata
 import inspect
 import math
@@ -14,7 +15,7 @@ from types import CodeType
 from typing import Any, Callable, Mapping
 
 from ..artifacts.canonical import ArtifactValidationError, sha256_bytes
-from ..params.expr import Const, Expr, Var
+from simplecadapi._cpp import Const, Expr, Var
 from ..recording.source_mapping import resolve_source
 
 SEMANTIC_REGISTRY_VERSION = "simplecad-operations-2.0"
@@ -218,16 +219,27 @@ def infer_project_root(
     return source_path.parent
 
 
+@functools.lru_cache(maxsize=None)
+def _distribution_version(distribution: str, fallback: str) -> str:
+    # importlib.metadata parses the dist-info METADATA (email parser) on every call; this runs per cell digest.
+    try:
+        return importlib.metadata.version(distribution)
+    except importlib.metadata.PackageNotFoundError:
+        return fallback
+
+
+def _occt_version() -> str:
+    from simplecadapi._cpp import occt
+
+    return str(occt.__version__)
+
+
 def generator_profile() -> Mapping[str, str]:
-    def version(distribution: str, fallback: str) -> str:
-        try:
-            return importlib.metadata.version(distribution)
-        except importlib.metadata.PackageNotFoundError:
-            return fallback
+    version = _distribution_version
 
     return {
         "simplecadapi_version": version("simplecadapi", "0.0.0+local"),
-        "ocp_version": version("cadquery-ocp", "0.0.0+unknown"),
+        "ocp_version": str(_occt_version()),
         "python_abi": f"cp{sys.version_info.major}{sys.version_info.minor}",
         "platform_tag": f"{platform.system().lower()}-{platform.machine().lower()}",
         "semantic_registry_version": SEMANTIC_REGISTRY_VERSION,

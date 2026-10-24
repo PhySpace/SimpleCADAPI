@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class Component(component_id: str, item: AssemblyItem, placement: Placement, name: Optional[str] = None)
+class Component(component_id, item, placement, name=None)
 ```
 
 *Source: product/assembly.py*

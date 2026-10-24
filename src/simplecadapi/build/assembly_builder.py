@@ -15,9 +15,8 @@ from ..artifacts.canonical import (
     validate_revision,
 )
 from ..artifacts.part_definition import PartDefinition
-from ..product.assembly import Assembly
-from ..product.part import Part
-from ..recording.graph import GraphSession, isolated_recording
+from simplecadapi._cpp import Assembly, isolated_recording, Part
+from simplecadapi._glue.session import GraphSession
 from ..recording.source_mapping import source_boundary
 from .definition import (
     Definition,

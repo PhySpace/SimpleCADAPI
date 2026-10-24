@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def const(value: int | float) -> Const
+def const(value)
 ```
 
 *Source: params/expr.py*

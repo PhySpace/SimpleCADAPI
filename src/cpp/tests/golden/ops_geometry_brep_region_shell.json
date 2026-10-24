@@ -1,0 +1,83 @@
+{
+  "provenance": {
+    "face_tags": [
+      [
+        "provenance.exact_transcription"
+      ]
+    ],
+    "faces": [
+      {
+        "artifact_sha256": "sha256:86d16996cf6c3dd21020d35ab1e3633d5849f7b0747fc05e4a22a823bc1b1593",
+        "construction": "exact_transcription",
+        "profile": "scadbrep-1-ocp-7.9.3.1-bintools-v4-no-mesh",
+        "runtime_dependency": "embedded_target_derived",
+        "source_face_id": "face:5",
+        "source_face_ids": [
+          "face:5"
+        ],
+        "source_name": "box.step",
+        "source_sha256": "sha256:9b90a81f9be03a4934feac6ba12459c646fa61ffb010e904b2aa42ef26af3e42",
+        "topology_origin": "retained"
+      }
+    ],
+    "region": {
+      "artifact_sha256": "sha256:86d16996cf6c3dd21020d35ab1e3633d5849f7b0747fc05e4a22a823bc1b1593",
+      "profile": "scadbrep-1-ocp-7.9.3.1-bintools-v4-no-mesh",
+      "provenance": {
+        "construction": "exact_transcription",
+        "evidence_origin": "copied",
+        "runtime_dependency": "embedded_target_derived",
+        "target_step_required_at_replay": false,
+        "topology_origin": "retained"
+      },
+      "source_face_ids": [
+        "face:5"
+      ]
+    }
+  },
+  "shell": {
+    "area": 199.99999999999997,
+    "bbox": [
+      0.0,
+      -10.0,
+      30.0,
+      10.0,
+      10.0,
+      30.0
+    ],
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ],
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 4,
+    "face_tags": [
+      [
+        "provenance.exact_transcription"
+      ]
+    ],
+    "faces": 1,
+    "geo": null,
+    "tags": [
+      "imported",
+      "lid.shell",
+      "provenance.exact_transcription",
+      "shell",
+      "sidecar"
+    ],
+    "track": {
+      "op": "load_brep_region_rshell"
+    },
+    "type": "Shell",
+    "vertices": 4
+  }
+}

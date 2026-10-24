@@ -1,0 +1,379 @@
+{
+  "aliases": [
+    {
+      "bbox": [
+        -1e-07,
+        -0.21449652098314248,
+        -0.2698046092540687,
+        3.0000000999999985,
+        2.1203834220391276,
+        1.0610527290046037
+      ],
+      "edge_tags": [],
+      "edges": 1,
+      "face_tags": [],
+      "faces": 0,
+      "geo": {
+        "construction": "interpolated",
+        "interpolation_points": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            2.0,
+            0.0
+          ],
+          [
+            2.0,
+            0.0,
+            1.0
+          ],
+          [
+            3.0,
+            2.0,
+            0.0
+          ]
+        ],
+        "periodic": false,
+        "tolerance": 1e-06,
+        "type": "bspline"
+      },
+      "length": 8.136150192314574,
+      "tags": [],
+      "track": {
+        "op": "make_interpolated_spline_redge"
+      },
+      "type": "Edge",
+      "vertices": 2
+    },
+    {
+      "bbox": [
+        -1e-07,
+        -0.21449652098314248,
+        -0.2698046092540687,
+        3.0000000999999985,
+        2.1203834220391276,
+        1.0610527290046037
+      ],
+      "closed": false,
+      "edge_tags": [
+        [
+          "edge.boundary"
+        ]
+      ],
+      "edges": 1,
+      "face_tags": [],
+      "faces": 0,
+      "geo": null,
+      "length": 8.136150192314574,
+      "tags": [],
+      "track": {
+        "op": "make_interpolated_spline_wire"
+      },
+      "type": "Wire",
+      "vertices": 2
+    },
+    {
+      "bbox": [
+        -0.6231868078375368,
+        -0.5116197578339307,
+        -1e-07,
+        2.29524923091636,
+        2.330524651523753,
+        1e-07
+      ],
+      "closed": true,
+      "edge_tags": [
+        [
+          "edge.boundary"
+        ]
+      ],
+      "edges": 1,
+      "face_tags": [],
+      "faces": 0,
+      "geo": null,
+      "length": 9.041483009114307,
+      "tags": [],
+      "track": {
+        "op": "make_interpolated_spline_wire"
+      },
+      "type": "Wire",
+      "vertices": 1
+    }
+  ],
+  "closed_input": {
+    "bbox": [
+      -0.6231868078375368,
+      -0.5116197578339307,
+      -1e-07,
+      2.29524923091636,
+      2.330524651523753,
+      1e-07
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 9.041483009114307,
+    "tags": [],
+    "track": {
+      "op": "make_interpolated_spline_wire"
+    },
+    "type": "Wire",
+    "vertices": 1
+  },
+  "open": {
+    "bbox": [
+      -1e-07,
+      -0.21449652098314248,
+      -0.2698046092540687,
+      3.0000000999999985,
+      2.1203834220391276,
+      1.0610527290046037
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": {
+      "construction": "interpolated",
+      "interpolation_points": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          2.0,
+          0.0
+        ],
+        [
+          2.0,
+          0.0,
+          1.0
+        ],
+        [
+          3.0,
+          2.0,
+          0.0
+        ]
+      ],
+      "periodic": false,
+      "tolerance": 1e-06,
+      "type": "bspline"
+    },
+    "length": 8.136150192314574,
+    "tags": [],
+    "track": {
+      "op": "make_interpolated_spline_redge"
+    },
+    "type": "Edge",
+    "vertices": 2
+  },
+  "periodic": {
+    "bbox": [
+      -0.6231868078375368,
+      -0.5116197578339307,
+      -1e-07,
+      2.29524923091636,
+      2.330524651523753,
+      1e-07
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": {
+      "construction": "interpolated",
+      "interpolation_points": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          2.0,
+          0.0,
+          0.0
+        ],
+        [
+          2.0,
+          2.0,
+          0.0
+        ],
+        [
+          0.0,
+          2.0,
+          0.0
+        ]
+      ],
+      "periodic": true,
+      "tolerance": 1e-06,
+      "type": "bspline"
+    },
+    "length": 9.041483009114307,
+    "tags": [],
+    "track": {
+      "op": "make_interpolated_spline_redge"
+    },
+    "type": "Edge",
+    "vertices": 1
+  },
+  "periodic_wire": {
+    "bbox": [
+      -0.6231868078375368,
+      -0.5116197578339307,
+      -1e-07,
+      2.29524923091636,
+      2.330524651523753,
+      1e-07
+    ],
+    "closed": true,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 9.041483009114307,
+    "tags": [],
+    "track": {
+      "op": "make_interpolated_spline_wire"
+    },
+    "type": "Wire",
+    "vertices": 1
+  },
+  "planar_2d": {
+    "bbox": [
+      -1e-07,
+      -1e-07,
+      -1e-07,
+      2.0000001,
+      1.0000001,
+      1e-07
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": {
+      "construction": "interpolated",
+      "interpolation_points": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          1.0,
+          0.0
+        ],
+        [
+          2.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "periodic": false,
+      "tolerance": 1e-06,
+      "type": "bspline"
+    },
+    "length": 2.9565463528645415,
+    "tags": [],
+    "track": {
+      "op": "make_interpolated_spline_redge"
+    },
+    "type": "Edge",
+    "vertices": 2
+  },
+  "tolerance": {
+    "bbox": [
+      -1e-07,
+      -0.21449652098314248,
+      -0.2698046092540687,
+      3.0000000999999985,
+      2.1203834220391276,
+      1.0610527290046037
+    ],
+    "edge_tags": [],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": {
+      "construction": "interpolated",
+      "interpolation_points": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          2.0,
+          0.0
+        ],
+        [
+          2.0,
+          0.0,
+          1.0
+        ],
+        [
+          3.0,
+          2.0,
+          0.0
+        ]
+      ],
+      "periodic": false,
+      "tolerance": 0.001,
+      "type": "bspline"
+    },
+    "length": 8.136150192314574,
+    "tags": [],
+    "track": {
+      "op": "make_interpolated_spline_redge"
+    },
+    "type": "Edge",
+    "vertices": 2
+  },
+  "wire": {
+    "bbox": [
+      -1e-07,
+      -0.21449652098314248,
+      -0.2698046092540687,
+      3.0000000999999985,
+      2.1203834220391276,
+      1.0610527290046037
+    ],
+    "closed": false,
+    "edge_tags": [
+      [
+        "edge.boundary"
+      ]
+    ],
+    "edges": 1,
+    "face_tags": [],
+    "faces": 0,
+    "geo": null,
+    "length": 8.136150192314574,
+    "tags": [],
+    "track": {
+      "op": "make_interpolated_spline_wire"
+    },
+    "type": "Wire",
+    "vertices": 2
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "bad_prefix": {
+    "how_to_fix": [
+      "Use a radius greater than zero.",
+      "Pass finite center and normal vectors.",
+      "If the normal is computed dynamically, verify it is not zero-length."
+    ],
+    "operation": "make_circle_redge",
+    "possible_causes": [
+      "The radius is not a positive finite scalar.",
+      "The center or normal is not a valid finite 3D vector.",
+      "The kernel rejected the circle definition."
+    ],
+    "technical_details": "ValueError: tag 'Bad Prefix' is not normalized",
+    "what_happened": "Failed to create a circular edge."
+  },
+  "edge": {
+    "how_to_fix": [
+      "Use a radius greater than zero.",
+      "Pass finite center and normal vectors.",
+      "If the normal is computed dynamically, verify it is not zero-length."
+    ],
+    "operation": "make_circle_redge",
+    "possible_causes": [
+      "The radius is not a positive finite scalar.",
+      "The center or normal is not a valid finite 3D vector.",
+      "The kernel rejected the circle definition."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create a circular edge."
+  },
+  "face": {
+    "how_to_fix": [
+      "Use a radius greater than zero.",
+      "Pass finite center and normal vectors.",
+      "If the normal is computed dynamically, verify it is not zero-length."
+    ],
+    "operation": "make_circle_redge",
+    "possible_causes": [
+      "The radius is not a positive finite scalar.",
+      "The center or normal is not a valid finite 3D vector.",
+      "The kernel rejected the circle definition."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create a circular edge."
+  },
+  "wire": {
+    "how_to_fix": [
+      "Use a radius greater than zero.",
+      "Pass finite center and normal vectors.",
+      "If the normal is computed dynamically, verify it is not zero-length."
+    ],
+    "operation": "make_circle_redge",
+    "possible_causes": [
+      "The radius is not a positive finite scalar.",
+      "The center or normal is not a valid finite 3D vector.",
+      "The kernel rejected the circle definition."
+    ],
+    "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
+    "what_happened": "Failed to create a circular edge."
+  }
+}

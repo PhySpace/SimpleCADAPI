@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class Expr(op: str, args: Tuple[ScalarExpr, ...], expr_id: str = '')
+class Expr(op, args, expr_id='')
 ```
 
 *Source: params/expr.py*

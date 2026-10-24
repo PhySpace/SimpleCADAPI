@@ -1,0 +1,45 @@
+{
+  "edge_path_len": 4,
+  "effective_has": true,
+  "face_attachment": "inherited",
+  "face_inherited": [
+    "role.x"
+  ],
+  "face_keys": [
+    "scope",
+    "binding_id",
+    "producer",
+    "attachment",
+    "binding",
+    "topology_path"
+  ],
+  "face_local": [
+    "face.box.back",
+    "face.left"
+  ],
+  "face_path_leaf": true,
+  "face_path_len": 2,
+  "face_path_root": true,
+  "face_scope": "effective",
+  "own_attachment": "local",
+  "own_binding_keys": [
+    "schema_version",
+    "binding_id",
+    "tag",
+    "producer",
+    "scope",
+    "target",
+    "attachment",
+    "propagation",
+    "evidence",
+    "certainty",
+    "lifecycle"
+  ],
+  "own_keys": [
+    "scope",
+    "binding_id",
+    "producer",
+    "attachment",
+    "binding"
+  ]
+}

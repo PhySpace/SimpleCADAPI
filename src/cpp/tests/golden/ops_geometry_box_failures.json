@@ -1,0 +1,62 @@
+{
+  "bad_result_tag": {
+    "how_to_fix": [
+      "Use width, height, and depth values greater than zero.",
+      "Pass bottom_face_center as a finite 3D tuple.",
+      "If dimensions come from expressions, inspect the evaluated numeric values."
+    ],
+    "operation": "make_box_rsolid",
+    "possible_causes": [
+      "Width, height, or depth is not a positive finite scalar.",
+      "The bottom face center is not a valid finite 3D point.",
+      "The kernel rejected the box dimensions or placement."
+    ],
+    "technical_details": "ValueError: tag 'Not Normal' is not normalized",
+    "what_happened": "Failed to create a box solid."
+  },
+  "bad_tag": {
+    "how_to_fix": [
+      "Use width, height, and depth values greater than zero.",
+      "Pass bottom_face_center as a finite 3D tuple.",
+      "If dimensions come from expressions, inspect the evaluated numeric values."
+    ],
+    "operation": "make_box_rsolid",
+    "possible_causes": [
+      "Width, height, or depth is not a positive finite scalar.",
+      "The bottom face center is not a valid finite 3D point.",
+      "The kernel rejected the box dimensions or placement."
+    ],
+    "technical_details": "ValueError: tag 'BAD TAG' is not normalized",
+    "what_happened": "Failed to create a box solid."
+  },
+  "negative_depth": {
+    "how_to_fix": [
+      "Use width, height, and depth values greater than zero.",
+      "Pass bottom_face_center as a finite 3D tuple.",
+      "If dimensions come from expressions, inspect the evaluated numeric values."
+    ],
+    "operation": "make_box_rsolid",
+    "possible_causes": [
+      "Width, height, or depth is not a positive finite scalar.",
+      "The bottom face center is not a valid finite 3D point.",
+      "The kernel rejected the box dimensions or placement."
+    ],
+    "technical_details": "ValueError: width, height, and depth must be greater than zero.",
+    "what_happened": "Failed to create a box solid."
+  },
+  "zero_width": {
+    "how_to_fix": [
+      "Use width, height, and depth values greater than zero.",
+      "Pass bottom_face_center as a finite 3D tuple.",
+      "If dimensions come from expressions, inspect the evaluated numeric values."
+    ],
+    "operation": "make_box_rsolid",
+    "possible_causes": [
+      "Width, height, or depth is not a positive finite scalar.",
+      "The bottom face center is not a valid finite 3D point.",
+      "The kernel rejected the box dimensions or placement."
+    ],
+    "technical_details": "ValueError: width, height, and depth must be greater than zero.",
+    "what_happened": "Failed to create a box solid."
+  }
+}

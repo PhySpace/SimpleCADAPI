@@ -12,10 +12,8 @@ from ..artifacts.canonical import (
     validate_logical_id,
     validate_revision,
 )
-from ..core import Solid
-from ..operators import make_part_rpart
-from ..product.part import Part
-from ..recording.graph import GraphSession, isolated_recording
+from simplecadapi._cpp import isolated_recording, make_part_rpart, Part, Solid
+from simplecadapi._glue.session import GraphSession
 from ..recording.source_mapping import source_boundary
 from .definition import finish_part_definition
 from .dependencies import FileInput, snapshot_file_inputs

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def get_unit(value: UnitLike) -> Unit
+def get_unit(value)
 ```
 
 *Source: params/units.py*

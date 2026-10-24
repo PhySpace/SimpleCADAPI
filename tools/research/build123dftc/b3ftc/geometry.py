@@ -54,8 +54,8 @@ def serialize(value: Any) -> Any:
 
 
 def metrics(shape: Any) -> dict[str, Any]:
-    from OCP.BRepGProp import BRepGProp
-    from OCP.GProp import GProp_GProps
+    from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+    from simplecadapi._cpp.occt.GProp import GProp_GProps
     shapes = shape if isinstance(shape, (list, tuple)) else [shape]
     solids = [s for item in shapes if item is not None for s in item.solids()]
     if not solids:
@@ -80,11 +80,11 @@ def surface_area(wrapped: Any) -> float:
     Splitting C0 boundaries/surfaces into C1 spans resolves those breaks before
     integration. This temporary topology is used only for the numeric metric.
     """
-    from OCP.BRepBuilderAPI import BRepBuilderAPI_Copy
-    from OCP.ShapeUpgrade import ShapeUpgrade_ShapeDivideContinuity
-    from OCP.GeomAbs import GeomAbs_C1
-    from OCP.BRepGProp import BRepGProp
-    from OCP.GProp import GProp_GProps
+    from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_Copy
+    from simplecadapi._cpp.occt.ShapeUpgrade import ShapeUpgrade_ShapeDivideContinuity
+    from simplecadapi._cpp.occt.GeomAbs import GeomAbs_C1
+    from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+    from simplecadapi._cpp.occt.GProp import GProp_GProps
     copied = BRepBuilderAPI_Copy(wrapped, True, False).Shape()
     divider = ShapeUpgrade_ShapeDivideContinuity(copied)
     divider.SetSurfaceCriterion(GeomAbs_C1)
@@ -124,7 +124,7 @@ def fingerprint(shape: Any, parent: Any = None) -> dict[str, Any]:
 
 
 def edge(value: Any) -> dict[str, Any]:
-    from OCP.BRepAdaptor import BRepAdaptor_Curve
+    from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Curve
     adaptor = BRepAdaptor_Curve(value.wrapped)
     kind = value.geom_type.name.lower()
     first, last = adaptor.FirstParameter(), adaptor.LastParameter()
@@ -149,9 +149,9 @@ def edge(value: Any) -> dict[str, Any]:
         # Segmentation preserves the exact trimmed curve, including NURBS weights.
         # Conic arcs become exact rational BSplines rather than sampled polylines.
         if kind not in {"bspline", "bezier"}:
-            from OCP.Geom import Geom_TrimmedCurve
-            from OCP.GeomConvert import GeomConvert
-            from OCP.BRep import BRep_Tool
+            from simplecadapi._cpp.occt.Geom import Geom_TrimmedCurve
+            from simplecadapi._cpp.occt.GeomConvert import GeomConvert
+            from simplecadapi._cpp.occt.BRep import BRep_Tool
             curve = BRep_Tool.Curve_s(value.wrapped, first, last)
             spline = GeomConvert.CurveToBSplineCurve_s(Geom_TrimmedCurve(curve, first, last))
             kind = "bspline"
@@ -186,7 +186,7 @@ def edge(value: Any) -> dict[str, Any]:
 
 def wire(value: Any) -> dict[str, Any]:
     from build123d import Edge
-    from OCP.BRepTools import BRepTools_WireExplorer
+    from simplecadapi._cpp.occt.BRepTools import BRepTools_WireExplorer
     explorer = BRepTools_WireExplorer(value.wrapped)
     edges = []
     while explorer.More():

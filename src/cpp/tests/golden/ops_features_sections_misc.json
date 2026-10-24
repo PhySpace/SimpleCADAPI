@@ -1,0 +1,210 @@
+{
+  "multisection": {
+    "area": 92.99315036357862,
+    "bbox": [
+      -2.0,
+      -2.0,
+      0.0,
+      2.0,
+      2.0,
+      6.0
+    ],
+    "edges": 12,
+    "faces": 6,
+    "tags": [],
+    "volume": 55.999999999999986
+  },
+  "multisection_binormal": {
+    "area": 92.99315036357862,
+    "bbox": [
+      -2.0,
+      -2.0,
+      0.0,
+      2.0,
+      2.0,
+      6.0
+    ],
+    "edges": 12,
+    "faces": 6,
+    "tags": [],
+    "volume": 55.999999999999986
+  },
+  "multisection_errors": [
+    [
+      "ValueError",
+      "multi-section sweep requires at least two sections"
+    ]
+  ],
+  "taper": [
+    {
+      "area": 80.0,
+      "bbox": [
+        -2.0,
+        -2.0,
+        0.0,
+        2.0,
+        2.0,
+        3.0
+      ],
+      "edges": 12,
+      "faces": 6,
+      "tags": [],
+      "volume": 47.999999999999986
+    },
+    {
+      "area": 66.95036973526271,
+      "bbox": [
+        -2.0,
+        -2.0,
+        0.0,
+        2.0,
+        2.0,
+        3.0000000000000004
+      ],
+      "edges": 12,
+      "faces": 6,
+      "tags": [],
+      "volume": 36.423740737518
+    },
+    {
+      "area": 96.76915170282379,
+      "bbox": [
+        -2.528980942125395,
+        -2.528980942125395,
+        0.0,
+        2.528980942125395,
+        2.528980942125395,
+        3.0
+      ],
+      "edges": 12,
+      "faces": 6,
+      "tags": [],
+      "volume": 61.814825959536954
+    }
+  ],
+  "taper_errors": [
+    [
+      "ValueError",
+      "extrusion vector must be nonzero"
+    ],
+    [
+      "ValueError",
+      "taper must be finite and between -90 and 90 degrees"
+    ]
+  ],
+  "taper_ring": [
+    {
+      "area": 122.64519513711508,
+      "bbox": [
+        -3.0,
+        -3.0,
+        0.0,
+        3.0,
+        3.0,
+        2.0
+      ],
+      "edges": 24,
+      "faces": 10,
+      "tags": [],
+      "volume": 58.40072553434085
+    },
+    {
+      "area": 122.63450097770536,
+      "bbox": [
+        -3.0,
+        -3.0,
+        0.0,
+        3.0,
+        3.0,
+        2.0
+      ],
+      "edges": 24,
+      "faces": 10,
+      "tags": [],
+      "volume": 61.200362767170425
+    }
+  ],
+  "until": {
+    "LAST": {
+      "area": 64.0,
+      "bbox": [
+        -1.0,
+        -1.0,
+        0.0,
+        1.0,
+        1.0,
+        7.0
+      ],
+      "edges": 12,
+      "faces": 6,
+      "tags": [
+        "solid.extrusion"
+      ],
+      "volume": 27.99999999999999
+    },
+    "NEXT": {
+      "area": 48.0,
+      "bbox": [
+        -1.0,
+        -1.0,
+        0.0,
+        1.0,
+        1.0,
+        5.0
+      ],
+      "edges": 12,
+      "faces": 6,
+      "tags": [
+        "solid.extrusion"
+      ],
+      "volume": 19.999999999999993
+    }
+  },
+  "until_curved": {
+    "area": 49.13694061965945,
+    "bbox": [
+      -1.0,
+      -1.0,
+      0.0,
+      1.0,
+      1.0,
+      5.204168476687281
+    ],
+    "edges": 15,
+    "faces": 6,
+    "tags": [
+      "solid.extrusion"
+    ],
+    "volume": 20.269212165090448
+  },
+  "until_errors": [
+    [
+      "ValueError",
+      "No intersection: extrusion does not contact target"
+    ],
+    [
+      "ValueError",
+      "direction must be a finite nonzero vector"
+    ],
+    [
+      "ValueError",
+      "until must be NEXT, LAST, PREVIOUS, or FIRST"
+    ],
+    [
+      "ValueError",
+      "target must contain at least one Solid"
+    ],
+    [
+      "ValueError",
+      "Target termination surface does not completely cover the extrusion profile"
+    ]
+  ],
+  "until_multi": [
+    19.999999999999993,
+    47.999999999999986
+  ],
+  "until_reverse": [
+    31.99999999999999,
+    39.999999999999986
+  ]
+}

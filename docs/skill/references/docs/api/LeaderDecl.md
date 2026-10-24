@@ -14,4 +14,4 @@ class LeaderDecl(view: str, anchor: tuple, lines: list, off: tuple = (30.0, -18.
 
 ## Description
 
-引出说明声明：从 anchor 引出折线到注释文本。
+Leader declaration: a polyline from anchor to the note text.

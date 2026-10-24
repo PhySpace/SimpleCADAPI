@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_herringbone_rack_rsolid(module: float, n_teeth: int = 10, pressure_angle: float = 20.0, helix_angle: float = 30.0, rack_height: float = 10.0) -> Solid
+def make_herringbone_rack_rsolid(module, n_teeth=10, pressure_angle=20.0, helix_angle=30.0, rack_height=10.0)
 ```
 
 *Source: std/gear.py*

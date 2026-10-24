@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def add_connector_rpart(part: Part, connector: Connector) -> Part
+def add_connector_rpart(part, connector)
 ```
 
 *Source: operators/product.py*

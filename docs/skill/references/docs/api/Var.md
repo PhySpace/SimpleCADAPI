@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class Var(name: str, default: float, comment: str | None = None, expr_id: str = '', tolerance: DimensionTolerance | None = None, unit: Unit | None = None, tolerance_unit: Unit | None = None)
+class Var(name, default, comment=None, expr_id='', tolerance=None, unit=None, tolerance_unit=None, *, ui=None, control=None, min=None, max=None, step=None, label=None, group=None)
 ```
 
 *Source: params/expr.py*

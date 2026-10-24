@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def intersect_rsolid(*solids: Union[Solid, Sequence[Solid]]) -> Solid
+def intersect_rsolid(*solids)
 ```
 
 *Source: operators/boolean.py*

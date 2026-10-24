@@ -35,18 +35,15 @@ from typing import Any
 import numpy as np
 
 from .._internal.mesh import DEFAULT_ANGULAR_TOLERANCE, DEFAULT_LINEAR_TOLERANCE, cached_mesh
-from ..artifacts.brep import _bintools_bytes
-from ..core import Solid
-from ..kernel.ocp_properties import center_of_mass
-from ..product.assembly import Assembly
-from ..product.part import Part
+from simplecadapi._cpp import Assembly, Part, Solid
 from ..product.placement import Placement, identity_placement
 from .compiler import (
     _curve_geometry,
     _edge_endpoints,
     _frame,
     _normalize,
-    _orientation,
+    _center_of_mass,
+    _face_orientation,
     _shape_bounds,
     _surface_geometry,
     _vec,
@@ -128,6 +125,12 @@ def clear_preview_cache() -> None:
         _parts.clear()
 
 
+def _brep_bytes(solid: Solid) -> bytes:
+    """The BRep content of *solid* (the key of its cached mesh)."""
+
+    return solid.to_brep()
+
+
 def part_key(solid: Solid, linear_tolerance: float, angular_tolerance: float) -> str:
     """A key for the geometry of *solid* at a tolerance: its BREP content, not its identity.
 
@@ -135,9 +138,9 @@ def part_key(solid: Solid, linear_tolerance: float, angular_tolerance: float) ->
     """
     tolerance = f"{float(linear_tolerance).hex()}:{float(angular_tolerance).hex()}"
     remembered = solid._get_runtime("preview.key", None)
-    if isinstance(remembered, tuple) and remembered[0] == tolerance:
+    if isinstance(remembered, (tuple, list)) and remembered[0] == tolerance:
         return remembered[1]
-    digest = hashlib.sha256(_bintools_bytes(solid.wrapped)).hexdigest()[:24]
+    digest = hashlib.sha256(_brep_bytes(solid)).hexdigest()[:24]
     key = f"{digest}-{hashlib.sha256(tolerance.encode()).hexdigest()[:6]}"
     solid._set_runtime("preview.key", (tolerance, key))
     return key
@@ -409,7 +412,7 @@ def entity_info(scene: PreviewScene, entity_id: str) -> dict[str, Any] | None:
                 "bounds": _bounds_document(solid_asset_bounds(solid)),
                 "volume": solid.get_volume(),
                 "surface_area": sum(face.get_area() for face in solid._iter_faces()),
-                "centroid": list(_vec(center_of_mass(solid.wrapped))),
+                "centroid": list(_vec(_center_of_mass(solid))),
             },
             "tags": sorted(solid._list_tags()),
         }
@@ -427,7 +430,7 @@ def entity_info(scene: PreviewScene, entity_id: str) -> dict[str, Any] | None:
                 "bounds": _bounds_document(_shape_bounds(face)),
                 "area": face.get_area(),
                 "centroid": list(center),
-                "orientation": _orientation(face.wrapped.Orientation()),
+                "orientation": _face_orientation(face),
                 "connector_frame": _frame(center, _vec(face.get_normal_at())),
             },
             "tags": sorted(face._list_tags()),

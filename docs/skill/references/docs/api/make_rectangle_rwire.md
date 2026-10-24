@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_rectangle_rwire(width: ScalarLike, height: ScalarLike, center: Tuple[ScalarLike, ScalarLike, ScalarLike] = (0, 0, 0), normal: Tuple[ScalarLike, ScalarLike, ScalarLike] = (0, 0, 1), *, tag_prefix: Optional[str] = None, edge_tags: Optional[Sequence[str]] = None) -> Wire
+def make_rectangle_rwire(width, height, center=(0, 0, 0), normal=(0, 0, 1), *, tag_prefix=None, edge_tags=None)
 ```
 
 *Source: operators/geometry.py*

@@ -29,10 +29,10 @@ import sys
 from pathlib import Path
 
 import simplecadapi as scad
-from OCP.Bnd import Bnd_Box
-from OCP.BRepAdaptor import BRepAdaptor_Surface
-from OCP.BRepBndLib import BRepBndLib
-from OCP.GeomAbs import GeomAbs_SurfaceType
+from simplecadapi._cpp.occt.Bnd import Bnd_Box
+from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Surface
+from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
+from simplecadapi._cpp.occt.GeomAbs import GeomAbs_SurfaceType
 from simplecadapi import ql
 from simplecadapi.inspect import brep
 from simplecadapi.scene import parse_canonical_json, read_scene_package

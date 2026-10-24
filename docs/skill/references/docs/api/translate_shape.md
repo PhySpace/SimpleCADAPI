@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def translate_shape(shape: AnyShape, vector: Tuple[float, float, float]) -> AnyShape
+def translate_shape(shape, vector)
 ```
 
 *Source: operators/transform.py*

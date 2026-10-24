@@ -5,20 +5,20 @@ from __future__ import annotations
 import math
 
 import numpy as np
-from OCP.BRep import BRep_Builder, BRep_Tool
-from OCP.BRepAdaptor import BRepAdaptor_Curve
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Common
-from OCP.BRepBndLib import BRepBndLib
-from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_Transform
-from OCP.BRepExtrema import BRepExtrema_DistShapeShape
-from OCP.BRepCheck import BRepCheck_Analyzer
-from OCP.Bnd import Bnd_Box
-from OCP.GeomAbs import GeomAbs_Circle
-from OCP.TopAbs import TopAbs_EDGE, TopAbs_SOLID
-from OCP.TopExp import TopExp_Explorer
-from OCP.TopoDS import TopoDS, TopoDS_Compound
-from OCP.TopTools import TopTools_ListOfShape
-from OCP.gp import gp_Pnt, gp_Trsf
+from simplecadapi._cpp.occt.BRep import BRep_Builder, BRep_Tool
+from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Curve
+from simplecadapi._cpp.occt.BRepAlgoAPI import BRepAlgoAPI_Common
+from simplecadapi._cpp.occt.BRepBndLib import BRepBndLib
+from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_Transform
+from simplecadapi._cpp.occt.BRepExtrema import BRepExtrema_DistShapeShape
+from simplecadapi._cpp.occt.BRepCheck import BRepCheck_Analyzer
+from simplecadapi._cpp.occt.Bnd import Bnd_Box
+from simplecadapi._cpp.occt.GeomAbs import GeomAbs_Circle
+from simplecadapi._cpp.occt.TopAbs import TopAbs_EDGE, TopAbs_SOLID
+from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
+from simplecadapi._cpp.occt.TopoDS import TopoDS, TopoDS_Compound
+from simplecadapi._cpp.occt.TopTools import TopTools_ListOfShape
+from simplecadapi._cpp.occt.gp import gp_Pnt, gp_Trsf
 
 from ..brep.queries import (
     _inspect_section_geometry,

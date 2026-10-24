@@ -10,30 +10,25 @@ from typing import Any, Dict, List, Literal, Mapping, Tuple
 import uuid
 
 from ..errors import SimpleCADMessageError
-from .expr import (
+from simplecadapi._cpp import (
+    ANGLE,
+    canonical_unit_for_dimension,
     Const,
+    Dimension,
     DimensionTolerance,
     Expr,
-    ExpressionGraph,
-    ScalarExpr,
-    ScalarLike,
-    ToleranceLike,
-    Var,
-    coerce_dimension_tolerance,
-    lift_scalar,
-)
-from .units import (
-    ANGLE,
-    Dimension,
-    Unit,
-    UnitLike,
-    canonical_unit_for_dimension,
     expression_uses_units,
+    ExpressionGraph,
     get_unit,
     infer_dimension,
+    lift_scalar,
+    Unit,
     unit_from_payload,
     unit_to_payload,
+    Var,
 )
+from .expr import ScalarExpr, ScalarLike, ToleranceLike, coerce_dimension_tolerance
+from .units import UnitLike
 
 
 ToleranceMethod = Literal["worst_case", "rss"]

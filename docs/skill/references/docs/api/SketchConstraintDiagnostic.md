@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class SketchConstraintDiagnostic(constraint_id: Optional[str], severity: str, code: str, message: str, residual: Optional[float] = None)
+class SketchConstraintDiagnostic(constraint_id, severity, code, message, residual=None)
 ```
 
 *Source: sketch.py*

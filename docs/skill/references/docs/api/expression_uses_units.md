@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def expression_uses_units(value: 'ScalarLike') -> bool
+def expression_uses_units(value)
 ```
 
 *Source: params/units.py*

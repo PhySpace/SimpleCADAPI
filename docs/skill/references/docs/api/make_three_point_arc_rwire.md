@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_three_point_arc_rwire(start: Tuple[float, float, float], middle: Tuple[float, float, float], end: Tuple[float, float, float]) -> Wire
+def make_three_point_arc_rwire(start, middle, end)
 ```
 
 *Source: operators/geometry.py*

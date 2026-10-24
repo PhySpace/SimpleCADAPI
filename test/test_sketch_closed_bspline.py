@@ -2,8 +2,8 @@
 import math
 import pytest
 import simplecadapi as scad
-from OCP.BRepGProp import BRepGProp
-from OCP.GProp import GProp_GProps
+from simplecadapi._cpp.occt.BRepGProp import BRepGProp
+from simplecadapi._cpp.occt.GProp import GProp_GProps
 
 
 def accurate_mass(shape, *, volume=False):
@@ -46,7 +46,7 @@ def test_periodic_bspline_seam_does_not_replace_control_poles():
     poles = [(2, 0), (0, 2), (-2, 0), (0, -2)]
     # The seam lies midway between poles for this periodic quadratic basis.
     native = scad.make_spline_redge(control_points=[(x, y, 0) for x, y in poles], degree=2, periodic=True)
-    from OCP.BRepAdaptor import BRepAdaptor_Curve
+    from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Curve
     adaptor = BRepAdaptor_Curve(native.wrapped)
     seam = adaptor.Value(adaptor.FirstParameter())
     wire = scad.make_wire_from_edges_rwire([native])

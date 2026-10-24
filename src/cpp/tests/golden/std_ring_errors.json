@@ -1,0 +1,18 @@
+[
+  [
+    "ValueError",
+    "n_teeth must be at least 3"
+  ],
+  [
+    "ValueError",
+    "rim_thickness must be positive"
+  ],
+  [
+    "ValueError",
+    "backlash must be non-negative"
+  ],
+  [
+    "ValueError",
+    "gear_height must be positive"
+  ]
+]

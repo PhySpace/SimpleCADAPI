@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class BSplineFitResult(degree: int, control_points: Tuple[PointTuple, ...], knots: Tuple[float, ...], sample_parameters: Tuple[float, ...], max_error: float, rms_error: float, tolerance: float, fairing: float, iterations: int, converged: bool)
+class BSplineFitResult()
 ```
 
 *Source: math.py*
