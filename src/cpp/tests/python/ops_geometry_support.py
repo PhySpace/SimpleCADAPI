@@ -19,7 +19,7 @@ import textwrap
 import simplecadapi._cpp as native
 from simplecadapi._cpp import _native
 
-from ref import close, golden
+from ref import GEOMETRY_REL, close, golden
 
 # ---- the two sides of describe() ---------------------------------------------------------
 
@@ -124,7 +124,7 @@ def run_native(source: str):
     return json.loads(json.dumps(namespace["result"], default=float))
 
 
-def mismatches(actual, expected, path="result", rel=1e-6, abs_=1e-9):
+def mismatches(actual, expected, path="result", rel=GEOMETRY_REL, abs_=1e-9):
     """Where `actual` and `expected` differ, one line each (empty when they agree)."""
     if isinstance(actual, dict) and isinstance(expected, dict):
         out = []
@@ -145,7 +145,7 @@ def mismatches(actual, expected, path="result", rel=1e-6, abs_=1e-9):
     return [f"{path}: native {actual!r} != reference {expected!r}"]
 
 
-def parity(name: str, source: str, rel: float = 1e-6, abs_: float = 1e-9, prelude: str = ""):
+def parity(name: str, source: str, rel: float = GEOMETRY_REL, abs_: float = 1e-9, prelude: str = ""):
     """Run `source` on both sides and assert that `result` agrees.  `prelude` is more shared helper code."""
     source = textwrap.dedent(prelude) + textwrap.dedent(source)
     expected = golden(f"ops_geometry_{name}", REFERENCE_SIDE + "\n" + source)
