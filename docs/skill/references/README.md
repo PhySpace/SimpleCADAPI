@@ -52,7 +52,7 @@ exporters) lives in `scadpkg-format.md`.
 | `single-part-modeling` | one physical part from brief to validated solid — sketch tier by default, std parts first |
 | `assembly-product-build` | multi-part product or mechanism with connectors/constraints and package capture; stdlib gears/bearings live here |
 | `step-computational-geometry-analysis` | STEP feature candidates, dimensions, highlights, profiles, and sections without reconstruction |
-| `step-reconstruction` | editable rebuild from a target STEP with tiered acceptance |
+| `step-reconstruction` | editable rebuild from a target STEP: computational-geometry analysis prelude, then feature tree, candidate, and tiered acceptance |
 | `step-reconstruction-geometry-guide` | detailed local geometric evidence and feature-tree analysis; upstream modeling operations remain authoritative |
 | `drawing-reconstruction` | editable rebuild from vector-PDF dimensions with stage checks and independent drawing/model/output acceptance |
 | `export-and-translation` | downstream formats from a validated package |

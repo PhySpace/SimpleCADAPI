@@ -11,7 +11,9 @@ candidates, and gather reconstruction evidence with the
 - A complete local analysis package needs global evidence, all supported
   geometric candidates, feature highlights, and 2D section panels; compose
   those APIs through
-  `references/workflows/step-computational-geometry-analysis.md`.
+  `references/workflows/step-computational-geometry-analysis.md`. STEP
+  reconstruction runs that workflow first as its prelude and consumes the
+  package before any targeted inspection here.
 - A reconstruction candidate must be compared against a target STEP.
 - Visual evidence (entity maps, region highlights, comparison renders) is
   needed for review.

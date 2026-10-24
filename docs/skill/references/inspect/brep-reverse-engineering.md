@@ -148,7 +148,10 @@ starting point, not the endpoint.
 
 ## Choosing an inspection strategy per problem
 
-There is no fixed reverse-engineering workflow to apply mechanically. First
+There is no fixed reverse-engineering workflow to apply mechanically beyond
+one fixed entry: STEP reconstruction always starts with the computational-geometry
+analysis package (`references/workflows/step-reconstruction.md`). The
+freedom below applies to the targeted inspection that follows it. First
 clarify the current unknown and the acceptance evidence, then compose the
 smallest set of primitives; for details the primitives do not cover, write
 case-by-case inspection code for the model:

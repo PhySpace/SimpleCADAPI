@@ -15,6 +15,8 @@
 
 - 只查询尺寸、拓扑、曲面或装配信息：使用
   `references/domains/step-inspection.md`；
+- 只要计算几何证据和局部可视化产物、不需要可编辑候补：使用
+  `references/workflows/step-computational-geometry-analysis.md`；
 - 只做格式转换或导出：使用导出工作流；
 - 直接加载目标 STEP 或复制整个 Solid 作为最终模型：这不是逆向重建。
 
@@ -77,6 +79,10 @@ result_reachable_constructive_modeling_operation_count >= 1
 manifest 必须位于用户指定的绝对输出目录内。没有输出目录时不得开始工作，也不
 得自行使用默认 `out/`。
 
+输出目录分两层：前置解析包写入 `<绝对输出目录>/analysis/`，Phase 9 后只读；
+重建产物全部写入 `<绝对输出目录>/reconstruction/`，不得写进 `analysis/`。
+替换解析包后，`reconstruction/` 中依赖旧包的结果全部失效。
+
 ## 三、流程总览
 
 ```text
@@ -86,7 +92,8 @@ manifest 必须位于用户指定的绝对输出目录内。没有输出目录�
 1. 定义需求和验收标准
    |
    v
-2. 检查目标并收集证据
+2. 前置计算几何解析（Phase 1-9，路由 reconstruction_prelude）
+   + 读取并校验解析包（R0）
    |
    v
 3. 推断特征树
@@ -150,7 +157,7 @@ manifest 必须位于用户指定的绝对输出目录内。没有输出目录�
 - 未确定事项已经询问用户或记录为显式假设；
 - 没有阈值的指标只允许报告数值，不能自行判定通过或“不支持”。
 
-### 阶段 2：检查目标并收集证据
+### 阶段 2：前置解析并读取解析包
 
 **输入**
 
@@ -159,27 +166,35 @@ manifest 必须位于用户指定的绝对输出目录内。没有输出目录�
 
 **动作**
 
-开始检查前，完整阅读 `references/inspect/brep-reverse-engineering.md`，并按
-`references/domains/step-inspection.md` 选择检查 API。
-
-按由便宜到昂贵的顺序收集证据：
-
-1. 用 `inspect_step_rsummary` 获取包围盒、面积、体积、质心、实体数量和载体统计；
-2. 需要分析半径、角度、曲面次数或重复载体时，只执行一次
-   `include_parameter_groups=True`；
-3. 围绕具体假设检查实体、邻接关系、边界和截面；
-4. 只有选定实体后才请求完整曲线或曲面定义；
-5. 大型控制点、节点矢量和采样数组直接保存到输出目录。
+1. 以路由 `reconstruction_prelude`、输出目录 `<绝对输出目录>/analysis/`、全部
+   八类特征和记录在案的渲染预算，完整执行
+   `references/workflows/step-computational-geometry-analysis.md` 的 Phase 1-9。
+   该流程负责必读文档、识别、截面、可视化和封包；任一阶段失败即停止重建。
+2. 按 `step-reconstruction.md` 的 R0 校验解析包。硬门禁：目标哈希、
+   `analysis-config.json` 中的识别参数、目录与 `reconstruction` 的
+   `schema_version`、SDK 版本、`artifact-manifest.json` 中的文件哈希、
+   `truncated=false` 与 `complete=true`。任一不符就重跑 Phase 1-9，不做局部修补。
+   软门禁：`run-status.json` 为 `complete_with_gaps` 时，缺图实例和专项复核
+   `incomplete` 的实例可以进入阶段 3，但置信度降级并在交付时说明。
+3. 读取 `feature-index.json`、`reconstruction-hypotheses.json`、
+   `loft-sweep-specialist.json`、`section-index.json`、`parse-report.md` 和
+   `unresolved-features.md`。
+4. 解析包回答不了的具体问题，再按 `references/domains/step-inspection.md`
+   直接检查目标，并遵守由便宜到昂贵的顺序：只有选定实体后才请求完整曲线或
+   曲面定义；大型控制点、节点矢量和采样数组直接保存到 `reconstruction/`。
 
 **产物**
 
-- 目标概览；
-- 有明确用途的实体、邻接、边界和截面证据；
-- 待解释区域清单。
+- 通过 R0 的解析包（路径记录在 `reconstruction/` 中）；
+- 有明确用途的补充实体、邻接、边界和截面证据；
+- 待解释区域清单（含 `unresolved-features.md` 和软门禁缺口）。
 
 **通过门禁**
 
+- 解析包通过全部硬门禁；
 - 后续每个特征假设都有目标证据；
+- 目录条目只作为证据；缺失、冲突或非强置信度的条目回到实体、邻接、边界和截面
+  检查，不能直接变成推断出的建模操作；
 - 没有仅凭渲染图或外观猜测几何；
 - 没有假设目标与候补中相同的 face ID 表示同一个语义面。
 
@@ -203,9 +218,9 @@ manifest 必须位于用户指定的绝对输出目录内。没有输出目录�
 多个局部几何信号             -> 有序混合特征树
 ```
 
-对于每个放样/扫掠候选，如果目录中存在版本化 `reconstruction` 契约，必须先校验
-目标哈希和 schema，再消费其中的截面、路径、标架、导轨、端部条件、候选操作和
-能力状态。专项结果是几何证据，不是可直接执行的原始建模历史。按能够解释 ROI 的
+对于每个放样/扫掠候选，从 `reconstruction-hypotheses.json` 读取已在 R0 校验过
+目标哈希和 schema 的版本化 `reconstruction` 契约，再消费其中的截面、路径、标架、
+导轨、端部条件、候选操作和能力状态。专项结果是几何证据，不是可直接执行的原始建模历史。按能够解释 ROI 的
 最简单受支持操作选择：
 
 ```text
@@ -463,6 +478,7 @@ roundtrip 有效，并记录候补 SHA-256。其他情况只能记为 `failed_at
 
 | 失败 | 处理 |
 | --- | --- |
+| 前置解析失败或 R0 硬门禁不通过 | 重跑 Phase 1-9 或报告失败阶段；不得进入阶段 3 |
 | 某区域证据不足 | 记录证据缺口，不发明几何 |
 | 特征族被局部证据推翻 | 回到阶段 3，修改特征假设和顺序 |
 | 布尔或构造失败 | 回到阶段 4，修复操作数、相交关系或上游参数 |
@@ -478,6 +494,7 @@ roundtrip 有效，并记录候补 SHA-256。其他情况只能记为 `failed_at
 
 ### 9.1 必须交付
 
+- 前置解析包路径（`analysis/`）及其 `run-status.json` 状态；
 - 最终 SimpleCADAPI 重建源码；
 - API 生成的 model JSON；
 - 拓扑有序的操作序列，其中至少一个结果可达的 `constructive_modeling` 操作；

@@ -233,8 +233,13 @@ def test_workflow_requires_loop_driven_extrusion_and_meridian_revolution_section
     assert "0°" in text and "90°" in text and "180°" in text and "270°" in text
     assert "conflict_group_id" in text
     assert "alternative_interpretations" in text
-    assert "计算几何可视化log.md" in text
-    assert "append" in prose
+
+
+def test_workflow_omits_repository_implementation_log():
+    text = _read(WORKFLOW)
+
+    assert "计算几何可视化log.md" not in text
+    assert "implementation work" not in text
 
 
 def test_reviewed_example_generator_is_pinned_to_external_output_root():
@@ -283,6 +288,105 @@ def test_reconstruction_scope_routes_analysis_only_requests_away():
 
     assert "step-computational-geometry-analysis.md" in text
     assert "evidence and local visual artifacts" in text
+
+
+def test_analysis_workflow_scopes_termination_to_the_calling_route():
+    text = _read(WORKFLOW)
+    prose = re.sub(r"\s+", " ", text.replace("`", ""))
+
+    assert "`analysis_only`" in text
+    assert "`reconstruction_prelude`" in text
+    assert "Route-scoped termination" in text
+    assert "applies only to the analysis package directory" in prose
+    assert "returns control to R0 of step-reconstruction.md" in prose
+    assert "#### Phase 4b:" in text
+    assert text.index("### Phase 4:") < text.index("#### Phase 4b:")
+    assert text.index("#### Phase 4b:") < text.index("### Phase 5:")
+    for artifact in (
+        "reconstruction-hypotheses.json",
+        "loft-sweep-specialist.json",
+    ):
+        assert artifact in text
+
+
+def test_analysis_workflow_declares_versions_gap_status_and_render_budget():
+    text = _read(WORKFLOW)
+    prose = re.sub(r"\s+", " ", text.replace("`", ""))
+
+    assert "Accepted schema versions" in text
+    assert '`feature-index.json` `schema_version`: `"4.1"`' in text
+    assert '`reconstruction` handoff `schema_version`: `"1.0"`' in text
+    assert "`complete_with_gaps`" in text
+    assert "render budget" in prose
+    assert "analysis_only runs never use complete_with_gaps" in prose
+
+
+def test_reconstruction_runs_analysis_prelude_before_feature_inference():
+    text = _read(SKILL / "references" / "workflows" / "step-reconstruction.md")
+    prose = re.sub(r"\s+", " ", text.replace("`", ""))
+
+    assert "reconstruction_prelude" in text
+    for stage in range(8):
+        assert f"### R{stage}:" in text
+    prelude = text.index("## Analysis prelude")
+    assert prelude < text.index("### R0:") < text.index("### R1:")
+    assert text.index("### R1:") < text.index("### R7:")
+    assert "<absolute-output-directory>/analysis/" in text
+    assert "<absolute-output-directory>/reconstruction/" in text
+    assert "Inventory the target economically" not in text
+
+
+def test_reconstruction_r0_lists_hard_and_soft_gates():
+    text = _read(SKILL / "references" / "workflows" / "step-reconstruction.md")
+    prose = re.sub(r"\s+", " ", text.replace("`", ""))
+
+    r0 = text[text.index("### R0:") : text.index("### R1:")]
+    for required in (
+        "target_sha256",
+        "analysis-config.json",
+        "schema_version",
+        "SDK version",
+        "artifact-manifest.json",
+        "truncated",
+        "feature-index.json",
+        "reconstruction-hypotheses.json",
+        "loft-sweep-specialist.json",
+        "unresolved-features.md",
+        "complete_with_gaps",
+    ):
+        assert required in r0
+    assert "Hard gate" in r0 and "Soft gate" in r0
+    assert "rerun Phase 1-9" in prose
+    assert "never patch a stale package" in prose
+    r2 = text[text.index("### R2:") : text.index("### R3:")]
+    for capability in ("native", "emulated", "planned", "unsupported"):
+        assert f"`{capability}`" in r2
+
+
+def test_router_and_index_explain_reconstruction_prelude_without_second_route():
+    router = _read(SKILL / "SKILL.md")
+    index = _read(SKILL / "references" / "README.md")
+    prose = re.sub(r"\s+", " ", router.replace("`", ""))
+
+    assert (
+        "STEP reconstruction runs the computational-geometry analysis phases "
+        "as its prelude"
+    ) in prose
+    assert "the prelude is not a second route" in prose
+    assert "computational-geometry analysis prelude" in index
+
+
+def test_geometry_guides_consume_the_analysis_package_first():
+    for name in (
+        "step-reconstruction-geometry-guide.md",
+        "step-reconstruction-geometry-guide-cn.md",
+    ):
+        text = _read(SKILL / "references" / "workflows" / name)
+        assert "reconstruction_prelude" in text
+        assert "analysis/" in text and "reconstruction/" in text
+        assert "feature-index.json" in text
+        assert "reconstruction-hypotheses.json" in text
+        assert "complete_with_gaps" in text
 
 
 def test_workflow_is_collected_for_every_skill_build_target():

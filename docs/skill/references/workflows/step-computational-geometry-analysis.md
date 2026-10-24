@@ -10,6 +10,15 @@ feature highlights, profile measurements, or section views. Use the inspection
 domain for one read-only fact. Use `step-reconstruction.md` only for an
 editable model or candidate STEP.
 
+This workflow runs under exactly one route, recorded in Phase 1:
+
+- `analysis_only`: the user asked for the analysis package; the run ends at
+  Phase 9.
+- `reconstruction_prelude`: `step-reconstruction.md` runs Phases 1-9 as its
+  mandatory first stage. The package is produced exactly as for
+  `analysis_only`, then `step-reconstruction.md` resumes at R0. The prelude is
+  part of the reconstruction lifecycle, not a second route.
+
 Every instance is a `geometric_candidate`: final-BREP evidence, not recovered
 feature history, a unique command order, or manufacturing intent.
 
@@ -41,14 +50,21 @@ transported section belongs to `sweep` before considering `loft`.
 - Bind every record and artifact to one target STEP SHA-256.
 - Run recognition once. Visualization consumes saved `feature-index.json` and
   must never rerun recognition.
-- During repository implementation work, append each start, completion,
-  failure, test, render, and important decision immediately to
-  `计算几何可视化log.md`; never replace its history or write it retrospectively.
-- A truncated catalog is incomplete. Stop after the analysis package.
+- A truncated catalog is incomplete. Stop after the analysis package; under
+  either route, no later stage may consume it.
 
 **Explicit terminal boundary:** do not create model JSON, an operation
 sequence, model audit, strict replay, roundtrip result, candidate STEP,
 target/candidate comparison, or reconstruction iteration.
+
+**Route-scoped termination:** the terminal boundary applies only to the
+analysis package directory, under both routes. For `analysis_only`, the output
+directory is the user's absolute directory and the task ends after Phase 9.
+For `reconstruction_prelude`, the package lives in
+`<absolute-output-directory>/analysis/`; after Phase 9 this workflow returns
+control to R0 of `step-reconstruction.md`, which writes every reconstruction
+artifact under `<absolute-output-directory>/reconstruction/`. This workflow
+itself never writes into `reconstruction/`.
 
 ## 3. Inputs
 
@@ -58,7 +74,10 @@ target/candidate comparison, or reconstruction iteration.
   `("hole", "extrusion", "revolution", "loft", "sweep", "fillet", "chamfer", "sheet_metal")`;
 - linear/angular tolerances and `max_features`;
 - optional user section planes and recorded automatic section rules;
-- deterministic rendering options.
+- deterministic rendering options;
+- route: `analysis_only` or `reconstruction_prelude`;
+- for `reconstruction_prelude` only, a render budget: the maximum number of
+  per-feature visual sets and the per-render timeout.
 
 Persist every default in `analysis-config.json` before analysis.
 
@@ -88,10 +107,12 @@ Execute all nine phases serially. On failure, write `run-status.json` with
 
 Validate target existence, suffix, readability, and output isolation. Compute
 the target hash. Write `requirement-brief.md`, `analysis-config.json`, and an
-initial `run-status.json` with units, SDK/platform/time, feature kinds,
-tolerances, `max_features`, section stations, and render options.
+initial `run-status.json` with units, SDK version/platform/time, route,
+feature kinds, tolerances, `max_features`, section stations, render options,
+and the render budget when the route is `reconstruction_prelude`.
 
-**Gate:** no hidden defaults; absolute paths and target hash are on disk.
+**Gate:** no hidden defaults; absolute paths, route, and target hash are on
+disk.
 
 ### Phase 2: Build one BREP index and global summary
 
@@ -175,6 +196,23 @@ require a longitudinal edge with near-constant fitted radius and a high-quality
 linear unwrapped-angle-to-axial fit that yields radius, pitch, turns, axis, and
 handedness.
 
+#### Phase 4b: Review loft/sweep candidates on their ROI
+
+This is the second checkpoint of Phase 4, not a separate recognition run. For
+every loft or sweep candidate that passed the coarse gate, read the specialist
+result the same call returned under `geometry.specialist_analysis`: adaptive
+sections, contour tracks, global seam alignment, path and frame hypotheses,
+guides, and endpoint conditions. Write
+`loft-sweep-specialist.json` with `target_sha256` and one entry per candidate
+holding its hint ID, ROI entity IDs, `specialist_trigger.decision`, and the
+unchanged `specialist_analysis`. A candidate whose analysis hit its budget or
+could not be resolved keeps its coarse classification and is recorded as
+`incomplete` with the reason; never force a subtype past the budget, and never
+describe a fitted path as the original design curve.
+
+**Gate:** every loft/sweep candidate has an entry; each entry is either
+complete or `incomplete` with a reason.
+
 ### Phase 5: Resolve ownership, overlap, and alternatives
 
 Closed negative space belongs to `hole`, including every shaped hole. Open
@@ -228,6 +266,19 @@ variation law, and section tracking. Sweeps store path chord, endpoint rigid
 fit, applicable twist angle, and applicable helix radius, pitch, turns, axis,
 handedness, and fit quality.
 
+Write `reconstruction-hypotheses.json` with `target_sha256` and one entry per
+feature whose `reconstruction` is not null (loft and sweep), copied unchanged
+and keyed by `feature_id`. It is a handoff for R1/R2 of
+`step-reconstruction.md`, not an operation sequence; other categories get
+their hypotheses from evidence in R1.
+
+Accepted schema versions, which R0 of `step-reconstruction.md` checks:
+
+- `feature-index.json` `schema_version`: `"4.1"`;
+- `reconstruction` handoff `schema_version`: `"1.0"`.
+
+Change this list in the same commit as any schema change.
+
 **Gate:** `truncated=false`, `complete=true`; all IDs resolve and every feature
 has its subtype-specific dimensions, evidence, and planned links.
 
@@ -269,17 +320,29 @@ length/depth sections; revolutions have a meridian profile and required
 angular sections. For zero features, the overview is `not_applicable`,
 but three global sections still exist.
 
+Under `reconstruction_prelude`, the overview and the three global sections are
+always required, but per-feature visuals stop at the recorded render budget.
+A feature that exceeds the budget or whose render fails is listed in
+`visual-index.json` with `status="skipped"` and the reason; it is a visual gap,
+not a missing feature.
+
 ### Phase 9: Write the per-instance report, manifest, and stop
 
 Write `parse-report.md` with category/subtype counts and exactly one section
 per feature. Each section directly lists type, body, location/direction,
 dimensions with units, topology, evidence, confidence, clickable relative
 visuals, and limitations. Write `artifact-manifest.json` with relative path,
-role, bytes, SHA-256, and target hash. Set `run-status.json` to `complete`.
+role, bytes, SHA-256, and target hash. Set `run-status.json` to `complete`,
+or to `complete_with_gaps` when the only shortfalls are budget-skipped or
+failed per-feature visuals and Phase 4b `incomplete` entries; list every gap
+in `run-status.json` and in the affected report sections. `analysis_only` runs
+never use `complete_with_gaps`: any missing visual leaves them incomplete.
 
 **Gate:** every link exists, hashes agree, no feature is omitted or double
 counted, and no candidate geometry/model/replay artifact exists. A
-`reconstruction` handoff descriptor is analysis data and is allowed. End here.
+`reconstruction` handoff descriptor is analysis data and is allowed. End here
+for `analysis_only`; for `reconstruction_prelude`, return to R0 of
+`step-reconstruction.md`.
 
 ## 6. Failure routes
 
@@ -291,7 +354,7 @@ counted, and no candidate geometry/model/replay artifact exists. A
 | Entity/hash mismatch | Reject stale report; do not render |
 | No supported feature | Preserve empty indexes; render global sections |
 | Ownership is ambiguous | Record unresolved/alternative; do not guess |
-| Missing visual or detailed section | Mark the run incomplete |
+| Missing visual or detailed section | `analysis_only`: mark the run incomplete. `reconstruction_prelude`: a missing overview or global section marks it incomplete; a skipped or failed per-feature visual is recorded as a gap under `complete_with_gaps` |
 | Manifest or link mismatch | Write failed status and stop |
 
 ## 7. Deliverables
@@ -330,5 +393,7 @@ comparison, and reconstruction iteration output.
 
 A run is complete only when all nine gates pass, every non-zero feature has one
 Markdown section and required visuals, all hashes agree, `run-status.json` is
-`complete`, and forbidden reconstruction outputs are absent. This is only an
-analysis-package verdict.
+`complete`, and forbidden reconstruction outputs are absent. Under
+`reconstruction_prelude`, `complete_with_gaps` also passes when every gap is
+listed. This is only an analysis-package verdict; whether reconstruction may
+start is decided by R0 of `step-reconstruction.md`.

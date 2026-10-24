@@ -27,7 +27,10 @@ Paths are relative to this file's directory.
    candidate outcomes; never pick silently between routes with
    different deliverables.
 3. Read the selected workflow in full. From selection on, it owns the
-   procedure; do not load another workflow's procedure.
+   procedure; do not load another workflow's procedure unless the selected
+   workflow names it as one of its own stages. STEP reconstruction runs the
+   computational-geometry analysis phases as its prelude; the prelude is not
+   a second route.
 4. Load each required domain/discipline file the workflow names
    before the step that uses it; optional ones only when their
    trigger fires.
@@ -68,7 +71,7 @@ Read exactly one workflow first, per the user's goal:
 | Model one physical part | `references/workflows/single-part-modeling.md` |
 | Multi-part product or mechanism (custom parts, stdlib gears/bearings, connectors, constraints, package) | `references/workflows/assembly-product-build.md` |
 | Parse a STEP file into a per-instance computational-geometry catalog, dimensions, and read-only local artifacts | `references/workflows/step-computational-geometry-analysis.md` |
-| Rebuild an editable model from a STEP file | `references/workflows/step-reconstruction.md` |
+| Rebuild an editable model from a STEP file (runs the analysis phases first) | `references/workflows/step-reconstruction.md` |
 | Export/translate a validated package | `references/workflows/export-and-translation.md` |
 | Produce a GB engineering drawing (DXF) from validated geometry | `references/workflows/engineering-drawing.md` |
 | Rebuild a 3D model from a vector-PDF engineering drawing | `references/workflows/drawing-reconstruction.md` |

@@ -90,6 +90,12 @@ reports, logs, renders, sidecars, and manifest must all be under the absolute
 output directory specified by the user. Do not start without an output
 directory, and do not invent a default `out/`.
 
+The output directory has two layers: the prelude analysis package goes to
+`<absolute-output-directory>/analysis/` and is read-only after Phase 9; every
+reconstruction artifact goes to `<absolute-output-directory>/reconstruction/`,
+never into `analysis/`. Replacing the analysis package invalidates every result
+in `reconstruction/` derived from it.
+
 ## 3. Workflow overview
 
 ```text
@@ -99,7 +105,8 @@ Target STEP
 1. Define requirements and acceptance criteria
    |
    v
-2. Inspect the target and collect evidence
+2. Computational-geometry prelude (Phases 1-9, route reconstruction_prelude)
+   + validate and load the analysis package (R0)
    |
    v
 3. Infer the feature tree
@@ -170,7 +177,7 @@ that establishes:
 - metrics without a threshold may only be reported, not declared passing or
   unsupported.
 
-### Phase 2: Inspect the target and collect evidence
+### Phase 2: Run the analysis prelude and load its package
 
 **Inputs**
 
@@ -179,38 +186,44 @@ that establishes:
 
 **Actions**
 
-After completing the required reading, select inspection APIs through
-`references/domains/step-inspection.md`.
-
-Gather evidence from least to most expensive:
-
-1. use `inspect_step_rsummary` for bounds, area, volume, centroid, entity
-   counts, and carrier statistics;
-2. call `include_parameter_groups=True` only once when radii, angles,
-   surface degrees, or repeated carriers are relevant;
-3. inspect entities, neighborhoods, boundaries, and sections for a specific
-   hypothesis;
-4. request complete curve or surface definitions only for selected entities;
-5. save large control-point, knot-vector, and sample arrays directly under the
-   output directory;
-6. when per-instance geometric-feature evidence is relevant, route through the
-   STEP-inspection domain to `inspect_geometric_features_rdescriptor`. Consume
-   its v2 catalog for holes and extrusion-style geometry, where
-   `whole_body_prism` is one subtype beside local bosses, ribs, pockets, slots,
-   and through cuts. Preserve shaped holes under `hole`. Save the report and
-   add every unresolved candidate to the unresolved-region list.
+1. Run Phases 1-9 of
+   `references/workflows/step-computational-geometry-analysis.md` with route
+   `reconstruction_prelude`, output directory
+   `<absolute-output-directory>/analysis/`, all eight feature kinds, and a
+   recorded render budget. That workflow owns required reading, recognition,
+   sections, visuals, and packaging; a failed phase stops reconstruction.
+2. Validate the package per R0 of `step-reconstruction.md`. Hard gates: target
+   hash, recognition parameters in `analysis-config.json`, catalog and
+   `reconstruction` `schema_version`, SDK version, file hashes in
+   `artifact-manifest.json`, `truncated=false`, and `complete=true`. Any
+   mismatch reruns Phases 1-9; never patch the package. Soft gate: under
+   `complete_with_gaps`, features with skipped visuals or `incomplete`
+   specialist entries may enter Phase 3 with lowered confidence and are
+   reported at delivery.
+3. Load `feature-index.json`, `reconstruction-hypotheses.json`,
+   `loft-sweep-specialist.json`, `section-index.json`, `parse-report.md`, and
+   `unresolved-features.md`.
+4. For a specific question the package does not answer, inspect the target
+   directly through `references/domains/step-inspection.md`, least to most
+   expensive: request complete curve or surface definitions only for selected
+   entities, and save large control-point, knot-vector, and sample arrays under
+   `reconstruction/`.
 
 **Artifacts**
 
-- target summary;
-- entity, neighborhood, boundary, and section evidence with a stated purpose;
-- unresolved-region list.
+- the analysis package that passed R0 (its path recorded in
+  `reconstruction/`);
+- supplementary entity, neighborhood, boundary, and section evidence with a
+  stated purpose;
+- unresolved-region list, including `unresolved-features.md` and every
+  soft-gate gap.
 
 **Gate**
 
+- the package passes every hard gate;
 - every later feature hypothesis is grounded in target evidence;
-- manufacturing hints are treated only as evidence; an absent, conflicting,
-  or non-strong hint returns to entity, neighborhood, boundary, and section
+- catalog entries are treated only as evidence; an absent, conflicting,
+  or non-strong entry returns to entity, neighborhood, boundary, and section
   inspection rather than becoming an inferred operation;
 - no geometry is inferred solely from a render or visual impression;
 - matching face IDs in the target and candidate are not assumed to represent
@@ -237,8 +250,9 @@ verified equal angular or linear spacing  -> one seed feature + pattern
 several local geometric signatures        -> ordered mixed feature tree
 ```
 
-For every loft/sweep candidate, consume the catalog's versioned
-`reconstruction` handoff when present and validate its target hash and schema.
+For every loft/sweep candidate, consume its versioned `reconstruction` handoff
+from `reconstruction-hypotheses.json`, whose target hash and schema R0 already
+validated.
 The specialist result is evidence, not executable history. Choose the least
 complex supported operation that explains the ROI:
 
@@ -555,6 +569,7 @@ at every acceptance tier.
 
 | Failure | Required response |
 | --- | --- |
+| The prelude fails or an R0 hard gate fails | Rerun Phases 1-9 or report the failed phase; do not enter Phase 3 |
 | Evidence for a region is insufficient | Record the evidence gap; do not invent geometry |
 | Local evidence falsifies a feature family | Return to Phase 3 and revise the feature hypothesis and order |
 | A boolean or construction fails | Return to Phase 4 and repair operands, intersection, or upstream parameters |
@@ -570,6 +585,8 @@ at every acceptance tier.
 
 ### 9.1 Required
 
+- the prelude analysis package path (`analysis/`) and its `run-status.json`
+  status;
 - final SimpleCADAPI reconstruction source;
 - API-produced model JSON;
 - topologically ordered operation sequence containing at least one
