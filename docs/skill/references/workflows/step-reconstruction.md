@@ -1,5 +1,11 @@
 # Workflow: STEP Reconstruction
 
+For evidence and local visual artifacts without reconstruction, see
+`step-computational-geometry-analysis.md`. For detailed local geometric feature analysis and section evidence, see
+`step-reconstruction-geometry-guide.md` (Chinese:
+`step-reconstruction-geometry-guide-cn.md`). Use the modeling operations and
+validation rules in this upstream workflow.
+
 Rebuild an editable SimpleCAD model from an existing STEP file, with evidence
 gathering, feature-tree inference, candidate construction, and tiered
 acceptance.

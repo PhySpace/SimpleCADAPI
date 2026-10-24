@@ -217,6 +217,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [index_shape_rbrepmodel](index_shape_rbrepmodel.md) *(from inspect/brep/model.py)* `inspection namespace`
 - [inspect_difference_regions_rdescriptor](inspect_difference_regions_rdescriptor.md) *(from inspect/brep/diagnostics.py)* `inspection namespace`
 - [inspect_face_boundaries_rdescriptor](inspect_face_boundaries_rdescriptor.md) *(from inspect/brep/queries.py)* `inspection namespace`
+- [inspect_geometric_features_rdescriptor](inspect_geometric_features_rdescriptor.md) *(from inspect/brep/feature_catalog.py)* `inspection namespace`
 - [inspect_manufacturing_hints_rdescriptor](inspect_manufacturing_hints_rdescriptor.md) *(from inspect/brep/manufacturing.py)* `inspection namespace`
 - [inspect_nearby_entities_rdescriptor](inspect_nearby_entities_rdescriptor.md) *(from inspect/brep/diagnostics.py)* `inspection namespace`
 - [inspect_point_rdescriptor](inspect_point_rdescriptor.md) *(from inspect/brep/queries.py)* `inspection namespace`
@@ -235,8 +236,10 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [measure_shape_mass_rtuple](measure_shape_mass_rtuple.md) *(from inspect/brep/io.py)* `inspection namespace`
 - [render_entity_kind_maps_rpath](render_entity_kind_maps_rpath.md) *(from inspect/brep/render.py)* `inspection namespace`
 - [render_entity_map_rpath](render_entity_map_rpath.md) *(from inspect/brep/render.py)* `inspection namespace`
+- [render_geometric_features_rpath](render_geometric_features_rpath.md) *(from inspect/brep/feature_visualization.py)* `inspection namespace`
 - [render_manufacturing_hints_rpath](render_manufacturing_hints_rpath.md) *(from inspect/brep/manufacturing.py)* `inspection namespace`
 - [render_region_rpath](render_region_rpath.md) *(from inspect/brep/render.py)* `inspection namespace`
+- [render_sections_rpath](render_sections_rpath.md) *(from inspect/brep/slices.py)* `inspection namespace`
 - [render_shape_views_rpath](render_shape_views_rpath.md) *(from inspect/brep/render.py)* `inspection namespace`
 - [render_step_comparison_rpath](render_step_comparison_rpath.md) *(from inspect/brep/render.py)* `inspection namespace`
 - [render_step_components_colored_rpath](render_step_components_colored_rpath.md) *(from inspect/brep/render.py)* `inspection namespace`

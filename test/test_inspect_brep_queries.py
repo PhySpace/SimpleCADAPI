@@ -667,6 +667,40 @@ def test_render_entity_map_rejects_empty_duplicate_and_invalid_options(tmp_path)
 
 
 
+def test_render_views_uses_worker_on_windows(tmp_path, monkeypatch):
+    import simplecadapi.inspect.brep.render as render
+
+    output = tmp_path / "windows-worker.png"
+    base = _point_polydata([(0.0, 0.0, 0.0)])
+    calls = []
+
+    def fake_worker(**kwargs):
+        calls.append(kwargs)
+        output.write_bytes(b"worker-image")
+        return output
+
+    def fail_in_process(*args, **kwargs):
+        raise AssertionError("Windows rendering must use the crash-isolated worker")
+
+    monkeypatch.setattr(render.sys, "platform", "win32")
+    monkeypatch.setattr(render, "_run_render_worker", fake_worker)
+    monkeypatch.setattr(render, "_render_in_process", fail_in_process)
+
+    result = render._render_polydata_views(
+        base,
+        output,
+        title="Windows worker",
+        views=((28.0, -45.0, "isometric"),),
+        image_size=(4.0, 3.0),
+        dpi=80,
+    )
+
+    assert result == output
+    assert len(calls) == 1
+    assert calls[0]["mode"] == "views"
+    assert calls[0]["datasets"]["base"] is base
+
+
 def test_render_worker_retries_crash_and_requires_clean_exit(tmp_path, monkeypatch):
     calls = []
 

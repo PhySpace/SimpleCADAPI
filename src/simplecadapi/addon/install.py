@@ -335,16 +335,23 @@ def _fetch(source: Source, dest: Path, *, method: str) -> None:
 
 def run_check_cmd(cmd: str, *, timeout: float = _CHECK_TIMEOUT_SECONDS) -> dict[str, Any]:
     """Run a runtime probe: exit 0 means usable; name the failure otherwise."""
-    argv = ["cmd", "/c", cmd] if sys.platform == "win32" else ["sh", "-c", cmd]
+    if sys.platform == "win32":
+        argv: str | list[str] = cmd
+        shell = True
+        launcher = "cmd"
+    else:
+        argv = ["sh", "-c", cmd]
+        shell = False
+        launcher = argv[0]
     try:
         completed = subprocess.run(
-            argv, capture_output=True, text=True, timeout=timeout
+            argv, capture_output=True, text=True, timeout=timeout, shell=shell
         )
     except FileNotFoundError as exc:
         return {
             "passed": False,
             "exit_code": None,
-            "output_tail": f"could not launch {argv[0]!r}: {exc}",
+            "output_tail": f"could not launch {launcher!r}: {exc}",
         }
     except subprocess.TimeoutExpired:
         return {

@@ -23,10 +23,29 @@ from .model import (
     index_shape_rbrepmodel,
     load_step_rbrepmodel,
 )
+from .feature_hints import (
+    extrusion_hints,
+    hole_hints,
+    loft_hints,
+    revolution_hints,
+    sweep_hints,
+)
+from .feature_hints.section_families import (
+    local_section_families,
+    whole_body_point_families,
+    whole_body_section_families,
+)
 
 
 ModelInput = BRepModel | TopoDS_Shape | str | Path
 FEATURE_KINDS = ("fillet", "chamfer", "sheet_metal")
+_SUPPORTED_FEATURE_KINDS = FEATURE_KINDS + (
+    "hole",
+    "extrusion",
+    "revolution",
+    "loft",
+    "sweep",
+)
 
 
 def _model(value: ModelInput) -> BRepModel:
@@ -64,10 +83,7 @@ def _axes_coaxial(
 ) -> bool:
     first_direction = _unit(first["direction"])
     second_direction = _unit(second["direction"])
-    if (
-        _angle_degrees(first_direction, second_direction)
-        > angular_tolerance_degrees
-    ):
+    if _angle_degrees(first_direction, second_direction) > angular_tolerance_degrees:
         return False
     offset = np.asarray(second["point"], dtype=float) - np.asarray(
         first["point"], dtype=float
@@ -149,9 +165,7 @@ def _cylinder_trim_overlap(
     second_u = second["parameters"]["u_range"]
     first_sweep = abs(float(first_u[1]) - float(first_u[0]))
     second_sweep = abs(float(second_u[1]) - float(second_u[0]))
-    if abs(first_sweep - second_sweep) > max(
-        1.0e-4, math.radians(angular_tolerance)
-    ):
+    if abs(first_sweep - second_sweep) > max(1.0e-4, math.radians(angular_tolerance)):
         return False
     first_radial = _cylinder_radial_direction(first)
     second_radial = _cylinder_radial_direction(second)
@@ -271,8 +285,7 @@ def _body_closed_manifold(body: TopoDS_Shape) -> bool:
             edge_explorer.Next()
         face_explorer.Next()
     return bool(edge_uses) and all(
-        count == 2
-        or BRep_Tool.Degenerated_s(TopoDS.Edge_s(edges.FindKey(index + 1)))
+        count == 2 or BRep_Tool.Degenerated_s(TopoDS.Edge_s(edges.FindKey(index + 1)))
         for index, count in enumerate(edge_uses)
     )
 
@@ -286,8 +299,7 @@ def _plane_pair_candidates(
     planes = [
         face_id
         for face_id in face_ids
-        if facts[face_id]["type"] == "PLANE"
-        and facts[face_id]["normal"] is not None
+        if facts[face_id]["type"] == "PLANE" and facts[face_id]["normal"] is not None
     ]
     cosine_limit = math.cos(math.radians(angular_tolerance))
     candidates = []
@@ -311,12 +323,9 @@ def _plane_pair_candidates(
                 continue
             centroid_delta = second["centroid"] - first["centroid"]
             projected = (
-                centroid_delta
-                - np.dot(centroid_delta, first_normal) * first_normal
+                centroid_delta - np.dot(centroid_delta, first_normal) * first_normal
             )
-            characteristic = math.sqrt(
-                max(first["area"], second["area"], 1.0e-15)
-            )
+            characteristic = math.sqrt(max(first["area"], second["area"], 1.0e-15))
             projected_ratio = float(np.linalg.norm(projected)) / characteristic
             if projected_ratio > 0.20:
                 continue
@@ -376,9 +385,7 @@ def _cylinder_pair_candidates(
                 first["area"] / first_radius,
                 second["area"] / second_radius,
             )
-            span_similarity = min(normalized_areas) / max(
-                *normalized_areas, 1.0e-15
-            )
+            span_similarity = min(normalized_areas) / max(*normalized_areas, 1.0e-15)
             if span_similarity < 0.90:
                 continue
             if not _cylinder_trim_overlap(
@@ -541,10 +548,14 @@ def _fillet_hints(
                 for support_id in tangent_supports
             ):
                 continue
-            if fact["type"] == "CYLINDER" and sum(
-                facts[support_id]["type"] == "PLANE"
-                for support_id in tangent_supports
-            ) < 2:
+            if (
+                fact["type"] == "CYLINDER"
+                and sum(
+                    facts[support_id]["type"] == "PLANE"
+                    for support_id in tangent_supports
+                )
+                < 2
+            ):
                 continue
             parameters = fact["parameters"]
             radius = (
@@ -552,6 +563,20 @@ def _fillet_hints(
                 if fact["type"] in {"CYLINDER", "SPHERE"}
                 else parameters.get("minor_radius")
             )
+            u_range = parameters.get("u_range") or []
+            v_range = parameters.get("v_range") or []
+            sweep_angle = (
+                math.degrees(abs(float(u_range[1]) - float(u_range[0])))
+                if len(u_range) == 2
+                else None
+            )
+            effective_length = None
+            if fact["type"] == "CYLINDER" and len(v_range) == 2:
+                effective_length = abs(float(v_range[1]) - float(v_range[0]))
+            elif fact["type"] == "TORUS" and len(u_range) == 2:
+                effective_length = abs(float(u_range[1]) - float(u_range[0])) * float(
+                    parameters["major_radius"]
+                )
             support_ids = sorted(tangent_supports, key=_entity_index)
             hints.append(
                 {
@@ -564,6 +589,12 @@ def _fillet_hints(
                     "geometry": {
                         "carrier_type": fact["type"],
                         "radius": float(radius) if radius is not None else None,
+                        "major_radius": parameters.get("major_radius"),
+                        "surface_area": fact["area"],
+                        "effective_length": effective_length,
+                        "sweep_angle_degrees": sweep_angle,
+                        "axis": parameters.get("axis"),
+                        "center": parameters.get("center"),
                         "tangent_boundary_edge_ids": sorted(
                             tangent_edges, key=_entity_index
                         ),
@@ -650,9 +681,7 @@ def _paired_bend_faces_from_fillet_hints(
             if thickness / max(diagonal, 1.0e-15) > 0.10:
                 continue
             pairs = cluster["pairs"]
-            paired_ids = {
-                face_id for pair in pairs for face_id in pair["face_ids"]
-            }
+            paired_ids = {face_id for pair in pairs for face_id in pair["face_ids"]}
             coverage = sum(facts[face_id]["area"] for face_id in paired_ids) / max(
                 float(body_geometry["surface_area"]), 1.0e-15
             )
@@ -702,6 +731,25 @@ def _chamfer_hints(
             support_ids: list[str] = []
             form = None
             geometry: dict[str, Any] = {"area": fact["area"]}
+            edge_lengths = []
+            if hasattr(model, "resolve_entity"):
+                for edge_id in fact.get("edges", []):
+                    try:
+                        descriptor = model.describe_entity(edge_id)
+                        edge_lengths.append(float(descriptor["geometry"]["length"]))
+                    except (KeyError, TypeError, ValueError):
+                        continue
+            chamfer_length = max(edge_lengths, default=None)
+            geometry.update(
+                {
+                    "length": chamfer_length,
+                    "face_width": (
+                        fact["area"] / chamfer_length
+                        if chamfer_length is not None and chamfer_length > 0.0
+                        else None
+                    ),
+                }
+            )
             if fact["type"] == "PLANE" and fact["normal"] is not None:
                 candidates = []
                 for neighbor_id in fact["neighbors"]:
@@ -734,6 +782,7 @@ def _chamfer_hints(
                             {
                                 "support_angle_degrees": support_angle,
                                 "support_normal_alignments": [first[1], second[1]],
+                                "support_setbacks": [None, None],
                             }
                         )
                         form = "planar_bevel"
@@ -752,9 +801,7 @@ def _chamfer_hints(
                         neighbor["type"] == "PLANE"
                         and axis
                         and neighbor["normal"] is not None
-                        and _angle_degrees(
-                            neighbor["normal"], axis["direction"]
-                        )
+                        and _angle_degrees(neighbor["normal"], axis["direction"])
                         <= angular_tolerance
                     ):
                         planes.append(neighbor_id)
@@ -780,6 +827,7 @@ def _chamfer_hints(
                             "reference_radius": fact["parameters"].get(
                                 "reference_radius"
                             ),
+                            "axis": axis,
                         }
                     )
                     form = "conical_bevel"
@@ -884,9 +932,7 @@ def _sheet_metal_hints(
         midsurface_area = sum(float(pair["midsurface_area"]) for pair in pairs)
         volume_estimate = thickness * midsurface_area
         body_volume = abs(float(body_geometry["volume"]))
-        volume_error = abs(
-            volume_estimate - body_volume
-        ) / max(body_volume, 1.0e-15)
+        volume_error = abs(volume_estimate - body_volume) / max(body_volume, 1.0e-15)
         diagonal = float(body_descriptor["bounding_box"]["diagonal"])
         thinness = thickness / max(diagonal, 1.0e-15)
         closed_manifold = _body_closed_manifold(body)
@@ -958,6 +1004,7 @@ def _sheet_metal_hints(
                     "paired_skin_area_fraction": coverage,
                     "thinness_ratio": thinness,
                     "midsurface_area": midsurface_area,
+                    "bounding_box_size": list(body_descriptor["bounding_box"]["size"]),
                     "volume_estimate": volume_estimate,
                     "volume_model_relative_error": volume_error,
                     "bend_count": len(bend_pairs),
@@ -1032,9 +1079,7 @@ def _sheet_metal_hints(
                         "mid_radius": pair["mid_radius"],
                         "thickness": pair["thickness"],
                         "axis": pair["axis"],
-                        "geometric_sweep_angle_degrees": pair[
-                            "sweep_angle_degrees"
-                        ],
+                        "geometric_sweep_angle_degrees": pair["sweep_angle_degrees"],
                         "bend_length": pair["bend_length"],
                         "adjacent_skin_face_ids": adjacent_skins,
                     },
@@ -1073,29 +1118,51 @@ def inspect_manufacturing_hints_rdescriptor(
 
     Fillet and chamfer hints require supported analytic carrier evidence.
     Sheet-metal hints require opposed constant-thickness skins, a thin-body
-    ratio, and a matching thickness-times-midsurface volume model. Every hint
-    includes stable entity IDs, measurements, evidence, and non-probabilistic
-    confidence. The result describes final BREP geometry only; it does not infer
-    original feature history, process choice, bend allowance, tooling, or
-    manufacturing intent.
+    ratio, and a matching thickness-times-midsurface volume model. Hole and
+    non-circular holes, local or whole-body extrusion/revolution geometry, and
+    loft/sweep geometry are available only when their category is explicitly
+    included in ``feature_kinds``; they describe
+    geometric explanations and do not recover the original feature history.
+    Every hint includes stable entity IDs, measurements, evidence, and
+    non-probabilistic confidence. The result describes final BREP geometry only;
+    it does not infer process choice, bend allowance, tooling, or manufacturing
+    intent.
     """
 
     if max_hints < 1:
         raise ValueError("max_hints must be at least one")
     requested = tuple(dict.fromkeys(str(value) for value in feature_kinds))
-    unknown = sorted(set(requested) - set(FEATURE_KINDS))
+    unknown = sorted(set(requested) - set(_SUPPORTED_FEATURE_KINDS))
     if unknown:
         raise ValueError(
             "feature_kinds contains unsupported values: " + ", ".join(unknown)
         )
     model = _model(model_or_path)
-    tolerances = _effective_tolerances(
-        model, tolerance, angular_tolerance_degrees
-    )
+    tolerances = _effective_tolerances(model, tolerance, angular_tolerance_degrees)
     facts = _face_facts(model)
     hints: list[dict[str, Any]] = []
     diagnostics: list[dict[str, Any]] = []
-    needs_sheet_context = "sheet_metal" in requested
+    hole_candidates: list[dict[str, Any]] = []
+    hole_face_ids: set[str] = set()
+    countersink_cone_face_ids: set[str] = set()
+    if "hole" in requested:
+        hole_candidates = hole_hints(model, facts, tolerances)
+        hints.extend(hole_candidates)
+        hole_face_ids = {
+            face_id
+            for hint in hole_candidates
+            for face_id in hint["entity_ids"]
+            if face_id.startswith("face:")
+        }
+        countersink_cone_face_ids = {
+            face_id
+            for hint in hole_candidates
+            if hint["geometry"]["form"] == "countersink"
+            for segment in hint["geometry"]["segments"]
+            if segment["carrier"] == "cone"
+            for face_id in segment["face_ids"]
+        }
+    needs_sheet_context = "sheet_metal" in requested or "revolution" in requested
     sheet_hints: list[dict[str, Any]] = []
     bend_faces: set[str] = set()
     if needs_sheet_context:
@@ -1105,6 +1172,56 @@ def inspect_manufacturing_hints_rdescriptor(
         if "sheet_metal" in requested:
             hints.extend(sheet_hints)
             diagnostics.extend(sheet_diagnostics)
+    sheet_faces = {
+        face_id
+        for hint in sheet_hints
+        if hint["kind"] == "sheet_metal_body_candidate"
+        for face_id in hint["entity_ids"]
+    }
+    if "extrusion" in requested:
+        hints.extend(
+            extrusion_hints(
+                model,
+                facts,
+                tolerances,
+                hole_face_ids=hole_face_ids,
+            )
+        )
+    if "revolution" in requested:
+        revolution_candidates, revolution_diagnostics = revolution_hints(
+            model,
+            facts,
+            tolerances,
+            excluded_face_ids=hole_face_ids | sheet_faces | bend_faces,
+        )
+        hints.extend(revolution_candidates)
+        diagnostics.extend(revolution_diagnostics)
+    shared_whole_families = None
+    shared_local_families = None
+    if {"sweep", "loft"}.intersection(requested):
+        shared_whole_families = whole_body_section_families(model, facts, tolerances)
+        shared_local_families = local_section_families(model, facts, tolerances)
+    if "sweep" in requested:
+        sweep_candidates, sweep_diagnostics = sweep_hints(
+            model,
+            facts,
+            tolerances,
+            whole_families=shared_whole_families,
+            local_families=shared_local_families,
+        )
+        hints.extend(sweep_candidates)
+        diagnostics.extend(sweep_diagnostics)
+    if "loft" in requested:
+        loft_candidates, loft_diagnostics = loft_hints(
+            model,
+            facts,
+            tolerances,
+            whole_families=shared_whole_families,
+            local_families=shared_local_families,
+            point_families=whole_body_point_families(model, facts, tolerances),
+        )
+        hints.extend(loft_candidates)
+        diagnostics.extend(loft_diagnostics)
     if "fillet" in requested:
         fillet_hints = _fillet_hints(model, facts, bend_faces)
         if not needs_sheet_context:
@@ -1117,18 +1234,12 @@ def inspect_manufacturing_hints_rdescriptor(
                 if not lightweight_bend_faces.intersection(hint["entity_ids"])
             ]
         hints.extend(fillet_hints)
-    sheet_faces = {
-        face_id
-        for hint in sheet_hints
-        if hint["kind"] == "sheet_metal_body_candidate"
-        for face_id in hint["entity_ids"]
-    }
     if "chamfer" in requested:
         hints.extend(
             _chamfer_hints(
                 model,
                 facts,
-                sheet_faces,
+                sheet_faces | countersink_cone_face_ids,
                 float(tolerances["angular_degrees"]),
                 float(tolerances["linear"]),
             )
@@ -1141,14 +1252,22 @@ def inspect_manufacturing_hints_rdescriptor(
     kind_order = {
         "sheet_metal_body_candidate": 0,
         "sheet_metal_bend_candidate": 1,
-        "fillet_region_candidate": 2,
-        "chamfer_region_candidate": 3,
+        "extrusion_region_candidate": 2,
+        "revolution_region_candidate": 3,
+        "sweep_region_candidate": 4,
+        "loft_region_candidate": 5,
+        "hole_region_candidate": 6,
+        "fillet_region_candidate": 7,
+        "chamfer_region_candidate": 8,
     }
     hints.sort(
         key=lambda hint: (
             kind_order[hint["kind"]],
             _entity_index(hint["body_id"]),
             tuple(_entity_index(value) for value in hint["entity_ids"]),
+            tuple(
+                float(value) for value in hint.get("geometry", {}).get("direction", ())
+            ),
         )
     )
     truncated = len(hints) > max_hints
@@ -1186,9 +1305,13 @@ def render_manufacturing_hints_rpath(
 ) -> Path:
     """Render manufacturing hints as deterministic category-colored overlays.
 
-    Sheet-metal skins are blue, bends are orange, fillet candidates are red,
-    and chamfer candidates are yellow. Analysis always runs against the current
-    model so entity IDs cannot be reused across different BREP instances.
+    Sheet-metal skins are blue, bends are orange, extrusion geometry is green,
+    revolution geometry is cyan, lofts are pink, sweeps are indigo, holes are
+    purple, fillets are red, and chamfers are yellow. Hole, extrusion,
+    revolution, loft, and sweep candidates must be explicitly enabled. They
+    explain final geometry rather than original
+    feature history. Analysis always runs against the current model so entity
+    IDs cannot be reused across different BREP instances.
     """
 
     model = _model(model_or_path)
@@ -1199,11 +1322,34 @@ def render_manufacturing_hints_rpath(
         angular_tolerance_degrees=angular_tolerance_degrees,
         max_hints=max_hints,
     )
+    from .feature_visualization import FEATURE_COLORS
+
     styles = (
-        ("sheet_metal_body_candidate", "Sheet-metal skins", (0.12, 0.45, 0.85)),
-        ("sheet_metal_bend_candidate", "Sheet-metal bends", (0.95, 0.48, 0.08)),
-        ("fillet_region_candidate", "Fillet candidates", (0.82, 0.12, 0.18)),
-        ("chamfer_region_candidate", "Chamfer candidates", (0.86, 0.70, 0.08)),
+        (
+            "sheet_metal_body_candidate",
+            "Sheet-metal skins",
+            FEATURE_COLORS["sheet_metal"],
+        ),
+        (
+            "sheet_metal_bend_candidate",
+            "Sheet-metal bends",
+            FEATURE_COLORS["sheet_metal_bend"],
+        ),
+        (
+            "extrusion_region_candidate",
+            "Extrusion candidates",
+            FEATURE_COLORS["extrusion"],
+        ),
+        (
+            "revolution_region_candidate",
+            "Revolution candidates",
+            FEATURE_COLORS["revolution"],
+        ),
+        ("loft_region_candidate", "Loft candidates", FEATURE_COLORS["loft"]),
+        ("sweep_region_candidate", "Sweep candidates", FEATURE_COLORS["sweep"]),
+        ("hole_region_candidate", "Hole candidates", FEATURE_COLORS["hole"]),
+        ("fillet_region_candidate", "Fillet candidates", FEATURE_COLORS["fillet"]),
+        ("chamfer_region_candidate", "Chamfer candidates", FEATURE_COLORS["chamfer"]),
     )
     from .render import (
         DEFAULT_VIEWS,
@@ -1246,9 +1392,7 @@ def render_manufacturing_hints_rpath(
         image_size=image_size,
         dpi=dpi,
         context_opacity=0.16,
-        brep_edge_polydata=_edge_polydata(
-            [model.root], deflection=linear_deflection
-        ),
+        brep_edge_polydata=_edge_polydata([model.root], deflection=linear_deflection),
         highlighted_groups=groups,
         legend=legend,
         legend_columns=1,

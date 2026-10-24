@@ -102,6 +102,8 @@ class TestAutoDocsGenPathResolution(unittest.TestCase):
                 resolved_names,
             )
             self.assertIn("inspect/brep/inspect.py", resolved_names)
+            self.assertIn("inspect/brep/feature_catalog.py", resolved_names)
+            self.assertIn("inspect/brep/feature_visualization.py", resolved_names)
             self.assertIn("inspect/brep/manufacturing.py", resolved_names)
             self.assertIn("inspect/brep/queries.py", resolved_names)
             self.assertIn("exporter/mjcf.py", resolved_names)
@@ -357,6 +359,31 @@ class TestAutoDocsGenPathResolution(unittest.TestCase):
                 output_dir / "render_manufacturing_hints_rpath.md"
             ).read_text(encoding="utf-8")
             self.assertNotIn("report:", renderer_page)
+
+    def test_slices_module_generates_section_renderer_api_page(self):
+        project_root = Path(__file__).resolve().parents[1]
+        source_file = project_root / "src/simplecadapi/inspect/brep/slices.py"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_dir = Path(tmp_dir) / "docs/api"
+            generator = auto_docs_gen.APIDocumentGenerator(
+                source_files=[source_file],
+                output_dirs=[output_dir],
+                quiet=True,
+            )
+
+            generator.extract_apis()
+            generator.generate_markdown_docs()
+
+            readme = (output_dir / "README.md").read_text(encoding="utf-8")
+            page = (output_dir / "render_sections_rpath.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("render_sections_rpath", readme)
+            self.assertIn("`inspection namespace`", readme)
+            self.assertIn("from simplecadapi.inspect import brep", page)
+            self.assertIn("unavailable inside GraphSession", page)
+            self.assertIn("samples_2d", page)
+            self.assertIn("Path", page)
 
     def test_default_stdlib_source_files_include_standard_modules(self):
         with tempfile.TemporaryDirectory() as tmp_dir:

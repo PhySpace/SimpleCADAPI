@@ -1,0 +1,3810 @@
+diff --git a/docs/skill/references/docs/api/README.md b/docs/skill/references/docs/api/README.md
+index a36d13c..13a3580 100644
+--- a/docs/skill/references/docs/api/README.md
++++ b/docs/skill/references/docs/api/README.md
+@@ -370,6 +370,8 @@ This index includes generated docs for the public SimpleCAD API surface, includi
+ - [load_brep_region_rshell](load_brep_region_rshell.md) *(from operators/geometry.py)* `top-level`
+ - [load_brep_region_rsolid](load_brep_region_rsolid.md) *(from operators/geometry.py)* `top-level`
+ - [measure_constraint_residual_rconstraintresidual](measure_constraint_residual_rconstraintresidual.md) *(from operators/product.py)* `top-level`
++- [multi_section_sweep_rshell](multi_section_sweep_rshell.md) *(from operators/geometry.py)* `top-level`
++- [multi_section_sweep_rsolid](multi_section_sweep_rsolid.md) *(from operators/features.py)* `top-level`
+ - [meta](meta.md) *(from ql.py)* `submodule:ql`
+ - [not_](not_.md) *(from ql.py)* `submodule:ql`
+ - [operation_event](operation_event.md) *(from ql.py)* `submodule:ql`
+@@ -380,6 +382,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
+ - [placement_frame_mm](placement_frame_mm.md) *(from product/placement.py)* `submodule:product/placement`
+ - [placement_from_canonical](placement_from_canonical.md) *(from product/placement.py)* `submodule:product/placement`
+ - [placement_ticks](placement_ticks.md) *(from product/placement.py)* `submodule:product/placement`
++- [preflight_loft](preflight_loft.md) *(from operators/geometry.py)* `top-level`
+ - [radial_pattern_rsolidlist](radial_pattern_rsolidlist.md) *(from operators/transform.py)* `top-level`
+ - [render_screenshot_rpath](render_screenshot_rpath.md) *(from operators/features.py)* `top-level`
+ - [select](select.md) *(from ql.py)* `submodule:ql`
+diff --git a/docs/skill/references/docs/api/inspect_geometric_features_rdescriptor.md b/docs/skill/references/docs/api/inspect_geometric_features_rdescriptor.md
+index ff35f9a..412f1c5 100644
+--- a/docs/skill/references/docs/api/inspect_geometric_features_rdescriptor.md
++++ b/docs/skill/references/docs/api/inspect_geometric_features_rdescriptor.md
+@@ -14,7 +14,7 @@ def inspect_geometric_features_rdescriptor(model_or_path: ModelInput, *, feature
+ 
+ ## Description
+ 
+-Return the normalized v3 catalog for final-BREP geometric candidates.
++Return the normalized v4 catalog for final-BREP geometric candidates.
+ 
+ ``extrusion`` means extrusion-style geometry; ``whole_body_prism`` is only
+ one subtype. ``revolution`` covers whole and local, full and partial-angle
+diff --git a/docs/skill/references/docs/api/inspect_manufacturing_hints_rdescriptor.md b/docs/skill/references/docs/api/inspect_manufacturing_hints_rdescriptor.md
+index fec5b70..0813890 100644
+--- a/docs/skill/references/docs/api/inspect_manufacturing_hints_rdescriptor.md
++++ b/docs/skill/references/docs/api/inspect_manufacturing_hints_rdescriptor.md
+@@ -19,9 +19,9 @@ Return deterministic, highlightable manufacturing-feature candidates.
+ Fillet and chamfer hints require supported analytic carrier evidence.
+ Sheet-metal hints require opposed constant-thickness skins, a thin-body
+ ratio, and a matching thickness-times-midsurface volume model. Hole and
+-non-circular holes, local or whole-body extrusion geometry, and local or
+-whole-body revolution geometry are available only when their category is
+-explicitly included in ``feature_kinds``; they describe
++non-circular holes, local or whole-body extrusion/revolution geometry, and
++loft/sweep geometry are available only when their category is explicitly
++included in ``feature_kinds``; they describe
+ geometric explanations and do not recover the original feature history.
+ Every hint includes stable entity IDs, measurements, evidence, and
+ non-probabilistic confidence. The result describes final BREP geometry only;
+diff --git a/docs/skill/references/docs/api/loft_rshell.md b/docs/skill/references/docs/api/loft_rshell.md
+index 61c9626..1a90a59 100644
+--- a/docs/skill/references/docs/api/loft_rshell.md
++++ b/docs/skill/references/docs/api/loft_rshell.md
+@@ -3,7 +3,7 @@
+ ## API Definition
+ 
+ ```python
+-def loft_rshell(sections: Sequence[Union[Wire, Vertex]], *, ruled: bool = False, tag_prefix: Optional[str] = None, result_tag: Optional[str] = None, start_wire_tag: Optional[str] = None, end_wire_tag: Optional[str] = None, side_faces_tag: Optional[str] = None) -> Shell
++def loft_rshell(sections: Sequence[Union[Wire, Vertex]], *, ruled: bool = False, tolerance: float = 1e-6, compatibility_check: bool = True, smoothing: Optional[bool] = None, continuity: Optional[str] = None, parametrization: Optional[str] = None, max_degree: Optional[int] = None, tag_prefix: Optional[str] = None, result_tag: Optional[str] = None, start_wire_tag: Optional[str] = None, end_wire_tag: Optional[str] = None, side_faces_tag: Optional[str] = None) -> Shell
+ ```
+ 
+ *Source: operators/geometry.py*
+@@ -15,3 +15,11 @@ def loft_rshell(sections: Sequence[Union[Wire, Vertex]], *, ruled: bool = False,
+ ## Description
+ 
+ Create an open loft Shell with endpoint-Wire and side-Face naming.
++
++The optional approximation controls map to OCP ThruSections and are recorded
++for replay. They do not add endpoint tangent/draft/magnitude conditions or
++explicit seam cutting; use `preflight_loft` to diagnose those requests.
++Some smoothing configurations rebuild an endpoint contour as individual result
++edges rather than preserving one result-owned Wire. In that case an explicitly
++requested endpoint Wire tag (or a `tag_prefix` that implies one) raises
++`SemanticCapabilityError` instead of publishing a false semantic role.
+diff --git a/docs/skill/references/docs/api/loft_rsolid.md b/docs/skill/references/docs/api/loft_rsolid.md
+index 94de869..a2503d8 100644
+--- a/docs/skill/references/docs/api/loft_rsolid.md
++++ b/docs/skill/references/docs/api/loft_rsolid.md
+@@ -3,7 +3,7 @@
+ ## API Definition
+ 
+ ```python
+-def loft_rsolid(profiles: Sequence[Union[Wire, Vertex]], ruled: bool = False, *, tracking_policy: TrackingPolicy | str = TrackingPolicy.FULL, tag_prefix: Optional[str] = None, result_tag: Optional[str] = None, start_face_tag: Optional[str] = None, end_face_tag: Optional[str] = None, side_faces_tag: Optional[str] = None) -> Solid
++def loft_rsolid(profiles: Sequence[Union[Wire, Vertex]], ruled: bool = False, *, tolerance: float = 1e-6, compatibility_check: bool = True, smoothing: Optional[bool] = None, continuity: Optional[str] = None, parametrization: Optional[str] = None, max_degree: Optional[int] = None, tracking_policy: TrackingPolicy | str = TrackingPolicy.FULL, tag_prefix: Optional[str] = None, result_tag: Optional[str] = None, start_face_tag: Optional[str] = None, end_face_tag: Optional[str] = None, side_faces_tag: Optional[str] = None) -> Solid
+ ```
+ 
+ *Source: operators/features.py*
+@@ -15,3 +15,10 @@ def loft_rsolid(profiles: Sequence[Union[Wire, Vertex]], ruled: bool = False, *,
+ ## Description
+ 
+ Create a lofted solid, with optional kernel-role-based tags.
++
++`continuity` accepts C0/C1/C2/C3/G1/G2. `parametrization` accepts
++`chord_length`, `centripetal`, or `iso_parametric`. Leaving the optional
++smoothing controls as `None` preserves the OCP defaults. Run
++`preflight_loft(..., result_kind="solid")` before reconstruction-sensitive
++calls. These options do not implement endpoint tangent/draft/magnitude
++conditions or explicit seam cutting.
+diff --git a/docs/skill/references/docs/api/render_geometric_features_rpath.md b/docs/skill/references/docs/api/render_geometric_features_rpath.md
+index 4ec1221..eafa7de 100644
+--- a/docs/skill/references/docs/api/render_geometric_features_rpath.md
++++ b/docs/skill/references/docs/api/render_geometric_features_rpath.md
+@@ -14,7 +14,7 @@ def render_geometric_features_rpath(model_or_path: ModelInput, feature_report: M
+ 
+ ## Description
+ 
+-Render the supplied v2 report with the approved category palette.
++Render the supplied feature report with the approved category palette.
+ 
+ The function consumes a report dictionary or saved ``feature-index.json``.
+ It never invokes feature recognition. It verifies the target hash and every
+diff --git a/docs/skill/references/docs/api/render_manufacturing_hints_rpath.md b/docs/skill/references/docs/api/render_manufacturing_hints_rpath.md
+index 71b2cd0..88dacad 100644
+--- a/docs/skill/references/docs/api/render_manufacturing_hints_rpath.md
++++ b/docs/skill/references/docs/api/render_manufacturing_hints_rpath.md
+@@ -17,8 +17,9 @@ def render_manufacturing_hints_rpath(model_or_path: ModelInput, output_path: str
+ Render manufacturing hints as deterministic category-colored overlays.
+ 
+ Sheet-metal skins are blue, bends are orange, extrusion geometry is green,
+-revolution geometry is cyan, holes are purple, fillets are red, and
+-chamfers are yellow. Hole, extrusion, and revolution candidates must be
+-explicitly enabled. They explain final geometry rather than original
++revolution geometry is cyan, lofts are pink, sweeps are indigo, holes are
++purple, fillets are red, and chamfers are yellow. Hole, extrusion,
++revolution, loft, and sweep candidates must be explicitly enabled. They
++explain final geometry rather than original
+ feature history. Analysis always runs against the current model so entity
+ IDs cannot be reused across different BREP instances.
+diff --git a/docs/skill/references/docs/core/operation_graph_json_spec.md b/docs/skill/references/docs/core/operation_graph_json_spec.md
+index fe997c8..6ef79f8 100644
+--- a/docs/skill/references/docs/core/operation_graph_json_spec.md
++++ b/docs/skill/references/docs/core/operation_graph_json_spec.md
+@@ -336,7 +336,7 @@ source API 名字不等于 canonical graph op 名字。Composite source API 可
+ 
+ - `make_*_face` 与 `make_face_from_wire` -> `Sketch`
+ - `make_*_edge` / `make_*_wire` -> `Profile`
+-- `make_extrude_rsolid` / `make_revolve_rsolid` / `make_loft_rsolid` / `make_sweep_rsolid` / `make_twisted_sweep_rsolid` / `make_fillet_rsolid` / `make_chamfer_rsolid` / `make_shell_rsolid` / `make_cut_rsolid` / `make_union_rsolid` / `make_intersect_rsolid` -> `Feature`
++- `make_extrude_rsolid` / `make_revolve_rsolid` / `make_loft_rsolid` / `make_multi_section_sweep_rsolid` / `make_sweep_rsolid` / `make_twisted_sweep_rsolid` / `make_fillet_rsolid` / `make_chamfer_rsolid` / `make_shell_rsolid` / `make_cut_rsolid` / `make_union_rsolid` / `make_intersect_rsolid` -> `Feature`
+ 
+ ## 7. Topology Delta Schema
+ 
+@@ -1038,6 +1038,8 @@ New canonical profile nodes use the `make_*_r*` names listed in `canonical_contr
+ - `make_extrude_rsolid`
+ - `make_revolve_rsolid`
+ - `make_loft_rsolid`
++- `make_multi_section_sweep_rsolid`
++- `make_multi_section_sweep_rshell`
+ - `make_sweep_rsolid`
+ - `make_twisted_sweep_rsolid`
+ - `make_translate_rshape`
+@@ -1428,6 +1430,12 @@ Important:
+ | --- | --- | --- |
+ | `profile_count` | `int` | number of profiles |
+ | `ruled` | `bool` | whether ruled loft mode was requested |
++| `tolerance` | positive number | 3D approximation tolerance |
++| `compatibility_check` | `bool` | enable OCP section compatibility correction |
++| `smoothing` | `bool` or `null` | explicit approximation smoothing selection |
++| `continuity` | string or `null` | C0/C1/C2/C3/G1/G2 approximation continuity |
++| `parametrization` | string or `null` | chord-length, centripetal, or iso-parametric mode |
++| `max_degree` | integer or `null` | maximum U degree |
+ 
+ #### `make_sweep_rsolid`
+ 
+@@ -1439,6 +1447,20 @@ Important:
+ | --- | --- | --- |
+ | `is_frenet` | `bool` | sweep orientation mode |
+ 
++#### `make_multi_section_sweep_rsolid` / `make_multi_section_sweep_rshell`
++
++- Ordered inputs: N section `Wire`/endpoint `Vertex`, one path `Wire`, then an
++  optional auxiliary-spine `Wire`.
++- Outputs: one `Solid` or one `Shell`.
++- Canonical contract: 2.2 and later. Translators currently declare these
++  operations unsupported rather than silently lowering them.
++- Params: `section_count`, `frame_policy`, `with_contact`, `with_correction`,
++  `has_auxiliary_spine`, `curvilinear_equivalence`, `auxiliary_contact`, and
++  ordered `input_refs`; the solid node also records `tracking_policy`.
++
++The auxiliary spine controls the moving frame. It is not a general guide rail
++or a promise that the generated boundary passes through that curve.
++
+ #### `make_twisted_sweep_rsolid`
+ 
+ - Inputs: 1 profile `Face`
+diff --git a/docs/skill/references/docs/core/serialization/features-booleans-transforms.md b/docs/skill/references/docs/core/serialization/features-booleans-transforms.md
+index 61273c0..3bf633b 100644
+--- a/docs/skill/references/docs/core/serialization/features-booleans-transforms.md
++++ b/docs/skill/references/docs/core/serialization/features-booleans-transforms.md
+@@ -94,6 +94,19 @@ Replay effect:
+ 2. Call `loft_rsolid(profiles, ruled=...)`.
+ 
+ Profile geometry is recovered from `inputs`; only count/options are stored in `params`.
++Newly recorded nodes also preserve `tolerance`, `compatibility_check`,
++`smoothing`, `continuity`, `parametrization`, and `max_degree`. Replay defaults
++missing fields so canonical 2.0/2.1 loft nodes keep their historical behavior.
++
++## Multi-section path sweep
++
++`multi_section_sweep_rsolid` and `multi_section_sweep_rshell` record canonical
++2.2 nodes. Ordered `input_refs` distinguish section inputs from the main path
++and optional auxiliary spine. Replay validates `section_count` and
++`has_auxiliary_spine` before calling the public API; it never guesses input
++roles from topology. Frame policy and auxiliary contact mode are recorded
++verbatim. Product translators currently report these operations as explicitly
++unsupported.
+ 
+ ## Sweep
+ 
+diff --git a/docs/skill/references/domains/step-inspection.md b/docs/skill/references/domains/step-inspection.md
+index fb822e1..5965820 100644
+--- a/docs/skill/references/domains/step-inspection.md
++++ b/docs/skill/references/domains/step-inspection.md
+@@ -93,13 +93,15 @@ the current hypothesis; escalate only when the question requires it:
+ | Final exact-BREP gate | `compare_shapes_rbrepcomparison`, `compare_steps_rbrepcomparison` |
+ 
+ Manufacturing-hint defaults remain the legacy fillet, chamfer, and sheet-metal
+-set. The v3 catalog explicitly defaults to hole, extrusion, revolution,
+-fillet, chamfer, and sheet metal. Here `extrusion` means extrusion-style geometry, including
++set. The v4 catalog explicitly defaults to hole, extrusion, revolution, loft,
++sweep, fillet, chamfer, and sheet metal. Here `extrusion` means extrusion-style geometry, including
+ local bosses, ribs, pockets, slots, and through cuts; `whole_body_prism` is
+ only one subtype. Circular and shaped closed negative spaces all belong to
+ `hole`. `revolution` covers full/partial and whole/local regions around a
+ supported axis. A cylinder is reported once with revolution primary and
+ extrusion recorded as an alternative interpretation when both gates pass.
++`loft` covers whole/local variable-section and point-terminal regions;
++`sweep` covers whole/local path transport, twist, and helix geometry.
+ IDs are valid only for the same unmodified BREP, and every candidate
+ describes final geometry rather than feature history or manufacturing intent.
+ 
+diff --git a/docs/skill/references/inspect/brep-reverse-engineering.md b/docs/skill/references/inspect/brep-reverse-engineering.md
+index d9dcc8f..1e96bc3 100644
+--- a/docs/skill/references/inspect/brep-reverse-engineering.md
++++ b/docs/skill/references/inspect/brep-reverse-engineering.md
+@@ -54,12 +54,12 @@ image = brep.render_step_comparison_rpath(
+ )
+ manufacturing_hints = brep.inspect_manufacturing_hints_rdescriptor(
+     model_or_path="part.step",
+-    feature_kinds=("hole", "extrusion", "revolution"),
++    feature_kinds=("hole", "extrusion", "revolution", "loft", "sweep"),
+ )
+ brep.render_manufacturing_hints_rpath(
+     model_or_path="part.step",
+     output_path="manufacturing-hints.png",
+-    feature_kinds=("hole", "extrusion", "revolution"),
++    feature_kinds=("hole", "extrusion", "revolution", "loft", "sweep"),
+ )
+ ```
+ 
+@@ -169,7 +169,7 @@ case-by-case inspection code for the model:
+ | Material difference inside one ROI | `compare_material_region_rdescriptor` |
+ | Ordered section sweep | `compare_sections_batch_rdescriptor` |
+ | Atomic STEP write/reload evidence | `validate_step_roundtrip_rdescriptor` |
+-| Build the v3 per-instance catalog for holes, extrusion-style regions, revolution-style regions, fillets, chamfers, and sheet metal | `inspect_geometric_features_rdescriptor` |
++| Build the v4 per-instance catalog for holes, extrusion, revolution, loft, sweep, fillets, chamfers, and sheet metal | `inspect_geometric_features_rdescriptor` |
+ | Render exactly the supplied saved catalog | `render_geometric_features_rpath` |
+ | Keep legacy manufacturing-hint callers compatible | `inspect_manufacturing_hints_rdescriptor`, `render_manufacturing_hints_rpath` |
+ | Final exact-BREP gate | `compare_shapes_rbrepcomparison`, `compare_steps_rbrepcomparison` |
+@@ -199,9 +199,10 @@ thickness set of opposed planar or coaxial cylindrical face pairs, a thin-body
+ ratio, and a matching thickness-times-midsurface volume model. Coaxial cylinder
+ pairs whose radius difference equals the nominal wall thickness are returned as
+ separate bend hints when they also connect at least two paired planar skins.
+-Hole, extrusion, and revolution candidates remain opt-in in the legacy hint API so its
+-default stays compatible. The v3 `inspect_geometric_features_rdescriptor`
+-defaults to all six categories and normalizes every instance to a stable ID,
++Hole, extrusion, revolution, loft, and sweep candidates remain opt-in in the
++legacy hint API so its default stays compatible. The v4
++`inspect_geometric_features_rdescriptor` defaults to all eight categories and
++normalizes every instance to a stable ID,
+ large/small subtype, location, dimensions with units, profile, relationships,
+ evidence, confidence, visuals, limitations, and target hash. Circular holes
+ include through, blind, counterbore, countersink, stepped, and tapered forms.
+@@ -227,11 +228,20 @@ conflict group as an alternative interpretation. A whole-body profile inner
+ loop may still be historical ambiguity, recorded as
+ an alternative rather than used to invent command order.
+ 
++A loft candidate reports whole/local coverage, additive/subtractive/neutral
++role, profile or point terminal, interpolation, variation law, endpoint
++similarity fit, actual section flow, and contour topology events. A sweep
++candidate requires rigid endpoint profiles and reports path evidence; twisted
++sweeps add measured section rotation, while helical sweeps add a fitted axis,
++radius, pitch, turns, handedness, radius variation, and linear-fit quality.
++Straight rigid translation remains extrusion. For the same whole-body entity
++set the primary order is revolution, extrusion, sweep, then loft.
++
+ Every hint includes stable IDs, measurements, evidence, and non-probabilistic
+ confidence. The legacy renderer performs a fresh analysis for compatibility.
+-The v3 `render_geometric_features_rpath` instead consumes a saved report,
++The v4 `render_geometric_features_rpath` instead consumes a saved report,
+ rejects stale hashes or IDs, and uses the fixed colors extrusion `#29ad57`,
+-revolution `#06b6d4`,
++revolution `#06b6d4`, loft `#ec4899`, sweep `#4f46e5`,
+ hole `#943dc7`, fillet `#ef4444`, chamfer `#f2b134`, sheet metal `#3b82f6`,
+ and bend `#f97316`.
+ 
+diff --git a/docs/skill/references/workflows/step-computational-geometry-analysis.md b/docs/skill/references/workflows/step-computational-geometry-analysis.md
+index da39442..2c5fd4f 100644
+--- a/docs/skill/references/workflows/step-computational-geometry-analysis.md
++++ b/docs/skill/references/workflows/step-computational-geometry-analysis.md
+@@ -1,4 +1,4 @@
+-# Workflow: STEP Computational-Geometry Analysis v3
++# Workflow: STEP Computational-Geometry Analysis v4
+ 
+ Parse a STEP file into a complete, per-instance computational-geometry
+ artifact package without reconstructing an editable model.
+@@ -25,6 +25,14 @@ partial-angle. A cylinder may support both extrusion and revolution; when the
+ complete revolution gate passes, revolution is primary and extrusion is an
+ `alternative_interpretations` entry in the same `conflict_group_id`.
+ 
++`loft` is variable-section geometry supported by ordered profile sections,
++including one- or two-point terminals and variable profiles constrained by a
++recovered path. `sweep` transports a rigid
++section along a path and includes path, twisted, and helical subtypes. These
++are final-geometry claims only: straight rigid translation belongs to
++`extrusion`, fixed-axis rotation belongs to `revolution`, and a rigid
++transported section belongs to `sweep` before considering `loft`.
++
+ ## 2. Non-negotiable boundaries
+ 
+ - Treat the target STEP and its directory as read-only.
+@@ -46,8 +54,8 @@ target/candidate comparison, or reconstruction iteration.
+ 
+ - absolute `.step` or `.stp` target path;
+ - isolated absolute output directory;
+-- explicit feature kinds; v3 full analysis uses
+-  `("hole", "extrusion", "revolution", "fillet", "chamfer", "sheet_metal")`;
++- explicit feature kinds; v4 full analysis uses
++  `("hole", "extrusion", "revolution", "loft", "sweep", "fillet", "chamfer", "sheet_metal")`;
+ - linear/angular tolerances and `max_features`;
+ - optional user section planes and recorded automatic section rules;
+ - deterministic rendering options.
+@@ -68,8 +76,8 @@ Read `references/inspect/brep-reverse-engineering.md` and
+ 
+ Legacy `inspect_manufacturing_hints_rdescriptor` and
+ `render_manufacturing_hints_rpath` remain available, but raw hints are not the
+-v3 user report. The legacy default remains fillet, chamfer, and sheet metal;
+-`hole`, `extrusion`, and `revolution` are opt-in there.
++v4 user report. The legacy default remains fillet, chamfer, and sheet metal;
++`hole`, `extrusion`, `revolution`, `loft`, and `sweep` are opt-in there.
+ 
+ ## 5. Workflow
+ 
+@@ -102,7 +110,15 @@ samples. Also build canonical collinear axis clusters from cylinder, cone,
+ torus, REVOLUTION carriers, and supporting circular edges. Measure
+ width/height, area, perimeter, directions, calipers, curve segments,
+ translated-loop correspondence, rotated-loop correspondence, and meridian
+-profiles. This layer measures only; it does not name features.
++profiles. For loft/sweep analysis, also compute equal-arc-length profile
++samples, cyclic/reversed Kabsch rigid fits, similarity fits, shared cap-to-cap
++wall coverage, ordered actual BREP sections, contour tracks, and longitudinal
++edge samples. Reuse one section-family result for loft and sweep. After a
++bounded candidate passes the coarse gate, run the specialist pass only on its
++ROI to recover global direction/seam alignment, path hypotheses, frame law,
++explicit guides, guide attachments, endpoint conditions, profile laws, and
++bounded station-refinement requests. This layer measures only; it does not
++create reconstruction geometry.
+ 
+ **Gate:** all values are finite and use recorded units.
+ 
+@@ -116,6 +132,15 @@ Call `inspect_geometric_features_rdescriptor` once with every enabled kind.
+   `whole_body_partial_revolution`, `local_full_revolved_boss`,
+   `local_partial_revolved_boss`, `local_full_revolved_groove`,
+   `local_partial_revolved_cut`.
++- Loft-style: `whole_body_profile_loft`, `whole_body_point_loft`,
++  `local_lofted_boss`, `local_lofted_cut`. Orthogonal fields record
++  `coverage`, `region_role`, `terminal_kind`, `terminal_mode`,
++  `interpolation`, `interpolation_by_span`, `loft_control_mode`, and
++  `variation_law`.
++- Sweep-style: `whole_body_path_sweep`, `local_swept_boss`,
++  `local_swept_cut`, `twisted_sweep`, `helical_sweep`. Orthogonal fields
++  record `coverage` and `region_role`; twist and helix measurements appear
++  only when applicable.
+ - Holes: `circular_through`, `circular_blind`, `counterbore`, `countersink`,
+   `circular_stepped`, `tapered_hole`, `obround_through`, `obround_blind`,
+   `rectangular`, `polygonal`, `d_or_keyhole`, `freeform_profile`,
+@@ -138,6 +163,18 @@ list position. A revolution region has a supported collinear axis cluster,
+ axis-compatible carriers, a stable meridian profile, coherent angular coverage
+ and angular caps, closed local boundaries, and a clear material side.
+ 
++A profile loft requires complete cap-to-side coverage, non-rigid endpoint
++profiles, actual intermediate BREP sections, and contour tracking without an
++unreported birth/death/split/merge. A point loft may have one or two shared
++terminal vertices. A two-point terminal requires non-degenerate intermediate
++sections; an interior point is not accepted as one loft operation. A sweep
++requires complete coverage plus a
++rigid endpoint-profile fit; straight translation is rejected in favor of
++extrusion. Twisted sweeps require rotating rigid sections. Helical sweeps also
++require a longitudinal edge with near-constant fitted radius and a high-quality
++linear unwrapped-angle-to-axial fit that yields radius, pitch, turns, axis, and
++handedness.
++
+ ### Phase 5: Resolve ownership, overlap, and alternatives
+ 
+ Closed negative space belongs to `hole`, including every shaped hole. Open
+@@ -148,7 +185,8 @@ explanatory face. Put uncertainty in `conflict_group_id` and
+ `alternative_interpretations`; count only the primary.
+ 
+ Recognize ownership in this dependency order: holes, sheet-metal skins and
+-bends, extrusion/revolution regions, then fillets and chamfers. Do not promote
++bends, extrusion/revolution/sweep/loft regions, then fillets and chamfers. For
++the same whole-body entity set use revolution > extrusion > sweep > loft. Do not promote
+ hole walls, countersink cones, confirmed sheet bends, fillets, or chamfers into
+ standalone revolution features. Whole-body candidates may contain local
+ features only through explicit `contains_feature_ids` / `parent_feature_id`.
+@@ -161,7 +199,16 @@ Write `feature-index.json` and `feature-summary.json`. Every feature has a
+ stable ID and exactly: `feature_id`, `category`, `subtype`, `display_name`,
+ `claim`, `body_id`, `entity_ids`, `highlight_entity_ids`,
+ `support_entity_ids`, `location`, `dimensions`, `profile`, `relationships`,
+-`evidence`, `confidence`, `visuals`, `limitations`, and `target_sha256`.
++`evidence`, `confidence`, `visuals`, `limitations`, `reconstruction`, and
++`target_sha256`.
++
++For loft and sweep, `reconstruction` is a versioned JSON-safe handoff, not a
++claim about original authoring history. It includes ROI IDs, ordered sections,
++global alignment, profile/frame laws, path candidates, explicit guides and
++`guide_attachment_map`, endpoint-condition evidence, adaptive station
++requests, operation candidates, capability state, preflight checks, fallback
++order, and limitations. Preserve `specialist_trigger.decision`; an incomplete
++specialist result must not erase the coarse candidate.
+ 
+ Each subtype lists its dimensions directly with units. A non-applicable value
+ says `not_applicable`; an unmeasurable value is `null` with
+@@ -170,6 +217,10 @@ direction/axis or local frame, depth, segment dimensions, and profile details.
+ Revolutions store `location.axis.point`, `location.axis.direction`,
+ `dimensions.sweep_angle`, `minimum_radius`, `maximum_radius`, `axial_span`, and
+ `profile.kind="meridian"`, without changing the fixed top-level field set.
++Lofts store endpoint fit error/scale, start/end area where measurable,
++variation law, and section tracking. Sweeps store path chord, endpoint rigid
++fit, applicable twist angle, and applicable helix radius, pitch, turns, axis,
++handedness, and fit quality.
+ 
+ **Gate:** `truncated=false`, `complete=true`; all IDs resolve and every feature
+ has its subtype-specific dimensions, evidence, and planned links.
+@@ -180,7 +231,14 @@ Plan longitudinal/transverse sections for holes, profile and 25/50/75%
+ transverse checks plus a length section for extrusions, and XY/XZ/YZ center
+ sections for every run. For revolutions, plan a through-axis meridian section;
+ full revolutions add 0°/90°/180°/270° comparisons, while partial revolutions add
+-start/25%/50%/75%/end angular sections. Deduplicate by recorded tolerances. Call
++start/25%/50%/75%/end angular sections. For lofts and sweeps, preserve the cap
++sections and every successful 25%/50%/75% actual BREP section plane used by
++recognition. Also materialize bounded `adaptive_station_plan.requests` as
++additional measured sections when the station budget permits; record skipped
++requests and their budget reason. Never replace an actual BREP section with
++an interpolated drawing. Helical candidates
++may use the longitudinal helix fit as primary evidence when one plane intersects
++multiple turns. Deduplicate by recorded tolerances. Call
+ `inspect_section_rdescriptor(..., compact=False)` and save descriptors under
+ `sections/data/`.
+ 
+@@ -194,12 +252,13 @@ Load saved `feature-index.json`. Call `render_geometric_features_rpath` for
+ recognizing. Produce per-feature `isometric.png`, `context.png`, profiles for
+ holes/extrusions, longitudinal/transverse sections, and `section-atlas.png`.
+ 
+-Use fixed colors: extrusion `#29ad57`, revolution `#06b6d4`, hole `#943dc7`, fillet `#ef4444`,
++Use fixed colors: extrusion `#29ad57`, revolution `#06b6d4`, loft `#ec4899`,
++sweep `#4f46e5`, hole `#943dc7`, fillet `#ef4444`,
+ chamfer `#f2b134`, sheet metal `#3b82f6`, bend `#f97316`. Circular and shaped
+ holes share purple. Write `visual-index.json` and `section-index.json` with
+ feature ID, entity IDs, relative path, image SHA-256, and target SHA-256.
+ 
+-**Gate:** every feature has a highlight; holes/extrusions have a profile and
++**Gate:** every feature has a highlight; holes/extrusions/lofts/sweeps have a profile and
+ length/depth sections; revolutions have a meridian profile and required
+ angular sections. For zero features, the overview is `not_applicable`,
+ but three global sections still exist.
+@@ -213,7 +272,8 @@ visuals, and limitations. Write `artifact-manifest.json` with relative path,
+ role, bytes, SHA-256, and target hash. Set `run-status.json` to `complete`.
+ 
+ **Gate:** every link exists, hashes agree, no feature is omitted or double
+-counted, and no reconstruction artifact exists. End here.
++counted, and no candidate geometry/model/replay artifact exists. A
++`reconstruction` handoff descriptor is analysis data and is allowed. End here.
+ 
+ ## 6. Failure routes
+ 
+@@ -238,6 +298,8 @@ counted, and no reconstruction artifact exists. End here.
+   raw-feature-hints.json
+   feature-index.json
+   feature-summary.json
++  reconstruction-hypotheses.json
++  loft-sweep-specialist.json
+   visual-index.json
+   section-index.json
+   parse-report.md
+diff --git a/docs/skill/references/workflows/step-reconstruction-cn.md b/docs/skill/references/workflows/step-reconstruction-cn.md
+index f79d3b0..41a97ca 100644
+--- a/docs/skill/references/workflows/step-reconstruction-cn.md
++++ b/docs/skill/references/workflows/step-reconstruction-cn.md
+@@ -199,6 +199,23 @@ manifest 必须位于用户指定的绝对输出目录内。没有输出目录
+ 多个局部几何信号             -> 有序混合特征树
+ ```
+ 
++对于每个放样/扫掠候选，如果目录中存在版本化 `reconstruction` 契约，必须先校验
++目标哈希和 schema，再消费其中的截面、路径、标架、导轨、端部条件、候选操作和
++能力状态。专项结果是几何证据，不是可直接执行的原始建模历史。按能够解释 ROI 的
++最简单受支持操作选择：
++
++```text
++刚性截面 + 恢复路径                 -> sweep_rsolid
++可变截面、不要求路径                 -> loft_rsolid / loft_rshell
++可变截面 + 恢复路径                  -> multi_section_sweep_rsolid / rshell
++一条控制朝向的辅助脊线               -> auxiliary_spine 多截面路径扫掠
++多条强制边界导轨                     -> 已验证曲面网络，否则 unsupported
++```
++
++必须使用 `terminal_mode` 区分无点、起点/终点和双点终端。内部点应拆成两个操作。
++不得把拟合路径或拟合导轨描述为原始设计意图，也不得把 `planned` 或
++`unsupported` 候选当作原生能力执行。
++
+ 每个基体、孔、槽、缺口、凸台或自由曲面区域记录一条来源信息：
+ 
+ - 观察到的边界或截面；
+@@ -253,6 +270,19 @@ sketch -> basic body operation -> boolean -> modifier
+ - 每个主要步骤输出少量 QL 派生事实；
+ - 布尔失败时修复操作数、相交关系或特征顺序，不把跳过的布尔称为成功。
+ 
++每次调用放样前，必须以预期的 `solid` 或 `shell` 结果运行 `preflight_loft`。
++报告含错误时停止构建；站位非单调或相邻截面法向相反时先修复参数，不能反复调用
++内核碰运气。对路径约束的可变截面候选，先使用最少但足够的截面，再调用
++`multi_section_sweep_rsolid` 或 `multi_section_sweep_rshell`。只有恢复出的辅助曲线
++确实解释截面朝向时，才使用 `frame_policy="auxiliary_spine"`；辅助脊线只控制移动
++标架，不是强制曲面经过的任意边界导轨。
++
++当前 section loft 后端不能可移植地执行端部切向、拔模角、曲率或影响幅值条件。
++如果 `preflight_loft` 返回 `boundary_condition_unsupported`，应保留识别证据，并明确
++选择近似方案或 unsupported，不能静默丢弃条件。solid/shell 与 ruled/smooth 的选择
++都必须有证据；端部不封闭时不能强制实体化，多导轨曲面网络也不能伪装成单辅助
++脊线路径扫掠。
++
+ **产物**
+ 
+ - SimpleCADAPI 重建源码；
+diff --git a/docs/skill/references/workflows/step-reconstruction.md b/docs/skill/references/workflows/step-reconstruction.md
+index fc220dd..a5bea68 100644
+--- a/docs/skill/references/workflows/step-reconstruction.md
++++ b/docs/skill/references/workflows/step-reconstruction.md
+@@ -232,6 +232,24 @@ verified equal angular or linear spacing  -> one seed feature + pattern
+ several local geometric signatures        -> ordered mixed feature tree
+ ```
+ 
++For every loft/sweep candidate, consume the catalog's versioned
++`reconstruction` handoff when present and validate its target hash and schema.
++The specialist result is evidence, not executable history. Choose the least
++complex supported operation that explains the ROI:
++
++```text
++rigid profile + recovered path                 -> sweep_rsolid
++variable profiles, no required path            -> loft_rsolid / loft_rshell
++variable profiles + recovered path             -> multi_section_sweep_rsolid / rshell
++one auxiliary orientation spine                -> multi-section sweep with auxiliary_spine
++multiple boundary guides                       -> validated surface network, otherwise unsupported
++```
++
++Use `terminal_mode` to distinguish no point, start/end point, and both-point
++lofts. An interior point splits the reconstruction into two operations. Do not
++promote a fitted path or guide to original authoring intent, and do not select
++a `planned` or `unsupported` operation as if it were native.
++
+ For every base, hole, slot, notch, boss, or freeform region, record:
+ 
+ - observed boundary or section;
+@@ -302,6 +320,23 @@ During construction:
+ - when a boolean fails, repair its operands, intersection, or feature order;
+   never call a skipped boolean successful.
+ 
++Before every loft call, run `preflight_loft` with the intended `solid` or
++`shell` result and stop on any report error. Treat non-monotonic stations or
++opposed section normals as repair tasks, not kernel trial-and-error. For a
++path-constrained variable-profile candidate, start with the smallest adequate
++section set and call `multi_section_sweep_rsolid` or
++`multi_section_sweep_rshell`; use `frame_policy="auxiliary_spine"` only when
++the recovered auxiliary curve explains orientation. The auxiliary spine is
++frame control, not an arbitrary boundary rail.
++
++Endpoint tangent, draft-angle, curvature, and magnitude constraints are not
++portable in the current section-loft backend. If `preflight_loft` returns
++`boundary_condition_unsupported`, keep the condition as evidence and choose a
++documented approximation or unsupported result; never silently drop it.
++Always keep solid/shell and ruled/smooth decisions evidence-backed. Do not call
++`MakeSolid` when endpoint closure is absent, and do not force a multi-rail
++surface network through the auxiliary-spine API.
++
+ **Artifacts**
+ 
+ - SimpleCADAPI reconstruction source;
+diff --git a/src/simplecadapi/__init__.py b/src/simplecadapi/__init__.py
+index 28aba43..9894031 100644
+--- a/src/simplecadapi/__init__.py
++++ b/src/simplecadapi/__init__.py
+@@ -160,6 +160,7 @@ from .operators import (  # 基础几何创建; 变换操作; 3D操作; 标签
+     linear_pattern_rsolidlist,
+     list_tags,
+     loft_rsolid,
++    multi_section_sweep_rsolid,
+     make_2d_cut_rface,
+     make_2d_intersect_rface,
+     make_2d_union_rface,
+@@ -277,6 +278,8 @@ from .surface import (
+     fit_point_grid_rface,
+     free_boundaries_rwirelist,
+     loft_rshell,
++    multi_section_sweep_rshell,
++    preflight_loft,
+     make_bezier_surface_rface,
+     make_cylindrical_surface_rface,
+     make_gordon_surface_rface,
+@@ -435,6 +438,8 @@ __all__ = [
+     "make_gordon_surface_rface",
+     "make_surface_patch_rface",
+     "loft_rshell",
++    "multi_section_sweep_rshell",
++    "preflight_loft",
+     "trim_surface_rface",
+     "sew_faces_rshell",
+     "make_solid_from_shell_rsolid",
+@@ -557,6 +562,7 @@ __all__ = [
+     "extrude_rsolid",
+     "helical_sweep_rsolid",
+     "loft_rsolid",
++    "multi_section_sweep_rsolid",
+     "revolve_rsolid",
+     "sweep_rsolid",
+     "twisted_sweep_rsolid",
+diff --git a/src/simplecadapi/inspect/brep/feature_catalog.py b/src/simplecadapi/inspect/brep/feature_catalog.py
+index 41d4767..cf49dc0 100644
+--- a/src/simplecadapi/inspect/brep/feature_catalog.py
++++ b/src/simplecadapi/inspect/brep/feature_catalog.py
+@@ -10,12 +10,15 @@ from pathlib import Path
+ from typing import Any, Sequence
+ 
+ from .manufacturing import ModelInput, _model, inspect_manufacturing_hints_rdescriptor
++from .reconstruction_contract import build_reconstruction_contract
+ 
+ 
+ FEATURE_CATEGORIES = (
+     "hole",
+     "extrusion",
+     "revolution",
++    "loft",
++    "sweep",
+     "fillet",
+     "chamfer",
+     "sheet_metal",
+@@ -38,6 +41,7 @@ FEATURE_FIELDS = (
+     "confidence",
+     "visuals",
+     "limitations",
++    "reconstruction",
+     "target_sha256",
+ )
+ 
+@@ -55,6 +59,15 @@ _DISPLAY_NAMES = {
+     "local_partial_revolved_boss": "局部部分旋转凸台",
+     "local_full_revolved_groove": "局部整周旋转凹槽",
+     "local_partial_revolved_cut": "局部部分旋转切除",
++    "whole_body_profile_loft": "整实体轮廓放样",
++    "whole_body_point_loft": "整实体点终端放样",
++    "local_lofted_boss": "局部放样凸台",
++    "local_lofted_cut": "局部放样切除",
++    "whole_body_path_sweep": "整实体路径扫掠",
++    "local_swept_boss": "局部扫掠凸台",
++    "local_swept_cut": "局部扫掠切除",
++    "twisted_sweep": "扭转扫掠",
++    "helical_sweep": "螺旋扫掠",
+     "circular_through": "圆形贯穿孔",
+     "circular_blind": "圆形盲孔",
+     "counterbore": "沉孔",
+@@ -154,6 +167,10 @@ def _category_subtype(hint: dict[str, Any]) -> tuple[str, str]:
+         return "extrusion", geometry["form"]
+     if kind == "revolution_region_candidate":
+         return "revolution", geometry["form"]
++    if kind == "loft_region_candidate":
++        return "loft", geometry["form"]
++    if kind == "sweep_region_candidate":
++        return "sweep", geometry["form"]
+     if kind == "hole_region_candidate":
+         aliases = {
+             "through_hole": "circular_through",
+@@ -182,7 +199,7 @@ def _category_subtype(hint: dict[str, Any]) -> tuple[str, str]:
+ 
+ def _profile(hint: dict[str, Any], category: str) -> dict[str, Any]:
+     geometry = hint["geometry"]
+-    if category == "extrusion":
++    if category in {"extrusion", "loft", "sweep"}:
+         return dict(geometry.get("profile") or {})
+     if category == "revolution":
+         return dict(geometry.get("profile") or {})
+@@ -209,7 +226,7 @@ def _profile(hint: dict[str, Any], category: str) -> dict[str, Any]:
+ 
+ def _location(hint: dict[str, Any], profile: dict[str, Any]) -> dict[str, Any]:
+     geometry = hint["geometry"]
+-    axis = geometry.get("axis") or {}
++    axis = geometry.get("axis") or (geometry.get("helix_fit") or {}).get("axis") or {}
+     return {
+         "center": geometry.get("entry_center")
+         or profile.get("centroid")
+@@ -229,7 +246,7 @@ def _dimensions(
+ ) -> dict[str, dict[str, Any]]:
+     geometry = hint["geometry"]
+     result: dict[str, dict[str, Any]] = {}
+-    if category in {"hole", "extrusion"}:
++    if category in {"hole", "extrusion", "loft", "sweep"}:
+         result.update(_profile_dimensions(profile))
+     if category == "hole":
+         diameters = geometry.get("diameters") or profile.get("diameters") or []
+@@ -287,6 +304,61 @@ def _dimensions(
+                 geometry.get("axial_span"), "mm", "轴向范围不可用"
+             ),
+         }
++    elif category == "loft":
++        alignment = geometry.get("endpoint_alignment") or {}
++        stations = (geometry.get("section_family") or {}).get("stations") or []
++        endpoint_areas = [
++            float(contour.get("area"))
++            for station in stations[:: max(len(stations) - 1, 1)]
++            for contour in station.get("contours", [])[:1]
++            if contour.get("area") is not None
++        ]
++        result.update(
++            {
++                "length": _dimension(geometry.get("length"), "mm", "端点距离不可用"),
++                "start_area": _dimension(
++                    endpoint_areas[0] if endpoint_areas else profile.get("area"),
++                    "mm^2",
++                    "起始截面面积不可用",
++                ),
++                "end_area": _dimension(
++                    endpoint_areas[-1] if endpoint_areas else None,
++                    "mm^2",
++                    "终止截面为点或面积不可用",
++                ),
++                "endpoint_scale": _dimension(
++                    alignment.get("scale"), "ratio", "点终端或轮廓配准不可用"
++                ),
++                "rigid_fit_error": _dimension(
++                    alignment.get("rigid_maximum_error"),
++                    "mm",
++                    "点终端或轮廓配准不可用",
++                ),
++            }
++        )
++    elif category == "sweep":
++        helix = geometry.get("helix_fit") or {}
++        result.update(
++            {
++                "path_chord_length": _dimension(
++                    geometry.get("path_chord_length"), "mm", "路径弦长不可用"
++                ),
++                "twist_angle": _dimension(
++                    geometry.get("twist_angle_degrees"),
++                    "degree",
++                    "非扭转扫掠不适用扭转角",
++                ),
++                "helix_radius": _dimension(
++                    helix.get("radius"), "mm", "非螺旋扫掠不适用螺旋半径"
++                ),
++                "helix_pitch": _dimension(
++                    helix.get("pitch"), "mm", "非螺旋扫掠不适用螺距"
++                ),
++                "helix_turn_count": _dimension(
++                    helix.get("turn_count"), "turn", "非螺旋扫掠不适用圈数"
++                ),
++            }
++        )
+     elif category == "fillet":
+         result = {
+             "radius": _dimension(geometry.get("radius"), "mm", "解析载体未提供半径"),
+@@ -412,48 +484,112 @@ def _deduplicate(hints: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+ 
+ 
+ def _resolve_conflicts(hints: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+-    """Prefer a complete revolution explanation over an equivalent extrusion."""
++    """Resolve equivalent whole-body explanations by geometric specificity."""
+ 
+     values = list(hints)
++    groups: defaultdict[tuple[str, tuple[str, ...]], list[int]] = defaultdict(list)
++    for index, hint in enumerate(values):
++        geometry = hint["geometry"]
++        whole = geometry.get("coverage") == "whole_body" or geometry.get("form") in {
++            "whole_body_prism",
++            "whole_body_full_revolution",
++            "whole_body_partial_revolution",
++        }
++        if whole:
++            groups[(hint["body_id"], tuple(_stable_ids(hint["entity_ids"])))].append(
++                index
++            )
++    rank = {
++        "whole_body_full_revolution": 500,
++        "whole_body_partial_revolution": 490,
++        "whole_body_prism": 400,
++        "helical_sweep": 330,
++        "twisted_sweep": 320,
++        "whole_body_path_sweep": 310,
++        "whole_body_point_loft": 210,
++        "whole_body_profile_loft": 200,
++    }
+     suppressed: set[int] = set()
+-    for revolution_index, revolution in enumerate(values):
+-        if (
+-            revolution["kind"] != "revolution_region_candidate"
+-            or revolution["geometry"].get("form") != "whole_body_full_revolution"
+-        ):
++    for (body_id, _entities), indices in groups.items():
++        recognized = [
++            index for index in indices if values[index]["geometry"].get("form") in rank
++        ]
++        if len(recognized) < 2:
+             continue
+-        revolution_entities = set(revolution["entity_ids"])
++        primary_index = min(
++            recognized,
++            key=lambda index: (
++                -rank[values[index]["geometry"]["form"]],
++                index,
++            ),
++        )
++        primary = values[primary_index]
++        primary_category, primary_subtype = _category_subtype(primary)
+         alternatives = []
+-        for extrusion_index, extrusion in enumerate(values):
+-            if (
+-                extrusion["kind"] != "extrusion_region_candidate"
+-                or extrusion["geometry"].get("form") != "whole_body_prism"
+-                or extrusion["body_id"] != revolution["body_id"]
+-                or set(extrusion["entity_ids"]) != revolution_entities
+-            ):
++        for index in recognized:
++            if index == primary_index:
++                continue
++            alternative = values[index]
++            category, subtype = _category_subtype(alternative)
++            if category == primary_category and subtype == primary_subtype:
++                suppressed.add(index)
+                 continue
+-            suppressed.add(extrusion_index)
++            suppressed.add(index)
+             alternatives.append(
+                 {
+-                    "category": "extrusion",
+-                    "subtype": "whole_body_prism",
+-                    "direction": list(extrusion["geometry"].get("direction") or []),
+-                    "reason": "same_final_brep_has_complete_revolution_evidence",
++                    "category": category,
++                    "subtype": subtype,
++                    "direction": list(alternative["geometry"].get("direction") or []),
++                    "reason": (
++                        f"same_final_brep_prefers_{primary_category}_{primary_subtype}"
++                    ),
++                }
++            )
++        if alternatives:
++            copied = {**primary, "geometry": dict(primary["geometry"])}
++            copied["geometry"][
++                "conflict_group_id"
++            ] = f"conflict-{body_id.replace(':', '-')}-generation-law"
++            copied["geometry"]["alternative_interpretations"] = alternatives
++            values[primary_index] = copied
++    for loft_index, loft in enumerate(values):
++        if loft["geometry"].get("form") != "whole_body_point_loft":
++            continue
++        loft_entities = set(loft["entity_ids"])
++        alternatives = list(loft["geometry"].get("alternative_interpretations", []))
++        for detail_index, detail in enumerate(values):
++            if detail_index == loft_index or detail_index in suppressed:
++                continue
++            if detail["body_id"] != loft["body_id"] or detail["kind"] not in {
++                "fillet_region_candidate",
++                "chamfer_region_candidate",
++            }:
++                continue
++            if not set(detail["entity_ids"]).issubset(loft_entities):
++                continue
++            category, subtype = _category_subtype(detail)
++            suppressed.add(detail_index)
++            alternatives.append(
++                {
++                    "category": category,
++                    "subtype": subtype,
++                    "direction": [],
++                    "reason": "point_loft_side_face_is_not_a_local_edge_treatment",
+                 }
+             )
+         if alternatives:
+-            copied = {**revolution, "geometry": dict(revolution["geometry"])}
++            copied = {**loft, "geometry": dict(loft["geometry"])}
+             copied["geometry"][
+                 "conflict_group_id"
+-            ] = f"conflict-{revolution['body_id'].replace(':', '-')}-rotation-extrusion"
++            ] = f"conflict-{loft['body_id'].replace(':', '-')}-point-loft"
+             copied["geometry"]["alternative_interpretations"] = alternatives
+-            values[revolution_index] = copied
++            values[loft_index] = copied
+     return [value for index, value in enumerate(values) if index not in suppressed]
+ 
+ 
+ def _visuals(category: str, feature_id: str) -> dict[str, str | None]:
+     base = f"highlights/{category}/{feature_id}"
+-    sectional = category in {"hole", "extrusion", "revolution"}
++    sectional = category in {"hole", "extrusion", "revolution", "loft", "sweep"}
+     return {
+         "overview": "highlights/all-features.png",
+         "isometric": f"{base}/isometric.png",
+@@ -479,7 +615,7 @@ def inspect_geometric_features_rdescriptor(
+     angular_tolerance_degrees: float = 0.5,
+     max_features: int = 500,
+ ) -> dict[str, Any]:
+-    """Return the normalized v3 catalog for final-BREP geometric candidates.
++    """Return the normalized v4 catalog for final-BREP geometric candidates.
+ 
+     ``extrusion`` means extrusion-style geometry; ``whole_body_prism`` is only
+     one subtype. ``revolution`` covers whole and local, full and partial-angle
+@@ -573,6 +709,13 @@ def inspect_geometric_features_rdescriptor(
+             "limitations": [
+                 "最终 BRep 只能支持几何候选，不能证明原始建模命令或创建顺序"
+             ],
++            "reconstruction": build_reconstruction_contract(
++                category=category,
++                geometry=hint["geometry"],
++                feature_id=feature_id,
++                entity_ids=_stable_ids(hint["entity_ids"]),
++                confidence=dict(hint["confidence"]),
++            ),
+             "target_sha256": target_sha256,
+         }
+         if set(feature) != set(FEATURE_FIELDS):
+@@ -609,7 +752,7 @@ def inspect_geometric_features_rdescriptor(
+     subtype_counts = Counter(feature["subtype"] for feature in features)
+     omitted = max(len(sortable) - max_features, 0) + int(raw["omitted_hint_count"])
+     return {
+-        "schema_version": "3.0",
++        "schema_version": "4.1",
+         "units": dict(raw["units"]),
+         "target_sha256": target_sha256,
+         "feature_kinds": list(requested),
+diff --git a/src/simplecadapi/inspect/brep/feature_hints/__init__.py b/src/simplecadapi/inspect/brep/feature_hints/__init__.py
+index c2092a5..218731c 100644
+--- a/src/simplecadapi/inspect/brep/feature_hints/__init__.py
++++ b/src/simplecadapi/inspect/brep/feature_hints/__init__.py
+@@ -2,6 +2,14 @@
+ 
+ from .extrusions import extrusion_hints
+ from .holes import hole_hints
++from .lofts import loft_hints
+ from .revolutions import revolution_hints
++from .sweeps import sweep_hints
+ 
+-__all__ = ["extrusion_hints", "hole_hints", "revolution_hints"]
++__all__ = [
++    "extrusion_hints",
++    "hole_hints",
++    "loft_hints",
++    "revolution_hints",
++    "sweep_hints",
++]
+diff --git a/src/simplecadapi/inspect/brep/feature_hints/profiles.py b/src/simplecadapi/inspect/brep/feature_hints/profiles.py
+index eea9790..a36df07 100644
+--- a/src/simplecadapi/inspect/brep/feature_hints/profiles.py
++++ b/src/simplecadapi/inspect/brep/feature_hints/profiles.py
+@@ -157,6 +157,85 @@ def resample_loop(loop: dict[str, Any], *, count: int = 128) -> np.ndarray:
+     return np.asarray(result, dtype=float)
+ 
+ 
++def sample_edge_points(edge, *, count: int = 129) -> np.ndarray:
++    """Return ordered points on one real BRep edge."""
++
++    if count < 2:
++        raise ValueError("count must be at least two")
++    return np.asarray(_sample_edge(edge, count), dtype=float)
++
++
++def align_closed_profiles(
++    first: dict[str, Any],
++    second: dict[str, Any],
++    *,
++    count: int = 128,
++) -> dict[str, Any]:
++    """Find the best cyclic 3-D similarity alignment of two closed loops.
++
++    Both wire direction and start edge are unknown in an imported BRep.  The
++    exhaustive cyclic search is deterministic and the Kabsch fit separates a
++    rigidly transported profile (sweep) from a genuinely changing one (loft).
++    """
++
++    source = resample_loop(first, count=count)
++    target = resample_loop(second, count=count)
++    source_center = np.mean(source, axis=0)
++    source_zero = source - source_center
++    source_energy = float(np.sum(source_zero * source_zero))
++    if source_energy <= 1.0e-24:
++        raise ValueError("profile has zero spatial extent")
++    best: tuple[tuple[float, float, float, int, int], dict[str, Any]] | None = None
++    for reversed_order in (False, True):
++        ordered = target[::-1] if reversed_order else target
++        for offset in range(count):
++            candidate = np.roll(ordered, -offset, axis=0)
++            target_center = np.mean(candidate, axis=0)
++            target_zero = candidate - target_center
++            covariance = source_zero.T @ target_zero
++            left, singular, right = np.linalg.svd(covariance)
++            rotation = right.T @ left.T
++            if float(np.linalg.det(rotation)) < 0.0:
++                right[-1, :] *= -1.0
++                rotation = right.T @ left.T
++            rigid = source_zero @ rotation.T + target_center
++            rigid_distances = np.linalg.norm(rigid - candidate, axis=1)
++            scale = float(np.sum(singular) / source_energy)
++            similarity = scale * (source_zero @ rotation.T) + target_center
++            similarity_distances = np.linalg.norm(similarity - candidate, axis=1)
++            trace = min(3.0, max(-1.0, float(np.trace(rotation))))
++            angle = math.degrees(math.acos(min(1.0, max(-1.0, (trace - 1.0) * 0.5))))
++            payload = {
++                "sample_count": count,
++                "reversed": reversed_order,
++                "cyclic_offset": offset,
++                "source_centroid": vector(source_center),
++                "target_centroid": vector(target_center),
++                "translation": vector(target_center - source_center @ rotation.T),
++                "rotation_matrix": [vector(row) for row in rotation],
++                "rotation_angle_degrees": angle,
++                "scale": scale,
++                "rigid_rms_error": float(np.sqrt(np.mean(rigid_distances**2))),
++                "rigid_maximum_error": float(np.max(rigid_distances)),
++                "similarity_rms_error": float(
++                    np.sqrt(np.mean(similarity_distances**2))
++                ),
++                "similarity_maximum_error": float(np.max(similarity_distances)),
++            }
++            key = (
++                payload["rigid_maximum_error"],
++                payload["rigid_rms_error"],
++                angle,
++                int(reversed_order),
++                offset,
++            )
++            if best is None or key < best[0]:
++                best = (key, payload)
++    if best is None:
++        raise ValueError("profile alignment produced no candidate")
++    return best[1]
++
++
+ def loop_geometry_signature(loop: dict[str, Any]) -> dict[str, Any]:
+     curve_types = [_curve_type(edge) for edge in loop["edges"]]
+     return {
+diff --git a/src/simplecadapi/inspect/brep/feature_hints/revolutions.py b/src/simplecadapi/inspect/brep/feature_hints/revolutions.py
+index fb0e4ba..c812121 100644
+--- a/src/simplecadapi/inspect/brep/feature_hints/revolutions.py
++++ b/src/simplecadapi/inspect/brep/feature_hints/revolutions.py
+@@ -150,8 +150,6 @@ def _angular_consistency(
+                 offsets - axial[:, None] * axis_direction, axis=1
+             )
+             values.append(np.column_stack((axial, radial_distance)))
+-        if not values:
+-            raise ValueError("revolution angular section produced no meridian boundary")
+         return values
+ 
+     def directed_distance(points: np.ndarray, polylines: list[np.ndarray]) -> float:
+@@ -182,6 +180,17 @@ def _angular_consistency(
+         return maximum
+ 
+     measured = {station: section_polylines(station) for station in stations}
++    empty_stations = [station for station, polylines in measured.items() if not polylines]
++    if empty_stations:
++        return {
++            "stations": stations,
++            "measurements": [],
++            "maximum_correspondence_error": None,
++            "tolerance": None,
++            "passed": False,
++            "unavailable_reason": "angular section produced no meridian boundary",
++            "empty_stations": empty_stations,
++        }
+     reference_station = 0.0 if full else 0.5 * sweep_angle_degrees
+     reference_polylines = measured[reference_station]
+     reference_points = np.vstack(reference_polylines)
+diff --git a/src/simplecadapi/inspect/brep/feature_visualization.py b/src/simplecadapi/inspect/brep/feature_visualization.py
+index 5ba6ca1..f382092 100644
+--- a/src/simplecadapi/inspect/brep/feature_visualization.py
++++ b/src/simplecadapi/inspect/brep/feature_visualization.py
+@@ -13,6 +13,8 @@ from .manufacturing import ModelInput, _model
+ FEATURE_COLORS = {
+     "extrusion": (41 / 255, 173 / 255, 87 / 255),
+     "revolution": (6 / 255, 182 / 255, 212 / 255),
++    "loft": (236 / 255, 72 / 255, 153 / 255),
++    "sweep": (79 / 255, 70 / 255, 229 / 255),
+     "hole": (148 / 255, 61 / 255, 199 / 255),
+     "fillet": (239 / 255, 68 / 255, 68 / 255),
+     "chamfer": (242 / 255, 177 / 255, 52 / 255),
+@@ -23,6 +25,8 @@ FEATURE_COLORS = {
+ _LABELS = {
+     "extrusion": "Extrusion-style geometry",
+     "revolution": "Revolution-style geometry",
++    "loft": "Loft-style geometry",
++    "sweep": "Sweep-style geometry",
+     "hole": "Holes",
+     "fillet": "Fillets",
+     "chamfer": "Chamfers",
+@@ -63,7 +67,7 @@ def render_geometric_features_rpath(
+     linear_deflection: float = 0.12,
+     angular_deflection: float = 0.18,
+ ) -> Path:
+-    """Render the supplied v2 report with the approved category palette.
++    """Render the supplied feature report with the approved category palette.
+ 
+     The function consumes a report dictionary or saved ``feature-index.json``.
+     It never invokes feature recognition. It verifies the target hash and every
+@@ -112,6 +116,8 @@ def render_geometric_features_rpath(
+         "sheet_metal_bend",
+         "extrusion",
+         "revolution",
++        "loft",
++        "sweep",
+         "hole",
+         "fillet",
+         "chamfer",
+diff --git a/src/simplecadapi/inspect/brep/manufacturing.py b/src/simplecadapi/inspect/brep/manufacturing.py
+index b2eae7a..85bbad6 100644
+--- a/src/simplecadapi/inspect/brep/manufacturing.py
++++ b/src/simplecadapi/inspect/brep/manufacturing.py
+@@ -23,12 +23,29 @@ from .model import (
+     index_shape_rbrepmodel,
+     load_step_rbrepmodel,
+ )
+-from .feature_hints import extrusion_hints, hole_hints, revolution_hints
++from .feature_hints import (
++    extrusion_hints,
++    hole_hints,
++    loft_hints,
++    revolution_hints,
++    sweep_hints,
++)
++from .feature_hints.section_families import (
++    local_section_families,
++    whole_body_point_families,
++    whole_body_section_families,
++)
+ 
+ 
+ ModelInput = BRepModel | TopoDS_Shape | str | Path
+ FEATURE_KINDS = ("fillet", "chamfer", "sheet_metal")
+-_SUPPORTED_FEATURE_KINDS = FEATURE_KINDS + ("hole", "extrusion", "revolution")
++_SUPPORTED_FEATURE_KINDS = FEATURE_KINDS + (
++    "hole",
++    "extrusion",
++    "revolution",
++    "loft",
++    "sweep",
++)
+ 
+ 
+ def _model(value: ModelInput) -> BRepModel:
+@@ -66,10 +83,7 @@ def _axes_coaxial(
+ ) -> bool:
+     first_direction = _unit(first["direction"])
+     second_direction = _unit(second["direction"])
+-    if (
+-        _angle_degrees(first_direction, second_direction)
+-        > angular_tolerance_degrees
+-    ):
++    if _angle_degrees(first_direction, second_direction) > angular_tolerance_degrees:
+         return False
+     offset = np.asarray(second["point"], dtype=float) - np.asarray(
+         first["point"], dtype=float
+@@ -151,9 +165,7 @@ def _cylinder_trim_overlap(
+     second_u = second["parameters"]["u_range"]
+     first_sweep = abs(float(first_u[1]) - float(first_u[0]))
+     second_sweep = abs(float(second_u[1]) - float(second_u[0]))
+-    if abs(first_sweep - second_sweep) > max(
+-        1.0e-4, math.radians(angular_tolerance)
+-    ):
++    if abs(first_sweep - second_sweep) > max(1.0e-4, math.radians(angular_tolerance)):
+         return False
+     first_radial = _cylinder_radial_direction(first)
+     second_radial = _cylinder_radial_direction(second)
+@@ -273,8 +285,7 @@ def _body_closed_manifold(body: TopoDS_Shape) -> bool:
+             edge_explorer.Next()
+         face_explorer.Next()
+     return bool(edge_uses) and all(
+-        count == 2
+-        or BRep_Tool.Degenerated_s(TopoDS.Edge_s(edges.FindKey(index + 1)))
++        count == 2 or BRep_Tool.Degenerated_s(TopoDS.Edge_s(edges.FindKey(index + 1)))
+         for index, count in enumerate(edge_uses)
+     )
+ 
+@@ -288,8 +299,7 @@ def _plane_pair_candidates(
+     planes = [
+         face_id
+         for face_id in face_ids
+-        if facts[face_id]["type"] == "PLANE"
+-        and facts[face_id]["normal"] is not None
++        if facts[face_id]["type"] == "PLANE" and facts[face_id]["normal"] is not None
+     ]
+     cosine_limit = math.cos(math.radians(angular_tolerance))
+     candidates = []
+@@ -313,12 +323,9 @@ def _plane_pair_candidates(
+                 continue
+             centroid_delta = second["centroid"] - first["centroid"]
+             projected = (
+-                centroid_delta
+-                - np.dot(centroid_delta, first_normal) * first_normal
+-            )
+-            characteristic = math.sqrt(
+-                max(first["area"], second["area"], 1.0e-15)
++                centroid_delta - np.dot(centroid_delta, first_normal) * first_normal
+             )
++            characteristic = math.sqrt(max(first["area"], second["area"], 1.0e-15))
+             projected_ratio = float(np.linalg.norm(projected)) / characteristic
+             if projected_ratio > 0.20:
+                 continue
+@@ -378,9 +385,7 @@ def _cylinder_pair_candidates(
+                 first["area"] / first_radius,
+                 second["area"] / second_radius,
+             )
+-            span_similarity = min(normalized_areas) / max(
+-                *normalized_areas, 1.0e-15
+-            )
++            span_similarity = min(normalized_areas) / max(*normalized_areas, 1.0e-15)
+             if span_similarity < 0.90:
+                 continue
+             if not _cylinder_trim_overlap(
+@@ -543,10 +548,14 @@ def _fillet_hints(
+                 for support_id in tangent_supports
+             ):
+                 continue
+-            if fact["type"] == "CYLINDER" and sum(
+-                facts[support_id]["type"] == "PLANE"
+-                for support_id in tangent_supports
+-            ) < 2:
++            if (
++                fact["type"] == "CYLINDER"
++                and sum(
++                    facts[support_id]["type"] == "PLANE"
++                    for support_id in tangent_supports
++                )
++                < 2
++            ):
+                 continue
+             parameters = fact["parameters"]
+             radius = (
+@@ -672,9 +681,7 @@ def _paired_bend_faces_from_fillet_hints(
+             if thickness / max(diagonal, 1.0e-15) > 0.10:
+                 continue
+             pairs = cluster["pairs"]
+-            paired_ids = {
+-                face_id for pair in pairs for face_id in pair["face_ids"]
+-            }
++            paired_ids = {face_id for pair in pairs for face_id in pair["face_ids"]}
+             coverage = sum(facts[face_id]["area"] for face_id in paired_ids) / max(
+                 float(body_geometry["surface_area"]), 1.0e-15
+             )
+@@ -794,9 +801,7 @@ def _chamfer_hints(
+                         neighbor["type"] == "PLANE"
+                         and axis
+                         and neighbor["normal"] is not None
+-                        and _angle_degrees(
+-                            neighbor["normal"], axis["direction"]
+-                        )
++                        and _angle_degrees(neighbor["normal"], axis["direction"])
+                         <= angular_tolerance
+                     ):
+                         planes.append(neighbor_id)
+@@ -927,9 +932,7 @@ def _sheet_metal_hints(
+         midsurface_area = sum(float(pair["midsurface_area"]) for pair in pairs)
+         volume_estimate = thickness * midsurface_area
+         body_volume = abs(float(body_geometry["volume"]))
+-        volume_error = abs(
+-            volume_estimate - body_volume
+-        ) / max(body_volume, 1.0e-15)
++        volume_error = abs(volume_estimate - body_volume) / max(body_volume, 1.0e-15)
+         diagonal = float(body_descriptor["bounding_box"]["diagonal"])
+         thinness = thickness / max(diagonal, 1.0e-15)
+         closed_manifold = _body_closed_manifold(body)
+@@ -1076,9 +1079,7 @@ def _sheet_metal_hints(
+                         "mid_radius": pair["mid_radius"],
+                         "thickness": pair["thickness"],
+                         "axis": pair["axis"],
+-                        "geometric_sweep_angle_degrees": pair[
+-                            "sweep_angle_degrees"
+-                        ],
++                        "geometric_sweep_angle_degrees": pair["sweep_angle_degrees"],
+                         "bend_length": pair["bend_length"],
+                         "adjacent_skin_face_ids": adjacent_skins,
+                     },
+@@ -1118,9 +1119,9 @@ def inspect_manufacturing_hints_rdescriptor(
+     Fillet and chamfer hints require supported analytic carrier evidence.
+     Sheet-metal hints require opposed constant-thickness skins, a thin-body
+     ratio, and a matching thickness-times-midsurface volume model. Hole and
+-    non-circular holes, local or whole-body extrusion geometry, and local or
+-    whole-body revolution geometry are available only when their category is
+-    explicitly included in ``feature_kinds``; they describe
++    non-circular holes, local or whole-body extrusion/revolution geometry, and
++    loft/sweep geometry are available only when their category is explicitly
++    included in ``feature_kinds``; they describe
+     geometric explanations and do not recover the original feature history.
+     Every hint includes stable entity IDs, measurements, evidence, and
+     non-probabilistic confidence. The result describes final BREP geometry only;
+@@ -1137,9 +1138,7 @@ def inspect_manufacturing_hints_rdescriptor(
+             "feature_kinds contains unsupported values: " + ", ".join(unknown)
+         )
+     model = _model(model_or_path)
+-    tolerances = _effective_tolerances(
+-        model, tolerance, angular_tolerance_degrees
+-    )
++    tolerances = _effective_tolerances(model, tolerance, angular_tolerance_degrees)
+     facts = _face_facts(model)
+     hints: list[dict[str, Any]] = []
+     diagnostics: list[dict[str, Any]] = []
+@@ -1161,7 +1160,7 @@ def inspect_manufacturing_hints_rdescriptor(
+             if hint["geometry"]["form"] == "countersink"
+             for segment in hint["geometry"]["segments"]
+             if segment["carrier"] == "cone"
+-                for face_id in segment["face_ids"]
++            for face_id in segment["face_ids"]
+         }
+     needs_sheet_context = "sheet_metal" in requested or "revolution" in requested
+     sheet_hints: list[dict[str, Any]] = []
+@@ -1197,6 +1196,32 @@ def inspect_manufacturing_hints_rdescriptor(
+         )
+         hints.extend(revolution_candidates)
+         diagnostics.extend(revolution_diagnostics)
++    shared_whole_families = None
++    shared_local_families = None
++    if {"sweep", "loft"}.intersection(requested):
++        shared_whole_families = whole_body_section_families(model, facts, tolerances)
++        shared_local_families = local_section_families(model, facts, tolerances)
++    if "sweep" in requested:
++        sweep_candidates, sweep_diagnostics = sweep_hints(
++            model,
++            facts,
++            tolerances,
++            whole_families=shared_whole_families,
++            local_families=shared_local_families,
++        )
++        hints.extend(sweep_candidates)
++        diagnostics.extend(sweep_diagnostics)
++    if "loft" in requested:
++        loft_candidates, loft_diagnostics = loft_hints(
++            model,
++            facts,
++            tolerances,
++            whole_families=shared_whole_families,
++            local_families=shared_local_families,
++            point_families=whole_body_point_families(model, facts, tolerances),
++        )
++        hints.extend(loft_candidates)
++        diagnostics.extend(loft_diagnostics)
+     if "fillet" in requested:
+         fillet_hints = _fillet_hints(model, facts, bend_faces)
+         if not needs_sheet_context:
+@@ -1229,16 +1254,20 @@ def inspect_manufacturing_hints_rdescriptor(
+         "sheet_metal_bend_candidate": 1,
+         "extrusion_region_candidate": 2,
+         "revolution_region_candidate": 3,
+-        "hole_region_candidate": 4,
+-        "fillet_region_candidate": 5,
+-        "chamfer_region_candidate": 6,
++        "sweep_region_candidate": 4,
++        "loft_region_candidate": 5,
++        "hole_region_candidate": 6,
++        "fillet_region_candidate": 7,
++        "chamfer_region_candidate": 8,
+     }
+     hints.sort(
+         key=lambda hint: (
+             kind_order[hint["kind"]],
+             _entity_index(hint["body_id"]),
+             tuple(_entity_index(value) for value in hint["entity_ids"]),
+-            tuple(float(value) for value in hint.get("geometry", {}).get("direction", ())),
++            tuple(
++                float(value) for value in hint.get("geometry", {}).get("direction", ())
++            ),
+         )
+     )
+     truncated = len(hints) > max_hints
+@@ -1277,9 +1306,10 @@ def render_manufacturing_hints_rpath(
+     """Render manufacturing hints as deterministic category-colored overlays.
+ 
+     Sheet-metal skins are blue, bends are orange, extrusion geometry is green,
+-    revolution geometry is cyan, holes are purple, fillets are red, and
+-    chamfers are yellow. Hole, extrusion, and revolution candidates must be
+-    explicitly enabled. They explain final geometry rather than original
++    revolution geometry is cyan, lofts are pink, sweeps are indigo, holes are
++    purple, fillets are red, and chamfers are yellow. Hole, extrusion,
++    revolution, loft, and sweep candidates must be explicitly enabled. They
++    explain final geometry rather than original
+     feature history. Analysis always runs against the current model so entity
+     IDs cannot be reused across different BREP instances.
+     """
+@@ -1295,10 +1325,28 @@ def render_manufacturing_hints_rpath(
+     from .feature_visualization import FEATURE_COLORS
+ 
+     styles = (
+-        ("sheet_metal_body_candidate", "Sheet-metal skins", FEATURE_COLORS["sheet_metal"]),
+-        ("sheet_metal_bend_candidate", "Sheet-metal bends", FEATURE_COLORS["sheet_metal_bend"]),
+-        ("extrusion_region_candidate", "Extrusion candidates", FEATURE_COLORS["extrusion"]),
+-        ("revolution_region_candidate", "Revolution candidates", FEATURE_COLORS["revolution"]),
++        (
++            "sheet_metal_body_candidate",
++            "Sheet-metal skins",
++            FEATURE_COLORS["sheet_metal"],
++        ),
++        (
++            "sheet_metal_bend_candidate",
++            "Sheet-metal bends",
++            FEATURE_COLORS["sheet_metal_bend"],
++        ),
++        (
++            "extrusion_region_candidate",
++            "Extrusion candidates",
++            FEATURE_COLORS["extrusion"],
++        ),
++        (
++            "revolution_region_candidate",
++            "Revolution candidates",
++            FEATURE_COLORS["revolution"],
++        ),
++        ("loft_region_candidate", "Loft candidates", FEATURE_COLORS["loft"]),
++        ("sweep_region_candidate", "Sweep candidates", FEATURE_COLORS["sweep"]),
+         ("hole_region_candidate", "Hole candidates", FEATURE_COLORS["hole"]),
+         ("fillet_region_candidate", "Fillet candidates", FEATURE_COLORS["fillet"]),
+         ("chamfer_region_candidate", "Chamfer candidates", FEATURE_COLORS["chamfer"]),
+@@ -1344,9 +1392,7 @@ def render_manufacturing_hints_rpath(
+         image_size=image_size,
+         dpi=dpi,
+         context_opacity=0.16,
+-        brep_edge_polydata=_edge_polydata(
+-            [model.root], deflection=linear_deflection
+-        ),
++        brep_edge_polydata=_edge_polydata([model.root], deflection=linear_deflection),
+         highlighted_groups=groups,
+         legend=legend,
+         legend_columns=1,
+diff --git a/src/simplecadapi/inspect/brep/section_tracking.py b/src/simplecadapi/inspect/brep/section_tracking.py
+index 743b676..6e3eb43 100644
+--- a/src/simplecadapi/inspect/brep/section_tracking.py
++++ b/src/simplecadapi/inspect/brep/section_tracking.py
+@@ -23,7 +23,13 @@ def _centroid(contour: Mapping[str, Any]) -> tuple[float, float]:
+ def _descriptor(contour: Mapping[str, Any]) -> dict[str, float]:
+     center = _centroid(contour)
+     area = abs(float(contour.get("area") or 0.0))
+-    perimeter = float(contour.get("perimeter") or contour.get("length") or 0.0)
++    perimeter = float(
++        contour.get("perimeter")
++        or contour.get("length_exact")
++        or contour.get("length_sampled")
++        or contour.get("length")
++        or 0.0
++    )
+     nesting = float(contour.get("nesting_depth") or contour.get("depth") or 0.0)
+     return {
+         "area": area,
+diff --git a/src/simplecadapi/kernel/ocp_features.py b/src/simplecadapi/kernel/ocp_features.py
+index 17b852e..000c5c4 100644
+--- a/src/simplecadapi/kernel/ocp_features.py
++++ b/src/simplecadapi/kernel/ocp_features.py
+@@ -6,6 +6,9 @@ from typing import Any, Iterable, Optional, Sequence
+ 
+ from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace, BRepBuilderAPI_Transform
+ from OCP.BRepOffsetAPI import BRepOffsetAPI_MakePipeShell, BRepOffsetAPI_ThruSections
++from OCP.BRepFill import BRepFill_TypeOfContact
++from OCP.Approx import Approx_ParametrizationType
++from OCP.GeomAbs import GeomAbs_Shape
+ from OCP.TopAbs import TopAbs_VERTEX, TopAbs_WIRE
+ from OCP.gp import gp_Trsf, gp_Vec
+ from OCP.TopoDS import TopoDS
+@@ -31,9 +34,45 @@ def make_face_from_wires(outer_wire, inner_wires: Sequence[Any]):
+     return builder.Face()
+ 
+ 
+-def make_loft_solid(sections: Iterable[Any], ruled: bool = False):
+-    builder = BRepOffsetAPI_ThruSections(True, bool(ruled))
+-    builder.CheckCompatibility(True)
++def _make_loft_builder(
++    sections: Iterable[Any],
++    *,
++    is_solid: bool,
++    ruled: bool,
++    tolerance: float = 1e-6,
++    compatibility_check: bool = True,
++    smoothing: Optional[bool] = None,
++    continuity: Optional[str] = None,
++    parametrization: Optional[str] = None,
++    max_degree: Optional[int] = None,
++) -> BRepOffsetAPI_ThruSections:
++    builder = BRepOffsetAPI_ThruSections(
++        bool(is_solid), bool(ruled), float(tolerance)
++    )
++    builder.CheckCompatibility(bool(compatibility_check))
++    if smoothing is not None:
++        builder.SetSmoothing(bool(smoothing))
++    if continuity is not None:
++        builder.SetContinuity(
++            {
++                "C0": GeomAbs_Shape.GeomAbs_C0,
++                "C1": GeomAbs_Shape.GeomAbs_C1,
++                "C2": GeomAbs_Shape.GeomAbs_C2,
++                "C3": GeomAbs_Shape.GeomAbs_C3,
++                "G1": GeomAbs_Shape.GeomAbs_G1,
++                "G2": GeomAbs_Shape.GeomAbs_G2,
++            }[continuity]
++        )
++    if parametrization is not None:
++        builder.SetParType(
++            {
++                "chord_length": Approx_ParametrizationType.Approx_ChordLength,
++                "centripetal": Approx_ParametrizationType.Approx_Centripetal,
++                "iso_parametric": Approx_ParametrizationType.Approx_IsoParametric,
++            }[parametrization]
++        )
++    if max_degree is not None:
++        builder.SetMaxDegree(int(max_degree))
+     for section in sections:
+         if section.ShapeType() == TopAbs_VERTEX:
+             builder.AddVertex(TopoDS.Vertex_s(section))
+@@ -44,6 +83,31 @@ def make_loft_solid(sections: Iterable[Any], ruled: bool = False):
+     builder.Build()
+     if not builder.IsDone():
+         raise ValueError("OCP loft builder failed")
++    return builder
++
++
++def make_loft_solid(
++    sections: Iterable[Any],
++    ruled: bool = False,
++    *,
++    tolerance: float = 1e-6,
++    compatibility_check: bool = True,
++    smoothing: Optional[bool] = None,
++    continuity: Optional[str] = None,
++    parametrization: Optional[str] = None,
++    max_degree: Optional[int] = None,
++):
++    builder = _make_loft_builder(
++        sections,
++        is_solid=True,
++        ruled=ruled,
++        tolerance=tolerance,
++        compatibility_check=compatibility_check,
++        smoothing=smoothing,
++        continuity=continuity,
++        parametrization=parametrization,
++        max_degree=max_degree,
++    )
+     return builder.Shape()
+ 
+ 
+@@ -60,6 +124,108 @@ def make_sweep_solid(profile_wire, path_wire, is_frenet: bool = False):
+     return builder.Shape()
+ 
+ 
++def _make_multi_section_pipe_shell_builder(
++    sections: Sequence[Any],
++    path_wire: Any,
++    *,
++    frame_policy: str,
++    with_contact: bool,
++    with_correction: bool,
++    auxiliary_spine: Optional[Any],
++    curvilinear_equivalence: bool,
++    auxiliary_contact: str,
++) -> BRepOffsetAPI_MakePipeShell:
++    """Build a configured multi-section PipeShell without choosing shell/solid output."""
++
++    builder = BRepOffsetAPI_MakePipeShell(path_wire)
++    if frame_policy == "corrected_frenet":
++        builder.SetMode(False)
++    elif frame_policy == "frenet":
++        builder.SetMode(True)
++    elif frame_policy == "auxiliary_spine":
++        if auxiliary_spine is None:
++            raise ValueError("auxiliary_spine frame policy requires an auxiliary spine")
++        contact_modes = {
++            "none": BRepFill_TypeOfContact.BRepFill_NoContact,
++            "contact": BRepFill_TypeOfContact.BRepFill_Contact,
++            "contact_on_border": BRepFill_TypeOfContact.BRepFill_ContactOnBorder,
++        }
++        try:
++            contact_mode = contact_modes[auxiliary_contact]
++        except KeyError as exc:
++            raise ValueError(
++                "auxiliary_contact must be 'none', 'contact', or 'contact_on_border'"
++            ) from exc
++        builder.SetMode(
++            auxiliary_spine,
++            bool(curvilinear_equivalence),
++            contact_mode,
++        )
++    else:
++        raise ValueError(
++            "frame_policy must be 'corrected_frenet', 'frenet', or 'auxiliary_spine'"
++        )
++
++    for section in sections:
++        if section.ShapeType() not in {TopAbs_VERTEX, TopAbs_WIRE}:
++            raise TypeError("multi-section sweep sections must be vertices or wires")
++        builder.Add(section, bool(with_contact), bool(with_correction))
++    builder.Build()
++    if not builder.IsDone():
++        raise ValueError("OCP multi-section sweep builder failed")
++    return builder
++
++
++def make_multi_section_sweep_shell(
++    sections: Sequence[Any],
++    path_wire: Any,
++    *,
++    frame_policy: str = "corrected_frenet",
++    with_contact: bool = False,
++    with_correction: bool = False,
++    auxiliary_spine: Optional[Any] = None,
++    curvilinear_equivalence: bool = True,
++    auxiliary_contact: str = "none",
++):
++    builder = _make_multi_section_pipe_shell_builder(
++        sections,
++        path_wire,
++        frame_policy=frame_policy,
++        with_contact=with_contact,
++        with_correction=with_correction,
++        auxiliary_spine=auxiliary_spine,
++        curvilinear_equivalence=curvilinear_equivalence,
++        auxiliary_contact=auxiliary_contact,
++    )
++    return builder.Shape()
++
++
++def make_multi_section_sweep_solid(
++    sections: Sequence[Any],
++    path_wire: Any,
++    *,
++    frame_policy: str = "corrected_frenet",
++    with_contact: bool = False,
++    with_correction: bool = False,
++    auxiliary_spine: Optional[Any] = None,
++    curvilinear_equivalence: bool = True,
++    auxiliary_contact: str = "none",
++):
++    builder = _make_multi_section_pipe_shell_builder(
++        sections,
++        path_wire,
++        frame_policy=frame_policy,
++        with_contact=with_contact,
++        with_correction=with_correction,
++        auxiliary_spine=auxiliary_spine,
++        curvilinear_equivalence=curvilinear_equivalence,
++        auxiliary_contact=auxiliary_contact,
++    )
++    if not builder.MakeSolid():
++        raise ValueError("OCP multi-section sweep solid conversion failed")
++    return builder.Shape()
++
++
+ def translate_shape(shape, vector: Sequence[float]):
+     trsf = gp_Trsf()
+     trsf.SetTranslation(gp_Vec(float(vector[0]), float(vector[1]), float(vector[2])))
+diff --git a/src/simplecadapi/kernel/ocp_surfaces.py b/src/simplecadapi/kernel/ocp_surfaces.py
+index 5f38a51..e533b33 100644
+--- a/src/simplecadapi/kernel/ocp_surfaces.py
++++ b/src/simplecadapi/kernel/ocp_surfaces.py
+@@ -19,7 +19,7 @@ from OCP.BRepBuilderAPI import (
+ from OCP.BRepCheck import BRepCheck_Analyzer, BRepCheck_NoError, BRepCheck_Wire
+ from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
+ from OCP.BRepFill import BRepFill
+-from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeFilling, BRepOffsetAPI_ThruSections
++from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeFilling
+ from OCP.Geom import (
+     Geom_BSplineCurve,
+     Geom_BezierSurface,
+@@ -67,6 +67,7 @@ from OCP.TopoDS import (
+ from OCP.gp import gp_Ax3, gp_Dir, gp_Pnt
+ 
+ from .ocp_topology import faces_of, wires_of
++from .ocp_features import _make_loft_builder
+ 
+ Point3 = tuple[float, float, float]
+ 
+@@ -194,20 +195,27 @@ def make_ruled_face(edge_a: TopoDS_Edge, edge_b: TopoDS_Edge) -> TopoDS_Face:
+ 
+ 
+ def make_loft_shell(
+-    sections: Sequence[TopoDS_Wire | TopoDS_Vertex], *, ruled: bool
++    sections: Sequence[TopoDS_Wire | TopoDS_Vertex],
++    *,
++    ruled: bool,
++    tolerance: float = 1e-6,
++    compatibility_check: bool = True,
++    smoothing: bool | None = None,
++    continuity: str | None = None,
++    parametrization: str | None = None,
++    max_degree: int | None = None,
+ ) -> TopoDS_Shell:
+-    builder = BRepOffsetAPI_ThruSections(False, bool(ruled))
+-    builder.CheckCompatibility(True)
+-    for section in sections:
+-        if section.ShapeType() == TopAbs_VERTEX:
+-            builder.AddVertex(TopoDS.Vertex_s(section))
+-        elif section.ShapeType() == TopAbs_WIRE:
+-            builder.AddWire(TopoDS.Wire_s(section))
+-        else:
+-            raise TypeError("loft sections must contain only vertices or wires")
+-    builder.Build()
+-    if not builder.IsDone():
+-        raise ValueError(f"OCP surface loft failed with status {builder.GetStatus()}")
++    builder = _make_loft_builder(
++        sections,
++        is_solid=False,
++        ruled=ruled,
++        tolerance=tolerance,
++        compatibility_check=compatibility_check,
++        smoothing=smoothing,
++        continuity=continuity,
++        parametrization=parametrization,
++        max_degree=max_degree,
++    )
+     shape = builder.Shape()
+     if shape.ShapeType() == TopAbs_SHELL:
+         return TopoDS.Shell_s(shape)
+diff --git a/src/simplecadapi/operators/_support.py b/src/simplecadapi/operators/_support.py
+index 8d35b77..55aa55e 100644
+--- a/src/simplecadapi/operators/_support.py
++++ b/src/simplecadapi/operators/_support.py
+@@ -147,6 +147,7 @@ from ..topology.tracking import (
+     tracked_intersect,
+     tracked_mirror,
+     tracked_loft,
++    tracked_multi_section_sweep,
+     tracked_revolve,
+     tracked_rotate,
+     tracked_shell,
+@@ -180,6 +181,8 @@ from ..kernel.ocp_features import (
+     make_face_from_wires as make_face_from_wires_ocp,
+     make_helical_sweep_solid,
+     make_loft_solid,
++    make_multi_section_sweep_shell,
++    make_multi_section_sweep_solid,
+     make_sweep_solid,
+ )
+ 
+@@ -271,6 +274,10 @@ _OP_MAKE_REVOLVE_RSOLID = "make_revolve_rsolid"
+ 
+ _OP_MAKE_LOFT_RSOLID = "make_loft_rsolid"
+ 
++_OP_MAKE_MULTI_SECTION_SWEEP_RSOLID = "make_multi_section_sweep_rsolid"
++
++_OP_MAKE_MULTI_SECTION_SWEEP_RSHELL = "make_multi_section_sweep_rshell"
++
+ _OP_MAKE_SWEEP_RSOLID = "make_sweep_rsolid"
+ 
+ _OP_MAKE_TWISTED_SWEEP_RSOLID = "make_twisted_sweep_rsolid"
+@@ -430,6 +437,16 @@ _OPERATION_OUTPUT_ROLE_CARDINALITY: Dict[str, Tuple[Tuple[str, str], ...]] = {
+         ("sweep.end", "one"),
+         ("sweep.side", "many"),
+     ),
++    _OP_MAKE_MULTI_SECTION_SWEEP_RSOLID: (
++        ("multi_section_sweep.start", "one"),
++        ("multi_section_sweep.end", "one"),
++        ("multi_section_sweep.side", "many"),
++    ),
++    _OP_MAKE_MULTI_SECTION_SWEEP_RSHELL: (
++        ("multi_section_sweep.start_boundary", "many"),
++        ("multi_section_sweep.end_boundary", "many"),
++        ("multi_section_sweep.side", "many"),
++    ),
+     "make_loft_rshell": (
+         ("loft.start_wire", "one"),
+         ("loft.end_wire", "one"),
+@@ -1499,6 +1516,7 @@ def _semantic_delta_for_output(
+             _OP_MAKE_EXTRUDE_RSOLID,
+             _OP_MAKE_REVOLVE_RSOLID,
+             _OP_MAKE_LOFT_RSOLID,
++            _OP_MAKE_MULTI_SECTION_SWEEP_RSOLID,
+             _OP_MAKE_SWEEP_RSOLID,
+             _OP_MAKE_TWISTED_SWEEP_RSOLID,
+             _OP_MAKE_FILLET_RSOLID,
+@@ -1526,6 +1544,7 @@ def _semantic_delta_for_output(
+                 _OP_MAKE_EXTRUDE_RSOLID,
+                 _OP_MAKE_REVOLVE_RSOLID,
+                 _OP_MAKE_LOFT_RSOLID,
++                _OP_MAKE_MULTI_SECTION_SWEEP_RSOLID,
+                 _OP_MAKE_SWEEP_RSOLID,
+                 _OP_MAKE_TWISTED_SWEEP_RSOLID,
+                 _OP_MAKE_FILLET_RSOLID,
+@@ -1738,6 +1757,7 @@ def _finalize_derived_shape(
+         "make_surface_patch_rface",
+         "trim_surface_rface",
+         "make_loft_rshell",
++        _OP_MAKE_MULTI_SECTION_SWEEP_RSHELL,
+         "sew_faces_rshell",
+         "make_solid_from_shell_rsolid",
+         "fill_holes_rshell",
+diff --git a/src/simplecadapi/operators/features.py b/src/simplecadapi/operators/features.py
+index e5736f7..494ae1b 100644
+--- a/src/simplecadapi/operators/features.py
++++ b/src/simplecadapi/operators/features.py
+@@ -5,9 +5,13 @@ from __future__ import annotations
+ from ._support import *
+ from .geometry import (
+     _default_plane_x_direction,
++    _recorded_loft_build_options,
++    _validated_loft_build_options,
+     _validated_loft_sections,
++    _validated_multi_section_sweep_inputs,
+     make_face_from_wire_rface,
+     make_helix_rwire,
++    preflight_loft,
+ )
+ 
+ from OCP.TopoDS import TopoDS_Shape
+@@ -700,6 +704,12 @@ def loft_rsolid(
+     profiles: Sequence[Union[Wire, Vertex]],
+     ruled: bool = False,
+     *,
++    tolerance: float = 1e-6,
++    compatibility_check: bool = True,
++    smoothing: Optional[bool] = None,
++    continuity: Optional[str] = None,
++    parametrization: Optional[str] = None,
++    max_degree: Optional[int] = None,
+     tracking_policy: TrackingPolicy | str = TrackingPolicy.FULL,
+     tag_prefix: Optional[str] = None,
+     result_tag: Optional[str] = None,
+@@ -710,6 +720,22 @@ def loft_rsolid(
+     """Create a lofted solid, with optional kernel-role-based tags."""
+     try:
+         profile_list = _validated_loft_sections(profiles, operation="loft_rsolid")
++        build_options = _validated_loft_build_options(
++            tolerance=tolerance,
++            compatibility_check=compatibility_check,
++            smoothing=smoothing,
++            continuity=continuity,
++            parametrization=parametrization,
++            max_degree=max_degree,
++        )
++        recorded_build_options = _recorded_loft_build_options(build_options)
++        preflight = preflight_loft(profile_list, result_kind="solid", ruled=ruled)
++        if not preflight["valid"]:
++            codes = ", ".join(
++                str(item["code"])
++                for item in cast(List[Dict[str, object]], preflight["errors"])
++            )
++            raise ValueError(f"loft preflight failed: {codes}")
+         if start_face_tag is not None and isinstance(profile_list[0], Vertex):
+             raise ValueError("start_face_tag requires a Wire start section")
+         if end_face_tag is not None and isinstance(profile_list[-1], Vertex):
+@@ -740,7 +766,7 @@ def loft_rsolid(
+             )
+ 
+         tracked = (
+-            tracked_loft(profiles, ruled=ruled)
++            tracked_loft(profiles, ruled=ruled, **build_options)
+             if policy == TrackingPolicy.FULL
+             else None
+         )
+@@ -748,7 +774,11 @@ def loft_rsolid(
+             cast(Solid, tracked.shape)
+             if tracked is not None
+             else Solid(
+-                make_loft_solid((profile.wrapped for profile in profiles), ruled=ruled)
++                make_loft_solid(
++                    (profile.wrapped for profile in profiles),
++                    ruled=ruled,
++                    **build_options,
++                )
+             )
+         )
+ 
+@@ -761,6 +791,7 @@ def loft_rsolid(
+         params: Dict[str, object] = {
+             "profile_count": len(profiles),
+             "ruled": ruled,
++            **recorded_build_options,
+             "tracking_policy": policy.value,
+         }
+         if tracked is not None:
+@@ -821,6 +852,191 @@ def loft_rsolid(
+             error=e,
+         )
+ 
++def multi_section_sweep_rsolid(
++    sections: Sequence[Union[Wire, Vertex]],
++    path: Wire,
++    *,
++    frame_policy: str = "corrected_frenet",
++    with_contact: bool = False,
++    with_correction: bool = False,
++    auxiliary_spine: Optional[Wire] = None,
++    curvilinear_equivalence: bool = True,
++    auxiliary_contact: str = "none",
++    tracking_policy: TrackingPolicy | str = TrackingPolicy.FULL,
++    tag_prefix: Optional[str] = None,
++    result_tag: Optional[str] = None,
++    start_face_tag: Optional[str] = None,
++    end_face_tag: Optional[str] = None,
++    side_faces_tag: Optional[str] = None,
++) -> Solid:
++    """Create a solid from ordered sections swept along one path.
++
++    The optional auxiliary spine controls section orientation. It is not an
++    arbitrary guide rail that forces the result boundary through that curve.
++    """
++
++    try:
++        section_list, policy_name, contact = _validated_multi_section_sweep_inputs(
++            sections,
++            path,
++            frame_policy=frame_policy,
++            auxiliary_spine=auxiliary_spine,
++            auxiliary_contact=auxiliary_contact,
++            operation="multi_section_sweep_rsolid",
++        )
++        if start_face_tag is not None and isinstance(section_list[0], Vertex):
++            raise ValueError("start_face_tag requires a Wire start section")
++        if end_face_tag is not None and isinstance(section_list[-1], Vertex):
++            raise ValueError("end_face_tag requires a Wire end section")
++        tracking = (
++            TrackingPolicy.GRAPH
++            if current_tracking_policy() == TrackingPolicy.GRAPH
++            else TrackingPolicy(tracking_policy)
++        )
++        assignments = _normalize_operation_role_tags(
++            _OP_MAKE_MULTI_SECTION_SWEEP_RSOLID,
++            (
++                ("multi_section_sweep.start", start_face_tag),
++                ("multi_section_sweep.end", end_face_tag),
++                ("multi_section_sweep.side", side_faces_tag),
++            ),
++        )
++        normalized_result_tag = (
++            normalize_tag(result_tag, strict=True) if result_tag is not None else None
++        )
++        if tracking == TrackingPolicy.GRAPH and (assignments or tag_prefix is not None):
++            raise ValueError(
++                "GRAPH tracking does not provide multi-section sweep face-role evidence; "
++                "use FULL tracking for role tags"
++            )
++
++        common_options = {
++            "frame_policy": policy_name,
++            "with_contact": bool(with_contact),
++            "with_correction": bool(with_correction),
++            "auxiliary_spine": auxiliary_spine,
++            "curvilinear_equivalence": bool(curvilinear_equivalence),
++            "auxiliary_contact": contact,
++        }
++        tracked = (
++            tracked_multi_section_sweep(section_list, path, **common_options)
++            if tracking == TrackingPolicy.FULL
++            else None
++        )
++        result = (
++            cast(Solid, tracked.shape)
++            if tracked is not None
++            else Solid(
++                make_multi_section_sweep_solid(
++                    [section.wrapped for section in section_list],
++                    path.wrapped,
++                    frame_policy=policy_name,
++                    with_contact=bool(with_contact),
++                    with_correction=bool(with_correction),
++                    auxiliary_spine=(
++                        auxiliary_spine.wrapped
++                        if auxiliary_spine is not None
++                        else None
++                    ),
++                    curvilinear_equivalence=bool(curvilinear_equivalence),
++                    auxiliary_contact=contact,
++                )
++            )
++        )
++        metadata: Dict[str, object] = {}
++        for source in [*section_list, path]:
++            metadata.update(source._metadata)
++        if auxiliary_spine is not None:
++            metadata.update(auxiliary_spine._metadata)
++        result._metadata = metadata
++
++        params: Dict[str, object] = {
++            "section_count": len(section_list),
++            "frame_policy": policy_name,
++            "with_contact": bool(with_contact),
++            "with_correction": bool(with_correction),
++            "has_auxiliary_spine": auxiliary_spine is not None,
++            "curvilinear_equivalence": bool(curvilinear_equivalence),
++            "auxiliary_contact": contact,
++            "tracking_policy": tracking.value,
++        }
++        ordered_inputs: List[AnyShape] = [*section_list, path]
++        if auxiliary_spine is not None:
++            ordered_inputs.append(auxiliary_spine)
++        if get_active_session() is not None:
++            input_refs = _serialize_shape_refs(ordered_inputs)
++            if len(input_refs) != len(ordered_inputs):
++                raise ValueError(
++                    "multi_section_sweep_rsolid requires every ordered input to have a graph reference"
++                )
++            params["input_refs"] = input_refs
++        if tracked is not None:
++            target_kinds = _validate_operation_output_roles(tracked.delta, assignments)
++            finalized = _finalize_tracked_solid(
++                result,
++                op=_OP_MAKE_MULTI_SECTION_SWEEP_RSOLID,
++                params=params,
++                delta=tracked.delta,
++                delta_entries=cast(Dict[str, Dict[str, object]], tracked.delta_entries),
++                input_shapes=ordered_inputs,
++            )
++        else:
++            target_kinds = {}
++            finalized = cast(
++                Solid,
++                _finalize_derived_shape(
++                    result,
++                    op=_OP_MAKE_MULTI_SECTION_SWEEP_RSOLID,
++                    params=params,
++                    input_shapes=ordered_inputs,
++                    tags={"derived", "feature", "solid", "sweep"},
++                ),
++            )
++        tagged = _apply_operation_role_tags(
++            finalized,
++            op=_OP_MAKE_MULTI_SECTION_SWEEP_RSOLID,
++            assignments=assignments,
++            target_kinds=target_kinds,
++            result_tag=normalized_result_tag,
++        )
++        if tracked is None:
++            return tagged
++        return _apply_feature_tag_prefix(
++            tagged,
++            tag_prefix=tag_prefix,
++            op=_OP_MAKE_MULTI_SECTION_SWEEP_RSOLID,
++            delta=tracked.delta,
++            start_role=(
++                "multi_section_sweep.start"
++                if isinstance(section_list[0], Wire)
++                else None
++            ),
++            end_role=(
++                "multi_section_sweep.end"
++                if isinstance(section_list[-1], Wire)
++                else None
++            ),
++            side_role="multi_section_sweep.side",
++            source_shapes=section_list,
++        )
++    except Exception as e:
++        _wrap_public_api_error(
++            operation="multi_section_sweep_rsolid",
++            what_happened="Failed to sweep the ordered sections along the path as a solid.",
++            possible_causes=[
++                "A Vertex section was used away from an endpoint.",
++                "One or more sections are open, invalid, or incompatible with the path.",
++                "The auxiliary spine does not correspond to the main path.",
++            ],
++            how_to_fix=[
++                "Pass at least two ordered closed Wire/endpoint-Vertex sections.",
++                "Keep each section at its intended station on the path.",
++                "Use the shell variant while diagnosing sections that cannot close a solid.",
++            ],
++            error=e,
++        )
++
++
+ def sweep_rsolid(
+     profile: Face,
+     path: Wire,
+diff --git a/src/simplecadapi/operators/geometry.py b/src/simplecadapi/operators/geometry.py
+index 6baf3a2..be46d7a 100644
+--- a/src/simplecadapi/operators/geometry.py
++++ b/src/simplecadapi/operators/geometry.py
+@@ -560,6 +560,344 @@ def _validated_loft_sections(
+         raise ValueError(f"{operation} allows Vertex sections only at the start or end")
+     return section_list
+ 
++
++def _validated_loft_build_options(
++    *,
++    tolerance: float,
++    compatibility_check: bool,
++    smoothing: Optional[bool],
++    continuity: Optional[str],
++    parametrization: Optional[str],
++    max_degree: Optional[int],
++) -> Dict[str, object]:
++    tolerance_value = float(tolerance)
++    if not np.isfinite(tolerance_value) or tolerance_value <= 0.0:
++        raise ValueError("loft tolerance must be a positive finite value")
++    if not isinstance(compatibility_check, bool):
++        raise TypeError("compatibility_check must be bool")
++    if smoothing is not None and not isinstance(smoothing, bool):
++        raise TypeError("smoothing must be bool or None")
++    continuity_value = None if continuity is None else str(continuity).upper()
++    if continuity_value not in {None, "C0", "C1", "C2", "C3", "G1", "G2"}:
++        raise ValueError("continuity must be C0, C1, C2, C3, G1, G2, or None")
++    parametrization_value = (
++        None if parametrization is None else str(parametrization).strip().lower()
++    )
++    if parametrization_value not in {
++        None,
++        "chord_length",
++        "centripetal",
++        "iso_parametric",
++    }:
++        raise ValueError(
++            "parametrization must be chord_length, centripetal, iso_parametric, or None"
++        )
++    degree_value = None if max_degree is None else int(max_degree)
++    if degree_value is not None and not 2 <= degree_value <= 25:
++        raise ValueError("max_degree must be between 2 and 25")
++    return {
++        "tolerance": tolerance_value,
++        "compatibility_check": compatibility_check,
++        "smoothing": smoothing,
++        "continuity": continuity_value,
++        "parametrization": parametrization_value,
++        "max_degree": degree_value,
++    }
++
++
++def _recorded_loft_build_options(
++    options: Mapping[str, object],
++) -> Dict[str, object]:
++    """Keep legacy graph params unchanged when all loft controls use defaults."""
++
++    defaults: Dict[str, object] = {
++        "tolerance": 1e-6,
++        "compatibility_check": True,
++        "smoothing": None,
++        "continuity": None,
++        "parametrization": None,
++        "max_degree": None,
++    }
++    return {
++        name: value
++        for name, value in options.items()
++        if value != defaults[name]
++    }
++
++
++def _validated_multi_section_sweep_inputs(
++    sections: Sequence[Union[Wire, Vertex]],
++    path: Wire,
++    *,
++    frame_policy: str,
++    auxiliary_spine: Optional[Wire],
++    auxiliary_contact: str,
++    operation: str,
++) -> Tuple[List[Union[Wire, Vertex]], str, str]:
++    section_list = _validated_loft_sections(sections, operation=operation)
++    if not isinstance(path, Wire):
++        raise TypeError(f"{operation} path must be a Wire")
++    normalized_policy = str(frame_policy).strip().lower()
++    if normalized_policy not in {"corrected_frenet", "frenet", "auxiliary_spine"}:
++        raise ValueError(
++            "frame_policy must be 'corrected_frenet', 'frenet', or 'auxiliary_spine'"
++        )
++    if auxiliary_spine is not None and not isinstance(auxiliary_spine, Wire):
++        raise TypeError("auxiliary_spine must be a Wire or None")
++    if normalized_policy == "auxiliary_spine" and auxiliary_spine is None:
++        raise ValueError("auxiliary_spine frame policy requires auxiliary_spine")
++    if normalized_policy != "auxiliary_spine" and auxiliary_spine is not None:
++        raise ValueError(
++            "auxiliary_spine may only be supplied with frame_policy='auxiliary_spine'"
++        )
++    normalized_contact = str(auxiliary_contact).strip().lower()
++    if normalized_contact not in {"none", "contact", "contact_on_border"}:
++        raise ValueError(
++            "auxiliary_contact must be 'none', 'contact', or 'contact_on_border'"
++        )
++    return section_list, normalized_policy, normalized_contact
++
++
++def _section_reference_point(section: Union[Wire, Vertex]) -> np.ndarray:
++    if isinstance(section, Vertex):
++        return np.asarray(section.get_coordinates(), dtype=float)
++    bounds = bounding_box(section.wrapped)
++    return np.asarray(
++        [
++            0.5 * (bounds.xmin + bounds.xmax),
++            0.5 * (bounds.ymin + bounds.ymax),
++            0.5 * (bounds.zmin + bounds.zmax),
++        ],
++        dtype=float,
++    )
++
++
++def preflight_loft(
++    sections: Sequence[Union[Wire, Vertex]],
++    *,
++    result_kind: str = "solid",
++    ruled: bool = False,
++    boundary_conditions: Optional[Mapping[str, object]] = None,
++) -> Dict[str, object]:
++    """Validate loft inputs without constructing the loft.
++
++    The report is JSON-safe. It checks topology, endpoint singularities,
++    section order, approximate orientation continuity, and predicted ruled
++    side complexity. Endpoint tangent/draft/magnitude conditions are reported
++    as unsupported because the current ThruSections backend cannot enforce
++    them portably.
++    """
++
++    errors: List[Dict[str, object]] = []
++    warnings: List[Dict[str, object]] = []
++    try:
++        section_list = _validated_loft_sections(sections, operation="preflight_loft")
++    except (TypeError, ValueError) as exc:
++        return {
++            "schema_version": "1.0",
++            "valid": False,
++            "can_build_shell": False,
++            "can_build_solid": False,
++            "errors": [{"code": "invalid_sections", "message": str(exc)}],
++            "warnings": [],
++            "metrics": {},
++        }
++
++    kind = str(result_kind).strip().lower()
++    if kind not in {"solid", "shell"}:
++        errors.append(
++            {
++                "code": "invalid_result_kind",
++                "message": "result_kind must be 'solid' or 'shell'",
++            }
++        )
++    wire_sections = [section for section in section_list if isinstance(section, Wire)]
++    open_wire_indices = [
++        index
++        for index, section in enumerate(section_list)
++        if isinstance(section, Wire) and not section.is_closed()
++    ]
++    invalid_wire_indices = [
++        index
++        for index, section in enumerate(section_list)
++        if isinstance(section, Wire)
++        and not BRepCheck_Analyzer(section.wrapped).IsValid()
++    ]
++    if invalid_wire_indices:
++        errors.append(
++            {
++                "code": "invalid_wire_topology",
++                "section_indices": invalid_wire_indices,
++                "message": "one or more Wire sections are topologically invalid",
++            }
++        )
++    if kind == "solid" and open_wire_indices:
++        errors.append(
++            {
++                "code": "open_solid_section",
++                "section_indices": open_wire_indices,
++                "message": "solid loft requires every Wire section to be closed",
++            }
++        )
++
++    reference_points = np.asarray(
++        [_section_reference_point(section) for section in section_list], dtype=float
++    )
++    segment_lengths = np.linalg.norm(np.diff(reference_points, axis=0), axis=1)
++    scale = max(float(np.ptp(reference_points, axis=0).max()), 1.0)
++    duplicate_spans = [
++        index
++        for index, length in enumerate(segment_lengths)
++        if float(length) <= 1e-9 * scale
++    ]
++    if duplicate_spans:
++        errors.append(
++            {
++                "code": "duplicate_section_station",
++                "span_indices": duplicate_spans,
++                "message": "adjacent section reference points occupy the same station",
++            }
++        )
++    if len(reference_points) >= 3:
++        centered = reference_points - np.mean(reference_points, axis=0)
++        _, _, right = np.linalg.svd(centered, full_matrices=False)
++        axis = right[0]
++        parameters = centered @ axis
++        if parameters[-1] < parameters[0]:
++            parameters = -parameters
++        changes = np.diff(parameters)
++        tolerance = max(1e-9 * scale, 1e-12)
++        reversals = [
++            index for index, change in enumerate(changes) if float(change) < -tolerance
++        ]
++        if reversals:
++            warnings.append(
++                {
++                    "code": "non_monotonic_section_order",
++                    "span_indices": reversals,
++                    "message": "section centers reverse along their principal station axis",
++                }
++            )
++    else:
++        parameters = np.arange(len(section_list), dtype=float)
++
++    normals: List[Tuple[int, np.ndarray]] = []
++    for index, section in enumerate(section_list):
++        if not isinstance(section, Wire) or not section.is_closed():
++            continue
++        try:
++            normal = Face(make_face_from_wire_ocp(section.wrapped)).get_normal_at()
++            normals.append(
++                (index, np.asarray([normal.x, normal.y, normal.z], dtype=float))
++            )
++        except (RuntimeError, ValueError):
++            warnings.append(
++                {
++                    "code": "section_plane_unknown",
++                    "section_index": index,
++                    "message": "closed section could not be converted to a planar face",
++                }
++            )
++    flipped_pairs = [
++        [first[0], second[0]]
++        for first, second in zip(normals, normals[1:])
++        if float(np.dot(first[1], second[1])) < 0.0
++    ]
++    if flipped_pairs:
++        warnings.append(
++            {
++                "code": "inconsistent_section_orientation",
++                "section_pairs": flipped_pairs,
++                "message": "adjacent planar section normals point in opposite directions",
++            }
++        )
++
++    requested_conditions = dict(boundary_conditions or {})
++    unsupported_conditions = [
++        name
++        for name, value in requested_conditions.items()
++        if value not in (None, {}, "free")
++    ]
++    if unsupported_conditions:
++        errors.append(
++            {
++                "code": "boundary_condition_unsupported",
++                "endpoints": unsupported_conditions,
++                "message": "the current portable loft backend cannot enforce endpoint tangent, draft, or magnitude conditions",
++            }
++        )
++
++    terminal_mode = "none"
++    if isinstance(section_list[0], Vertex) and isinstance(section_list[-1], Vertex):
++        terminal_mode = "both_points"
++    elif isinstance(section_list[0], Vertex):
++        terminal_mode = "start_point"
++    elif isinstance(section_list[-1], Vertex):
++        terminal_mode = "end_point"
++    edge_counts = [len(section._iter_edges()) for section in wire_sections]
++    section_extents = []
++    for section in section_list:
++        if isinstance(section, Vertex):
++            section_extents.append(0.0)
++            continue
++        bounds = bounding_box(section.wrapped)
++        section_extents.append(
++            float(
++                np.linalg.norm(
++                    [bounds.xlen, bounds.ylen, bounds.zlen]
++                )
++            )
++        )
++    interior_extent_extrema = [
++        index
++        for index in range(1, len(section_extents) - 1)
++        if (
++            section_extents[index]
++            > max(section_extents[index - 1], section_extents[index + 1]) * 1.05
++            or section_extents[index]
++            < min(section_extents[index - 1], section_extents[index + 1]) * 0.95
++        )
++    ]
++    if not ruled and interior_extent_extrema:
++        warnings.append(
++            {
++                "code": "smooth_overshoot_risk",
++                "section_indices": interior_extent_extrema,
++                "message": "interior section-size extrema can cause smooth loft overshoot; require STEP roundtrip and bounding-box comparison",
++            }
++        )
++    estimated_side_faces = (
++        max(edge_counts, default=0) * max(len(section_list) - 1, 1)
++        if ruled
++        else max(edge_counts, default=0)
++    )
++    valid = not errors
++    can_build_shell = valid
++    can_build_solid = valid and not open_wire_indices and kind == "solid"
++    return {
++        "schema_version": "1.0",
++        "valid": valid,
++        "can_build_shell": can_build_shell,
++        "can_build_solid": can_build_solid,
++        "result_kind": kind,
++        "ruled": bool(ruled),
++        "terminal_mode": terminal_mode,
++        "errors": errors,
++        "warnings": warnings,
++        "metrics": {
++            "section_count": len(section_list),
++            "wire_section_count": len(wire_sections),
++            "point_section_count": len(section_list) - len(wire_sections),
++            "open_wire_indices": open_wire_indices,
++            "section_parameters": [float(value) for value in parameters],
++            "adjacent_station_distances": [
++                float(value) for value in segment_lengths
++            ],
++            "estimated_side_face_count": estimated_side_faces,
++            "section_extents": section_extents,
++        },
++    }
++
+ def _pending_loft_role(shape: AnyShape, role: str, method: str) -> TopoRoleEntry:
+     return TopoRoleEntry(
+         ref=TopoRef(
+@@ -567,6 +905,7 @@ def _pending_loft_role(shape: AnyShape, role: str, method: str) -> TopoRoleEntry
+             "pending",
+             0,
+             {
++                "edge": TopoKind.EDGE,
+                 "wire": TopoKind.WIRE,
+                 "face": TopoKind.FACE,
+             }[_shape_kind_token(shape)],
+@@ -581,7 +920,7 @@ def _pending_loft_role(shape: AnyShape, role: str, method: str) -> TopoRoleEntry
+         },
+     )
+ 
+-def _matching_shell_boundary(shell: Shell, profile: Wire) -> Wire:
++def _matching_shell_boundary_member(shell: Shell, profile: Wire) -> Optional[Wire]:
+     profile_edges = list(profile._iter_edges())
+     matches = [
+         boundary
+@@ -595,11 +934,74 @@ def _matching_shell_boundary(shell: Shell, profile: Wire) -> Wire:
+             for profile_edge in profile_edges
+         )
+     ]
+-    if len(matches) != 1:
++    if len(matches) == 1:
++        return matches[0]
++    return None
++
++
++def _matching_shell_boundary(shell: Shell, profile: Wire) -> Wire:
++    member = _matching_shell_boundary_member(shell, profile)
++    if member is not None:
++        return member
++    profile_edges = list(profile._iter_edges())
++    candidates = [
++        Wire(wire)
++        for wire in free_boundaries_ocp(shell.wrapped, tolerance=1e-7)
++    ]
++    distance_matches = [
++        (ocp_distance(boundary.wrapped, profile.wrapped), boundary)
++        for boundary in candidates
++        if len(boundary._iter_edges()) == len(profile_edges)
++    ]
++    distance_matches.sort(key=lambda item: item[0])
++    if not distance_matches or distance_matches[0][0] > 1e-6:
+         raise ValueError(
+-            f"loft endpoint profile must match exactly one result boundary, got {len(matches)}"
+-        )
+-    return matches[0]
++            "endpoint profile does not match a unique shell free boundary"
++        )
++    if len(distance_matches) > 1 and abs(
++        distance_matches[1][0] - distance_matches[0][0]
++    ) <= 1e-9:
++        raise ValueError("endpoint profile matches multiple shell free boundaries")
++    return distance_matches[0][1]
++
++
++def _matching_shell_boundary_edges(shell: Shell, profile: Wire) -> List[Edge]:
++    result_edges = list(shell._iter_edges())
++    matches: List[Edge] = []
++    for profile_edge in profile._iter_edges():
++        profile_box = bounding_box(profile_edge.wrapped)
++        profile_bounds = (
++            profile_box.xmin,
++            profile_box.ymin,
++            profile_box.zmin,
++            profile_box.xmax,
++            profile_box.ymax,
++            profile_box.zmax,
++        )
++        candidates: List[Edge] = []
++        for result_edge in result_edges:
++            result_box = bounding_box(result_edge.wrapped)
++            result_bounds = (
++                result_box.xmin,
++                result_box.ymin,
++                result_box.zmin,
++                result_box.xmax,
++                result_box.ymax,
++                result_box.zmax,
++            )
++            if max(
++                abs(first - second)
++                for first, second in zip(profile_bounds, result_bounds)
++            ) <= 1e-6 and ocp_distance(profile_edge.wrapped, result_edge.wrapped) <= 1e-7:
++                candidates.append(result_edge)
++        if len(candidates) != 1:
++            raise ValueError(
++                "endpoint profile edge does not match one shell boundary edge"
++            )
++        matches.append(candidates[0])
++    if len({_topo_id(edge.wrapped) for edge in matches}) != len(matches):
++        raise ValueError("endpoint profile boundary edge matching is not one-to-one")
++    return matches
+ 
+ def _apply_loft_role_metadata(
+     shape: AnyShape, delta: TopoDelta, *, op: str
+@@ -608,6 +1010,7 @@ def _apply_loft_role_metadata(
+     for kind, members in (
+         (TopoKind.FACE, shape._iter_faces() if hasattr(shape, "get_faces") else []),
+         (TopoKind.WIRE, shape._iter_wires() if hasattr(shape, "get_wires") else []),
++        (TopoKind.EDGE, shape._iter_edges() if hasattr(shape, "get_edges") else []),
+     ):
+         for member in members:
+             candidates[(kind, _topo_id(member.wrapped))] = member
+@@ -750,6 +1153,12 @@ def loft_rshell(
+     sections: Sequence[Union[Wire, Vertex]],
+     *,
+     ruled: bool = False,
++    tolerance: float = 1e-6,
++    compatibility_check: bool = True,
++    smoothing: Optional[bool] = None,
++    continuity: Optional[str] = None,
++    parametrization: Optional[str] = None,
++    max_degree: Optional[int] = None,
+     tag_prefix: Optional[str] = None,
+     result_tag: Optional[str] = None,
+     start_wire_tag: Optional[str] = None,
+@@ -759,6 +1168,22 @@ def loft_rshell(
+     """Create an open loft Shell with endpoint-Wire and side-Face naming."""
+     try:
+         section_list = _validated_loft_sections(sections, operation="loft_rshell")
++        build_options = _validated_loft_build_options(
++            tolerance=tolerance,
++            compatibility_check=compatibility_check,
++            smoothing=smoothing,
++            continuity=continuity,
++            parametrization=parametrization,
++            max_degree=max_degree,
++        )
++        recorded_build_options = _recorded_loft_build_options(build_options)
++        preflight = preflight_loft(section_list, result_kind="shell", ruled=ruled)
++        if not preflight["valid"]:
++            codes = ", ".join(
++                str(item["code"])
++                for item in cast(List[Dict[str, object]], preflight["errors"])
++            )
++            raise ValueError(f"loft preflight failed: {codes}")
+         start_is_wire = isinstance(section_list[0], Wire)
+         end_is_wire = isinstance(section_list[-1], Wire)
+         if start_wire_tag is not None and not start_is_wire:
+@@ -778,30 +1203,54 @@ def loft_rshell(
+         )
+         result = Shell(
+             make_loft_shell(
+-                [section.wrapped for section in section_list], ruled=bool(ruled)
++                [section.wrapped for section in section_list],
++                ruled=bool(ruled),
++                **build_options,
+             )
+         )
+         roles = [
+             _pending_loft_role(face, "loft.side", "ResultSideFace")
+             for face in result._iter_faces()
+         ]
+-        if start_is_wire:
++        start_boundary = (
++            _matching_shell_boundary_member(result, cast(Wire, section_list[0]))
++            if start_is_wire
++            else None
++        )
++        end_boundary = (
++            _matching_shell_boundary_member(result, cast(Wire, section_list[-1]))
++            if end_is_wire
++            else None
++        )
++        if start_boundary is not None:
+             roles.append(
+                 _pending_loft_role(
+-                    _matching_shell_boundary(result, section_list[0]),
++                    start_boundary,
+                     "loft.start_wire",
+                     "EndpointBoundary",
+                 )
+             )
+-        if end_is_wire:
++        if end_boundary is not None:
+             roles.append(
+                 _pending_loft_role(
+-                    _matching_shell_boundary(result, section_list[-1]),
++                    end_boundary,
+                     "loft.end_wire",
+                     "EndpointBoundary",
+                 )
+             )
+         delta = TopoDelta(roles=tuple(roles))
++        missing_requested_boundary_role = (
++            start_wire_tag is not None and start_boundary is None
++        ) or (end_wire_tag is not None and end_boundary is None)
++        missing_prefix_boundary_role = tag_prefix is not None and (
++            (start_is_wire and start_boundary is None)
++            or (end_is_wire and end_boundary is None)
++        )
++        if missing_requested_boundary_role or missing_prefix_boundary_role:
++            raise SemanticCapabilityError(
++                "the selected loft approximation rebuilt endpoint contours as edge sets; "
++                "the requested endpoint Wire roles are unavailable"
++            )
+         _apply_loft_role_metadata(result, delta, op="make_loft_rshell")
+         finalized = cast(
+             Shell,
+@@ -811,6 +1260,7 @@ def loft_rshell(
+                 params={
+                     "section_count": len(section_list),
+                     "ruled": bool(ruled),
++                    **recorded_build_options,
+                     "tag_prefix": tag_prefix,
+                 },
+                 input_shapes=section_list,
+@@ -849,6 +1299,149 @@ def loft_rshell(
+             error=e,
+         )
+ 
++
++def multi_section_sweep_rshell(
++    sections: Sequence[Union[Wire, Vertex]],
++    path: Wire,
++    *,
++    frame_policy: str = "corrected_frenet",
++    with_contact: bool = False,
++    with_correction: bool = False,
++    auxiliary_spine: Optional[Wire] = None,
++    curvilinear_equivalence: bool = True,
++    auxiliary_contact: str = "none",
++    result_tag: Optional[str] = None,
++    start_edges_tag: Optional[str] = None,
++    end_edges_tag: Optional[str] = None,
++    side_faces_tag: Optional[str] = None,
++) -> Shell:
++    """Create a multi-section sweep Shell along one path.
++
++    ``auxiliary_spine`` controls the moving frame; it is not an arbitrary
++    second boundary rail. Vertex sections are allowed only at the two ends.
++    """
++
++    try:
++        section_list, policy, contact = _validated_multi_section_sweep_inputs(
++            sections,
++            path,
++            frame_policy=frame_policy,
++            auxiliary_spine=auxiliary_spine,
++            auxiliary_contact=auxiliary_contact,
++            operation="multi_section_sweep_rshell",
++        )
++        start_is_wire = isinstance(section_list[0], Wire)
++        end_is_wire = isinstance(section_list[-1], Wire)
++        if start_edges_tag is not None and not start_is_wire:
++            raise ValueError("start_edges_tag requires a Wire start section")
++        if end_edges_tag is not None and not end_is_wire:
++            raise ValueError("end_edges_tag requires a Wire end section")
++        assignments = _normalize_operation_role_tags(
++            _OP_MAKE_MULTI_SECTION_SWEEP_RSHELL,
++            (
++                ("multi_section_sweep.start_boundary", start_edges_tag),
++                ("multi_section_sweep.end_boundary", end_edges_tag),
++                ("multi_section_sweep.side", side_faces_tag),
++            ),
++        )
++        normalized_result_tag = (
++            normalize_tag(result_tag, strict=True) if result_tag is not None else None
++        )
++        result = Shell(
++            make_multi_section_sweep_shell(
++                [section.wrapped for section in section_list],
++                path.wrapped,
++                frame_policy=policy,
++                with_contact=bool(with_contact),
++                with_correction=bool(with_correction),
++                auxiliary_spine=(
++                    auxiliary_spine.wrapped if auxiliary_spine is not None else None
++                ),
++                curvilinear_equivalence=bool(curvilinear_equivalence),
++                auxiliary_contact=contact,
++            )
++        )
++        roles = [
++            _pending_loft_role(
++                face, "multi_section_sweep.side", "ResultSideFace"
++            )
++            for face in result._iter_faces()
++        ]
++        if start_is_wire:
++            roles.extend(
++                _pending_loft_role(
++                    edge,
++                    "multi_section_sweep.start_boundary",
++                    "EndpointBoundary",
++                )
++                for edge in _matching_shell_boundary_edges(
++                    result, cast(Wire, section_list[0])
++                )
++            )
++        if end_is_wire:
++            roles.extend(
++                _pending_loft_role(
++                    edge,
++                    "multi_section_sweep.end_boundary",
++                    "EndpointBoundary",
++                )
++                for edge in _matching_shell_boundary_edges(
++                    result, cast(Wire, section_list[-1])
++                )
++            )
++        delta = TopoDelta(roles=tuple(roles))
++        _apply_loft_role_metadata(
++            result, delta, op=_OP_MAKE_MULTI_SECTION_SWEEP_RSHELL
++        )
++        ordered_inputs: List[AnyShape] = [*section_list, path]
++        if auxiliary_spine is not None:
++            ordered_inputs.append(auxiliary_spine)
++        finalized = cast(
++            Shell,
++            _finalize_derived_shape(
++                result,
++                op=_OP_MAKE_MULTI_SECTION_SWEEP_RSHELL,
++                params={
++                    "section_count": len(section_list),
++                    "frame_policy": policy,
++                    "with_contact": bool(with_contact),
++                    "with_correction": bool(with_correction),
++                    "has_auxiliary_spine": auxiliary_spine is not None,
++                    "curvilinear_equivalence": bool(curvilinear_equivalence),
++                    "auxiliary_contact": contact,
++                },
++                input_shapes=ordered_inputs,
++                tags={"derived", "surface", "shell", "sweep"},
++                topo_delta=delta,
++            ),
++        )
++        target_kinds = _validate_operation_output_roles(delta, assignments)
++        return cast(
++            Shell,
++            _apply_operation_role_tags(
++                finalized,
++                op=_OP_MAKE_MULTI_SECTION_SWEEP_RSHELL,
++                assignments=assignments,
++                target_kinds=target_kinds,
++                result_tag=normalized_result_tag,
++            ),
++        )
++    except Exception as e:
++        _wrap_public_api_error(
++            operation="multi_section_sweep_rshell",
++            what_happened="Failed to sweep the ordered sections along the path as a shell.",
++            possible_causes=[
++                "A Vertex section was used away from an endpoint.",
++                "The section locations are incompatible with the path or moving frame.",
++                "The auxiliary spine does not correspond to the main path.",
++            ],
++            how_to_fix=[
++                "Pass at least two ordered Wire/endpoint-Vertex sections and one continuous path Wire.",
++                "Use frame_policy='auxiliary_spine' only with a corresponding auxiliary Wire.",
++            ],
++            error=e,
++        )
++
+ def sew_faces_rshell(
+     faces: Sequence[Face], *, tolerance: float = 1e-6, tag_prefix: Optional[str] = None
+ ) -> Shell:
+diff --git a/src/simplecadapi/recording/serializer.py b/src/simplecadapi/recording/serializer.py
+index aa03437..853294c 100644
+--- a/src/simplecadapi/recording/serializer.py
++++ b/src/simplecadapi/recording/serializer.py
+@@ -70,8 +70,8 @@ from ..kernel.ocp_properties import bounding_box
+ 
+ 
+ MODEL_SCHEMA_VERSION = "2.0"
+-CANONICAL_CONTRACT_VERSION = "2.1"
+-SUPPORTED_CANONICAL_CONTRACT_VERSIONS = {"2.0", CANONICAL_CONTRACT_VERSION}
++CANONICAL_CONTRACT_VERSION = "2.2"
++SUPPORTED_CANONICAL_CONTRACT_VERSIONS = {"2.0", "2.1", CANONICAL_CONTRACT_VERSION}
+ 
+ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
+     # Core geometry ops that are recorded and replayable
+@@ -425,6 +425,10 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
+     "extrude_rsolid": {"status": "replayable", "op": "make_extrude_rsolid"},
+     "revolve_rsolid": {"status": "replayable", "op": "make_revolve_rsolid"},
+     "loft_rsolid": {"status": "replayable", "op": "make_loft_rsolid"},
++    "multi_section_sweep_rsolid": {
++        "status": "replayable",
++        "op": "make_multi_section_sweep_rsolid",
++    },
+     "sweep_rsolid": {"status": "replayable", "op": "make_sweep_rsolid"},
+     "twisted_sweep_rsolid": {
+         "status": "replayable",
+@@ -465,6 +469,10 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
+         "op": "make_surface_patch_rface",
+     },
+     "loft_rshell": {"status": "replayable", "op": "make_loft_rshell"},
++    "multi_section_sweep_rshell": {
++        "status": "replayable",
++        "op": "make_multi_section_sweep_rshell",
++    },
+     "make_cylindrical_surface_rface": {
+         "status": "replayable",
+         "op": "make_cylindrical_surface_rface",
+@@ -593,6 +601,7 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
+     "make_extrude_rsolid",
+     "make_revolve_rsolid",
+     "make_loft_rsolid",
++    "make_multi_section_sweep_rsolid",
+     "make_sweep_rsolid",
+     "make_twisted_sweep_rsolid",
+     "make_translate_rshape",
+@@ -615,6 +624,7 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
+     "make_surface_patch_rface",
+     "trim_surface_rface",
+     "make_loft_rshell",
++    "make_multi_section_sweep_rshell",
+     "sew_faces_rshell",
+     "make_solid_from_shell_rsolid",
+     "free_boundaries_rwirelist",
+@@ -634,13 +644,25 @@ CANONICAL_OP_SET: Tuple[str, ...] = (
+     *CANONICAL_SEMANTIC_OP_SET,
+ )
+ 
++_CANONICAL_2_2_ONLY_OPS = {
++    "make_multi_section_sweep_rsolid",
++    "make_multi_section_sweep_rshell",
++}
++CANONICAL_CORE_OP_SET_2_1: Tuple[str, ...] = tuple(
++    op for op in CANONICAL_CORE_OP_SET if op not in _CANONICAL_2_2_ONLY_OPS
++)
++CANONICAL_OP_SET_2_1: Tuple[str, ...] = (
++    *CANONICAL_CORE_OP_SET_2_1,
++    *CANONICAL_SEMANTIC_OP_SET,
++)
++
+ _CANONICAL_2_1_ONLY_OPS = {
+     "load_brep_region_rshell",
+     "load_brep_region_rsolid",
+     "make_solid_from_shell_rsolid",
+ }
+ CANONICAL_CORE_OP_SET_2_0: Tuple[str, ...] = tuple(
+-    op for op in CANONICAL_CORE_OP_SET if op not in _CANONICAL_2_1_ONLY_OPS
++    op for op in CANONICAL_CORE_OP_SET_2_1 if op not in _CANONICAL_2_1_ONLY_OPS
+ )
+ CANONICAL_OP_SET_2_0: Tuple[str, ...] = (
+     *CANONICAL_CORE_OP_SET_2_0,
+@@ -675,11 +697,11 @@ def _canonical_contract_payload(
+ ) -> Dict[str, Any]:
+     if contract_version not in SUPPORTED_CANONICAL_CONTRACT_VERSIONS:
+         raise ValueError(f"Unsupported canonical contract version '{contract_version}'")
+-    core_op_set = (
+-        CANONICAL_CORE_OP_SET
+-        if contract_version == CANONICAL_CONTRACT_VERSION
+-        else CANONICAL_CORE_OP_SET_2_0
+-    )
++    core_op_set = {
++        CANONICAL_CONTRACT_VERSION: CANONICAL_CORE_OP_SET,
++        "2.1": CANONICAL_CORE_OP_SET_2_1,
++        "2.0": CANONICAL_CORE_OP_SET_2_0,
++    }[contract_version]
+     return {
+         "contract_version": contract_version,
+         "graph_roles": {
+@@ -722,11 +744,11 @@ def _validate_canonical_contract(contract: Any) -> Tuple[str, ...]:
+         raise ValueError(
+             "Model canonical_contract does not match the declared contract version"
+         )
+-    return (
+-        CANONICAL_OP_SET
+-        if contract_version == CANONICAL_CONTRACT_VERSION
+-        else CANONICAL_OP_SET_2_0
+-    )
++    return {
++        CANONICAL_CONTRACT_VERSION: CANONICAL_OP_SET,
++        "2.1": CANONICAL_OP_SET_2_1,
++        "2.0": CANONICAL_OP_SET_2_0,
++    }[contract_version]
+ 
+ 
+ def _assert_graph_is_canonical(
+@@ -3555,6 +3577,57 @@ def _execute_graph(
+                         _store_outputs(node, result)
+                         continue
+ 
++                    if op_name == "make_multi_section_sweep_rshell":
++                        ctx.require_params(
++                            node.node_id,
++                            op_name,
++                            params,
++                            (
++                                "section_count",
++                                "frame_policy",
++                                "with_contact",
++                                "with_correction",
++                                "has_auxiliary_spine",
++                                "curvilinear_equivalence",
++                                "auxiliary_contact",
++                            ),
++                        )
++                        ordered = _ordered_input_shapes(ctx, graph, outputs, node, params)
++                        section_count = int(params["section_count"])
++                        has_auxiliary = bool(params["has_auxiliary_spine"])
++                        expected_count = section_count + 1 + int(has_auxiliary)
++                        if (
++                            len(ordered) != expected_count
++                            or not all(
++                                isinstance(item, (Wire, Vertex))
++                                for item in ordered[:section_count]
++                            )
++                            or not isinstance(ordered[section_count], Wire)
++                            or (
++                                has_auxiliary
++                                and not isinstance(ordered[-1], Wire)
++                            )
++                        ):
++                            ctx.fail(
++                                f"Graph node '{node.node_id}' ({op_name}) inputs do not match its section/path contract"
++                            )
++                        result = ops.multi_section_sweep_rshell(
++                            cast(Sequence[Wire | Vertex], ordered[:section_count]),
++                            cast(Wire, ordered[section_count]),
++                            frame_policy=str(params["frame_policy"]),
++                            with_contact=bool(params["with_contact"]),
++                            with_correction=bool(params["with_correction"]),
++                            auxiliary_spine=(
++                                cast(Wire, ordered[-1]) if has_auxiliary else None
++                            ),
++                            curvilinear_equivalence=bool(
++                                params["curvilinear_equivalence"]
++                            ),
++                            auxiliary_contact=str(params["auxiliary_contact"]),
++                        )
++                        _store_outputs(node, result)
++                        continue
++
+                     if op_name == "make_loft_rshell":
+                         ctx.require_params(
+                             node.node_id, op_name, params, ("section_count", "ruled")
+@@ -3571,6 +3644,16 @@ def _execute_graph(
+                         result = ops.loft_rshell(
+                             cast(Sequence[Wire | Vertex], ordered),
+                             ruled=bool(params["ruled"]),
++                            tolerance=float(params.get("tolerance", 1e-6)),
++                            compatibility_check=bool(
++                                params.get("compatibility_check", True)
++                            ),
++                            smoothing=cast(Optional[bool], params.get("smoothing")),
++                            continuity=cast(Optional[str], params.get("continuity")),
++                            parametrization=cast(
++                                Optional[str], params.get("parametrization")
++                            ),
++                            max_degree=cast(Optional[int], params.get("max_degree")),
+                             tag_prefix=cast(Optional[str], params.get("tag_prefix")),
+                         )
+                         _store_outputs(node, result)
+@@ -3916,6 +3999,58 @@ def _execute_graph(
+                             _store_outputs(node, result)
+                         continue
+ 
++                    if op_name == "make_multi_section_sweep_rsolid":
++                        ctx.require_params(
++                            node.node_id,
++                            op_name,
++                            params,
++                            (
++                                "section_count",
++                                "frame_policy",
++                                "with_contact",
++                                "with_correction",
++                                "has_auxiliary_spine",
++                                "curvilinear_equivalence",
++                                "auxiliary_contact",
++                            ),
++                        )
++                        ordered = _ordered_input_shapes(ctx, graph, outputs, node, params)
++                        section_count = int(params["section_count"])
++                        has_auxiliary = bool(params["has_auxiliary_spine"])
++                        expected_count = section_count + 1 + int(has_auxiliary)
++                        if (
++                            len(ordered) != expected_count
++                            or not all(
++                                isinstance(item, (Wire, Vertex))
++                                for item in ordered[:section_count]
++                            )
++                            or not isinstance(ordered[section_count], Wire)
++                            or (
++                                has_auxiliary
++                                and not isinstance(ordered[-1], Wire)
++                            )
++                        ):
++                            ctx.fail(
++                                f"Graph node '{node.node_id}' ({op_name}) inputs do not match its section/path contract"
++                            )
++                        result = ops.multi_section_sweep_rsolid(
++                            cast(Sequence[Wire | Vertex], ordered[:section_count]),
++                            cast(Wire, ordered[section_count]),
++                            frame_policy=str(params["frame_policy"]),
++                            with_contact=bool(params["with_contact"]),
++                            with_correction=bool(params["with_correction"]),
++                            auxiliary_spine=(
++                                cast(Wire, ordered[-1]) if has_auxiliary else None
++                            ),
++                            curvilinear_equivalence=bool(
++                                params["curvilinear_equivalence"]
++                            ),
++                            auxiliary_contact=str(params["auxiliary_contact"]),
++                            tracking_policy=str(params.get("tracking_policy", "full")),
++                        )
++                        _store_outputs(node, result)
++                        continue
++
+                     if op_name == "make_loft_rsolid":
+                         ctx.require_params(
+                             node.node_id, op_name, params, ("profile_count", "ruled")
+@@ -3925,6 +4060,22 @@ def _execute_graph(
+                             result = ops.loft_rsolid(
+                                 cast(Any, profile_outputs),
+                                 ruled=bool(params["ruled"]),
++                                tolerance=float(params.get("tolerance", 1e-6)),
++                                compatibility_check=bool(
++                                    params.get("compatibility_check", True)
++                                ),
++                                smoothing=cast(
++                                    Optional[bool], params.get("smoothing")
++                                ),
++                                continuity=cast(
++                                    Optional[str], params.get("continuity")
++                                ),
++                                parametrization=cast(
++                                    Optional[str], params.get("parametrization")
++                                ),
++                                max_degree=cast(
++                                    Optional[int], params.get("max_degree")
++                                ),
+                                 tracking_policy=str(
+                                     params.get("tracking_policy", "full")
+                                 ),
+diff --git a/src/simplecadapi/surface.py b/src/simplecadapi/surface.py
+index 78cbb39..09c018f 100644
+--- a/src/simplecadapi/surface.py
++++ b/src/simplecadapi/surface.py
+@@ -14,6 +14,8 @@ from .operators.geometry import (
+     make_cylindrical_surface_rface,
+     make_gordon_surface_rface,
+     loft_rshell,
++    multi_section_sweep_rshell,
++    preflight_loft,
+     make_ruled_surface_rface,
+     make_surface_patch_rface,
+     make_solid_from_shell_rsolid,
+@@ -31,6 +33,8 @@ __all__ = [
+     "make_gordon_surface_rface",
+     "make_surface_patch_rface",
+     "loft_rshell",
++    "multi_section_sweep_rshell",
++    "preflight_loft",
+     "trim_surface_rface",
+     "sew_faces_rshell",
+     "make_solid_from_shell_rsolid",
+diff --git a/src/simplecadapi/topology/model.py b/src/simplecadapi/topology/model.py
+index a595696..b056a56 100644
+--- a/src/simplecadapi/topology/model.py
++++ b/src/simplecadapi/topology/model.py
+@@ -456,6 +456,8 @@ def _node_display_category(op: str) -> str:
+         "make_extrude_rsolid",
+         "make_revolve_rsolid",
+         "make_loft_rsolid",
++        "make_multi_section_sweep_rsolid",
++        "make_multi_section_sweep_rshell",
+         "make_sweep_rsolid",
+         "make_twisted_sweep_rsolid",
+     }:
+diff --git a/src/simplecadapi/topology/tracking.py b/src/simplecadapi/topology/tracking.py
+index fdc37c4..08f1f81 100644
+--- a/src/simplecadapi/topology/tracking.py
++++ b/src/simplecadapi/topology/tracking.py
+@@ -61,7 +61,6 @@ from OCP.BRepFilletAPI import (
+ from OCP.BRepOffsetAPI import (
+     BRepOffsetAPI_MakePipeShell,
+     BRepOffsetAPI_MakeThickSolid,
+-    BRepOffsetAPI_ThruSections,
+ )
+ from OCP.BRepOffset import BRepOffset_Skin
+ from OCP.GeomAbs import GeomAbs_Arc, GeomAbs_Plane
+@@ -87,6 +86,7 @@ from ..kernel.ocp_builders import (
+     build_cone_primitive,
+     build_cylinder_primitive,
+ )
++from ..kernel.ocp_features import _make_loft_builder, _make_multi_section_pipe_shell_builder
+ from .model import (
+     TopoKind,
+     TopoEvent,
+@@ -1717,23 +1717,33 @@ def tracked_shell(
+     )
+ 
+ 
+-def tracked_loft(profiles: List[Wire | Vertex], ruled: bool = False) -> TrackedResult:
++def tracked_loft(
++    profiles: List[Wire | Vertex],
++    ruled: bool = False,
++    *,
++    tolerance: float = 1e-6,
++    compatibility_check: bool = True,
++    smoothing: Optional[bool] = None,
++    continuity: Optional[str] = None,
++    parametrization: Optional[str] = None,
++    max_degree: Optional[int] = None,
++) -> TrackedResult:
+     """Loft wire/vertex profiles into a solid with topology history tracking."""
+ 
+     graph_id = _make_id("g")
+     node_id = _make_id("n")
+ 
+-    loft_op = BRepOffsetAPI_ThruSections(True, bool(ruled))
+-    loft_op.CheckCompatibility(True)
+-    for profile in profiles:
+-        if isinstance(profile, Vertex):
+-            loft_op.AddVertex(profile.wrapped)
+-        else:
+-            loft_op.AddWire(profile.wrapped)
+-    loft_op.Build()
+-
+-    if not loft_op.IsDone():
+-        raise ValueError("Loft failed: OCC build did not complete")
++    loft_op = _make_loft_builder(
++        [profile.wrapped for profile in profiles],
++        is_solid=True,
++        ruled=ruled,
++        tolerance=tolerance,
++        compatibility_check=compatibility_check,
++        smoothing=smoothing,
++        continuity=continuity,
++        parametrization=parametrization,
++        max_degree=max_degree,
++    )
+ 
+     result_solid = Solid(loft_op.Shape())
+ 
+@@ -1906,6 +1916,100 @@ def tracked_sweep(profile: Face, path: Wire, is_frenet: bool = False) -> Tracked
+     )
+ 
+ 
++def tracked_multi_section_sweep(
++    sections: Sequence[Wire | Vertex],
++    path: Wire,
++    *,
++    frame_policy: str = "corrected_frenet",
++    with_contact: bool = False,
++    with_correction: bool = False,
++    auxiliary_spine: Optional[Wire] = None,
++    curvilinear_equivalence: bool = True,
++    auxiliary_contact: str = "none",
++) -> TrackedResult:
++    """Sweep ordered Wire/endpoint-Vertex sections along one path with history."""
++
++    graph_id = _make_id("g")
++    node_id = _make_id("n")
++    sweep_op = _make_multi_section_pipe_shell_builder(
++        [section.wrapped for section in sections],
++        path.wrapped,
++        frame_policy=frame_policy,
++        with_contact=with_contact,
++        with_correction=with_correction,
++        auxiliary_spine=(
++            auxiliary_spine.wrapped if auxiliary_spine is not None else None
++        ),
++        curvilinear_equivalence=curvilinear_equivalence,
++        auxiliary_contact=auxiliary_contact,
++    )
++    if not sweep_op.MakeSolid():
++        raise ValueError("Multi-section sweep failed: OCC solid conversion did not complete")
++    result_solid = Solid(sweep_op.Shape())
++
++    preserved: List[TopoRef] = []
++    modified: List[TopoRef] = []
++    generated: List[TopoRef] = []
++    deleted: List[TopoRef] = []
++    history_entries: List[Dict[str, Any]] = []
++    for index, section in enumerate(sections):
++        if isinstance(section, Vertex):
++            continue
++        pres, mod, gen, del_, entries = _query_history(
++            sweep_op,
++            section.wrapped,
++            graph_id,
++            node_id,
++            f"section_{index}",
++            TopoKind.EDGE,
++            TopAbs_EDGE,
++            result_shape=result_solid.wrapped,
++            generated_result_role="multi_section_sweep.side",
++            project_source_tags=True,
++        )
++        preserved.extend(pres)
++        modified.extend(mod)
++        generated.extend(gen)
++        deleted.extend(del_)
++        history_entries.extend(entries)
++
++    roles = _roles_from_history(history_entries, evidence_method="Generated")
++    for section, candidate, role, method in (
++        (sections[0], sweep_op.FirstShape(), "multi_section_sweep.start", "FirstShape"),
++        (sections[-1], sweep_op.LastShape(), "multi_section_sweep.end", "LastShape"),
++    ):
++        if not isinstance(section, Wire):
++            continue
++        role_entry = _operation_role(
++            candidate,
++            result_shape=result_solid.wrapped,
++            graph_id=graph_id,
++            node_id=node_id,
++            role=role,
++            evidence_method=method,
++        )
++        if role_entry is not None:
++            roles.append(role_entry)
++
++    delta = TopoDelta(
++        preserved=tuple(preserved),
++        modified=tuple(modified),
++        generated=tuple(generated),
++        deleted=tuple(deleted),
++        entries=_canonical_topo_entries(
++            history_entries,
++            graph_id=graph_id,
++            node_id=node_id,
++        ),
++        roles=_canonical_topo_roles(roles, graph_id=graph_id, node_id=node_id),
++    )
++    return TrackedResult(
++        shape=result_solid,
++        delta=delta,
++        delta_entries=_aggregate_delta_entries(history_entries, roles),
++    )
++
++
+ def _axial_cap_face(
+     solid_shape: Any,
+     axis: Tuple[float, float, float],
+diff --git a/test/test_inspect_brep_feature_catalog.py b/test/test_inspect_brep_feature_catalog.py
+index e94b300..ce8bf61 100644
+--- a/test/test_inspect_brep_feature_catalog.py
++++ b/test/test_inspect_brep_feature_catalog.py
+@@ -30,6 +30,7 @@ REQUIRED_FIELDS = {
+     "confidence",
+     "visuals",
+     "limitations",
++    "reconstruction",
+     "target_sha256",
+ }
+ 
+@@ -168,7 +169,7 @@ def test_revolution_catalog_uses_existing_top_level_contract_and_axis_dimensions
+         if item["subtype"] == "whole_body_partial_revolution"
+     )
+ 
+-    assert report["schema_version"] == "3.0"
++    assert report["schema_version"] == "4.1"
+     assert set(feature) == REQUIRED_FIELDS
+     assert feature["category"] == "revolution"
+     assert feature["location"]["axis"]["direction"] == pytest.approx([0.0, 1.0, 0.0])
+@@ -202,3 +203,55 @@ def test_cylinder_prefers_revolution_and_records_extrusion_as_alternative():
+         item["category"] == "extrusion"
+         for item in relationships["alternative_interpretations"]
+     )
++
++
++def test_v4_catalog_exposes_loft_and_sweep_instances_with_section_visuals():
++    first = scad.make_rectangle_rwire(8.0, 4.0, center=(0.0, 0.0, 0.0))
++    second = scad.make_rectangle_rwire(3.0, 7.0, center=(1.0, 0.5, 10.0))
++    loft = scad.loft_rsolid([first, second])
++    loft_report = brep.inspect_geometric_features_rdescriptor(
++        loft.wrapped, feature_kinds=("loft",), max_features=20
++    )
++    loft_feature = next(
++        item
++        for item in loft_report["features"]
++        if item["subtype"] == "whole_body_profile_loft"
++    )
++    assert set(loft_feature) == REQUIRED_FIELDS
++    assert loft_feature["category"] == "loft"
++    assert loft_feature["dimensions"]["rigid_fit_error"]["value"] > 0.0
++    assert loft_feature["visuals"]["transverse_section"]
++    assert loft_feature["reconstruction"]["schema_version"] == "1.0"
++    assert loft_feature["reconstruction"]["section_alignment"]["status"] == "aligned"
++    assert loft_feature["reconstruction"]["feature_id"] == loft_feature["feature_id"]
++    assert loft_feature["reconstruction"]["roi_face_ids"]
++    assert loft_feature["reconstruction"]["profile_tracks"][0]["track_id"] == (
++        "profile_track:0"
++    )
++    assert loft_feature["reconstruction"]["specialist_trigger"]["decision"] == (
++        "accepted"
++    )
++    assert loft_feature["reconstruction"]["adaptive_station_plan"]["status"] in {
++        "adequate",
++        "refinement_requested",
++    }
++    assert loft_feature["reconstruction"]["recommended_operation"]["api"] in {
++        "loft_rsolid",
++        "multi_section_sweep_rsolid",
++    }
++
++    profile = scad.make_rectangle_rface(4.0, 2.0)
++    twisted = scad.twisted_sweep_rsolid(profile, 9.0, 70.0)
++    sweep_report = brep.inspect_geometric_features_rdescriptor(
++        twisted.wrapped, feature_kinds=("sweep",), max_features=20
++    )
++    sweep_feature = next(
++        item for item in sweep_report["features"] if item["subtype"] == "twisted_sweep"
++    )
++    assert set(sweep_feature) == REQUIRED_FIELDS
++    assert sweep_feature["category"] == "sweep"
++    assert sweep_feature["dimensions"]["twist_angle"]["value"] > 60.0
++    assert sweep_feature["visuals"]["profile"]
++    assert sweep_feature["reconstruction"]["recommended_operation"]["capability"] == (
++        "native"
++    )
+diff --git a/test/test_inspect_brep_manufacturing.py b/test/test_inspect_brep_manufacturing.py
+index 701ab6e..a03cae8 100644
+--- a/test/test_inspect_brep_manufacturing.py
++++ b/test/test_inspect_brep_manufacturing.py
+@@ -533,6 +533,51 @@ def test_default_feature_kinds_remain_legacy_and_skip_operation_hints(monkeypatc
+     }.intersection(hint["kind"] for hint in default["hints"])
+ 
+ 
++def test_sweep_and_loft_share_precomputed_section_families(monkeypatch):
++    from simplecadapi.inspect.brep import manufacturing
++
++    whole = [{"family": "whole"}]
++    local = [{"family": "local"}]
++    points = [{"family": "point"}]
++    calls = {"whole": 0, "local": 0, "points": 0}
++    received = {}
++
++    def whole_families(*_):
++        calls["whole"] += 1
++        return whole
++
++    def local_families(*_):
++        calls["local"] += 1
++        return local
++
++    def point_families(*_):
++        calls["points"] += 1
++        return points
++
++    def sweep(*_, whole_families, local_families):
++        received["sweep"] = (whole_families, local_families)
++        return [], []
++
++    def loft(*_, whole_families, local_families, point_families):
++        received["loft"] = (whole_families, local_families, point_families)
++        return [], []
++
++    monkeypatch.setattr(manufacturing, "whole_body_section_families", whole_families)
++    monkeypatch.setattr(manufacturing, "local_section_families", local_families)
++    monkeypatch.setattr(manufacturing, "whole_body_point_families", point_families)
++    monkeypatch.setattr(manufacturing, "sweep_hints", sweep)
++    monkeypatch.setattr(manufacturing, "loft_hints", loft)
++
++    brep.inspect_manufacturing_hints_rdescriptor(
++        scad.make_box_rsolid(10.0, 8.0, 4.0).wrapped,
++        feature_kinds=("sweep", "loft"),
++    )
++
++    assert calls == {"whole": 1, "local": 1, "points": 1}
++    assert received["sweep"] == (whole, local)
++    assert received["loft"] == (whole, local, points)
++
++
+ def test_revolution_is_available_only_when_explicitly_requested():
+     profile = scad.make_rectangle_rface(
+         width=2.0,
+diff --git a/test/test_inspect_brep_revolution_regions.py b/test/test_inspect_brep_revolution_regions.py
+index a9c5cac..099999a 100644
+--- a/test/test_inspect_brep_revolution_regions.py
++++ b/test/test_inspect_brep_revolution_regions.py
+@@ -12,6 +12,7 @@ import pytest
+ 
+ import simplecadapi as scad
+ from simplecadapi.inspect import brep
++from simplecadapi.inspect.brep.feature_hints import revolutions
+ 
+ 
+ def _meridian_face(*, inner: float, outer: float, start: float, end: float):
+@@ -197,3 +198,13 @@ def test_twisted_loft_is_not_a_strong_revolution_candidate():
+     loft = scad.loft_rsolid([first, second])
+ 
+     assert not any(item["confidence"]["level"] == "strong" for item in _hints(loft))
++
++
++def test_empty_angular_section_rejects_candidate_without_aborting_analysis(monkeypatch):
++    monkeypatch.setattr(
++        revolutions,
++        "inspect_section_rdescriptor",
++        lambda **_: {"edges": []},
++    )
++
++    assert _hints(_partial_local(additive=False)) == []
+diff --git a/test/test_inspect_brep_section_render.py b/test/test_inspect_brep_section_render.py
+index 29d24d6..20bd7bc 100644
+--- a/test/test_inspect_brep_section_render.py
++++ b/test/test_inspect_brep_section_render.py
+@@ -339,6 +339,8 @@ def test_feature_palette_matches_human_review_standard():
+         "extrusion": pytest.approx((41 / 255, 173 / 255, 87 / 255)),
+         "hole": pytest.approx((148 / 255, 61 / 255, 199 / 255)),
+         "revolution": pytest.approx((6 / 255, 182 / 255, 212 / 255)),
++        "loft": pytest.approx((236 / 255, 72 / 255, 153 / 255)),
++        "sweep": pytest.approx((79 / 255, 70 / 255, 229 / 255)),
+         "fillet": pytest.approx((239 / 255, 68 / 255, 68 / 255)),
+         "chamfer": pytest.approx((242 / 255, 177 / 255, 52 / 255)),
+         "sheet_metal": pytest.approx((59 / 255, 130 / 255, 246 / 255)),
+diff --git a/test/test_model_json.py b/test/test_model_json.py
+index ab30ae2..b43fa66 100644
+--- a/test/test_model_json.py
++++ b/test/test_model_json.py
+@@ -65,7 +65,7 @@ class TestModelJson(unittest.TestCase):
+ 
+         self.assertIn("canonical_contract", payload)
+         contract = payload["canonical_contract"]
+-        self.assertEqual(contract["contract_version"], "2.1")
++        self.assertEqual(contract["contract_version"], "2.2")
+         self.assertEqual(contract["graph_roles"]["graph"], "canonical_low_level_graph")
+         self.assertEqual(contract["graph_roles"]["leaf_ids"], "explicit_result_set")
+         self.assertEqual(contract["replay_policy"]["preferred_graph"], "graph")
+diff --git a/test/test_rearchitecture_2_0_contract.py b/test/test_rearchitecture_2_0_contract.py
+index fa88b12..a46215f 100644
+--- a/test/test_rearchitecture_2_0_contract.py
++++ b/test/test_rearchitecture_2_0_contract.py
+@@ -285,7 +285,7 @@ class TestRearchitecture20IoContracts(unittest.TestCase):
+ 
+         self.assertIn("canonical_contract", payload)
+         contract = payload["canonical_contract"]
+-        self.assertEqual(contract["contract_version"], "2.1")
++        self.assertEqual(contract["contract_version"], "2.2")
+         self.assertEqual(contract["graph_roles"]["graph"], "canonical_low_level_graph")
+         self.assertEqual(contract["graph_roles"]["leaf_ids"], "explicit_result_set")
+         self.assertEqual(contract["replay_policy"]["preferred_graph"], "graph")
+diff --git a/test/test_serialization.py b/test/test_serialization.py
+index 880d426..446a8cf 100644
+--- a/test/test_serialization.py
++++ b/test/test_serialization.py
+@@ -353,6 +353,8 @@ class TestCoverageMatrix(unittest.TestCase):
+             "make_extrude_rsolid",
+             "make_revolve_rsolid",
+             "make_loft_rsolid",
++            "make_multi_section_sweep_rsolid",
++            "make_multi_section_sweep_rshell",
+             "make_sweep_rsolid",
+             "make_twisted_sweep_rsolid",
+             "make_translate_rshape",
+diff --git a/test/test_step_computational_geometry_workflow.py b/test/test_step_computational_geometry_workflow.py
+index 30e86fd..7d3ee0d 100644
+--- a/test/test_step_computational_geometry_workflow.py
++++ b/test/test_step_computational_geometry_workflow.py
+@@ -64,7 +64,7 @@ def test_workflow_defines_inputs_phases_gates_failures_and_terminal_boundary():
+     assert "not recovered feature history" in prose
+ 
+ 
+-def test_workflow_requests_all_v3_feature_kinds_and_declares_complete_catalog_gate():
++def test_workflow_requests_all_v4_feature_kinds_and_declares_complete_catalog_gate():
+     text = _read(WORKFLOW)
+ 
+     for kind in (
+@@ -74,6 +74,8 @@ def test_workflow_requests_all_v3_feature_kinds_and_declares_complete_catalog_ga
+         "hole",
+         "extrusion",
+         "revolution",
++        "loft",
++        "sweep",
+     ):
+         assert f'"{kind}"' in text
+     assert "inspect_geometric_features_rdescriptor" in text
+@@ -135,7 +137,7 @@ def test_workflow_references_exist_and_inspection_domain_registers_renderer():
+     assert "step-computational-geometry-analysis.md" in domain
+ 
+ 
+-def test_workflow_defines_v3_taxonomy_fields_and_reviewed_palette():
++def test_workflow_defines_v4_taxonomy_fields_and_reviewed_palette():
+     text = _read(WORKFLOW)
+ 
+     for subtype in (
+@@ -151,6 +153,15 @@ def test_workflow_defines_v3_taxonomy_fields_and_reviewed_palette():
+         "local_partial_revolved_boss",
+         "local_full_revolved_groove",
+         "local_partial_revolved_cut",
++        "whole_body_profile_loft",
++        "whole_body_point_loft",
++        "local_lofted_boss",
++        "local_lofted_cut",
++        "whole_body_path_sweep",
++        "local_swept_boss",
++        "local_swept_cut",
++        "twisted_sweep",
++        "helical_sweep",
+         "circular_through",
+         "circular_blind",
+         "counterbore",
+@@ -198,6 +209,8 @@ def test_workflow_defines_v3_taxonomy_fields_and_reviewed_palette():
+     for color in (
+         "#29ad57",
+         "#06b6d4",
++        "#ec4899",
++        "#4f46e5",
+         "#943dc7",
+         "#ef4444",
+         "#f2b134",
+@@ -230,6 +243,7 @@ def test_reviewed_example_generator_is_pinned_to_external_output_root():
+     assert r"D:\Code\step-feat\feat\math-vis-eg" in source
+     assert "--output-root" in source
+     assert "--v3-only" in source
++    assert "--v4-only" in source
+     assert all(
+         f'"{case_id}"' in source
+         for case_id in (
+@@ -253,6 +267,10 @@ def test_reviewed_example_generator_is_pinned_to_external_output_root():
+             "N4",
+         )
+     )
++    assert all(
++        f'"{case_id}"' in source
++        for case_id in ("L1", "L2", "L3", "L4", "S1", "S2", "S3", "S4", "S5")
++    )
+     assert "inspect_geometric_features_rdescriptor" in source
+     assert "render_geometric_features_rpath" in source
+     assert "target_sha256" in source and "feature_ids" in source
+@@ -321,6 +339,8 @@ def test_minimal_analysis_artifact_package_ends_before_reconstruction(tmp_path):
+         "hole",
+         "extrusion",
+         "revolution",
++        "loft",
++        "sweep",
+     )
+     linear_tolerance = 1.0e-6
+     angular_tolerance_degrees = 0.5
+@@ -424,6 +444,8 @@ def test_minimal_analysis_artifact_package_ends_before_reconstruction(tmp_path):
+         "hole_region_candidate": "purple",
+         "extrusion_region_candidate": "green",
+         "revolution_region_candidate": "cyan",
++        "loft_region_candidate": "pink",
++        "sweep_region_candidate": "indigo",
+     }
+     highlight_records = []
+     for hint in hints["hints"]:
+diff --git a/test/test_translator_backend_contract.py b/test/test_translator_backend_contract.py
+index fc37a18..e6fd409 100644
+--- a/test/test_translator_backend_contract.py
++++ b/test/test_translator_backend_contract.py
+@@ -215,6 +215,20 @@ class TestTranslatorBackendContract(unittest.TestCase):
+                         SupportLevel.UNSUPPORTED,
+                     )
+ 
++    def test_multi_section_sweep_is_explicitly_unsupported_by_translators(self):
++        from simplecadapi import translator
++
++        for backend_name in translator.__all__:
++            backend = getattr(translator, backend_name)
++            for operation in (
++                "make_multi_section_sweep_rsolid",
++                "make_multi_section_sweep_rshell",
++            ):
++                with self.subTest(backend=backend_name, operation=operation):
++                    capability = backend.CAPABILITIES.operations[operation]
++                    self.assertIs(capability.level, SupportLevel.UNSUPPORTED)
++                    self.assertTrue(capability.reason)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+diff --git a/tools/generate_step_feature_visual_examples.py b/tools/generate_step_feature_visual_examples.py
+index 608ec26..3b731bd 100644
+--- a/tools/generate_step_feature_visual_examples.py
++++ b/tools/generate_step_feature_visual_examples.py
+@@ -28,6 +28,16 @@ V3_FEATURE_KINDS = (
+     "chamfer",
+     "sheet_metal",
+ )
++V4_FEATURE_KINDS = (
++    "hole",
++    "extrusion",
++    "revolution",
++    "loft",
++    "sweep",
++    "fillet",
++    "chamfer",
++    "sheet_metal",
++)
+ 
+ 
+ def _meridian_face(inner: float, outer: float, start: float, end: float):
+@@ -169,6 +179,73 @@ def _fillet_case():
+     return scad.fillet_rsolid(body, [body.get_edges(0)], 3.0)
+ 
+ 
++def _profile_loft_case():
++    first = scad.make_rectangle_rwire(8.0, 4.0, center=(0.0, 0.0, 0.0))
++    second = scad.make_rectangle_rwire(3.0, 7.0, center=(1.0, 0.5, 10.0))
++    return scad.loft_rsolid([first, second])
++
++
++def _point_loft_case():
++    base = scad.make_rectangle_rwire(6.0, 4.0, center=(0.0, 0.0, 0.0))
++    apex = scad.make_point_rvertex(0.5, 0.25, 8.0)
++    return scad.loft_rsolid([base, apex])
++
++
++def _local_loft_case(*, additive: bool):
++    base = scad.make_box_rsolid(30.0, 24.0, 10.0, bottom_face_center=(0.0, 0.0, 0.0))
++    start = scad.make_rectangle_rwire(
++        10.0 if additive else 9.0,
++        8.0 if additive else 7.0,
++        center=(0.0, 0.0, 10.0),
++    )
++    end = scad.make_rectangle_rwire(
++        5.0 if additive else 4.0,
++        3.0,
++        center=(1.0 if additive else 0.5, 0.0, 16.0 if additive else 4.0),
++    )
++    feature = scad.loft_rsolid([start, end])
++    return (
++        scad.union_rsolid(base, feature, clean=False)
++        if additive
++        else scad.cut_rsolid(base, feature)
++    )
++
++
++def _path_sweep_case():
++    profile = scad.make_rectangle_rface(2.0, 1.0)
++    path = scad.make_interpolated_spline_rwire(
++        points=[(0, 0, 0), (1, 0, 2), (3, 1, 4), (5, 0, 6)]
++    )
++    return scad.sweep_rsolid(profile, path, is_frenet=True)
++
++
++def _local_sweep_case(*, additive: bool):
++    base = scad.make_box_rsolid(30.0, 24.0, 10.0, bottom_face_center=(0.0, 0.0, 0.0))
++    profile = scad.make_rectangle_rface(3.0, 2.0, center=(0.0, 0.0, 10.0))
++    middle = (0.5, 0.4, 12.0 if additive else 8.0)
++    end = (4.0, -0.5, 14.0 if additive else 6.0)
++    path = scad.make_interpolated_spline_rwire(points=[(0.0, 0.0, 10.0), middle, end])
++    feature = scad.sweep_rsolid(profile, path, is_frenet=True)
++    return (
++        scad.union_rsolid(base, feature, clean=False)
++        if additive
++        else scad.cut_rsolid(base, feature)
++    )
++
++
++def _twisted_sweep_case():
++    return scad.twisted_sweep_rsolid(
++        scad.make_rectangle_rface(4.0, 2.0),
++        distance=9.0,
++        twist_angle=70.0,
++    )
++
++
++def _helical_sweep_case():
++    profile = scad.make_circle_rwire((3.0, 0.0, 0.0), 0.35, normal=(0.0, 1.0, 0.0))
++    return scad.helical_sweep_rsolid(profile, pitch=2.0, height=5.0, radius=3.0)
++
++
+ V3_CASES = (
+     (
+         "E1",
+@@ -232,6 +309,18 @@ V3_CASES = (
+     ("N4", _fillet_case, "fillet", "cylindrical_constant", 1),
+ )
+ 
++V4_CASES = (
++    ("L1", _profile_loft_case, "loft", "whole_body_profile_loft", 1),
++    ("L2", _point_loft_case, "loft", "whole_body_point_loft", 1),
++    ("L3", lambda: _local_loft_case(additive=True), "loft", "local_lofted_boss", 1),
++    ("L4", lambda: _local_loft_case(additive=False), "loft", "local_lofted_cut", 1),
++    ("S1", _path_sweep_case, "sweep", "whole_body_path_sweep", 1),
++    ("S2", lambda: _local_sweep_case(additive=True), "sweep", "local_swept_boss", 1),
++    ("S3", lambda: _local_sweep_case(additive=False), "sweep", "local_swept_cut", 1),
++    ("S4", _twisted_sweep_case, "sweep", "twisted_sweep", 1),
++    ("S5", _helical_sweep_case, "sweep", "helical_sweep", 1),
++)
++
+ 
+ def _raw_shape(value):
+     return value.wrapped if hasattr(value, "wrapped") else value
+@@ -286,6 +375,29 @@ def _section_planes(feature, summary):
+     if feature and feature["category"] == "hole":
+         direction = np.asarray(feature["location"]["direction"], dtype=float)
+         return [("hole-transverse", center, direction)]
++    if feature and feature["category"] in {"loft", "sweep"}:
++        flow = next(
++            (
++                item["observed"]
++                for item in feature["evidence"]
++                if item["code"]
++                in {
++                    "loft.actual_section_flow",
++                    "loft.local_non_rigid_section_flow",
++                    "sweep.actual_section_flow",
++                    "sweep.local_rigid_section_flow",
++                }
++            ),
++            {},
++        )
++        planes = []
++        for item in flow.get("stations", []):
++            plane = item.get("plane") or {}
++            if plane.get("origin") and plane.get("normal"):
++                label = str(round(float(item["station"]), 3)).replace(".", "p")
++                planes.append((f"station-{label}", plane["origin"], plane["normal"]))
++        if planes:
++            return planes
+     return [
+         ("global-xy", center, (0.0, 0.0, 1.0)),
+         ("global-xz", center, (0.0, 1.0, 0.0)),
+@@ -313,17 +425,23 @@ def _render_profile(feature, output_path: Path) -> None:
+     plt.close(figure)
+ 
+ 
+-def generate_v3_cases(output_root: Path) -> None:
+-    root = output_root / "v3"
++def _generate_cases(
++    output_root: Path,
++    *,
++    version: str,
++    cases,
++    feature_kinds,
++) -> None:
++    root = output_root / version
+     records = []
+-    for case_id, builder, category, subtype, expected_count in V3_CASES:
++    for case_id, builder, category, subtype, expected_count in cases:
+         case_root = root / case_id
+         case_root.mkdir(parents=True, exist_ok=True)
+         shape = builder()
+         raw_shape = _raw_shape(shape)
+         report = brep.inspect_geometric_features_rdescriptor(
+             model_or_path=raw_shape,
+-            feature_kinds=V3_FEATURE_KINDS,
++            feature_kinds=feature_kinds,
+             max_features=200,
+         )
+         _write_json(case_root / "feature-index.json", report)
+@@ -461,6 +579,24 @@ def generate_v3_cases(output_root: Path) -> None:
+     _write_json(root / "artifact-manifest.json", {"artifacts": artifacts})
+ 
+ 
++def generate_v3_cases(output_root: Path) -> None:
++    _generate_cases(
++        output_root,
++        version="v3",
++        cases=V3_CASES,
++        feature_kinds=V3_FEATURE_KINDS,
++    )
++
++
++def generate_v4_cases(output_root: Path) -> None:
++    _generate_cases(
++        output_root,
++        version="v4",
++        cases=V4_CASES,
++        feature_kinds=V4_FEATURE_KINDS,
++    )
++
++
+ def main() -> None:
+     parser = argparse.ArgumentParser(
+         description="Regenerate the reviewed computational-geometry examples."
+@@ -471,22 +607,31 @@ def main() -> None:
+         required=True,
+         help=f"must be exactly {APPROVED_OUTPUT_ROOT}",
+     )
+-    parser.add_argument(
++    versions = parser.add_mutually_exclusive_group()
++    versions.add_argument(
+         "--v3-only",
+         action="store_true",
+         help="generate only the v3 E/R/A/N review cases",
+     )
++    versions.add_argument(
++        "--v4-only",
++        action="store_true",
++        help="generate only the v4 loft/sweep review cases",
++    )
+     args = parser.parse_args()
+     output_root = args.output_root.resolve()
+     if output_root != APPROVED_OUTPUT_ROOT.resolve():
+         parser.error(f"--output-root must be exactly {APPROVED_OUTPUT_ROOT}")
+-    if not args.v3_only:
++    if not args.v3_only and not args.v4_only:
+         reviewed_source = output_root / "_work" / "generate_examples.py"
+         if not reviewed_source.is_file():
+             parser.error(f"reviewed generator source is missing: {reviewed_source}")
+         namespace = runpy.run_path(str(reviewed_source), run_name="reviewed_examples")
+         namespace["main"]()
+-    generate_v3_cases(output_root)
++    if not args.v4_only:
++        generate_v3_cases(output_root)
++    if not args.v3_only:
++        generate_v4_cases(output_root)
+ 
+ 
+ if __name__ == "__main__":

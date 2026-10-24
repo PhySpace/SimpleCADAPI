@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import fcntl
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
 import sys
+import tempfile
 import traceback
-from typing import Any, Mapping
+from typing import Any, BinaryIO, Iterator, Mapping
 
 
 def _read_polydata(path: Path):
@@ -107,6 +108,33 @@ def _render_views(
 
 
 
+@contextmanager
+def _exclusive_render_lock(lock_file: BinaryIO) -> Iterator[None]:
+    if os.name == "nt":
+        import msvcrt
+
+        lock_file.seek(0, os.SEEK_END)
+        if lock_file.tell() == 0:
+            lock_file.write(b"\0")
+            lock_file.flush()
+        lock_file.seek(0)
+        msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
+        try:
+            yield
+        finally:
+            lock_file.seek(0)
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+        return
+
+    import fcntl
+
+    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+    try:
+        yield
+    finally:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
 def _main(manifest_path: Path) -> None:
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     if payload.get("schema_version") != "1.0":
@@ -117,23 +145,23 @@ def _main(manifest_path: Path) -> None:
     options = payload["options"]
     lock_path = Path(
         os.environ.get(
-            "SIMPLECAD_VTK_RENDER_LOCK", "/tmp/simplecad-vtk-render.lock"
+            "SIMPLECAD_VTK_RENDER_LOCK",
+            str(Path(tempfile.gettempdir()) / "simplecad-vtk-render.lock"),
         )
     )
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+b") as lock_file:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-        if mode == "views":
-            _render_views(datasets, output_path, options)
-        else:
-            raise ValueError(f"unsupported render worker mode: {mode}")
-        Path(payload["completion_path"]).touch()
-        # vtkCocoaRenderWindow can crash while Python unwinds VTK wrappers after
-        # rendering. Exit before this frame is destroyed; the OS releases the
-        # one-shot worker's native resources and file lock.
-        sys.stdout.flush()
-        sys.stderr.flush()
-        os._exit(0)
+        with _exclusive_render_lock(lock_file):
+            if mode == "views":
+                _render_views(datasets, output_path, options)
+            else:
+                raise ValueError(f"unsupported render worker mode: {mode}")
+            Path(payload["completion_path"]).touch()
+            # Native render windows can crash while Python unwinds VTK wrappers.
+            # Exit before this frame is destroyed; the OS releases resources.
+            sys.stdout.flush()
+            sys.stderr.flush()
+            os._exit(0)
 
 
 if __name__ == "__main__":

@@ -67,6 +67,7 @@ Read exactly one workflow first, per the user's goal:
 | --- | --- |
 | Model one physical part | `references/workflows/single-part-modeling.md` |
 | Multi-part product or mechanism (custom parts, stdlib gears/bearings, connectors, constraints, package) | `references/workflows/assembly-product-build.md` |
+| Parse a STEP file into a per-instance computational-geometry catalog, dimensions, and read-only local artifacts | `references/workflows/step-computational-geometry-analysis.md` |
 | Rebuild an editable model from a STEP file | `references/workflows/step-reconstruction.md` |
 | Export/translate a validated package | `references/workflows/export-and-translation.md` |
 | Produce a GB engineering drawing (DXF) from validated geometry | `references/workflows/engineering-drawing.md` |

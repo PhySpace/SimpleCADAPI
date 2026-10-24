@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GIF capture harness</title>
+  <style>
+    html, body { margin: 0; background: #0b0e12; }
+    /* Fixed stage so every frame across packages shares one composition. */
+    #stage { width: 960px; height: 640px; }
+    #stage canvas { display: block; }
+    #status { color: #7d8aa2; font: 12px monospace; padding: 4px 8px; }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+  <div id="status">idle</div>
+  <script type="module">
+    import { mountScene, openCadPackage, utils } from '/src/embed-bundle.ts';
+
+    var status = document.getElementById('status');
+    function setStatus(text) { status.textContent = text; }
+
+    window.gifStep = null;
+    window.gifWire = false;
+
+    async function boot() {
+      var params = new URLSearchParams(location.search);
+      var pkgPath = params.get('pkg') || '/pkg.scadpkg';
+      setStatus('fetching ' + pkgPath);
+      var bytes = new Uint8Array(await (await fetch(pkgPath)).arrayBuffer());
+      setStatus('opening package');
+      var opened = await openCadPackage(bytes);
+      setStatus('mounting scene');
+      var view = await mountScene(document.getElementById('stage'), opened.files, { interactive: false });
+      utils.setAzimuth(view, 0);
+      setStatus('ready');
+      window.gifStep = function (azimuthDeg, elevationDeg, wire) {
+        elevationDeg = (typeof elevationDeg === 'number') ? elevationDeg : 26;
+        utils.setAzimuth(view, azimuthDeg, elevationDeg);
+        var wantWire = !!wire;
+        if (window.gifWire !== wantWire) {
+          utils.setWireframe(view, wantWire);
+          window.gifWire = wantWire;
+        }
+      };
+      window.gifReady = true;
+    }
+
+    boot().catch(function (error) {
+      setStatus('error: ' + (error && error.message ? error.message : String(error)));
+    });
+  </script>
+</body>
+</html>

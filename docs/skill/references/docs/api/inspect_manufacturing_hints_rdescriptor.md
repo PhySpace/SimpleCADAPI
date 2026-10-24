@@ -18,8 +18,12 @@ Return deterministic, highlightable manufacturing-feature candidates.
 
 Fillet and chamfer hints require supported analytic carrier evidence.
 Sheet-metal hints require opposed constant-thickness skins, a thin-body
-ratio, and a matching thickness-times-midsurface volume model. Every hint
-includes stable entity IDs, measurements, evidence, and non-probabilistic
-confidence. The result describes final BREP geometry only; it does not infer
-original feature history, process choice, bend allowance, tooling, or
-manufacturing intent.
+ratio, and a matching thickness-times-midsurface volume model. Hole and
+non-circular holes, local or whole-body extrusion/revolution geometry, and
+loft/sweep geometry are available only when their category is explicitly
+included in ``feature_kinds``; they describe
+geometric explanations and do not recover the original feature history.
+Every hint includes stable entity IDs, measurements, evidence, and
+non-probabilistic confidence. The result describes final BREP geometry only;
+it does not infer process choice, bend allowance, tooling, or manufacturing
+intent.

@@ -16,6 +16,10 @@ def render_manufacturing_hints_rpath(model_or_path: ModelInput, output_path: str
 
 Render manufacturing hints as deterministic category-colored overlays.
 
-Sheet-metal skins are blue, bends are orange, fillet candidates are red,
-and chamfer candidates are yellow. Analysis always runs against the current
-model so entity IDs cannot be reused across different BREP instances.
+Sheet-metal skins are blue, bends are orange, extrusion geometry is green,
+revolution geometry is cyan, lofts are pink, sweeps are indigo, holes are
+purple, fillets are red, and chamfers are yellow. Hole, extrusion,
+revolution, loft, and sweep candidates must be explicitly enabled. They
+explain final geometry rather than original
+feature history. Analysis always runs against the current model so entity
+IDs cannot be reused across different BREP instances.

@@ -35,6 +35,8 @@ from .manufacturing import (
     inspect_manufacturing_hints_rdescriptor,
     render_manufacturing_hints_rpath,
 )
+from .feature_catalog import inspect_geometric_features_rdescriptor
+from .feature_visualization import render_geometric_features_rpath
 from .section_tracking import track_section_contours_rdescriptor
 from .model import (
     BRepEntityError,
@@ -77,6 +79,7 @@ from .slices import (
     compare_shape_slices_rslicecomparison,
     compare_step_slices_rslicecomparison,
     make_center_slice_specs_rslicespeclist,
+    render_sections_rpath,
 )
 from .persistence import validate_step_roundtrip_rdescriptor
 from .snapshots import copy_step_region_rpath
@@ -114,6 +117,7 @@ __all__ = [
     "index_shape_rbrepmodel",
     "inspect_difference_regions_rdescriptor",
     "inspect_face_boundaries_rdescriptor",
+    "inspect_geometric_features_rdescriptor",
     "inspect_manufacturing_hints_rdescriptor",
     "inspect_nearby_entities_rdescriptor",
     "inspect_point_rdescriptor",
@@ -131,8 +135,10 @@ __all__ = [
     "track_section_contours_rdescriptor",
     "render_entity_kind_maps_rpath",
     "render_entity_map_rpath",
+    "render_geometric_features_rpath",
     "render_manufacturing_hints_rpath",
     "render_region_rpath",
+    "render_sections_rpath",
     "render_shape_views_rpath",
     "render_step_components_colored_rpath",
     "render_step_components_rpath",

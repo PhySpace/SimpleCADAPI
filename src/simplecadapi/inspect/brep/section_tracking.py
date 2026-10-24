@@ -23,7 +23,13 @@ def _centroid(contour: Mapping[str, Any]) -> tuple[float, float]:
 def _descriptor(contour: Mapping[str, Any]) -> dict[str, float]:
     center = _centroid(contour)
     area = abs(float(contour.get("area") or 0.0))
-    perimeter = float(contour.get("perimeter") or contour.get("length") or 0.0)
+    perimeter = float(
+        contour.get("perimeter")
+        or contour.get("length_exact")
+        or contour.get("length_sampled")
+        or contour.get("length")
+        or 0.0
+    )
     nesting = float(contour.get("nesting_depth") or contour.get("depth") or 0.0)
     return {
         "area": area,

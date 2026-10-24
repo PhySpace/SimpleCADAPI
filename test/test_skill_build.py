@@ -121,7 +121,9 @@ class TestOutputShape:
         root = make_project(tmp_path, {"plain.md": plain, "a.md": SIMPLE})
         project, files = load(root)
         skillbuild.build_target(project, files, "omp")
-        assert (project.root / "out/omp/plain.md").read_bytes() == plain.encode()
+        assert (project.root / "out/omp/plain.md").read_bytes() == (
+            project.source / "plain.md"
+        ).read_bytes()
 
     def test_binary_file_copied_verbatim(self, tmp_path):
         root = make_project(tmp_path, {"a.md": SIMPLE})

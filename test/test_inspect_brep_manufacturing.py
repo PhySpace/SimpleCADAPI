@@ -28,6 +28,47 @@ def _hints(report, kind):
     return [hint for hint in report["hints"] if hint["kind"] == kind]
 
 
+def _shape(value):
+    return value.wrapped if hasattr(value, "wrapped") else value
+
+
+def _cut_shape(base, *tools):
+    result = _shape(base)
+    for tool in tools:
+        operation = BRepAlgoAPI_Cut(result, _shape(tool))
+        operation.Build()
+        assert operation.IsDone()
+        result = operation.Shape()
+    return result
+
+
+def _through_hole_shape():
+    base = scad.make_box_rsolid(width=20.0, height=16.0, depth=10.0)
+    tool = scad.make_cylinder_rsolid(
+        radius=2.0,
+        height=12.0,
+        bottom_face_center=(0.0, 0.0, -1.0),
+    )
+    return _cut_shape(base, tool)
+
+
+def _countersink_shape():
+    base = scad.make_box_rsolid(width=20.0, height=16.0, depth=10.0)
+    through = scad.make_cylinder_rsolid(
+        radius=2.0,
+        height=12.0,
+        bottom_face_center=(0.0, 0.0, -1.0),
+    )
+    sink = scad.make_cone_rsolid(
+        bottom_radius=4.0,
+        top_radius=2.0,
+        height=2.0,
+        bottom_face_center=(0.0, 0.0, 10.0),
+        axis=(0.0, 0.0, -1.0),
+    )
+    return _cut_shape(base, through, sink)
+
+
 def test_manufacturing_hints_are_public_and_geometry_only():
     result = brep.inspect_manufacturing_hints_rdescriptor(
         scad.make_box_rsolid(20.0, 10.0, 1.0).wrapped
@@ -50,6 +91,9 @@ def test_fillet_candidate_uses_tangent_support_evidence():
     assert len(hints) == 1
     assert hints[0]["geometry"]["carrier_type"] == "CYLINDER"
     assert hints[0]["geometry"]["radius"] == pytest.approx(1.0)
+    assert hints[0]["geometry"]["effective_length"] == pytest.approx(4.0)
+    assert hints[0]["geometry"]["sweep_angle_degrees"] > 0.0
+    assert hints[0]["geometry"]["surface_area"] > 0.0
     assert len(hints[0]["support_entity_ids"]) >= 2
     assert hints[0]["confidence"]["level"] == "strong"
 
@@ -74,6 +118,8 @@ def test_chamfer_candidate_bridges_two_support_faces():
 
     assert len(hints) == 1
     assert hints[0]["geometry"]["form"] == "planar_bevel"
+    assert hints[0]["geometry"]["length"] == pytest.approx(4.0)
+    assert hints[0]["geometry"]["face_width"] > 0.0
     assert len(hints[0]["support_entity_ids"]) == 2
     assert hints[0]["claim"] == "geometric_candidate"
 
@@ -457,6 +503,148 @@ def test_feature_kind_selection_is_compositional():
     )
 
 
+def test_default_feature_kinds_remain_legacy_and_skip_operation_hints(monkeypatch):
+    from simplecadapi.inspect.brep import manufacturing
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("operation-hint analysis should not run by default")
+
+    monkeypatch.setattr(manufacturing, "_hole_hints", fail_if_called, raising=False)
+    monkeypatch.setattr(
+        manufacturing, "_extrusion_hints", fail_if_called, raising=False
+    )
+    monkeypatch.setattr(
+        manufacturing, "revolution_hints", fail_if_called, raising=False
+    )
+    shape = scad.make_box_rsolid(10.0, 8.0, 4.0).wrapped
+
+    default = brep.inspect_manufacturing_hints_rdescriptor(shape)
+    explicit_legacy = brep.inspect_manufacturing_hints_rdescriptor(
+        shape,
+        feature_kinds=("fillet", "chamfer", "sheet_metal"),
+    )
+
+    assert manufacturing.FEATURE_KINDS == ("fillet", "chamfer", "sheet_metal")
+    assert default == explicit_legacy
+    assert not {
+        "hole_region_candidate",
+        "extrusion_region_candidate",
+        "revolution_region_candidate",
+    }.intersection(hint["kind"] for hint in default["hints"])
+
+
+def test_sweep_and_loft_share_precomputed_section_families(monkeypatch):
+    from simplecadapi.inspect.brep import manufacturing
+
+    whole = [{"family": "whole"}]
+    local = [{"family": "local"}]
+    points = [{"family": "point"}]
+    calls = {"whole": 0, "local": 0, "points": 0}
+    received = {}
+
+    def whole_families(*_):
+        calls["whole"] += 1
+        return whole
+
+    def local_families(*_):
+        calls["local"] += 1
+        return local
+
+    def point_families(*_):
+        calls["points"] += 1
+        return points
+
+    def sweep(*_, whole_families, local_families):
+        received["sweep"] = (whole_families, local_families)
+        return [], []
+
+    def loft(*_, whole_families, local_families, point_families):
+        received["loft"] = (whole_families, local_families, point_families)
+        return [], []
+
+    monkeypatch.setattr(manufacturing, "whole_body_section_families", whole_families)
+    monkeypatch.setattr(manufacturing, "local_section_families", local_families)
+    monkeypatch.setattr(manufacturing, "whole_body_point_families", point_families)
+    monkeypatch.setattr(manufacturing, "sweep_hints", sweep)
+    monkeypatch.setattr(manufacturing, "loft_hints", loft)
+
+    brep.inspect_manufacturing_hints_rdescriptor(
+        scad.make_box_rsolid(10.0, 8.0, 4.0).wrapped,
+        feature_kinds=("sweep", "loft"),
+    )
+
+    assert calls == {"whole": 1, "local": 1, "points": 1}
+    assert received["sweep"] == (whole, local)
+    assert received["loft"] == (whole, local, points)
+
+
+def test_revolution_is_available_only_when_explicitly_requested():
+    profile = scad.make_rectangle_rface(
+        width=2.0,
+        height=4.0,
+        center=(3.0, 0.0, 0.0),
+    )
+    body = scad.revolve_rsolid(
+        profile,
+        axis=(0.0, 1.0, 0.0),
+        angle=360.0,
+        origin=(0.0, 0.0, 0.0),
+    )
+
+    default = brep.inspect_manufacturing_hints_rdescriptor(body.wrapped)
+    explicit = brep.inspect_manufacturing_hints_rdescriptor(
+        body.wrapped,
+        feature_kinds=("revolution",),
+    )
+
+    assert not _hints(default, "revolution_region_candidate")
+    assert any(
+        item["geometry"]["form"] == "whole_body_full_revolution"
+        for item in _hints(explicit, "revolution_region_candidate")
+    )
+
+
+def test_new_feature_kinds_compose_with_legacy_kinds_in_stable_order():
+    shape = _through_hole_shape()
+    options = {"feature_kinds": ("chamfer", "hole", "extrusion")}
+
+    report = brep.inspect_manufacturing_hints_rdescriptor(shape, **options)
+    repeated = brep.inspect_manufacturing_hints_rdescriptor(shape, **options)
+
+    assert report == repeated
+    assert [(hint["kind"], hint["hint_id"]) for hint in report["hints"]] == [
+        ("extrusion_region_candidate", "extrusion_region_candidate:0"),
+        ("hole_region_candidate", "hole_region_candidate:0"),
+    ]
+
+
+def test_new_feature_hints_preserve_truncation_metadata():
+    report = brep.inspect_manufacturing_hints_rdescriptor(
+        _through_hole_shape(),
+        feature_kinds=("hole", "extrusion"),
+        max_hints=1,
+    )
+
+    assert [hint["kind"] for hint in report["hints"]] == [
+        "extrusion_region_candidate"
+    ]
+    assert report["summary"]["hint_count"] == 1
+    assert report["truncated"] is True
+    assert report["omitted_hint_count"] == 1
+
+
+def test_countersink_cone_is_not_also_reported_as_a_chamfer():
+    report = brep.inspect_manufacturing_hints_rdescriptor(
+        _countersink_shape(),
+        feature_kinds=("hole", "chamfer"),
+    )
+
+    holes = _hints(report, "hole_region_candidate")
+    assert len(holes) == 1
+    assert holes[0]["geometry"]["form"] == "countersink"
+    assert _hints(report, "chamfer_region_candidate") == []
+
+
 def test_specialized_fillet_request_skips_sheet_metal_pair_scan(monkeypatch):
     from simplecadapi.inspect.brep import manufacturing
 
@@ -604,18 +792,126 @@ def test_manufacturing_hint_renderer_forwards_analysis_options(monkeypatch, tmp_
         brep.render_manufacturing_hints_rpath(
             shape,
             tmp_path / "unused.png",
-            feature_kinds=("fillet",),
+            feature_kinds=("hole", "extrusion"),
             tolerance=1.0e-4,
             angular_tolerance_degrees=0.25,
             max_hints=7,
         )
 
     assert observed == {
-        "feature_kinds": ("fillet",),
+        "feature_kinds": ("hole", "extrusion"),
         "tolerance": 1.0e-4,
         "angular_tolerance_degrees": 0.25,
         "max_hints": 7,
     }
+
+
+def test_manufacturing_hint_renderer_groups_hole_and_extrusion_colors(
+    monkeypatch, tmp_path
+):
+    from simplecadapi.inspect.brep import manufacturing, render
+
+    class FakeModel:
+        root = object()
+
+        def resolve_entity(self, entity_id):
+            return None, None, entity_id
+
+    captured = {}
+    fake_model = FakeModel()
+    monkeypatch.setattr(manufacturing, "_model", lambda value: fake_model)
+    monkeypatch.setattr(
+        manufacturing,
+        "inspect_manufacturing_hints_rdescriptor",
+        lambda model, **options: {
+            "hints": [
+                {
+                    "kind": "extrusion_region_candidate",
+                    "entity_ids": ["face:0"],
+                    "highlight_entity_ids": ["face:0"],
+                },
+                {
+                    "kind": "hole_region_candidate",
+                    "entity_ids": ["face:1"],
+                    "highlight_entity_ids": ["face:1"],
+                },
+            ]
+        },
+    )
+    monkeypatch.setattr(render, "_mesh_polydata", lambda shapes, *args: tuple(shapes))
+    monkeypatch.setattr(render, "_edge_polydata", lambda shapes, **kwargs: tuple(shapes))
+
+    def capture_render(context, output_path, **kwargs):
+        captured.update(kwargs)
+        return output_path
+
+    monkeypatch.setattr(render, "_render_polydata_views", capture_render)
+    output = tmp_path / "new-hint-colors.png"
+
+    assert (
+        brep.render_manufacturing_hints_rpath(
+            fake_model,
+            output,
+            feature_kinds=("hole", "extrusion"),
+        )
+        == output
+    )
+    assert captured["highlighted_groups"] == [
+        (("face:0",), (41 / 255, 173 / 255, 87 / 255), 1.0),
+        (("face:1",), (148 / 255, 61 / 255, 199 / 255), 1.0),
+    ]
+    assert captured["legend"] == [
+        ("Extrusion candidates", (41 / 255, 173 / 255, 87 / 255)),
+        ("Hole candidates", (148 / 255, 61 / 255, 199 / 255)),
+    ]
+
+
+def test_manufacturing_hint_renderer_uses_cyan_for_revolution(monkeypatch, tmp_path):
+    from simplecadapi.inspect.brep import manufacturing, render
+
+    class FakeModel:
+        root = object()
+
+        def resolve_entity(self, entity_id):
+            return None, None, entity_id
+
+    captured = {}
+    fake_model = FakeModel()
+    monkeypatch.setattr(manufacturing, "_model", lambda value: fake_model)
+    monkeypatch.setattr(
+        manufacturing,
+        "inspect_manufacturing_hints_rdescriptor",
+        lambda model, **options: {
+            "hints": [
+                {
+                    "kind": "revolution_region_candidate",
+                    "entity_ids": ["face:0"],
+                    "highlight_entity_ids": ["face:0"],
+                }
+            ]
+        },
+    )
+    monkeypatch.setattr(render, "_mesh_polydata", lambda shapes, *args: tuple(shapes))
+    monkeypatch.setattr(render, "_edge_polydata", lambda shapes, **kwargs: tuple(shapes))
+
+    def capture_render(context, output_path, **kwargs):
+        captured.update(kwargs)
+        return output_path
+
+    monkeypatch.setattr(render, "_render_polydata_views", capture_render)
+
+    brep.render_manufacturing_hints_rpath(
+        fake_model,
+        tmp_path / "revolution.png",
+        feature_kinds=("revolution",),
+    )
+
+    assert captured["highlighted_groups"] == [
+        (("face:0",), (6 / 255, 182 / 255, 212 / 255), 1.0)
+    ]
+    assert captured["legend"] == [
+        ("Revolution candidates", (6 / 255, 182 / 255, 212 / 255))
+    ]
 
 
 def test_manufacturing_hints_reject_active_graph_session():
@@ -623,4 +919,7 @@ def test_manufacturing_hints_reject_active_graph_session():
 
     with scad.GraphSession():
         with pytest.raises(RuntimeError, match="cannot run inside an active GraphSession"):
-            brep.inspect_manufacturing_hints_rdescriptor(shape)
+            brep.inspect_manufacturing_hints_rdescriptor(
+                shape,
+                feature_kinds=("hole", "extrusion"),
+            )

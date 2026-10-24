@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable, Literal, Sequence
+from typing import Any, Iterable, Literal, Mapping, Sequence
 
 import numpy as np
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier
@@ -245,3 +245,200 @@ def compare_step_slices_rslicecomparison(
         candidate_name=str(candidate_source),
         **kwargs,
     )
+
+
+def render_sections_rpath(
+    *,
+    sections: Sequence[Mapping[str, Any]],
+    output_path: str | Path,
+    titles: Sequence[str] | None = None,
+    columns: int = 3,
+    image_size_per_panel: tuple[float, float] = (6.0, 5.0),
+    dpi: int = 180,
+) -> Path:
+    """Render detailed section descriptors as a local-coordinate 2D atlas.
+
+    ``sections`` must contain non-compact results from
+    ``inspect_section_rdescriptor``. The renderer consumes each contour's
+    existing ``samples_2d`` values and never recalculates or projects BREP
+    geometry.
+
+    Parameters
+    ----------
+    sections:
+        Detailed section descriptors in the desired panel order.
+    output_path:
+        Destination image path. Missing parent directories are created.
+    titles:
+        Optional panel titles in the same order as ``sections``.
+    columns:
+        Positive number of atlas columns.
+    image_size_per_panel:
+        Positive panel width and height in inches.
+    dpi:
+        Positive output resolution in dots per inch.
+
+    Returns
+    -------
+    Path
+        The image path that was written.
+
+    Raises
+    ------
+    ValueError
+        If the atlas options are invalid, a compact descriptor is supplied,
+        or contour coordinates are missing, malformed, or non-finite.
+    """
+    selected_sections = tuple(sections)
+    if not selected_sections:
+        raise ValueError("At least one section is required")
+    if not isinstance(columns, int) or isinstance(columns, bool) or columns < 1:
+        raise ValueError("columns must be a positive integer")
+    if len(image_size_per_panel) != 2 or any(
+        not np.isfinite(value) or value <= 0.0 for value in image_size_per_panel
+    ):
+        raise ValueError("image_size_per_panel must contain two positive finite values")
+    if not isinstance(dpi, int) or isinstance(dpi, bool) or dpi < 1:
+        raise ValueError("dpi must be a positive integer")
+    selected_titles = tuple(titles) if titles is not None else None
+    if selected_titles is not None and len(selected_titles) != len(selected_sections):
+        raise ValueError("titles must contain exactly one entry per section")
+
+    panel_contours: list[list[tuple[np.ndarray, bool, str, int]]] = []
+    for section_index, section in enumerate(selected_sections):
+        if not isinstance(section, Mapping):
+            raise TypeError(f"sections[{section_index}] must be a mapping")
+        if section.get("compact") is True:
+            raise ValueError(
+                f"sections[{section_index}] is compact; regenerate it with compact=False "
+                "so contours include samples_2d"
+            )
+        contours = section.get("contours")
+        if not isinstance(contours, Sequence) or isinstance(contours, (str, bytes)):
+            raise ValueError(f"sections[{section_index}].contours must be a sequence")
+        validated_contours: list[tuple[np.ndarray, bool, str, int]] = []
+        for contour_index, contour in enumerate(contours):
+            if not isinstance(contour, Mapping):
+                raise TypeError(
+                    f"sections[{section_index}].contours[{contour_index}] must be a mapping"
+                )
+            if "samples_2d" not in contour:
+                raise ValueError(
+                    f"sections[{section_index}].contours[{contour_index}] is missing "
+                    "samples_2d; regenerate the section with compact=False"
+                )
+            try:
+                points = np.asarray(contour["samples_2d"], dtype=float)
+            except (TypeError, ValueError) as error:
+                raise ValueError(
+                    f"sections[{section_index}].contours[{contour_index}].samples_2d "
+                    "must contain numeric coordinates"
+                ) from error
+            if points.ndim != 2 or points.shape[1:] != (2,) or len(points) < 2:
+                raise ValueError(
+                    f"sections[{section_index}].contours[{contour_index}].samples_2d "
+                    "must contain at least two XY points"
+                )
+            if not np.all(np.isfinite(points)):
+                raise ValueError(
+                    f"sections[{section_index}].contours[{contour_index}].samples_2d "
+                    "must contain only finite coordinates"
+                )
+            validated_contours.append(
+                (
+                    points,
+                    bool(contour.get("closed", False)),
+                    str(contour.get("role", "other")),
+                    int(contour.get("nesting_depth", 0) or 0),
+                )
+            )
+        panel_contours.append(validated_contours)
+
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError as error:
+        raise ImportError("Section atlas rendering requires matplotlib") from error
+
+    rows = (len(selected_sections) + columns - 1) // columns
+    figure, axes = plt.subplots(
+        rows,
+        columns,
+        figsize=(image_size_per_panel[0] * columns, image_size_per_panel[1] * rows),
+        constrained_layout=True,
+        squeeze=False,
+    )
+    axes_array = axes.ravel()
+    try:
+        for section_index, (axes_item, section, contours) in enumerate(
+            zip(axes_array, selected_sections, panel_contours)
+        ):
+            for points, closed, role, nesting_depth in contours:
+                if not closed:
+                    color, linestyle, fill = "#9467bd", "--", False
+                elif role == "hole":
+                    color, linestyle, fill = "#d62728", "-", False
+                elif role == "material" and nesting_depth > 0:
+                    color, linestyle, fill = "#2ca02c", "-.", True
+                elif role == "material":
+                    color, linestyle, fill = "#1f77b4", "-", True
+                else:
+                    color, linestyle, fill = "#7f7f7f", ":", False
+                axes_item.plot(
+                    points[:, 0],
+                    points[:, 1],
+                    color=color,
+                    linestyle=linestyle,
+                    linewidth=1.8,
+                )
+                if fill:
+                    axes_item.fill(
+                        points[:, 0],
+                        points[:, 1],
+                        color=color,
+                        alpha=0.14,
+                    )
+
+            if not contours:
+                plane = section.get("plane", {})
+                axes_item.text(
+                    0.5,
+                    0.5,
+                    "No section contours\n"
+                    f"origin={plane.get('origin', 'unknown')}\n"
+                    f"normal={plane.get('normal', 'unknown')}",
+                    ha="center",
+                    va="center",
+                    transform=axes_item.transAxes,
+                )
+                axes_item.set_xlim(-1.0, 1.0)
+                axes_item.set_ylim(-1.0, 1.0)
+
+            title = (
+                selected_titles[section_index]
+                if selected_titles is not None
+                else str(section.get("section_id", f"Section {section_index + 1}"))
+            )
+            closed_count = int(section.get("closed_contour_count", 0))
+            open_count = int(section.get("open_contour_count", 0))
+            material_area = float(section.get("material_area", 0.0))
+            axes_item.set_title(
+                f"{title}\nMaterial area {material_area:.6g} mm^2 | "
+                f"closed {closed_count} | open {open_count}"
+            )
+            axes_item.set_xlabel("Local X (mm)")
+            axes_item.set_ylabel("Local Y (mm)")
+            axes_item.set_aspect("equal", adjustable="datalim")
+            axes_item.grid(True, color="#d9d9d9", linewidth=0.6, linestyle=":")
+
+        for axes_item in axes_array[len(selected_sections) :]:
+            axes_item.set_visible(False)
+
+        output = Path(output_path)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        figure.savefig(output, dpi=dpi)
+    finally:
+        plt.close(figure)
+    return output

@@ -1,0 +1,244 @@
+/* re-studio styles — Tailwind v4 entry.
+   Tokens mirror the .scadpkg viewer visual language (void background,
+   panel chrome, lime accent, Space Grotesk + DM Mono) exposed as Tailwind
+   colors so the React tree reads like shadcn/ui with a house palette.
+   Only DOM we do NOT control from JSX (the imperative composer chips,
+   the slash-suggest popup, CodeMirror) keeps hand-written component css. */
+
+/* style.css (shared viewer chrome + .tree-row styles for FeatureTreeView)
+   lands in a dedicated layer so Tailwind's unlayered-in-spirit utilities can
+   out-rank it — unlayered, its `button { font: inherit }` would beat every
+   utility and render all buttons at the inherited 16px. */
+@import '../style.css' layer(viewer);
+@import 'tailwindcss';
+
+/* Tailwind preflight lives in a layer ABOVE the viewer chrome, so its
+   universal padding/border reset and `button { color: inherit; font: inherit }`
+   out-rank the layered .tree-row rules (FeatureTreeView renders real buttons).
+   Re-declare the clobbered declarations unlayered — unlayered css tops every
+   layer. */
+.tree-row {
+  padding: 8px 12px 8px calc(12px + var(--depth, 0) * 16px);
+  border-left: 2px solid transparent;
+  color: #94a1b2;
+  font-size: 12px;
+}
+.tree-row:hover {
+  color: #edf3f9;
+  background: #171d24;
+}
+.tree-row.selected {
+  border-left-color: var(--color-lime);
+  color: #f2f8fb;
+  background: #1a2324;
+}
+.tree-row.hidden-node {
+  color: #4d5a68;
+}
+.feature-tree-row {
+  padding-right: 10px;
+}
+
+@theme {
+  --font-sans: 'Space Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --color-void: #0b0e12;
+  --color-panel: #10141a;
+  --color-inset: #0d1218;
+  --color-line: #202832;
+  --color-edge: #2a3440;
+  --color-ink: #dfe7f1;
+  --color-dim: #758397;
+  --color-faint: #56657a;
+  --color-lime: #b3e36b;
+  --color-amber: #ffd23f;
+  --color-reddish: #ff5c5c;
+}
+
+/* Radix forceMount'd tab panels stay mounted for CodeMirror/three hosts;
+   this keeps the hidden attribute authoritative wherever we toggle it. */
+[hidden] {
+  display: none !important;
+}
+
+/* three.js renderer canvases are appended imperatively into .re-viewport */
+.re-viewport canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* -- composer (contenteditable host built by TokenComposer) ------------------ */
+
+.re-composer-input:focus {
+  outline: none;
+}
+.re-composer-input[data-empty='true']::before {
+  content: attr(data-placeholder);
+  color: var(--color-faint);
+  pointer-events: none;
+}
+.re-composer-input {
+  caret-color: var(--color-lime);
+}
+
+/* -- inline entity/op chips (composer + capsule bubbles, imperative DOM) ----- */
+
+.re-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid;
+  border-radius: 9999px;
+  padding: 0 7px;
+  margin: 0 1px;
+  font-size: 9px;
+  line-height: 1.7;
+  vertical-align: baseline;
+  user-select: all;
+  white-space: nowrap;
+}
+.re-token-glyph {
+  font: 700 8px/1 var(--font-mono);
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+}
+.re-token-label {
+  font-family: var(--font-mono);
+}
+
+.re-token-face   { color: #a8cdf5; border-color: #33587e; background: rgba(79, 156, 240, 0.13); }
+.re-token-edge   { color: #a9e2bd; border-color: #2f5c42; background: rgba(79, 197, 122, 0.13); }
+.re-token-vertex { color: #f2c4a3; border-color: #7c5232; background: rgba(224, 129, 79, 0.13); }
+.re-token-body   { color: #e7d5a8; border-color: #79622f; background: rgba(201, 162, 79, 0.13); }
+
+.re-token-op.re-opcat-sketch    { color: #a8e0da; border-color: #2f5c57; background: rgba(69, 184, 173, 0.12); }
+.re-token-op.re-opcat-boolean   { color: #cdd3dd; border-color: #4a5462; background: rgba(148, 163, 184, 0.13); }
+.re-token-op.re-opcat-solid     { color: #b9c8ee; border-color: #3c4d7e; background: rgba(122, 148, 212, 0.12); }
+.re-token-op.re-opcat-primitive { color: #e6d3ab; border-color: #6f5c33; background: rgba(206, 170, 96, 0.13); }
+.re-token-op.re-opcat-modify    { color: #eeb9c3; border-color: #7e3c4a; background: rgba(212, 122, 138, 0.12); }
+.re-token-op.re-opcat-surface   { color: #d3c4ee; border-color: #4c3a7e; background: rgba(157, 122, 212, 0.12); }
+.re-token-op.re-opcat-pattern   { color: #e6bce6; border-color: #6b3a6b; background: rgba(196, 111, 196, 0.12); }
+
+/* -- slash operation suggest (imperative popup, floats above the composer) --- */
+
+.re-op-suggest {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 14px;
+  right: 14px;
+  z-index: 40;
+  max-height: 300px;
+  overflow-y: auto;
+  background: color-mix(in srgb, var(--color-panel) 94%, transparent);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--color-edge);
+  border-radius: 14px;
+  box-shadow: 0 -12px 44px rgba(0, 0, 0, 0.6);
+  padding: 6px;
+}
+.re-op-suggest-group {
+  padding: 7px 10px 3px;
+  color: var(--color-faint);
+  font: 500 9px var(--font-mono);
+  letter-spacing: 0.14em;
+}
+.re-op-suggest-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  color: var(--color-ink);
+  border-radius: 9px;
+  padding: 6px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.re-op-suggest-row.active {
+  background: rgba(179, 227, 107, 0.08);
+}
+.re-op-suggest-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.re-op-suggest-hint {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-dim);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.re-op-suggest-empty {
+  padding: 10px 12px;
+  color: var(--color-dim);
+  font-size: 11px;
+}
+
+.re-op-suggest-row.re-opcat-sketch    .re-op-suggest-name { color: #a8e0da; }
+.re-op-suggest-row.re-opcat-boolean   .re-op-suggest-name { color: #cdd3dd; }
+.re-op-suggest-row.re-opcat-solid     .re-op-suggest-name { color: #b9c8ee; }
+.re-op-suggest-row.re-opcat-primitive .re-op-suggest-name { color: #e6d3ab; }
+.re-op-suggest-row.re-opcat-modify    .re-op-suggest-name { color: #eeb9c3; }
+.re-op-suggest-row.re-opcat-surface   .re-op-suggest-name { color: #d3c4ee; }
+.re-op-suggest-row.re-opcat-pattern   .re-op-suggest-name { color: #e6bce6; }
+
+/* -- visible scroll affordance for code/scroll panels (global chrome hides
+   scrollbars; these panels carry an opt-in utility class instead) ------------ */
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #344353 transparent;
+}
+.scroll-thin::-webkit-scrollbar {
+  display: block;
+  width: 8px;
+  height: 8px;
+}
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: #344353;
+}
+.scroll-thin::-webkit-scrollbar-thumb:hover {
+  background: #52677c;
+}
+
+/* -- CodeMirror inside the source tab ---------------------------------------- */
+
+.re-source-editor .cm-editor {
+  font-size: 11.5px;
+  background: var(--color-inset);
+}
+.re-source-editor .cm-gutters {
+  border-right: 1px solid var(--color-line);
+  background: var(--color-inset);
+}
+
+/* -- entity inspector (floating card in the target viewport) ----------------- */
+
+.re-details summary {
+  cursor: pointer;
+  color: #7fa8d4;
+  font-size: 10px;
+}
+.re-mini-json {
+  margin: 6px 0 0;
+  padding: 8px;
+  background: var(--color-void);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.5;
+  max-height: 200px;
+  overflow: auto;
+  color: #b8c4d4;
+}

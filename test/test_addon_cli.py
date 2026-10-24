@@ -67,12 +67,12 @@ def _make_addon_repo(
         rendered = ", ".join(f'"{item}"' for item in platforms)
         lines.append(f"platforms = [{rendered}]")
     if check_cmd is not None:
-        escaped = check_cmd.replace('"', '\\"')
+        escaped = check_cmd.replace("\\", "\\\\").replace('"', '\\"')
         lines.append(f'check_cmd = "{escaped}"')
     if overrides:
         lines.append("[runtime.check_overrides]")
         for key, value in overrides.items():
-            escaped = value.replace('"', '\\"')
+            escaped = value.replace("\\", "\\\\").replace('"', '\\"')
             lines.append(f'"{key}" = "{escaped}"')
     (repo / "sca-addon.toml").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return repo

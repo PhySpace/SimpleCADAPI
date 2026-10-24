@@ -123,9 +123,8 @@ def _validate_render_output_path(output_path: str | Path) -> Path:
     return output
 
 
-# VTK offscreen rendering on macOS intermittently crashes natively
-# (SIGTRAP/SIGSEGV/SIGBUS) under heavy system load; extra attempts with real
-# backoff absorb those crash bursts.
+# VTK offscreen rendering can crash natively on macOS and Windows. Isolate it
+# in a worker process so a crash cannot terminate the inspection session.
 _WORKER_ATTEMPTS = 6
 _WORKER_RETRY_BACKOFF_SECONDS = (0.5, 1.0, 2.0, 4.0, 8.0)
 
@@ -1661,7 +1660,7 @@ def _prepare_polydata_render(
         "view_up": None if view_up is None else [float(value) for value in view_up],
         "datasets": datasets,
     }
-    if not worker_isolated and sys.platform != "darwin":
+    if not worker_isolated and sys.platform not in {"darwin", "win32"}:
         return (
             "in-process",
             (_render_polydata_views_in_process, base_polydata, output_path, kwargs),
