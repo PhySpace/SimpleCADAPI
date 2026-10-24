@@ -57,6 +57,7 @@ jobs:
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           python-version: "3.12"
+          enable-cache: false
 
       - name: Validate tag and project version
         shell: bash
@@ -213,6 +214,7 @@ jobs:
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           python-version: "3.12"
+          enable-cache: false
 
       - name: Build the source distribution
         run: uv build --sdist --out-dir dist
