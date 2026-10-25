@@ -66,6 +66,13 @@ def main() -> None:
         scad.render_screenshot_rpath(shapes=[body], output_path=str(png))
         assert png.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
 
+        # BREP inspection ships in the default install and draws with the same renderer (no VTK).
+        from simplecadapi.inspect import brep
+
+        views = folder / "views.png"
+        brep.render_step_views_rpath(str(step), str(views), image_size=(6.0, 4.0), dpi=60)
+        assert views.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+
         # Sketch solver and the product layer.
         part = scad.make_part_rpart("plate", body)
         assembly = scad.make_assembly_rassembly("a")

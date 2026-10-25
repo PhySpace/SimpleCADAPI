@@ -560,12 +560,10 @@ A durable CAD/viewer deliverable is a notebook product captured to
 
 ## STEP/BREP Inspection
 
-Install the optional rendering dependency when synchronized STEP views,
-highlighted regions, or slice overlays are needed:
-
-```bash
-pip install "simplecadapi[inspect]"
-```
+Synchronized STEP views, highlighted regions and slice overlays need nothing
+beyond `pip install simplecadapi`: they are drawn by the built-in software
+renderer (no GPU, no display server, no VTK). Only the engineering-drawing
+family (`simplecadapi.inspect.drawing`) needs the `drawing` extra.
 
 Inspection lives under `simplecadapi.inspect.brep`. These APIs are diagnostic
 tools, not modeling operations: they do not enter the graph and are rejected

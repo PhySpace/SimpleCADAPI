@@ -104,8 +104,9 @@ repair_routes:
   geometry and call it recovered.
 - Candidate structurally different → re-open the feature-tree hypothesis
   before accepting a visual-close stop.
-- Reconstruction tooling absent (`inspect` extra not installed) → report the
-  missing capability rather than degrading silently.
+- Reconstruction tooling absent (for example the `drawing` extra, which
+  `simplecadapi.inspect.drawing` needs, is not installed) → report the missing
+  capability rather than degrading silently.
 
 ## Deliverables
 

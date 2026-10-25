@@ -34,6 +34,7 @@ dependencies = [
     "marimo>=0.25.0",
     "plotly>=7.1.0",
     "cryptography>=42.0.0",
+    "matplotlib>=3.7.0",
 ]
 
 [project.optional-dependencies]
@@ -53,9 +54,9 @@ editor = [
     "uvicorn>=0.54.0",
     "websockets>=16.1.1",
 ]
-inspect = [
-    "matplotlib>=3.7.0",
-]
+# simplecadapi.inspect.brep is part of the default install; this extra is kept empty so that
+# `pip install "simplecadapi[inspect]"` from older instructions still works.
+inspect = []
 whucad = [
     "h5py>=3.8",
 ]
