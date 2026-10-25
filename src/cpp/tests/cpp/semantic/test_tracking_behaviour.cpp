@@ -386,9 +386,9 @@ TEST_CASE("shell roles: body, offset, closing descendants and walls") {
 // ---------------------------------------------------------------------------
 
 TEST_CASE("a cut that removes everything has no solid, only deletions") {
-  const Solid small = box_solid(2, 2, 2, {0, 0, 4});
+  const Solid tiny = box_solid(2, 2, 2, {0, 0, 4});
   const Solid big = box_solid(10, 10, 10);
-  const TrackedBooleanResult tracked = tracked_cut(small, big);
+  const TrackedBooleanResult tracked = tracked_cut(tiny, big);
   CHECK_FALSE(tracked.solid.has_value());
   CHECK(tracked.delta.deleted.size() == 12);  // all six faces of each input
   std::map<std::string, int> by_role;

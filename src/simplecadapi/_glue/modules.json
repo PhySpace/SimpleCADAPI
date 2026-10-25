@@ -185,6 +185,7 @@
 "current_tracking_policy": "simplecadapi.topology.tracking",
 "curve_type": "simplecadapi.ql",
 "cut_rsolid": "simplecadapi.operators.boolean",
+"cut_rsolid_list": "simplecadapi.operators.boolean",
 "cut_shapes": "simplecadapi.kernel.ocp_booleans",
 "diagnose_blend_failure": "simplecadapi.operators._diagnostics",
 "diagnose_boolean_failure": "simplecadapi.operators._diagnostics",

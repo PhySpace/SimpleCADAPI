@@ -34,6 +34,10 @@ no patching exported or solved artifacts.
 - Isolate and simplify the failing base/tool pair.
 - `cut_rsolid(..., skip_non_intersecting=False)` is the strict diagnostic mode;
   with the default `True`, non-intersecting tools may be ignored.
+- `cut_rsolid` expected a single Solid but the kernel returned several: the cut
+  split the body. If that is intended, call `cut_rsolid_list`; if not, the tool
+  crosses the body completely or touches a wall tangentially — resize or
+  reposition it.
 - After repeated failure, reconsider operation order — not just retry the same
   cut harder.
 

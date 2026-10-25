@@ -14,6 +14,7 @@ from simplecadapi._cpp import (
     # bind_ops_features.cpp
     boolean_rsolidlist,
     cut_rsolid,
+    cut_rsolid_list,
     diagnose_boolean_failure,
     intersect_rsolid,
     union_rsolid,
@@ -28,6 +29,7 @@ __all__ = [
     "BooleanDiagnosis",
     "boolean_rsolidlist",
     "cut_rsolid",
+    "cut_rsolid_list",
     "diagnose_boolean_failure",
     "intersect_rsolid",
     "make_2d_cut_rface",

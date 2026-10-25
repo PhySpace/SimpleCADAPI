@@ -135,8 +135,9 @@ std::vector<RoleAssignment> normalize_operation_role_tags(std::string_view op, c
   }
 
   std::string unknown;
-  for (const auto& [role, tag] : requested) {
-    (void)tag;
+  for (const auto& entry : requested) {
+    // a named variable, not a structured binding: Apple clang 15 (Xcode 15.4) cannot capture one in the lambda
+    const std::string& role = entry.first;
     const bool known = std::any_of(specs.begin(), specs.end(), [&](const auto& spec) { return spec.first == role; });
     if (!known) unknown += (unknown.empty() ? "" : ", ") + role;
   }

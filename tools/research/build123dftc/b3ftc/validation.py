@@ -219,8 +219,12 @@ def _worker(ftc_path: Path, workdir: Path | None, timeout: float,
         elif reference_step is not None:
             command.extend(["--reference-step", str(reference_step.resolve())])
         env = os.environ.copy()
-        env["PYTHONPATH"] = os.pathsep.join([str(repo_root / "src"), str(tool_dir),
-                                            env.get("PYTHONPATH", "")])
+        # The checkout's source tree goes on the path only when it is a built one (the compiled module sits next to
+        # its Python files, as in a development build); otherwise it would shadow the installed wheel.
+        source = repo_root / "src"
+        built = any((source / "simplecadapi" / "_cpp").glob("_native*"))
+        env["PYTHONPATH"] = os.pathsep.join(
+            [*([str(source)] if built else []), str(tool_dir), env.get("PYTHONPATH", "")])
         started = time.monotonic()
         result = _process(command, staging, env, output, timeout)
         if reference_python is not None and reference_step is not None and result.get("status") == "ok":

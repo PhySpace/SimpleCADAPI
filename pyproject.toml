@@ -77,7 +77,7 @@ Issues = "https://github.com/PhySpace/SimpleCADAPI/issues"
 
 [build-system]
 # One distribution: the Python package and the compiled C++ module (``simplecadapi._cpp``, src/cpp/) it runs on.
-requires = ["scikit-build-core>=0.10", "pybind11>=2.13"]
+requires = ["scikit-build-core>=0.10", "pybind11>=2.13", "ninja>=1.11; platform_system == 'Windows'"]
 build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]

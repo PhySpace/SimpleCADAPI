@@ -11,6 +11,7 @@
 #include "scad/kernel/properties.hpp"
 #include "scad/kernel/topology.hpp"
 #include "scad/ops/features/diagnostics.hpp"
+#include "scad/semantic/autotag.hpp"
 #include "scad/semantic/tracking.hpp"
 
 namespace scad {
@@ -19,6 +20,7 @@ namespace {
 
 constexpr const char* kUnionOp = "make_union_rsolid";
 constexpr const char* kCutOp = "make_cut_rsolid";
+constexpr const char* kCutListOp = "make_cut_rsolid_list";
 constexpr const char* kIntersectOp = "make_intersect_rsolid";
 
 constexpr double kUnionTolFactor = 1e-7;
@@ -44,6 +46,18 @@ const ErrorSpec& union_spec() {
 const ErrorSpec& cut_spec() {
   static const ErrorSpec spec{
       "cut_rsolid",
+      "Failed to compute the boolean cut.",
+      {"One or more inputs are not Solid objects.", "The base solid or tool solids are invalid.",
+       "The kernel could not compute a valid cut result for the current geometry."},
+      {"Pass a valid base solid followed by valid tool solids.",
+       "Check whether the tool geometry actually intersects the base solid.",
+       "If the cut depends on earlier union results, verify those results first."}};
+  return spec;
+}
+
+const ErrorSpec& cut_list_spec() {
+  static const ErrorSpec spec{
+      "cut_rsolid_list",
       "Failed to compute the boolean cut.",
       {"One or more inputs are not Solid objects.", "The base solid or tool solids are invalid.",
        "The kernel could not compute a valid cut result for the current geometry."},
@@ -232,6 +246,83 @@ Solid union_rsolid(const std::vector<Solid>& solids, const UnionOptions& options
 // ---------------------------------------------------------------------------
 // cut
 // ---------------------------------------------------------------------------
+namespace {
+
+// What a run of cuts left: every piece of the base, and the history of the steps that touched it.
+struct CutRun {
+  std::vector<Solid> pieces;
+  std::vector<TopoDelta> deltas;
+  DeltaEntries entries;
+  bool cut_performed = false;
+  // Every intermediate result stays alive until the merged delta is recorded: step deltas name faces by kernel
+  // hashes, which come from the shapes' addresses, and a freed face's address could be reused by an output face.
+  std::vector<Solid> intermediates;
+};
+
+// The first solid minus every other.  A tool is cut from each piece it meets, and a cut may split a piece in two
+// (a slot through a bar), so the answer is a list: empty when the tools consume the base.
+CutRun run_cuts(const std::vector<Solid>& solids, const CutOptions& options, TrackingPolicy policy,
+                std::string_view operation, bool& no_intersection) {
+  if (solids.empty()) throw ValueError(std::string(operation) + " requires at least one Solid input");
+  CutRun run;
+  run.pieces.push_back(solids.front());
+
+  for (std::size_t i = 1; i < solids.size(); ++i) {
+    const Solid& candidate = solids[i];
+    const TopoDS_Shape& s2 = candidate.wrapped();
+    if (s2.IsNull()) throw ValueError("The input solid is invalid; the cut cannot be computed.");
+
+    std::vector<Solid> next;
+    bool met = false;      // some piece intersects this tool
+    bool too_small = false;
+    for (const Solid& piece : run.pieces) {
+      const TopoDS_Shape& s1 = piece.wrapped();
+      if (s1.IsNull()) throw ValueError("The input solid is invalid; the cut cannot be computed.");
+
+      const std::vector<TopoDS_Solid> overlap = kernel::solids_of(kernel::common_shapes({s1, s2}));
+      if (overlap.empty()) {
+        next.push_back(piece);
+        continue;
+      }
+      if (kernel::volume(overlap.front()) < 1e-12) {
+        too_small = true;
+        next.push_back(piece);
+        continue;
+      }
+      met = true;
+
+      std::vector<Solid> cut_pieces;
+      if (policy == TrackingPolicy::Full) {
+        TrackedBooleanResult tracked = tracked_cut(piece, candidate);
+        cut_pieces = std::move(tracked.solids);
+        run.deltas.push_back(std::move(tracked.delta));
+        merge_entries(run.entries, std::move(tracked.delta_entries));
+      } else {
+        for (const TopoDS_Solid& part : kernel::solids_of(kernel::cut_shapes(s1, {s2}))) cut_pieces.emplace_back(part);
+      }
+      run.intermediates.push_back(piece);
+      for (Solid& part : cut_pieces) next.push_back(std::move(part));
+      run.cut_performed = true;
+    }
+    if (!met && !options.skip_non_intersecting) {
+      no_intersection = true;
+      throw ValueError(too_small ? "The intersection of the cut tool solid and the current solid is too small."
+                                 : "The cut tool solid does not intersect the current solid.");
+    }
+    run.pieces = std::move(next);
+  }
+  return run;
+}
+
+void record_cut(const std::vector<Solid>& solids, const CutOptions& options, TrackingPolicy policy, FeatureRecord& rec) {
+  rec.param("tool_count", Value(static_cast<std::int64_t>(solids.size() - 1)))
+      .param("skip_non_intersecting", Value(options.skip_non_intersecting))
+      .param("tracking_policy", Value(std::string(to_string(policy))));
+  add_operands(rec, solids);
+}
+
+}  // namespace
+
 Solid cut_rsolid(const std::vector<Solid>& solids, const CutOptions& options) {
   bool no_intersection = false;
   try {
@@ -240,77 +331,72 @@ Solid cut_rsolid(const std::vector<Solid>& solids, const CutOptions& options) {
       if (solids.empty()) throw ValueError("cut_rsolid requires at least one Solid input");
       if (solids.size() == 1) return solids.front();
 
-      Solid result_solid = solids.front();
-      std::vector<TopoDelta> deltas;
-      DeltaEntries merged_entries;
-      // Step deltas name faces by kernel hashes, which come from the shapes' addresses.  Every
-      // intermediate result stays alive until the merged delta is recorded: a freed face's
-      // address could otherwise be reused by an output face and a stale entry would resolve to it.
-      std::vector<Solid> intermediates;
-      bool cut_performed = false;
-
-      for (std::size_t i = 1; i < solids.size(); ++i) {
-        const Solid& candidate = solids[i];
-        const TopoDS_Shape& s1 = result_solid.wrapped();
-        const TopoDS_Shape& s2 = candidate.wrapped();
-        if (s1.IsNull() || s2.IsNull()) throw ValueError("The input solid is invalid; the cut cannot be computed.");
-
-        const std::vector<TopoDS_Solid> overlap = kernel::solids_of(kernel::common_shapes({s1, s2}));
-        if (overlap.empty()) {
-          if (options.skip_non_intersecting) continue;
-          no_intersection = true;
-          throw ValueError("The cut tool solid does not intersect the current solid.");
-        }
-        if (kernel::volume(overlap.front()) < 1e-12) {
-          if (options.skip_non_intersecting) continue;
-          no_intersection = true;
-          throw ValueError("The intersection of the cut tool solid and the current solid is too small.");
-        }
-
-        std::optional<TrackedBooleanResult> tracked;
-        Solid next = [&]() -> Solid {
-          if (policy == TrackingPolicy::Full) {
-            tracked = tracked_cut(result_solid, candidate);
-            if (!tracked->solid) throw ValueError("The cut failed: OCC returned no valid solid");
-            return *tracked->solid;
-          }
-          const std::vector<TopoDS_Solid> pieces = kernel::solids_of(kernel::cut_shapes(s1, {s2}));
-          if (pieces.empty()) throw ValueError("The cut failed: OCC returned no valid solid");
-          if (pieces.size() != 1) {
-            throw ValueError("cut_rsolid expected a single Solid result but the kernel returned " + std::to_string(pieces.size()) + " solids.");
-          }
-          return Solid(pieces.front());
-        }();
-        inherit_metadata(next, {&result_solid});
-        intermediates.push_back(result_solid);
-        result_solid = next;
-        if (tracked) {
-          deltas.push_back(std::move(tracked->delta));
-          merge_entries(merged_entries, std::move(tracked->delta_entries));
-        }
-        cut_performed = true;
+      CutRun run = run_cuts(solids, options, policy, "cut_rsolid", no_intersection);
+      if (run.pieces.empty()) throw ValueError("The cut failed: OCC returned no valid solid");
+      if (run.pieces.size() != 1) {
+        throw ValueError("cut_rsolid expected a single Solid result but the kernel returned " +
+                         std::to_string(run.pieces.size()) +
+                         " solids; the cut split the body. Use cut_rsolid_list to keep every piece.");
       }
 
+      Solid result_solid = run.pieces.front();
       inherit_metadata(result_solid, {&solids.front()});
       result_solid.apply_tag("solid.boolean.cut", false);
 
-      std::optional<TopoDelta> merged = merge_topo_deltas(deltas);
+      std::optional<TopoDelta> merged = merge_topo_deltas(run.deltas);
       FeatureRecord rec(kCutOp);
-      rec.param("tool_count", Value(static_cast<std::int64_t>(solids.size() - 1)))
-          .param("skip_non_intersecting", Value(options.skip_non_intersecting))
-          .param("tracking_policy", Value(std::string(to_string(policy))));
-      add_operands(rec, solids);
+      record_cut(solids, options, policy, rec);
 
       FinalizeSpec spec;
       spec.record = std::move(rec).take();
-      if (cut_performed && merged) {
-        return finalize_tracked<Solid>(std::move(result_solid), std::move(*merged), std::move(merged_entries), std::move(spec));
+      if (run.cut_performed && merged) {
+        return finalize_tracked<Solid>(std::move(result_solid), std::move(*merged), std::move(run.entries), std::move(spec));
       }
       if (policy == TrackingPolicy::Graph) return finalize_derived(std::move(result_solid), std::move(spec));
       return finalize_primitive(std::move(result_solid), std::move(spec.record));
     });
   } catch (const std::exception& error) {
     raise_boolean_failure(cut_spec(), "cut", error, solids, std::nullopt, no_intersection);
+  }
+}
+
+std::vector<Solid> cut_rsolid_list(const std::vector<Solid>& solids, const CutOptions& options) {
+  bool no_intersection = false;
+  try {
+    return occt_guard([&]() -> std::vector<Solid> {
+      const TrackingPolicy policy = resolve_tracking_policy(options.tracking_policy);
+      if (solids.empty()) throw ValueError("cut_rsolid_list requires at least one Solid input");
+      if (solids.size() == 1) return {solids.front()};
+
+      CutRun run = run_cuts(solids, options, policy, "cut_rsolid_list", no_intersection);
+
+      std::vector<Solid> pieces = std::move(run.pieces);
+      std::optional<TopoDelta> merged = merge_topo_deltas(run.deltas);
+      const bool tracked = policy != TrackingPolicy::Graph && run.cut_performed && merged;
+      std::vector<Shape> sources(solids.begin(), solids.end());
+      for (Solid& piece : pieces) {
+        inherit_metadata(piece, {&solids.front()});
+        piece.apply_tag("solid.boolean.cut", false);
+        if (tracked) {
+          apply_tracking_tags(piece, *merged, run.entries, TrackingContext{kCutListOp, sources});
+        }
+        attach_track_summary(piece, kCutListOp, tracked ? &*merged : nullptr, tracked ? &run.entries : nullptr);
+      }
+
+      FeatureRecord rec(kCutListOp);
+      record_cut(solids, options, policy, rec);
+      OpRecord record = std::move(rec).take();
+      if (Recorder* recorder = current_recorder()) {
+        std::vector<Shape> ordered;
+        for (const OpInput& input : record.inputs) ordered.push_back(input.shape);
+        if (auto refs = recorder->input_refs(ordered)) record.params.set("input_refs", std::move(*refs));
+        if (tracked) record.delta = *merged;
+      }
+      record_operation(std::move(record), std::vector<Shape>(pieces.begin(), pieces.end()));
+      return pieces;
+    });
+  } catch (const std::exception& error) {
+    raise_boolean_failure(cut_list_spec(), "cut", error, solids, std::nullopt, no_intersection);
   }
 }
 

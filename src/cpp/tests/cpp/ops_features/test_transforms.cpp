@@ -54,8 +54,8 @@ TEST_CASE("scale and affine transform") {
 }
 
 TEST_CASE("patterns number their members") {
-  const Solid small = box(0.5, 0.5, 0.5);
-  const std::vector<Shape> row = linear_pattern_rsolidlist(small, scalar3(1, 0, 0), 5, 1.0);
+  const Solid tiny = box(0.5, 0.5, 0.5);
+  const std::vector<Shape> row = linear_pattern_rsolidlist(tiny, scalar3(1, 0, 0), 5, 1.0);
   REQUIRE(row.size() == 5);
   CHECK(row[4].center().x == Approx(4.0));
   CHECK(has_tag(row[2], "solid.pattern.linear"));
@@ -66,7 +66,7 @@ TEST_CASE("patterns number their members") {
   REQUIRE(ring.size() == 6);
   CHECK(has_tag(ring[5], "solid.pattern.radial"));
 
-  CHECK(failure_of([&] { (void)linear_pattern_rsolidlist(small, scalar3(1, 0, 0), 0, 1.0); }).operation() ==
+  CHECK(failure_of([&] { (void)linear_pattern_rsolidlist(tiny, scalar3(1, 0, 0), 0, 1.0); }).operation() ==
         "linear_pattern_rsolidlist");
   CHECK(failure_of([&] { (void)radial_pattern_rsolidlist(arm, scalar3(0, 0, 0), scalar3(0, 0, 1), 3, 0.0); }).operation() ==
         "radial_pattern_rsolidlist");

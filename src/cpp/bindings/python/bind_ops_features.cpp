@@ -474,6 +474,17 @@ void bind_booleans(py::module_& m) {
       "Compute the boolean difference of solids: the first is the base, the rest are subtracted in order.");
 
   m.def(
+      "cut_rsolid_list",
+      [](const py::args& solids, bool skip_non_intersecting, const py::object& tracking_policy) {
+        const std::vector<Solid> operands = flattened(solids, "cut_rsolid_list");
+        const CutOptions options{skip_non_intersecting, policy_text(tracking_policy)};
+        return solids_to_py(unlocked(false, [&] { return cut_rsolid_list(operands, options); }));
+      },
+      py::kw_only(), py::arg("skip_non_intersecting") = true, py::arg("tracking_policy") = "full",
+      "Compute the boolean difference of solids and keep every piece: a cut that splits the body returns each part, "
+      "and one that consumes the body returns an empty list.");
+
+  m.def(
       "intersect_rsolid",
       [](const py::args& solids) {
         const std::vector<Solid> operands = flattened(solids, "intersect_rsolid");

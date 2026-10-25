@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import textwrap
 
-from ref import close, golden
+from ref import GEOMETRY_REL, close, golden
 
 import simplecadapi._cpp as port
 
@@ -72,7 +72,7 @@ def run_port(snippet: str):
     return namespace["result"]
 
 
-def compare(name: str, *parts: str, rel: float = 1e-6, abs_: float = 1e-7):
+def compare(name: str, *parts: str, rel: float = GEOMETRY_REL, abs_: float = 1e-7):
     snippet = "\n".join(textwrap.dedent(part) for part in parts)
     expected = golden("ops_features_" + name, PRELUDE + snippet)
     actual = run_port(snippet)

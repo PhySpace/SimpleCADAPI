@@ -109,7 +109,7 @@ def circle(center, radius):
     return T.circle(center, radius)
 
 
-def close_to(got, expected, rel=1e-6, abs_=1e-6):
+def close_to(got, expected, rel=1e-4, abs_=1e-6):
     """Recursive approximate equality; bbox corners are compared with an absolute floor."""
     from ref import close
 

@@ -74,7 +74,14 @@ def golden(name: str, snippet: str) -> Any:
 _GENERIC_DETAIL = "The underlying validation failed; use the structured guidance above to repair the operation."
 
 
-def close(a: Any, b: Any, rel: float = 1e-6, abs_: float = 1e-9) -> bool:
+# Geometric measurements (areas, volumes, bounding boxes, centres) come out of OpenCASCADE's numerical integration and
+# optimisation, which differ between OCCT builds (the reference's, Homebrew's, the static one of the wheels) at the 1e-5
+# level and, for a bounding box found by a heuristic optimiser, more.  A real error in the geometry is orders of magnitude
+# larger, so the parity tests hold geometry to this and everything exact (counts, names, ids, strings) exactly.
+GEOMETRY_REL = 1e-4
+
+
+def close(a: Any, b: Any, rel: float = GEOMETRY_REL, abs_: float = 1e-9) -> bool:
     """Recursive approximate equality for golden comparisons."""
     if isinstance(b, str) and isinstance(a, str) and b.endswith(_GENERIC_DETAIL) and a != b:
         return a.split(": ", 1)[0] == b.split(": ", 1)[0] and a.isascii()

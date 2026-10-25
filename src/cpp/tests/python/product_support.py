@@ -32,7 +32,7 @@ class _Native:
 
 native = _Native()
 
-from ref import close, golden
+from ref import GEOMETRY_REL, close, golden
 
 _PRELUDE = '''
 import math
@@ -116,7 +116,7 @@ def solved_summary(solved):
 '''
 
 
-def mismatches(actual, expected, path="result", rel=1e-6, abs_=1e-9):
+def mismatches(actual, expected, path="result", rel=GEOMETRY_REL, abs_=1e-9):
     """Where `actual` and `expected` differ, one line each (empty when they agree)."""
     if isinstance(actual, dict) and isinstance(expected, dict):
         out = []
@@ -138,7 +138,7 @@ def run_native(source: str):
     return json.loads(json.dumps(namespace["result"], default=float))
 
 
-def parity(name: str, source: str, rel: float = 1e-6, abs_: float = 1e-9, ignore=()):
+def parity(name: str, source: str, rel: float = GEOMETRY_REL, abs_: float = 1e-9, ignore=()):
     """Run `source` on both sides and assert that `result` agrees; keys in `ignore` are dropped first."""
     source = textwrap.dedent(source)
     expected = golden(f"product_{name}", _PRELUDE + "\n" + source)
