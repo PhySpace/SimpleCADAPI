@@ -445,6 +445,7 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
     },
     "union_rsolid": {"status": "replayable", "op": "make_union_rsolid"},
     "cut_rsolid": {"status": "replayable", "op": "make_cut_rsolid"},
+    "cut_rsolid_list": {"status": "replayable", "op": "make_cut_rsolid_list"},
     "intersect_rsolid": {"status": "replayable", "op": "make_intersect_rsolid"},
     "make_2d_cut_rface": {"status": "replayable", "op": "make_2d_cut_rface"},
     "make_2d_union_rface": {"status": "replayable", "op": "make_2d_union_rface"},
@@ -615,6 +616,7 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "make_draft_rsolid",
     "make_mirror_rshape",
     "make_cut_rsolid",
+    "make_cut_rsolid_list",
     "make_union_rsolid",
     "make_intersect_rsolid",
     "make_2d_cut_rface",
@@ -3750,6 +3752,28 @@ def _execute_graph(
                                     "skip_non_intersecting",
                                     False,
                                 )
+                            ),
+                            tracking_policy=str(params.get("tracking_policy", "full")),
+                        )
+                        _store_outputs(node, result)
+                        continue
+
+                    if op_name == "make_cut_rsolid_list":
+                        ctx.require_params(
+                            node.node_id, op_name, params, ("tool_count", "input_refs")
+                        )
+                        inputs = _ordered_input_shapes(ctx, graph, outputs, node, params)
+                        if len(inputs) < 2:
+                            if ctx.strict:
+                                ctx.fail(
+                                    f"Graph node '{node.node_id}' ({op_name}) requires at least two inputs"
+                                )
+                            continue
+                        result = ops.cut_rsolid_list(
+                            cast(Solid, inputs[0]),
+                            [cast(Solid, tool) for tool in inputs[1:]],
+                            skip_non_intersecting=bool(
+                                _param(ctx, node.node_id, op_name, params, "skip_non_intersecting", False)
                             ),
                             tracking_policy=str(params.get("tracking_policy", "full")),
                         )

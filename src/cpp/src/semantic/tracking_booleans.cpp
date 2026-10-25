@@ -18,9 +18,11 @@ namespace scad {
 
 namespace {
 
-TrackedBooleanResult to_boolean_result(std::optional<Solid> solid, tracking::DeltaBuilder&& builder) {
+TrackedBooleanResult to_boolean_result(std::optional<Solid> solid, std::vector<Solid> solids,
+                                       tracking::DeltaBuilder&& builder) {
   tracking::Finished finished = std::move(builder).finish();
-  return TrackedBooleanResult{std::move(solid), std::move(finished.delta), std::move(finished.delta_entries)};
+  return TrackedBooleanResult{std::move(solid), std::move(solids), std::move(finished.delta),
+                              std::move(finished.delta_entries)};
 }
 
 // Face history of one input of a boolean.
@@ -64,7 +66,9 @@ TrackedBooleanResult track_boolean(kernel::BooleanOp op, const Solid& body, cons
     std::optional<Solid> solid;
     TopoDS_Solid first;
     if (kernel::first_solid(run.shape, first)) solid.emplace(first);
-    return to_boolean_result(std::move(solid), std::move(delta));
+    std::vector<Solid> solids;
+    for (const TopoDS_Solid& piece : kernel::solids_of(run.shape)) solids.emplace_back(piece);
+    return to_boolean_result(std::move(solid), std::move(solids), std::move(delta));
   });
 }
 
@@ -113,7 +117,7 @@ TrackedBooleanResult track_union_history(const std::vector<Solid>& solids, const
       seen.Add(edge);
       if (seen.Extent() > before) delta.section_edge_ids.push_back(kernel_topo_id(edge));
     }
-    return to_boolean_result(result_solid, std::move(delta));
+    return to_boolean_result(result_solid, std::vector<Solid>{result_solid}, std::move(delta));
   });
 }
 

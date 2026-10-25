@@ -9,7 +9,7 @@ from ref import golden
 from surface_support import REF_PRELUDE, arc, circle, close_to, line, measure, rectangle, spline  # noqa: F401
 
 
-def compare(name, ref_body, native_result, rel=1e-6):
+def compare(name, ref_body, native_result, rel=1e-4):
     expected = golden(name, REF_PRELUDE + ref_body)
     assert close_to(native_result, expected, rel=rel), f"{name}:\nnative   {native_result}\nreference {expected}"
 

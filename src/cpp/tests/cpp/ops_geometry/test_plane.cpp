@@ -11,15 +11,15 @@ using namespace scad::geometry_test;
 
 namespace {
 
-bool near(const Vec3& a, const Vec3& b, double tol = 1e-12) { return (a - b).norm() <= tol; }
+bool close_to(const Vec3& a, const Vec3& b, double tol = 1e-12) { return (a - b).norm() <= tol; }
 
 }  // namespace
 
 TEST_CASE("a +Z normal gives exactly the global frame (test_plane_axes_convention)") {
   const PlaneAxes axes = orthonormal_plane_axes({0, 0, 1});
-  CHECK(near(axes.z_axis, {0, 0, 1}));
-  CHECK(near(axes.x_axis, {1, 0, 0}));
-  CHECK(near(axes.y_axis, {0, 1, 0}));
+  CHECK(close_to(axes.z_axis, {0, 0, 1}));
+  CHECK(close_to(axes.x_axis, {1, 0, 0}));
+  CHECK(close_to(axes.y_axis, {0, 1, 0}));
 }
 
 TEST_CASE("plane frames are unit, right-handed and transverse") {
@@ -30,21 +30,21 @@ TEST_CASE("plane frames are unit, right-handed and transverse") {
     CHECK(a.y_axis.norm() == doctest::Approx(1.0));
     CHECK(a.x_axis.dot(a.z_axis) == doctest::Approx(0.0).epsilon(1e-9));
     CHECK(a.y_axis.dot(a.z_axis) == doctest::Approx(0.0).epsilon(1e-9));
-    CHECK(near(a.x_axis.cross(a.y_axis), a.z_axis));
+    CHECK(close_to(a.x_axis.cross(a.y_axis), a.z_axis));
   }
   CHECK_THROWS_AS(orthonormal_plane_axes({0, 0, 0}), ValueError);
 }
 
 TEST_CASE("default_plane_x_direction is OpenCASCADE's") {
-  CHECK(near(default_plane_x_direction({0, 0, 1}), {1, 0, 0}));
-  CHECK(near(default_plane_x_direction({1, 0, 0}), {0, 0, 1}));
+  CHECK(close_to(default_plane_x_direction({0, 0, 1}), {1, 0, 0}));
+  CHECK(close_to(default_plane_x_direction({1, 0, 0}), {0, 0, 1}));
   CHECK_THROWS(default_plane_x_direction({0, 0, 0}));
 }
 
 TEST_CASE("sketch_plane_in_current_coordinates reads named and mapped planes") {
   const PlaneFrame xz = sketch_plane_in_current_coordinates(Value("xz"));
-  CHECK(near(xz.x_axis, {1, 0, 0}));
-  CHECK(near(xz.y_axis, {0, 0, 1}));
+  CHECK(close_to(xz.x_axis, {1, 0, 0}));
+  CHECK(close_to(xz.y_axis, {0, 0, 1}));
   CHECK_THROWS_AS(sketch_plane_in_current_coordinates(Value("AB")), ValueError);
 
   const Workplane plane({0, 0, 5}, {0, 0, 1}, {1, 0, 0});
@@ -52,8 +52,8 @@ TEST_CASE("sketch_plane_in_current_coordinates reads named and mapped planes") {
   Value mapping = Value::object();
   mapping.set("origin", Value(Value::Array{Value(1.0), Value(0.0), Value(0.0)}));
   const PlaneFrame frame = sketch_plane_in_current_coordinates(mapping);
-  CHECK(near(frame.origin, {1, 0, 5}));
-  CHECK(near(frame.y_axis, {0, 1, 0}));
+  CHECK(close_to(frame.origin, {1, 0, 5}));
+  CHECK(close_to(frame.y_axis, {0, 1, 0}));
 }
 
 TEST_CASE("Num is a float until an operand is symbolic, like Python") {
