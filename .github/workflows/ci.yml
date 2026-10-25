@@ -74,15 +74,13 @@ jobs:
 
       - name: Install locked dependencies and build the C++ module
         run: CMAKE_ARGS="-DSCAD_OCCT_PREFIX=$HOME/occt" uv sync --locked --group dev
-      - name: Verify headless rendering support
-        run: command -v xvfb-run
 
 
       - name: Compile package
         run: uv run python -m compileall -q src/simplecadapi
 
       - name: Run tests
-        run: xvfb-run --auto-servernum uv run pytest test tests -q
+        run: uv run pytest test tests -q
 
   editor-e2e:
     needs: occt

@@ -1207,9 +1207,9 @@ def render_manufacturing_hints_rpath(
     )
     from .render import (
         DEFAULT_VIEWS,
-        _edge_polydata,
-        _mesh_polydata,
-        _render_polydata_views,
+        _edge_geometry,
+        _mesh_geometry,
+        _render_views,
     )
 
     groups = []
@@ -1230,7 +1230,7 @@ def render_manufacturing_hints_rpath(
         shapes = [model.resolve_entity(entity_id)[2] for entity_id in ids]
         groups.append(
             (
-                _mesh_polydata(shapes, linear_deflection, angular_deflection),
+                _mesh_geometry(shapes, linear_deflection, angular_deflection),
                 color,
                 1.0,
             )
@@ -1238,15 +1238,15 @@ def render_manufacturing_hints_rpath(
         legend.append((label, color))
     if not groups:
         raise ValueError("The manufacturing analysis contains no highlightable faces")
-    return _render_polydata_views(
-        _mesh_polydata([model.root], linear_deflection, angular_deflection),
+    return _render_views(
+        _mesh_geometry([model.root], linear_deflection, angular_deflection),
         output_path,
         title="BREP manufacturing-feature hints",
         views=tuple(views or DEFAULT_VIEWS),
         image_size=image_size,
         dpi=dpi,
         context_opacity=0.16,
-        brep_edge_polydata=_edge_polydata(
+        brep_edges=_edge_geometry(
             [model.root], deflection=linear_deflection
         ),
         highlighted_groups=groups,

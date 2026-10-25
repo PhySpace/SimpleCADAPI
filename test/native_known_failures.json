@@ -15,10 +15,6 @@
 "internal",
 "patches the Python helpers tracked_cut / fuse_shapes_with_history to prove they are not called; the C++ operators never go through a Python attribute. The behaviour (a graph-policy boolean asks the kernel for no history) is asserted by src/cpp/tests/cpp/ops_features/test_booleans.cpp via tracking::history_query_count()"
 ],
-"test/test_render_screenshot_multiview.py::TestRenderScreenshotMultiView::test_default_routes_to_multiview_engine_with_annotations": [
-"internal",
-"patches the VTK engine's inspect.brep.render._prepare_polydata_render to see which engine a request is routed to; the native screenshot is the C++ renderer, there is no second engine. The routing contract (default = 4-panel grid, view= = one panel, views= = custom grid) is asserted by src/cpp/tests/python/test_render_screenshot_routing.py"
-],
 "test/test_shape_restore_cost.py::TestLazyRestore::test_a_restored_shape_is_built_on_first_use": [
 "internal",
 "tests the Python wrappers' internals (OperationNode dataclass/pickle, _TopoEntity, shape restore cost), which the C++ port does not have"
@@ -78,13 +74,5 @@
 "tests/test_topology_identity.py::test_shared_edge_occurrences_keep_entity_state_after_whole_assignment": [
 "internal",
 "tests the Python wrappers' internals (OperationNode dataclass/pickle, _TopoEntity, shape restore cost), which the C++ port does not have"
-],
-"test/test_render_screenshot_multiview.py::TestRenderScreenshotMultiView::test_custom_views_reach_the_grid_engine": [
-"internal",
-"patches the VTK engine's inspect.brep.render._prepare_polydata_render to see which engine a request is routed to; the native screenshot is the C++ renderer, there is no second engine. The routing contract (default = 4-panel grid, view= = one panel, views= = custom grid) is asserted by src/cpp/tests/python/test_render_screenshot_routing.py"
-],
-"test/test_render_screenshot_multiview.py::TestRenderScreenshotMultiView::test_explicit_view_routes_through_the_grid_engine": [
-"internal",
-"patches the VTK engine's inspect.brep.render._prepare_polydata_render to see which engine a request is routed to; the native screenshot is the C++ renderer, there is no second engine. The routing contract (default = 4-panel grid, view= = one panel, views= = custom grid) is asserted by src/cpp/tests/python/test_render_screenshot_routing.py"
 ]
 }

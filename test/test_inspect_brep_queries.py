@@ -31,12 +31,10 @@ from simplecadapi.inspect.brep.queries import (
     select_region_entities_rdescriptor,
 )
 from simplecadapi.inspect.brep.render import (
-    _edge_polydata,
+    _edge_geometry,
     _entity_map_legend,
     _load_step_xcaf,
-    _mesh_polydata,
-    _point_polydata,
-    _run_render_worker,
+    _mesh_geometry,
     inspect_step_components_rdescriptorlist,
     render_entity_kind_maps_rpath,
     render_entity_map_rpath,
@@ -477,14 +475,15 @@ def test_render_step_views_preserves_xcaf_colors_and_brep_edges(tmp_path):
     shape, face_colors = _load_step_xcaf(step)
     assert face_colors
     assert all(color[:3] == pytest.approx(expected) for color in face_colors.values())
-    mesh = _mesh_polydata(
+    mesh = _mesh_geometry(
         [shape],
         linear_deflection=0.1,
         angular_deflection=0.2,
         face_colors=face_colors,
     )
-    assert mesh.GetCellData().GetScalars().GetName() == "STEP_RGBA"
-    assert _edge_polydata([shape], deflection=0.1).GetNumberOfLines() == 12
+    # one RGBA colour per triangle, the STEP colours of the faces
+    assert mesh.colors is not None and mesh.colors.shape == (mesh.triangle_count, 4)
+    assert _edge_geometry([shape], deflection=0.1).line_count == 12
     output = tmp_path / "colored.png"
     assert render_step_views_rpath(step, output, image_size=(2.0, 2.0), dpi=60) == output
     assert output.stat().st_size > 0
@@ -666,35 +665,6 @@ def test_render_entity_map_rejects_empty_duplicate_and_invalid_options(tmp_path)
         )
 
 
-
-def test_render_worker_retries_crash_and_requires_clean_exit(tmp_path, monkeypatch):
-    calls = []
-
-    def fake_run(command, **kwargs):
-        del kwargs
-        calls.append(tuple(command))
-        payload = json.loads(Path(command[-1]).read_text(encoding="utf-8"))
-        Path(payload["output_path"]).write_bytes(b"crashed-image")
-        Path(payload["completion_path"]).touch()
-        if len(calls) == 1:
-            return SimpleNamespace(returncode=-11, stderr="", stdout="")
-        Path(payload["output_path"]).write_bytes(b"complete-image")
-        return SimpleNamespace(returncode=0, stderr="", stdout="")
-
-    monkeypatch.setattr(
-        "simplecadapi.inspect.brep.render.subprocess.run", fake_run
-    )
-    output = tmp_path / "worker.png"
-    result = _run_render_worker(
-        mode="views",
-        output_path=output,
-        datasets={"base": _point_polydata([(0.0, 0.0, 0.0)])},
-        options={},
-    )
-
-    assert result == output
-    assert output.read_bytes() == b"complete-image"
-    assert len(calls) == 2
 
 def test_render_region_does_not_mutate_cached_model_geometry(tmp_path):
     model = _model()

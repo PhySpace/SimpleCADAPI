@@ -309,13 +309,10 @@ jobs:
           uv sync --locked --group dev --no-install-project
           uv pip install --no-deps dist/*-"$py"-"$py"-*.whl
 
-      - name: Install headless rendering support
-        run: sudo apt-get update && sudo apt-get install --yes xvfb
-
       - name: Run tests
         run: |
-          xvfb-run --auto-servernum .venv/bin/python -m pytest test tests -q
-          xvfb-run --auto-servernum .venv/bin/python -m pytest src/cpp/tests/python -q
+          .venv/bin/python -m pytest test tests -q
+          .venv/bin/python -m pytest src/cpp/tests/python -q
 
   release:
     name: Build the skill and publish the release

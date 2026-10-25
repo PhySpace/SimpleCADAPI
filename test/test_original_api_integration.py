@@ -54,7 +54,7 @@ class TestOriginalBooleanApiIntegration(unittest.TestCase):
 
 
 class TestScreenshotRenderingIntegration(unittest.TestCase):
-    def test_render_screenshot_uses_vtk_with_tags_and_annotations(self):
+    def test_render_screenshot_with_tags_and_annotations(self):
         box = scad.make_box_rsolid(4.0, 3.0, 2.0)
         scad.apply_tag(box, "role.body")
         output = Path(self._testMethodName + ".png")
