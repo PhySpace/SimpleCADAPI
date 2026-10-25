@@ -12,7 +12,7 @@ from simplecadapi import ql as Q
 class TestOriginalBooleanApiIntegration(unittest.TestCase):
     def test_cut_rsolid_auto_applies_semantic_tags(self):
         body = scad.make_box_rsolid(10, 10, 10)
-        tool = scad.make_cylinder_rsolid(2.0, 15.0, bottom_face_center=(3, 3, -2.5))
+        tool = scad.make_cylinder_rsolid(1.5, 15.0, bottom_face_center=(3, 3, -2.5))
 
         result = scad.cut_rsolid(body, tool)
         self.assertIsInstance(result, scad.Solid)
@@ -151,7 +151,7 @@ class TestOriginalApiGraphRecording(unittest.TestCase):
     def test_original_apis_record_graph_automatically(self):
         with GraphSession() as session:
             body = scad.make_box_rsolid(10, 10, 10)
-            tool = scad.make_cylinder_rsolid(2.0, 15.0, bottom_face_center=(3, 3, -2.5))
+            tool = scad.make_cylinder_rsolid(1.5, 15.0, bottom_face_center=(3, 3, -2.5))
             result = scad.cut_rsolid(body, tool)
 
         graph = session.graph

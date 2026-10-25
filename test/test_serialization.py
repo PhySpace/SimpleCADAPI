@@ -101,7 +101,7 @@ class TestExportImport(unittest.TestCase):
     def test_export_graph_json_includes_display_payload(self):
         with scad.GraphSession() as session:
             body = scad.make_box_rsolid(10, 10, 10)
-            tool = scad.make_cylinder_rsolid(2.0, 15.0, bottom_face_center=(3, 3, -2.5))
+            tool = scad.make_cylinder_rsolid(1.5, 15.0, bottom_face_center=(3, 3, -2.5))
             scad.cut_rsolid(body, tool)
 
         payload = json.loads(export_graph_json(session.graph))
@@ -365,6 +365,7 @@ class TestCoverageMatrix(unittest.TestCase):
             "make_extrude_until_rsolid",
             "make_draft_rsolid",
             "make_boolean_rsolidlist",
+            "make_cut_rsolid_list",
             "make_mirror_rshape",
             "make_cut_rsolid",
             "make_union_rsolid",

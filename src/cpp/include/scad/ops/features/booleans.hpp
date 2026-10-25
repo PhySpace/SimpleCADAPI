@@ -29,6 +29,11 @@ struct CutOptions {
 // The first solid minus every other.  Error "cut_rsolid".
 Solid cut_rsolid(const std::vector<Solid>& solids, const CutOptions& options = {});
 
+// The same cut, keeping every piece: a cut that splits the body (a slot through a bar) returns each part, and one that
+// consumes the body returns an empty list.  cut_rsolid refuses such a result instead of dropping parts.
+// Error "cut_rsolid_list"; recorded as make_cut_rsolid_list.
+std::vector<Solid> cut_rsolid_list(const std::vector<Solid>& solids, const CutOptions& options = {});
+
 // The overlap of all `solids`.  Error "intersect_rsolid".
 Solid intersect_rsolid(const std::vector<Solid>& solids);
 

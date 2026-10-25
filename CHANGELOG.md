@@ -9,15 +9,24 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 ## 2.2.7b1 — 2026-10-24
 
 ### Added
+- `cut_rsolid_list(base, *tools)`: the boolean cut that keeps every piece. A slot through a bar returns both halves, a
+  tool that encloses the body returns an empty list. Recorded as `make_cut_rsolid_list` and replayable.
 - Prebuilt wheels for Linux x86_64, Linux aarch64, macOS arm64 and Windows x86_64, each for Python 3.10-3.13,
   built by the release workflow against one static OpenCASCADE 7.9.3.
 
 ### Changed
 - The geometry engine is C++ on OpenCASCADE, shipped in the wheel as `simplecadapi._cpp`; one distribution, one
-  import package. The public API and the previous test suite are unchanged.
+  import package. The public API is unchanged, and the previous test suite passes (three tests that relied on a dropped
+  sliver of a tangent cut now use a tool clear of the wall).
 - Every message the library writes is English; the tag-validation and semantic-query errors render in full with
   possible causes and fixes.
 - macOS wheels require macOS 14 or later.
+
+### Fixed
+- `cut_rsolid` no longer drops pieces silently. When a cut split the body it returned only the first piece (a slot
+  through a 100x20x10 bar reported half the volume); it now raises and points to `cut_rsolid_list`. A tool that only
+  touches a wall tangentially (a cylinder of radius 2 at (3, 3) in a 10x10 block) leaves a separate sliver and now
+  raises too.
 
 ### Removed
 - Dependencies `cadquery-ocp`, `ocp-gordon` and `py-slvs`; the `SCA_BACKEND` switch.

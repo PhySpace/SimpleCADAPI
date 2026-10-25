@@ -130,6 +130,9 @@ void register_booleans(reactive::ExecutorRegistry& registry) {
   registry.add("make_cut_rsolid", [](Params p, Inputs in, const ScalarValues&) {
     return one(cut_rsolid(rest<Solid>(in, 0, in.size()), {flag(p, "skip_non_intersecting"), text(p, "tracking_policy")}));
   });
+  registry.add("make_cut_rsolid_list", [](Params p, Inputs in, const ScalarValues&) {
+    return many(cut_rsolid_list(rest<Solid>(in, 0, in.size()), {flag(p, "skip_non_intersecting"), text(p, "tracking_policy")}));
+  });
   registry.add("make_intersect_rsolid", [](Params, Inputs in, const ScalarValues&) {
     return one(intersect_rsolid(rest<Solid>(in, 0, in.size())));
   });

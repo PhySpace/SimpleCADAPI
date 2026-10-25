@@ -108,7 +108,7 @@ it and stop that route; never invent an alternative route.
    boundary comment `# ---- feature: <slug> (<role>) ----`; 2D
    profiles and planar paths go through the sketch API, primitives
    only when the shape is completely contained in the basic form.
-4. Booleans (`union_rsolid`, `cut_rsolid`, `intersect_rsolid`)
+4. Booleans (`union_rsolid`, `cut_rsolid`, `cut_rsolid_list`, `intersect_rsolid`)
    accept mixed inputs and return exactly one `Solid`; union
    defaults to `glue=False` with a conservative scale-relative
    tolerance and fails explicitly when it cannot produce one

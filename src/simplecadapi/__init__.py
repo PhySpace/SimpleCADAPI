@@ -179,6 +179,7 @@ from simplecadapi._cpp import (
     boolean_rsolidlist,
     chamfer_rsolid,
     cut_rsolid,
+    cut_rsolid_list,
     draft_rsolid,
     extrude_rsolid,
     extrude_taper_rsolid,
@@ -648,6 +649,7 @@ __all__ = [
     # Boolean operations
     "boolean_rsolidlist",
     "cut_rsolid",
+    "cut_rsolid_list",
     "make_2d_cut_rface",
     "intersect_rsolid",
     "make_2d_intersect_rface",

@@ -87,7 +87,7 @@ def test_bolt_modeled_thread():
                                              thread_detail="modeled", thread_form="v", thread_pitch=1.25,
                                              thread_depth=0.65, thread_length=18.0, drive_style="cross")
         result = {"shape": describe(bolt, detail=False), "meta": meta(bolt, "std.fastener.bolt")}
-    """)
+    """, phase_searched=True)
     compare("bolt_modeled_full_phase", """
         with scad.GraphSession() as session:
             bolt = std.fastener.make_bolt_rsolid(diameter=6.0, length=18.0, thread_style="full", thread_detail="modeled",
@@ -96,7 +96,7 @@ def test_bolt_modeled_thread():
         result = {"shape": describe(bolt, detail=False), "meta": meta(bolt, "std.fastener.bolt"),
                   "rotations": ops.count("make_rotate_rshape"), "helices": ops.count("make_helix_rwire") + ops.count("make_helix_redge"),
                   "sweeps": ops.count("make_sweep_rsolid"), "cuts": ops.count("make_cut_rsolid")}
-    """)
+    """, phase_searched=True)
 
 
 def test_bolt_errors():
@@ -148,7 +148,7 @@ def test_nut_modeled_thread():
                                                thread_pitch=1.25, thread_depth=0.65, knurl_count=18)
         result = {"hex": {"shape": describe(nut, detail=False), "meta": meta(nut, "std.fastener.nut")},
                   "knurled": {"shape": describe(knurled, detail=False), "meta": meta(knurled, "std.fastener.nut")}}
-    """)
+    """, phase_searched=True)
     compare("nut_phase", """
         with scad.GraphSession() as session:
             nut = std.fastener.make_nut_rsolid(diameter=6.0, width=10.0, height=5.0, thread_detail="modeled",
@@ -157,7 +157,7 @@ def test_nut_modeled_thread():
         result = {"shape": describe(nut, detail=False), "meta": meta(nut, "std.fastener.nut"),
                   "rotations": ops.count("make_rotate_rshape"), "unions": ops.count("make_union_rsolid"),
                   "sweeps": ops.count("make_sweep_rsolid")}
-    """)
+    """, phase_searched=True)
 
 
 def test_nut_errors():
