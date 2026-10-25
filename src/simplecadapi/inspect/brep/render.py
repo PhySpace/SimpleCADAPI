@@ -3,21 +3,11 @@
 from __future__ import annotations
 
 import colorsys
-import json
-import math
 from pathlib import Path
-import shutil
-import signal
-import subprocess
-import sys
-import time
-import tempfile
-from threading import RLock
 from typing import Any, Literal, Mapping, Sequence, Union
 
 import numpy as np
 
-from ...errors import raise_harness_error
 from simplecadapi._cpp.occt.BRep import BRep_Builder, BRep_Tool
 from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Curve
 from simplecadapi._cpp.occt.BRepBuilderAPI import BRepBuilderAPI_Copy
@@ -28,7 +18,6 @@ from simplecadapi._cpp.occt.TopAbs import (
     TopAbs_FACE,
     TopAbs_REVERSED,
     TopAbs_SOLID,
-    TopAbs_VERTEX,
 )
 from simplecadapi._cpp.occt.TopExp import TopExp, TopExp_Explorer
 from simplecadapi._cpp.occt.TopTools import TopTools_IndexedMapOfShape
@@ -50,6 +39,7 @@ from simplecadapi._cpp.occt.XCAFPrs import (
 from simplecadapi._cpp.occt.TDF import TDF_LabelSequence
 from simplecadapi._cpp.occt.TDataStd import TDataStd_Name
 
+from ._raster import LineData, MeshData, PointData, render_comparison, render_views as _render_views
 from .io import load_step_rshape
 from .model import BRepModel, index_shape_rbrepmodel, load_step_rbrepmodel
 
@@ -61,59 +51,15 @@ DEFAULT_VIEWS: tuple[tuple[float, float, str], ...] = (
 )
 
 
-def _vtk_modules():
-    try:
-        import vtk
-        from vtk.util.numpy_support import numpy_to_vtk, numpy_to_vtkIdTypeArray
-    except ImportError as error:
-        raise ImportError("BREP rendering requires VTK") from error
-    # VTK's own chatter (a missing X server, driver notes) reads as a render
-    # failure; a real one is raised and named here.
-    vtk.vtkObject.GlobalWarningDisplayOff()
-    return vtk, numpy_to_vtk, numpy_to_vtkIdTypeArray
-
-_OFFSCREEN_WINDOW: Any | None = None
-_OFFSCREEN_RENDER_LOCK = RLock()
-
-
-def _detach_offscreen_renderers() -> None:
-    if _OFFSCREEN_WINDOW is None:
-        return
-    collection = _OFFSCREEN_WINDOW.GetRenderers()
-    collection.InitTraversal()
-    renderers = []
-    while True:
-        renderer = collection.GetNextItem()
-        if renderer is None:
-            break
-        renderers.append(renderer)
-    for renderer in renderers:
-        renderer.ReleaseGraphicsResources(_OFFSCREEN_WINDOW)
-        _OFFSCREEN_WINDOW.RemoveRenderer(renderer)
 
 
 
 
-def _offscreen_window(width: int, height: int):
-    global _OFFSCREEN_WINDOW
-    vtk, _, _ = _vtk_modules()
-    if _OFFSCREEN_WINDOW is None:
-        _OFFSCREEN_WINDOW = vtk.vtkRenderWindow()
-        _OFFSCREEN_WINDOW.SetOffScreenRendering(1)
-        _OFFSCREEN_WINDOW.SetMultiSamples(0)
-    _detach_offscreen_renderers()
-    _OFFSCREEN_WINDOW.SetSize(width, height)
-    return _OFFSCREEN_WINDOW
 
 
-def _write_polydata(path: Path, polydata: Any) -> None:
-    vtk, _, _ = _vtk_modules()
-    writer = vtk.vtkXMLPolyDataWriter()
-    writer.SetFileName(str(path))
-    writer.SetInputData(polydata)
-    writer.SetDataModeToBinary()
-    if writer.Write() != 1:
-        raise RuntimeError(f"Could not write VTK render input {path}")
+
+
+
 
 
 def _validate_render_output_path(output_path: str | Path) -> Path:
@@ -126,128 +72,12 @@ def _validate_render_output_path(output_path: str | Path) -> Path:
 # VTK offscreen rendering on macOS intermittently crashes natively
 # (SIGTRAP/SIGSEGV/SIGBUS) under heavy system load; extra attempts with real
 # backoff absorb those crash bursts.
-_WORKER_ATTEMPTS = 6
-_WORKER_RETRY_BACKOFF_SECONDS = (0.5, 1.0, 2.0, 4.0, 8.0)
 
 
-def _describe_worker_exit(returncode: int) -> str:
-    if returncode < 0:
-        try:
-            name = signal.Signals(-returncode).name
-        except ValueError:
-            name = f"signal {-returncode}"
-        return f"terminated by {name}"
-    return f"exited with code {returncode}"
 
 
-def _run_render_worker(
-    *,
-    mode: str,
-    output_path: str | Path,
-    datasets: Mapping[str, Any],
-    options: Mapping[str, Any],
-) -> Path:
-    output = _validate_render_output_path(output_path)
-    with tempfile.TemporaryDirectory(prefix="simplecad-render-") as temp_name:
-        root = Path(temp_name)
-        members: dict[str, str | None] = {}
-        for name, polydata in datasets.items():
-            if polydata is None:
-                members[name] = None
-                continue
-            member = root / f"{name}.vtp"
-            _write_polydata(member, polydata)
-            members[name] = member.name
-        worker_output = root / f"result{output.suffix.lower()}"
-        completion_marker = root / "render.complete"
-        manifest = root / "render.json"
-        manifest.write_text(
-            json.dumps(
-                {
-                    "schema_version": "1.0",
-                    "mode": mode,
-                    "output_path": str(worker_output),
-                    "completion_path": str(completion_marker),
-                    "datasets": members,
-                    "options": options,
-                },
-                ensure_ascii=True,
-                separators=(",", ":"),
-                sort_keys=True,
-            ),
-            encoding="utf-8",
-        )
-        completed = None
-        failures: list[str] = []
-        for attempt in range(_WORKER_ATTEMPTS):
-            worker_output.unlink(missing_ok=True)
-            completion_marker.unlink(missing_ok=True)
-            completed = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "simplecadapi.inspect.brep.render_worker",
-                    str(manifest),
-                ],
-                capture_output=True,
-                text=True,
-                timeout=180.0,
-                check=False,
-            )
-            if (
-                completed.returncode == 0
-                and completion_marker.is_file()
-                and worker_output.is_file()
-                and worker_output.stat().st_size > 0
-            ):
-                break
-            detail = completed.stderr.strip() or completed.stdout.strip()
-            failures.append(
-                f"attempt {attempt + 1}: worker {_describe_worker_exit(completed.returncode)}"
-                + (f"; {detail}" if detail else "")
-            )
-            if attempt < _WORKER_ATTEMPTS - 1:
-                time.sleep(
-                    _WORKER_RETRY_BACKOFF_SECONDS[
-                        min(attempt, len(_WORKER_RETRY_BACKOFF_SECONDS) - 1)
-                    ]
-                )
-        else:
-            # All attempts failed. The dominant failure mode on macOS is a
-            # transient native VTK/Cocoa crash under system load; tell the
-            # caller (LLM agents included) to retry rather than abandon the
-            # render interface.
-            raise_harness_error(
-                operation="simplecadapi.inspect.brep.render",
-                what_happened=(
-                    f"The offscreen render worker produced no image after {_WORKER_ATTEMPTS} attempts. "
-                    "This is a known transient instability of VTK offscreen rendering on macOS: "
-                    "the native OpenGL/Metal layer can crash under heavy system load. "
-                    "The rendering interface itself is NOT broken."
-                ),
-                possible_causes=(
-                    "Heavy CPU/GPU load while rendering (most common; native crashes arrive in bursts under load).",
-                    "A one-shot render worker hit the rare VTK native crash (a fresh worker usually succeeds).",
-                    "A persistent VTK installation problem (only likely if failures continue on an idle machine).",
-                ),
-                how_to_fix=(
-                    "Retry the same render call unchanged; transient worker crashes are recoverable and a later attempt typically succeeds.",
-                    "Wait a few seconds before retrying, or finish CPU-heavy work first so the machine is quieter.",
-                    "Keep using the render interface; an occasional native crash does not mean the render API is unusable.",
-                ),
-                technical_details=" | ".join(failures),
-            )
-        output.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(worker_output, output)
-    return output
 
 
-def _render_in_process(function, *args, **kwargs):
-    with _OFFSCREEN_RENDER_LOCK:
-        try:
-            return function(*args, **kwargs)
-        finally:
-            _detach_offscreen_renderers()
 
 
 def _compound(shapes: Sequence[TopoDS_Shape]) -> TopoDS_Shape:
@@ -378,13 +208,13 @@ def _load_step_xcaf(
     return root, face_colors
 
 
-def _mesh_polydata(
+def _mesh_geometry(
     shapes: Sequence[TopoDS_Shape],
     linear_deflection: float,
     angular_deflection: float,
     face_colors: Mapping[int, tuple[float, float, float, float]] | None = None,
 ):
-    """Tessellate BREP faces into one GPU-friendly VTK dataset.
+    """Tessellate BREP faces into one triangle mesh (:class:`MeshData`).
 
     OpenCascade supplies per-face vertex normals. Face-local vertices remain
     separate, which keeps sharp BREP boundaries sharp while smoothing adjacent
@@ -474,37 +304,14 @@ def _mesh_polydata(
     normals = np.concatenate(normal_blocks)
     triangles = np.concatenate(triangle_blocks)
     colors = np.concatenate(color_blocks) if color_blocks else None
-    vtk, numpy_to_vtk, numpy_to_vtk_id = _vtk_modules()
-    polydata = vtk.vtkPolyData()
-    vtk_points = vtk.vtkPoints()
-    vtk_points.SetData(numpy_to_vtk(points, deep=False))
-    polydata.SetPoints(vtk_points)
-
-    offsets = np.arange(0, 3 * (len(triangles) + 1), 3, dtype=np.int64)
-    cells = vtk.vtkCellArray()
-    cells.SetData(
-        numpy_to_vtk_id(offsets, deep=False),
-        numpy_to_vtk_id(triangles.reshape(-1), deep=False),
+    return MeshData(
+        points=points.astype(np.float32, copy=False),
+        normals=normals.astype(np.float32, copy=False),
+        triangles=triangles.astype(np.uint32, copy=False),
+        colors=colors,
     )
-    polydata.SetPolys(cells)
-    vtk_normals = numpy_to_vtk(normals, deep=False)
-    vtk_normals.SetName("Normals")
-    polydata.GetPointData().SetNormals(vtk_normals)
-    if colors is not None:
-        vtk_colors = numpy_to_vtk(colors, deep=False)
-        vtk_colors.SetName("STEP_RGBA")
-        polydata.GetCellData().SetScalars(vtk_colors)
-    polydata._simplecad_numpy_refs = (points, normals, triangles, offsets, colors)
-    return polydata
 
 
-SCREENSHOT_VIEWS: tuple[tuple[float, float, str], ...] = (
-    (28.0, -45.0, "isometric"),
-    (90.0, -90.0, "top / X-Y"),
-    (0.0, -90.0, "front / X-Z"),
-    (0.0, 0.0, "side / Y-Z"),
-)
-"""Default four-view set used by the SDK screenshot entry."""
 
 _EDGE_DEFLECTION_CAP = 0.04  # mm chord error cap for BRep edge discretization
 
@@ -538,7 +345,7 @@ def _sample_edge(
     )
 
 
-def _edge_polydata(
+def _edge_geometry(
     shapes: Sequence[TopoDS_Shape],
     *,
     deflection: float | None = None,
@@ -574,20 +381,7 @@ def _edge_polydata(
     offsets = np.empty(len(cell_blocks) + 1, dtype=np.int64)
     offsets[0] = 0
     offsets[1:] = np.cumsum([len(cell) for cell in cell_blocks])
-    connectivity = np.concatenate(cell_blocks)
-    vtk, numpy_to_vtk, numpy_to_vtk_id = _vtk_modules()
-    polydata = vtk.vtkPolyData()
-    vtk_points = vtk.vtkPoints()
-    vtk_points.SetData(numpy_to_vtk(points, deep=False))
-    polydata.SetPoints(vtk_points)
-    lines = vtk.vtkCellArray()
-    lines.SetData(
-        numpy_to_vtk_id(offsets, deep=False),
-        numpy_to_vtk_id(connectivity, deep=False),
-    )
-    polydata._simplecad_numpy_refs = (points, offsets, connectivity)
-    polydata.SetLines(lines)
-    return polydata
+    return LineData(points=points.astype(np.float32, copy=False), starts=offsets.astype(np.uint32))
 
 
 
@@ -596,1201 +390,47 @@ def _hex_rgb(value: str) -> tuple[float, float, float]:
     return tuple(int(token[index : index + 2], 16) / 255.0 for index in (0, 2, 4))
 
 
-_VIEW_PRESETS = {
-    "iso": (25.0, 35.0),
-    "isometric": (25.0, 35.0),
-    "top": (90.0, 0.0),
-    "bottom": (-90.0, 0.0),
-    "front": (0.0, -90.0),
-    "back": (0.0, 90.0),
-    "left": (0.0, 180.0),
-    "right": (0.0, 0.0),
-    "front_right": (20.0, -45.0),
-    "front_left": (20.0, 135.0),
-    "rear_right": (20.0, 45.0),
-    "rear_left": (20.0, -135.0),
-}
 
 
-def _screenshot_view_angles(
-    view: str | Sequence[float],
-    spans: Sequence[float],
-) -> tuple[float, float]:
-    if isinstance(view, str):
-        token = view.strip().lower()
-        if token == "auto":
-            return (22.0 if spans[2] <= max(spans[0], spans[1]) else 35.0, 35.0 if spans[0] >= spans[1] else 125.0)
-        presets = _VIEW_PRESETS
-        if token not in presets:
-            raise ValueError(f"Unsupported view preset: {view}")
-        return presets[token]
-    if len(view) != 2:
-        raise ValueError("view must be an (elevation, azimuth) pair")
-    return float(view[0]), float(view[1])
 
 
-def _write_window_supersampled(window, output: Path, factor: int) -> None:
-    """Write through an integer-factor LANCZOS downsample.
-
-    vtkPNGWriter needs a real path, so the supersampled frame lands in a
-    temporary sibling file before PIL downsamples it onto ``output``. The
-    temp file is created with ``mkstemp`` and its handle closed immediately:
-    vtkPNGWriter opens the same path itself, and Windows denies a second
-    open while a handle is still held (POSIX masks this). The file is
-    unlinked in a ``finally`` so render failures don't leak temp siblings.
-    """
-    import os
-    import tempfile
-
-    from PIL import Image
-
-    fd, raw_name = tempfile.mkstemp(
-        prefix=f".{output.stem}-ss{factor}x-", suffix=".png", dir=output.parent
-    )
-    os.close(fd)
-    try:
-        _write_window(window, Path(raw_name))
-        with Image.open(raw_name) as frame:
-            frame = frame.convert("RGB")
-            downsampled = frame.resize(
-                (frame.width // factor, frame.height // factor),
-                Image.Resampling.LANCZOS,
-            )
-            if output.suffix.lower() in (".jpg", ".jpeg"):
-                downsampled.save(output, quality=95)
-            else:
-                downsampled.save(output)
-    finally:
-        try:
-            os.unlink(raw_name)
-        except OSError:
-            pass
 
 
-def _prepare_sdk_screenshot(
-    solids: Sequence[Any],  # SDK Solid or raw TopoDS_Shape
-    output_path: str | Path,
-    *,
-    highlight_tags: Sequence[str] = (),
-    tag_labels: Mapping[str, str] | None = None,
-    image_size: tuple[int, int] = (1400, 900),
-    view: str | Sequence[float] = "auto",
-    show_axes: bool = True,
-    show_legend: bool = True,
-    zoom: float = 4.0,
-    show_callouts: bool = True,
-    linear_deflection: float | None = None,
-    angular_deflection: float | None = None,
-    views: Sequence[tuple[float, float, str]] | None = None,
-    style: str = "standard",
-    edge_width_scale: float | None = None,
-    view_up: Sequence[float] | None = None,
-    supersample: int = 2,
-    highlight_edges: Sequence[Any] = (),
-    highlight_edge_width: float = 4.5,
-    worker_isolated: bool = False,
-) -> tuple[str, Any]:
-    """Validate inputs and build the render datasets (no GL work).
-
-    This is the half of the SDK screenshot pipeline that imports VTK/OCP
-    and tessellates — it must run on the calling (main) thread. The
-    returned plan is executed by :func:`_execute_polydata_render`, which
-    is safe to run from a worker thread because it only orchestrates GL
-    work (in-process on non-macOS, or the crash-isolated subprocess when
-    ``worker_isolated`` is set — the diagnostic evidence channel always
-    sets it).
-
-    ``views`` switches to the multi-view grid engine: every invocation then
-    renders one tiled image with a panel per ``(elevation, azimuth, label)``
-    view, carrying the same tag highlight groups, legend and callouts (2-D
-    leader-line labels, projected per panel). ``zoom`` only applies to the
-    single-view path; the grid camera uses its standard fitting.
-
-    Raw ``TopoDS_Shape`` entries (the STEP inspection family) are accepted
-    alongside SDK solids and render through the same engine with the same
-    edge ink and supersampling; they simply carry no tag/callout features.
-
-    ``supersample`` (default 2) renders at an integer multiple of the
-    requested size and downsamples with LANCZOS — deterministic
-    anti-aliasing so BRep edge ink stays crisp; pass 1 to render 1:1.
-
-    ``style="studio"`` renders the single-view path as a product shot:
-    gradient backdrop, three-point lighting, glossy steel material and BRep
-    edges drawn as bold dark tubes ( ``standard`` keeps the flat inspection
-    look). It requires an explicit ``view`` (it is not implemented for the
-    ``views`` grid). ``linear_deflection``/``angular_deflection`` default to
-    the inspection tessellation; tighten them for high-resolution exports.
-    """
-    if not solids:
-        raise ValueError("At least one Solid or TopoDS_Shape is required")
-    if image_size[0] < 1 or image_size[1] < 1:
-        raise ValueError("image_size values must be greater than zero")
-    if zoom <= 0.0:
-        raise ValueError("zoom must be greater than zero")
-    if style not in ("standard", "studio"):
-        raise ValueError(f"unknown render style: {style!r} (expected 'standard' or 'studio')")
-    if linear_deflection is None:
-        linear_deflection = 0.35
-    if angular_deflection is None:
-        angular_deflection = 0.22
-    if edge_width_scale is None:
-        edge_width_scale = 0.0019
-    if edge_width_scale < 0.0 or edge_width_scale > 0.02:
-        raise ValueError("edge_width_scale must be within [0, 0.02] (fraction of model span)")
-    if int(supersample) not in (1, 2, 3):
-        raise ValueError("supersample must be 1, 2, or 3")
-    tags = tuple(str(tag) for tag in highlight_tags)
-    labels = dict(tag_labels or {})
-    palette = (
-        "#f39c12", "#9b59b6", "#f1c40f", "#1abc9c",
-        "#e67e22", "#e84393", "#16a085", "#d35400",
-    )
-    tag_colors = {
-        tag: _hex_rgb(palette[index % len(palette)])
-        for index, tag in enumerate(tags)
-    }
-    grouped_faces: dict[str | None, list[TopoDS_Shape]] = {None: []}
-    label_points: dict[str, tuple[float, float, float]] = {}
-    shapes: list[TopoDS_Shape] = []
-    for solid in solids:
-        # Raw TopoDS_Shape entries (e.g. STEP inspection targets) render
-        # through the same engine but carry no tag/query features.
-        if isinstance(solid, TopoDS_Shape):
-            shapes.append(solid)
-            grouped_faces[None].append(solid)
-            continue
-        shapes.append(solid.wrapped)
-        solid_tag = next((tag for tag in tags if solid._has_tag(tag)), None)
-        if solid_tag is not None and solid_tag not in label_points:
-            bounds = _mesh_polydata(
-                [solid.wrapped], linear_deflection, angular_deflection
-            ).GetBounds()
-            label_points[solid_tag] = (
-                (bounds[0] + bounds[1]) * 0.5,
-                (bounds[2] + bounds[3]) * 0.5,
-                (bounds[4] + bounds[5]) * 0.5,
-            )
-        for face in solid._iter_faces():
-            face_tag = next((tag for tag in tags if face._has_tag(tag)), None)
-            selected_tag = face_tag or solid_tag
-            grouped_faces.setdefault(selected_tag, []).append(face.wrapped)
-            if face_tag is not None and face_tag not in label_points:
-                center = face.get_center()
-                label_points[face_tag] = (center.x, center.y, center.z)
-
-    datasets: dict[str, Any] = {
-        "base": (
-            _mesh_polydata(
-                grouped_faces.pop(None), linear_deflection, angular_deflection
-            )
-            if grouped_faces.get(None)
-            else None
-        ),
-        # Edges carry the ink; give them a tighter deflection cap than the
-        # surface tessellation so curved edges stay smooth when tubed.
-        "edges": _edge_polydata(shapes, deflection=min(linear_deflection, _EDGE_DEFLECTION_CAP)),
-    }
-    surface_groups = []
-    surface_group_refs: list[tuple[str, tuple[float, float, float]]] = []
-    tag_dataset: dict[str, str] = {}
-    for index, (tag, faces) in enumerate(grouped_faces.items()):
-        if not faces:
-            continue
-        # NOTE: name must match the wrapper's worker-datasets scheme
-        # (surface_groups_{index}) so candidate lookups survive the worker hop.
-        name = f"surface_groups_{index}"
-        datasets[name] = _mesh_polydata(
-            faces, linear_deflection, angular_deflection
-        )
-        color = tag_colors[str(tag)]
-        surface_groups.append({"dataset": name, "color": color})
-        surface_group_refs.append((name, color))
-        if tag is not None:
-            tag_dataset[str(tag)] = name
-    legend_items = []
-    if show_legend and (tags or show_axes):
-        legend_items.extend(
-            {"label": labels.get(tag, tag), "color": tag_colors[tag]}
-            for tag in tags
-        )
-        if show_axes:
-            legend_items.extend(
-                (
-                    {"label": "+X", "color": (1.0, 0.35, 0.35)},
-                    {"label": "+Y", "color": (0.35, 1.0, 0.55)},
-                    {"label": "+Z", "color": (0.45, 0.65, 1.0)},
-                )
-            )
-    if views is not None:
-        normalized_views = tuple(
-            (float(entry[0]), float(entry[1]), str(entry[2])) for entry in views
-        )
-        if not normalized_views:
-            raise ValueError("views must contain at least one (elevation, azimuth, label)")
-        if any(len(entry) != 3 for entry in views):
-            raise ValueError("each view must be an (elevation, azimuth, label) triple")
-        if len(normalized_views) > 4:
-            raise ValueError("views accepts at most four (elevation, azimuth, label) entries")
-    elif isinstance(view, str) and view.strip().lower() == "auto":
-        normalized_views = tuple(SCREENSHOT_VIEWS)
-    else:
-        # one explicit view (a preset name or (elev, azim)) = a single-cell grid
-        elevation, azimuth = _screenshot_view_angles(view, (1.0, 1.0, 1.0))
-        label = view.strip().lower() if isinstance(view, str) else "view"
-        normalized_views = ((elevation, azimuth, label),)
-    legend_pairs = [
-        (
-            str(item["label"]),
-            (
-                float(item["color"][0]),
-                float(item["color"][1]),
-                float(item["color"][2]),
-            ),
-        )
-        for item in legend_items
-    ]
-    callout_triples = [
-        (
-            labels.get(tag, tag),
-            point,
-            tag_colors.get(tag, (0.95, 0.55, 0.2)),
-        # occlusion re-anchor candidates: the label's own highlighted-face mesh (dataset channel, serialisable by the worker)
-            tag_dataset.get(str(tag)),
-        )
-        for tag, point in label_points.items()
-    ] if show_callouts else []
-    group_polydata = [
-        (datasets[name], color, 1.0) for name, color in surface_group_refs
-    ]
-    # Highlighted edges draw as crisp colored line actors (4.5 px) exactly on
-    # the edge — no marker geometry, nothing covering the model.
-    edge_groups = []
-    if highlight_edges:
-        edge_shapes = [
-            entry.wrapped if hasattr(entry, "wrapped") else entry
-            for entry in highlight_edges
-        ]
-        edge_polydata = _edge_polydata(
-            edge_shapes, deflection=min(linear_deflection, _EDGE_DEFLECTION_CAP)
-        )
-        if edge_polydata is not None:
-            highlight_color = (0.953, 0.612, 0.071)  # palette #f39c12
-            edge_groups = [(edge_polydata, highlight_color)]
-            if show_legend:
-                legend_pairs = legend_pairs + [("highlighted edges", highlight_color)]
-    return _prepare_polydata_render(
-        datasets["base"],
-        output_path,
-        title="SDK screenshot",
-        views=normalized_views,
-        image_size=(image_size[0] / 100.0, image_size[1] / 100.0),
-        dpi=100,
-        brep_edge_polydata=datasets["edges"],
-        highlighted_groups=group_polydata,
-        highlighted_edge_groups=edge_groups,
-        highlight_edge_width=highlight_edge_width,
-        legend=legend_pairs or None,
-        legend_panel=len(legend_pairs) > 8,
-        show_axes=show_axes,
-        callouts=callout_triples or None,
-        edge_width_scale=edge_width_scale,
-        supersample=supersample,
-        style=style,
-        zoom=zoom if len(normalized_views) == 1 else None,
-        view_up=view_up,
-        worker_isolated=worker_isolated,
-    )
-def _add_corner_axes(window, source_renderer, rect, *, corner="bottom-left") -> None:
-    """Overlay a small orientation triad in a corner of one panel's viewport.
-
-    The triad lives in its own transparent layered renderer sized to 20% of
-    the panel edge; its camera copies the panel camera's view direction so
-    the axes read correctly for that specific view.
-    """
-    vtk, _, _ = _vtk_modules()
-    left, bottom, right, top = rect
-    inset = 0.20
-    if corner == "bottom-left":
-        viewport = (left, bottom, left + (right - left) * inset, bottom + (top - bottom) * inset)
-    else:
-        viewport = (right - (right - left) * inset, bottom, right, bottom + (top - bottom) * inset)
-    triad = vtk.vtkRenderer()
-    triad.SetViewport(*viewport)
-    triad.SetLayer(1)
-    triad.GradientBackgroundOff()
-    triad.SetBackground(0.04, 0.05, 0.07)
-    triad.SetBackgroundAlpha(0.0)
-    triad.SetInteractive(False)
-    axes = vtk.vtkAxesActor()
-    axes.SetTotalLength(1.0, 1.0, 1.0)
-    axes.SetShaftTypeToCylinder()
-    triad.AddActor(axes)
-    camera = source_renderer.GetActiveCamera()
-    triad_camera = triad.GetActiveCamera()
-    focal = np.asarray(camera.GetFocalPoint())
-    direction = np.asarray(camera.GetPosition()) - focal
-    distance = float(np.linalg.norm(direction))
-    if distance <= 1.0e-9:
-        direction = np.asarray((1.0, 1.0, 1.0))
-        distance = float(np.linalg.norm(direction))
-    triad_camera.SetFocalPoint(0.0, 0.0, 0.0)
-    triad_camera.SetPosition(*(direction / distance * 4.0))
-    triad_camera.SetViewUp(camera.GetViewUp())
-    triad_camera.ParallelProjectionOn()
-    window.SetNumberOfLayers(2)
-    window.AddRenderer(triad)
 
 
-def _point_polydata(points: Sequence[Sequence[float]]):
-    if not points:
+def _point_geometry(points: Sequence[Sequence[float]]):
+    if not len(points):
         return None
-    vtk, numpy_to_vtk, numpy_to_vtk_id = _vtk_modules()
-    values = np.asarray(points, dtype=np.float32)
-    polydata = vtk.vtkPolyData()
-    vtk_points = vtk.vtkPoints()
-    vtk_points.SetData(numpy_to_vtk(values, deep=False))
-    polydata.SetPoints(vtk_points)
-    offsets = np.arange(len(values) + 1, dtype=np.int64)
-    vertices = vtk.vtkCellArray()
-    vertices.SetData(
-        numpy_to_vtk_id(offsets, deep=False),
-        numpy_to_vtk_id(np.arange(len(values), dtype=np.int64), deep=False),
-    )
-    polydata.SetVerts(vertices)
-    polydata._simplecad_numpy_refs = (values, offsets)
-    return polydata
-
-
-def _surface_actor(polydata, color: tuple[float, float, float], opacity: float, *, studio: bool = False):
-    vtk, _, _ = _vtk_modules()
-    mapper = vtk.vtkPolyDataMapper()
-    mapper.SetInputData(polydata)
-    if polydata.GetCellData().GetScalars() is not None:
-        mapper.SetScalarModeToUseCellData()
-        mapper.SetColorModeToDirectScalars()
-        mapper.ScalarVisibilityOn()
-    else:
-        mapper.ScalarVisibilityOff()
-    actor = vtk.vtkActor()
-    actor.SetMapper(mapper)
-    prop = actor.GetProperty()
-    prop.SetColor(*color)
-    prop.SetOpacity(opacity)
-    prop.SetInterpolationToPhong()
-    if studio:
-        # Studio metal: low flat ambient, tight bright specular so curved
-        # faces pick up the key light as a moving highlight.
-        prop.SetAmbient(0.17)
-        prop.SetDiffuse(0.62)
-        prop.SetSpecular(0.50)
-        prop.SetSpecularPower(45.0)
-        prop.SetSpecularColor(1.0, 0.97, 0.92)
-    else:
-        prop.SetAmbient(0.24)
-        prop.SetDiffuse(0.72)
-        prop.SetSpecular(0.22)
-        prop.SetSpecularPower(28.0)
-    prop.EdgeVisibilityOff()
-    return actor
-
-
-def _tube_edge_actor(polydata, radius: float, color: tuple[float, float, float]):
-    """BRep edges as thin tubes: LineWidth is capped around 3px on macOS, so
-    bold "ink" edges need geometry, not the line width property."""
-    vtk, _, _ = _vtk_modules()
-    tubes = vtk.vtkTubeFilter()
-    tubes.SetInputData(polydata)
-    tubes.SetRadius(radius)
-    tubes.SetNumberOfSides(14)
-    tubes.CappingOn()
-    mapper = vtk.vtkPolyDataMapper()
-    mapper.SetInputConnection(tubes.GetOutputPort())
-    actor = vtk.vtkActor()
-    actor.SetMapper(mapper)
-    actor.GetProperty().SetColor(*color)
-    actor.GetProperty().LightingOff()
-    return actor
-
-
-def _studio_lights(renderer) -> None:
-    """Warm key + cool fill + cool rim, derived from the camera pose so the
-    lit side always faces the viewer regardless of elevation/azimuth."""
-    import numpy as np
-
-    vtk, _, _ = _vtk_modules()
-    renderer.AutomaticLightCreationOff()
-    cam = renderer.GetActiveCamera()
-    focal = np.asarray(cam.GetFocalPoint(), dtype=float)
-    view_dir = np.asarray(cam.GetPosition(), dtype=float) - focal
-    span = float(np.linalg.norm(view_dir))
-    if span <= 0.0:
-        bounds = renderer.ComputeVisiblePropBounds()
-        span = max(bounds[1] - bounds[0], bounds[3] - bounds[2], bounds[5] - bounds[4])
-        span = max(span, 1e-9)
-        view_dir = np.asarray([0.6, 0.5, 0.6])
-    view_dir = view_dir / np.linalg.norm(view_dir)
-    world_up = np.asarray([0.0, 0.0, 1.0])
-    right = np.cross(view_dir, world_up)
-    right /= max(np.linalg.norm(right), 1e-9)
-    up = np.cross(right, view_dir)
-
-    def light(color, intensity, offset):
-        bulb = vtk.vtkLight()
-        bulb.SetColor(*color)
-        bulb.SetIntensity(intensity)
-        bulb.SetPosition(*(focal + np.asarray(offset) * span))
-        bulb.SetFocalPoint(*focal)
-        renderer.AddLight(bulb)
-
-    # warm key upper-right of the camera, cool fill from camera-left,
-    # cool rim behind/above the model for silhouette separation
-    light((1.00, 0.96, 0.90), 1.55, view_dir * 0.55 + right * 0.60 + up * 0.70)
-    light((0.60, 0.70, 0.85), 0.68, view_dir * 0.35 - right * 0.95 + up * 0.05)
-    light((0.88, 0.93, 1.00), 1.05, -view_dir * 0.90 + up * 0.60 - right * 0.15)
-
-
-def _line_actor(polydata, color: tuple[float, float, float], width: float):
-    vtk, _, _ = _vtk_modules()
-    mapper = vtk.vtkPolyDataMapper()
-    mapper.SetInputData(polydata)
-    actor = vtk.vtkActor()
-    actor.SetMapper(mapper)
-    actor.GetProperty().SetColor(*color)
-    actor.GetProperty().SetLineWidth(width)
-    actor.GetProperty().LightingOff()
-    return actor
-
-
-def _point_actor(polydata, color: tuple[float, float, float], size: float):
-    vtk, _, _ = _vtk_modules()
-    mapper = vtk.vtkPolyDataMapper()
-    mapper.SetInputData(polydata)
-    actor = vtk.vtkActor()
-    actor.SetMapper(mapper)
-    actor.GetProperty().SetColor(*color)
-    actor.GetProperty().SetPointSize(size)
-    actor.GetProperty().LightingOff()
-    return actor
+    return PointData(points=np.asarray(points, dtype=np.float32))
 
 
 
-def _view_ray_occluded(renderer, locator, point: Sequence[float], span: float) -> bool:
-    """True when geometry lies between ``point`` and the camera along the view axis.
-
-    Parallel-projection safe: the test ray backs off from the point along the
-    camera's direction of projection instead of using the camera position.
-    ``span`` scales the surface tolerance so anchors sitting exactly on their
-    own face do not count as occluded.
-    """
-    vtk, _, _ = _vtk_modules()
-    import numpy as _np
-
-    camera = renderer.GetActiveCamera()
-    direction = _np.asarray(camera.GetDirectionOfProjection())
-    target = _np.asarray(point, dtype=float)
-    reach = max(span * 10.0, 1.0)
-    p0 = target - direction * reach
-    t = vtk.reference(0.0)
-    x = [0.0, 0.0, 0.0]
-    pcoords = [0.0, 0.0, 0.0]
-    sub_id = vtk.reference(0)
-    cell_id = locator.IntersectWithLine(
-        p0.tolist(), target.tolist(), 1e-8, t, x, pcoords, sub_id
-    )
-    if cell_id < 0:
-        return False
-    # hit parameter t in [0,1]; a hit closer to the target than the surface tolerance counts as hitting itself
-    hit_distance = (1.0 - t.get()) * reach
-    return hit_distance > max(span * 0.002, 1e-6)
 
 
-def _select_panel_callouts(renderer, callouts, locator, datasets, span: float):
-    """Per-panel callout admission with occlusion re-anchoring.
-
-    A callout whose anchor is occluded re-anchors to the nearest visible
-    sampled point of its own tagged surface (referenced by dataset name);
-    a callout whose whole region is hidden in this panel is suppressed —
-    a label pointing at empty space is worse than no label.
-    """
-    import numpy as _np
-
-    if not callouts:
-        return []
-    camera = renderer.GetActiveCamera()
-    direction = _np.asarray(camera.GetDirectionOfProjection())
-    selected = []
-    for entry in callouts:
-        label, anchor, color = entry[0], entry[1], entry[2]
-        candidates_name = entry[3] if len(entry) > 3 else None
-        if not _view_ray_occluded(renderer, locator, anchor, span):
-            selected.append((label, anchor, color))
-            continue
-        polydata = datasets.get(str(candidates_name)) if candidates_name else None
-        if polydata is None:
-            continue
-        points = polydata.GetPoints()
-        count = points.GetNumberOfPoints() if points else 0
-        if count == 0:
-            continue
-        stride = max(1, count // 400)
-        reach = max(span * 10.0, 1.0)
-    # screen-distance measure: perpendicular distance along the view direction + depth (the one closer to the camera wins)
-        anchor_vec = _np.asarray(anchor, dtype=float)
-        best = None
-        best_score = None
-        vtk, _, _ = _vtk_modules()
-        for index in range(0, count, stride):
-            point = _np.asarray(points.GetPoint(index))
-            p0 = point - direction * reach
-            t = vtk.reference(0.0)
-            x = [0.0, 0.0, 0.0]
-            pcoords = [0.0, 0.0, 0.0]
-            sub_id = vtk.reference(0)
-            cell_id = locator.IntersectWithLine(
-                p0.tolist(), point.tolist(), 1e-8, t, x, pcoords, sub_id
-            )
-            if cell_id >= 0 and (1.0 - t.get()) * reach > max(span * 0.002, 1e-6):
-                continue
-            lateral = point - anchor_vec
-            lateral = lateral - direction * float(_np.dot(lateral, direction))
-            depth = float(_np.dot(anchor_vec - point, direction))
-            score = float(_np.linalg.norm(lateral)) + abs(depth) * 0.25
-            if best_score is None or score < best_score:
-                best_score = score
-                best = point
-        if best is not None:
-            selected.append((label, tuple(float(v) for v in best), color))
-    return selected
 
 
-def _add_geometry_callouts(
-    renderer,
-    callouts: Sequence[
-        tuple[str, tuple[float, float, float], tuple[float, float, float]]
-    ],
-    *,
-    font_size: int,
-    viewport_size: tuple[int, int],
-) -> list[tuple[Any, ...]]:
-    """Project anchors to non-overlapping 2D labels connected by leader lines."""
-    vtk, _, _ = _vtk_modules()
-    width, height = viewport_size
-    margin = font_size // 2
-    line_height = font_size + 8
-    placed: list[tuple[float, float, float, float]] = []
-    resources: list[tuple[Any, ...]] = []
-
-    def overlaps(box: tuple[float, float, float, float]) -> bool:
-        return any(
-            box[0] < other[2]
-            and box[2] > other[0]
-            and box[1] < other[3]
-            and box[3] > other[1]
-            for other in placed
-        )
-
-    origin_x, origin_y = renderer.GetOrigin()
-    for index, (label, anchor, color) in enumerate(callouts):
-        renderer.SetWorldPoint(*anchor, 1.0)
-        renderer.WorldToDisplay()
-        display_x, display_y, _ = renderer.GetDisplayPoint()
-        anchor_x = display_x - origin_x
-        anchor_y = display_y - origin_y
-        label_width = max(88, int(len(label) * font_size * 0.62) + 12)
-        offset_x = 18 if index % 2 == 0 else -label_width - 18
-        offset_y = 14 if index % 4 < 2 else -line_height - 14
-        label_x = min(max(anchor_x + offset_x, margin), width - label_width - margin)
-        label_y = min(max(anchor_y + offset_y, margin), height - line_height - margin)
-        attempts = 0
-        box = (label_x, label_y, label_x + label_width, label_y + line_height)
-        while overlaps(box) and attempts < 24:
-            label_y += line_height if attempts % 2 == 0 else -2 * line_height
-            label_y = min(max(label_y, margin), height - line_height - margin)
-            if attempts % 4 == 3:
-                label_x = min(
-                    max(label_x + label_width + 16, margin),
-                    width - label_width - margin,
-                )
-            box = (label_x, label_y, label_x + label_width, label_y + line_height)
-            attempts += 1
-        placed.append(box)
-        line_end_x = label_x if label_x >= anchor_x else label_x + label_width
-        line_end_y = label_y + line_height * 0.5
-        points = vtk.vtkPoints()
-        points.InsertNextPoint(anchor_x, anchor_y, 0.0)
-        points.InsertNextPoint(line_end_x, line_end_y, 0.0)
-        lines = vtk.vtkCellArray()
-        lines.InsertNextCell(2)
-        lines.InsertCellPoint(0)
-        lines.InsertCellPoint(1)
-        polydata = vtk.vtkPolyData()
-        polydata.SetPoints(points)
-        polydata.SetLines(lines)
-        mapper = vtk.vtkPolyDataMapper2D()
-        mapper.SetInputData(polydata)
-        leader = vtk.vtkActor2D()
-        leader.SetMapper(mapper)
-        leader.GetProperty().SetColor(*color)
-        leader.GetProperty().SetLineWidth(2.0)
-        renderer.AddViewProp(leader)
-        resources.append((points, lines, polydata, mapper, leader))
-        actor = vtk.vtkTextActor()
-        actor.SetInput(label)
-        actor.SetPosition(label_x, label_y)
-        prop = actor.GetTextProperty()
-        prop.SetColor(*color)
-        prop.SetBackgroundColor(0.04, 0.05, 0.07)
-        prop.SetBackgroundOpacity(0.86)
-        prop.SetFontSize(font_size)
-        prop.SetBold(True)
-        renderer.AddViewProp(actor)
-        resources.append((actor,))
-    return resources
 
 
-def _set_camera(
-    renderer,
-    elevation: float,
-    azimuth: float,
-    bounds: Sequence[float] | None = None,
-    view_up: Sequence[float] | None = None,
-) -> None:
-    shared_bounds = bounds
-    bounds = renderer.ComputeVisiblePropBounds() if shared_bounds is None else shared_bounds
-    center = np.asarray(
-        [
-            (bounds[0] + bounds[1]) * 0.5,
-            (bounds[2] + bounds[3]) * 0.5,
-            (bounds[4] + bounds[5]) * 0.5,
-        ]
-    )
-    spans = np.asarray(
-        [bounds[1] - bounds[0], bounds[3] - bounds[2], bounds[5] - bounds[4]]
-    )
-    elevation_radians = math.radians(elevation)
-    azimuth_radians = math.radians(azimuth)
-    direction = np.asarray(
-        [
-            math.cos(elevation_radians) * math.cos(azimuth_radians),
-            math.cos(elevation_radians) * math.sin(azimuth_radians),
-            math.sin(elevation_radians),
-        ]
-    )
-    distance = max(float(np.linalg.norm(spans)) * 2.5, 1.0)
-    camera = renderer.GetActiveCamera()
-    camera.ParallelProjectionOn()
-    camera.SetFocalPoint(*center)
-    camera.SetPosition(*(center + direction * distance))
-    if view_up is not None:
-        # explicit roll (e.g. riding an inclined camera orbit); the caller
-        # guarantees it is not parallel to the view direction
-        camera.SetViewUp(*[float(value) for value in view_up])
-    elif abs(direction[2]) > 0.95:
-        camera.SetViewUp(0.0, 1.0, 0.0)
-    else:
-        camera.SetViewUp(0.0, 0.0, 1.0)
-    if shared_bounds is None:
-        renderer.ResetCamera()
-    else:
-        renderer.ResetCamera(*[float(value) for value in bounds])
-    camera.Zoom(0.92)
-    renderer.ResetCameraClippingRange()
 
 
-def _write_window(window, output: Path) -> None:
-    vtk, _, _ = _vtk_modules()
-    capture = vtk.vtkWindowToImageFilter()
-    capture.SetInput(window)
-    capture.ReadFrontBufferOff()
-    capture.Update()
-    suffix = output.suffix.lower()
-    writers = {
-        ".png": vtk.vtkPNGWriter,
-        ".jpg": vtk.vtkJPEGWriter,
-        ".jpeg": vtk.vtkJPEGWriter,
-        ".tif": vtk.vtkTIFFWriter,
-        ".tiff": vtk.vtkTIFFWriter,
-    }
-    if suffix not in writers:
-        raise ValueError("render output must be PNG, JPEG, or TIFF")
-    writer = writers[suffix]()
-    writer.SetFileName(str(output))
-    writer.SetInputConnection(capture.GetOutputPort())
-    # vtkImageWriter.Write() return semantics differ across VTK builds;
-    # validate the artifact instead of the return value.
-    writer.Write()
-    if not output.is_file() or output.stat().st_size == 0:
-        raise RuntimeError(f"Could not write render output {output}")
 
 
-def _render_polydata_views_in_process(
-    base_polydata,
-    output_path: str | Path,
-    *,
-    title: str,
-    views: Sequence[tuple[float, float, str]],
-    image_size: tuple[float, float],
-    dpi: int,
-    context_opacity: float = 1.0,
-    highlight_edge_width: float = 4.5,
-    highlight_point_size: float = 15.0,
-    brep_edge_polydata=None,
-    highlighted_polydata=None,
-    highlighted_edge_polydata=None,
-    highlighted_point_polydata=None,
-    highlighted_groups=None,
-    highlighted_edge_groups=None,
-    highlighted_point_groups=None,
-    legend: Sequence[tuple[str, tuple[float, float, float]]] | None = None,
-    legend_columns: int = 1,
-    legend_panel: bool = False,
-    show_axes: bool = False,
-    callouts: Sequence[
-        tuple[str, tuple[float, float, float], tuple[float, float, float]]
-        | tuple[str, tuple[float, float, float], tuple[float, float, float], str | None]
-    ]
-    | None = None,
-    edge_width_scale: float = 0.0019,
-    supersample: int = 1,
-    style: str = "standard",
-    zoom: float | None = None,
-    view_up: Sequence[float] | None = None,
-    datasets: Mapping[str, Any] | None = None,
-) -> Path:
-    """Render smooth views; optionally multiple colored highlight groups.
-
-    ``highlighted_groups`` is a sequence of ``(polydata, rgb, opacity)``
-    triples rendered as separate colored actors; ``highlighted_edge_groups``
-    and ``highlighted_point_groups`` are ``(polydata, rgb)`` pairs. ``legend``
-    is a list of ``(label, rgb)`` entries drawn in the first viewport.
-    ``callouts`` is ``(label, anchor, rgb)`` entries drawn next to their
-    geometry with same-color anchor markers in every viewport.
-    """
-    if not views:
-        raise ValueError("at least one render view is required")
-    if dpi < 1 or image_size[0] <= 0.0 or image_size[1] <= 0.0:
-        raise ValueError("image size and DPI must be greater than zero")
-    if highlight_edge_width <= 0.0:
-        raise ValueError("highlight_edge_width must be greater than zero")
-    if highlight_point_size <= 0.0:
-        raise ValueError("highlight_point_size must be greater than zero")
-    if legend_columns < 1:
-        raise ValueError("legend_columns must be at least one")
-    vtk, _, _ = _vtk_modules()
-    # Integer-factor supersampling:
-    # render large, downsample with LANCZOS — deterministic crisp edges.
-    supersample = max(1, int(supersample))
-    width = max(1, int(round(image_size[0] * dpi))) * supersample
-    height = max(1, int(round(image_size[1] * dpi))) * supersample
-    legend_panel_width = int(width * 0.30) if legend and legend_panel else 0
-    render_width = width - legend_panel_width
-    columns = min(2, len(views))
-    rows = (len(views) + columns - 1) // columns
-    window = _offscreen_window(width, height)
-    # Coincident faces (shared walls after booleans) z-fight without this.
-    vtk.vtkMapper.SetResolveCoincidentTopologyToPolygonOffset()
-    ink_radius = 0.0
-    if brep_edge_polydata is not None and edge_width_scale > 0.0:
-        ink_source = base_polydata if base_polydata is not None else brep_edge_polydata
-        b = ink_source.GetBounds()
-        ink_radius = max(b[1] - b[0], b[3] - b[2], b[5] - b[4], 1e-9) * float(edge_width_scale)
-    callout_resources: list[tuple[Any, ...]] = []
-    callout_renderers: list[tuple[Any, int]] = []
-
-    for index, (elevation, azimuth, view_title) in enumerate(views):
-        row = index // columns
-        column = index % columns
-        left = column / columns * render_width / width
-        right = (column + 1) / columns * render_width / width
-        top = 1.0 - row / rows
-        bottom = 1.0 - (row + 1) / rows
-        renderer = vtk.vtkRenderer()
-        renderer.SetViewport(left, bottom, right, top)
-        if style == "studio":
-            renderer.GradientBackgroundOff()
-            renderer.SetBackground(0.0, 0.0, 0.0)
-        else:
-            renderer.GradientBackgroundOn()
-            renderer.SetBackground(0.94, 0.96, 0.98)
-            renderer.SetBackground2(0.78, 0.84, 0.90)
-        renderer.SetUseFXAA(supersample == 1)
-        if context_opacity < 1.0:
-            renderer.SetUseDepthPeeling(True)
-            renderer.SetMaximumNumberOfPeels(24)
-            renderer.SetOcclusionRatio(0.05)
-        if base_polydata is not None:
-            renderer.AddActor(_surface_actor(
-                base_polydata,
-                (0.66, 0.68, 0.72) if style == "studio" else (0.55, 0.64, 0.73),
-                context_opacity,
-                studio=style == "studio",
-            ))
-        if brep_edge_polydata is not None:
-            # Same tubed-ink policy as the single-view path: LineWidth is
-            # capped ~3px on macOS, so crisp CAD ink needs geometry.
-            if ink_radius > 0.0:
-                renderer.AddActor(
-                    _tube_edge_actor(brep_edge_polydata, ink_radius, (0.16, 0.21, 0.27))
-                )
-            else:
-                renderer.AddActor(_line_actor(brep_edge_polydata, (0.16, 0.21, 0.27), 1.0))
-        if highlighted_groups:
-            for polydata, color, opacity in highlighted_groups:
-                renderer.AddActor(_surface_actor(polydata, color, opacity))
-        elif highlighted_polydata is not None:
-            renderer.AddActor(_surface_actor(highlighted_polydata, (0.94, 0.18, 0.30), 1.0))
-        if highlighted_edge_groups:
-            for polydata, color in highlighted_edge_groups:
-                renderer.AddActor(_line_actor(polydata, color, highlight_edge_width))
-        elif highlighted_edge_polydata is not None:
-            renderer.AddActor(
-                _line_actor(highlighted_edge_polydata, (0.78, 0.0, 0.0), highlight_edge_width)
-            )
-        if highlighted_point_groups:
-            for polydata, color in highlighted_point_groups:
-                renderer.AddActor(_point_actor(polydata, color, highlight_point_size))
-        elif highlighted_point_polydata is not None:
-            renderer.AddActor(
-                _point_actor(highlighted_point_polydata, (0.78, 0.0, 0.0), highlight_point_size)
-            )
-        label = vtk.vtkTextActor()
-        label.SetInput(f"{title}\n{view_title}" if index == 0 else view_title)
-        label.SetPosition(16 * supersample, 14 * supersample)
-        text = label.GetTextProperty()
-        text.SetColor((0.85, 0.89, 0.94) if style == "studio" else (0.08, 0.11, 0.15))
-        # font sizes below are FINAL-image pixels; the window is supersampled,
-        # so scale here once and keep every downstream heuristic in final px
-        text.SetFontSize(max(14, min(width // columns, height // rows) // 34) * supersample)
-        text.SetBold(True)
-        renderer.AddViewProp(label)
-        if index == 0 and legend and not legend_panel:
-            viewport_width = render_width // columns
-            viewport_height = height // rows
-            legend_font = max(12, min(20, min(viewport_width, viewport_height) // 34)) * supersample
-            legend_spacing = int(legend_font * 1.55)
-            legend_rows = (len(legend) + legend_columns - 1) // legend_columns
-            column_width = max(
-                112,
-                max(int(len(entry_label) * legend_font * 0.62) + 26 for entry_label, _ in legend),
-            )
-            start_x = max(16, viewport_width - column_width * legend_columns - 16)
-            start_y = max(48, viewport_height - legend_spacing * legend_rows - 18)
-            for legend_index, (entry_label, entry_rgb) in enumerate(legend):
-                column = legend_index // legend_rows
-                legend_row = legend_index % legend_rows
-                entry = vtk.vtkTextActor()
-                entry.SetInput(f"■ {entry_label}")
-                entry.SetPosition(
-                    start_x + column * column_width,
-                    start_y + (legend_rows - legend_row - 1) * legend_spacing,
-                )
-                entry_prop = entry.GetTextProperty()
-                entry_prop.SetColor(float(entry_rgb[0]), float(entry_rgb[1]), float(entry_rgb[2]))
-                if style == "studio":
-                    entry_prop.SetBackgroundColor(0.02, 0.02, 0.04)
-                    entry_prop.SetBackgroundOpacity(0.72)
-                else:
-                    entry_prop.SetBackgroundColor(0.94, 0.96, 0.98)
-                    entry_prop.SetBackgroundOpacity(0.82)
-                entry_prop.SetFontSize(legend_font)
-                entry_prop.SetBold(True)
-                renderer.AddViewProp(entry)
-        window.AddRenderer(renderer)
-        _set_camera(renderer, elevation, azimuth, view_up=view_up)
-        if style == "studio":
-            # key/fill/rim derive from each panel's camera pose
-            _studio_lights(renderer)
-        if len(views) == 1 and zoom is not None:
-            renderer.GetActiveCamera().Zoom(float(zoom) / 4.0)
-            renderer.ResetCameraClippingRange()
-        if show_axes:
-            _add_corner_axes(window, renderer, (left, bottom, right, top), corner="bottom-right")
-        if callouts:
-            callout_renderers.append((renderer, index))
-    if legend and legend_panel:
-        panel = vtk.vtkRenderer()
-        panel.SetViewport(render_width / width, 0.0, 1.0, 1.0)
-        panel.SetBackground(0.0, 0.0, 0.0) if style == "studio" else panel.SetBackground(0.94, 0.96, 0.98)
-        panel.SetInteractive(False)
-        panel_font = max(12, min(20, height // 52)) * supersample
-        panel_spacing = int(panel_font * 1.55)
-        panel_rows = (len(legend) + legend_columns - 1) // legend_columns
-        panel_column_width = legend_panel_width / legend_columns
-        start_y = height - panel_spacing * 2
-        for legend_index, (entry_label, entry_rgb) in enumerate(legend):
-            column = legend_index // panel_rows
-            legend_row = legend_index % panel_rows
-            entry = vtk.vtkTextActor()
-            entry.SetInput(f"■ {entry_label}")
-            entry.SetPosition(
-                12 + column * panel_column_width,
-                start_y - legend_row * panel_spacing,
-            )
-            entry_prop = entry.GetTextProperty()
-            entry_prop.SetColor(float(entry_rgb[0]), float(entry_rgb[1]), float(entry_rgb[2]))
-            entry_prop.SetFontSize(panel_font)
-            entry_prop.SetBold(True)
-            panel.AddViewProp(entry)
-        window.AddRenderer(panel)
-
-    window.Render()
-    visible_span = 1.0
-    occlusion_locator = None
-    if callout_renderers and callouts:
-        bounds = base_polydata.GetBounds() if base_polydata is not None else (0.0,) * 6
-        visible_span = max(
-            bounds[1] - bounds[0], bounds[3] - bounds[2], bounds[5] - bounds[4], 1e-9
-        )
-    if callout_renderers and callouts:
-        vtk, _, _ = _vtk_modules()
-        combined = vtk.vtkAppendPolyData()
-        if base_polydata is not None:
-            combined.AddInputData(base_polydata)
-        for group in highlighted_groups or ():
-            combined.AddInputData(group[0])
-        if highlighted_edge_groups:
-            for group in highlighted_edge_groups:
-                combined.AddInputData(group[0])
-        combined.Update()
-        occlusion_locator = vtk.vtkCellLocator()
-        occlusion_locator.SetDataSet(combined.GetOutput())
-        occlusion_locator.BuildLocator()
-    for renderer, index in callout_renderers:
-        panel_callouts = (
-            _select_panel_callouts(renderer, callouts, occlusion_locator, datasets or {}, visible_span)
-            if occlusion_locator is not None
-            else [(entry[0], entry[1], entry[2]) for entry in (callouts or ())]
-        )
-        callout_resources.extend(
-            _add_geometry_callouts(
-                renderer,
-                panel_callouts,
-                font_size=max(
-                    18,
-                    min(28, min(width // columns, height // rows) // 30),
-                ),
-                viewport_size=(width // columns, height // rows),
-            )
-        )
-    if callout_renderers:
-        window.Render()
-    output = Path(output_path)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    if supersample > 1:
-        _write_window_supersampled(window, output, supersample)
-    else:
-        _write_window(window, output)
-    return output
 
 
-def _prepare_polydata_render(
-    base_polydata,
-    output_path: str | Path,
-    *,
-    title: str,
-    views: Sequence[tuple[float, float, str]],
-    image_size: tuple[float, float],
-    dpi: int,
-    context_opacity: float = 1.0,
-    highlight_edge_width: float = 4.5,
-    highlight_point_size: float = 15.0,
-    brep_edge_polydata=None,
-    highlighted_polydata=None,
-    highlighted_edge_polydata=None,
-    highlighted_point_polydata=None,
-    highlighted_groups=None,
-    highlighted_edge_groups=None,
-    highlighted_point_groups=None,
-    legend: Sequence[tuple[str, tuple[float, float, float]]] | None = None,
-    legend_columns: int = 1,
-    legend_panel: bool = False,
-    show_axes: bool = False,
-    callouts: Sequence[
-        tuple[str, tuple[float, float, float], tuple[float, float, float]]
-        | tuple[str, tuple[float, float, float], tuple[float, float, float], str | None]
-    ] | None = None,
-    edge_width_scale: float = 0.0019,
-    supersample: int = 1,
-    style: str = "standard",
-    zoom: float | None = None,
-    view_up: Sequence[float] | None = None,
-    datasets: Mapping[str, Any] | None = None,
-    worker_isolated: bool = False,
-) -> tuple[str, Any]:
-    """Validate inputs and build a render plan (no GL work on this thread).
-
-    Returns ``(kind, payload)`` for :func:`_execute_polydata_render`:
-    ``("in-process", ...)`` on non-macOS synchronous callers, or
-    ``("worker", ...)`` on macOS (native crash isolation) and whenever
-    ``worker_isolated`` is requested (callers rendering from a thread).
-    """
-    if not views:
-        raise ValueError("at least one render view is required")
-    if dpi < 1 or image_size[0] <= 0.0 or image_size[1] <= 0.0:
-        raise ValueError("image size and DPI must be greater than zero")
-    if highlight_edge_width <= 0.0:
-        raise ValueError("highlight_edge_width must be greater than zero")
-    if highlight_point_size <= 0.0:
-        raise ValueError("highlight_point_size must be greater than zero")
-    if legend_columns < 1:
-        raise ValueError("legend_columns must be at least one")
-    kwargs = {
-        "title": title,
-        "views": views,
-        "image_size": image_size,
-        "dpi": dpi,
-        "context_opacity": context_opacity,
-        "highlight_edge_width": highlight_edge_width,
-        "highlight_point_size": highlight_point_size,
-        "brep_edge_polydata": brep_edge_polydata,
-        "highlighted_polydata": highlighted_polydata,
-        "highlighted_edge_polydata": highlighted_edge_polydata,
-        "highlighted_point_polydata": highlighted_point_polydata,
-        "highlighted_groups": highlighted_groups,
-        "highlighted_edge_groups": highlighted_edge_groups,
-        "highlighted_point_groups": highlighted_point_groups,
-        "legend": legend,
-        "legend_columns": legend_columns,
-        "legend_panel": legend_panel,
-        "show_axes": show_axes,
-        "callouts": callouts,
-        "edge_width_scale": float(edge_width_scale),
-        "supersample": int(supersample),
-        "style": str(style),
-        "zoom": None if zoom is None else float(zoom),
-        "view_up": None if view_up is None else [float(value) for value in view_up],
-        "datasets": datasets,
-    }
-    if not worker_isolated and sys.platform != "darwin":
-        return (
-            "in-process",
-            (_render_polydata_views_in_process, base_polydata, output_path, kwargs),
-        )
-    datasets: dict[str, Any] = {
-        "base": base_polydata,
-        "brep_edges": brep_edge_polydata,
-        "highlighted": highlighted_polydata,
-        "highlighted_edges": highlighted_edge_polydata,
-        "highlighted_points": highlighted_point_polydata,
-    }
-    options: dict[str, Any] = {
-        "title": title,
-        "views": views,
-        "image_size": image_size,
-        "dpi": dpi,
-        "context_opacity": context_opacity,
-        "highlight_edge_width": highlight_edge_width,
-        "highlight_point_size": highlight_point_size,
-        "legend": legend,
-        "legend_columns": legend_columns,
-        "legend_panel": legend_panel,
-        "show_axes": show_axes,
-        "callouts": callouts,
-        "surface_groups": [],
-        "edge_groups": [],
-        "point_groups": [],
-        "edge_width_scale": float(edge_width_scale),
-        "supersample": int(supersample),
-        "style": str(style),
-        "zoom": None if zoom is None else float(zoom),
-        "view_up": None if view_up is None else [float(value) for value in view_up],
-    }
-    for option_name, groups in (
-        ("surface_groups", highlighted_groups or ()),
-        ("edge_groups", highlighted_edge_groups or ()),
-        ("point_groups", highlighted_point_groups or ()),
-    ):
-        for index, group in enumerate(groups):
-            name = f"{option_name}_{index}"
-            datasets[name] = group[0]
-            item = {"dataset": name, "color": group[1]}
-            if option_name == "surface_groups":
-                item["opacity"] = group[2]
-            options[option_name].append(item)
-    return ("worker", {"mode": "views", "output_path": output_path, "datasets": datasets, "options": options})
 
 
-def _execute_polydata_render(plan: tuple[str, Any]) -> Path:
-    """Execute a prepared render plan; thread-safe (no native imports).
-
-    ``plan`` is what :func:`_prepare_polydata_render` returned: either an
-    in-process render (non-macOS synchronous callers) or a crash-isolated
-    worker subprocess invocation (macOS, and any caller that must keep GL
-    work out of its own process — the diagnostic evidence channel, which
-    renders from a daemon thread).
-    """
-    kind, payload = plan
-    if kind == "worker":
-        return _run_render_worker(**payload)
-    function, base_polydata, output_path, render_kwargs = payload
-    return _render_in_process(function, base_polydata, output_path, **render_kwargs)
 
 
-def _render_polydata_views(
-    base_polydata,
-    output_path: str | Path,
-    *,
-    title: str,
-    views: Sequence[tuple[float, float, str]],
-    image_size: tuple[float, float],
-    dpi: int,
-    context_opacity: float = 1.0,
-    highlight_edge_width: float = 4.5,
-    highlight_point_size: float = 15.0,
-    brep_edge_polydata=None,
-    highlighted_polydata=None,
-    highlighted_edge_polydata=None,
-    highlighted_point_polydata=None,
-    highlighted_groups=None,
-    highlighted_edge_groups=None,
-    highlighted_point_groups=None,
-    legend: Sequence[tuple[str, tuple[float, float, float]]] | None = None,
-    legend_columns: int = 1,
-    legend_panel: bool = False,
-    show_axes: bool = False,
-    callouts: Sequence[
-        tuple[str, tuple[float, float, float], tuple[float, float, float]]
-        | tuple[str, tuple[float, float, float], tuple[float, float, float], str | None]
-    ] | None = None,
-    edge_width_scale: float = 0.0019,
-    supersample: int = 1,
-    style: str = "standard",
-    zoom: float | None = None,
-    view_up: Sequence[float] | None = None,
-    datasets: Mapping[str, Any] | None = None,
-) -> Path:
-    """Prepare and execute one multi-view render synchronously."""
-    return _execute_polydata_render(
-        _prepare_polydata_render(
-            base_polydata,
-            output_path,
-            title=title,
-            views=views,
-            image_size=image_size,
-            dpi=dpi,
-            context_opacity=context_opacity,
-            highlight_edge_width=highlight_edge_width,
-            highlight_point_size=highlight_point_size,
-            brep_edge_polydata=brep_edge_polydata,
-            highlighted_polydata=highlighted_polydata,
-            highlighted_edge_polydata=highlighted_edge_polydata,
-            highlighted_point_polydata=highlighted_point_polydata,
-            highlighted_groups=highlighted_groups,
-            highlighted_edge_groups=highlighted_edge_groups,
-            highlighted_point_groups=highlighted_point_groups,
-            legend=legend,
-            legend_columns=legend_columns,
-            legend_panel=legend_panel,
-            show_axes=show_axes,
-            callouts=callouts,
-            edge_width_scale=edge_width_scale,
-            supersample=supersample,
-            style=style,
-            zoom=zoom,
-            view_up=view_up,
-            datasets=datasets,
-        )
-    )
+
+
+
+
+
+
+
+
+
+
 def render_shape_views_rpath(
     shape: TopoDS_Shape,
     output_path: str | Path,
@@ -1808,20 +448,20 @@ def render_shape_views_rpath(
     ``show_brep_edges`` draws exact topological edges sampled from the BREP; it
     never exposes the internal triangle edges used by the GPU.
     """
-    base = _mesh_polydata([shape], linear_deflection, angular_deflection)
+    base = _mesh_geometry([shape], linear_deflection, angular_deflection)
     edges = (
-        _edge_polydata([shape], deflection=min(linear_deflection, _EDGE_DEFLECTION_CAP))
+        _edge_geometry([shape], deflection=min(linear_deflection, _EDGE_DEFLECTION_CAP))
         if show_brep_edges
         else None
     )
-    return _render_polydata_views(
+    return _render_views(
         base,
         output_path,
         title=title,
         views=views,
         image_size=image_size,
         dpi=dpi,
-        brep_edge_polydata=edges,
+        brep_edges=edges,
         supersample=2,
         style="standard",
     )
@@ -1906,28 +546,28 @@ def render_step_components_rpath(
     selected = _resolve_step_components(document, component_names)
     shapes = [record["shape"] for record in selected]
     selected_title = ", ".join(str(record["name"]) for record in selected)
-    selected_mesh = _mesh_polydata(shapes, linear_deflection, angular_deflection)
-    selected_edges = _edge_polydata(shapes, deflection=linear_deflection)
+    selected_mesh = _mesh_geometry(shapes, linear_deflection, angular_deflection)
+    selected_edges = _edge_geometry(shapes, deflection=linear_deflection)
     if with_context:
-        return _render_polydata_views(
-            _mesh_polydata([root], linear_deflection, angular_deflection),
+        return _render_views(
+            _mesh_geometry([root], linear_deflection, angular_deflection),
             output_path,
             title=title or f"{source.name} - {selected_title}",
             views=views,
             image_size=image_size,
             dpi=dpi,
             context_opacity=0.12,
-            highlighted_polydata=selected_mesh,
-            highlighted_edge_polydata=selected_edges,
+            highlighted=selected_mesh,
+            highlighted_edges=selected_edges,
         )
-    return _render_polydata_views(
+    return _render_views(
         selected_mesh,
         output_path,
         title=title or f"{source.name} - {selected_title}",
         views=views,
         image_size=image_size,
         dpi=dpi,
-        brep_edge_polydata=selected_edges,
+        brep_edges=selected_edges,
     )
 
 
@@ -2060,9 +700,8 @@ def render_entity_map_rpath(
     label_entries: list[
         tuple[str, str, tuple[float, float, float]]
     ] = []
-    callouts: list[
-        tuple[str, tuple[float, float, float], tuple[float, float, float]]
-    ] = []
+    callouts: list[tuple] = []
+    datasets: dict[str, Any] = {}  # canonical id -> its own geometry, where an occluded callout re-anchors
     for canonical, color, (kind, shape, descriptor) in zip(
         canonical_ids,
         _distinct_entity_colors(len(resolved)),
@@ -2071,30 +710,24 @@ def render_entity_map_rpath(
     ):
         anchor = _entity_anchor(descriptor)
         if kind == "face":
-            surface_groups.append(
-                (
-                    _mesh_polydata(
-                        [shape], linear_deflection, angular_deflection
-                    ),
-                    color,
-                    min(0.28, context_opacity),
-                )
-            )
-            edge_groups.append(
-                (_edge_polydata([shape], deflection=linear_deflection), color)
-            )
+            face_mesh = _mesh_geometry([shape], linear_deflection, angular_deflection)
+            surface_groups.append((face_mesh, color, min(0.28, context_opacity)))
+            edge_groups.append((_edge_geometry([shape], deflection=linear_deflection), color))
+            datasets[canonical] = face_mesh
         elif kind == "body":
-            edge_groups.append(
-                (_edge_polydata([shape], deflection=linear_deflection), color)
-            )
+            body_edges = _edge_geometry([shape], deflection=linear_deflection)
+            edge_groups.append((body_edges, color))
+            datasets[canonical] = body_edges
         elif kind == "edge":
-            edge_groups.append(
-                (_edge_polydata([shape], sample_count=edge_samples), color)
-            )
-        point_groups.append((_point_polydata([anchor]), color))
+            line_geometry = _edge_geometry([shape], sample_count=edge_samples)
+            edge_groups.append((line_geometry, color))
+            datasets[canonical] = line_geometry
+        anchor_points = _point_geometry([anchor])
+        point_groups.append((anchor_points, color))
+        datasets.setdefault(canonical, anchor_points)
         geometry_type = str(descriptor["geometry"]["type"])
         label_entries.append((canonical, geometry_type, color))
-        callouts.append((f"{canonical} · {geometry_type}", anchor, color))
+        callouts.append((f"{canonical} · {geometry_type}", anchor, color, canonical))
 
     effective_label_mode = (
         "callout" if label_mode == "auto" and len(resolved) <= max_callouts
@@ -2107,8 +740,8 @@ def render_entity_map_rpath(
         else None
     )
 
-    return _render_polydata_views(
-        _mesh_polydata([model.root], linear_deflection, angular_deflection),
+    return _render_views(
+        _mesh_geometry([model.root], linear_deflection, angular_deflection),
         output_path,
         legend_panel=effective_label_mode == "legend",
         title=title,
@@ -2116,7 +749,7 @@ def render_entity_map_rpath(
         image_size=image_size,
         dpi=dpi,
         context_opacity=context_opacity,
-        brep_edge_polydata=_edge_polydata([model.root], deflection=linear_deflection),
+        brep_edges=_edge_geometry([model.root], deflection=linear_deflection),
         highlighted_groups=surface_groups,
         highlighted_edge_groups=edge_groups,
         highlighted_point_groups=point_groups,
@@ -2125,6 +758,7 @@ def render_entity_map_rpath(
         legend=legend,
         legend_columns=legend_columns,
         callouts=callouts if effective_label_mode == "callout" else None,
+        datasets=datasets,
     )
 def render_entity_kind_maps_rpath(
     model_or_path: BRepModel | TopoDS_Shape | str | Path,
@@ -2297,17 +931,17 @@ def render_step_components_colored_rpath(
         for record in selector_to_records[str(selector).strip()]:
             shape = record["shape"]
             groups.append(
-                (_mesh_polydata([shape], linear_deflection, angular_deflection), rgb, 1.0)
+                (_mesh_geometry([shape], linear_deflection, angular_deflection), rgb, 1.0)
             )
-            edge_groups.append((_edge_polydata([shape], deflection=linear_deflection), rgb))
+            edge_groups.append((_edge_geometry([shape], deflection=linear_deflection), rgb))
         entry = (f"{str(selector).strip()} ({spec})", rgb)
         if show_legend and entry not in legend_seen:
             legend.append(entry)
             legend_seen.add(entry)
 
     if with_context:
-        return _render_polydata_views(
-            _mesh_polydata([root], linear_deflection, angular_deflection),
+        return _render_views(
+            _mesh_geometry([root], linear_deflection, angular_deflection),
             output_path,
             title=title or f"{source.name} - colored components",
             views=views,
@@ -2318,7 +952,7 @@ def render_step_components_colored_rpath(
             highlighted_edge_groups=edge_groups,
             legend=legend,
         )
-    return _render_polydata_views(
+    return _render_views(
         None,
         output_path,
         title=title or f"{source.name} - colored components",
@@ -2350,8 +984,8 @@ def render_step_views_rpath(
     if kwargs:
         unknown = ", ".join(sorted(kwargs))
         raise TypeError(f"Unexpected render options: {unknown}")
-    return _render_polydata_views(
-        _mesh_polydata(
+    return _render_views(
+        _mesh_geometry(
             [shape],
             linear_deflection,
             angular_deflection,
@@ -2362,8 +996,8 @@ def render_step_views_rpath(
         views=views,
         image_size=image_size,
         dpi=dpi,
-        brep_edge_polydata=(
-            _edge_polydata([shape], deflection=linear_deflection)
+        brep_edges=(
+            _edge_geometry([shape], deflection=linear_deflection)
             if show_brep_edges
             else None
         ),
@@ -2396,19 +1030,19 @@ def render_step_comparison_rpath(
     current_path = Path(current_step_path)
     target_shape = load_step_rshape(target_path)
     current_shape = load_step_rshape(current_path)
-    target_polydata = _mesh_polydata(
+    target_polydata = _mesh_geometry(
         [target_shape], linear_deflection, angular_deflection
     )
-    current_polydata = _mesh_polydata(
+    current_polydata = _mesh_geometry(
         [current_shape], linear_deflection, angular_deflection
     )
     target_edges = (
-        _edge_polydata([target_shape], deflection=linear_deflection)
+        _edge_geometry([target_shape], deflection=linear_deflection)
         if show_brep_edges
         else None
     )
     current_edges = (
-        _edge_polydata([current_shape], deflection=linear_deflection)
+        _edge_geometry([current_shape], deflection=linear_deflection)
         if show_brep_edges
         else None
     )
@@ -2426,47 +1060,17 @@ def render_step_comparison_rpath(
         float(maximum[2]),
     )
 
-    width = max(1, int(round(image_size[0] * dpi)))
-    height = max(1, int(round(image_size[1] * dpi)))
-    rows = len(views)
-    columns = 2
-    window = _offscreen_window(width, height)
-    vtk, _, _ = _vtk_modules()
-    models = (
-        ("Original", target_path.name, target_polydata, target_edges),
-        ("Reconstructed", current_path.name, current_polydata, current_edges),
+    return render_comparison(
+        (
+            ("Original", target_path.name, target_polydata, target_edges),
+            ("Reconstructed", current_path.name, current_polydata, current_edges),
+        ),
+        output_path,
+        views=views,
+        image_size=image_size,
+        dpi=dpi,
+        shared_bounds=shared_bounds,
     )
-    for row, (elevation, azimuth, view_title) in enumerate(views):
-        for column, (model_title, filename, polydata, edge_data) in enumerate(models):
-            left = column / columns
-            right = (column + 1) / columns
-            top = 1.0 - row / rows
-            bottom = 1.0 - (row + 1) / rows
-            renderer = vtk.vtkRenderer()
-            renderer.SetViewport(left, bottom, right, top)
-            renderer.GradientBackgroundOn()
-            renderer.SetBackground(0.94, 0.96, 0.98)
-            renderer.SetBackground2(0.78, 0.84, 0.90)
-            renderer.SetUseFXAA(True)
-            renderer.AddActor(_surface_actor(polydata, (0.55, 0.64, 0.73), 1.0))
-            if edge_data is not None:
-                renderer.AddActor(_line_actor(edge_data, (0.16, 0.21, 0.27), 1.0))
-            label = vtk.vtkTextActor()
-            label.SetInput(f"{model_title}: {filename}\n{view_title}")
-            label.SetPosition(14, 12)
-            text = label.GetTextProperty()
-            text.SetColor(0.08, 0.11, 0.15)
-            text.SetFontSize(max(13, min(width // columns, height // rows) // 34))
-            text.SetBold(True)
-            renderer.AddViewProp(label)
-            window.AddRenderer(renderer)
-            _set_camera(renderer, elevation, azimuth, shared_bounds)
-
-    window.Render()
-    output = Path(output_path)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    _write_window(window, output)
-    return output
 
 
 def render_region_rpath(
@@ -2531,26 +1135,26 @@ def render_region_rpath(
         for index in range(1, selected_faces.Extent() + 1)
     ]
     highlighted = (
-        _mesh_polydata(face_shapes, linear_deflection, angular_deflection)
+        _mesh_geometry(face_shapes, linear_deflection, angular_deflection)
         if face_shapes
         else None
     )
-    highlighted_edges = _edge_polydata(
+    highlighted_edges = _edge_geometry(
         selected_edges,
         sample_count=edge_samples,
     )
-    highlighted_points = _point_polydata(selected_points)
-    return _render_polydata_views(
-        _mesh_polydata([model.root], linear_deflection, angular_deflection),
+    highlighted_points = _point_geometry(selected_points)
+    return _render_views(
+        _mesh_geometry([model.root], linear_deflection, angular_deflection),
         output_path,
         title=f"{title} ({', '.join(selected_ids)})",
         views=views,
         image_size=image_size,
         dpi=dpi,
         context_opacity=0.18,
-        highlighted_polydata=highlighted,
-        highlighted_edge_polydata=highlighted_edges,
+        highlighted=highlighted,
+        highlighted_edges=highlighted_edges,
         highlight_edge_width=highlight_edge_width,
         highlight_point_size=highlight_point_size,
-        highlighted_point_polydata=highlighted_points,
+        highlighted_points=highlighted_points,
     )

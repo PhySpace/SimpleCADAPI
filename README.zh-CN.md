@@ -508,11 +508,8 @@ cell 已经记录进各自的 session，不要在 cell 里再开一个。它在�
 
 ## STEP/BREP 检查
 
-需要同步 STEP 视图、区域高亮或截面叠加时，安装可选渲染依赖：
-
-```bash
-pip install "simplecadapi[inspect]"
-```
+同步 STEP 视图、区域高亮和截面叠加不需要额外安装：`pip install simplecadapi` 即可，由内置软渲染绘制
+（不依赖 GPU、显示服务和 VTK）。只有工程图系列（`simplecadapi.inspect.drawing`）需要 `drawing` 额外依赖。
 
 检查 API 位于 `simplecadapi.inspect.brep`。它们是诊断工具，不是建模操作：不进入
 操作图，在 `GraphSession` 内调用会被拒绝。先导出或拿到几何，再在建模脚本之外

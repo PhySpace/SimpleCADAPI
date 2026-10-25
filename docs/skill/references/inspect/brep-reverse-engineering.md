@@ -249,12 +249,7 @@ both models to the union of their bounds so independent camera fitting cannot
 hide size or placement differences. The rendered image remains diagnostic and
 does not replace the strict BREP gate.
 
-On macOS the render functions offload drawing to an isolated worker process
-that may hit a rare native VTK crash under heavy system load. The SDK already
-retries such failures internally; if a render call still raises, the error is
-transient — retry the same call (ideally after a few seconds or once
-CPU-heavy work has finished). It does not mean the render interface is broken
-or unusable.
+The render functions draw with the SDK's own software renderer: they need no GPU, display server or VTK, and run in the calling process.
 
 After `compare_steps_rbrepcomparison(...)`, use
 `comparison.to_error_summary()` to collect every failed validity, bounds,

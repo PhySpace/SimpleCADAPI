@@ -34,6 +34,7 @@ dependencies = [
     "marimo>=0.25.0",
     "plotly>=7.1.0",
     "cryptography>=42.0.0",
+    "matplotlib>=3.7.0",
 ]
 
 [project.optional-dependencies]
@@ -53,11 +54,9 @@ editor = [
     "uvicorn>=0.54.0",
     "websockets>=16.1.1",
 ]
-inspect = [
-    "matplotlib>=3.7.0",
-    # BREP rendering (simplecadapi.inspect.brep): cadquery-ocp used to bring VTK in
-    "vtk>=9.3",
-]
+# simplecadapi.inspect.brep is part of the default install; this extra is kept empty so that
+# `pip install "simplecadapi[inspect]"` from older instructions still works.
+inspect = []
 whucad = [
     "h5py>=3.8",
 ]
@@ -157,7 +156,6 @@ dev = [
     "matplotlib>=3.10.8",
     "numpy-stl>=3.2.0",
     "trimesh>=4.11.3",
-    "vtk>=9.3",
     "datamodel-code-generator==0.32.0",
     "ty>=0.0.18",
 ]

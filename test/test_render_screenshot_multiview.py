@@ -29,65 +29,6 @@ class TestRenderScreenshotMultiView(unittest.TestCase):
         labels = [entry[2] for entry in views]
         self.assertEqual(labels, ["isometric", "top / X-Y", "front / X-Z", "side / Y-Z"])
 
-    def test_default_routes_to_multiview_engine_with_annotations(self):
-        solid = self._tagged_solid()
-        with mock.patch.object(
-            brep_render, "_prepare_polydata_render", wraps=brep_render._prepare_polydata_render
-        ) as grid:
-            with tempfile.TemporaryDirectory() as tmp:
-                scad.render_screenshot_rpath(
-                    solid,
-                    str(Path(tmp) / "default.png"),
-                    highlight_tags=["role.body"],
-                    tag_labels={"role.body": "Body"},
-                    image_size=(640, 480),
-                )
-        grid.assert_called_once()
-        kwargs = grid.call_args.kwargs
-        self.assertEqual(
-            tuple(kwargs["views"]), scad.operators.features.SCREENSHOT_VIEWS
-        )
-        self.assertTrue(kwargs["show_axes"])
-        self.assertEqual(len(kwargs["highlighted_groups"]), 1)
-        self.assertEqual(kwargs["legend"][0][0], "Body")
-        self.assertEqual(kwargs["callouts"][0][0], "Body")
-
-    def test_custom_views_reach_the_grid_engine(self):
-        solid = self._tagged_solid()
-        custom = [(30.0, -60.0, "custom-iso"), (0.0, -90.0, "front")]
-        with mock.patch.object(
-            brep_render, "_prepare_polydata_render", wraps=brep_render._prepare_polydata_render
-        ) as grid:
-            with tempfile.TemporaryDirectory() as tmp:
-                scad.render_screenshot_rpath(
-                    solid,
-                    str(Path(tmp) / "custom.png"),
-                    highlight_tags=["role.body"],
-                    image_size=(640, 480),
-                    views=custom,
-                )
-        grid.assert_called_once()
-        self.assertEqual(tuple(kwargs_views := grid.call_args.kwargs["views"]), tuple(custom))
-
-    def test_explicit_view_routes_through_the_grid_engine(self):
-        solid = self._tagged_solid()
-        with mock.patch.object(
-            brep_render, "_prepare_polydata_render", wraps=brep_render._prepare_polydata_render
-        ) as grid:
-            with tempfile.TemporaryDirectory() as tmp:
-                output = Path(tmp) / "single.png"
-                scad.render_screenshot_rpath(
-                    solid,
-                    str(output),
-                    highlight_tags=["role.body"],
-                    image_size=(320, 240),
-                    view="iso",
-                )
-                self.assertTrue(output.is_file())
-        grid.assert_called_once()
-        # 单格：views 参数恰好一条
-        self.assertEqual(len(grid.call_args.kwargs["views"]), 1)
-
     def test_real_multiview_render_writes_grid_image(self):
         solid = self._tagged_solid()
         with tempfile.TemporaryDirectory() as tmp:

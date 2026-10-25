@@ -15,6 +15,8 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   built by the release workflow against one static OpenCASCADE 7.9.3.
 
 ### Changed
+- `simplecadapi.inspect.brep` is part of the default install and renders with the built-in software renderer: VTK is no
+  longer needed, `matplotlib` is a core dependency, and the `inspect` extra is an empty alias.
 - The geometry engine is C++ on OpenCASCADE, shipped in the wheel as `simplecadapi._cpp`; one distribution, one
   import package. The public API is unchanged, and the previous test suite passes (three tests that relied on a dropped
   sliver of a tangent cut now use a tool clear of the wall).
