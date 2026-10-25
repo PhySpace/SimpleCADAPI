@@ -16,7 +16,8 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ### Changed
 - The geometry engine is C++ on OpenCASCADE, shipped in the wheel as `simplecadapi._cpp`; one distribution, one
-  import package. The public API and the previous test suite are unchanged.
+  import package. The public API is unchanged, and the previous test suite passes (three tests that relied on a dropped
+  sliver of a tangent cut now use a tool clear of the wall).
 - Every message the library writes is English; the tag-validation and semantic-query errors render in full with
   possible causes and fixes.
 - macOS wheels require macOS 14 or later.
