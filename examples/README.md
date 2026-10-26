@@ -51,6 +51,7 @@ uv run python examples/four_bar_linkage/export.py     # package + exchange files
 | `integrated_bldc_joint_actuator/` | product (sub-assembly notebooks) | `integrated_bldc_joint_actuator.py` | `export_all.py`, `render_showcase.py` | `integrated_bldc_joint_actuator.scadpkg` + STEP/FCStd/MJCF + renders |
 | `ap242_gmsh_volume_mesh/` | FEM / data exchange | `bracket.py` | see below | AP242 + Gmsh volume mesh + CalculiX statics |
 | `bowl_connector/` | reverse engineering | — | Re-mode workspace in the unified Web Editor | rebuild artifacts under `re_work/` |
+| `step_reconstruction_loft_sweep/` | STEP reverse engineering | `l1.py`, `s1.py`, `p1.py` | `analyze.py`, then `reconstruct.py` | analysis reports, candidate STEP, comparison and per-feature verdicts |
 | `histcad_demo/` | translation demos | — | `uv run python examples/histcad_demo/<script>.py` | per-dialect FTC script + render |
 | `demo_kit/` | infra | — | — | shared single-file demo builder (`build_demo.py`) |
 

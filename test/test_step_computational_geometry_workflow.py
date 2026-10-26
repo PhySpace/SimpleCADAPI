@@ -336,6 +336,21 @@ def test_reconstruction_runs_analysis_prelude_before_feature_inference():
     assert "Inventory the target economically" not in text
 
 
+def test_reconstruction_requires_report_evidence_and_per_feature_acceptance():
+    workflow = _read(SKILL / "references" / "workflows" / "step-reconstruction.md")
+    r0 = workflow[workflow.index("### R0:") : workflow.index("### R1:")]
+    r3 = workflow[workflow.index("### R3:") : workflow.index("### R4:")]
+    r5 = workflow[workflow.index("### R5:") : workflow.index("### R6:")]
+    r6 = workflow[workflow.index("### R6:") : workflow.index("### R7:")]
+    r7 = workflow[workflow.index("### R7:") : workflow.index("## Validation gates")]
+    assert "read `parse-report.md` in full" in r0
+    assert "analysis-evidence.md" in r0 and "every catalog `feature_id`" in r0
+    assert "analysis-evidence.md" in r3
+    assert "For each `feature_id`" in r5
+    assert "try another supported operation" in r6
+    assert "every in-scope recognized feature" in r7
+
+
 def test_reconstruction_r0_lists_hard_and_soft_gates():
     text = _read(SKILL / "references" / "workflows" / "step-reconstruction.md")
     prose = re.sub(r"\s+", " ", text.replace("`", ""))

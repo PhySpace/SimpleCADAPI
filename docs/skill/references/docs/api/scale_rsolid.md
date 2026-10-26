@@ -1,11 +1,21 @@
 # scale_rsolid
 
+## API Definition
+
 ```python
 def scale_rsolid(solid: Solid, factors: Sequence[float], center: Sequence[float] = (0, 0, 0)) -> Solid
 ```
 
-Scale a solid along the current coordinate system's axes about `center`.
-The three factors must be finite and nonzero. Uniform scaling preserves
-analytic curves and surfaces; nonuniform scaling uses the CAD kernel's
-general affine transform. The source stays unchanged. Records a replayable
-`make_scale_rsolid` operation. Topology tag lineage is conservatively partial.
+*Source: operators/deformation.py*
+
+## Import Surface
+
+- top-level: `from simplecadapi import scale_rsolid`
+
+## Description
+
+Scale along current coordinate-system axes about an explicit center.
+
+Every factor must be finite and nonzero. A uniform scale preserves analytic
+geometry; a nonuniform scale converts curves/surfaces where the kernel needs
+it. The input is unchanged and this operation is recorded for graph replay.

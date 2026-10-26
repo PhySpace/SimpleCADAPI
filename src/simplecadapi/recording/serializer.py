@@ -426,7 +426,7 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
     "offset_rsolid": {"status": "replayable", "op": "make_offset_rsolid"},
     "boolean_rsolidlist": {"status": "replayable", "op": "make_boolean_rsolidlist"},
     "extrude_taper_rsolid": {"status": "replayable", "op": "make_extrude_taper_rsolid"},
-    "sweep_multisection_rsolid": {"status": "replayable", "op": "make_sweep_multisection_rsolid"},
+    "loft_multisection_rsolid": {"status": "replayable", "op": "make_loft_multisection_rsolid"},
     "extrude_until_rsolid": {"status": "replayable", "op": "make_extrude_until_rsolid"},
     "draft_rsolid": {"status": "replayable", "op": "make_draft_rsolid"},
     "mirror_shape": {"status": "replayable", "op": "make_mirror_rshape"},
@@ -610,7 +610,7 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "make_offset_rsolid",
     "make_boolean_rsolidlist",
     "make_extrude_taper_rsolid",
-    "make_sweep_multisection_rsolid",
+    "make_loft_multisection_rsolid",
     "make_extrude_until_rsolid",
     "make_draft_rsolid",
     "make_mirror_rshape",
@@ -3956,15 +3956,15 @@ def _execute_graph(
                             _store_outputs(node, result)
                         continue
 
-                    if op_name == "make_sweep_multisection_rsolid":
+                    if op_name == "make_loft_multisection_rsolid":
                         ctx.require_params(node.node_id, op_name, params, ("profile_count", "is_frenet"))
                         count = int(params["profile_count"])
                         values = _feature_input_shapes(ctx, graph, outputs, node, params)
                         expected = count + 1 + int(bool(params.get("binormal_is_wire")))
                         if len(values) != expected:
-                            ctx.fail(f"Graph node '{node.node_id}' requires {expected} ordered sweep inputs")
+                            ctx.fail(f"Graph node '{node.node_id}' requires {expected} ordered loft inputs")
                         binormal = values[count + 1] if params.get("binormal_is_wire") else params.get("binormal")
-                        result = ops.sweep_multisection_rsolid(profiles=values[:count], path=values[count],
+                        result = ops.loft_multisection_rsolid(profiles=values[:count], path=values[count],
                             is_frenet=params["is_frenet"], binormal=binormal)
                         _store_outputs(node, result)
                         continue

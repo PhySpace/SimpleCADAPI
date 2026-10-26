@@ -195,7 +195,7 @@ class TraceReplayer:
                 binormal = p.get('binormal')
                 if isinstance(binormal, dict):
                     raise ValueError('multisection sweep binormal wire missing from portable trace')
-                self.lines.append(f'    {var} = [scad.sweep_multisection_rsolid(profiles=[{", ".join(refs)}], path={path_expr}, is_frenet={frenet!r}, binormal={fmt_literal(binormal)})]')
+                self.lines.append(f'    {var} = [scad.loft_multisection_rsolid(profiles=[{", ".join(refs)}], path={path_expr}, is_frenet={frenet!r}, binormal={fmt_literal(binormal)})]')
             else:
                 if p.get('mode') is not None or str(p.get('transition', 'TRANSFORMED')) != 'TRANSFORMED':
                     raise ValueError('sweep mode/transition needs a native advanced sweep operator')

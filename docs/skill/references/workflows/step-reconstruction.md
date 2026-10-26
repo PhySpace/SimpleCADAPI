@@ -6,6 +6,12 @@ For evidence and local visual artifacts without reconstruction, see
 `step-reconstruction-geometry-guide-cn.md`). Use the modeling operations and
 validation rules in this upstream workflow.
 
+Three whole-body loft/sweep examples with saved report gates, candidate
+iterations, and visual previews are in
+`references/docs/guides/step-reconstruction-loft-sweep-cases.md` (relative to
+the skill root). Load that guide when the target has the corresponding
+whole-body feature; keep this workflow's gates authoritative.
+
 Rebuild an editable SimpleCAD model from an existing STEP file. The first
 stage always runs the complete computational-geometry analysis as a prelude;
 feature-tree inference, candidate construction, and tiered acceptance consume
@@ -35,10 +41,12 @@ optional_domains:
 artifacts:
   - analysis package from the prelude (analysis/)
   - feature-tree hypothesis with provenance rows
+  - analysis-evidence.md mapping every recognized feature to a candidate operation
   - candidate source and replayed model
   - comparison evidence and acceptance verdict
 validation_gates:
   - prelude package passes the R0 hard gates
+  - analysis report is read and every recognized feature has an evidence row before candidate construction
   - replay succeeds in a fresh process
   - STEP roundtrip of the candidate validates
   - acceptance follows the hierarchy (topology identity > float drift > justified stop)
@@ -102,6 +110,8 @@ Hard gate (any failure means rerun Phase 1-9; never patch a stale package):
   SHA-256;
 - the catalog carries `coverage`, and every face it reports as owned by no
   feature is listed in `unresolved-features.md`.
+- `parse-report.md` contains exactly one feature heading for each catalog
+  `feature_id`.
 
 Soft gate: under `complete_with_gaps`, skipped per-feature visuals or
 sections and `incomplete` loft/sweep entries do not block R1 when each is
@@ -112,9 +122,16 @@ into R1 as lowered confidence and report it in R7.
 A package from an earlier `analysis_only` run may be reused when every hard
 gate passes; record its original path in `reconstruction/` as reused.
 
-Then load `feature-index.json`, `reconstruction-hypotheses.json`,
-`loft-sweep-specialist.json`, `section-index.json`, `parse-report.md`, and
-`unresolved-features.md`.
+Before R1 or any candidate construction, read `parse-report.md` in full, then
+load `feature-index.json`, `reconstruction-hypotheses.json`,
+`loft-sweep-specialist.json`, `section-index.json`, and
+`unresolved-features.md`. Write `reconstruction/analysis-evidence.md` with one
+row for every catalog `feature_id`: report claim, category/subtype, location and
+dimensions, confidence, supporting section or entity IDs, proposed operation,
+and a check that could falsify it. List unresolved faces and soft gaps there as
+well. If the report and catalog conflict, inspect the target and resolve the
+conflict before R1. A passing package hash alone does not satisfy this read
+gate. Do not start R3 until the evidence rows cover the entire catalog.
 
 ### R1: Turn geometric evidence into a feature tree
 
@@ -124,13 +141,14 @@ Infer feature families from the catalog, sections, and carrier behavior
 ```text
 shared axis + rotational sections       -> revolve
 stable translated profile               -> extrude
-profile transported along a path        -> sweep
-ordered changing section family         -> loft
+unchanged profile transported on a path -> sweep
+ordered changing section family         -> loft (with or without a path)
 verified equal angular/linear units     -> one unit + pattern
 several local signatures                -> ordered mixed feature tree
 ```
 
-Record a provenance row per region: observed boundary, adjacent-carrier
+Use the analysis-evidence rows to choose the first candidate's operations and
+parameters. Record a provenance row per region: observed boundary, adjacent-carrier
 evidence, catalog `feature_id`, proposed operation, direction/axis/path,
 confidence, and the check that could falsify it. A loop on a final planar face
 may be a later hole or pocket, not part of the base profile. Every entry in
@@ -149,7 +167,8 @@ lost constraint and the check that will measure its effect.
 
 ### R3: Build the minimal candidate
 
-Build via `single-part-modeling.md` (block structure per
+Build the initial candidate from `analysis-evidence.md` via
+`single-part-modeling.md` (block structure per
 `discipline/feature-tree-convention.md`; sketch tier when constraints
 represent the evidence (`domains/sketch-and-features.md`), direct geometry
 tier for non-planar or exact transcription, annotated `profile=geometry`
@@ -174,13 +193,20 @@ Use `domains/step-inspection.md`:
 (birth/death/split/merge) is the open question,
 `fit_face_analytic_rdescriptor` to test carrier families,
 `render_step_comparison_rpath` for shared-view visual evidence.
+For each `feature_id` in `feature-index.json`, compare the target region with
+the corresponding candidate region using the feature's dimensions, section
+shape, location, adjacency, and material role. Record `built_and_matched`,
+`built_but_mismatched`, or `not_built` with the evidence. A global comparison
+cannot stand in for this feature-by-feature check.
 
 ### R6: Iterate from the error
 
-After a failed strict comparison, group causes with
-`BRepComparison.to_error_summary()`, fix related groups together, and rerun a
-fresh cycle: return to R1 to change a feature hypothesis or to R3 to change
-parameters.
+After a failed feature check or strict comparison, group causes with
+`BRepComparison.to_error_summary()` where available. Correct an evidenced
+parameter error first; if the chosen operation still fails to reproduce the
+reported feature, return to R1/R2 and try another supported operation. Record
+why the prior operation failed and how the replacement uses the analysis
+evidence, then rerun a fresh R3-R5 cycle.
 
 ### R7: Accept and deliver
 
@@ -188,6 +214,11 @@ Accept per the hierarchy (`domains/step-inspection.md`): topology identity is
 the endpoint; float-level serialization drift is acceptable; a structurally
 different but visually close stop requires recorded evidence that no better
 feature order exists or the SDK lacks the operation.
+The feature checklist must have an outcome for every recognized `feature_id`.
+Acceptance requires every in-scope recognized feature to be
+`built_and_matched`; any `built_but_mismatched` or `not_built` entry blocks
+acceptance unless its unsupported or unresolved limitation is explicitly
+justified under the hierarchy and reported as incomplete reconstruction.
 
 ## Validation gates
 
@@ -196,6 +227,8 @@ feature order exists or the SDK lacks the operation.
 - Preserve the best valid candidate; repeated non-improvement changes the
   feature hypothesis instead of blind parameter tuning.
 - Global similarity never overrides a locally falsified feature.
+- The feature checklist covers every catalog feature exactly once and cites
+  target and candidate evidence for each verdict.
 
 ## Failure routes
 
@@ -210,9 +243,10 @@ feature order exists or the SDK lacks the operation.
 
 ## Deliverables
 
-The analysis package path, candidate source path, replay evidence, comparison
-evidence with verdict and its acceptance tier, provenance rows, and explicitly
-unrecovered regions with their reasons, including every soft-gate gap.
+The analysis package path, `analysis-evidence.md`, candidate source path,
+replay evidence, per-feature checklist, comparison evidence with verdict and
+its acceptance tier, provenance rows, and explicitly unrecovered regions with
+their reasons, including every soft-gate gap.
 
 **Required reading before authoring or editing any part source in this
 workflow:** `discipline/feature-tree-convention.md` — the block-structured

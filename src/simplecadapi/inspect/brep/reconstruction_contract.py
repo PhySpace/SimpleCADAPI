@@ -80,6 +80,28 @@ def _operation_candidates(
                 }
             )
     else:
+        if (
+            strategy == "path_constrained"
+            and result_kind == "solid"
+            and (specialist.get("spine") or {}).get("recommended")
+        ):
+            candidates.append(
+                {
+                    "operation": "path_loft",
+                    "api": "loft_multisection_rsolid",
+                    "capability": (
+                        "emulated" if unsupported_boundary_conditions else "native"
+                    ),
+                    "score": 1.0,
+                    "parameters": {"is_frenet": False},
+                    "path_evidence": specialist.get("spine"),
+                    "unsupported_parameters": unsupported_boundary_conditions,
+                    "rejection_reason": (
+                        "path loft cannot enforce explicit endpoint continuity"
+                        if unsupported_boundary_conditions else None
+                    ),
+                }
+            )
         candidates.append(
             {
                 "operation": "section_loft",
@@ -145,6 +167,10 @@ def build_reconstruction_contract(
     path_proxy_required = (
         category == "loft"
         and specialist.get("construction_strategy") == "path_constrained"
+        and (
+            specialist.get("result_kind", "solid") != "solid"
+            or not (specialist.get("spine") or {}).get("recommended")
+        )
     )
     roi_face_ids = sorted(
         {
@@ -178,6 +204,8 @@ def build_reconstruction_contract(
         "reconstruction_support": (
             "emulated"
             if boundary_proxy_required or path_proxy_required
+            else recommended["capability"]
+            if recommended is not None and recommended["operation"] == "path_loft"
             else specialist.get("reconstruction_support", "unsupported")
         ),
         "result_kind": specialist.get("result_kind", "solid"),
@@ -245,7 +273,7 @@ def build_reconstruction_contract(
             "fitted paths and guides are reconstruction hypotheses unless marked explicit_brep",
             "boundary magnitude is kernel-specific when identifiability is low",
             "multi-rail guide constraints require a separate validated surface-network implementation",
-            "upstream loft does not support a path constraint or explicit endpoint continuity",
+            "path loft supports ordered solid sections and one path, but not explicit endpoint continuity",
         ],
     }
 

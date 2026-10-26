@@ -62,7 +62,8 @@ consult their own documentation before the first call.
   `make_cylindrical_surface_rface`.
 - Features: `extrude_rsolid`, `revolve_rsolid`, `sweep_rsolid`,
   `twisted_sweep_rsolid` (supports inner-wire profiles), `helical_sweep_rsolid`,
-  `loft_rsolid`, `loft_rshell`, `shell_rsolid`.
+  `loft_rsolid`, `loft_rshell`, `loft_multisection_rsolid` (varying sections
+  along a path), `shell_rsolid`.
 - Detail: `fillet_rsolid`, `chamfer_rsolid`.
 
 ## Boolean discipline

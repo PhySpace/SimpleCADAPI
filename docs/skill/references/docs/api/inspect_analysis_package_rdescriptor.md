@@ -22,7 +22,8 @@ and never reruns recognition. Hard failures mean the package must be
 regenerated; soft gaps are budget-skipped per-feature visuals or
 sections and ``incomplete`` loft/sweep specialist entries declared under
 ``complete_with_gaps``. Every face the catalog's ``coverage`` reports as
-unowned must be listed in ``unresolved-features.md``.
+unowned must be listed in ``unresolved-features.md``. The parse report
+must contain one feature heading per catalog feature.
 
 ## Parameters
 

@@ -76,6 +76,11 @@ Read exactly one workflow first, per the user's goal:
 | Produce a GB engineering drawing (DXF) from validated geometry | `references/workflows/engineering-drawing.md` |
 | Rebuild a 3D model from a vector-PDF engineering drawing | `references/workflows/drawing-reconstruction.md` |
 
+For a whole-body loft or sweep STEP reconstruction, after selecting the STEP
+reconstruction workflow, use its three worked cases in
+`references/docs/guides/step-reconstruction-loft-sweep-cases.md` as examples.
+They do not replace the workflow's analysis and acceptance gates.
+
 Do not present route-choice menus when a row already matches: profile,
 strategy, and tool choices inside a route belong to that workflow's
 own gates, not to an up-front question. A missing prerequisite — state

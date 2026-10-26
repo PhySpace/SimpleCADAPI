@@ -1,4 +1,4 @@
-"""Recorded tapered extrusions and sweeps with multiple explicit sections."""
+"""Recorded tapered extrusions and path-constrained lofts."""
 from __future__ import annotations
 
 import math
@@ -101,21 +101,22 @@ def extrude_taper_rsolid(
                    {"vector": vector, "taper": taper, "flip_inner": flip_inner}, [profile])
 
 
-def sweep_multisection_rsolid(
+def loft_multisection_rsolid(
     profiles: Sequence[Face | Wire],
     path: Wire,
     is_frenet: bool = False,
     binormal: Sequence[float] | Wire | None = None,
 ) -> Solid:
-    """Sweep through explicit ordered section wires along a continuous path.
+    """Loft ordered, varying sections along a continuous path.
 
-    Face sections use their outer boundary, as in build123d's multi-section
-    pipe contract. Binormal may be a direction vector or auxiliary spine.
-    Each supplied section and path remains a graph input for replay.
+    Face sections use their outer boundary. Binormal may be a direction vector
+    or one auxiliary spine. Explicit endpoint continuity and multiple boundary
+    rails are not supported. Each supplied section, path, and auxiliary spine
+    remains a graph input for replay.
     """
     sections = list(profiles)
     if len(sections) < 2:
-        raise ValueError("multi-section sweep requires at least two sections")
+        raise ValueError("path loft requires at least two sections")
     builder = BRepOffsetAPI_MakePipeShell(path.wrapped)
     rotate = False
     if isinstance(binormal, Wire):
@@ -136,7 +137,7 @@ def sweep_multisection_rsolid(
         builder.Add(wire, False, rotate)
     builder.Build()
     if not builder.IsDone() or not builder.MakeSolid():
-        raise ValueError("kernel could not make a solid multi-section sweep")
+        raise ValueError("kernel could not make a solid path loft")
     inputs = [*sections, path]
     params = {"profile_count": len(sections), "is_frenet": bool(is_frenet), "binormal": None}
     if isinstance(binormal, Wire):
@@ -144,7 +145,7 @@ def sweep_multisection_rsolid(
         params["binormal_is_wire"] = True
     elif binormal is not None:
         params["binormal"] = binormal
-    return _finish(sections[0], builder.Shape(), "make_sweep_multisection_rsolid", params, inputs)
+    return _finish(sections[0], builder.Shape(), "make_loft_multisection_rsolid", params, inputs)
 
 
-__all__ = ("extrude_taper_rsolid", "sweep_multisection_rsolid")
+__all__ = ("extrude_taper_rsolid", "loft_multisection_rsolid")

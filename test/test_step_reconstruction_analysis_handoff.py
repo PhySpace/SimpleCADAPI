@@ -102,6 +102,9 @@ def _build_package(target: Path, package: Path, config: dict = CONFIG) -> dict:
     package.mkdir(parents=True)
     for name in PACKAGE_TEXT_FILES:
         (package / name).write_text(f"# {name}\n", encoding="utf-8")
+    with (package / "parse-report.md").open("a", encoding="utf-8") as stream:
+        for feature in features:
+            stream.write(f"\n## {feature['feature_id']}\n")
     with (package / "unresolved-features.md").open("a", encoding="utf-8") as stream:
         for face_id in catalog["coverage"]["unowned_face_ids"]:
             stream.write(f"- `{face_id}` owned by no feature\n")
@@ -348,6 +351,18 @@ def test_file_changed_after_sealing_blocks_reconstruction(hole_package):
         stream.write("edited after the manifest\n")
 
     assert "manifest_hash_mismatch" in _codes(_check(package, target))
+
+
+def test_report_missing_recognized_feature_blocks_reconstruction(hole_package):
+    target, package, catalog = hole_package
+    feature_id = catalog["features"][0]["feature_id"]
+    report = package / "parse-report.md"
+    report.write_text(report.read_text(encoding="utf-8").replace(
+        f"## {feature_id}", "## omitted"
+    ), encoding="utf-8")
+    _write_manifest(package, _read_json(package / "feature-index.json")["target_sha256"])
+
+    assert "parse_report_feature_missing" in _codes(_check(package, target))
 
 
 def test_missing_file_blocks_reconstruction(hole_package):

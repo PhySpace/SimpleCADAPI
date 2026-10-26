@@ -22,6 +22,10 @@ DEFAULT_SOURCE_FILENAMES: tuple[str, ...] = (
     "operators/sketch.py",
     "operators/selection.py",
     "operators/features.py",
+    "operators/section_features.py",
+    "operators/deformation.py",
+    "operators/draft.py",
+    "operators/limited_extrusion.py",
     "ql.py",
     "recording/serializer.py",
     "math.py",
@@ -106,6 +110,10 @@ FULL_PUBLIC_FUNCTION_MODULES = frozenset(
 
 EXPORTED_FUNCTION_MODULES = frozenset(
     {
+        "operators/section_features.py",
+        "operators/deformation.py",
+        "operators/draft.py",
+        "operators/limited_extrusion.py",
         "recording/serializer.py",
         "recording/graph.py",
         "params/expr.py",

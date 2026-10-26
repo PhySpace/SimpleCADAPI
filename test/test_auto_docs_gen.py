@@ -136,6 +136,13 @@ class TestAutoDocsGenPathResolution(unittest.TestCase):
             names = {api.name for api in generator.extract_apis()}
             for name in (
                 "capture",
+                "loft_multisection_rsolid",
+                "extrude_taper_rsolid",
+                "extrude_until_rsolid",
+                "draft_rsolid",
+                "scale_rsolid",
+                "offset_rsolid",
+                "transform_rsolid",
                 "CaptureResult",
                 "assemble",
                 "file_input",
@@ -147,6 +154,7 @@ class TestAutoDocsGenPathResolution(unittest.TestCase):
             ):
                 self.assertIn(name, names)
             self.assertNotIn("snapshot_file_inputs", names)
+            self.assertNotIn("sweep_multisection_rsolid", names)
             self.assertNotIn("OperationCacheReport", names)
             self.assertNotIn("operation_cache_scope", names)
             self.assertNotIn("operation_cache_report", names)

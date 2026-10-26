@@ -361,7 +361,7 @@ class TestCoverageMatrix(unittest.TestCase):
             "make_transform_rsolid",
             "make_offset_rsolid",
             "make_extrude_taper_rsolid",
-            "make_sweep_multisection_rsolid",
+            "make_loft_multisection_rsolid",
             "make_extrude_until_rsolid",
             "make_draft_rsolid",
             "make_boolean_rsolidlist",

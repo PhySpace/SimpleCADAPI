@@ -257,11 +257,14 @@ requests, operation candidates, capability state, preflight checks, fallback
 order, and limitations. Preserve `specialist_trigger.decision`; an incomplete
 specialist result must not erase the coarse candidate.
 
-Operation candidates describe what the upstream modeling API can currently
-build. `loft_rsolid` and `loft_rshell` accept ordered sections and `ruled`, but
-cannot enforce a recovered path or endpoint continuity. Mark such a proposal
-`emulated` and retain the path and conditions as evidence; do not suggest a
-multi-section sweep operation that is absent from the upstream API.
+Operation candidates describe what the modeling API can currently build.
+`loft_rsolid` and `loft_rshell` accept ordered sections and `ruled`, but not a
+path. For varying solid sections with a recovered path, use
+`loft_multisection_rsolid`; it accepts one path and an optional binormal
+direction or auxiliary spine. It cannot enforce explicit endpoint continuity
+or multiple boundary rails. Keep unsupported conditions as evidence and mark
+the proposal `emulated` when they affect the result. A rigid section carried
+along a path is a sweep; varying sections are a loft.
 
 Each subtype lists its dimensions directly with units. A non-applicable value
 says `not_applicable`; an unmeasurable value is `null` with
@@ -345,8 +348,8 @@ not a missing feature.
 
 ### Phase 9: Write the per-instance report, manifest, and stop
 
-Write `parse-report.md` with category/subtype counts and exactly one section
-per feature. Each section directly lists type, body, location/direction,
+Write `parse-report.md` with category/subtype counts and exactly one Markdown
+heading containing the `feature_id` per feature. Each section directly lists type, body, location/direction,
 dimensions with units, topology, evidence, confidence, clickable relative
 visuals, and limitations. Write `artifact-manifest.json` with relative path,
 role, bytes, SHA-256, and target hash. Set `run-status.json` to `complete`,

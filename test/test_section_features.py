@@ -25,20 +25,26 @@ def test_tapered_rectangle_and_graph_replay():
     assert replayed.get_volume() == pytest.approx(expected, rel=1e-8)
 
 
-def test_multisection_straight_sweep_and_replay():
+def test_multisection_path_loft_and_replay():
     with s.GraphSession(graph_id="multi") as session:
         sections = [_rectangle(0), _rectangle(3), _rectangle(6)]
         path = s.make_segment_rwire(start=(5, 3, 0), end=(5, 3, 6))
-        body = s.sweep_multisection_rsolid(profiles=sections, path=path)
+        body = s.loft_multisection_rsolid(profiles=sections, path=path)
         session.capture_result(value=body)
     assert body.get_volume() == pytest.approx(360, rel=1e-6)
-    replayed = s.replay_model_json(s.export_model_json(session=session), strict=True)[0]
+    payload = s.export_model_json(session=session)
+    assert 'make_loft_multisection_rsolid' in payload
+    replayed = s.replay_model_json(payload, strict=True)[0]
     assert replayed.get_volume() == pytest.approx(360, rel=1e-6)
 
 
 def test_multisection_needs_two_sections():
     with pytest.raises(ValueError):
-        s.sweep_multisection_rsolid(profiles=[_rectangle(0)], path=s.make_segment_rwire(start=(0, 0, 0), end=(0, 0, 3)))
+        s.loft_multisection_rsolid(profiles=[_rectangle(0)], path=s.make_segment_rwire(start=(0, 0, 0), end=(0, 0, 3)))
+
+
+def test_multisection_sweep_name_is_not_public():
+    assert not hasattr(s, "sweep_multisection_rsolid")
 
 
 def test_invalid_taper_is_rejected():
@@ -86,7 +92,7 @@ def test_multisection_uses_ordered_slots_from_one_boundary_node():
         boundaries = s.free_boundaries_rwirelist(shell)
         assert len(boundaries) == 2
         path = s.make_segment_rwire(start=(0, 0, 0), end=(0, 0, 6))
-        body = s.sweep_multisection_rsolid(profiles=list(reversed(boundaries)), path=path)
+        body = s.loft_multisection_rsolid(profiles=list(reversed(boundaries)), path=path)
         session.capture_result(value=body)
     replayed = s.replay_model_json(s.export_model_json(session=session), strict=True)[0]
     assert replayed.get_volume() == pytest.approx(body.get_volume(), rel=1e-7)

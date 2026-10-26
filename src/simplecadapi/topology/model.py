@@ -668,7 +668,7 @@ def _node_display_category(op: str) -> str:
         "make_twisted_sweep_rsolid",
         "make_extrude_taper_rsolid",
         "make_extrude_until_rsolid",
-        "make_sweep_multisection_rsolid",
+        "make_loft_multisection_rsolid",
     }:
         return "feature"
     if op in {

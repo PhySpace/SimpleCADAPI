@@ -179,9 +179,12 @@ manifest 必须位于用户指定的绝对输出目录内。没有输出目录�
    写进 `unresolved-features.md`。任一不符就重跑 Phase 1-9，不做局部修补。
    软门禁：`run-status.json` 为 `complete_with_gaps` 时，缺图或缺剖面的实例和
    专项复核 `incomplete` 的实例可以进入阶段 3，但置信度降级并在交付时说明。
-3. 读取 `feature-index.json`、`reconstruction-hypotheses.json`、
-   `loft-sweep-specialist.json`、`section-index.json`、`parse-report.md` 和
-   `unresolved-features.md`。
+3. **在构建任何候补之前，完整读取** `parse-report.md`，并读取
+   `feature-index.json`、`reconstruction-hypotheses.json`、
+   `loft-sweep-specialist.json`、`section-index.json` 和
+   `unresolved-features.md`。在 `reconstruction/analysis-evidence.md` 中逐项记录
+   每个识别特征的 `feature_id`、类别、位置/尺寸、置信度、报告证据、拟采用的操作
+   及待验证点。报告与目录不一致时先复核目标，不能直接构建候补。
 4. 解析包回答不了的具体问题，再按 `references/domains/step-inspection.md`
    直接检查目标，并遵守由便宜到昂贵的顺序：只有选定实体后才请求完整曲线或
    曲面定义；大型控制点、节点矢量和采样数组直接保存到 `reconstruction/`。
@@ -189,12 +192,14 @@ manifest 必须位于用户指定的绝对输出目录内。没有输出目录�
 **产物**
 
 - 通过 R0 的解析包（路径记录在 `reconstruction/` 中）；
+- 构建候补前完成的 `reconstruction/analysis-evidence.md`；
 - 有明确用途的补充实体、邻接、边界和截面证据；
 - 待解释区域清单（含 `unresolved-features.md` 和软门禁缺口）。
 
 **通过门禁**
 
 - 解析包通过全部硬门禁；
+- 解析报告已经完整读取，证据表覆盖目录中的每个 `feature_id`；
 - 后续每个特征假设都有目标证据；
 - 目录条目只作为证据；缺失、冲突或非强置信度的条目回到实体、邻接、边界和截面
   检查，不能直接变成推断出的建模操作；
@@ -210,13 +215,14 @@ manifest 必须位于用户指定的绝对输出目录内。没有输出目录�
 
 **动作**
 
-按 `references/docs/guides/reconstruction-agent-strategy.md` 推断特征族：
+从 `analysis-evidence.md` 出发，按
+`references/docs/guides/reconstruction-agent-strategy.md` 推断特征族：
 
 ```text
 共享轴线并呈旋转截面         -> revolve
 截面沿固定方向稳定平移       -> extrude
-轮廓沿路径传送               -> sweep
-有序且持续变化的截面         -> loft
+不变轮廓沿路径传送           -> sweep
+有序且持续变化的截面         -> loft（可有路径）
 已验证的等角度或等间距重复   -> 一个母特征 + pattern
 多个局部几何信号             -> 有序混合特征树
 ```
@@ -227,10 +233,10 @@ manifest 必须位于用户指定的绝对输出目录内。没有输出目录�
 最简单受支持操作选择：
 
 ```text
-刚性截面 + 恢复路径                 -> sweep_rsolid
+不变截面 + 恢复路径                 -> sweep_rsolid
 可变截面、不要求路径                 -> loft_rsolid / loft_rshell
-可变截面 + 恢复路径                  -> loft_rsolid / loft_rshell 近似，路径保留为证据
-一条控制朝向的辅助脊线               -> 上游接口暂不支持标架约束
+可变实体截面 + 恢复路径              -> loft_multisection_rsolid
+一条控制朝向的辅助脊线               -> loft_multisection_rsolid 的 binormal
 多条强制边界导轨                     -> 已验证曲面网络，否则 unsupported
 ```
 
@@ -293,9 +299,9 @@ sketch -> basic body operation -> boolean -> modifier
 - 布尔失败时修复操作数、相交关系或特征顺序，不把跳过的布尔称为成功。
 
 每次调用放样前，检查截面顺序、闭合、朝向及拓扑兼容性。站位非单调或相邻截面
-法向相反时先修复参数，不能反复调用内核碰运气。上游 `loft_rsolid` 与
-`loft_rshell` 接受有序截面和 `ruled`，不接受路径或辅助脊线约束。若恢复路径
-对结果有影响，必须将仅按截面放样的结果标为近似，并与目标对比验证。
+法向相反时先修复参数，不能反复调用内核碰运气。`loft_rsolid` 与
+`loft_rshell` 只接受有序截面和 `ruled`；变截面实体需要路径时使用
+`loft_multisection_rsolid`。若改用不带路径的放样，必须标为近似并与目标对比。
 
 当前 section loft 后端不能可移植地执行端部切向、拔模角、曲率或影响幅值条件。
 应保留端部条件的识别证据，并明确选择近似方案或 unsupported，不能静默丢弃。
@@ -381,9 +387,13 @@ solid/shell 与 ruled/smooth 的选择
 - `fit_face_analytic_rdescriptor`：验证解析载体假设；
 - `render_step_comparison_rpath`：提供共同视角的人工复核图。
 
-渲染图只用于复核，不能替代严格比较。严格比较失败后，用
-`BRepComparison.to_error_summary()` 按共同根因分组，修复对应的上游特征，然后回到
-阶段 4，重新构建、审计、重放、roundtrip 和比较。
+对 `feature-index.json` 中每个 `feature_id`，用目标与候补的区域证据核对尺寸、
+位置、截面、邻接和加料/减料关系。逐项记为 `built_and_matched`、
+`built_but_mismatched` 或 `not_built`，并附对比依据。渲染图只用于复核，
+不能替代严格比较。某操作构建效果不好时，先检查参数；若仍无法重现报告中的
+特征，则根据解析证据尝试另一种受支持操作，记录原操作失败的原因，再重做
+阶段 4 起的构建与验证。严格比较失败时可用
+`BRepComparison.to_error_summary()` 按共同根因分组。
 
 每次尝试记录：
 
@@ -403,6 +413,7 @@ roundtrip 有效，并记录候补 SHA-256。其他情况只能记为 `failed_at
 
 - 迭代日志；
 - 各层比较报告；
+- 覆盖全部识别特征的逐项核对表；
 - 通过哈希绑定的最佳有效候补。
 
 **通过门禁**
@@ -410,6 +421,10 @@ roundtrip 有效，并记录候补 SHA-256。其他情况只能记为 `failed_at
 - 当前候补满足阶段 1 定义的验收标准；或
 - 已有足够证据按本文验收层级停止；或
 - 只有目标样条面仍失败，并满足进入受控回退评估的前提。
+
+核对表必须对每个识别出的特征给出结论。范围内的特征均为
+`built_and_matched` 才能判定完整重建；其余状态须说明不支持或未解决的原因，
+按验收层级作为不完整重建交付。
 
 始终保留最佳有效候补。一次参数修正可以沿用当前构造策略；连续没有改善时必须
 修改特征假设，不能盲目枚举参数。全局相似不能推翻局部已经证伪的特征。
@@ -475,7 +490,8 @@ roundtrip 有效，并记录候补 SHA-256。其他情况只能记为 `failed_at
    缺少所需操作，并明确记录差异和未恢复区域时才可交付；
 4. **仅视觉接近**：不能通过验收。
 
-无论采用哪个层级，最终重建程序都必须通过真实建模操作门禁。
+无论采用哪个层级，最终重建程序都必须通过真实建模操作门禁，且逐项核对表
+覆盖解析报告识别出的全部特征。
 
 ## 八、失败后的处理
 
@@ -498,6 +514,7 @@ roundtrip 有效，并记录候补 SHA-256。其他情况只能记为 `failed_at
 ### 9.1 必须交付
 
 - 前置解析包路径（`analysis/`）及其 `run-status.json` 状态；
+- `analysis-evidence.md` 和逐项特征核对表；
 - 最终 SimpleCADAPI 重建源码；
 - API 生成的 model JSON；
 - 拓扑有序的操作序列，其中至少一个结果可达的 `constructive_modeling` 操作；

@@ -203,3 +203,23 @@ def test_three_section_smooth_polygon_loft_is_not_called_ruled():
     assert {
         condition["type"] for condition in contract["boundary_conditions"].values()
     } != {"implied_by_ruled"}
+
+
+def test_path_constrained_variable_sections_recommend_path_loft():
+    from simplecadapi.inspect.brep.reconstruction_contract import build_reconstruction_contract
+
+    contract = build_reconstruction_contract(
+        category="loft",
+        geometry={
+            "section_family": {"stations": [{}, {}]},
+            "specialist_analysis": {
+                "construction_strategy": "path_constrained",
+                "result_kind": "solid",
+                "spine": {"recommended": {"curve_type": "BSPLINE"}},
+                "boundary_conditions": {},
+            },
+        },
+    )
+    assert contract["recommended_operation"]["api"] == "loft_multisection_rsolid"
+    assert contract["reconstruction_support"] == "native"
+    assert contract["exactness"] == "tolerance_fit"

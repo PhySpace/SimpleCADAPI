@@ -338,6 +338,34 @@ def _check_unowned_faces_listed(
         )
 
 
+def _check_parse_report_features(
+    root: Path,
+    catalog: Mapping[str, Any] | None,
+    failures: list[dict[str, Any]],
+) -> None:
+    path = root / "parse-report.md"
+    if catalog is None or not path.is_file():
+        return
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except UnicodeDecodeError:
+        failures.append(_issue("invalid_text", "parse-report.md is not UTF-8"))
+        return
+    headings = [line for line in lines if re.match(r"^#{2,6}\s+", line)]
+    for feature in catalog.get("features", ()):
+        feature_id = str(feature.get("feature_id", ""))
+        pattern = rf"(?<![A-Za-z0-9_:-]){re.escape(feature_id)}(?![A-Za-z0-9_:-])"
+        matches = sum(bool(re.search(pattern, heading)) for heading in headings)
+        if feature_id and matches != 1:
+            failures.append(
+                _issue(
+                    "parse_report_feature_missing",
+                    f"parse-report.md must have one heading for {feature_id}",
+                    feature_id=feature_id,
+                )
+            )
+
+
 def _collect_gaps(
     status: Mapping[str, Any] | None,
     visual_index: Mapping[str, Any] | None,
@@ -432,7 +460,8 @@ def inspect_analysis_package_rdescriptor(
     regenerated; soft gaps are budget-skipped per-feature visuals or
     sections and ``incomplete`` loft/sweep specialist entries declared under
     ``complete_with_gaps``. Every face the catalog's ``coverage`` reports as
-    unowned must be listed in ``unresolved-features.md``.
+    unowned must be listed in ``unresolved-features.md``. The parse report
+    must contain one feature heading per catalog feature.
 
     Parameters
     ----------
@@ -490,6 +519,9 @@ def inspect_analysis_package_rdescriptor(
             root, documents.get("artifact-manifest.json"), failures
         )
         _check_unowned_faces_listed(
+            root, documents.get("feature-index.json"), failures
+        )
+        _check_parse_report_features(
             root, documents.get("feature-index.json"), failures
         )
         gaps = _collect_gaps(

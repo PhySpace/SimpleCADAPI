@@ -204,9 +204,13 @@ that establishes:
    package. Soft gate: under `complete_with_gaps`, features with skipped
    visuals or sections, or `incomplete` specialist entries, may enter Phase 3
    with lowered confidence and are reported at delivery.
-3. Load `feature-index.json`, `reconstruction-hypotheses.json`,
-   `loft-sweep-specialist.json`, `section-index.json`, `parse-report.md`, and
-   `unresolved-features.md`.
+3. Before building a candidate, read `parse-report.md` in full, then load
+   `feature-index.json`, `reconstruction-hypotheses.json`,
+   `loft-sweep-specialist.json`, `section-index.json`, and
+   `unresolved-features.md`. Write `reconstruction/analysis-evidence.md` with
+   one row per recognized `feature_id`: report claim, category, location,
+   dimensions, confidence, supporting evidence, proposed operation, and a
+   falsification check. Resolve report/catalog conflicts before construction.
 4. For a specific question the package does not answer, inspect the target
    directly through `references/domains/step-inspection.md`, least to most
    expensive: request complete curve or surface definitions only for selected
@@ -248,8 +252,8 @@ families:
 ```text
 shared axis + rotational sections        -> revolve
 stable profile translated in one direction -> extrude
-profile transported along a path         -> sweep
-ordered continuously changing sections   -> loft
+unchanged profile transported on a path  -> sweep
+ordered continuously changing sections   -> loft (with or without a path)
 verified equal angular or linear spacing  -> one seed feature + pattern
 several local geometric signatures        -> ordered mixed feature tree
 ```
@@ -261,10 +265,10 @@ The specialist result is evidence, not executable history. Choose the least
 complex supported operation that explains the ROI:
 
 ```text
-rigid profile + recovered path                 -> sweep_rsolid
+unchanged profile + recovered path             -> sweep_rsolid
 variable profiles, no required path            -> loft_rsolid / loft_rshell
-variable profiles + recovered path             -> loft_rsolid / loft_rshell as an approximation; path remains evidence
-one auxiliary orientation spine                -> unsupported as a frame constraint in the upstream API
+variable solid profiles + recovered path       -> loft_multisection_rsolid
+one auxiliary orientation spine                -> loft_multisection_rsolid binormal
 multiple boundary guides                       -> validated surface network, otherwise unsupported
 ```
 
@@ -346,9 +350,11 @@ During construction:
 Before every loft call, inspect section order, closure, orientation, and
 compatible topology. Treat non-monotonic stations or opposed section normals
 as repair tasks, not kernel trial-and-error. The upstream API accepts ordered
-sections and `ruled` for `loft_rsolid` or `loft_rshell`; it does not accept a
-path or auxiliary spine constraint. If the recovered path matters, mark a
-section-only loft as an approximation and verify it against the target.
+sections and `ruled` for `loft_rsolid` or `loft_rshell`; they do not accept a
+path. `loft_multisection_rsolid` accepts varying solid sections, one path,
+and an optional binormal direction or auxiliary spine. If the recovered path
+matters but a section-only loft is used, mark it as an approximation and
+verify it against the target.
 
 Endpoint tangent, draft-angle, curvature, and magnitude constraints are not
 portable in the upstream section-loft backend. Keep such conditions as evidence
@@ -446,10 +452,14 @@ Use these diagnostics when needed:
 - `fit_face_analytic_rdescriptor` to test analytic-carrier hypotheses;
 - `render_step_comparison_rpath` for human review under a shared view.
 
-Renders are review evidence, not a substitute for strict comparison. After a
-strict comparison fails, use `BRepComparison.to_error_summary()` to group
-likely common causes, repair the owning upstream features, and return to Phase
-4 for a fresh build, audit, replay, roundtrip, and comparison.
+For every recognized `feature_id`, compare the candidate region with the
+report's dimensions, location, sections, adjacency, and material role. Record
+`built_and_matched`, `built_but_mismatched`, or `not_built` with evidence.
+Renders are review evidence, not a substitute for strict comparison. If a
+candidate operation gives a poor match, check its parameters and then try a
+different supported operation grounded in the analysis. Record why the first
+operation failed and rerun Phase 4 onward. Use
+`BRepComparison.to_error_summary()` to group strict-comparison failures.
 
 Record every attempt with:
 
@@ -567,7 +577,10 @@ higher-tier gate failure:
 4. **Visual similarity only**: not acceptable.
 
 The final reconstruction program must pass the actual-modeling-operation gate
-at every acceptance tier.
+at every acceptance tier. The feature checklist must cover every recognized
+feature; complete reconstruction requires every in-scope feature to be
+`built_and_matched`. Explain unsupported or unresolved entries as incomplete
+reconstruction.
 
 ## 8. Failure routes
 
@@ -591,6 +604,7 @@ at every acceptance tier.
 
 - the prelude analysis package path (`analysis/`) and its `run-status.json`
   status;
+- `analysis-evidence.md` and the per-feature comparison checklist;
 - final SimpleCADAPI reconstruction source;
 - API-produced model JSON;
 - topologically ordered operation sequence containing at least one

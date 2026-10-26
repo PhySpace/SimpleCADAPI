@@ -1,13 +1,21 @@
 # extrude_taper_rsolid
 
+## API Definition
+
 ```python
-def extrude_taper_rsolid(profile: Face, vector: Sequence[float],
-    taper: float, flip_inner: bool = True) -> Solid
+def extrude_taper_rsolid(profile: Face, vector: Sequence[float], taper: float, flip_inner: bool = True) -> Solid
 ```
 
-Extrude a planar sketch face by a nonzero vector, in current coordinate-system
-coordinates. The finite taper angle is in degrees and must lie strictly between
--90 and 90. Positive taper shrinks the outer section; inner loops taper in the
-opposite direction when `flip_inner=True`. Uses an analytic draft prism where
-applicable and exact offset sections with lofts otherwise. Raises on collapsed
-loops or invalid topology. Records `make_extrude_taper_rsolid` for replay.
+*Source: operators/section_features.py*
+
+## Import Surface
+
+- top-level: `from simplecadapi import extrude_taper_rsolid`
+
+## Description
+
+Extrude a planar face by a vector, with a taper in degrees.
+
+Positive taper shrinks the outer section. Inner loops optionally taper in
+the opposite direction. Analytic draft prisms are retained where valid;
+other orientations/holes use exact offset wire sections and solid lofts.
