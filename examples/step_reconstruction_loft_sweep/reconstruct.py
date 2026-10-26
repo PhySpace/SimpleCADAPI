@@ -193,20 +193,50 @@ def reconstruct_case(case: str) -> dict:
             candidate, prefix.with_name(prefix.name + "-roundtrip.step"),
             protected_input_paths=(target,),
         )
-        comparison = brep.compare_steps_rbrepcomparison(target, candidate)
+        try:
+            material = brep.compare_material_rdescriptor(
+                target, candidate, include_components=True,
+            )
+        except (RuntimeError, ValueError) as exc:
+            material = {
+                "boolean_result_valid": False,
+                "strict_equality_supported": False,
+                "error": str(exc),
+            }
+        _write_json(prefix.with_name(prefix.name + "-material.json"), material)
+        material_proven = (
+            material["boolean_result_valid"]
+            and material["strict_equality_supported"]
+            and material["missing_material"]["volume"] < 1.0e-9
+            and material["excess_material"]["volume"] < 1.0e-9
+        )
+        try:
+            comparison = brep.compare_steps_rbrepcomparison(target, candidate)
+        except (RuntimeError, ValueError) as exc:
+            iteration_log.append({
+                "attempt": number, "hypothesis": operation["api"], "reason": reason,
+                "overrides": overrides, "fresh_package_replay": True,
+                "roundtrip_passed": roundtrip["passed"],
+                "material_proven": material_proven,
+                "strict_passed": False, "strict_error": str(exc),
+                "package": package.name, "candidate": candidate.name,
+            })
+            continue
         comparison.write_json(prefix.with_name(prefix.name + "-comparison.json"))
         comparison.write_error_summary_json(prefix.with_name(prefix.name + "-errors.json"))
         iteration_log.append({
             "attempt": number, "hypothesis": operation["api"], "reason": reason,
             "overrides": overrides, "fresh_package_replay": True,
             "roundtrip_passed": roundtrip["passed"],
+            "material_proven": material_proven,
+            "material_boolean_valid": material["boolean_result_valid"],
             "strict_passed": comparison.hard_gate_passed,
             "target_minus_candidate_volume": comparison.target_minus_candidate_volume,
             "candidate_minus_target_volume": comparison.candidate_minus_target_volume,
             "geometry_labelled_topology_matched": comparison.geometry_labelled_incidence_graph_isomorphic,
             "package": package.name, "candidate": candidate.name,
         })
-        if roundtrip["passed"] and comparison.hard_gate_passed:
+        if roundtrip["passed"] and material_proven and comparison.hard_gate_passed:
             winner = candidate
             break
     _write_json(reconstruction / "iterations.json", iteration_log)

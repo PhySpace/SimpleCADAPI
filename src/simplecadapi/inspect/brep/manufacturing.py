@@ -750,7 +750,11 @@ def _chamfer_hints(
                     ),
                 }
             )
-            if fact["type"] == "PLANE" and fact["normal"] is not None:
+            if (
+                fact["type"] == "PLANE"
+                and fact["normal"] is not None
+                and len(fact.get("edges", ())) >= 4
+            ):
                 candidates = []
                 for neighbor_id in fact["neighbors"]:
                     if neighbor_id not in body_faces:

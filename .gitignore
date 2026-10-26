@@ -1,5 +1,6 @@
 # Python-generated files
 __pycache__/
+.pytest_cache/
 *.py[oc]
 /build/
 dist/
@@ -12,6 +13,7 @@ wheels/
 .env
 
 output/
+/out/
 
 # Sandbox artifacts
 sandbox/

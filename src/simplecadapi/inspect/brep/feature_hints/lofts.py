@@ -9,6 +9,7 @@ from .loft_sweep_specialist import analyze_loft_sweep_family
 from .ruled_sides import side_faces_are_ruled
 from .section_families import (
     local_section_families,
+    variable_section_evidence,
     whole_body_point_families,
     whole_body_section_families,
 )
@@ -60,17 +61,22 @@ def loft_hints(
         if point_families is None
         else point_families
     )
+    variation = [
+        variable_section_evidence(model, facts, family) for family in section_families
+    ]
     rigid_bodies = {
-        family["body_id"] for family in section_families if family["rigid_profile"]
+        family["body_id"]
+        for family, spacing_change in zip(section_families, variation)
+        if family["rigid_profile"] and spacing_change is None
     }
-    for family in section_families:
-        if family["rigid_profile"]:
+    for family, spacing_change in zip(section_families, variation):
+        if family["rigid_profile"] and spacing_change is None:
             continue
         if family["body_id"] in rigid_bodies:
             continue
         section_family = family["section_family"]
         safe = section_family["tracking"]["summary"]["single_loft_safe"]
-        if not safe:
+        if not safe and spacing_change is None:
             diagnostics.append(
                 {
                     "code": "loft.section_topology_change",
@@ -91,7 +97,15 @@ def loft_hints(
         specialist = analyze_loft_sweep_family(
             model,
             facts,
-            family,
+            (
+                {
+                    **family,
+                    "rigid_profile": False,
+                    "variable_section_evidence": spacing_change,
+                }
+                if spacing_change
+                else family
+            ),
             linear_tolerance=float(tolerances["linear"]),
             angular_tolerance_degrees=float(tolerances["angular_degrees"]),
             feature_family="loft",
@@ -100,7 +114,7 @@ def loft_hints(
         )
         level = (
             "strong"
-            if section_family["actual_intermediate_section_count"] >= 2
+            if safe and section_family["actual_intermediate_section_count"] >= 2
             else "medium"
         )
         geometry = {
@@ -109,7 +123,12 @@ def loft_hints(
             "region_role": family["region_role"],
             "terminal_kind": "profile",
             "interpolation": interpolation,
-            "variation_law": _variation_law(family),
+            "variation_law": (
+                "corner_spacing"
+                if spacing_change and family["rigid_profile"]
+                else _variation_law(family)
+            ),
+            "variable_section_evidence": spacing_change,
             "start_face_id": family["start_face_id"],
             "end_face_id": family["end_face_id"],
             "side_face_ids": family["side_face_ids"],
@@ -140,13 +159,21 @@ def loft_hints(
                         ],
                     ),
                     evidence(
-                        "loft.non_rigid_endpoint_profiles",
+                        (
+                            "loft.variable_longitudinal_spacing"
+                            if spacing_change
+                            else "loft.non_rigid_endpoint_profiles"
+                        ),
                         entity_ids_value=[
                             family["start_face_id"],
                             family["end_face_id"],
                         ],
-                        observed=family["alignment"],
-                        criterion={"minimum_rigid_error": family["rigid_error_limit"]},
+                        observed=spacing_change or family["alignment"],
+                        criterion=(
+                            {"minimum_median_relative_change": 0.15}
+                            if spacing_change
+                            else {"minimum_rigid_error": family["rigid_error_limit"]}
+                        ),
                     ),
                     evidence(
                         "loft.actual_section_flow",
@@ -166,16 +193,21 @@ def loft_hints(
                                 for item in section_family["stations"]
                             ],
                         },
-                        criterion={"single_loft_safe": True},
+                        criterion={"single_loft_safe": True} if safe else {},
+                        required=safe,
                     ),
                 ],
             }
         )
     for family in local_values:
-        if family["rigid_profile"]:
+        spacing_change = variable_section_evidence(model, facts, family)
+        if family["rigid_profile"] and spacing_change is None:
             continue
         section_family = family["section_family"]
-        if not section_family["tracking"]["summary"]["single_loft_safe"]:
+        if (
+            not section_family["tracking"]["summary"]["single_loft_safe"]
+            and spacing_change is None
+        ):
             diagnostics.append(
                 {
                     "code": "loft.local_section_topology_change",
@@ -201,7 +233,15 @@ def loft_hints(
         specialist = analyze_loft_sweep_family(
             model,
             facts,
-            family,
+            (
+                {
+                    **family,
+                    "rigid_profile": False,
+                    "variable_section_evidence": spacing_change,
+                }
+                if spacing_change
+                else family
+            ),
             linear_tolerance=float(tolerances["linear"]),
             angular_tolerance_degrees=float(tolerances["angular_degrees"]),
             feature_family="loft",
@@ -222,7 +262,12 @@ def loft_hints(
                     "region_role": family["region_role"],
                     "terminal_kind": "profile",
                     "interpolation": interpolation,
-                    "variation_law": _variation_law(family),
+                    "variation_law": (
+                        "corner_spacing"
+                        if spacing_change and family["rigid_profile"]
+                        else _variation_law(family)
+                    ),
+                    "variable_section_evidence": spacing_change,
                     "start_face_id": family["start_face_id"],
                     "end_face_id": family["end_face_id"],
                     "side_face_ids": family["side_face_ids"],
@@ -235,7 +280,8 @@ def loft_hints(
                 },
                 "confidence": confidence(
                     "strong"
-                    if section_family["actual_intermediate_section_count"] >= 2
+                    if section_family["tracking"]["summary"]["single_loft_safe"]
+                    and section_family["actual_intermediate_section_count"] >= 2
                     else "medium"
                 ),
                 "evidence": [
@@ -248,10 +294,15 @@ def loft_hints(
                         ],
                     ),
                     evidence(
-                        "loft.local_non_rigid_section_flow",
+                        (
+                            "loft.variable_longitudinal_spacing"
+                            if spacing_change
+                            else "loft.local_non_rigid_section_flow"
+                        ),
                         entity_ids_value=family["entity_ids"],
                         observed={
                             "alignment": family["alignment"],
+                            "variable_section_evidence": spacing_change,
                             "tracking_summary": section_family["tracking"]["summary"],
                             "stations": [
                                 {
@@ -262,7 +313,11 @@ def loft_hints(
                                 for item in section_family["stations"]
                             ],
                         },
-                        criterion={"minimum_rigid_error": family["rigid_error_limit"]},
+                        criterion=(
+                            {"minimum_median_relative_change": 0.15}
+                            if spacing_change
+                            else {"minimum_rigid_error": family["rigid_error_limit"]}
+                        ),
                     ),
                 ],
             }

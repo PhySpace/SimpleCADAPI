@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import simplecadapi as scad
 from simplecadapi.inspect import brep
 
@@ -70,3 +72,78 @@ def test_scaled_profiles_are_not_mislabeled_as_sweep():
     second = scad.make_rectangle_rwire(3.0, 7.0, center=(1.0, 0.5, 10.0))
     shape = scad.loft_rsolid([first, second])
     assert _sweep_hints(shape) == []
+
+
+def test_matching_end_caps_do_not_hide_variable_middle_sections():
+    def circle(x, z, slope):
+        length = math.hypot(1.0, slope)
+
+        def point(angle):
+            return (
+                x - 10.0 * slope / length * math.sin(angle),
+                10.0 * math.cos(angle),
+                z + 10.0 / length * math.sin(angle),
+            )
+
+        edges = []
+        for index in range(4):
+            angle = -3.0 * math.pi / 4.0 + index * math.pi / 2.0
+            edges.append(
+                scad.make_three_point_arc_redge(
+                    start=point(angle),
+                    middle=point(angle + math.pi / 4.0),
+                    end=point(angle + math.pi / 2.0),
+                )
+            )
+        return scad.make_wire_from_edges_rwire(edges=edges)
+
+    def rectangle(x):
+        return scad.make_polyline_rwire(
+            points=[
+                (x - 15.0, -20.0, 0.0),
+                (x + 15.0, -20.0, 0.0),
+                (x + 15.0, 20.0, 0.0),
+                (x - 15.0, 20.0, 0.0),
+            ],
+            closed=True,
+        )
+
+    profiles = [
+        rectangle(-135),
+        circle(-55, 180, 0.8),
+        circle(55, 180, -0.8),
+        rectangle(135),
+    ]
+    path = scad.make_interpolated_spline_rwire(
+        points=[
+            (-135, 0, 0),
+            (-100, 0, 100),
+            (-55, 0, 180),
+            (0, 0, 190),
+            (55, 0, 180),
+            (100, 0, 100),
+            (135, 0, 0),
+        ]
+    )
+    shape = scad.loft_multisection_rsolid(profiles=profiles, path=path)
+    report = brep.inspect_manufacturing_hints_rdescriptor(
+        shape.wrapped, feature_kinds=("loft", "sweep")
+    )
+
+    assert any(item["kind"] == "loft_region_candidate" for item in report["hints"])
+    assert not any(item["kind"] == "sweep_region_candidate" for item in report["hints"])
+    assert any(
+        item["code"] == "sweep.variable_section_spacing"
+        for item in report["diagnostics"]
+    )
+    catalog = brep.inspect_geometric_features_rdescriptor(
+        shape.wrapped, feature_kinds=("loft", "sweep")
+    )
+    feature = catalog["features"][0]
+    assert feature["category"] == "loft"
+    assert feature["reconstruction"]["recommended_operation"]["api"] == (
+        "loft_multisection_rsolid"
+    )
+    assert feature["reconstruction"]["spine"]["source"] == (
+        "averaged_longitudinal_guides"
+    )

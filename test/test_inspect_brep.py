@@ -600,6 +600,21 @@ def test_strict_cut_is_configured_before_one_build(monkeypatch):
     ]
 
 
+def test_strict_cut_does_not_accept_an_invalid_boolean_result(monkeypatch):
+    class InvalidResult:
+        def __init__(self, shape):
+            pass
+
+        def IsValid(self):
+            return False
+
+    monkeypatch.setattr(compare_module, "BRepCheck_Analyzer", InvalidResult)
+    shape = _box().wrapped
+
+    with pytest.raises(RuntimeError, match="invalid shape"):
+        compare_module._cut_volume(shape, shape, None)
+
+
 def test_compare_detects_same_geometry_with_different_topology():
     full_circle = scad.make_cylinder_rsolid(radius=1.0, height=2.0)
     two_arcs = _two_arc_cylinder()

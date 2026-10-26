@@ -10,7 +10,11 @@ import numpy as np
 from .common import confidence, entity_ids, evidence, unit, vector
 from .loft_sweep_specialist import analyze_loft_sweep_family
 from .profiles import local_axes, sample_edge_points
-from .section_families import local_section_families, whole_body_section_families
+from .section_families import (
+    local_section_families,
+    variable_section_evidence,
+    whole_body_section_families,
+)
 
 
 def _helix_fit(points: np.ndarray) -> dict[str, Any] | None:
@@ -143,7 +147,19 @@ def sweep_hints(
     for family in whole_values:
         if not family["rigid_profile"] or family["pure_translation"]:
             continue
+        section_family = family["section_family"]
         helix_fit, longitudinal_edge_ids = _longitudinal_helix(model, facts, family)
+        variable_section = variable_section_evidence(model, facts, family)
+        if helix_fit is None and variable_section is not None:
+            diagnostics.append(
+                {
+                    "code": "sweep.variable_section_spacing",
+                    "body_id": family["body_id"],
+                    "entity_ids": family["entity_ids"],
+                    "observed": variable_section,
+                }
+            )
+            continue
         alignment = family["alignment"]
         chord_direction = unit(family["path_chord"])
         start_normal = unit(facts[family["start_face_id"]]["normal"])
@@ -158,7 +174,6 @@ def sweep_hints(
             form = "twisted_sweep"
         else:
             form = "whole_body_path_sweep"
-        section_family = family["section_family"]
         strong_sections = section_family["actual_intermediate_section_count"] >= 2
         specialist = analyze_loft_sweep_family(
             model,
@@ -258,7 +273,19 @@ def sweep_hints(
     for family in local_values:
         if not family["rigid_profile"] or family["pure_translation"]:
             continue
+        section_family = family["section_family"]
         helix_fit, longitudinal_edge_ids = _longitudinal_helix(model, facts, family)
+        variable_section = variable_section_evidence(model, facts, family)
+        if helix_fit is None and variable_section is not None:
+            diagnostics.append(
+                {
+                    "code": "sweep.variable_section_spacing",
+                    "body_id": family["body_id"],
+                    "entity_ids": family["entity_ids"],
+                    "observed": variable_section,
+                }
+            )
+            continue
         alignment = family["alignment"]
         chord_direction = unit(family["path_chord"])
         start_normal = unit(facts[family["start_face_id"]]["normal"])
@@ -277,7 +304,6 @@ def sweep_hints(
                 if family["region_role"] == "additive"
                 else "local_swept_cut"
             )
-        section_family = family["section_family"]
         specialist = analyze_loft_sweep_family(
             model,
             facts,

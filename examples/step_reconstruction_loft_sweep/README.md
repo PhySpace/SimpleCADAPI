@@ -33,7 +33,8 @@ notebooks. These synthetic targets demonstrate verification of a hypothesis;
 the examples do not implement automatic recovery of the original controls.
 
 Each attempt produces a durable `.scadpkg`, a STEP exported from that package
-in a fresh Python process, a roundtrip STEP, and strict comparison diagnostics.
+in a fresh Python process, a roundtrip STEP, a validity-checked bidirectional
+material comparison, and strict comparison diagnostics.
 `feature-checklist.json` separately checks every recognized feature against
 the candidate catalog. `verdict.json` is written only after those checks pass.
 All generated data stays in the ignored `out/` folder.

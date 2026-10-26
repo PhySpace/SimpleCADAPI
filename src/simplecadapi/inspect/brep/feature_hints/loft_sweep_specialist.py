@@ -300,6 +300,47 @@ def _implied_by_ruled(conditions: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def _path_from_guides(guides, family, linear_tolerance):
+    """Use a symmetric set of full-length corner curves as a centerline proxy."""
+
+    selected = [
+        guide
+        for guide in guides
+        if guide.get("coverage_fraction", 0.0) >= 0.99
+        and guide.get("curve_definition", {}).get("type") == "sampled_brep_edge"
+    ]
+    if len(selected) != 4:
+        return None
+    count = len(selected[0]["curve_definition"]["points"])
+    if count < 3 or any(
+        len(guide["curve_definition"]["points"]) != count for guide in selected
+    ):
+        return None
+    chord = np.asarray(family["path_chord"], dtype=float)
+    paths = []
+    for guide in selected:
+        points = np.asarray(guide["curve_definition"]["points"], dtype=float)
+        if float(np.dot(points[-1] - points[0], chord)) < 0.0:
+            points = points[::-1]
+        paths.append(points)
+    centers = np.mean(paths, axis=0)
+    stations = {
+        "stations": [
+            {"station": index / (count - 1), "plane": {"origin": point.tolist()}}
+            for index, point in enumerate(centers)
+        ]
+    }
+    path = recover_path(stations, linear_tolerance=linear_tolerance)
+    if path["recommended"]["curve_type"] == "line":
+        return None
+    path.update(
+        source="averaged_longitudinal_guides",
+        path_role="guide_centerline_proxy",
+        guide_ids=[guide["guide_id"] for guide in selected],
+    )
+    return path
+
+
 def analyze_loft_sweep_family(
     model,
     facts: dict[str, dict[str, Any]],
@@ -327,6 +368,10 @@ def analyze_loft_sweep_family(
         linear_tolerance=linear_tolerance,
         angular_tolerance_degrees=angular_tolerance_degrees,
     )
+    if family.get("variable_section_evidence"):
+        guide_path = _path_from_guides(guides["guides"], family, linear_tolerance)
+        if guide_path is not None:
+            path = guide_path
     path_type = ((path.get("recommended") or {}).get("curve_type"))
     terminal_mode = _terminal_mode(family)
     path_profile_mode = "rigid" if family.get("rigid_profile") else "variable"

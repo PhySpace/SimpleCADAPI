@@ -155,6 +155,12 @@ may be a later hole or pocket, not part of the base profile. Every entry in
 `unresolved-features.md` and every soft-gate gap stays an explicit unexplained
 or low-confidence region. When the catalog does not answer a question, inspect
 the target directly through `domains/step-inspection.md`.
+If the catalog has zero candidates, treat the whole body as unresolved:
+inspect its face carriers, cap/section sequence, and material role before
+choosing a first operation. Record that operation as a manual hypothesis with
+the measured evidence and a falsification check. Zero candidates do not mean
+that the body has no reconstructable features, and a manual hypothesis does
+not become an automatic recognition result.
 
 ### R2: Check capability and parameters
 
@@ -178,9 +184,13 @@ before patterning. Loading the target STEP is never a reconstruction.
 
 ### R4: Replay and export
 
-Replay in a fresh process: `export_model_json` → `replay_model_json`; then
-`validate_step_roundtrip_rdescriptor` on the candidate's STEP export. Record
-the failing operation on any failure and repair before comparing.
+Run a marimo candidate in a fresh process with `run_notebook` or `sca run`,
+capture its definition as `.scadpkg`, then export STEP from that package in a
+separate process. For a `GraphSession` candidate, use its matching
+`export_model_json` → `replay_model_json` route instead. The two JSON schemas
+are different; do not pass notebook or package feature-graph JSON to
+`replay_model_json`. Run `validate_step_roundtrip_rdescriptor` on the exported
+STEP. Record the failing operation on any failure and repair before comparing.
 
 ### R5: Compare
 
@@ -193,6 +203,10 @@ Use `domains/step-inspection.md`:
 (birth/death/split/merge) is the open question,
 `fit_face_analytic_rdescriptor` to test carrier families,
 `render_step_comparison_rpath` for shared-view visual evidence.
+If a Boolean result is invalid or a comparison times out, mark material
+equality `unproven`, retain the failure record, and use bounded sections and
+face-scoped boundary samples to localize the difference. Do not accept a
+candidate on global volume, area, or screenshots alone.
 For each `feature_id` in `feature-index.json`, compare the target region with
 the corresponding candidate region using the feature's dimensions, section
 shape, location, adjacency, and material role. Record `built_and_matched`,

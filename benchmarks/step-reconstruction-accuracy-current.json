@@ -1,0 +1,60 @@
+{
+  "method": "compare_global_properties_rdescriptor",
+  "acceptance_proof": false,
+  "cases": [
+    {
+      "case": "arch_beam",
+      "version": "merge",
+      "target_sha256": "eff860cbfc133265c3ca380e51fee87b10ff981956be0f18b3831984a432c97c",
+      "candidate_sha256": "db0b4711a1d815e2f4801735bf2decafb71c3b914dfdd8ab635830d6baffb556",
+      "volume_relative_error_percent": 0.0609529819939377,
+      "area_relative_error_percent": 0.026923716823227074,
+      "bounding_box_max_delta_mm": 0.07496800907674128
+    },
+    {
+      "case": "arch_beam",
+      "version": "merge_1024",
+      "target_sha256": "eff860cbfc133265c3ca380e51fee87b10ff981956be0f18b3831984a432c97c",
+      "candidate_sha256": "4086ba4c5720ce42585a2ab8f9f689e511e346bbb149d74fd328af9702ea8046",
+      "volume_relative_error_percent": 1.0716390531491358,
+      "area_relative_error_percent": 0.002456100274709404,
+      "bounding_box_max_delta_mm": 0.0013991678140996555
+    },
+    {
+      "case": "concept_hairdryer",
+      "version": "merge",
+      "target_sha256": "5c2de5425205ad71ed074659bb385f910cc19fb28524b71cf6886dea05452f5a",
+      "candidate_sha256": "9ae84c360bd759074e29383590217fc8f66bb0fd5ddc23d751e4b8a9bba2d468",
+      "volume_relative_error_percent": 4.096388724499889e-05,
+      "area_relative_error_percent": 0.00010221051424333433,
+      "bounding_box_max_delta_mm": 0.0
+    },
+    {
+      "case": "concept_hairdryer",
+      "version": "merge_1024",
+      "target_sha256": "5c2de5425205ad71ed074659bb385f910cc19fb28524b71cf6886dea05452f5a",
+      "candidate_sha256": "29b4d116e852b669076a4d63b9cccd5919d12d4963153e9aeea99fc3b8747f37",
+      "volume_relative_error_percent": 0.022514845859517008,
+      "area_relative_error_percent": 0.0056721667203807405,
+      "bounding_box_max_delta_mm": 0.007350882947193327
+    },
+    {
+      "case": "twisted_ring",
+      "version": "merge",
+      "target_sha256": "529a9e6a5ce4a5842d9d17784f3acc04a5b51f767e1b8239329cd45e268efe75",
+      "candidate_sha256": "7abee79afca3ce9a0e1467f45270c3c99790a951be4229f14d8892d4d4446df2",
+      "volume_relative_error_percent": 3.2540384062683443e-11,
+      "area_relative_error_percent": 4.344543380906635e-12,
+      "bounding_box_max_delta_mm": 1.8189894035458565e-12
+    },
+    {
+      "case": "twisted_ring",
+      "version": "merge_1024",
+      "target_sha256": "529a9e6a5ce4a5842d9d17784f3acc04a5b51f767e1b8239329cd45e268efe75",
+      "candidate_sha256": "306756e2c33be00f74c165fd784335f87d6cefc5185f4cc5ddf1b90e044302d9",
+      "volume_relative_error_percent": 3.670361737292575,
+      "area_relative_error_percent": 0.9257482031399757,
+      "bounding_box_max_delta_mm": 9.999999406318238e-08
+    }
+  ]
+}

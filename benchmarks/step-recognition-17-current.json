@@ -1,0 +1,300 @@
+{
+  "version": "input",
+  "timeout_seconds_per_case": 20.0,
+  "max_features": 200,
+  "feature_kinds": [
+    "hole",
+    "extrusion",
+    "revolution",
+    "loft",
+    "sweep",
+    "fillet",
+    "chamfer",
+    "sheet_metal"
+  ],
+  "cases": [
+    {
+      "case": "apple_loft",
+      "status": "completed",
+      "step_sha256": "c21280fdcde653817eef25fd551db6c740210de21ebf86930fcac979010d3cf8",
+      "candidate_count": 0,
+      "categories": {},
+      "features": [],
+      "unowned_face_count": 1
+    },
+    {
+      "case": "arch_beam",
+      "status": "completed",
+      "step_sha256": "eff860cbfc133265c3ca380e51fee87b10ff981956be0f18b3831984a432c97c",
+      "candidate_count": 1,
+      "categories": {
+        "loft": 1
+      },
+      "features": [
+        {
+          "category": "loft",
+          "subtype": "whole_body_profile_loft",
+          "confidence": "medium",
+          "recommended_api": "loft_multisection_rsolid",
+          "spine_source": "averaged_longitudinal_guides"
+        }
+      ],
+      "unowned_face_count": 0
+    },
+    {
+      "case": "concept_hairdryer",
+      "status": "completed",
+      "step_sha256": "5c2de5425205ad71ed074659bb385f910cc19fb28524b71cf6886dea05452f5a",
+      "candidate_count": 0,
+      "categories": {},
+      "features": [],
+      "unowned_face_count": 6
+    },
+    {
+      "case": "curved_path_round",
+      "status": "completed",
+      "step_sha256": "6896e3ac09818ae91b60fedff588c0ca91addb5dd251b3b87f14dae52a63cc53",
+      "candidate_count": 1,
+      "categories": {
+        "loft": 1
+      },
+      "features": [
+        {
+          "category": "loft",
+          "subtype": "whole_body_profile_loft",
+          "confidence": "strong",
+          "recommended_api": "loft_rsolid",
+          "spine_source": "section_plane_origins"
+        }
+      ],
+      "unowned_face_count": 0
+    },
+    {
+      "case": "curved_path_tip",
+      "status": "completed",
+      "step_sha256": "711c40e3eef7839e889b7e489de8d474b58e832a5bd6c56695865fbf5d739983",
+      "candidate_count": 1,
+      "categories": {
+        "loft": 1
+      },
+      "features": [
+        {
+          "category": "loft",
+          "subtype": "whole_body_point_loft",
+          "confidence": "strong",
+          "recommended_api": "loft_rsolid",
+          "spine_source": null
+        }
+      ],
+      "unowned_face_count": 0
+    },
+    {
+      "case": "dimensioned_vase",
+      "status": "completed",
+      "step_sha256": "b8f01f94a2d05d4ddf051faeb0c41cadef160a08cc476159c58ccc11c1e0a6a2",
+      "candidate_count": 1,
+      "categories": {
+        "hole": 1
+      },
+      "features": [
+        {
+          "category": "hole",
+          "subtype": "countersink",
+          "confidence": "strong",
+          "recommended_api": null,
+          "spine_source": null
+        }
+      ],
+      "unowned_face_count": 3
+    },
+    {
+      "case": "draft45_circle_pentagon",
+      "status": "completed",
+      "step_sha256": "89d2a2562bdb5b58e7889407c89b7ab2fc2410148f71d690678a4a5b2c7e6d99",
+      "candidate_count": 1,
+      "categories": {
+        "loft": 1
+      },
+      "features": [
+        {
+          "category": "loft",
+          "subtype": "whole_body_profile_loft",
+          "confidence": "strong",
+          "recommended_api": "loft_multisection_rsolid",
+          "spine_source": "averaged_longitudinal_guides"
+        }
+      ],
+      "unowned_face_count": 0
+    },
+    {
+      "case": "draft90_circle_pentagon",
+      "status": "completed",
+      "step_sha256": "4b3d2092adf6629f177aa862edd435e319d4a96c3cf724592a019c39ffe26d98",
+      "candidate_count": 1,
+      "categories": {
+        "loft": 1
+      },
+      "features": [
+        {
+          "category": "loft",
+          "subtype": "whole_body_profile_loft",
+          "confidence": "strong",
+          "recommended_api": "loft_multisection_rsolid",
+          "spine_source": "averaged_longitudinal_guides"
+        }
+      ],
+      "unowned_face_count": 0
+    },
+    {
+      "case": "four_guide_body",
+      "status": "completed",
+      "step_sha256": "a9c30efd0ddf46f9f71ab6e52d18248368748fc6725a5eb214c5e87bc98cb4a7",
+      "candidate_count": 1,
+      "categories": {
+        "loft": 1
+      },
+      "features": [
+        {
+          "category": "loft",
+          "subtype": "whole_body_profile_loft",
+          "confidence": "strong",
+          "recommended_api": "loft_rsolid",
+          "spine_source": "section_plane_origins"
+        }
+      ],
+      "unowned_face_count": 0
+    },
+    {
+      "case": "grooved_block",
+      "status": "completed",
+      "step_sha256": "b1dfa8bf65076156bc9dc82abdd0096e35c3f8764294c5d667aa3c2fc615828c",
+      "candidate_count": 0,
+      "categories": {},
+      "features": [],
+      "unowned_face_count": 23
+    },
+    {
+      "case": "normal_circle_pentagon",
+      "status": "completed",
+      "step_sha256": "ebc9ff775f1fd59709d91ffe883280bc1579041f86698f2d195567eafe703a38",
+      "candidate_count": 1,
+      "categories": {
+        "loft": 1
+      },
+      "features": [
+        {
+          "category": "loft",
+          "subtype": "whole_body_profile_loft",
+          "confidence": "strong",
+          "recommended_api": "loft_multisection_rsolid",
+          "spine_source": "averaged_longitudinal_guides"
+        }
+      ],
+      "unowned_face_count": 0
+    },
+    {
+      "case": "point_to_circle",
+      "status": "completed",
+      "step_sha256": "781519f5d13a48367e949ea1d083386a81401287ff214c406b2d1746373cc40d",
+      "candidate_count": 1,
+      "categories": {
+        "revolution": 1
+      },
+      "features": [
+        {
+          "category": "revolution",
+          "subtype": "whole_body_full_revolution",
+          "confidence": "strong",
+          "recommended_api": null,
+          "spine_source": null
+        }
+      ],
+      "unowned_face_count": 0
+    },
+    {
+      "case": "point_to_pentagon",
+      "status": "completed",
+      "step_sha256": "7bf5bfac2a4d5c6835123c93ebdaf66326e5d7007152f396ac218a1312fc6d4d",
+      "candidate_count": 1,
+      "categories": {
+        "loft": 1
+      },
+      "features": [
+        {
+          "category": "loft",
+          "subtype": "whole_body_point_loft",
+          "confidence": "strong",
+          "recommended_api": "loft_rsolid",
+          "spine_source": null
+        }
+      ],
+      "unowned_face_count": 0
+    },
+    {
+      "case": "ruled_circle_pentagon",
+      "status": "completed",
+      "step_sha256": "e62bd86e8749f88561bdb9810855a4afededd5c23b14f708be9877be90d12594",
+      "candidate_count": 1,
+      "categories": {
+        "loft": 1
+      },
+      "features": [
+        {
+          "category": "loft",
+          "subtype": "whole_body_profile_loft",
+          "confidence": "strong",
+          "recommended_api": "loft_rsolid",
+          "spine_source": "section_plane_origins"
+        }
+      ],
+      "unowned_face_count": 0
+    },
+    {
+      "case": "smooth_circle_pentagon",
+      "status": "completed",
+      "step_sha256": "62c699e6b1e23a14a93fecd566015b72038213e7b732b7d635e5a9cd635ec151",
+      "candidate_count": 1,
+      "categories": {
+        "loft": 1
+      },
+      "features": [
+        {
+          "category": "loft",
+          "subtype": "whole_body_profile_loft",
+          "confidence": "strong",
+          "recommended_api": "loft_multisection_rsolid",
+          "spine_source": "averaged_longitudinal_guides"
+        }
+      ],
+      "unowned_face_count": 0
+    },
+    {
+      "case": "star_base",
+      "status": "completed",
+      "step_sha256": "2d0c04aff66439b942aabd0423bd19ec4f27060c3c983ef146a24b0ec4fc3089",
+      "candidate_count": 1,
+      "categories": {
+        "loft": 1
+      },
+      "features": [
+        {
+          "category": "loft",
+          "subtype": "local_lofted_boss",
+          "confidence": "strong",
+          "recommended_api": "loft_multisection_rsolid",
+          "spine_source": "averaged_longitudinal_guides"
+        }
+      ],
+      "unowned_face_count": 3
+    },
+    {
+      "case": "twisted_ring",
+      "status": "completed",
+      "step_sha256": "529a9e6a5ce4a5842d9d17784f3acc04a5b51f767e1b8239329cd45e268efe75",
+      "candidate_count": 0,
+      "categories": {},
+      "features": [],
+      "unowned_face_count": 768
+    }
+  ]
+}

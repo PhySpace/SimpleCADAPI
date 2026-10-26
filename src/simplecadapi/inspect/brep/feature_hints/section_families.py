@@ -16,6 +16,7 @@ from .profiles import (
     local_axes,
     measure_loop,
     resample_loop,
+    sample_edge_points,
     transformed_loop_deviation,
 )
 
@@ -28,6 +29,44 @@ def _wall_ids(model, face_id: str, loops: Sequence[dict[str, Any]]) -> list[str]
     return entity_ids(
         {wall_id for loop in loops for wall_id in loop_wall_ids(model, loop, face_id)}
     )
+
+
+def variable_section_evidence(model, facts, family):
+    """Measure clear profile-size changes along corresponding corner paths."""
+
+    cap_edges = set(family["start_loop"]["edge_ids"]) | set(
+        family["end_loop"]["edge_ids"]
+    )
+    edge_ids = entity_ids(
+        {
+            edge_id
+            for face_id in family["side_face_ids"]
+            for edge_id in facts[face_id]["edges"]
+            if edge_id not in cap_edges
+        }
+    )
+    if len(edge_ids) < 3:
+        return None
+    start = np.asarray(facts[family["start_face_id"]]["centroid"], dtype=float)
+    paths = []
+    for edge_id in edge_ids:
+        _, _, edge = model.resolve_entity(edge_id)
+        points = sample_edge_points(edge, count=33)
+        if len(points) != 33:
+            return None
+        if np.linalg.norm(points[0] - start) > np.linalg.norm(points[-1] - start):
+            points = points[::-1]
+        paths.append(points)
+    changes = []
+    for index, first in enumerate(paths):
+        for second in paths[index + 1 :]:
+            distances = np.linalg.norm(first - second, axis=1)
+            endpoint = max(float(distances[0]), float(distances[-1]))
+            if endpoint > 1.0e-9:
+                changes.append(float(np.max(np.abs(distances - endpoint)) / endpoint))
+    if not changes or float(np.median(changes)) <= 0.15:
+        return None
+    return {"median_relative_corner_spacing_change": float(np.median(changes))}
 
 
 def _loop_contour(

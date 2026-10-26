@@ -801,6 +801,11 @@ def extrusion_hints(
 ) -> list[dict[str, Any]]:
     """Return whole-body and smallest supported local extrusion regions."""
 
+    if facts and all(
+        fact["type"] == "PLANE" and len(fact["edges"]) == 3
+        for fact in facts.values()
+    ):
+        return []
     holes = hole_face_ids or set()
     whole = _whole_body_hints(model, facts, tolerances, holes)
     local = _closed_local_hints(model, facts, tolerances, holes)

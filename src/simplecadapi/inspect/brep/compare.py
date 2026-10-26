@@ -13,6 +13,7 @@ import numpy as np
 from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
+from OCP.BRepCheck import BRepCheck_Analyzer
 from OCP.TopAbs import (
     TopAbs_COMPOUND,
     TopAbs_COMPSOLID,
@@ -417,7 +418,10 @@ def _cut_volume(
     operation.Build()
     if not operation.IsDone():
         raise RuntimeError("BREP boolean difference failed")
-    volume = measure_shape_mass_rtuple(operation.Shape(), "volume")[0]
+    result = operation.Shape()
+    if not BRepCheck_Analyzer(result).IsValid():
+        raise RuntimeError("BREP boolean difference produced an invalid shape")
+    volume = measure_shape_mass_rtuple(result, "volume")[0]
     if not math.isfinite(volume):
         raise RuntimeError("BREP boolean difference produced a non-finite volume")
     if volume < 0.0:
