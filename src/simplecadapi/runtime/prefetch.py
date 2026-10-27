@@ -36,6 +36,7 @@ from ..artifacts.canonical import validate_logical_id
 from .children import notebook_digest
 from .config import read_notebook_config
 from .deps import state_dir, use_calls
+from .usememo import recall
 
 # ---------------------------------------------------------------------------
 # What a cell is going to use
@@ -297,7 +298,12 @@ def start(directory: Path, code: str, scope: Mapping[str, Any], notebook_id: str
         return
     if not use_calls(code):
         return
-    planned = [(request, _expected_seconds(request)) for request in plan_uses(code, scope, directory, notebook_id)]
+    # What this process kept from an earlier run is handed out by ``use`` itself: no worker is worth starting for it.
+    planned = [
+        (request, _expected_seconds(request))
+        for request in plan_uses(code, scope, directory, notebook_id)
+        if recall(request.path, request.id, request.overrides) is None
+    ]
     wanted = [(request, seconds) for request, seconds in planned if seconds is not None]
     if len(wanted) < 2:
         return  # nothing to do beside the cell's own first call

@@ -19,6 +19,12 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   its cache belongs to.
 
 ### Changed
+- `use` keeps the product of the last run of each child notebook in the process and hands it out again while the
+  child's static digest (source, header, local modules, input files, the children it uses) and the overrides are
+  unchanged (`simplecadapi.runtime.usememo`; `SCA_NO_USE_MEMO=1` turns it off). One entry per (notebook, id): the run's
+  nodes are registered by graph id, so the entry is the last run's. The editor's kernel is a long-lived process, so a
+  new `OPEN_STROKE` on the six-axis arm rebuilds in 4.2 s instead of 6.4 s. Children with a computed `use` path and
+  overrides that are not plain data are not kept. Prefetch no longer starts workers for what is kept.
 - Editor: the model is pushed over the WebSocket with the `preview` event, in one binary frame
   (`<u32 big-endian N><N bytes of JSON envelope><SCAPREV1 preview>`), and a page that joins late is given it on
   connect: no second HTTP request for it. A model already on screen still travels as the bare notice

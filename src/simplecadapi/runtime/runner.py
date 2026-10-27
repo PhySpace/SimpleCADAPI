@@ -54,7 +54,7 @@ from ._marimo import (
     safe_get_context,
     suppress_warnings_logs,
 )
-from . import prefetch
+from . import prefetch, usememo
 from .cache import CellCache, CellDigests, cache_root, prune
 from .cells import NotebookCells
 from .config import NotebookConfig, NotebookConfigError, read_notebook_config
@@ -191,12 +191,17 @@ def use(path: str | Path, /, *, id: str | None = None, **overrides: Any) -> Prod
     target = Path(path)
     if not target.is_absolute():
         target = _calling_directory() / target
+    kept = usememo.recall(target, id, overrides)
+    if kept is not None:  # this process ran it already and nothing it depends on changed
+        record_dependencies({kept.path, *kept.dependencies})
+        return kept.product
     prefetch.wait(target, id, overrides)  # a worker may be building it
     child = run_notebook(target, id=id, overrides=overrides)
     # use() never asks for a partial run, so the product is always there.
     if child.product is None:
         raise RuntimeError(f"{child.config.path}: the child run produced no product")
     record_dependencies({child.config.path, *child.dependencies})
+    usememo.keep(target, id, overrides, usememo.Kept(child.product, child.config.path, frozenset(child.dependencies)))
     return child.product
 
 
