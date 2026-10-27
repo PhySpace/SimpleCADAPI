@@ -7,6 +7,12 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 ## Unreleased
 
 ### Fixed
+- A cache entry that names classes which no longer exist (written by an older build: `No module named
+  'simplecadapi._native'`) is deleted and written again. marimo restores such a value as a stub; the runner dropped the
+  cache for the run and ran again without it, which neither read nor wrote entries, so the same stubs came back on every
+  later run and every cell ran every time. A notebook with such entries (a child run through `use`, the six-axis arm's
+  gripper) now takes 0.8 s instead of 3.3-6 s once the entries are replaced. A stub for any other reason (a value that
+  cannot be pickled) keeps the old behaviour.
 - A cell whose value is cached but whose lineage record is missing now runs once and writes both again. It used to
   run on every call and never repair the record (the cell stayed active nowhere, so nothing was saved), which showed as
   a notebook that never hit its cache, such as a child notebook run through `use`.

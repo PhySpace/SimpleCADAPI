@@ -251,6 +251,27 @@ class CellCache(CachedLifecycle):
             self.restored.discard(cell.cell_id)
         return decision
 
+    def discard(self, cell: CellImpl) -> None:
+        """Delete the entry this cell was restored from (it could not be unpickled).
+
+        marimo's own invalidation only makes the entry miss for the rest of the process and never overwrites it, so an
+        entry that names classes which are gone would come back as a stub on every later run.
+        """
+
+        key = self._restored_keys.pop(cell.cell_id, None)
+        digest = self._digest_for(cell)
+        self.restored.discard(cell.cell_id)
+        if key is None or digest is None:
+            return
+        directory = self._root / digest
+        manifest = directory / key
+        blobs = directory / manifest.parent.name / manifest.stem.split("_", 1)[-1]
+        try:
+            manifest.unlink(missing_ok=True)
+            shutil.rmtree(blobs, ignore_errors=True)
+        except OSError:
+            pass
+
     def _load_lineage(self, cell: CellImpl, digest: str) -> bool:
         from . import lineage
 

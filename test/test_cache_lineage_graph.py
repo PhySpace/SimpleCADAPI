@@ -109,3 +109,38 @@ class MissingRecordHealsTest(unittest.TestCase):
             self.assertIn("ran", repaired[1:])  # the record was missing: the cells ran
             again = statuses()
             self.assertNotIn("ran", again[1:])  # and wrote it: the next run restores them
+
+
+class UnrestorableEntryTest(unittest.TestCase):
+    """An entry that names classes which are gone is deleted, not kept: it used to cost every later run all its cells.
+
+    marimo restores such a value as a stub and only makes the entry miss for the rest of the process; the runner
+    dropped the whole cache for the run and left the entry as it was, so every later run found the same stubs.
+    """
+
+    def test_discard_deletes_the_manifest_and_the_blobs_of_the_restored_entry(self) -> None:
+        from types import SimpleNamespace
+
+        from simplecadapi.runtime.cache import CellCache
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            entry = root / "dg1" / "cells"
+            (entry / "Ab_cD-1").mkdir(parents=True)
+            (entry / "Ab_cD-1" / "bearing.pickle").write_bytes(b"x")
+            (entry / "Ab_cD-1").joinpath("other.pickle").write_bytes(b"x")
+            (entry / "C_Ab_cD-1.jsonl").write_text("{}")
+            (entry / "Zz9").mkdir()
+            (entry / "C_Zz9.jsonl").write_text("{}")  # another entry of the same digest: untouched
+            cache = CellCache.__new__(CellCache)
+            cache._root = root
+            cache._digest_for = lambda cell: "dg1"
+            cache._restored_keys = {"cellA": "cells/C_Ab_cD-1.jsonl"}
+            cache.restored = {"cellA"}
+            cache.discard(SimpleNamespace(cell_id="cellA"))
+            self.assertFalse((entry / "C_Ab_cD-1.jsonl").exists())
+            self.assertFalse((entry / "Ab_cD-1").exists())
+            self.assertTrue((entry / "C_Zz9.jsonl").exists())
+            self.assertTrue((entry / "Zz9").exists())
+            self.assertEqual(cache.restored, set())
+            cache.discard(SimpleNamespace(cell_id="cellA"))  # nothing restored under it any more: a no-op
