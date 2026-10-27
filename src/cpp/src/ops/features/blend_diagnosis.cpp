@@ -86,9 +86,13 @@ std::optional<BlendDiagnosis> classify_tiny_edges(const Case& c) {
   const double threshold = std::max(1e-3, median * 1e-3);  // sub-micron slivers against the selection's scale
   std::size_t tiny = 0;
   double shortest = 0.0;
+  const Edge* shortest_edge = nullptr;
   for (const auto& entry : lengths) {
     if (entry.second > threshold) continue;
-    shortest = tiny == 0 ? entry.second : std::min(shortest, entry.second);
+    if (tiny == 0 || entry.second < shortest) {
+      shortest = entry.second;
+      shortest_edge = entry.first;
+    }
     ++tiny;
   }
   if (tiny == 0 || tiny == lengths.size()) return std::nullopt;
@@ -103,6 +107,8 @@ std::optional<BlendDiagnosis> classify_tiny_edges(const Case& c) {
   out.measurements = {{"shortest_selected_edge", shortest, "mm"}, {"selection_median_edge", median, "mm"}};
   out.repair = {"Drop the sliver edges from the selection (filter by feature intent, not by a blanket selector).",
                 "Re-select with a QL predicate that excludes sub-micron edges before the " + c.words.blend + "."};
+  out.evidence_edges = {*shortest_edge};
+  out.evidence_caption = "orange line marks the shortest sliver edge; see measurements";
   return out;
 }
 
@@ -126,6 +132,8 @@ std::optional<BlendDiagnosis> classify_tangent_adjacency(const Case& c) {
     out.repair = {"Remove that junction edge from the selection: there is no corner to blend.",
                   "If a visual transition is required there, it already exists \xE2\x80\x94 the faces are tangent by "
                   "construction."};
+    out.evidence_edges = {edge};
+    out.evidence_caption = "orange line marks the tangent junction edge; see measurements";
     return out;
   }
   return std::nullopt;
@@ -151,6 +159,8 @@ std::optional<BlendDiagnosis> classify_blend_room(const Case& c) {
       out.repair = {"Reduce the " + c.words.size + " to below " + g4(*extent) + " mm (e.g. " + g4(*extent * 0.95) +
                         ") and retry.",
                     "Or select a different edge with more room on its adjacent faces."};
+      out.evidence_edges = {edge};
+      out.evidence_caption = "orange line marks the failing edge; see measurements for its endpoints and the available face room";
       return out;
     }
   }
@@ -185,6 +195,8 @@ std::optional<BlendDiagnosis> classify_partial_smooth_chain(const Case& c) {
         out.repair = {"Select the entire smooth chain: every tangent-continuous segment of that curve, then blend them "
                       "together in one call.",
                       "Enumerate with QL and extend the selection across the shared vertices before retrying."};
+        out.evidence_edges = {edge};
+        out.evidence_caption = "orange line marks the partially selected chain segment";
         return out;
       }
     }
@@ -207,6 +219,8 @@ BlendDiagnosis tangency_critical(const Case& c, const Edge& edge, double extent)
   out.repair = {"Reduce the " + c.words.size + " below " + g4(extent / 2) +
                     " mm (half the narrowest shared face) so adjacent blend surfaces leave material between them.",
                 "Or blend the edges in two passes with different sizes."};
+  out.evidence_edges = {edge};
+  out.evidence_caption = "orange line marks the critical edge; see measurements";
   return out;
 }
 
@@ -262,6 +276,8 @@ std::optional<BlendDiagnosis> classify_vertex_conflict(const Case& c) {
     out.repair = {"Blend the converging edges in separate passes: hardest edges first, then the remainder with a "
                   "smaller size.",
                   "Or drop the corner edge from this pass and blend it alone afterwards."};
+    for (std::size_t i = 0; i < corner.incident.size() && i < 3; ++i) out.evidence_edges.push_back(*corner.incident[i]);
+    out.evidence_caption = "orange lines mark the edges converging at the corner vertex";
     return out;
   }
   return std::nullopt;

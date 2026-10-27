@@ -2,7 +2,10 @@
 
 An operation that has diagnosed a failure asks for a picture (``DiagnosticImage`` in C++); this module draws it:
 
-* ``render``            solids, each operand in its own colour, on the software renderer (four axonometric views);
+* ``render``            solids on the software renderer (four axonometric views): each boolean operand in its own
+                         colour, or one solid with the implicated edges as orange lines (fillet, chamfer);
+* ql cardinality errors  the scope with the matched faces orange and up to three near misses purple (other targets:
+                         the matched entities as orange lines), through ``_ql_evidence``;
 * ``wire_plan_render``  wires projected on their best-fit plane, the loose ends in orange (matplotlib);
 * ``sketch_render``     a sketch at the solver's positions, implicated entities orange, related ones purple (matplotlib).
 
@@ -71,6 +74,8 @@ def provide(kind: str, operation: str, view: str, caption: str, dedup_key: str, 
     _RENDER_DEDUP.add(key)
     try:
         if kind == "render":
+            if payload.get("mode") == "highlight_edges":
+                return _render_highlight_edges(operation, view, caption, shapes, payload)
             return _render_solids(operation, view, caption, shapes, payload)
         if kind == "wire_plan_render":
             return _wire_plan(operation, view, caption, shapes, payload)
@@ -115,6 +120,103 @@ def _render_solids(operation: str, view: str, caption: str, shapes: Sequence[Any
         show_callouts=False,  # a solid-tag anchor sits inside the solid and may point at the wrong body
     )
     return _evidence("render", path, view, caption)
+
+
+def _render_highlight_edges(operation: str, view: str, caption: str, shapes: Sequence[Any], payload: Mapping[str, Any]):
+    """One solid, the implicated edges as crisp orange lines (a failed fillet / chamfer)."""
+
+    from .screenshot import render_screenshot
+
+    count = int(payload.get("edge_count") or 0)
+    solid, edges = shapes[0], list(shapes[1:1 + count])
+    path = _path(operation)
+    render_screenshot(
+        [solid],
+        path,
+        views=_DIAGNOSTIC_VIEWS,
+        supersample=1,
+        edge_width_scale=0.0035,  # heavier model ink so panels read at grid size
+        highlight_edge_width=8.0,  # highlights outweigh the ink, always
+        show_legend=True,
+        show_callouts=False,
+        highlight_edges=tuple(edges),
+    )
+    return _evidence("render", path, view, caption)
+
+
+# ---- ql: the scope with what the query matched ----------------------------------------------------
+
+_MATCHED_TAG = "diagnostic.matched"
+_NEAR_MISS_TAG = "diagnostic.near_miss"
+
+
+def _ql_evidence(scope: Any, matched: Sequence[Any], target_kind: str, dedup_key: Any,
+                 near_misses: Sequence[Any] = ()) -> List[Dict[str, Any]]:
+    """Render the scope with the matched entities visibly highlighted.
+
+    Face selections render a copy of the scope whose matched faces carry ``diagnostic.matched`` (orange) and up to three
+    near-miss faces carry ``diagnostic.near_miss`` (purple), with legend and callouts, so the agent can see what it
+    selected; the copy keeps the caller's shape free of tags.  Other targets render the matched entities themselves
+    as orange lines.  One picture per failure signature; never raises.
+    """
+
+    if not enabled() or dedup_key in _RENDER_DEDUP:
+        return []
+    _RENDER_DEDUP.add(dedup_key)
+    operation = f"ql_{target_kind}_resolve"
+    view = "default"
+    try:
+        from . import _native as _n
+        from .screenshot import render_screenshot
+
+        highlight_tags: List[str] = []
+        tag_labels: Dict[str, str] = {}
+        shapes: List[Any] = []
+        if target_kind == "face":
+            copy = _n.clone_semantic_view(scope) if scope.__class__.__name__ == "Solid" else None
+            if copy is not None:
+                # Match by kernel identity (IsSame): wrapper copies differ at the Python level, not in the topology.
+                matched_wrapped = [item.wrapped for item in matched]
+                near_wrapped = [item.wrapped for item in near_misses]
+                matched_any, near_tagged = False, 0
+                for face in copy._iter_faces():
+                    if any(face.wrapped.IsSame(w) for w in matched_wrapped):
+                        face._apply_tag(_MATCHED_TAG, propagate=False)
+                        matched_any = True
+                    elif near_tagged < 3 and any(face.wrapped.IsSame(w) for w in near_wrapped):
+                        face._apply_tag(_NEAR_MISS_TAG, propagate=False)
+                        near_tagged += 1
+                if matched_any:
+                    highlight_tags = [_MATCHED_TAG] + ([_NEAR_MISS_TAG] if near_tagged else [])
+                    tag_labels = {_MATCHED_TAG: f"matched {target_kind}(s)", _NEAR_MISS_TAG: "near miss"}
+                    shapes = [copy]
+        highlight_edges: List[Any] = []
+        if not shapes:
+            highlight_edges = list(matched[:8])
+            if scope.__class__.__name__ == "Solid":
+                shapes = [scope]
+            if not shapes and not highlight_edges:
+                return []
+        path = _path(operation)
+        render_screenshot(
+            shapes,
+            path,
+            views=_DIAGNOSTIC_VIEWS,
+            supersample=1,
+            edge_width_scale=0.0035,
+            highlight_edge_width=8.0,
+            highlight_tags=tuple(highlight_tags),
+            tag_labels=tag_labels,
+            highlight_edges=tuple(highlight_edges),
+            show_legend=bool(highlight_tags or highlight_edges),
+            show_callouts=bool(highlight_tags),
+        )
+        caption = ("orange = matched, purple = near miss; see inventory for identities" if target_kind == "face"
+                   else "orange lines = matched entities; see inventory")
+        return [_evidence("render", path, view, caption)]
+    except Exception as error:  # noqa: BLE001 - a picture must never mask the error it illustrates
+        return [_evidence("render-unavailable", Path(), view,
+                          f"diagnostic render unavailable: {type(error).__name__}: {error}")]
 
 
 # ---- 2D: wires on their best-fit plane --------------------------------------------------------
@@ -379,3 +481,4 @@ def install() -> None:
     from . import _native
 
     _native._set_diagnostic_image_provider(provide)
+    _native.ql._set_evidence_provider(_ql_evidence)

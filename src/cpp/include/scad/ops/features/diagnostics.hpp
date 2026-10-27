@@ -3,8 +3,8 @@
 // operation has failed.
 //
 // Every entry is best effort: a probe that cannot decide says nothing, and a diagnosis
-// never replaces the error it explains.  Unlike the Python SDK none of them renders an
-// evidence image (the measurements and repair lines carry the same facts as text).
+// never replaces the error it explains.  A diagnosis names what to draw (`evidence_edges`,
+// `evidence_caption`): the operator that raises asks `diagnostic_image` for the picture.
 #pragma once
 
 #include <functional>
@@ -27,6 +27,8 @@ struct BlendDiagnosis {
   std::vector<std::string> possible_causes;
   std::vector<ErrorMeasurement> measurements;
   std::vector<std::string> repair;
+  std::vector<Edge> evidence_edges;  // the edges the picture marks in orange (the solid itself is drawn)
+  std::string evidence_caption;
 };
 
 // Does the blend succeed on this one edge alone?  The per-edge diagnostic rerun.

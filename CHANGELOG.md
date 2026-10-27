@@ -6,6 +6,11 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+### Fixed
+- A failed fillet or chamfer, and a ql cardinality error, carry their diagnostic picture again (as in 2.2.6): the
+  failing edge(s) as orange lines, or the matched faces orange and the near misses purple. 2.2.7b1 drew pictures for
+  failed booleans only. Highlighted faces are shaded with the standard material, so the palette colours read as before.
+
 ## 2.2.7b1 — 2026-10-24
 
 ### Added
