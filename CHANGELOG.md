@@ -7,6 +7,9 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 ## Unreleased
 
 ### Fixed
+- A cell whose value is cached but whose lineage record is missing now runs once and writes both again. It used to
+  run on every call and never repair the record (the cell stayed active nowhere, so nothing was saved), which showed as
+  a notebook that never hit its cache, such as a child notebook run through `use`.
 - Editor: a slider drag that pauses and is then released no longer rebuilds twice. The page sends the value when the
   drag pauses and again on release; the server now skips a value the model already has (unless the last run failed,
   when the same value is a retry).

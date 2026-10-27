@@ -75,3 +75,37 @@ class LineageGraphTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MissingRecordHealsTest(unittest.TestCase):
+    """Cached values without their lineage record: the cell runs once more and the next run restores it."""
+
+    def test_a_cell_whose_record_is_missing_is_a_miss_once(self) -> None:
+        from simplecadapi.editor.templates import create_notebook
+
+        with tempfile.TemporaryDirectory() as tmp:
+            notebook = create_notebook(Path(tmp), "child", "part")
+            Path(notebook).write_text(Path(notebook).read_text().replace("    return (base,)", CELL, 1))
+            run_notebook(notebook)
+            config = read_notebook_config(notebook)
+            records = glob.glob(str(state_dir(config) / "cache" / "*" / "lineage.*"))
+            self.assertTrue(records)
+            for record in records:
+                Path(record).unlink()
+            code = textwrap.dedent(
+                f"""
+                from simplecadapi.runtime import run_notebook
+                run = run_notebook({str(notebook)!r})
+                print("STATUSES", ",".join(cell.status for cell in run.cells))
+                """
+            )
+
+            def statuses() -> list[str]:
+                done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300)
+                self.assertEqual(done.returncode, 0, done.stderr[-800:])
+                return next(line for line in done.stdout.splitlines() if line.startswith("STATUSES")).split()[1].split(",")
+
+            repaired = statuses()
+            self.assertIn("ran", repaired[1:])  # the record was missing: the cells ran
+            again = statuses()
+            self.assertNotIn("ran", again[1:])  # and wrote it: the next run restores them

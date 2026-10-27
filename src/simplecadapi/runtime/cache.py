@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 import shutil
 import zlib
 from collections.abc import Callable, Mapping
@@ -235,9 +236,14 @@ class CellCache(CachedLifecycle):
         decision = super().setup(cell, glbls)
         if isinstance(decision, Skip):
             if not self._load_lineage(cell, digest):
-                # The nodes behind the values are missing (or are another graph's): run the cell and record them
-                # again.
-                self._active.pop(cell.cell_id, None)
+                # The values are cached but the nodes behind them are missing (or are another graph's): run the
+                # cell, and let the run write the entry and the nodes again.  The attempt becomes a miss for marimo
+                # and the cell stays active here: dropping either made the cell run on every later call without
+                # ever repairing what was missing.
+                attempt = self._attempts.get(cell.cell_id)
+                if attempt is not None:
+                    attempt.hit = False
+                self._exec_starts[cell.cell_id] = time.time()
                 self.restored.discard(cell.cell_id)
                 return None
             self.restored.add(cell.cell_id)
