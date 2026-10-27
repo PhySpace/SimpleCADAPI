@@ -202,3 +202,49 @@ class PreviewPushTest(unittest.TestCase):
         state = self.state()
         state.latest_preview_bytes = self.PREVIEW
         self.assertEqual(TestClient(create_app(state)).get("/api/preview/latest").content, self.PREVIEW)
+
+
+class RepeatedParamTest(unittest.TestCase):
+    """A value the model already has is not a rebuild (a drag that pauses sends its value again on release)."""
+
+    def state(self):
+        pytest.importorskip("starlette")
+        from simplecadapi.editor.server import WorkspaceState
+        from simplecadapi.editor.templates import create_notebook
+        from simplecadapi.runtime.params import ParamSpec
+
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name).resolve()
+        state = WorkspaceState(root, create_notebook(root, "bracket", "part"))
+        state.specs = {"RADIUS": ParamSpec("RADIUS", "", "c1", 1, "float", "literal", 10.0, "slider", 1.0, 50.0, 1.0)}
+        self.runs: list[list[str]] = []
+        state.emit_params = lambda: None  # type: ignore[method-assign]
+        state.schedule_settle = lambda: None  # type: ignore[method-assign]
+        runs = self.runs
+        state.kernel = type("K", (), {"run_until_settled": lambda self, cells: runs.append(list(cells))})()  # type: ignore[assignment]
+        return state
+
+    def test_the_same_value_twice_rebuilds_once(self) -> None:
+        state = self.state()
+        state._apply_params(state.kernel, {"RADIUS": 40.0})
+        state._apply_params(state.kernel, {"RADIUS": 40.0})
+        self.assertEqual(self.runs, [["c1"]])
+
+    def test_a_different_value_and_a_return_to_the_source_value_each_rebuild(self) -> None:
+        state = self.state()
+        for value in (40.0, 25.0, 10.0):
+            state._apply_params(state.kernel, {"RADIUS": value})
+        self.assertEqual(len(self.runs), 3)
+
+    def test_the_source_value_when_nothing_is_saved_is_not_a_rebuild(self) -> None:
+        state = self.state()
+        state._apply_params(state.kernel, {"RADIUS": 10.0})
+        self.assertEqual(self.runs, [])
+
+    def test_after_a_failed_run_the_same_value_is_a_retry(self) -> None:
+        state = self.state()
+        state._apply_params(state.kernel, {"RADIUS": 40.0})
+        state._last_publish_error = "the cell failed"
+        state._apply_params(state.kernel, {"RADIUS": 40.0})
+        self.assertEqual(len(self.runs), 2)

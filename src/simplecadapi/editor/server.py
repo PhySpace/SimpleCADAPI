@@ -1308,6 +1308,14 @@ class WorkspaceState:
         if config is None:
             raise RuntimeError("no SimpleCAD notebook is open")
         saved = read_saved_params(config)
+        # A drag that pauses and is then released sends its value twice (the pause, the release): the second is
+        # what the model already shows.  Rebuilding for it would run the cells that depend on child notebooks
+        # again for nothing -- unless the last run failed, when the person may be asking for a retry.
+        if not self._last_publish_error:
+            values = {name: value for name, value in values.items() if saved.get(name, self.specs[name].default) != value}
+            if not values:
+                self.emit_params()  # keep the page's controls in step
+                return
         cells: list[str] = []
         for name, value in values.items():
             spec = self.specs[name]

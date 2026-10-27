@@ -7,6 +7,9 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 ## Unreleased
 
 ### Fixed
+- Editor: a slider drag that pauses and is then released no longer rebuilds twice. The page sends the value when the
+  drag pauses and again on release; the server now skips a value the model already has (unless the last run failed,
+  when the same value is a retry).
 - A cached cell whose lineage record belongs to another graph is a cache miss and runs again. A part-family member
   (`use("child.py", id="member")`) with such a record used to fail with `value contains graph node '...' not owned by
   active graph 'member'`. A restored cell no longer overwrites its record, and a record is only written under the id
