@@ -6,6 +6,21 @@
  */
 
 export type Envelope = Record<string, unknown> & { type: string };
+
+/** A binary frame is a `preview` envelope and the preview itself: `<u32 big-endian N><N bytes JSON><preview bytes>`
+ *  (`simplecadapi.editor.ws.preview_frame`).  The envelope handed to handlers carries the preview as `bytes`. */
+function decodeFrame(buffer: ArrayBuffer): Envelope | null {
+  if (buffer.byteLength < 4) return null;
+  const length = new DataView(buffer).getUint32(0, false);
+  if (buffer.byteLength < 4 + length) return null;
+  try {
+    const envelope = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 4, length))) as Envelope;
+    envelope["bytes"] = buffer.slice(4 + length);
+    return envelope;
+  } catch {
+    return null;
+  }
+}
 type Handler = (envelope: Envelope) => void;
 
 export class EnvelopeSocket {
@@ -29,17 +44,23 @@ export class EnvelopeSocket {
   connect(): void {
     this.closed = false;
     const ws = new WebSocket(this.url);
+    ws.binaryType = "arraybuffer";
     this.ws = ws;
     ws.onopen = () => {
       this.backoffMs = 500;
     };
     ws.onmessage = (event) => {
-      let envelope: Envelope;
-      try {
-        envelope = JSON.parse(String(event.data));
-      } catch {
-        return;
+      let envelope: Envelope | null;
+      if (event.data instanceof ArrayBuffer) {
+        envelope = decodeFrame(event.data);
+      } else {
+        try {
+          envelope = JSON.parse(String(event.data));
+        } catch {
+          return;
+        }
       }
+      if (!envelope) return;
       const set = this.handlers.get(envelope.type);
       if (set) for (const handler of set) handler(envelope);
       const anySet = this.handlers.get("*");

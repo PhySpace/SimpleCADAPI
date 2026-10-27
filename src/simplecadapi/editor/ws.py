@@ -38,16 +38,36 @@ class WsHub:
 
     def broadcast_text(self, text: str) -> None:
         """Push one pre-serialized JSON frame to every client (thread-safe)."""
+        self._push(text)
+
+    def broadcast_bytes(self, data: bytes) -> None:
+        """Push one binary frame to every client (thread-safe)."""
+        self._push(data)
+
+    def _push(self, frame: str | bytes) -> None:
         loop = self._loop
         if loop is None or loop.is_closed():
             return
-        asyncio.run_coroutine_threadsafe(self._send_all(text), loop)
+        asyncio.run_coroutine_threadsafe(self._send_all(frame), loop)
 
-    async def _send_all(self, text: str) -> None:
+    async def _send_all(self, frame: str | bytes) -> None:
         async with self._lock:
             clients = tuple(self._clients)
         for client in clients:
             try:
-                await client.send_text(text)
+                if isinstance(frame, bytes):
+                    await client.send_bytes(frame)
+                else:
+                    await client.send_text(frame)
             except Exception:
                 self._clients.discard(client)
+
+
+def preview_frame(envelope: dict[str, Any], data: bytes) -> bytes:
+    """One binary frame carrying a ``preview`` envelope and the preview itself.
+
+    ``<u32 big-endian N><N bytes of the envelope as UTF-8 JSON><the preview bytes (SCAPREV1 ...)>``.  The page gets
+    the model with the event that announces it: no second request for it.
+    """
+    header = json.dumps(envelope, ensure_ascii=False).encode("utf-8")
+    return len(header).to_bytes(4, "big") + header + data

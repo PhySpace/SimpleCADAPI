@@ -7,6 +7,10 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 ## Unreleased
 
 ### Changed
+- Editor: the model is pushed over the WebSocket with the `preview` event, in one binary frame
+  (`<u32 big-endian N><N bytes of JSON envelope><SCAPREV1 preview>`), and a page that joins late is given it on
+  connect: no second HTTP request for it. A model already on screen still travels as the bare notice
+  (`unchanged: true`). `GET /api/preview/latest` stays for agents and tools.
 - Editor: the model reaches the page sooner after the last cell. A settle makes one call into the kernel instead of
   three (the cells are listed in the call that publishes the preview), the duplicate settle a boot used to run is gone,
   and the settle debounce is 0.12 s. On the six-axis arm the time from the last cell to the preview event went from

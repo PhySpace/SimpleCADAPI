@@ -52,7 +52,7 @@ from ..runtime.workspace import features_in_cell, notebook_modules, scan_modules
 from .kernel import MarimoKernel
 from .selection import MARKER, selection_cell_code, variable_names
 from .templates import create_notebook
-from .ws import WsHub
+from .ws import WsHub, preview_frame
 
 
 def _webui_dir() -> Path:
@@ -905,7 +905,21 @@ class WorkspaceState:
 
     def emit(self, envelope: dict) -> None:
         self.remember(envelope)
-        self.hub.broadcast(envelope)
+        frame = self._preview_frame(envelope)
+        if frame is not None:
+            self.hub.broadcast_bytes(frame)
+        else:
+            self.hub.broadcast(envelope)
+
+    def _preview_frame(self, envelope: dict) -> bytes | None:
+        """The binary frame that carries a ``preview`` envelope with its model, else ``None``.
+
+        A model that is already on screen (``unchanged``) travels as the bare envelope: there is nothing to load.
+        """
+        data = self.latest_preview_bytes
+        if envelope.get("type") != "preview" or envelope.get("unchanged") or not data:
+            return None
+        return preview_frame(envelope, data)
 
     def replay(self) -> list[dict]:
         return [self.latest[key] for key in self._REPLAYED if key in self.latest]
@@ -1736,8 +1750,9 @@ def create_app(state: WorkspaceState) -> Starlette:
     async def push_preview(request: Request) -> JSONResponse:
         """The kernel hands over the preview of the model it just built.
 
-        The bytes are cached for late webuis; webuis only get a lightweight
-        revision event and fetch the bytes on demand.
+        The bytes go to every page in one binary frame with the ``preview`` event
+        (see :func:`.ws.preview_frame`) and are kept for pages that join late;
+        ``GET /api/preview/latest`` still serves them to agents and tools.
         """
         body = await request.body()
         if not body:
@@ -1905,7 +1920,11 @@ def create_app(state: WorkspaceState) -> Starlette:
         await hub.connect(websocket)
         await websocket.send_json(state.hello())
         for envelope in state.replay():
-            await websocket.send_json(envelope)
+            frame = state._preview_frame({**envelope, "unchanged": False})
+            if frame is not None:
+                await websocket.send_bytes(frame)  # a page that joins late is given the model itself
+            else:
+                await websocket.send_json(envelope)
         settled = state.settled_error()
         if settled is not None:
             await websocket.send_json(settled)

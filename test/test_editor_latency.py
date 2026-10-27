@@ -9,6 +9,7 @@ from pathlib import Path
 import tempfile
 
 import numpy as np
+import pytest
 
 import simplecadapi as scad
 from simplecadapi.editor.kernel import MarimoKernel
@@ -120,3 +121,84 @@ class OneRoundTripTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PreviewPushTest(unittest.TestCase):
+    """The model reaches a page with the event that announces it: one binary frame, no second request."""
+
+    PREVIEW = b"SCAPREV1" + b"\x00" * 64
+
+    def state(self):
+        pytest.importorskip("starlette")
+        from simplecadapi.editor.server import WorkspaceState
+
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        state = WorkspaceState(Path(tmp.name).resolve())
+        self.text: list[dict] = []
+        self.binary: list[bytes] = []
+        state.hub.broadcast = self.text.append  # type: ignore[method-assign]
+        state.hub.broadcast_bytes = self.binary.append  # type: ignore[method-assign]
+        return state
+
+    @staticmethod
+    def decode(frame: bytes) -> tuple[dict, bytes]:
+        import json
+
+        size = int.from_bytes(frame[:4], "big")
+        return json.loads(frame[4 : 4 + size].decode("utf-8")), frame[4 + size :]
+
+    def test_the_frame_is_envelope_then_model(self) -> None:
+        from simplecadapi.editor.ws import preview_frame
+
+        envelope = {"type": "preview", "revision": 3, "name": "näme", "size": 72}
+        header, model = self.decode(preview_frame(envelope, self.PREVIEW))
+        self.assertEqual(header, envelope)
+        self.assertEqual(model, self.PREVIEW)
+
+    def test_a_new_model_is_pushed_as_one_binary_frame(self) -> None:
+        state = self.state()
+        state.latest_preview_bytes = self.PREVIEW
+        state.emit({"type": "preview", "revision": 1, "name": "n", "size": len(self.PREVIEW), "unchanged": False})
+        self.assertEqual(self.text, [])
+        header, model = self.decode(self.binary[0])
+        self.assertEqual((header["type"], header["revision"]), ("preview", 1))
+        self.assertEqual(model, self.PREVIEW)
+
+    def test_a_model_already_on_screen_is_only_a_notice(self) -> None:
+        state = self.state()
+        state.latest_preview_bytes = self.PREVIEW
+        state.emit({"type": "preview", "revision": 2, "unchanged": True})
+        self.assertEqual(self.binary, [])
+        self.assertEqual(self.text[0]["unchanged"], True)
+
+    def test_other_envelopes_stay_text(self) -> None:
+        state = self.state()
+        state.latest_preview_bytes = self.PREVIEW
+        state.emit({"type": "status", "error": ""})
+        self.assertEqual(self.binary, [])
+        self.assertEqual(self.text, [{"type": "status", "error": ""}])
+
+    def test_a_page_that_joins_late_is_given_the_model_itself(self) -> None:
+        from starlette.testclient import TestClient
+
+        from simplecadapi.editor.server import create_app
+
+        state = self.state()
+        state.latest_preview_bytes = self.PREVIEW
+        # the envelope the last run left behind said "unchanged": a new page has nothing on screen
+        state.latest["preview"] = {"type": "preview", "revision": 5, "name": "n", "size": len(self.PREVIEW), "unchanged": True}
+        with TestClient(create_app(state)).websocket_connect("/ws") as socket:
+            self.assertEqual(socket.receive_json()["type"], "hello")
+            header, model = self.decode(socket.receive_bytes())
+        self.assertEqual((header["revision"], header["unchanged"]), (5, False))
+        self.assertEqual(model, self.PREVIEW)
+
+    def test_the_http_route_still_serves_the_latest_model(self) -> None:
+        from starlette.testclient import TestClient
+
+        from simplecadapi.editor.server import create_app
+
+        state = self.state()
+        state.latest_preview_bytes = self.PREVIEW
+        self.assertEqual(TestClient(create_app(state)).get("/api/preview/latest").content, self.PREVIEW)

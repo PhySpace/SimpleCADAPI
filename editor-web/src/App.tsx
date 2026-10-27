@@ -9,7 +9,7 @@ import { ModuleView, type ModuleState } from "@/components/ModuleView";
 import { NotebookList } from "@/components/NotebookList";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { fetchPreview, getWorkspace, newNotebook, openNotebook, postViewport, type ModuleRow, type NotebookRow } from "@/lib/api";
+import { getWorkspace, newNotebook, openNotebook, postViewport, type ModuleRow, type NotebookRow } from "@/lib/api";
 import { parsePreview } from "@/lib/preview";
 import { EnvelopeSocket, type Envelope } from "@/lib/envelope";
 import { useRunLog } from "@/lib/runlog";
@@ -203,7 +203,9 @@ export function App() {
         log.modelShown();
         return;
       }
-      void fetchPreview().then((buffer) => loadPreviewBytes(buffer, (envelope["name"] as string) ?? null));
+      // The model came with the event (one binary frame); a bare envelope without it is only a notice.
+      const bytes = envelope["bytes"];
+      if (bytes instanceof ArrayBuffer) void loadPreviewBytes(bytes, (envelope["name"] as string) ?? null);
       log.modelShown();
     });
 
