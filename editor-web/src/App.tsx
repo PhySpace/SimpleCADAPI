@@ -10,7 +10,7 @@ import { NotebookList } from "@/components/NotebookList";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getWorkspace, newNotebook, openNotebook, postViewport, type ModuleRow, type NotebookRow } from "@/lib/api";
-import { parsePreview } from "@/lib/preview";
+import { parsePreview, type PreviewPart } from "@/lib/preview";
 import { EnvelopeSocket, type Envelope } from "@/lib/envelope";
 import { useRunLog } from "@/lib/runlog";
 import { useTheme } from "@/lib/theme";
@@ -82,12 +82,20 @@ export function App() {
 
   // Camera framing is disruptive during slider drags; frame once per notebook.
   const framedNotebook = useRef<string | null>(null);
+  // The parts of the preview on screen, by key: a frame leaves out the ones a page has (see lib/preview.ts).
+  const partCache = useRef<Map<string, PreviewPart>>(new Map());
 
   const loadPreviewBytes = useCallback(async (buffer: ArrayBuffer, name: string | null) => {
     const view = viewRef.current;
     if (!view) return;
     try {
-      const preview = parsePreview(buffer);
+      const preview = parsePreview(buffer, partCache.current);
+      if (preview.missing.length) {
+        // The frame left out parts this page does not hold: ask for the whole model.
+        socketRef.current?.send({ type: "preview.resync" });
+        return;
+      }
+      partCache.current = preview.parts; // the parts on screen: the next frame may leave them out
       view.loadPreview(preview);
       setStatus(`${preview.nodes.length} ${preview.nodes.length === 1 ? "part" : "parts"} · ${preview.parts.size} distinct`);
       if (framedNotebook.current !== name) {

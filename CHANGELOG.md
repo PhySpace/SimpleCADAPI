@@ -25,6 +25,16 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   its cache belongs to.
 
 ### Changed
+- Editor: the preview is incremental. A model's parts are identified by the content of their geometry, so the kernel
+  posts only the parts the server does not hold, the server sends each page only the parts that page lacks (a page that
+  joins late, or asks with `preview.resync`, is given the whole model), and the page builds geometry only for new
+  parts and reuses the rest. On the six-axis arm a joint angle now moves 115 KB instead of 6.26 MB: the kernel's post
+  takes 17 ms instead of 285-610 ms, the page handles the frame in 2-5 ms with no long task, and from the last cell
+  to the model on screen it takes 0.36-0.41 s instead of 1.3-3.2 s. `simplecadapi.scene.preview.encode_preview` takes
+  `omit=` for the parts to leave out; the editor keeps parts in `simplecadapi.editor.preview_parts.PartStore`.
+- Editor: the signature that files a model on disk is taken beside the build, not before it, and the server replies to
+  the kernel's post before filing the model and writing the snapshot. `SCA_EDITOR_TRACE=1` prints how long each step
+  of a settle takes.
 - `use` keeps the product of the last run of each child notebook in the process and hands it out again while the
   child's static digest (source, header, local modules, input files, the children it uses) and the overrides are
   unchanged (`simplecadapi.runtime.usememo`; `SCA_NO_USE_MEMO=1` turns it off). One entry per (notebook, id): the run's

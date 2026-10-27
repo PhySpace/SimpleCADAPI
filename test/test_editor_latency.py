@@ -248,3 +248,63 @@ class RepeatedParamTest(unittest.TestCase):
         state._last_publish_error = "the cell failed"
         state._apply_params(state.kernel, {"RADIUS": 40.0})
         self.assertEqual(len(self.runs), 2)
+
+
+class SignatureBesideTheBuildTest(unittest.TestCase):
+    """The signature of a publish is taken beside the build and files that publish's model, whatever came after."""
+
+    def state(self):
+        pytest.importorskip("starlette")
+        from simplecadapi.editor.server import WorkspaceState
+        from simplecadapi.editor.templates import create_notebook
+
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name).resolve()
+        state = WorkspaceState(root, create_notebook(root, "bracket", "part"))
+        self.filed: list[tuple[str, bytes]] = []
+        state.remember_model = lambda notebook, signature, data: self.filed.append((signature, data))  # type: ignore[method-assign]
+        state.write_snapshot = lambda: None  # type: ignore[method-assign]
+        return state
+
+    def test_the_signature_is_taken_in_the_background_and_waited_for_when_filing(self) -> None:
+        import threading
+
+        state = self.state()
+        release = threading.Event()
+
+        def slow(notebook):
+            release.wait(5)
+            return "sig-1"
+
+        state._signature = slow  # type: ignore[method-assign]
+        state._sign_in_background()
+        self.assertIsNone(state._publish_signature)  # not there yet: nothing waited for it
+        signing = state._signing
+        worker = threading.Thread(target=state.after_publish, args=(0.0, 10, signing, b"model-1"))
+        worker.start()
+        self.assertEqual(self.filed, [])  # filing waits for the signature
+        release.set()
+        worker.join(5)
+        self.assertEqual(self.filed, [("sig-1", b"model-1")])
+
+    def test_a_later_publish_does_not_change_the_pair_of_an_earlier_one(self) -> None:
+        state = self.state()
+        signatures = iter(["sig-1", "sig-2"])
+        state._signature = lambda notebook: next(signatures)  # type: ignore[method-assign]
+        state._sign_in_background()
+        first = state._signing
+        state._sign_in_background()  # the next publish starts before the first one is filed
+        state.after_publish(0.0, 1, first, b"model-1")
+        self.assertEqual(self.filed, [("sig-1", b"model-1")])
+
+    def test_a_failed_signature_files_nothing(self) -> None:
+        state = self.state()
+
+        def broken(notebook):
+            raise OSError("gone")
+
+        state._signature = broken  # type: ignore[method-assign]
+        state._sign_in_background()
+        state.after_publish(0.0, 1, state._signing, b"model")
+        self.assertEqual(self.filed, [])

@@ -19,6 +19,7 @@ import asyncio
 import hashlib
 import json
 import re
+import os
 import sys
 import threading
 import time
@@ -52,6 +53,8 @@ from ..runtime.workspace import features_in_cell, notebook_modules, scan_modules
 from .kernel import MarimoKernel
 from .selection import MARKER, selection_cell_code, variable_names
 from .templates import create_notebook
+from ..scene.preview import PreviewError
+from .preview_parts import PartStore, parse_preview
 from .ws import WsHub, preview_frame
 
 
@@ -79,6 +82,14 @@ def pick_notebook(workspace: Path, prefer: Path | None = None) -> Path | None:
     tops = [e for e in entries if e.kind == "assembly" and e.path not in used]
     chosen = (tops or entries)[0]
     return (workspace / chosen.path).resolve()
+
+
+class _Signing:
+    """The signature being taken for one publish, and when it is done."""
+
+    def __init__(self) -> None:
+        self.value: str | None = None
+        self.done = threading.Event()
 
 
 class WorkspaceState:
@@ -114,6 +125,10 @@ class WorkspaceState:
         self.latest: dict[str, dict] = {}
         self.latest_package_bytes: bytes | None = None  # a full package, made on demand (export)
         self.latest_preview_bytes: bytes | None = None
+        # The parts of the latest preview by key, and what it is made of: a page is sent only the parts it lacks.
+        self.part_store = PartStore()
+        self.scene_nodes: list[dict] | None = None
+        self.latest_keys: frozenset[str] = frozenset()
         self.preview_revision = 0
         self._package_event = threading.Event()
         self.selection: dict = {}
@@ -135,6 +150,7 @@ class WorkspaceState:
         self._module_lock = threading.Lock()
         self._packages: OrderedDict[str, tuple[str, bytes]] = OrderedDict()
         self._publish_signature: str | None = None
+        self._signing: _Signing | None = None
         self._stopped = False
         self._selection_code: str | None = None
         self._selection_busy = False
@@ -212,6 +228,7 @@ class WorkspaceState:
             # Let the webuis drop the old model now; commands have no kernel until the new one is up.
             self.latest.clear()
             self.latest_preview_bytes = None
+            self.scene_nodes = None
             self._drop_kernel()
         return True
 
@@ -265,6 +282,7 @@ class WorkspaceState:
             if not restored:
                 self.latest.clear()
                 self.latest_preview_bytes = None
+                self.scene_nodes = None
                 self.cells = []
                 self.specs = {}
             self._watched = self._watched_files()[0]
@@ -361,7 +379,7 @@ class WorkspaceState:
             return False
         self.notebook = notebook
         self._publish_cells(_static_cells(notebook))
-        self.latest_preview_bytes = data
+        self.set_preview(data)
         self.preview_revision += 1
         self.emit(
             {
@@ -905,21 +923,47 @@ class WorkspaceState:
 
     def emit(self, envelope: dict) -> None:
         self.remember(envelope)
-        frame = self._preview_frame(envelope)
-        if frame is not None:
-            self.hub.broadcast_bytes(frame)
+        if envelope.get("type") == "preview" and not envelope.get("unchanged") and self.latest_preview_bytes:
+            if self.scene_nodes is not None:
+                nodes, store = self.scene_nodes, self.part_store
+                # Each page gets the parts it lacks, together with the event that announces the model.
+                self.hub.broadcast_preview(
+                    lambda known: preview_frame(envelope, store.assemble(nodes, omit=known)), self.latest_keys
+                )
+            else:
+                self.hub.broadcast_bytes(preview_frame(envelope, self.latest_preview_bytes))
         else:
             self.hub.broadcast(envelope)
 
-    def _preview_frame(self, envelope: dict) -> bytes | None:
-        """The binary frame that carries a ``preview`` envelope with its model, else ``None``.
+    def set_preview(self, data: bytes) -> bool:
+        """Take *data* (a full preview, or one with parts the store already holds) as the latest model.
 
-        A model that is already on screen (``unchanged``) travels as the bare envelope: there is nothing to load.
+        Returns whether it is the model already held.  Bytes that are not a preview are kept as they are.  Raises
+        ``KeyError`` (with the missing part keys) when a part is neither in *data* nor in the store.
         """
+        try:
+            parsed = parse_preview(data)
+        except PreviewError:
+            # Not a preview this server can split (a tool's own bytes): kept and sent whole.
+            unchanged = self.latest_preview_bytes == data
+            self.scene_nodes, self.latest_keys, self.latest_preview_bytes = None, frozenset(), bytes(data)
+            return unchanged
+        missing = self.part_store.missing(parsed.needed - parsed.parts.keys())
+        if missing:
+            raise KeyError(sorted(missing))
+        self.part_store.put(parsed.parts, keep=parsed.needed)
+        self.part_store.touch(parsed.needed)
+        full = self.part_store.assemble(parsed.nodes)
+        unchanged = self.latest_preview_bytes == full
+        self.scene_nodes, self.latest_keys, self.latest_preview_bytes = parsed.nodes, frozenset(parsed.needed), full
+        return unchanged
+
+    def full_preview_frame(self, envelope: dict) -> bytes | None:
+        """The frame that gives a page the whole model with *envelope*, else ``None`` (no model yet)."""
         data = self.latest_preview_bytes
-        if envelope.get("type") != "preview" or envelope.get("unchanged") or not data:
+        if envelope.get("type") != "preview" or not data:
             return None
-        return preview_frame(envelope, data)
+        return preview_frame({**envelope, "unchanged": False}, data)
 
     def replay(self) -> list[dict]:
         return [self.latest[key] for key in self._REPLAYED if key in self.latest]
@@ -957,6 +1001,52 @@ class WorkspaceState:
             self._settle_timer.daemon = True
             self._settle_timer.start()
 
+    def _sign_in_background(self) -> None:
+        """Start taking the signature of what is about to be published (see :meth:`after_publish`)."""
+        notebook = self.notebook
+        self._publish_signature = None
+        signing = _Signing()
+        self._signing = signing
+        if notebook is None:
+            signing.done.set()
+            return
+
+        def work() -> None:
+            began = time.perf_counter()
+            try:
+                signing.value = self._signature(notebook)
+            except (OSError, ValueError):
+                signing.value = None
+            if self._signing is signing:
+                self._publish_signature = signing.value
+            signing.done.set()
+            if os.environ.get("SCA_EDITOR_TRACE"):
+                print(f"[sca edit] signature {(time.perf_counter() - began) * 1000:.0f} ms (beside the build)", file=sys.stderr, flush=True)
+
+        threading.Thread(target=work, name="signature", daemon=True).start()
+
+    def after_publish(self, arrived: float, posted: int, signing: "_Signing | None", model: bytes | None) -> None:
+        """What follows a published preview: file *model* under the signature taken for it, write the snapshot.
+
+        The signature and the model are the pair of one publish: a later publish does not change them under it.
+        """
+        try:
+            signature = None
+            if signing is not None:
+                signing.done.wait()
+                signature = signing.value
+            if self.notebook is not None and signature is not None and model:
+                self.remember_model(self.notebook, signature, model)
+            self.write_snapshot()
+        finally:
+            if os.environ.get("SCA_EDITOR_TRACE"):
+                print(
+                    f"[sca edit] push: {(time.perf_counter() - arrived) * 1000:.0f} ms until filed ({posted / 1e6:.2f} MB posted, "
+                    f"model {len(model or b'') / 1e6:.2f} MB)",
+                    file=sys.stderr,
+                    flush=True,
+                )
+
     def _settle_in_thread(self) -> None:
         try:
             with self._settle_lock:
@@ -975,15 +1065,24 @@ class WorkspaceState:
             return
         with self._settle_lock:
             self._settle_dirty = False
-            # The signature of what is published is taken before it is built.
-            try:
-                self._publish_signature = self._signature(self.notebook) if self.notebook else None
-            except (OSError, ValueError):
-                self._publish_signature = None
+            began = time.perf_counter()
+            # The signature of what is published is taken as the build starts, beside it: it is only needed to
+            # file the model once it is published, so it must not hold the model back.
+            self._sign_in_background()
             # One round trip into the kernel: it lists the cells in the same call that publishes the preview
             # (the kernel keeps what it listed for the push below).
+            signed = began
             result = kernel.publish_preview(self.preview_url, step=self.notebook.stem if self.notebook else "")
+            published = time.perf_counter()
             self.push_cells()
+            if os.environ.get("SCA_EDITOR_TRACE"):
+                print(
+                    f"[sca edit] settle: kernel call {(published - signed) * 1000:.0f} ms "
+                    f"(compile {result.get('compile_ms', '-')}, encode {result.get('encode_ms', '-')}, post {result.get('post_ms', '-')}), "
+                    f"cells {(time.perf_counter() - published) * 1000:.0f} ms",
+                    file=sys.stderr,
+                    flush=True,
+                )
             if result.get("ok"):
                 self._last_publish_error = ""
                 self._stopped = False
@@ -1765,8 +1864,12 @@ def create_app(state: WorkspaceState) -> Starlette:
         body = await request.body()
         if not body:
             return JSONResponse({"ok": False, "error": "empty preview"}, status_code=400)
-        unchanged = state.latest_preview_bytes == body
-        state.latest_preview_bytes = bytes(body)
+        arrived = time.perf_counter()
+        try:
+            unchanged = state.set_preview(bytes(body))
+        except KeyError as missing:
+            # Parts the kernel left out are not here (the server was given another model since): it sends them all.
+            return JSONResponse({"ok": False, "missing": missing.args[0]}, status_code=409)
         state.preview_revision += 1
         state.emit(
             {
@@ -1774,16 +1877,20 @@ def create_app(state: WorkspaceState) -> Starlette:
                 "revision": state.preview_revision,
                 "step": request.headers.get("X-Live-Step", ""),
                 "name": state.notebook.stem if state.notebook else None,
-                "size": len(body),
+                "size": len(state.latest_preview_bytes or b""),
                 # The model on screen is this model: nothing to reload.
                 "unchanged": unchanged,
             }
         )
-        if state.notebook is not None and state._publish_signature is not None:
-            await asyncio.to_thread(state.remember_model, state.notebook, state._publish_signature, bytes(body))
-        # The model is fine again: clear a stale "no product yet" message.
-        hub.broadcast({"type": "status", "error": ""})
-        await asyncio.to_thread(state.write_snapshot)
+        # The pages have the model.  Filing it on disk (and the snapshot an agent reads) wait for nothing: the kernel
+        # that posted it is released now and goes on.
+        hub.broadcast({"type": "status", "error": ""})  # the model is fine again: clear a stale "no product yet"
+        threading.Thread(
+            target=state.after_publish,
+            args=(arrived, len(body), state._signing, state.latest_preview_bytes),
+            name="after-publish",
+            daemon=True,
+        ).start()
         return JSONResponse({"ok": True, "revision": state.preview_revision})
 
     async def latest_preview(request: Request) -> Response:
@@ -1928,9 +2035,10 @@ def create_app(state: WorkspaceState) -> Starlette:
         await hub.connect(websocket)
         await websocket.send_json(state.hello())
         for envelope in state.replay():
-            frame = state._preview_frame({**envelope, "unchanged": False})
+            frame = state.full_preview_frame(envelope)
             if frame is not None:
                 await websocket.send_bytes(frame)  # a page that joins late is given the model itself
+                hub.set_known(websocket, state.latest_keys)
             else:
                 await websocket.send_json(envelope)
         settled = state.settled_error()
@@ -1940,7 +2048,13 @@ def create_app(state: WorkspaceState) -> Starlette:
             while True:
                 message = await websocket.receive_json()
                 try:
-                    if isinstance(message, dict) and str(message.get("type", "")).endswith(
+                    if isinstance(message, dict) and message.get("type") == "preview.resync":
+                        # The page lacks a part its delta named: it is given the whole model.
+                        frame = state.full_preview_frame(state.latest.get("preview", {"type": "preview"}))
+                        if frame is not None:
+                            await websocket.send_bytes(frame)
+                            hub.set_known(websocket, state.latest_keys)
+                    elif isinstance(message, dict) and str(message.get("type", "")).endswith(
                         (".set", ".request", ".edit", ".commit", ".revert", ".save", ".open", ".close", ".param", ".info")
                     ):
                         ack = await asyncio.to_thread(state.dispatch_command, message)

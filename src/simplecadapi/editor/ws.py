@@ -9,14 +9,15 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any
+from typing import Any, Callable, Collection
 
 from starlette.websockets import WebSocket
 
 
 class WsHub:
     def __init__(self) -> None:
-        self._clients: set[WebSocket] = set()
+        # Each page and the preview parts it holds: a page is sent only the parts it lacks.
+        self._clients: dict[WebSocket, set[str]] = {}
         self._lock = asyncio.Lock()
         self._loop: asyncio.AbstractEventLoop | None = None
 
@@ -27,10 +28,32 @@ class WsHub:
     async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
         async with self._lock:
-            self._clients.add(websocket)
+            self._clients[websocket] = set()
 
     def disconnect(self, websocket: WebSocket) -> None:
-        self._clients.discard(websocket)
+        self._clients.pop(websocket, None)
+
+    def set_known(self, websocket: WebSocket, keys: Collection[str]) -> None:
+        """The page behind *websocket* holds exactly these preview parts (it was just sent them)."""
+        if websocket in self._clients:
+            self._clients[websocket] = set(keys)
+
+    def broadcast_preview(self, make_frame: Callable[[frozenset[str]], bytes], keys: Collection[str]) -> None:
+        """Push a preview to every page: ``make_frame(parts the page has)`` builds its frame (thread-safe)."""
+        loop = self._loop
+        if loop is None or loop.is_closed():
+            return
+        asyncio.run_coroutine_threadsafe(self._send_preview(make_frame, frozenset(keys)), loop)
+
+    async def _send_preview(self, make_frame: Callable[[frozenset[str]], bytes], keys: frozenset[str]) -> None:
+        async with self._lock:
+            clients = tuple(self._clients.items())
+        for client, known in clients:
+            try:
+                await client.send_bytes(make_frame(frozenset(known)))
+                self._clients[client] = set(keys)
+            except Exception:
+                self._clients.pop(client, None)
 
     def broadcast(self, message: dict[str, Any]) -> None:
         """Push one JSON message to every connected client (thread-safe)."""
@@ -60,7 +83,7 @@ class WsHub:
                 else:
                     await client.send_text(frame)
             except Exception:
-                self._clients.discard(client)
+                self._clients.pop(client, None)
 
 
 def preview_frame(envelope: dict[str, Any], data: bytes) -> bytes:

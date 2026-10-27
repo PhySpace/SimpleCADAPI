@@ -12,6 +12,7 @@ in the kernel once the cells have settled.
 
 from __future__ import annotations
 
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -89,16 +90,15 @@ def live_package(*, validate: bool = False) -> LivePackage:
 _last_preview: PreviewScene | None = None
 """The scene last previewed in this kernel: what :func:`preview_entity_info` answers about."""
 
+last_timings: dict[str, float] = {}
+"""Milliseconds the last :func:`live_preview` / :func:`publish_preview` spent: ``compile_ms``, ``encode_ms``, ``post_ms``."""
 
-def live_preview() -> tuple[bytes, PreviewScene]:
-    """The preview of the running notebook's product, from the values in the kernel.
 
-    Unlike :func:`live_package` this does not project the product onto a
-    definition: it looks at the solids as they are, which takes a fraction of the
-    time (see :mod:`simplecadapi.scene.preview`).
-    """
+def _live_scene() -> PreviewScene:
+    """The preview scene of the running notebook's product (not yet encoded)."""
 
     global _last_preview
+    started = time.perf_counter()
     context = safe_get_context()
     if context is None or context.filename is None:
         raise LiveUnavailableError("not running inside a marimo kernel")
@@ -112,26 +112,70 @@ def live_preview() -> tuple[bytes, PreviewScene]:
     values = {name: glbls[name] for cell in ordered for name in cell.defs if name in glbls}
     read = frozenset().union(*(cell.refs for cell in ordered))
     scene = compile_preview(find_product(config, values, read))
+    last_timings["compile_ms"] = round((time.perf_counter() - started) * 1000, 1)
     _last_preview = scene
-    return encode_preview(scene), scene
+    return scene
 
 
-def publish_preview(url: str, *, step: str = "", timeout: float = 60.0) -> dict[str, Any]:
-    """:func:`live_preview`, then POST the bytes to *url*; returns a short summary."""
+def live_preview() -> tuple[bytes, PreviewScene]:
+    """The preview of the running notebook's product, from the values in the kernel.
 
-    data, scene = live_preview()
+    Unlike :func:`live_package` this does not project the product onto a
+    definition: it looks at the solids as they are, which takes a fraction of the
+    time (see :mod:`simplecadapi.scene.preview`).
+    """
+
+    scene = _live_scene()
+    encoded = time.perf_counter()
+    data = encode_preview(scene)
+    last_timings["encode_ms"] = round((time.perf_counter() - encoded) * 1000, 1)
+    return data, scene
+
+
+_posted: set[str] = set()
+"""The part keys of the preview this kernel last posted: the server holds them (it keeps the parts of its latest model)."""
+
+
+def _post(url: str, data: bytes, step: str, delta: bool, timeout: float) -> None:
     request = urllib.request.Request(
         url,
         data=data,
-        headers={"Content-Type": PREVIEW_MEDIA_TYPE, "X-Live-Step": step},
+        headers={"Content-Type": PREVIEW_MEDIA_TYPE, "X-Live-Step": step, "X-Preview-Delta": "1" if delta else "0"},
         method="POST",
     )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        response.read()
+
+
+def publish_preview(url: str, *, step: str = "", timeout: float = 60.0) -> dict[str, Any]:
+    """:func:`live_preview`, then POST it to *url*; returns a short summary.
+
+    Only the parts the server does not hold are sent: it keeps the parts of the model it was last given, so after a
+    joint angle changed nothing but the nodes travel.  When the server answers that it lacks a part (it was given
+    another model meanwhile) the whole preview is sent.
+    """
+
+    global _posted
+    scene = _live_scene()
+    omit = _posted & scene.parts.keys()
+    encoded = time.perf_counter()
+    data = encode_preview(scene, omit)
+    last_timings["encode_ms"] = round((time.perf_counter() - encoded) * 1000, 1)
+    posted = time.perf_counter()
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            response.read()
+        try:
+            _post(url, data, step, bool(omit), timeout)
+        except urllib.error.HTTPError as error:
+            if error.code != 409:
+                raise
+            data = encode_preview(scene)  # the server lacks parts: send it all
+            _post(url, data, step, False, timeout)
     except (urllib.error.URLError, OSError) as error:
+        _posted = set()
         raise RuntimeError(f"publishing the preview to {url} failed: {error}") from error
-    return {"nodes": len(scene.nodes), "parts": len(scene.parts), "bytes": len(data)}
+    _posted = set(scene.parts)
+    last_timings["post_ms"] = round((time.perf_counter() - posted) * 1000, 1)
+    return {"nodes": len(scene.nodes), "parts": len(scene.parts), "bytes": len(data), **last_timings}
 
 
 def preview_entity_info(entity_id: str) -> dict[str, Any] | None:

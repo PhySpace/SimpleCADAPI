@@ -586,7 +586,7 @@ class MarimoKernel:
             "from simplecadapi.runtime.live import publish_preview as _preview\n"
             "try:\n"
             f"    _p = _preview({url!r}, step={step!r})\n"
-            "    print('SCA-PREVIEWED', _p['nodes'], _p['parts'], _p['bytes'])\n"
+            "    print('SCA-PREVIEWED', _p['nodes'], _p['parts'], _p['bytes'], _p.get('compile_ms', 0), _p.get('encode_ms', 0), _p.get('post_ms', 0))\n"
             "except Exception as _e:\n"
             "    print('SCA-PREVIEW-ERROR', type(_e).__name__ + ':', str(_e).splitlines()[0] if str(_e) else '')\n"
         )
@@ -595,8 +595,11 @@ class MarimoKernel:
     def _preview_result(result: dict) -> dict:
         for line in (result.get("log") or "").splitlines():
             if line.startswith("SCA-PREVIEWED "):
-                _, nodes, parts, size = line.split(" ")
-                return {"ok": True, "nodes": int(nodes), "parts": int(parts), "bytes": int(size)}
+                _, nodes, parts, size, *times = line.split(" ")
+                result = {"ok": True, "nodes": int(nodes), "parts": int(parts), "bytes": int(size)}
+                if len(times) == 3:  # the kernel's own clock: compile, encode, post (milliseconds)
+                    result.update(compile_ms=float(times[0]), encode_ms=float(times[1]), post_ms=float(times[2]))
+                return result
             if line.startswith("SCA-PREVIEW-ERROR "):
                 return {"ok": False, "error": line[len("SCA-PREVIEW-ERROR "):]}
         return {"ok": False, "error": (result.get("log") or "preview failed").strip()[-300:]}
