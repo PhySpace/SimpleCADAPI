@@ -208,6 +208,7 @@ print(len(rebuilt))
 - `references/workflows/` — goal-oriented workflows, including drawing reconstruction
 - `references/domains/` — capability domains, including drawing inspection
 - `references/discipline/` — modeling knowledge and invariants
+- `references/discipline/verifier-scripts.md` — writing a verifier script (OCP through `simplecadapi.verify`)
 - `references/SDK_OVERVIEW.md` — package-level map
 - `references/inspect/brep-reverse-engineering.md`
 - `references/domains/addon-development.md` — `sca` addon CLI and authoring guide

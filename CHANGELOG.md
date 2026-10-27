@@ -6,6 +6,16 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+### Added
+- `simplecadapi.verify` (`to_ocp`, `from_ocp`) and the `verify` extra (`pip install "simplecadapi[verify]"`, OCP 7.9
+  without VTK) for verifier scripts: `shape.wrapped` is the SDK's own binding and OCP functions reject it. The SDK
+  itself still never imports OCP. The skill gains `references/discipline/verifier-scripts.md` with the recipes
+  (volume, bounds, validity, point in solid, distance, overlap) and a verifier skeleton.
+
+### Removed
+- The `fem` extra (`gmsh` and `ccx2paraview[VTK]`) and the README steps that used it; the `gmsh` extra stays. VTK is no
+  longer in the lock file at all.
+
 ## 2.2.7b1 — 2026-10-24
 
 ### Added

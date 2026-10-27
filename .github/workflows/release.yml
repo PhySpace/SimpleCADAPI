@@ -313,6 +313,9 @@ jobs:
         run: |
           .venv/bin/python -m pytest test tests -q
           .venv/bin/python -m pytest src/cpp/tests/python -q
+          # Last: the verifier bridge needs OCP, which nothing above may find installed.
+          uv pip install --python .venv/bin/python "cadquery-ocp-novtk>=7.9.3.1,<8"
+          .venv/bin/python -m pytest src/cpp/tests/python/test_verify_bridge.py -q
 
   release:
     name: Build the skill and publish the release

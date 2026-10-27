@@ -29,6 +29,10 @@ invalid — correct bounds and volume, one bad face — which survives until the
 next operation fails far from the cause. Gate every boolean result, not just
 the final one.
 
+A verifier that measures with the full OCCT toolbox (point classification,
+minimum distance, Boolean overlap) is covered by
+`references/discipline/verifier-scripts.md`.
+
 ## Incremental grounding
 
 Every major step prints a small QL-derived fact: selected face count, a
