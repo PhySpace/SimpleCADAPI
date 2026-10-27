@@ -6,6 +6,16 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+### Changed
+- Editor: the model reaches the page sooner after the last cell. A settle makes one call into the kernel instead of
+  three (the cells are listed in the call that publishes the preview), the duplicate settle a boot used to run is gone,
+  and the settle debounce is 0.12 s. On the six-axis arm the time from the last cell to the preview event went from
+  about 0.83 s (plus a second, redundant round of 0.27 s) to about 0.36 s.
+- Editor: parts are tessellated in the background while the next cell computes (`simplecadapi.scene.prewarm`;
+  `SCA_NO_PREVIEW_WARM=1` turns it off). `cached_mesh` runs without the interpreter lock for that; a failure is
+  recorded on the shape back under the lock.
+- Preview edge polylines are keyed with one numpy pass instead of one `struct.pack` per point; the bytes are identical.
+
 ## 2.2.7b1 — 2026-10-24
 
 ### Added

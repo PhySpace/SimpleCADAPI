@@ -123,6 +123,7 @@ class SimpleCadExecutor:
         cache = self._cache_for(scope, cell)
         restored = _restore(cache, cell, glbls)
         if restored is not _MISS:
+            self._warm_preview(cell, glbls)
             return restored
         cache = cache if restored is _MISS else None
         _prefetch(scope, cell, glbls)
@@ -134,6 +135,7 @@ class SimpleCadExecutor:
             _store(cache, cell, glbls, None, error)
             raise
         _store(cache, cell, glbls, result, None)
+        self._warm_preview(cell, glbls)
         return result
 
     async def execute_cell_async(self, cell: CellImpl, glbls: MutableGlobals) -> Any:
@@ -143,6 +145,7 @@ class SimpleCadExecutor:
         cache = self._cache_for(scope, cell)
         restored = _restore(cache, cell, glbls)
         if restored is not _MISS:
+            self._warm_preview(cell, glbls)
             return restored
         _prefetch(scope, cell, glbls)
         try:
@@ -153,7 +156,17 @@ class SimpleCadExecutor:
             _store(cache, cell, glbls, None, error)
             raise
         _store(cache, cell, glbls, result, None)
+        self._warm_preview(cell, glbls)
         return result
+
+    def _warm_preview(self, cell: CellImpl, glbls: MutableGlobals) -> None:
+        """The editor kernel tessellates what the cell made in the background (see :mod:`..scene.prewarm`)."""
+
+        if self._scope is not None or os.environ.get("SCA_NO_PREVIEW_WARM"):
+            return
+        from ..scene import prewarm
+
+        prewarm.submit(glbls[name] for name in cell.defs if name in glbls)
 
     def _apply_saved(
         self, scope: NotebookScope, cell: CellImpl, glbls: MutableGlobals

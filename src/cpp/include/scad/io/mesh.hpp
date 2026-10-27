@@ -143,6 +143,10 @@ TriMesh build_solid_trimesh(const Shape& solid, double linear_tolerance = kDefau
 std::shared_ptr<const TriMesh> cached_mesh(const Shape& solid,
                                            double linear_tolerance = kDefaultLinearDeflection,
                                            double angular_tolerance = kDefaultAngularDeflection);
+// The same without touching the shape: a failure's diagnostic is stored in `*error` instead of on the shape, so
+// the call is safe on a thread that holds no lock on the shape (the editor meshes parts in the background).
+std::shared_ptr<const TriMesh> cached_mesh_detached(const Shape& solid, double linear_tolerance,
+                                                    double angular_tolerance, std::string* error);
 // The diagnostic recorded by the last failed cached_mesh on this shape, or "".
 std::string mesh_error(const Shape& solid);
 // Drop every cached mesh (tests, memory pressure).

@@ -141,6 +141,7 @@ class WorkspaceState:
         self._selection_lock = threading.Lock()
         self._settle_timer: threading.Timer | None = None
         self._settle_lock = threading.Lock()
+        self._settle_dirty = True  # a run ended (or the notebook just opened) since the last settle
         self._last_publish_error = ""
         self._generation = 0
         self._switch_lock = threading.Lock()
@@ -937,12 +938,18 @@ class WorkspaceState:
         with self._settle_lock:
             if self._settle_timer is not None:
                 self._settle_timer.cancel()
-            self._settle_timer = threading.Timer(0.4, self._settle_in_thread)
+            self._settle_dirty = True
+            self._settle_timer = threading.Timer(0.12, self._settle_in_thread)
             self._settle_timer.daemon = True
             self._settle_timer.start()
 
     def _settle_in_thread(self) -> None:
         try:
+            with self._settle_lock:
+                if not self._settle_dirty:
+                    # The settle that ran meanwhile (a boot's own, which the run it ended with also asked for)
+                    # already published what these runs made.
+                    return
             self.settle()
         except Exception as exc:  # never let a timer thread die silently
             self.hub.broadcast({"type": "status", "error": str(exc)[-300:]})
@@ -953,13 +960,16 @@ class WorkspaceState:
         if kernel is None:
             return
         with self._settle_lock:
-            self.push_cells()
+            self._settle_dirty = False
             # The signature of what is published is taken before it is built.
             try:
                 self._publish_signature = self._signature(self.notebook) if self.notebook else None
             except (OSError, ValueError):
                 self._publish_signature = None
+            # One round trip into the kernel: it lists the cells in the same call that publishes the preview
+            # (the kernel keeps what it listed for the push below).
             result = kernel.publish_preview(self.preview_url, step=self.notebook.stem if self.notebook else "")
+            self.push_cells()
             if result.get("ok"):
                 self._last_publish_error = ""
                 self._stopped = False

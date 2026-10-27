@@ -1,0 +1,122 @@
+"""The editor's post-run latency: vectorised edge keys, preview prewarm, one kernel round trip per settle."""
+
+from __future__ import annotations
+
+import threading
+import time
+import unittest
+from pathlib import Path
+import tempfile
+
+import numpy as np
+
+import simplecadapi as scad
+from simplecadapi.editor.kernel import MarimoKernel
+from simplecadapi.scene import prewarm, preview
+from simplecadapi.scene.render_mesh import _position_key, _position_keys, cad_to_gltf
+
+
+class PositionKeysTest(unittest.TestCase):
+    """``_position_keys`` is ``_position_key(cad_to_gltf(point))`` for each point: same bytes, one numpy pass."""
+
+    def test_matches_the_scalar_path_byte_for_byte(self) -> None:
+        rng = np.random.default_rng(7)
+        points = [tuple(row) for row in rng.uniform(-5000, 5000, size=(500, 3))]
+        points += [(0.0, -0.0, 1e-46), (-0.0, 0.0, -1e-46), (123456.789, -98765.4321, 3.3e5), (1e12, -1e12, 0.0), (1e-3, 1e-3, 1e-3)]
+        self.assertEqual(_position_keys(points), [_position_key(cad_to_gltf(point)) for point in points])
+
+    def test_an_empty_polyline_has_no_keys(self) -> None:
+        self.assertEqual(_position_keys([]), [])
+
+    def test_the_profile_errors_are_unchanged(self) -> None:
+        with self.assertRaisesRegex(ValueError, "finite"):
+            _position_keys([(float("nan"), 0.0, 0.0)])
+        with self.assertRaisesRegex(ValueError, "overflowed"):
+            _position_keys([(1e300, 0.0, 0.0)])
+
+
+class PrewarmTest(unittest.TestCase):
+    def setUp(self) -> None:
+        preview.clear_preview_cache()
+
+    def test_solids_of_finds_parts_assemblies_and_solids_once(self) -> None:
+        box = scad.make_box_rsolid(10, 10, 10)
+        part = scad.make_part_rpart(part_id="p", body=box, name="p")
+        self.assertEqual([s.topo_id for s in prewarm.solids_of([part, part, box])], [box.topo_id, box.topo_id])
+        self.assertEqual(list(prewarm.solids_of([1, "x", None, {"a": box}])), [])
+
+    def test_a_submitted_solid_is_in_the_preview_cache_afterwards(self) -> None:
+        box = scad.make_box_rsolid(12, 8, 5)
+        key = preview.part_key(box, preview.DEFAULT_LINEAR_TOLERANCE, preview.DEFAULT_ANGULAR_TOLERANCE)
+        self.assertIsNone(preview._recall(key))
+        self.assertEqual(prewarm.submit([box]), 1)
+        deadline = time.monotonic() + 10
+        while preview._recall(key) is None and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertIsNotNone(preview._recall(key))
+
+    def test_nothing_a_cell_defined_can_make_submit_fail(self) -> None:
+        class Hostile:
+            def __iter__(self):
+                raise RuntimeError("boom")
+
+        self.assertEqual(prewarm.submit(Hostile()), 0)
+
+    def test_meshing_beside_other_work_gives_the_same_mesh(self) -> None:
+        """``cached_mesh`` runs without the interpreter lock: a mesh made on another thread is the one made here."""
+
+        solid = scad.make_cylinder_rsolid(6, 20)
+        made: list = []
+        worker = threading.Thread(target=lambda: made.append(preview.preview_solid(solid)))
+        worker.start()
+        for _ in range(20):
+            scad.make_box_rsolid(5, 5, 5)  # the main thread keeps computing meanwhile
+        worker.join(10)
+        self.assertEqual(len(made), 1)
+        again = preview.preview_solid(solid)
+        self.assertIs(made[0], again)  # served from the cache, not meshed twice
+
+
+class OneRoundTripTest(unittest.TestCase):
+    """A settle lists the cells in the call that publishes the preview; nothing else reuses that listing."""
+
+    def kernel(self) -> tuple[MarimoKernel, list[str]]:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        path = Path(tmp.name) / "n.py"
+        path.write_text("x = 1\n")
+        calls: list[str] = []
+        kernel = MarimoKernel(path, server_port=8123)
+
+        def run(code: str, timeout) -> dict:  # the HTTP call under MarimoKernel.execute, which is the real one
+            calls.append("preview" if "SCA-PREVIEWED" in code else "cells")
+            log = '[{"id": "a", "name": "_", "code": "x = 1", "status": "idle"}]\nSCA-PREVIEWED 1 1 10\n'
+            return {"log": log}
+
+        kernel._execute = run  # type: ignore[method-assign]
+        return kernel, calls
+
+    def test_publishing_lists_the_cells_in_the_same_call(self) -> None:
+        kernel, calls = self.kernel()
+        result = kernel.publish_preview("http://x/preview", step="n")
+        self.assertEqual(result, {"ok": True, "nodes": 1, "parts": 1, "bytes": 10})
+        self.assertEqual([c["id"] for c in kernel.list_cells()], ["a"])
+        self.assertEqual(calls, ["preview"])  # one call into the kernel, not two
+
+    def test_the_listing_is_used_once(self) -> None:
+        kernel, calls = self.kernel()
+        kernel.publish_preview("http://x/preview")
+        kernel.list_cells()
+        kernel.list_cells()
+        self.assertEqual(calls, ["preview", "cells"])
+
+    def test_a_listing_older_than_the_call_that_followed_is_not_reused(self) -> None:
+        kernel, calls = self.kernel()
+        kernel.publish_preview("http://x/preview")
+        kernel.execute("anything")  # something ran in the kernel meanwhile
+        kernel.list_cells()
+        self.assertEqual(calls, ["preview", "cells", "cells"])
+
+
+if __name__ == "__main__":
+    unittest.main()

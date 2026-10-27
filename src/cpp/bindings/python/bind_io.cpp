@@ -222,8 +222,21 @@ void bind_mesh(py::module_& m) {
   internal.def(
       "cached_mesh",
       [](const Shape& solid, double linear_tolerance, double angular_tolerance) {
+        // Meshing works on a topology copy (see meshed_copy) and touches no Python object, so it runs without the GIL:
+        // the editor tessellates parts on a background thread while the next cell computes.  A failure is recorded on
+        // the shape here, with the GIL back.
+        std::shared_ptr<const io::TriMesh> mesh;
+        std::string error;
+        {
+          py::gil_scoped_release release;
+          mesh = io::cached_mesh_detached(solid, linear_tolerance, angular_tolerance, &error);
+        }
+        if (!mesh && !error.empty()) {
+          Shape handle = solid;
+          handle.set_runtime("mesh.error", Value(error));
+        }
         // The mesh is shared with the cache and exposed read-only, so handing it out un-const is safe.
-        return std::const_pointer_cast<io::TriMesh>(io::cached_mesh(solid, linear_tolerance, angular_tolerance));
+        return std::const_pointer_cast<io::TriMesh>(mesh);
       },
       py::arg("solid"), py::kw_only(), py::arg("linear_tolerance") = io::kDefaultLinearDeflection,
       py::arg("angular_tolerance") = io::kDefaultAngularDeflection);

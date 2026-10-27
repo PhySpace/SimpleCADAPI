@@ -60,6 +60,79 @@ def _locked(method):
     return wrapper
 
 
+_CELLS_CODE = (
+    "import json as _json\n"
+    "import marimo._code_mode as _cm\n"
+    "def _text(_o):\n"
+    "    if _o is None:\n"
+    "        return None\n"
+    "    # CellOutput.data is str | list[Error] | dict[str, Any] — render\n"
+    "    # each shape as plain text instead of its repr.\n"
+    "    _d = getattr(_o, 'data', None)\n"
+    "    if isinstance(_d, str):\n"
+    "        _v = _d\n"
+    "    elif isinstance(_d, dict):\n"
+    "        _v = _d.get('text/plain') or str(_d)\n"
+    "    elif isinstance(_d, (list, tuple)):\n"
+    "        _parts = []\n"
+    "        for _item in _d:\n"
+    "            _m = getattr(_item, 'message', None)\n"
+    "            _parts.append(_m if isinstance(_m, str) else str(_item))\n"
+    "        _v = '\\n'.join(_parts)\n"
+    "    else:\n"
+    "        _v = str(_d) if _d is not None else None\n"
+    "    if isinstance(_v, str):\n"
+    "        if _v.lstrip().startswith('['):\n"
+    "            # marimo serialises mimebundle outputs as a JSON array of\n"
+    "            # '<mimetype>:<text>' strings — prefer the text/plain entry.\n"
+    "            try:\n"
+    "                import json as _json\n"
+    "                _arr = _json.loads(_v)\n"
+    "            except Exception:\n"
+    "                _arr = None\n"
+    "            if isinstance(_arr, list):\n"
+    "                _plain = [str(_x)[len('text/plain:'):] for _x in _arr if isinstance(_x, str) and _x.startswith('text/plain:')]\n"
+    "                _v = _plain[0] if _plain else '\\n'.join(str(_x) for _x in _arr)\n"
+    "        if _v.startswith('text/plain:'):\n"
+    "            _v = _v[len('text/plain:'):]\n"
+    "        if _v.lstrip().startswith('<'):\n"
+    "            import html as _html, re as _re\n"
+    "            _v = _html.unescape(_re.sub(r'<[^>]+>', '', _v)).strip()\n"
+    "        return _v\n"
+    "    return str(_v) if _v is not None else None\n"
+    "def _failures(_c):\n"
+    "    # An error is the cell's output: a list of marimo error objects.\n"
+    "    _d = getattr(getattr(_c, 'output', None), 'data', None)\n"
+    "    _own, _blocked = [], False\n"
+    "    if isinstance(_d, (list, tuple)):\n"
+    "        for _e in _d:\n"
+    "            _kind = str(getattr(_e, 'exception_type', '') or '')\n"
+    "            _msg = str(getattr(_e, 'msg', _e))\n"
+    "            if _kind == 'Ancestor raised':\n"
+    "                _blocked = True\n"
+    "            else:\n"
+    "                _own.append((_kind + ': ' if _kind else '') + _msg)\n"
+    "    return _own, _blocked\n"
+    "_ctx = _cm.get_context()\n"
+    "_rows = []\n"
+    "for _c in _ctx.cells:\n"
+    "    _st = getattr(_c, 'status', None)\n"
+    "    _own, _blocked = _failures(_c)\n"
+    "    _failed = bool(_own) or _blocked\n"
+    "    _rows.append({\n"
+    "        'id': _c.id, 'name': _c.name, 'code': _c.code,\n"
+    "        'status': getattr(_st, 'value', None) if _st is not None else None,\n"
+    "        'errors': ([str(getattr(_e, 'msg', _e))[:300] for _e in (getattr(_c, 'errors', None) or [])][:4] + [_m[:400] for _m in _own])[:4],\n"
+    "        'blocked': _blocked,\n"
+    "        'output': None if _failed else ((_text(_c.output) or '')[:400] if getattr(_c, 'output', None) is not None else None),\n"
+    "        'console': [t for t in ((_text(_o) or '')[-4000:] for _o in (getattr(_c, 'console_outputs', None) or [])[-4:]) if t],\n"
+    "    })\n"
+    "print(_json.dumps(_rows))\n"
+
+)
+"""The snippet that lists the notebook's cells in the kernel (prints one JSON line)."""
+
+
 class MarimoKernel:
     def __init__(
         self,
@@ -76,6 +149,8 @@ class MarimoKernel:
         self.setup_errors: list[str] = []
         self._ran = threading.Event()  # a run of cells completed (see wait_instantiated)
         self._own_calls = 0
+        self._fresh_cells: tuple[float, list[dict]] | None = None
+        """The cells the last preview call listed, until anything else runs in the kernel (see :meth:`list_cells`)."""
         self.write_lock = threading.RLock()
         self._own_ended = 0.0
         self.workspace = self.notebook.parent
@@ -280,76 +355,14 @@ class MarimoKernel:
         cells (the setup cell) are hidden; every other cell, anonymous ones
         included, is one block of the notebook. Cells are addressed by id.
         """
+        fresh, self._fresh_cells = self._fresh_cells, None
+        if fresh is not None and time.monotonic() - fresh[0] < 5.0:
+            return fresh[1]
+        return self._read_cells(self.execute(_CELLS_CODE))
+
+    def _read_cells(self, result: dict) -> list[dict]:
+        """The cells a :data:`_CELLS_CODE` run printed (the setup cell's errors are kept in ``setup_errors``)."""
         hidden = {"setup"}
-        result = self.execute(
-            "import json as _json\n"
-            "import marimo._code_mode as _cm\n"
-            "def _text(_o):\n"
-            "    if _o is None:\n"
-            "        return None\n"
-            "    # CellOutput.data is str | list[Error] | dict[str, Any] — render\n"
-            "    # each shape as plain text instead of its repr.\n"
-            "    _d = getattr(_o, 'data', None)\n"
-            "    if isinstance(_d, str):\n"
-            "        _v = _d\n"
-            "    elif isinstance(_d, dict):\n"
-            "        _v = _d.get('text/plain') or str(_d)\n"
-            "    elif isinstance(_d, (list, tuple)):\n"
-            "        _parts = []\n"
-            "        for _item in _d:\n"
-            "            _m = getattr(_item, 'message', None)\n"
-            "            _parts.append(_m if isinstance(_m, str) else str(_item))\n"
-            "        _v = '\\n'.join(_parts)\n"
-            "    else:\n"
-            "        _v = str(_d) if _d is not None else None\n"
-            "    if isinstance(_v, str):\n"
-            "        if _v.lstrip().startswith('['):\n"
-            "            # marimo serialises mimebundle outputs as a JSON array of\n"
-            "            # '<mimetype>:<text>' strings — prefer the text/plain entry.\n"
-            "            try:\n"
-            "                import json as _json\n"
-            "                _arr = _json.loads(_v)\n"
-            "            except Exception:\n"
-            "                _arr = None\n"
-            "            if isinstance(_arr, list):\n"
-            "                _plain = [str(_x)[len('text/plain:'):] for _x in _arr if isinstance(_x, str) and _x.startswith('text/plain:')]\n"
-            "                _v = _plain[0] if _plain else '\\n'.join(str(_x) for _x in _arr)\n"
-            "        if _v.startswith('text/plain:'):\n"
-            "            _v = _v[len('text/plain:'):]\n"
-            "        if _v.lstrip().startswith('<'):\n"
-            "            import html as _html, re as _re\n"
-            "            _v = _html.unescape(_re.sub(r'<[^>]+>', '', _v)).strip()\n"
-            "        return _v\n"
-            "    return str(_v) if _v is not None else None\n"
-            "def _failures(_c):\n"
-            "    # An error is the cell's output: a list of marimo error objects.\n"
-            "    _d = getattr(getattr(_c, 'output', None), 'data', None)\n"
-            "    _own, _blocked = [], False\n"
-            "    if isinstance(_d, (list, tuple)):\n"
-            "        for _e in _d:\n"
-            "            _kind = str(getattr(_e, 'exception_type', '') or '')\n"
-            "            _msg = str(getattr(_e, 'msg', _e))\n"
-            "            if _kind == 'Ancestor raised':\n"
-            "                _blocked = True\n"
-            "            else:\n"
-            "                _own.append((_kind + ': ' if _kind else '') + _msg)\n"
-            "    return _own, _blocked\n"
-            "_ctx = _cm.get_context()\n"
-            "_rows = []\n"
-            "for _c in _ctx.cells:\n"
-            "    _st = getattr(_c, 'status', None)\n"
-            "    _own, _blocked = _failures(_c)\n"
-            "    _failed = bool(_own) or _blocked\n"
-            "    _rows.append({\n"
-            "        'id': _c.id, 'name': _c.name, 'code': _c.code,\n"
-            "        'status': getattr(_st, 'value', None) if _st is not None else None,\n"
-            "        'errors': ([str(getattr(_e, 'msg', _e))[:300] for _e in (getattr(_c, 'errors', None) or [])][:4] + [_m[:400] for _m in _own])[:4],\n"
-            "        'blocked': _blocked,\n"
-            "        'output': None if _failed else ((_text(_c.output) or '')[:400] if getattr(_c, 'output', None) is not None else None),\n"
-            "        'console': [t for t in ((_text(_o) or '')[-4000:] for _o in (getattr(_c, 'console_outputs', None) or [])[-4:]) if t],\n"
-            "    })\n"
-            "print(_json.dumps(_rows))\n"
-        )
         for line in (result.get("log") or "").splitlines():
             line = line.strip()
             if line.startswith("["):
@@ -567,20 +580,19 @@ class MarimoKernel:
             self.run_cells(stale)
             self.wait_idle()
 
-    def publish_preview(self, url: str, step: str = "") -> dict:
-        """Have the kernel preview its product and POST the bytes to *url*.
-
-        Returns ``{"ok": True, ...}`` or ``{"ok": False, "error"}``; a notebook that
-        has not produced its product yet is an error value, not an exception.
-        """
-        result = self.execute(
+    @staticmethod
+    def _preview_code(url: str, step: str) -> str:
+        return (
             "from simplecadapi.runtime.live import publish_preview as _preview\n"
             "try:\n"
             f"    _p = _preview({url!r}, step={step!r})\n"
             "    print('SCA-PREVIEWED', _p['nodes'], _p['parts'], _p['bytes'])\n"
             "except Exception as _e:\n"
-            "    print('SCA-PREVIEW-ERROR', type(_e).__name__ + ':', str(_e).splitlines()[0] if str(_e) else '')\n",
+            "    print('SCA-PREVIEW-ERROR', type(_e).__name__ + ':', str(_e).splitlines()[0] if str(_e) else '')\n"
         )
+
+    @staticmethod
+    def _preview_result(result: dict) -> dict:
         for line in (result.get("log") or "").splitlines():
             if line.startswith("SCA-PREVIEWED "):
                 _, nodes, parts, size = line.split(" ")
@@ -588,6 +600,19 @@ class MarimoKernel:
             if line.startswith("SCA-PREVIEW-ERROR "):
                 return {"ok": False, "error": line[len("SCA-PREVIEW-ERROR "):]}
         return {"ok": False, "error": (result.get("log") or "preview failed").strip()[-300:]}
+
+    def publish_preview(self, url: str, step: str = "") -> dict:
+        """Have the kernel preview its product and POST the bytes to *url*.
+
+        Returns ``{"ok": True, ...}`` or ``{"ok": False, "error"}``; a notebook that
+        has not produced its product yet is an error value, not an exception.
+        """
+        # Every call into the kernel costs a fixed ~60 ms (marimo queues a scratch cell and waits for it), and a
+        # settle needs the cells as well: the snippet that lists them rides along, and :meth:`list_cells` hands out
+        # what it read (see ``_fresh_cells``).
+        result = self.execute(_CELLS_CODE + self._preview_code(url, step))
+        self._fresh_cells = (time.monotonic(), self._read_cells(result))
+        return self._preview_result(result)
 
     def entity_info(self, entity_id: str) -> dict | None:
         """The properties of one entity of the scene last previewed (``None`` if unknown)."""
@@ -640,6 +665,7 @@ class MarimoKernel:
         that gave up after 10 s killed any cell that ran longer (a ``use`` of a
         child notebook, a big rebuild).
         """
+        self._fresh_cells = None  # anything that runs in the kernel may change the cells
         self._own_calls += 1
         started = time.monotonic()
         try:
