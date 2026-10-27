@@ -6,6 +6,12 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+### Fixed
+- A cached cell whose lineage record belongs to another graph is a cache miss and runs again. A part-family member
+  (`use("child.py", id="member")`) with such a record used to fail with `value contains graph node '...' not owned by
+  active graph 'member'`. A restored cell no longer overwrites its record, and a record is only written under the id
+  its cache belongs to.
+
 ### Changed
 - Editor: the model is pushed over the WebSocket with the `preview` event, in one binary frame
   (`<u32 big-endian N><N bytes of JSON envelope><SCAPREV1 preview>`), and a page that joins late is given it on

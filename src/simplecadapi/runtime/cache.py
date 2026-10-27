@@ -235,17 +235,22 @@ class CellCache(CachedLifecycle):
         decision = super().setup(cell, glbls)
         if isinstance(decision, Skip):
             if not self._load_lineage(cell, digest):
-                # The nodes behind the values are missing: run the cell and record them again.
+                # The nodes behind the values are missing (or are another graph's): run the cell and record them
+                # again.
                 self._active.pop(cell.cell_id, None)
+                self.restored.discard(cell.cell_id)
                 return None
             self.restored.add(cell.cell_id)
+        else:
+            self.restored.discard(cell.cell_id)
         return decision
 
     def _load_lineage(self, cell: CellImpl, digest: str) -> bool:
         from . import lineage
 
         try:
-            return lineage.load(self._root / digest, str(cell.cell_id))
+            # The entries of a run live in <state>/<id>/cache: the nodes of its cells belong to the graph of that id.
+            return lineage.load(self._root / digest, str(cell.cell_id), self._root.parent.name)
         except Exception:  # noqa: BLE001 - an unreadable record is a miss, never a failure
             return False
 
@@ -276,8 +281,10 @@ class CellCache(CachedLifecycle):
 
         session = executor.take_session(cell.cell_id)
         digest = self._digest_for(cell)
-        if session is None or digest is None:
-            return
+        if session is None or digest is None or cell.cell_id in self.restored:
+            return  # a restored cell keeps the record it was restored with
+        if session.graph.graph_id != self._root.parent.name:
+            return  # recorded under another id: not this run's lineage to keep
         lineage.save(self._root / digest, str(cell.cell_id), session)
 
     def _invalidate(self, cell_id: CellId_t) -> None:
