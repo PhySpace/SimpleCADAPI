@@ -7,6 +7,9 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 ## Unreleased
 
 ### Fixed
+- The editor starts with whatever model file is on disk: a model kept by an older build that leaves parts out, or a damaged
+  one, is not restored (and no longer stops the kernel from starting, which showed as "starting the kernel" for ever), and
+  a model that leaves parts out is not filed.
 - A cache entry that names classes which no longer exist (written by an older build: `No module named
   'simplecadapi._native'`) is deleted and written again. marimo restores such a value as a stub; the runner dropped the
   cache for the run and ran again without it, which neither read nor wrote entries, so the same stubs came back on every

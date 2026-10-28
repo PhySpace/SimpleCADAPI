@@ -308,3 +308,45 @@ class SignatureBesideTheBuildTest(unittest.TestCase):
         state._sign_in_background()
         state.after_publish(0.0, 1, state._signing, b"model")
         self.assertEqual(self.filed, [])
+
+
+class StoredModelTest(unittest.TestCase):
+    """A model kept on disk is whole; a damaged or partial file is no reason for the editor not to start."""
+
+    def state(self):
+        pytest.importorskip("starlette")
+        from simplecadapi.editor.server import WorkspaceState
+        from simplecadapi.editor.templates import create_notebook
+
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name).resolve()
+        self.path = create_notebook(root, "bracket", "part")
+        return WorkspaceState(root, self.path)
+
+    def scene(self):
+        assembly = scad.make_assembly_rassembly("a")
+        for index, body in enumerate((scad.make_box_rsolid(5, 5, 5), scad.make_cylinder_rsolid(3, 6))):
+            part = scad.make_part_rpart(part_id=f"p{index}", body=body, name=f"p{index}")
+            assembly = scad.add_component_rassembly(assembly, part, component_id=f"c{index}", placement=scad.identity_placement_rplacement())
+        return preview.compile_preview(assembly)
+
+    def test_a_preview_that_leaves_parts_out_is_not_kept(self) -> None:
+        state = self.state()
+        scene = self.scene()
+        state.remember_model(self.path, "sig", preview.encode_preview(scene, omit=set(scene.parts)))
+        self.assertIsNone(state._recall_model(self.path, "sig"))
+
+    def test_a_whole_preview_and_opaque_bytes_are_kept(self) -> None:
+        state = self.state()
+        state.remember_model(self.path, "sig", preview.encode_preview(self.scene()))
+        self.assertIsNotNone(state._recall_model(self.path, "sig"))
+        state.remember_model(self.path, "sig2", b"PKG")
+        self.assertEqual(state._recall_model(self.path, "sig2"), b"PKG")
+
+    def test_restoring_a_partial_file_leaves_the_editor_able_to_start(self) -> None:
+        state = self.state()
+        scene = self.scene()
+        delta = preview.encode_preview(scene, omit=set(scene.parts))
+        state._packages["bracket.py"] = (state._signature(self.path), delta)  # what an older build could have left
+        self.assertFalse(state._restore(self.path))

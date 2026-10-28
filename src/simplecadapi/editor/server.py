@@ -334,8 +334,24 @@ class WorkspaceState:
         name = notebook.relative_to(self.workspace).as_posix().replace("/", "__")
         return self.snapshot_dir / "models" / f"{name}.scapreview"
 
+    @staticmethod
+    def _is_whole(data: bytes) -> bool:
+        """Whether *data* is a model that stands on its own: every part its nodes draw is in it.
+
+        A preview that is not one this server can split (a tool's own bytes) is kept as it is.  A delta (parts left
+        out for a reader that has them) is not a model to keep: whoever restores it would not have those parts.
+        """
+        try:
+            parsed = parse_preview(data)
+        except PreviewError:
+            return True
+        return parsed.needed <= parsed.parts.keys()
+
     def remember_model(self, notebook: Path, signature: str, data: bytes) -> None:
         """Keep *data* (a preview) as the model of *notebook* for *signature*, in memory and on disk."""
+        if not self._is_whole(data):
+            print("[sca edit] not keeping a model that leaves out parts", file=sys.stderr)
+            return
         key = notebook.relative_to(self.workspace).as_posix()
         self._packages[key] = (signature, data)
         self._packages.move_to_end(key)
@@ -377,9 +393,15 @@ class WorkspaceState:
             data = None
         if data is None or (generation is not None and self._superseded(generation)):
             return False
+        if not self._is_whole(data):
+            # (a file an older build kept, or a damaged one): nothing to show, and nothing to start the kernel on
+            return False
         self.notebook = notebook
         self._publish_cells(_static_cells(notebook))
-        self.set_preview(data)
+        try:
+            self.set_preview(data)
+        except (KeyError, ValueError):
+            return False
         self.preview_revision += 1
         self.emit(
             {
