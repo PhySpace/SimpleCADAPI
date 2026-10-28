@@ -131,3 +131,15 @@ id, a 36-char rule id, an evidence Value: about 700 B per binding, 36 bindings p
 * The geometry-interface bounds of solids, shells and wires are the union of their faces' / edges' boxes
   (bitwise equal to `AddOptimal` on the whole shape on every arm6 shape); the fingerprint is memoised per OCCT
   shape identity. Neither changes a hash.
+
+## Old tests that do not run on the native build (and why)
+
+Each is a test of something 2.2.7b1 removed on purpose, not of behaviour a user can see. Listed here so that a missing
+test is a decision on record, not a gap.
+
+| Old test | Why it does not apply |
+|---|---|
+| `tests/test_render_supersample.py` (2 tests) | patches `inspect.brep.render._write_window`, a VTK window writer; VTK is gone (the soft renderer supersamples in `render_scene(supersample=)`, covered by `tests/python/test_render_*`) |
+| `test_inspect_brep_queries.py::test_render_worker_retries_crash_and_requires_clean_exit` | tests the crash-isolated VTK render worker subprocess and its retry policy; the soft renderer runs in-process |
+| `test_render_screenshot_multiview.py` (3 tests: `..._grid_engine`, `..._multiview_engine_with_annotations`) | tests the routing between the VTK single-view engine and the grid engine; there is one engine |
+| `test_sketch_api.py::...default_solver_backend_is_py_slvs...` (in `test/native_known_failures.json`) | the default sketch solver backend is `scad-native`; py-slvs (GPL) is not linked. A user-visible difference: the backend name in a sketch snapshot. See `sketch-solver.md` |
