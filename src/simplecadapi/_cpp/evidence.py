@@ -2,7 +2,9 @@
 
 An operation that has diagnosed a failure asks for a picture (``DiagnosticImage`` in C++); this module draws it:
 
-* ``render``            solids, each operand in its own colour, on the software renderer (four axonometric views);
+* ``render``            solids on the software renderer (four axonometric views): each operand in its own colour, or
+                        one solid with the implicated edges as orange lines (a failed blend); a failed QL selection
+                        is drawn by ``_ql_evidence``, which the QL layer asks for through its own hook;
 * ``wire_plan_render``  wires projected on their best-fit plane, the loose ends in orange (matplotlib);
 * ``sketch_render``     a sketch at the solver's positions, implicated entities orange, related ones purple (matplotlib).
 
@@ -60,7 +62,7 @@ def _evidence(kind: str, path: Path, view: str, caption: str, symbols: Sequence[
 
 
 def provide(kind: str, operation: str, view: str, caption: str, dedup_key: str, shapes: Sequence[Any],
-            payload: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
+            payload: Mapping[str, Any], highlight_edges: Sequence[Any] = ()) -> Optional[Dict[str, Any]]:
     """The provider the C++ side calls: the evidence dict for one requested picture, or None."""
 
     if not enabled():
@@ -71,7 +73,7 @@ def provide(kind: str, operation: str, view: str, caption: str, dedup_key: str, 
     _RENDER_DEDUP.add(key)
     try:
         if kind == "render":
-            return _render_solids(operation, view, caption, shapes, payload)
+            return _render_solids(operation, view, caption, shapes, payload, highlight_edges)
         if kind == "wire_plan_render":
             return _wire_plan(operation, view, caption, shapes, payload)
         if kind == "sketch_render":
@@ -86,9 +88,35 @@ def provide(kind: str, operation: str, view: str, caption: str, dedup_key: str, 
 # ---- 3D: the operands on the software renderer ------------------------------------------------
 
 
-def _render_solids(operation: str, view: str, caption: str, shapes: Sequence[Any], payload: Mapping[str, Any]):
-    from . import _native as _n
+def _draw_solids(operation: str, drawn: Sequence[Any], *, tags: Sequence[str] = (), tag_labels: Mapping[str, str] = {},
+                 edges: Sequence[Any] = (), callouts: bool = False) -> Path:
     from .screenshot import render_screenshot
+
+    path = _path(operation)
+    render_screenshot(
+        list(drawn),
+        path,
+        views=_DIAGNOSTIC_VIEWS,
+        supersample=1,
+        edge_width_scale=0.0035,  # heavier model ink so panels read at grid size
+        highlight_edge_width=8.0,  # highlights outweigh the ink, always
+        highlight_tags=tuple(tags),
+        tag_labels=dict(tag_labels),
+        highlight_edges=tuple(edges),
+        show_legend=True,
+        show_callouts=callouts,
+    )
+    return path
+
+
+def _render_solids(operation: str, view: str, caption: str, shapes: Sequence[Any], payload: Mapping[str, Any],
+                   highlight_edges: Sequence[Any] = ()):
+    if highlight_edges:
+        # One solid, the implicated edges as orange lines over it: nothing to tag.
+        return _evidence("render", _draw_solids(operation, shapes, edges=list(highlight_edges)), view,
+                         caption)
+
+    from . import _native as _n
 
     labels = list(payload.get("operand_labels") or [])
     tags: List[str] = []
@@ -101,20 +129,69 @@ def _render_solids(operation: str, view: str, caption: str, shapes: Sequence[Any
         drawn.append(copy)
         tags.append(tag)
         tag_labels[tag] = labels[index] if index < len(labels) else f"operand {index + 1}"
-    path = _path(operation)
-    render_screenshot(
-        drawn,
-        path,
-        views=_DIAGNOSTIC_VIEWS,
-        supersample=1,
-        edge_width_scale=0.0035,  # heavier model ink so panels read at grid size
-        highlight_edge_width=8.0,
-        highlight_tags=tuple(tags),
-        tag_labels=tag_labels,
-        show_legend=True,
-        show_callouts=False,  # a solid-tag anchor sits inside the solid and may point at the wrong body
-    )
-    return _evidence("render", path, view, caption)
+    # A solid-tag callout anchor sits inside the solid and may point at the wrong body.
+    return _evidence("render", _draw_solids(operation, drawn, tags=tags, tag_labels=tag_labels), view, caption)
+
+
+# ---- 3D: a QL selection that missed its cardinality -------------------------------------------
+
+_MATCHED_TAG = "diagnostic.matched"
+_NEAR_MISS_TAG = "diagnostic.near_miss"
+
+
+def _ql_evidence(scope: Any, matched: Sequence[Any], target_kind: str, dedup_key: Any,
+                 near_misses: Sequence[Any]) -> List[Dict[str, Any]]:
+    """The provider the QL layer calls: the scope with the matched entities visibly highlighted.
+
+    A face selection draws a copy of the scope whose matched faces carry ``diagnostic.matched`` (orange) and up to
+    three near-miss faces ``diagnostic.near_miss`` (purple), with legend and callouts; the user's own shape is never
+    tagged.  Other targets draw the first eight matched entities as orange lines.
+    """
+
+    if not enabled() or dedup_key in _RENDER_DEDUP:
+        return []
+    _RENDER_DEDUP.add(dedup_key)
+    operation = f"ql_{target_kind}_resolve"
+    try:
+        from . import _native as _n
+
+        tags: List[str] = []
+        tag_labels: Dict[str, str] = {}
+        shapes: List[Any] = []
+        if target_kind == "face" and scope.__class__.__name__ == "Solid":
+            copy = _n.clone_semantic_view(scope)
+            # Match by kernel topology identity: Python-level wrappers differ across copies, TopoDS identity does not.
+            matched_wrapped = [item._native_wrapped for item in matched]
+            near_wrapped = [item._native_wrapped for item in near_misses]
+            matched_any = False
+            near_tagged = 0
+            for face in copy._iter_faces():
+                if any(face._native_wrapped.IsSame(w) for w in matched_wrapped):
+                    face._apply_tag(_MATCHED_TAG, propagate=False)
+                    matched_any = True
+                elif near_tagged < 3 and any(face._native_wrapped.IsSame(w) for w in near_wrapped):
+                    face._apply_tag(_NEAR_MISS_TAG, propagate=False)
+                    near_tagged += 1
+            if matched_any:
+                tags = [_MATCHED_TAG] + ([_NEAR_MISS_TAG] if near_tagged else [])
+                tag_labels = {_MATCHED_TAG: f"matched {target_kind}(s)", _NEAR_MISS_TAG: "near miss"}
+                shapes = [copy]
+        edges: List[Any] = []
+        if not shapes:
+            # Everything but faces (and faces of a scope that is no solid, or none matched): the matched entities
+            # themselves, as orange lines.
+            edges = list(matched[:8])
+            if scope.__class__.__name__ == "Solid":
+                shapes = [scope]
+            if not edges:
+                return []
+        path = _draw_solids(operation, shapes, tags=tags, tag_labels=tag_labels, edges=edges, callouts=bool(tags))
+    except Exception as error:  # noqa: BLE001 - a picture must never mask the error it illustrates
+        return [_evidence("render-unavailable", Path(), "default",
+                          f"diagnostic render unavailable: {type(error).__name__}: {error}")]
+    caption = ("orange = matched, purple = near miss; see inventory for identities" if target_kind == "face"
+               else "orange lines = matched entities; see inventory")
+    return [_evidence("render", path, "default", caption)]
 
 
 # ---- 2D: wires on their best-fit plane --------------------------------------------------------
@@ -379,3 +456,4 @@ def install() -> None:
     from . import _native
 
     _native._set_diagnostic_image_provider(provide)
+    _native.ql._set_evidence_provider(_ql_evidence)

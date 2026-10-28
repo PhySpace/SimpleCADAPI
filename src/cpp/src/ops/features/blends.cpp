@@ -3,11 +3,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <functional>
 
 #include "internal.hpp"
 #include "scad/ops/features/diagnostics.hpp"
 #include "scad/semantic/tracking.hpp"
+#include "scad/topo/diagnostic_image.hpp"
 
 namespace scad {
 
@@ -53,6 +55,22 @@ raise_blend_failure(const ErrorSpec &base, const std::exception &error,
   if (diagnosis && !diagnosis->possible_causes.empty())
     spec.possible_causes = diagnosis->possible_causes;
 
+  std::vector<ErrorEvidence> evidence;
+  if (diagnosis && !diagnosis->evidence_edges.empty()) {
+    // The failing edge(s) as orange lines on the solid; the same unmoved failure is drawn once (agent retry loops).
+    DiagnosticImage image;
+    image.kind = "render";
+    image.operation = base.operation;
+    image.view = "default";
+    image.caption = diagnosis->evidence_caption;
+    char size[32];
+    std::snprintf(size, sizeof size, "%.1f", *attempt.size);
+    image.dedup_key = base.operation + "|" + diagnosis->failure_kind + "|" + size;
+    image.shapes = {solid};
+    image.highlight_edges.assign(diagnosis->evidence_edges.begin(), diagnosis->evidence_edges.end());
+    if (auto picture = diagnostic_image(image)) evidence.push_back(std::move(*picture));
+  }
+
   const std::string details =
       violation != nullptr
           ? "BlendVolumeViolation: " + std::string(violation->what())
@@ -60,7 +78,7 @@ raise_blend_failure(const ErrorSpec &base, const std::exception &error,
   raise_harness_error(
       spec, details,
       diagnosis ? diagnosis->measurements : std::vector<ErrorMeasurement>{},
-      diagnosis ? diagnosis->repair : std::vector<std::string>{});
+      diagnosis ? diagnosis->repair : std::vector<std::string>{}, {}, std::move(evidence));
 }
 
 // The shared flow of fillet and chamfer once the size and the edges are known.

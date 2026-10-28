@@ -67,6 +67,7 @@ so assemblies had no data flow in the graph. Done, all additive:
 | native, ids/refs canonical | 1927 | 181 | 11 | `reserve_node`, resolved topology refs, dataclass protocol |
 | native, current (run 5) | 1942 | 170 | 11 | scene/apiindex fixes |
 | native, current with the classification of `test/native_known_failures.json` (run 6) | 1942 (+351 subtests) | 0 unexpected | 3 (same as ocp) | 46 skipped as internal, 122 xfailed as open, 8 modules ignored at collection (private helpers); 2231 -> 1942 passed, 289 of the baseline's passes are internal or open |
+| native, 2026-10-29 (`feat/sca-serve`; the rows above are history) | 2197 | 0 | 0 | 49 skipped (19 internal in `test/native_known_failures.json`, the rest optional packages), 1 xfailed (`open`: the soft renderer's shading of the ql evidence picture), 7 restored old test files not yet tracked (need bindings); `src/cpp/tests/python` 468 passed |
 
 Failures by cause (run 5, 170): 
 1. the SDK's graph replay contract (`replay_model_json` / `replay_graph`; ~85): native-recorded nodes differ from

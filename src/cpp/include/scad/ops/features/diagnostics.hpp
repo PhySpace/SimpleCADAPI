@@ -27,6 +27,8 @@ struct BlendDiagnosis {
   std::vector<std::string> possible_causes;
   std::vector<ErrorMeasurement> measurements;
   std::vector<std::string> repair;
+  std::vector<Edge> evidence_edges;  // the edges the picture marks as orange lines
+  std::string evidence_caption;
 };
 
 // Does the blend succeed on this one edge alone?  The per-edge diagnostic rerun.
