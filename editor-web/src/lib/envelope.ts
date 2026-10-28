@@ -10,15 +10,19 @@ export type Envelope = Record<string, unknown> & { type: string };
 /** A binary frame is a `preview` envelope and the preview itself: `<u32 big-endian N><N bytes JSON><preview bytes>`
  *  (`simplecadapi.editor.ws.preview_frame`).  The envelope handed to handlers carries the preview as `bytes`. */
 function decodeFrame(buffer: ArrayBuffer): Envelope | null {
-  if (buffer.byteLength < 4) return null;
+  const damaged = (why: string): null => {
+    console.warn(`[sca edit] a binary frame was dropped: ${why}`);
+    return null;
+  };
+  if (buffer.byteLength < 4) return damaged("shorter than its length prefix");
   const length = new DataView(buffer).getUint32(0, false);
-  if (buffer.byteLength < 4 + length) return null;
+  if (buffer.byteLength < 4 + length) return damaged("shorter than its envelope");
   try {
     const envelope = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 4, length))) as Envelope;
     envelope["bytes"] = buffer.slice(4 + length);
     return envelope;
-  } catch {
-    return null;
+  } catch (error) {
+    return damaged(`its envelope is not JSON (${error})`);
   }
 }
 type Handler = (envelope: Envelope) => void;

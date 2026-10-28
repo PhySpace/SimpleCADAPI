@@ -356,7 +356,7 @@ class WorkspaceState:
     def remember_model(self, notebook: Path, signature: str, data: bytes) -> None:
         """Keep *data* (a preview) as the model of *notebook* for *signature*, in memory and on disk."""
         if not self._is_whole(data):
-            print("[sca edit] not keeping a model that leaves out parts", file=sys.stderr)
+            print("[sca edit] not keeping a model that is damaged or leaves out parts", file=sys.stderr)
             return
         key = notebook.relative_to(self.workspace).as_posix()
         self._packages[key] = (signature, data)
@@ -1092,6 +1092,8 @@ class WorkspaceState:
             if signing is not None:
                 signing.done.wait()
                 signature = signing.value
+            if signing is None and os.environ.get("SCA_EDITOR_TRACE"):
+                print("[sca edit] a preview that no settle asked for: not filed", file=sys.stderr, flush=True)
             if self.notebook is not None and signature is not None and model:
                 self.remember_model(self.notebook, signature, model)
             self.write_snapshot()

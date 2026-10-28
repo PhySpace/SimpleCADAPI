@@ -76,8 +76,8 @@ export function parsePreview(buffer: ArrayBuffer, cache: ReadonlyMap<string, Pre
   const header = JSON.parse(new TextDecoder().decode(bytes.subarray(headerStart, headerStart + headerLength))) as Header;
   if (header.schema !== "sca-preview-1") throw new Error(`unsupported preview schema: ${header.schema}`);
   const base = headerStart + headerLength;
-  const floats = (ref: ArrayRef) => new Float32Array(buffer, base + ref.offset, ref.count);
-  const uints = (ref: ArrayRef) => new Uint32Array(buffer, base + ref.offset, ref.count);
+  const floats = (ref: ArrayRef) => new Float32Array(buffer, base + ref.offset, ref.count).slice(); // a copy: a kept part must not pin the whole frame it came in
+  const uints = (ref: ArrayRef) => new Uint32Array(buffer, base + ref.offset, ref.count).slice();
   const carried = new Map<string, PreviewPart>();
   for (const part of header.parts) {
     carried.set(part.key, {

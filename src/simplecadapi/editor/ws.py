@@ -61,7 +61,8 @@ class WsHub:
             except Exception:  # the page went away
                 await self._drop(client)
             else:
-                self._clients[client] = set(keys)
+                if client in self._clients:  # (it may have gone while the frame was being sent)
+                    self._clients[client] = set(keys)
 
     def broadcast(self, message: dict[str, Any]) -> None:
         """Push one JSON message to every connected client (thread-safe)."""

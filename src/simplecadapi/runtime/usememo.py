@@ -83,14 +83,21 @@ def keep(target: Path, id: str | None, overrides: Mapping[str, Any], kept: Kept)
         previous = _owners.pop(kept.graph_id, None)
         if previous is not None:
             _entries.pop(previous, None)
+        _forget(key)  # (this key may have been kept under another graph id: the header id was edited)
         if signature is None:
-            _entries.pop(key, None)
             return
         _entries[key] = (signature, kept)
-        _entries.move_to_end(key)
         _owners[kept.graph_id] = key
         while len(_entries) > _MAX_ENTRIES:
-            _owners.pop(_entries.popitem(last=False)[1][1].graph_id, None)
+            _forget(next(iter(_entries)))
+
+
+def _forget(key: tuple[str, str | None]) -> None:
+    """Drop the entry of *key* and, if it is the owner of its graph id, that ownership (the lock is held)."""
+
+    entry = _entries.pop(key, None)
+    if entry is not None and _owners.get(entry[1].graph_id) == key:
+        del _owners[entry[1].graph_id]
 
 
 def clear() -> None:

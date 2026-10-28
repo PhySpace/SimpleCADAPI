@@ -26,6 +26,9 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   (`use("child.py", id="member")`) with such a record used to fail with `value contains graph node '...' not owned by
   active graph 'member'`. A restored cell no longer overwrites its record, and a record is only written under the id
   its cache belongs to.
+- A face or edge query that matches nothing draws the plain solid in its failure picture again (2.2.6 did; the native port returned no picture).
+- A fillet or chamfer that fails, and a ql `exactly()` that fails, attach their picture again (the failing edge as an orange line; the matched faces orange, near misses purple). `test_ql_evidence_highlight_is_visible` stays listed as open: the soft renderer's shading leaves 302 sampled orange pixels where the test asks for more than 400.
+- A refused preview post names what the editor server said (`HTTP 400: damaged preview: ...`) instead of only the status line.
 
 ### Changed
 - A handled failure that used to leave no trace now prints a `[sca] ...` line on stderr: the preview warm-up, an

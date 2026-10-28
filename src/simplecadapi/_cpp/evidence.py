@@ -21,6 +21,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
+from .._glue.notice import say
+
 # One picture per distinct failure signature (the tests clear it).
 _RENDER_DEDUP: Set[Any] = set()
 
@@ -82,6 +84,7 @@ def provide(kind: str, operation: str, view: str, caption: str, dedup_key: str, 
         if kind == "render":
             return _evidence("render-unavailable", Path(), view,
                              f"diagnostic render unavailable: {type(error).__name__}: {error}")
+        say(f"the {kind} picture of {operation} could not be drawn ({type(error).__name__}: {error})")
     return None
 
 
@@ -183,7 +186,7 @@ def _ql_evidence(scope: Any, matched: Sequence[Any], target_kind: str, dedup_key
             edges = list(matched[:8])
             if scope.__class__.__name__ == "Solid":
                 shapes = [scope]
-            if not edges:
+            if not shapes and not edges:
                 return []
         path = _draw_solids(operation, shapes, tags=tags, tag_labels=tag_labels, edges=edges, callouts=bool(tags))
     except Exception as error:  # noqa: BLE001 - a picture must never mask the error it illustrates

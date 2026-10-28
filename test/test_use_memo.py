@@ -92,6 +92,26 @@ class UseMemoTest(unittest.TestCase):
         self.assertIsNot(again, first)  # the first run's nodes are gone from the registry: it has to run again
         self.assertEqual([run[0] for run in self.runs], ["child.py", "other.py", "child.py"])
 
+    def test_a_key_kept_again_under_another_graph_id_does_not_leave_its_old_owner(self) -> None:
+        runner.use(self.child, id="one")
+        owners = dict(usememo._owners)
+        self.assertEqual(len(owners), 1)
+        # the same key, now under another graph id (the child's header id was edited)
+        key = next(iter(usememo._entries))
+        kept = usememo._entries[key][1]
+        usememo.keep(self.child, "one", {}, usememo.Kept(kept.product, kept.path, kept.dependencies, "other-graph"))
+        self.assertEqual(set(usememo._owners), {"other-graph"})
+        self.assertEqual(usememo._owners["other-graph"], key)
+
+    def test_eviction_forgets_the_owner_of_the_evicted_entry_only(self) -> None:
+        original = usememo._MAX_ENTRIES
+        usememo._MAX_ENTRIES = 2
+        self.addCleanup(setattr, usememo, "_MAX_ENTRIES", original)
+        for name in ("a", "b", "c"):
+            runner.use(self.child, id=name)
+        self.assertEqual(len(usememo._entries), 2)
+        self.assertEqual(set(usememo._owners.values()), set(usememo._entries))
+
 
 if __name__ == "__main__":
     unittest.main()

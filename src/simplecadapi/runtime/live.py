@@ -12,6 +12,7 @@ in the kernel once the cells have settled.
 
 from __future__ import annotations
 
+import json
 import time
 import urllib.error
 import urllib.request
@@ -147,6 +148,16 @@ def _post(url: str, data: bytes, step: str, delta: bool, timeout: float) -> None
         response.read()
 
 
+def _server_words(error: urllib.error.HTTPError) -> str:
+    """What the editor server said about a refused post (its JSON ``error``), else the HTTP status line."""
+
+    try:
+        said = json.loads(error.read()).get("error")
+    except (OSError, ValueError, AttributeError):
+        said = None
+    return f"HTTP {error.code}: {said}" if said else str(error)
+
+
 def publish_preview(url: str, *, step: str = "", timeout: float = 60.0) -> dict[str, Any]:
     """:func:`live_preview`, then POST it to *url*; returns a short summary.
 
@@ -167,7 +178,7 @@ def publish_preview(url: str, *, step: str = "", timeout: float = 60.0) -> dict[
             _post(url, data, step, bool(omit), timeout)
         except urllib.error.HTTPError as error:
             if error.code != 409:
-                raise
+                raise RuntimeError(f"publishing the preview to {url} failed: {_server_words(error)}") from error
             data = encode_preview(scene)  # the server lacks parts: send it all
             _post(url, data, step, False, timeout)
     except (urllib.error.URLError, OSError) as error:
