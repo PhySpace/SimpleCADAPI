@@ -16,6 +16,7 @@ import threading
 from typing import Any, Iterable, Iterator
 
 from simplecadapi._cpp import Assembly, Part, Solid
+from simplecadapi._glue.notice import say
 
 from .preview import preview_solid
 
@@ -59,7 +60,8 @@ def submit(values: Iterable[Any]) -> int:
             except queue.Full:
                 break
             queued += 1
-    except Exception:  # noqa: BLE001 - an optimisation: whatever a cell defined, it must not fail the cell
+    except Exception as error:  # noqa: BLE001 - an optimisation: whatever a cell defined, it must not fail the cell
+        say(f"preview warm-up skipped a value ({type(error).__name__}: {error})", once="prewarm-submit")
         return queued
     if queued:
         _ensure_worker()
@@ -82,5 +84,5 @@ def _run() -> None:
             return  # the thread ends when idle; the next submit starts another
         try:
             preview_solid(solid)
-        except Exception:  # noqa: BLE001 - the preview that follows reports a part that cannot be drawn
-            pass
+        except Exception as error:  # noqa: BLE001 - the preview that follows reports a part that cannot be drawn
+            say(f"preview warm-up could not draw a part ({type(error).__name__}: {error})", once="prewarm-run")

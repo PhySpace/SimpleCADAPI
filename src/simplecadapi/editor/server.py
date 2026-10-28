@@ -18,15 +18,15 @@ import ast
 import asyncio
 import hashlib
 import json
-import re
 import os
+import re
 import sys
 import threading
 import time
 import webbrowser
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import uvicorn
 from starlette.applications import Starlette
@@ -53,7 +53,7 @@ from ..runtime.workspace import features_in_cell, notebook_modules, scan_modules
 from .kernel import MarimoKernel
 from .selection import MARKER, selection_cell_code, variable_names
 from .templates import create_notebook
-from ..scene.preview import PreviewError
+from ..scene.preview import MAGIC, PreviewError
 from .preview_parts import PartStore, parse_preview
 from .ws import WsHub, preview_frame
 
@@ -82,6 +82,14 @@ def pick_notebook(workspace: Path, prefer: Path | None = None) -> Path | None:
     tops = [e for e in entries if e.kind == "assembly" and e.path not in used]
     chosen = (tops or entries)[0]
     return (workspace / chosen.path).resolve()
+
+
+class _Model(NamedTuple):
+    """The model the pages show, as one value: what it is made of, the part keys, and the bytes of all of it."""
+
+    nodes: list[dict] | None
+    keys: frozenset[str]
+    data: bytes | None
 
 
 class _Signing:
@@ -124,11 +132,10 @@ class WorkspaceState:
         self.lock = threading.Lock()
         self.latest: dict[str, dict] = {}
         self.latest_package_bytes: bytes | None = None  # a full package, made on demand (export)
-        self.latest_preview_bytes: bytes | None = None
-        # The parts of the latest preview by key, and what it is made of: a page is sent only the parts it lacks.
+        # The latest preview (replaced as a whole, so a reader on another thread never sees half of one) and the
+        # parts of it by key: a page is sent only the parts it lacks.
+        self._model = _Model(None, frozenset(), None)
         self.part_store = PartStore()
-        self.scene_nodes: list[dict] | None = None
-        self.latest_keys: frozenset[str] = frozenset()
         self.preview_revision = 0
         self._package_event = threading.Event()
         self.selection: dict = {}
@@ -151,6 +158,7 @@ class WorkspaceState:
         self._packages: OrderedDict[str, tuple[str, bytes]] = OrderedDict()
         self._publish_signature: str | None = None
         self._signing: _Signing | None = None
+        self._signing_lock = threading.Lock()
         self._stopped = False
         self._selection_code: str | None = None
         self._selection_busy = False
@@ -227,8 +235,7 @@ class WorkspaceState:
             self.notebook = target
             # Let the webuis drop the old model now; commands have no kernel until the new one is up.
             self.latest.clear()
-            self.latest_preview_bytes = None
-            self.scene_nodes = None
+            self._model = _Model(None, frozenset(), None)
             self._drop_kernel()
         return True
 
@@ -281,8 +288,7 @@ class WorkspaceState:
             self._last_publish_error = ""
             if not restored:
                 self.latest.clear()
-                self.latest_preview_bytes = None
-                self.scene_nodes = None
+                self._model = _Model(None, frozenset(), None)
                 self.cells = []
                 self.specs = {}
             self._watched = self._watched_files()[0]
@@ -344,7 +350,7 @@ class WorkspaceState:
         try:
             parsed = parse_preview(data)
         except PreviewError:
-            return True
+            return not data.startswith(MAGIC)  # (a damaged preview is no model; bytes that are not one are kept as they are)
         return parsed.needed <= parsed.parts.keys()
 
     def remember_model(self, notebook: Path, signature: str, data: bytes) -> None:
@@ -395,12 +401,14 @@ class WorkspaceState:
             return False
         if not self._is_whole(data):
             # (a file an older build kept, or a damaged one): nothing to show, and nothing to start the kernel on
+            print(f"[sca edit] the kept model of {notebook.name} is not usable; building it again", file=sys.stderr)
             return False
         self.notebook = notebook
         self._publish_cells(_static_cells(notebook))
         try:
             self.set_preview(data)
-        except (KeyError, ValueError):
+        except (KeyError, PreviewError) as error:
+            print(f"[sca edit] the kept model of {notebook.name} is not usable ({error}); building it again", file=sys.stderr)
             return False
         self.preview_revision += 1
         self.emit(
@@ -957,18 +965,43 @@ class WorkspaceState:
         else:
             self.hub.broadcast(envelope)
 
+    @property
+    def latest_preview_bytes(self) -> bytes | None:
+        return self._model.data
+
+    @latest_preview_bytes.setter
+    def latest_preview_bytes(self, data: bytes | None) -> None:
+        self._model = _Model(None, frozenset(), data)  # bytes that are not split into parts
+
+    @property
+    def scene_nodes(self) -> list[dict] | None:
+        return self._model.nodes
+
+    @property
+    def latest_keys(self) -> frozenset[str]:
+        return self._model.keys
+
+    def take_signing(self) -> "_Signing | None":
+        """The signing of the publish that is arriving, handed out once: a second post under it has none to file under."""
+        with self._signing_lock:
+            signing, self._signing = self._signing, None
+        return signing
+
     def set_preview(self, data: bytes) -> bool:
         """Take *data* (a full preview, or one with parts the store already holds) as the latest model.
 
         Returns whether it is the model already held.  Bytes that are not a preview are kept as they are.  Raises
-        ``KeyError`` (with the missing part keys) when a part is neither in *data* nor in the store.
+        ``KeyError`` (with the missing part keys) when a part is neither in *data* nor in the store, and
+        :class:`PreviewError` when *data* announces itself as a preview and is not a readable one.
         """
         try:
             parsed = parse_preview(data)
         except PreviewError:
-            # Not a preview this server can split (a tool's own bytes): kept and sent whole.
+            if data.startswith(MAGIC):
+                raise  # a preview that is damaged, or of a schema this server does not know: not bytes to keep
+            # Not a preview at all (a tool's own bytes): kept and sent whole.
             unchanged = self.latest_preview_bytes == data
-            self.scene_nodes, self.latest_keys, self.latest_preview_bytes = None, frozenset(), bytes(data)
+            self.latest_preview_bytes = bytes(data)
             return unchanged
         missing = self.part_store.missing(parsed.needed - parsed.parts.keys())
         if missing:
@@ -977,7 +1010,7 @@ class WorkspaceState:
         self.part_store.touch(parsed.needed)
         full = self.part_store.assemble(parsed.nodes)
         unchanged = self.latest_preview_bytes == full
-        self.scene_nodes, self.latest_keys, self.latest_preview_bytes = parsed.nodes, frozenset(parsed.needed), full
+        self._model = _Model(parsed.nodes, frozenset(parsed.needed), full)
         return unchanged
 
     def full_preview_frame(self, envelope: dict) -> bytes | None:
@@ -1028,7 +1061,8 @@ class WorkspaceState:
         notebook = self.notebook
         self._publish_signature = None
         signing = _Signing()
-        self._signing = signing
+        with self._signing_lock:
+            self._signing = signing
         if notebook is None:
             signing.done.set()
             return
@@ -1037,8 +1071,9 @@ class WorkspaceState:
             began = time.perf_counter()
             try:
                 signing.value = self._signature(notebook)
-            except (OSError, ValueError):
+            except (OSError, ValueError) as error:
                 signing.value = None
+                print(f"[sca edit] could not sign the notebook ({error}); the model will not be filed", file=sys.stderr)
             if self._signing is signing:
                 self._publish_signature = signing.value
             signing.done.set()
@@ -1889,6 +1924,8 @@ def create_app(state: WorkspaceState) -> Starlette:
         arrived = time.perf_counter()
         try:
             unchanged = state.set_preview(bytes(body))
+        except PreviewError as error:
+            return JSONResponse({"ok": False, "error": str(error)}, status_code=400)
         except KeyError as missing:
             # Parts the kernel left out are not here (the server was given another model since): it sends them all.
             return JSONResponse({"ok": False, "missing": missing.args[0]}, status_code=409)
@@ -1909,7 +1946,7 @@ def create_app(state: WorkspaceState) -> Starlette:
         hub.broadcast({"type": "status", "error": ""})  # the model is fine again: clear a stale "no product yet"
         threading.Thread(
             target=state.after_publish,
-            args=(arrived, len(body), state._signing, state.latest_preview_bytes),
+            args=(arrived, len(body), state.take_signing(), state.latest_preview_bytes),
             name="after-publish",
             daemon=True,
         ).start()

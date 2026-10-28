@@ -46,26 +46,35 @@ class ParsedPreview:
 
 
 def parse_preview(data: bytes) -> ParsedPreview:
-    """Split an encoded preview (full or with parts omitted) into nodes and per-part blocks."""
+    """Split an encoded preview (full or with parts omitted) into nodes and per-part blocks.
+
+    Raises :class:`PreviewError` for anything that is not a readable preview: bytes without the magic, a header that is
+    cut off or not JSON, a schema this reader does not know, a part that lacks a field.
+    """
 
     if not data.startswith(MAGIC):
         raise PreviewError("not a preview")
-    (length,) = struct.unpack_from("<I", data, len(MAGIC))
-    start = len(MAGIC) + 8
-    header = json.loads(data[start : start + length])
-    if header.get("schema") != PREVIEW_SCHEMA:
-        raise PreviewError(f"unsupported preview schema: {header.get('schema')!r}")
-    base = start + length
-    parts: dict[str, Stored] = {}
-    for part in header["parts"]:
-        first = part["positions"]["offset"]
-        last = part["vertex_positions"]
-        end = last["offset"] + last["count"] * _ITEM
-        meta = dict(part)
-        for name in _ARRAYS:
-            meta[name] = {"offset": part[name]["offset"] - first, "count": part[name]["count"]}
-        parts[part["key"]] = Stored(meta, bytes(data[base + first : base + end]))
-    return ParsedPreview(list(header["nodes"]), parts)
+    try:
+        (length,) = struct.unpack_from("<I", data, len(MAGIC))
+        start = len(MAGIC) + 8
+        header = json.loads(data[start : start + length])
+        if header.get("schema") != PREVIEW_SCHEMA:
+            raise PreviewError(f"unsupported preview schema: {header.get('schema')!r}")
+        base = start + length
+        parts: dict[str, Stored] = {}
+        for part in header["parts"]:
+            first = part["positions"]["offset"]
+            last = part["vertex_positions"]
+            end = last["offset"] + last["count"] * _ITEM
+            meta = dict(part)
+            for name in _ARRAYS:
+                meta[name] = {"offset": part[name]["offset"] - first, "count": part[name]["count"]}
+            parts[part["key"]] = Stored(meta, bytes(data[base + first : base + end]))
+        return ParsedPreview(list(header["nodes"]), parts)
+    except PreviewError:
+        raise
+    except (struct.error, ValueError, KeyError, TypeError, AttributeError) as error:
+        raise PreviewError(f"damaged preview: {type(error).__name__}: {error}") from error
 
 
 class PartStore:

@@ -113,3 +113,46 @@ def test_the_way_back_from_an_ocp_shape_keeps_the_geometry() -> None:
 def test_something_that_is_not_a_shape_is_refused_with_a_reason() -> None:
     with pytest.raises(TypeError, match="SDK shape"):
         bridge.native_to_ocp(5)
+
+
+def test_a_moved_and_turned_solid_keeps_its_place_and_the_orientation_of_its_faces() -> None:
+    """The way through BRep must keep the location and the orientation flags, not only the volume and the class."""
+    from OCP.BRepAdaptor import BRepAdaptor_Surface
+    from OCP.BRepBndLib import BRepBndLib
+    from OCP.BRepGProp import BRepGProp
+    from OCP.BRepTools import BRepTools
+    from OCP.Bnd import Bnd_Box
+    from OCP.GProp import GProp_GProps
+    from OCP.TopAbs import TopAbs_FACE, TopAbs_REVERSED
+    from OCP.TopExp import TopExp_Explorer
+    from OCP.TopoDS import TopoDS
+    from OCP.gp import gp_Pnt, gp_Vec
+
+    solid = scad.rotate_shape(scad.translate_shape(box(), (10.0, -5.0, 3.0)), 30.0, axis=(1, 1, 0))
+    shape = solid.wrapped
+    centre = GProp_GProps()
+    BRepGProp.VolumeProperties_s(shape, centre)
+    inside = centre.CentreOfMass()
+    expected = solid.get_center()
+    assert (inside.X(), inside.Y(), inside.Z()) == pytest.approx(tuple(expected), abs=1e-6)  # the placement is kept
+
+    explorer = TopExp_Explorer(shape, TopAbs_FACE)
+    reversed_faces = faces = 0
+    while explorer.More():
+        face = TopoDS.Face_s(explorer.Current())
+        faces += 1
+        reversed_faces += face.Orientation() == TopAbs_REVERSED
+        u0, u1, v0, v1 = BRepTools.UVBounds_s(face)
+        surface = BRepAdaptor_Surface(face)
+        point, du, dv = gp_Pnt(), gp_Vec(), gp_Vec()
+        surface.D1((u0 + u1) / 2, (v0 + v1) / 2, point, du, dv)
+        normal = du.Crossed(dv)
+        if face.Orientation() == TopAbs_REVERSED:
+            normal.Reverse()
+        outward = gp_Vec(inside, point)
+        assert normal.Dot(outward) > 0, "a face of a solid must point away from its inside"
+        explorer.Next()
+    assert faces == 6 and 0 < reversed_faces < 6  # (a box built by the kernel has both)
+    bounds = Bnd_Box()
+    BRepBndLib.Add_s(shape, bounds)
+    assert bounds.Get()[0] > -20.0 and bounds.Get()[3] < 20.0

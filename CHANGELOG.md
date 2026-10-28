@@ -28,37 +28,53 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   its cache belongs to.
 
 ### Changed
+- A handled failure that used to leave no trace now prints a `[sca] ...` line on stderr: the preview warm-up, an
+  unreadable lineage record, a cache entry that could not be deleted, a preview frame that could not be built, a
+  notebook that could not be signed, and a kept model that is damaged and is built again.
 - `shape.wrapped` is an OCP shape when OCP is installed (the `verify` extra), of the class of its kind (`TopoDS_Solid`,
   `TopoDS_Face`, ...), as it is in CadQuery: the OCCT code an agent writes for verifier scripts runs as written
-  (`BRepGProp.VolumeProperties_s(solid.wrapped, props)`). It is a copy made through BinTools; without OCP it stays the
-  SDK's own OCCT shape. `SCA_WRAPPED=native|ocp` chooses. The SDK's own Python layers take `shape._native_wrapped`, which
+  (`BRepGProp.VolumeProperties_s(solid.wrapped, props)`). It is a copy made through BinTools, with its location and
+  orientation: every access makes a new one (`s.wrapped is s.wrapped` is false), so a change made to it (a
+  `BRepBuilderAPI_Transform`, `BRepTools.Clean`) does not reach the SDK's shape, which is unlike CadQuery's live handle
+  and unlike 2.2.6, where `.wrapped` was the shape itself. To use a result, convert it back with
+  `simplecadapi._glue.bridge.ocp_to_native`. Without OCP it stays the SDK's own OCCT shape. `SCA_WRAPPED=native|ocp`
+  chooses, and is read on each access. The SDK's own Python layers take `shape._native_wrapped`, which
   is always the native one, and the functions that take a raw shape (the `inspect.brep` queries, the STEP export, the
   geometry helpers of `simplecadapi.kernel`) accept either.
 - Editor kernel: the cells keep what they made (`simplecadapi.runtime.cache._CellMemory`, 12 results; `SCA_NO_CELL_MEMORY=1`
   turns it off). marimo unpickles an entry while it answers the cache lookup, which is about a second for each of the
   six-axis arm's assemblies; the kernel now asks its memory right after the cell's key is hashed and before the disk,
   and hands out the same objects when the entry is one this process holds. Only plain data and the SDK's value types are
-  kept (they are functional: a cell cannot change what an earlier one made). `SCA_EDITOR_TRACE=1` with
+  kept. They are functional except for `set_metadata` and `auto_tag_faces`, which change the value they are called on:
+  those two are watched, and an entry holding a value that one of them changed is dropped, so the next restore reads
+  the disk copy as before (a change made through a part of an assembly, `assembly.get_component(...)`, is not seen).
+  The limit is twelve entries, not a number of bytes, and costs about 300 MB on the six-axis arm; only the editor's
+  kernel has a memory (`sca run` and the tests do not). With a marimo whose `cache_attempt_from_hash` has another
+  signature than the one this was written for, a line on stderr says so and the memory is off. `SCA_EDITOR_TRACE=1` with
   `SCA_EDITOR_TRACE_FILE=<path>` writes what the cache did with each cell and how long each part took.
 - The saved parameter values in a cell's digest follow what the cell reads. A value the notebook's parameter cell
   defines used to be part of the digest of every cell below that cell, so changing one joint angle changed the digest
   of the cell that builds the parts and every cell after it. It is now part of the digest of the cell that defines it,
   of the cells that read it, and of the cells that read from those. On the six-axis arm a joint angle that has not been
   seen before takes 2.3-2.7 s to show instead of 5.7-6.5 s, and one that has been seen takes 0.6 s instead of 5.5 s.
+  The digests of cells of a notebook that has saved parameter values are not those of the previous version, so the
+  first run after the upgrade builds those notebooks again once.
 - Editor: the preview is incremental. A model's parts are identified by the content of their geometry, so the kernel
   posts only the parts the server does not hold, the server sends each page only the parts that page lacks (a page that
   joins late, or asks with `preview.resync`, is given the whole model), and the page builds geometry only for new
   parts and reuses the rest. On the six-axis arm a joint angle now moves 115 KB instead of 6.26 MB: the kernel's post
   takes 17 ms instead of 285-610 ms, the page handles the frame in 2-5 ms with no long task, and from the last cell
   to the model on screen it takes 0.36-0.41 s instead of 1.3-3.2 s. `simplecadapi.scene.preview.encode_preview` takes
-  `omit=` for the parts to leave out; the editor keeps parts in `simplecadapi.editor.preview_parts.PartStore`.
+  `omit=` for the parts to leave out; a post that is not a readable preview is answered `400` (`409` is only for parts
+  the server does not hold), and the server replaces the model it holds as one value; the editor keeps parts in `simplecadapi.editor.preview_parts.PartStore`.
 - Editor: the signature that files a model on disk is taken beside the build, not before it, and the server replies to
   the kernel's post before filing the model and writing the snapshot. `SCA_EDITOR_TRACE=1` prints how long each step
   of a settle takes.
 - `use` keeps the product of the last run of each child notebook in the process and hands it out again while the
   child's static digest (source, header, local modules, input files, the children it uses) and the overrides are
   unchanged (`simplecadapi.runtime.usememo`; `SCA_NO_USE_MEMO=1` turns it off). One entry per (notebook, id): the run's
-  nodes are registered by graph id, so the entry is the last run's. The editor's kernel is a long-lived process, so a
+  nodes are registered by graph id, so the entry is the last run's, and two notebooks that run under one graph id
+  replace each other's entry. The editor's kernel is a long-lived process, so a
   new `OPEN_STROKE` on the six-axis arm rebuilds in 4.2 s instead of 6.4 s. Children with a computed `use` path and
   overrides that are not plain data are not kept. Prefetch no longer starts workers for what is kept.
 - Editor: the model is pushed over the WebSocket with the `preview` event, in one binary frame

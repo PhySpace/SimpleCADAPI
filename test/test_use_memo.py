@@ -84,6 +84,14 @@ class UseMemoTest(unittest.TestCase):
         self.assertEqual(recorded[0], recorded[1])
         self.assertIn(self.child.resolve(), {path.resolve() for path in recorded[1]})
 
+    def test_two_children_under_one_id_do_not_both_stay_kept(self) -> None:
+        other = Path(create_notebook(self.root, "other", "part"))
+        first = runner.use(self.child, id="shared")
+        runner.use(other, id="shared")  # registers its nodes under "shared", replacing the first run's
+        again = runner.use(self.child, id="shared")
+        self.assertIsNot(again, first)  # the first run's nodes are gone from the registry: it has to run again
+        self.assertEqual([run[0] for run in self.runs], ["child.py", "other.py", "child.py"])
+
 
 if __name__ == "__main__":
     unittest.main()

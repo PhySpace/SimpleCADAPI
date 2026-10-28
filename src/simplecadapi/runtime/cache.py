@@ -22,6 +22,7 @@ use, so going back to a previous value is still instant.
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import os
 import shutil
@@ -29,10 +30,11 @@ import threading
 import time
 import zlib
 from collections import OrderedDict
-from collections.abc import Callable, Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from .._glue.notice import say
 from ._marimo import (
     CachedLifecycle,
     CellId_t,
@@ -212,7 +214,10 @@ class CellDigests:
 
 
 _MEMORY_ENTRIES = 12
-"""How many cell results the kernel keeps (the newest; an assembly of a few dozen parts is some tens of megabytes)."""
+"""How many cell results the kernel keeps (the newest; counted in entries, not bytes: an assembly of a few dozen parts is
+some tens of megabytes, which is where the editor's extra resident memory comes from).  Only an editor kernel has a
+memory (``CellCache(memory=True)``); ``sca run`` and the tests do not, and the SDK's own code cannot change under it:
+the kernel is a process that imported it once."""
 
 
 def _shareable(value: Any) -> bool:
@@ -228,6 +233,53 @@ def _shareable(value: Any) -> bool:
         return all(_shareable(item) for item in value)
     kind = type(value)
     return kind.__module__ == "simplecadapi.core" or kind.__module__.startswith("simplecadapi.product.")
+
+
+_MUTATORS = ("set_metadata", "auto_tag_faces")
+_changed: set[int] = set()
+"""Ids of values something changed in place (a later cell calling ``set_metadata`` on a value it was given)."""
+
+
+def _watch_changes() -> None:
+    """Note which value a ``set_metadata``/``auto_tag_faces`` call changes, for every SDK type that has them.
+
+    The SDK's values are functional except for these: they change the value they are called on, and a memory that hands
+    the same object to a later run would hand out the change (the disk copy is a fresh object each time).  The ids are
+    kept in :data:`_changed`; a memory entry holding one of them is not handed out again (a wrong id only costs a read).
+    """
+
+    import functools
+
+    from .. import _cpp
+
+    native = getattr(_cpp, "_native", None)
+    for kind in vars(native).values() if native is not None else ():
+        if not isinstance(kind, type):
+            continue
+        for name in _MUTATORS:
+            original = kind.__dict__.get(name)
+            if original is None or getattr(original, "_sca_watched", False):
+                continue
+
+            def watched(self, *args, __original=original, **kwargs):
+                if len(_changed) > 100_000:
+                    _changed.clear()
+                _changed.add(id(self))
+                return __original(self, *args, **kwargs)
+
+            functools.update_wrapper(watched, original)
+            watched._sca_watched = True  # type: ignore[attr-defined]
+            setattr(kind, name, watched)
+
+
+_watch_changes()
+
+
+def _held(value: Any) -> "Iterator[Any]":
+    yield value
+    if isinstance(value, (tuple, frozenset)):
+        for item in value:
+            yield from _held(item)
 
 
 class _CellMemory:
@@ -253,6 +305,9 @@ class _CellMemory:
             entry = self._entries.get(key)
             if entry is None or entry[0] is not loader:  # (an id is reused once its loader is gone)
                 return None
+            if any(id(held) in _changed for value in entry[1].values() for held in _held(value)):
+                del self._entries[key]  # something changed a value in place since it was kept
+                return None
             self._entries.move_to_end(key)
             return entry[1], entry[2]
 
@@ -261,6 +316,7 @@ class _CellMemory:
         if stateful or not all(_shareable(value) for value in values.values()):
             return
         key = self._key(loader, key)
+        _changed.difference_update(id(held) for value in values.values() for held in _held(value))
         with self._lock:
             self._entries[key] = (loader, values, meta)
             self._entries.move_to_end(key)
@@ -272,7 +328,8 @@ class _CellMemory:
             self._entries.clear()
 
     def __len__(self) -> int:
-        return len(self._entries)
+        with self._lock:
+            return len(self._entries)
 
 
 def _attempt_with_memory(
@@ -338,7 +395,17 @@ def _attempt_with_memory(
 
 
 _marimo_attempt = _marimo_cached.cache_attempt_from_hash
-_marimo_cached.cache_attempt_from_hash = _attempt_with_memory  # a loader without a memory is not affected
+_MEMORY_NEEDS = {"module", "graph", "cell_id", "scope", "context", "pin_modules", "hash_type", "scoped_refs", "loader", "as_fn"}
+
+if _MEMORY_NEEDS <= set(inspect.signature(_marimo_attempt).parameters):
+    _marimo_cached.cache_attempt_from_hash = _attempt_with_memory  # a loader without a memory is not affected
+else:
+    # The cell memory re-implements the first half of this marimo function; with another signature it cannot.
+    say(
+        "this marimo's cache_attempt_from_hash has another signature than the cell memory was written for: "
+        "the editor kernel will not keep cell results in memory (every restore reads the disk)",
+        once="cell-memory-marimo",
+    )
 
 
 class CellCache(CachedLifecycle):
@@ -447,8 +514,8 @@ class CellCache(CachedLifecycle):
         try:
             manifest.unlink(missing_ok=True)
             shutil.rmtree(blobs, ignore_errors=True)
-        except OSError:
-            pass
+        except OSError as error:
+            say(f"could not delete the stale cache entry {manifest} ({error}); it will be read again")
 
     def _load_lineage(self, cell: CellImpl, digest: str) -> bool:
         from . import lineage
@@ -456,7 +523,8 @@ class CellCache(CachedLifecycle):
         try:
             # The entries of a run live in <state>/<id>/cache: the nodes of its cells belong to the graph of that id.
             return lineage.load(self._root / digest, str(cell.cell_id), self._root.parent.name)
-        except Exception:  # noqa: BLE001 - an unreadable record is a miss, never a failure
+        except Exception as error:  # noqa: BLE001 - an unreadable record is a miss, never a failure
+            say(f"unreadable lineage record of cell {cell.cell_id} ({type(error).__name__}: {error}); running it again")
             return False
 
 

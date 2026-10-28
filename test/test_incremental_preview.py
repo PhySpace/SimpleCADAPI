@@ -151,6 +151,46 @@ class ServerSendsPagesWhatTheyLackTest(unittest.TestCase):
         self.assertTrue(state.set_preview(P.encode_preview(scene, omit=set(scene.parts))))  # same model, parts left out
         self.assertEqual(state.latest_preview_bytes, full)
 
+    def test_a_damaged_preview_is_refused_as_such_not_as_missing_parts(self) -> None:
+        from starlette.testclient import TestClient
+
+        from simplecadapi.editor.server import create_app
+
+        state = self.state()
+        client = TestClient(create_app(state))
+        scene = scene_of(scad.make_box_rsolid(10, 10, 10))
+        full = P.encode_preview(scene)
+        for name, body in {
+            "cut inside the header": full[: len(P.MAGIC) + 8 + 5],
+            "header that is not JSON": full[: len(P.MAGIC) + 8] + b"x" * (len(full) - len(P.MAGIC) - 8),
+        }.items():
+            with self.subTest(name):
+                reply = client.post("/api/runtime/preview", content=body)
+                self.assertEqual(reply.status_code, 400, reply.text)
+                self.assertNotIn("missing", reply.json())
+        self.assertIsNone(state.latest_preview_bytes)  # nothing was taken
+        self.assertEqual(client.post("/api/runtime/preview", content=full).status_code, 200)
+
+    def test_bytes_that_are_no_preview_at_all_are_still_kept_whole(self) -> None:
+        state = self.state()
+        self.assertFalse(state.set_preview(b"PKG"))
+        self.assertEqual(state.latest_preview_bytes, b"PKG")
+
+    def test_the_model_is_replaced_as_one_value(self) -> None:
+        state = self.state()
+        scene = scene_of(scad.make_box_rsolid(10, 10, 10))
+        state.set_preview(P.encode_preview(scene))
+        nodes, keys, data = state.scene_nodes, state.latest_keys, state.latest_preview_bytes
+        self.assertEqual(state._model, (nodes, keys, data))
+        self.assertEqual(keys, frozenset(scene.parts))
+
+    def test_the_signing_of_a_publish_is_handed_out_once(self) -> None:
+        state = self.state()
+        state._sign_in_background()
+        first = state.take_signing()
+        self.assertIsNotNone(first)
+        self.assertIsNone(state.take_signing())  # a second post under the same settle has no signature to be filed under
+
     def test_a_connected_page_is_sent_only_new_parts_and_a_late_page_everything(self) -> None:
         from starlette.testclient import TestClient
 
@@ -180,9 +220,6 @@ class ServerSendsPagesWhatTheyLackTest(unittest.TestCase):
             _, whole = decode_frame(page.receive_bytes())
             self.assertEqual(set(parse_preview(whole).parts), set(second.parts))
 
-
-if __name__ == "__main__":
-    unittest.main()
 
 
 class HubSendsEachPageItsOwnFrameTest(unittest.TestCase):
@@ -226,3 +263,7 @@ class HubSendsEachPageItsOwnFrameTest(unittest.TestCase):
             time.sleep(0.01)
         self.assertEqual(old.sent[1], b"b,c")  # and it now holds the scene it was sent
         self.assertEqual(new.sent[1], b"b,c")
+
+
+if __name__ == "__main__":
+    unittest.main()

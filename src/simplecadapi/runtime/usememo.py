@@ -35,9 +35,11 @@ class Kept:
     product: Any
     path: Path
     dependencies: frozenset[Path]
+    graph_id: str
 
 
 _entries: "OrderedDict[tuple[str, str | None], tuple[tuple[str, str], Kept]]" = OrderedDict()
+_owners: dict[str, tuple[str, str | None]] = {}  # graph id -> the entry whose run registered its nodes
 _lock = threading.Lock()
 
 
@@ -77,15 +79,21 @@ def keep(target: Path, id: str | None, overrides: Mapping[str, Any], kept: Kept)
     signature = _signature(target, overrides)
     key = (str(target.resolve()), id)
     with _lock:
+        # The registry now holds this run's nodes: whatever entry owned the graph id before no longer matches.
+        previous = _owners.pop(kept.graph_id, None)
+        if previous is not None:
+            _entries.pop(previous, None)
         if signature is None:
-            _entries.pop(key, None)  # the registry now holds this run's nodes: an older entry no longer matches
+            _entries.pop(key, None)
             return
         _entries[key] = (signature, kept)
         _entries.move_to_end(key)
+        _owners[kept.graph_id] = key
         while len(_entries) > _MAX_ENTRIES:
-            _entries.popitem(last=False)
+            _owners.pop(_entries.popitem(last=False)[1][1].graph_id, None)
 
 
 def clear() -> None:
     with _lock:
         _entries.clear()
+        _owners.clear()

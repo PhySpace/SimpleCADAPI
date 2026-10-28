@@ -10,7 +10,11 @@ pytest.importorskip("marimo")
 
 import simplecadapi as scad
 from simplecadapi.runtime import cache as cache_module
-from simplecadapi.runtime.cache import _CellMemory, _attempt_with_memory, _shareable
+from simplecadapi.runtime._marimo import InternalApp, load_notebook
+from simplecadapi.runtime.config import read_notebook_config
+from simplecadapi.runtime.runner import _cell_prefix
+from test_notebook_runtime import NotebookTestCase, cell, notebook_text
+from simplecadapi.runtime.cache import CellDigests, _CellMemory, _attempt_with_memory, _shareable
 
 
 class Loader:
@@ -146,9 +150,6 @@ class MemoryTest(unittest.TestCase):
         self.assertIsNotNone(self.memory.recall(self.loader, Key("c")))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class SavedValuesFollowWhatACellReadsTest(unittest.TestCase):
     """A saved value is in the digest of the cells it reaches, not of every cell below the cell that defines it."""
@@ -192,3 +193,77 @@ class SavedValuesFollowWhatACellReadsTest(unittest.TestCase):
 
     def test_nothing_saved_means_nothing_to_carry(self) -> None:
         self.assertTrue(all(not found for found in self.names(set()).values()))
+
+
+class SavedValuesInTheDigestsOfARealNotebookTest(NotebookTestCase):
+    """What the editor applies to a variable changes the digest of the cells that get it, through any chain of cells."""
+
+    def digests(self, saved):
+        path = self.write(
+            "arm.py",
+            notebook_text(
+                cell("A = 1.0\nB = 2.0", returns="A, B"),
+                cell("half = A / 2", reads="A", returns="half"),
+                cell("quarter = half / 2", reads="half", returns="quarter"),
+                cell("other = B + 1", reads="B", returns="other"),
+            ),
+        )
+        config = read_notebook_config(path)
+        internal = InternalApp(load_notebook(path, cell_prefix=_cell_prefix(config)))
+        ordered = [internal.graph.cells[i] for i in internal.cell_manager.cell_ids() if i in internal.graph.cells]
+        setup = internal.graph.cells.get(internal.cell_manager.setup_cell_id)
+        found = CellDigests(config, ordered, setup, saved=saved, kernel=True)
+        return {cell_.code.split(" =")[0].split("\n")[0]: found.digest(cell_.cell_id) for cell_ in ordered}
+
+    def test_a_value_reaches_a_cell_that_only_reads_it_through_another(self) -> None:
+        before, after = self.digests({"A": 1.0}), self.digests({"A": 5.0})
+        self.assertNotEqual(before["half"], after["half"])
+        self.assertNotEqual(before["quarter"], after["quarter"])  # reads `half`, which reads `A`
+        self.assertEqual(before["other"], after["other"])  # reads only `B`
+
+    def test_the_same_saved_values_give_the_same_digests(self) -> None:
+        self.assertEqual(self.digests({"A": 5.0}), self.digests({"A": 5.0}))
+
+
+class MarimoHookTest(unittest.TestCase):
+    def test_marimo_asks_the_function_the_memory_replaced(self) -> None:
+        """The cell memory re-implements the first half of marimo's ``cache_attempt_from_hash``: a marimo whose
+        signature changed (the upgrade this would break on) has to fail here, not quietly lose the memory."""
+        import inspect
+
+        from simplecadapi.runtime import cache
+        from simplecadapi.runtime._marimo import marimo_cached
+
+        self.assertTrue(cache._MEMORY_NEEDS <= set(inspect.signature(cache._marimo_attempt).parameters))
+        self.assertIs(marimo_cached.cache_attempt_from_hash, cache._attempt_with_memory)
+
+
+class AValueAnotherCellChangedIsNotHandedOutTest(unittest.TestCase):
+    """``set_metadata`` and ``auto_tag_faces`` change a value in place: what a cell did to a value it was given must
+    not be seen by a later run that restores the entry (the disk copy is a fresh object each time)."""
+
+    def setUp(self) -> None:
+        self.memory = _CellMemory(limit=4)
+        self.loader = object()
+
+    def test_a_value_changed_in_place_after_it_was_kept_is_a_miss(self) -> None:
+        import simplecadapi as scad
+
+        box = scad.make_box_rsolid(2, 2, 2)
+        self.memory.remember(self.loader, Key("e"), {"box": box}, {})
+        self.assertIsNotNone(self.memory.recall(self.loader, Key("e")))
+        box.set_metadata("note", "changed by a later cell")
+        self.assertIsNone(self.memory.recall(self.loader, Key("e")))
+        self.assertEqual(len(self.memory), 0)  # and the entry is gone, not just skipped
+
+    def test_a_value_kept_again_after_a_change_is_the_new_state(self) -> None:
+        import simplecadapi as scad
+
+        box = scad.make_box_rsolid(2, 2, 2)
+        box.set_metadata("note", "before")
+        self.memory.remember(self.loader, Key("e"), {"box": box}, {})
+        self.assertIsNotNone(self.memory.recall(self.loader, Key("e")))
+
+
+if __name__ == "__main__":
+    unittest.main()

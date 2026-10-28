@@ -13,6 +13,8 @@ from typing import Any, Callable, Collection
 
 from starlette.websockets import WebSocket
 
+from .._glue.notice import say
+
 
 class WsHub:
     def __init__(self) -> None:
@@ -50,10 +52,16 @@ class WsHub:
             clients = tuple(self._clients.items())
         for client, known in clients:
             try:
-                await client.send_bytes(make_frame(frozenset(known)))
+                frame = make_frame(frozenset(known))
+            except Exception as error:  # a frame that cannot be made is this server's fault, not the page's
+                say(f"could not build a preview frame ({type(error).__name__}: {error}); the page keeps its model")
+                continue
+            try:
+                await client.send_bytes(frame)
+            except Exception:  # the page went away
+                await self._drop(client)
+            else:
                 self._clients[client] = set(keys)
-            except Exception:
-                self._clients.pop(client, None)
 
     def broadcast(self, message: dict[str, Any]) -> None:
         """Push one JSON message to every connected client (thread-safe)."""
@@ -82,8 +90,12 @@ class WsHub:
                     await client.send_bytes(frame)
                 else:
                     await client.send_text(frame)
-            except Exception:
-                self._clients.pop(client, None)
+            except Exception:  # the page went away
+                await self._drop(client)
+
+    async def _drop(self, client: Any) -> None:
+        async with self._lock:
+            self._clients.pop(client, None)
 
 
 def preview_frame(envelope: dict[str, Any], data: bytes) -> bytes:
