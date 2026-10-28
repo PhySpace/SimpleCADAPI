@@ -146,6 +146,27 @@ targeted check:
 - Assemblies: solve residuals, coaxiality of mated axes, flush faces, repeated
   occurrences at named positions (`assembly-positioning.md`).
 
+## OCCT measurements on an SDK shape
+
+When the checks need more than the SDK exposes (point-in-solid, minimum distance between shapes, Boolean overlap
+volume, centroids and inertia), write them with OCP exactly as OCCT references and CadQuery do. With OCP installed (the
+`verify` extra), `shape.wrapped` **is an OCP shape** of the class of its kind (`TopoDS_Solid`, `TopoDS_Face`,
+`TopoDS_Edge`, ...), so this runs as written:
+
+```python
+from OCP.BRepGProp import BRepGProp
+from OCP.GProp import GProp_GProps
+
+props = GProp_GProps()
+BRepGProp.VolumeProperties_s(solid.wrapped, props)
+volume = props.Mass()
+```
+
+`wrapped` is a copy made through OpenCASCADE's binary format (milliseconds for a part); changing it does not change the
+SDK shape, and a shape you build in OCP comes back into the SDK with `simplecadapi._glue.bridge.from_occt`. Without OCP
+installed `wrapped` is the SDK's own OCCT shape, which OCP functions reject: install the extra for verifier scripts.
+`SCA_WRAPPED=native` or `SCA_WRAPPED=ocp` forces one view.
+
 ## Visual review converts to deterministic checks
 
 A visual concern found at review (misplaced feature, wrong silhouette) is not

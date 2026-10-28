@@ -25,6 +25,12 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   its cache belongs to.
 
 ### Changed
+- `shape.wrapped` is an OCP shape when OCP is installed (the `verify` extra), of the class of its kind (`TopoDS_Solid`,
+  `TopoDS_Face`, ...), as it is in CadQuery: the OCCT code an agent writes for verifier scripts runs as written
+  (`BRepGProp.VolumeProperties_s(solid.wrapped, props)`). It is a copy made through BinTools; without OCP it stays the
+  SDK's own OCCT shape. `SCA_WRAPPED=native|ocp` chooses. The SDK's own Python layers take `shape._native_wrapped`, which
+  is always the native one, and the functions that take a raw shape (the `inspect.brep` queries, the STEP export, the
+  geometry helpers of `simplecadapi.kernel`) accept either.
 - Editor kernel: the cells keep what they made (`simplecadapi.runtime.cache._CellMemory`, 12 results; `SCA_NO_CELL_MEMORY=1`
   turns it off). marimo unpickles an entry while it answers the cache lookup, which is about a second for each of the
   six-axis arm's assemblies; the kernel now asks its memory right after the cell's key is hashed and before the disk,

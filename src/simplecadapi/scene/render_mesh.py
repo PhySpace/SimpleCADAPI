@@ -146,7 +146,7 @@ def build_edge_mesh(
         raise ValueError("edge entity count does not match the solid topology")
     blocks = tuple(
         _edge_block(
-            edge if hasattr(edge, "_polyline") else edge.wrapped,
+            edge if hasattr(edge, "_polyline") else edge._native_wrapped,
             entity_id=entity_id,
             linear_tolerance=linear_tolerance,
             angular_tolerance=angular_tolerance,
@@ -191,7 +191,7 @@ def solid_asset_bounds(solid: Solid) -> tuple[tuple[float, float, float], tuple[
         return ((float(xmin), float(ymin), float(zmin)), (float(xmax), float(ymax), float(zmax)))
     from ..kernel.ocp_properties import bounding_box
 
-    box = bounding_box(solid.wrapped)
+    box = bounding_box(solid._native_wrapped)
     return (
         (float(box.xmin), float(box.ymin), float(box.zmin)),
         (float(box.xmax), float(box.ymax), float(box.zmax)),

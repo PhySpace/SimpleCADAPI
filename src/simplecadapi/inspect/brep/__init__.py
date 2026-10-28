@@ -149,6 +149,7 @@ from inspect import isfunction as _isfunction
 import sys as _sys
 
 from simplecadapi._cpp import get_active_session as _get_active_session
+from simplecadapi._glue.bridge import accepts_ocp as _accepts_ocp
 
 
 def _outside_model_graph(function):
@@ -168,8 +169,10 @@ for _public_name in __all__:
     _public_value = globals()[_public_name]
     if not _isfunction(_public_value):
         continue
-    _checked_value = _outside_model_graph(_public_value)
+    # a raw shape may be an OCP one (`shape.wrapped` is, when OCP is installed): the queries work on the SDK's own
+    # OCCT, so such a shape is converted on the way in
+    _checked_value = _accepts_ocp(_outside_model_graph(_public_value))
     globals()[_public_name] = _checked_value
     setattr(_sys.modules[_public_value.__module__], _public_name, _checked_value)
 
-del _checked_value, _isfunction, _outside_model_graph, _public_name, _public_value
+del _accepts_ocp, _checked_value, _isfunction, _outside_model_graph, _public_name, _public_value

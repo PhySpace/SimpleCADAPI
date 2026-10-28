@@ -51,3 +51,10 @@ def export_stl_shape(shape: TopoDS_Shape, filename: str) -> None:
     ok = writer.Write(shape, str(Path(filename)))
     if ok is False:
         raise ValueError("STL write failed")
+
+
+# `shape.wrapped` is an OCP shape when OCP is installed: these helpers work on the SDK's own OCCT
+from simplecadapi._glue.bridge import accepting_ocp as _accepting_ocp  # noqa: E402
+
+_accepting_ocp(globals())
+del _accepting_ocp

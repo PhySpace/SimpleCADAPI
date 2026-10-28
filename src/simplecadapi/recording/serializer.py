@@ -1579,7 +1579,7 @@ def _shape_geom_type(shape: AnyShape) -> Optional[str]:
         )
 
         if isinstance(shape, Edge):
-            curve_type = BRepAdaptor_Curve(shape.wrapped).GetType()
+            curve_type = BRepAdaptor_Curve(shape._native_wrapped).GetType()
             mapping = {
                 GeomAbs_Line: "LINE",
                 GeomAbs_Circle: "CIRCLE",
@@ -1591,7 +1591,7 @@ def _shape_geom_type(shape: AnyShape) -> Optional[str]:
                 str(curve_type).replace("GeomAbs_CurveType.GeomAbs_", "").upper(),
             )
         if isinstance(shape, Face):
-            surface_type = BRepAdaptor_Surface(shape.wrapped).GetType()
+            surface_type = BRepAdaptor_Surface(shape._native_wrapped).GetType()
             mapping = {
                 GeomAbs_Plane: "PLANE",
                 GeomAbs_Cylinder: "CYLINDER",
@@ -1620,7 +1620,7 @@ def _shape_bounding_box(shape: AnyShape) -> Any:
         return SimpleNamespace(xmin=xmin, ymin=ymin, zmin=zmin, xmax=xmax, ymax=ymax, zmax=zmax)
     from ..kernel.ocp_properties import bounding_box
 
-    return bounding_box(shape.wrapped)
+    return bounding_box(shape._native_wrapped)
 
 
 def _bbox_score(shape: AnyShape, selector: Dict[str, Any]) -> float:

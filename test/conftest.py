@@ -17,6 +17,11 @@ os.environ.setdefault("SCA_DIAGNOSTIC_RENDER_BUDGET", "60")
 # run would only slow the rest of the suite down.
 os.environ.setdefault("SCA_JOBS", "1")
 
+# ``shape.wrapped`` is an OCP shape when OCP is installed (the ``verify`` extra).  Most of the suite hands it to the
+# SDK's own OCCT classes (``simplecadapi._cpp.occt``), which want the native one, whether or not OCP happens to be in
+# the environment: tests about the OCP view (test_wrapped_ocp.py) ask for it themselves.
+os.environ.setdefault("SCA_WRAPPED", "native")
+
 
 # ---------------------------------------------------------------------------
 # The C++ backend: failures that are known and classified.
