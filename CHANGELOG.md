@@ -25,6 +25,17 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   its cache belongs to.
 
 ### Changed
+- Editor kernel: the cells keep what they made (`simplecadapi.runtime.cache._CellMemory`, 12 results; `SCA_NO_CELL_MEMORY=1`
+  turns it off). marimo unpickles an entry while it answers the cache lookup, which is about a second for each of the
+  six-axis arm's assemblies; the kernel now asks its memory right after the cell's key is hashed and before the disk,
+  and hands out the same objects when the entry is one this process holds. Only plain data and the SDK's value types are
+  kept (they are functional: a cell cannot change what an earlier one made). `SCA_EDITOR_TRACE=1` with
+  `SCA_EDITOR_TRACE_FILE=<path>` writes what the cache did with each cell and how long each part took.
+- The saved parameter values in a cell's digest follow what the cell reads. A value the notebook's parameter cell
+  defines used to be part of the digest of every cell below that cell, so changing one joint angle changed the digest
+  of the cell that builds the parts and every cell after it. It is now part of the digest of the cell that defines it,
+  of the cells that read it, and of the cells that read from those. On the six-axis arm a joint angle that has not been
+  seen before takes 2.3-2.7 s to show instead of 5.7-6.5 s, and one that has been seen takes 0.6 s instead of 5.5 s.
 - Editor: the preview is incremental. A model's parts are identified by the content of their geometry, so the kernel
   posts only the parts the server does not hold, the server sends each page only the parts that page lacks (a page that
   joins late, or asks with `preview.resync`, is given the whole model), and the page builds geometry only for new
