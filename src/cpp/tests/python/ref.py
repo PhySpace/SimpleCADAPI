@@ -27,8 +27,10 @@ from typing import Any
 import pytest
 
 GOLDEN_DIR = Path(__file__).resolve().parents[1] / "golden"
+# The reference interpreter runs the 2.2.6 SDK.  SCAD_REF_PYTHON names it; without it the checkout next to this one
+# (../SimpleCADAPI/.venv) is tried, and the tests that need a reference are skipped when it is not there.
 REF_PYTHON = os.environ.get(
-    "SCAD_REF_PYTHON", "/Users/lildino/Project/ocws/SimpleCADAPI/.venv/bin/python"
+    "SCAD_REF_PYTHON", str(Path(__file__).resolve().parents[5] / "SimpleCADAPI" / ".venv" / "bin" / "python")
 )
 
 _PRELUDE = """

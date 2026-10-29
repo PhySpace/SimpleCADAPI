@@ -184,8 +184,8 @@ jobs:
         run: uv run pytest test tests -q
 
       - name: Run the C++ parity tests (goldens must exist)
-        # SCAD_GOLDEN_STRICT makes a missing golden file a failure instead of a skip / silent recording; it needs the
-        # ref.py change in src/cpp/tools/ref_strict.patch.
+        # SCAD_GOLDEN_STRICT (read by tests/python/ref.py) makes a missing golden file a failure, not a silent recording;
+        # SCAD_REGOLDEN is refused under it.
         env:
           SCAD_GOLDEN_STRICT: "1"
         run: uv run pytest src/cpp/tests/python -q

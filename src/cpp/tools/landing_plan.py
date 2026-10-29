@@ -5,6 +5,7 @@
     python3 src/cpp/tools/landing_plan.py --files         # every file of every PR
     python3 src/cpp/tools/landing_plan.py --pr 6          # the files of one PR
     python3 src/cpp/tools/landing_plan.py --rev WORKTREE  # the working tree (tracked + untracked, not ignored)
+    python3 src/cpp/tools/landing_plan.py --check-includes  # no area includes a header of an area above it
 
 By default the tree of HEAD is read (`git ls-tree -r --name-only HEAD`).  The universe is every file below src/cpp plus the
 Python files that exist only to drive the compiled module (src/simplecadapi/_cpp, src/simplecadapi/_glue, pyproject.toml,
@@ -30,8 +31,8 @@ PRS: list[tuple[str, list[str]]] = [
         C + ".clang-format", C + ".clang-tidy", C + ".gitignore", C + "tools/check_format.sh", C + "tools/build_occt.py",
         C + "tools/check_occt_guard.py", C + "tools/lsan.supp", C + "tools/gen_stubs.sh",
         C + "tools/landing_plan.py", C + "tools/gen_status.py", C + "scripts/",
-        C + "README.md", C + "CONTRIBUTING.md", C + "ARCHITECTURE.md", C + "AGENTS.md", C + "PORTING_STATUS.md",
-        C + "docs/READING_ORDER.md", C + "docs/LANDING_PLAN.md", C + "docs/DEVIATIONS.md", C + "docs/HANDOFF.md",
+        C + "README.md", C + "CONTRIBUTING.md", C + "ARCHITECTURE.md", C + "PORTING_STATUS.md",
+        C + "docs/READING_ORDER.md", C + "docs/LANDING_PLAN.md", C + "docs/DEVIATIONS.md",
         C + "docs/briefs.md",
     ]),
     ("core, topo, kernel", [
@@ -140,17 +141,61 @@ def assign(files: list[str]) -> tuple[dict[int, list[str]], list[str], list[str]
     return groups, left_over, stale
 
 
+# Link dependencies of the areas, copied from src/CMakeLists.txt (scad_add_area ... DEPS).
+DEPS = {
+    "core": [], "kernel": ["core"], "topo": ["kernel", "core"], "semantic": ["topo"], "reactive": ["topo"], "io": ["topo"],
+    "ql": ["topo", "semantic"], "render": ["topo", "io"], "sketch": ["topo", "semantic"], "surface": ["semantic"],
+    "ops_geometry": ["semantic", "reactive", "io"], "ops_features": ["semantic", "ql", "ops_geometry"],
+    "product": ["ops_features", "ops_geometry", "reactive"],
+    "std": ["ops_features", "ops_geometry", "sketch", "reactive", "product"],
+}
+
+
+def check_includes() -> int:
+    """Report every #include "scad/<area>/..." in an area's include/, src/ or tests/cpp/ directory that names an area
+    outside that area's link-dependency closure (a stacked PR would not compile there).  Reads the working tree."""
+    import re
+
+    def closure(area: str, seen: set[str] | None = None) -> set[str]:
+        seen = set() if seen is None else seen
+        for d in DEPS[area]:
+            if d not in seen:
+                seen.add(d)
+                closure(d, seen)
+        return seen
+
+    bad = 0
+    for area in DEPS:
+        allowed = closure(area) | {area}
+        sub = area.replace("ops_", "ops/")
+        for base in (C + "include/scad/" + sub, C + "src/" + sub, C + "tests/cpp/" + area):
+            for f in Path(base).rglob("*"):
+                if f.suffix not in (".cpp", ".hpp"):
+                    continue
+                for inc in re.findall(r'#include "(scad/[^"]+)"', f.read_text(encoding="utf-8", errors="replace")):
+                    m = re.match(r"scad/(ops/geometry|ops/features|\w+)/", inc)
+                    other = m.group(1).replace("ops/", "ops_") if m else None
+                    if other in DEPS and other not in allowed:
+                        bad += 1
+                        print(f"{f}: includes {inc} ({other} is not below {area})")
+    print("check-includes:", "no upward include" if not bad else f"{bad} upward include(s)")
+    return 1 if bad else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--rev", default="HEAD", help="a git revision, or WORKTREE (default HEAD)")
     ap.add_argument("--files", action="store_true", help="list every file")
     ap.add_argument("--pr", type=int, help="list the files of this PR only")
+    ap.add_argument("--check-includes", action="store_true", help="check that no area includes a header above it")
     args = ap.parse_args()
 
     root = Path(git("rev-parse", "--show-toplevel").strip())
     import os
     os.chdir(root)
 
+    if args.check_includes:
+        return check_includes()
     files = universe(args.rev)
     groups, left_over, stale = assign(files)
     lines = line_counts(args.rev, files)
