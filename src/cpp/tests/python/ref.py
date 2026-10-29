@@ -28,10 +28,13 @@ import pytest
 
 GOLDEN_DIR = Path(__file__).resolve().parents[1] / "golden"
 # The reference interpreter runs the 2.2.6 SDK.  SCAD_REF_PYTHON names it; without it the checkout next to this one
-# (../SimpleCADAPI/.venv) is tried, and the tests that need a reference are skipped when it is not there.
-REF_PYTHON = os.environ.get(
-    "SCAD_REF_PYTHON", str(Path(__file__).resolve().parents[5] / "SimpleCADAPI" / ".venv" / "bin" / "python")
-)
+# (../SimpleCADAPI/.venv) is tried - unless that path is this very repository (a CI checkout is
+# <work>/SimpleCADAPI/SimpleCADAPI), which would make the SDK under test its own reference.  The tests that need a
+# reference are skipped when there is none.
+_REPO = Path(__file__).resolve().parents[4]
+_NEIGHBOUR = _REPO.parent / "SimpleCADAPI"
+_DEFAULT = None if _NEIGHBOUR.resolve() == _REPO else str(_NEIGHBOUR / ".venv" / "bin" / "python")
+REF_PYTHON = os.environ.get("SCAD_REF_PYTHON", _DEFAULT)
 
 _PRELUDE = """
 import json, sys
@@ -44,7 +47,7 @@ json.dump(result, sys.stdout, default=float)
 
 
 def reference_available() -> bool:
-    return Path(REF_PYTHON).exists()
+    return REF_PYTHON is not None and Path(REF_PYTHON).exists()
 
 
 def ref_eval(snippet: str, timeout: float = 120.0) -> Any:
