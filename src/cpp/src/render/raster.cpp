@@ -274,12 +274,16 @@ void shade(const MeshView& m, std::uint32_t t, float w1, float w2, const Lightin
 
   Rgb base = m.style->color;
   float a = 1.0f;
+  const Material* surface_material = m.material;
   const std::uint32_t face = m.fid[t];
   if (face < m.style->face_colors.size()) {
     const Rgba& fc = m.style->face_colors[face];
     if (!std::isnan(fc[3])) {
       base = {fc[0], fc[1], fc[2]};
       a = fc[3];
+      // A face with a colour of its own is a highlight: the VTK path drew those as separate surfaces with the standard
+      // material (ambient .24 / diffuse .72) even in a studio shot, so the palette colour stays readable.
+      surface_material = &lighting.standard;
     }
   }
   if (alpha)
@@ -290,7 +294,7 @@ void shade(const MeshView& m, std::uint32_t t, float w1, float w2, const Lightin
     out[2] = base[2];
     return;
   }
-  const Material& mat = *m.material;
+  const Material& mat = *surface_material;
   float diffuse[3] = {0, 0, 0}, specular[3] = {0, 0, 0};
   for (const Light& l : lighting.lights) {
     const float ndl = n[0] * l.dir[0] + n[1] * l.dir[1] + n[2] * l.dir[2];

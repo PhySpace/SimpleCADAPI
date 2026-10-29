@@ -74,9 +74,5 @@
 "tests/test_topology_identity.py::test_shared_edge_occurrences_keep_entity_state_after_whole_assignment": [
 "internal",
 "tests the Python wrappers' internals (OperationNode dataclass/pickle, _TopoEntity, shape restore cost), which the C++ port does not have"
-],
-"test/test_error_diagnostics_blend_ql.py::test_ql_evidence_highlight_is_visible": [
-"open",
-"the picture is drawn and the matched cylinder bands are orange, but the soft renderer's shading leaves 302 sampled pixels within 40 of #f39c12 where the VTK picture of 2.2.6 had more than 400 (the test's threshold). A renderer-shading parity difference, not a missing picture"
 ]
 }

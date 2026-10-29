@@ -1,5 +1,4 @@
 // fillet_rsolid, chamfer_rsolid (operators/features.py).
-#include "scad/core/tolerance.hpp"
 #include "scad/ops/features/blends.hpp"
 
 #include <algorithm>
@@ -9,8 +8,8 @@
 
 #include "internal.hpp"
 #include "scad/ops/features/diagnostics.hpp"
-#include "scad/semantic/tracking.hpp"
 #include "scad/topo/diagnostic_image.hpp"
+#include "scad/semantic/tracking.hpp"
 
 namespace scad {
 
@@ -51,9 +50,12 @@ struct BlendAttempt {
   if (diagnosis && !diagnosis->possible_causes.empty())
     spec.possible_causes = diagnosis->possible_causes;
 
+  const std::string details =
+      violation != nullptr ? "BlendVolumeViolation: " + std::string(violation->what()) : technical_details_of(error);
   std::vector<ErrorEvidence> evidence;
   if (diagnosis && !diagnosis->evidence_edges.empty()) {
-    // The failing edge(s) as orange lines on the solid; the same unmoved failure is drawn once (agent retry loops).
+    // The solid with the implicated edges in orange; the same failure at the same size is drawn once per process
+    // (agent retry loops must not pay again).
     DiagnosticImage image;
     image.kind = "render";
     image.operation = base.operation;
@@ -61,15 +63,15 @@ struct BlendAttempt {
     image.caption = diagnosis->evidence_caption;
     char size[32];
     std::snprintf(size, sizeof size, "%.1f", *attempt.size);
-    image.dedup_key = base.operation + "|" + diagnosis->failure_kind + "|" + size;
-    image.shapes = {solid};
-    image.highlight_edges.assign(diagnosis->evidence_edges.begin(), diagnosis->evidence_edges.end());
+    image.dedup_key = diagnosis->failure_kind + "|" + size;
+    image.shapes.push_back(solid);
+    for (const Edge& edge : diagnosis->evidence_edges)
+      image.shapes.push_back(edge);
+    image.payload.set("mode", Value("highlight_edges"));
+    image.payload.set("edge_count", Value(static_cast<std::int64_t>(diagnosis->evidence_edges.size())));
     if (auto picture = diagnostic_image(image))
       evidence.push_back(std::move(*picture));
   }
-
-  const std::string details =
-      violation != nullptr ? "BlendVolumeViolation: " + std::string(violation->what()) : technical_details_of(error);
   raise_harness_error(spec, details, diagnosis ? diagnosis->measurements : std::vector<ErrorMeasurement>{},
                       diagnosis ? diagnosis->repair : std::vector<std::string>{}, {}, std::move(evidence));
 }
@@ -155,7 +157,7 @@ namespace {
 std::vector<std::pair<Face, Face>> chamfer_reference_face_pairs(const std::vector<Edge>& edges,
                                                                 const Vec3& reference_direction) {
   const double norm = reference_direction.norm();
-  if (norm <= tol::kDegenerateNorm)
+  if (norm <= 1e-12)
     throw ValueError("chamfer reference_direction must be non-zero");
   const Vec3 direction = reference_direction / norm;
   std::vector<std::pair<Face, Face>> pairs;

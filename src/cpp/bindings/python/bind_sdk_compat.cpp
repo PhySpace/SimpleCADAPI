@@ -542,22 +542,19 @@ void bind_sdk_compat(py::module_& m) {
         const auto callable = std::make_shared<KeptCallable>(provider);
         set_diagnostic_image_provider([callable](const DiagnosticImage& request) -> std::optional<ErrorEvidence> {
           const py::gil_scoped_acquire gil;  // the operation that failed may be running without the GIL
-          py::list shapes, highlight_edges;
+          py::list shapes;
           for (const Shape& shape : request.shapes)
             shapes.append(scad::pybind::reactive::shape_to_python(shape));
-          for (const Shape& edge : request.highlight_edges)
-            highlight_edges.append(scad::pybind::reactive::shape_to_python(edge));
           const py::object picture =
               callable->get()(request.kind, request.operation, request.view, request.caption, request.dedup_key, shapes,
-                              scad::pybind::value_to_python(request.payload), highlight_edges);
+                              scad::pybind::value_to_python(request.payload));
           if (picture.is_none())
             return std::nullopt;
           return evidence_of(picture);
         });
       },
       py::arg("provider"),
-      "Install provider(kind, operation, view, caption, dedup_key, shapes, payload, highlight_edges) -> evidence dict "
-      "or None: it "
+      "Install provider(kind, operation, view, caption, dedup_key, shapes, payload) -> evidence dict or None: it "
       "draws the pictures a failing operation asks for.  None removes it.");
   m.def(
       "_sample_edge_points",
