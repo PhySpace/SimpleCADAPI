@@ -484,37 +484,6 @@ Both outputs contain the same oriented triangles and require no optional
 remeshing dependency. Control curved-surface accuracy with `linear_deflection`
 and `angular_deflection_degrees`.
 
-### Optional CalculiX FEM workflow
-
-The AP242/Gmsh example also includes an optional CalculiX FEM workflow. Install
-the Python-side FEM dependencies with `uv sync --extra fem`, and install the
-external CalculiX solver separately (on macOS: `brew install
-costerwi/homebrew-calculix/calculix-ccx`). The example uses consistent `mm`,
-`N`, and `MPa` units:
-
-```bash
-uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py \
-  --ccx "$(brew --prefix calculix-ccx)/bin/ccx_2.23"
-uv run --extra fem python examples/ap242_gmsh_volume_mesh/visualize_calculix.py
-uv run --extra fem python examples/ap242_gmsh_volume_mesh/study_mesh_convergence.py \
-  --ccx "$(brew --prefix calculix-ccx)/bin/ccx_2.23" \
-  --linear-solver "ITERATIVE CHOLESKY" --solver-timeout 2400
-```
-
-The analysis writes CalculiX `.inp`, `.dat`, `.frd`, solver-log, summary JSON,
-ParaView `.vtu`, and displaced von-Mises PNG artifacts. The preview shows the
-load physical group's yellow boundary and red `-Z` force arrows without
-covering the stress heatmap. The convergence study supports `--resume`; failed
-solver levels are reported separately and never enter the numerical sequence.
-
-The checked-in `-1000 N` study evaluates eleven mesh sizes from `h=3.0 mm` to
-`h=0.25 mm`. A platform requires three consecutive refinement pairs below `5%`
-maximum-displacement change and `10%` peak integration-point von-Mises change.
-The verification level N is `h=0.25 mm` (`0.0331843 mm`, `98.6392 MPa`), so the
-recommended production level N-1 is `h=0.27 mm`. Fine levels use iterative
-Cholesky after a same-mesh comparison at `h=0.375 mm` matched SPOOLES within
-`0.005%`; this avoids the direct solver's in-memory capacity limit.
-
 ## Replayable Operation Graphs
 
 Use an explicit `GraphSession` when a geometry flow outside a notebook should
@@ -681,10 +650,9 @@ uv run python examples/flange_plate/verify.py
 sca run examples/compact_two_stage_planetary_reducer/compact_two_stage_planetary_reducer.py
 uv run python examples/compact_two_stage_planetary_reducer/export_mjcf.py
 
-# FEM (AP242 STEP -> Gmsh volume mesh -> Calculix statics)
+# Gmsh volume mesh (AP242 STEP -> volume mesh)
 uv run python examples/ap242_gmsh_volume_mesh/export_step.py
 uv run --extra gmsh python examples/ap242_gmsh_volume_mesh/export_fem_mesh.py
-uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py
 ```
 
 To try the editor on a real model, `sca example u_link` copies a motor mount

@@ -57,15 +57,17 @@ editor = [
 # simplecadapi.inspect.brep is part of the default install; this extra is kept empty so that
 # `pip install "simplecadapi[inspect]"` from older instructions still works.
 inspect = []
+# Verifier scripts measure models with OCP; the SDK itself never imports it (simplecadapi.verify bridges the two).
+# The build without VTK (same `OCP` import, no 100 MB VTK) and the OCCT generation the SDK ships (7.9): OCP 8 renames
+# the casts and changes signatures.
+verify = [
+    "cadquery-ocp-novtk>=7.9.3.1,<8",
+]
 whucad = [
     "h5py>=3.8",
 ]
 gmsh = [
     "gmsh>=4.15,<5",
-]
-fem = [
-    "gmsh>=4.15,<5",
-    "ccx2paraview[VTK]>=3.2,<4",
 ]
 
 [project.urls]

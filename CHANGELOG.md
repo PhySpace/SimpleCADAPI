@@ -94,6 +94,17 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   recorded on the shape back under the lock.
 - Preview edge polylines are keyed with one numpy pass instead of one `struct.pack` per point; the bytes are identical.
 
+### Added
+- `simplecadapi.verify` (`to_ocp`, `from_ocp`) and the `verify` extra (`pip install "simplecadapi[verify]"`, OCP 7.9
+  without VTK) for verifier scripts. With OCP installed `shape.wrapped` is an OCP shape itself (see Changed), so both
+  routes work; `to_ocp` / `from_ocp` are the explicit ones. The SDK itself still never imports OCP. The skill gains
+  `references/discipline/verifier-scripts.md` with the recipes (volume, bounds, validity, point in solid, distance,
+  overlap) and a verifier skeleton.
+
+### Removed
+- The `fem` extra (`gmsh` and `ccx2paraview[VTK]`) and the README steps that used it; the `gmsh` extra stays. VTK is no
+  longer in the lock file at all.
+
 ## 2.2.7b1 — 2026-10-24
 
 ### Added
