@@ -138,6 +138,58 @@ double payload_number(const Value& value, std::string_view label) {
   return value.as_double();
 }
 
+ScalarPtr const_node_from_value(const Value& node, const std::string& id) {
+  const Value* value = node.find("value");
+  if (value == nullptr)
+    throw ValueError("Constant expression node '" + id + "' is missing 'value'");
+  return Const::make(payload_number(*value, "value"), id);
+}
+
+ScalarPtr var_node_from_value(const Value& node, const std::string& id) {
+  const Value* name = node.find("name");
+  const Value* def = node.find("default");
+  if (name == nullptr || def == nullptr) {
+    throw ValueError("Variable expression node '" + id + "' requires 'name' and 'default'");
+  }
+  if (!name->is_string())
+    throw ValueError("Variable name must be a non-empty string");
+  VarSpec spec;
+  spec.name = name->as_string();
+  spec.default_value = payload_number(*def, "Variable default");
+  spec.expr_id = id;
+  if (const Value* comment = node.find("comment"); comment != nullptr && !comment->is_null()) {
+    if (!comment->is_string())
+      throw ValueError("Variable comment must be a string when provided");
+    spec.comment = comment->as_string();
+  }
+  if (const Value* tol = node.find("tolerance"); tol != nullptr && !tol->is_null()) {
+    spec.tolerance = DimensionTolerance::from_value(*tol);
+  }
+  if (const Value* unit = node.find("unit"))
+    spec.unit = unit_from_payload(*unit);
+  if (const Value* unit = node.find("tolerance_unit"))
+    spec.tolerance_unit = unit_from_payload(*unit);
+  return Var::make(std::move(spec));
+}
+
+// The node objects of the payload in file order, checked for id presence and uniqueness.
+void collect_node_payloads(const Value& raw, std::vector<std::pair<std::string, const Value*>>& payloads,
+                           std::unordered_map<std::string, const Value*>& by_id) {
+  for (const Value& node : raw.as_array()) {
+    if (!node.is_object())
+      throw TypeError("Expression graph nodes must be objects");
+    const Value* id = node.find("expr_id");
+    if (id == nullptr)
+      throw ValueError("Expression graph node is missing 'expr_id'");
+    if (!id->is_string() || id->as_string().empty())
+      throw ValueError("Expression graph node id must be non-empty");
+    if (!by_id.emplace(id->as_string(), &node).second) {
+      throw ValueError("Duplicate expression node id '" + id->as_string() + "'");
+    }
+    payloads.emplace_back(id->as_string(), &node);
+  }
+}
+
 }  // namespace
 
 ExpressionGraph ExpressionGraph::from_value(const Value& payload) {
@@ -152,19 +204,7 @@ ExpressionGraph ExpressionGraph::from_value(const Value& payload) {
 
   std::vector<std::pair<std::string, const Value*>> payloads;
   std::unordered_map<std::string, const Value*> by_id;
-  for (const Value& node : raw->as_array()) {
-    if (!node.is_object())
-      throw TypeError("Expression graph nodes must be objects");
-    const Value* id = node.find("expr_id");
-    if (id == nullptr)
-      throw ValueError("Expression graph node is missing 'expr_id'");
-    if (!id->is_string() || id->as_string().empty())
-      throw ValueError("Expression graph node id must be non-empty");
-    if (!by_id.emplace(id->as_string(), &node).second) {
-      throw ValueError("Duplicate expression node id '" + id->as_string() + "'");
-    }
-    payloads.emplace_back(id->as_string(), &node);
-  }
+  collect_node_payloads(*raw, payloads, by_id);
 
   ExpressionGraph graph;
   std::unordered_map<std::string, ScalarPtr> built;
@@ -190,35 +230,9 @@ ExpressionGraph ExpressionGraph::from_value(const Value& payload) {
       const Value* kind = node.find("kind");
       ScalarPtr expr;
       if (kind != nullptr && kind->is_string() && kind->as_string() == "const") {
-        const Value* value = node.find("value");
-        if (value == nullptr)
-          throw ValueError("Constant expression node '" + id + "' is missing 'value'");
-        expr = Const::make(payload_number(*value, "value"), id);
+        expr = const_node_from_value(node, id);
       } else if (kind != nullptr && kind->is_string() && kind->as_string() == "var") {
-        const Value* name = node.find("name");
-        const Value* def = node.find("default");
-        if (name == nullptr || def == nullptr) {
-          throw ValueError("Variable expression node '" + id + "' requires 'name' and 'default'");
-        }
-        if (!name->is_string())
-          throw ValueError("Variable name must be a non-empty string");
-        VarSpec spec;
-        spec.name = name->as_string();
-        spec.default_value = payload_number(*def, "Variable default");
-        spec.expr_id = id;
-        if (const Value* comment = node.find("comment"); comment != nullptr && !comment->is_null()) {
-          if (!comment->is_string())
-            throw ValueError("Variable comment must be a string when provided");
-          spec.comment = comment->as_string();
-        }
-        if (const Value* tol = node.find("tolerance"); tol != nullptr && !tol->is_null()) {
-          spec.tolerance = DimensionTolerance::from_value(*tol);
-        }
-        if (const Value* unit = node.find("unit"))
-          spec.unit = unit_from_payload(*unit);
-        if (const Value* unit = node.find("tolerance_unit"))
-          spec.tolerance_unit = unit_from_payload(*unit);
-        expr = Var::make(std::move(spec));
+        expr = var_node_from_value(node, id);
       } else if (kind != nullptr && kind->is_string() && kind->as_string() == "expr") {
         const Value* op = node.find("op");
         if (op == nullptr)

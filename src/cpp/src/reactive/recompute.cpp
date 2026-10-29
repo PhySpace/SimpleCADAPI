@@ -32,6 +32,45 @@ namespace {
   raise_harness_error(spec, "No executor registered for operation '" + node.op + "'");
 }
 
+// The recorded numbers of a node, with each symbolic scalar re-evaluated under the edited bindings;
+// `scalars` receives the evaluated values by parameter path.
+Value evaluate_node_params(const OperationNode& node, const Bindings& bindings, ScalarValues& scalars) {
+  Value params = node.params;
+  if (node.source_index) {
+    Value at = Value::array();
+    at.push_back(node.source_index->first);
+    at.push_back(node.source_index->second);
+    params.set("__source_index", std::move(at));
+  }
+  for (const auto& [path, scalar] : node.symbolic) {
+    const double value = evaluate_scalar(scalar, path, &bindings);
+    scalars[path] = value;
+    set_param(params, ParamPath::parse(path), Value(value));
+  }
+  return params;
+}
+
+// Runs the executor under the conditions the operation was recorded in, and checks its output count.
+std::vector<Shape> run_executor(const OperationNode& node, const Executor& executor, const Value& params,
+                                const std::vector<OpInput>& inputs, const ScalarValues& scalars, bool value_output) {
+  std::vector<Shape> outputs;
+  try {
+    // Executors re-run operators under the conditions the operation was recorded in:
+    // its workplane, the edited variable values, and no recording.
+    const RecorderSuspend suspended;
+    const CoordinateSystemScope placement(
+        node.frame ? CoordinateSystem(node.frame->origin, node.frame->x_axis, node.frame->y_axis) : CoordinateSystem());
+    outputs = occt_guard([&] { return executor(params, inputs, scalars); });
+    if (static_cast<int>(outputs.size()) != node.output_count && !(value_output && outputs.empty())) {
+      throw RuntimeError("executor returned " + std::to_string(outputs.size()) + " output(s); the operation recorded " +
+                         std::to_string(node.output_count));
+    }
+  } catch (const std::exception& e) {
+    raise_recompute_error(node, e);
+  }
+  return outputs;
+}
+
 }  // namespace
 
 void Session::mark_dirty(const std::vector<std::string>& node_ids) {
@@ -107,20 +146,8 @@ RecomputeReport Session::recompute(const RecomputeOptions& options) {
     }
 
     try {
-      // The recorded numbers, with each symbolic scalar re-evaluated under the edits.
-      Value params = node->params;
-      if (node->source_index) {
-        Value at = Value::array();
-        at.push_back(node->source_index->first);
-        at.push_back(node->source_index->second);
-        params.set("__source_index", std::move(at));
-      }
       ScalarValues scalars;
-      for (const auto& [path, scalar] : node->symbolic) {
-        const double value = evaluate_scalar(scalar, path, &bindings_);
-        scalars[path] = value;
-        set_param(params, ParamPath::parse(path), Value(value));
-      }
+      const Value params = evaluate_node_params(*node, bindings_, scalars);
       const std::string key = node_key(*node, params);
 
       if (key == state.key) {
@@ -156,23 +183,7 @@ RecomputeReport Session::recompute(const RecomputeOptions& options) {
         }
       }
 
-      std::vector<Shape> outputs;
-      try {
-        // Executors re-run operators under the conditions the operation was recorded in:
-        // its workplane, the edited variable values, and no recording.
-        const RecorderSuspend suspended;
-        const CoordinateSystemScope placement(
-            node->frame ? CoordinateSystem(node->frame->origin, node->frame->x_axis, node->frame->y_axis)
-                        : CoordinateSystem());
-        outputs = occt_guard([&] { return executor(params, inputs, scalars); });
-        if (static_cast<int>(outputs.size()) != node->output_count && !(state.value_output && outputs.empty())) {
-          throw RuntimeError("executor returned " + std::to_string(outputs.size()) +
-                             " output(s); the operation recorded " + std::to_string(node->output_count));
-        }
-      } catch (const std::exception& e) {
-        raise_recompute_error(*node, e);
-      }
-
+      std::vector<Shape> outputs = run_executor(*node, executor, params, inputs, scalars, state.value_output);
       state.outputs = std::move(outputs);
       state.key = key;
       state.status = NodeStatus::Clean;

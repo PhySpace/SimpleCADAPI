@@ -463,14 +463,12 @@ SurfaceExportReport export_obj(const std::vector<TopoDS_Shape>& shapes, const st
 // ---------------------------------------------------------------------------
 // GLB
 // ---------------------------------------------------------------------------
-Bytes glb_bytes(const Mesh& mesh) {
-  if (mesh.empty())
-    throw ValueError("cannot export an empty mesh");
-  const std::size_t index_bytes = mesh.triangles.size() * 4;
-  const std::size_t position_bytes = mesh.vertices.size() * 4;
-  const std::size_t normal_bytes = mesh.normals.size() * 4;
-  const std::size_t total = index_bytes + position_bytes + normal_bytes;  // every part is a multiple of 4
+namespace {
 
+// The glTF JSON chunk (canonical form, space-padded to 4 bytes): one mesh, one primitive, three
+// accessors over three bufferViews of a single buffer laid out as indices | positions | normals.
+std::string glb_json(const Mesh& mesh, std::size_t index_bytes, std::size_t position_bytes, std::size_t normal_bytes,
+                     std::size_t total) {
   const auto box = mesh.bounds();
   const auto triple = [](const std::array<float, 3>& v) {
     Value a = Value::array();
@@ -564,7 +562,11 @@ Bytes glb_bytes(const Mesh& mesh) {
   std::string json = canonical_json(root);
   while (json.size() % 4 != 0)
     json.push_back(' ');
+  return json;
+}
 
+// The BIN chunk: little-endian indices, then positions, then normals (the order glb_json declares).
+std::string glb_binary(const Mesh& mesh, std::size_t total) {
   std::string bin;
   bin.reserve(total);
   for (const std::uint32_t i : mesh.triangles)
@@ -573,6 +575,21 @@ Bytes glb_bytes(const Mesh& mesh) {
     put_le_float(bin, v);
   for (const float v : mesh.normals)
     put_le_float(bin, v);
+  return bin;
+}
+
+}  // namespace
+
+Bytes glb_bytes(const Mesh& mesh) {
+  if (mesh.empty())
+    throw ValueError("cannot export an empty mesh");
+  const std::size_t index_bytes = mesh.triangles.size() * 4;
+  const std::size_t position_bytes = mesh.vertices.size() * 4;
+  const std::size_t normal_bytes = mesh.normals.size() * 4;
+  const std::size_t total = index_bytes + position_bytes + normal_bytes;  // every part is a multiple of 4
+
+  const std::string json = glb_json(mesh, index_bytes, position_bytes, normal_bytes, total);
+  const std::string bin = glb_binary(mesh, total);
 
   Bytes out;
   out.reserve(12 + 8 + json.size() + 8 + bin.size());

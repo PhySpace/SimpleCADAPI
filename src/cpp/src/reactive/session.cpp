@@ -218,10 +218,11 @@ void index_entities(RefIndex& index, const Shape& root, const std::set<std::pair
   }
 }
 
-TopoDelta resolve_recorded_delta(const TopoDelta& raw, const std::string& graph_id, const std::string& node_id,
-                                 const std::vector<Shape>& outputs, const std::vector<OpInput>& inputs,
-                                 const OperationGraph& graph) {
-  const auto wanted = refs_of(raw);
+using KindKeys = std::set<std::pair<Kind, std::string>>;
+
+// Entities of the node's own outputs, named by the node's refs.
+RefIndex index_output_entities(const KindKeys& wanted, const std::string& graph_id, const std::string& node_id,
+                               const std::vector<Shape>& outputs) {
   RefIndex output_index;
   for (std::size_t slot = 0; slot < outputs.size(); ++slot) {
     index_entities(
@@ -232,6 +233,11 @@ TopoDelta resolve_recorded_delta(const TopoDelta& raw, const std::string& graph_
         },
         true);
   }
+  return output_index;
+}
+
+// Entities of the inputs, named by the refs their producers gave them.
+RefIndex index_input_entities(const KindKeys& wanted, const std::vector<OpInput>& inputs, const OperationGraph& graph) {
   RefIndex source_index;
   // The SDK stamps every entity under a pick with the pick's reference when the pick becomes a
   // selection node, over what its producer stamped: a pick's sub-shapes name the selection node.
@@ -242,6 +248,7 @@ TopoDelta resolve_recorded_delta(const TopoDelta& raw, const std::string& graph_
     const NodePtr node = graph.get_node(lineage->node_id);
     return node && node->op.rfind("make_select_", 0) == 0;
   };
+  // Non-picks first, then picks, which overwrite (so the pick's node wins for its sub-shapes).
   for (const bool picks : {false, true}) {
     for (const OpInput& input : inputs) {
       if (is_pick(input) != picks)
@@ -261,8 +268,23 @@ TopoDelta resolve_recorded_delta(const TopoDelta& raw, const std::string& graph_
           false, picks);
     }
   }
+  return source_index;
+}
 
-  const auto resolve = [&](const TopoRef& ref, bool source, bool required) -> std::optional<TopoRef> {
+// A witness is "complete" unless its metadata says it is partial or unproven.
+bool witness_complete(const Value& metadata) {
+  const Value* coverage = metadata.find("coverage");
+  const Value* status = metadata.find("status");
+  return (coverage == nullptr || !coverage->is_string() || coverage->as_string() == "complete") &&
+         (status == nullptr || !status->is_string() || status->as_string() == "proven");
+}
+
+// Maps tracker refs to recorded refs through the two indexes.
+struct RefResolver {
+  const RefIndex& source_index;
+  const RefIndex& output_index;
+
+  std::optional<TopoRef> resolve(const TopoRef& ref, bool source, bool required) const {
     const RefIndex& index = source ? source_index : output_index;
     if (const auto found = index.find({ref.kind, ref.topo_id}); found != index.end())
       return found->second;
@@ -277,14 +299,9 @@ TopoDelta resolve_recorded_delta(const TopoDelta& raw, const std::string& graph_
     if (required)
       return std::nullopt;
     return ref;
-  };
-  const auto complete = [](const Value& metadata) {
-    const Value* coverage = metadata.find("coverage");
-    const Value* status = metadata.find("status");
-    return (coverage == nullptr || !coverage->is_string() || coverage->as_string() == "complete") &&
-           (status == nullptr || !status->is_string() || status->as_string() == "proven");
-  };
-  const auto resolve_parents = [&](const std::vector<TopoRef>& parents, bool required, bool& dropped) {
+  }
+
+  std::vector<TopoRef> resolve_parents(const std::vector<TopoRef>& parents, bool required, bool& dropped) const {
     std::vector<TopoRef> out;
     for (const TopoRef& parent : parents) {
       if (const auto resolved = resolve(parent, true, required)) {
@@ -294,14 +311,32 @@ TopoDelta resolve_recorded_delta(const TopoDelta& raw, const std::string& graph_
       }
     }
     return out;
-  };
+  }
+
+  std::vector<TopoRef> resolve_many(const std::vector<TopoRef>& refs, bool source) const {
+    std::vector<TopoRef> resolved;
+    for (const TopoRef& ref : refs) {
+      if (const auto found = resolve(ref, source, true))
+        resolved.push_back(*found);
+    }
+    return resolved;
+  }
+};
+
+TopoDelta resolve_recorded_delta(const TopoDelta& raw, const std::string& graph_id, const std::string& node_id,
+                                 const std::vector<Shape>& outputs, const std::vector<OpInput>& inputs,
+                                 const OperationGraph& graph) {
+  const auto wanted = refs_of(raw);
+  const RefIndex output_index = index_output_entities(wanted, graph_id, node_id, outputs);
+  const RefIndex source_index = index_input_entities(wanted, inputs, graph);
+  const RefResolver refs{source_index, output_index};
 
   TopoDelta out;
   for (const TopoEntry& entry : raw.entries) {
-    const bool required = complete(entry.metadata);
-    const auto ref = resolve(entry.ref, entry.event == TopoEvent::Deleted, required);
+    const bool required = witness_complete(entry.metadata);
+    const auto ref = refs.resolve(entry.ref, entry.event == TopoEvent::Deleted, required);
     bool dropped = !ref;
-    std::vector<TopoRef> parents = resolve_parents(entry.parent_refs, required, dropped);
+    std::vector<TopoRef> parents = refs.resolve_parents(entry.parent_refs, required, dropped);
     if (dropped)
       continue;
     TopoEntry item = entry;
@@ -310,10 +345,10 @@ TopoDelta resolve_recorded_delta(const TopoDelta& raw, const std::string& graph_
     out.entries.push_back(std::move(item));
   }
   for (const TopoRoleEntry& role : raw.roles) {
-    const bool required = complete(role.metadata);
-    const auto ref = resolve(role.ref, false, required);
+    const bool required = witness_complete(role.metadata);
+    const auto ref = refs.resolve(role.ref, false, required);
     bool dropped = !ref;
-    std::vector<TopoRef> parents = resolve_parents(role.parent_refs, required, dropped);
+    std::vector<TopoRef> parents = refs.resolve_parents(role.parent_refs, required, dropped);
     if (dropped)
       continue;
     TopoRoleEntry item = role;
@@ -321,21 +356,13 @@ TopoDelta resolve_recorded_delta(const TopoDelta& raw, const std::string& graph_
     item.parent_refs = std::move(parents);
     out.roles.push_back(std::move(item));
   }
-  const auto resolve_many = [&](const std::vector<TopoRef>& refs, bool source) {
-    std::vector<TopoRef> resolved;
-    for (const TopoRef& ref : refs) {
-      if (const auto found = resolve(ref, source, true))
-        resolved.push_back(*found);
-    }
-    return resolved;
-  };
   if (out.entries.empty()) {  // what the witnesses could not name falls back to the plain lists
-    out.preserved = resolve_many(raw.preserved, false);
-    out.modified = resolve_many(raw.modified, false);
-    out.generated = resolve_many(raw.generated, false);
-    out.deleted = resolve_many(raw.deleted, true);
+    out.preserved = refs.resolve_many(raw.preserved, false);
+    out.modified = refs.resolve_many(raw.modified, false);
+    out.generated = refs.resolve_many(raw.generated, false);
+    out.deleted = refs.resolve_many(raw.deleted, true);
   }
-  out.section_edges = resolve_many(raw.section_edges, false);
+  out.section_edges = refs.resolve_many(raw.section_edges, false);
   out.raw_event = raw.raw_event;
   return out;
 }

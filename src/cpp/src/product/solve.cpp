@@ -99,36 +99,23 @@ Value definition_runtime_of(const Assembly& assembly) {
 
 }  // namespace detail
 
-AssemblyPtr solve_assembly_constraints(const AssemblyPtr& input, bool strict) {
-  using namespace detail;
-  if (!input)
-    throw TypeError("assembly must be an Assembly");
-  const Value definition_runtime = definition_runtime_of(*input);
-  const Value authored = authored_placements_of(*input);
-  if (input->constraints().empty())
-    return input;
-  if (input->grounded_component_ids().empty()) {
-    throw ValueError("assembly constraints require at least one grounded component");
-  }
+namespace {
 
-  Assembly assembly = *input;
-  std::map<std::string, Placement> solved;
-  for (const std::string& id : assembly.grounded_component_ids())
-    solved.emplace(id, assembly.get_component(id).placement);
+using namespace detail;
 
-  std::vector<Constraint> pending;
-  for (const Constraint& constraint : assembly.constraints()) {
-    if (!constraint.is_coupling())
-      pending.push_back(constraint);
-  }
+// Places the unsolved side of a constraint relative to its solved side.
+void place_other(const Assembly& assembly, std::map<std::string, Placement>& solved, const Constraint& constraint,
+                 Side known_side, const std::string& known_id, const std::string& unknown_id) {
+  const std::optional<double> scalar = propagation_scalar(assembly, constraint);
+  solved.insert_or_assign(unknown_id,
+                          solve_other_component(assembly, constraint, known_side, solved.at(known_id), scalar));
+}
 
-  const auto place_other = [&](const Constraint& constraint, Side known_side, const std::string& known_id,
-                               const std::string& unknown_id) {
-    const std::optional<double> scalar = propagation_scalar(assembly, constraint);
-    solved.insert_or_assign(unknown_id,
-                            solve_other_component(assembly, constraint, known_side, solved.at(known_id), scalar));
-  };
-
+// Sweeps the constraints until no more components can be placed from the grounded ones. A constraint
+// whose two sides are both placed is checked and, if open, closed by adjusting `assembly`.
+// Returns the constraints still unresolved (loops and unreachable ones).
+std::vector<Constraint> propagate_from_grounded(Assembly& assembly, std::map<std::string, Placement>& solved,
+                                                std::vector<Constraint> pending, bool strict) {
   for (bool progressed = true; !pending.empty() && progressed;) {
     progressed = false;
     std::vector<Constraint> remaining;
@@ -138,10 +125,10 @@ AssemblyPtr solve_assembly_constraints(const AssemblyPtr& input, bool strict) {
       const bool a_solved = solved.count(a_id) != 0;
       const bool b_solved = solved.count(b_id) != 0;
       if (a_solved && !b_solved) {
-        place_other(constraint, Side::A, a_id, b_id);
+        place_other(assembly, solved, constraint, Side::A, a_id, b_id);
         progressed = true;
       } else if (b_solved && !a_solved) {
-        place_other(constraint, Side::B, b_id, a_id);
+        place_other(assembly, solved, constraint, Side::B, b_id, a_id);
         progressed = true;
       } else if (a_solved && b_solved) {
         const Assembly candidate =
@@ -160,7 +147,13 @@ AssemblyPtr solve_assembly_constraints(const AssemblyPtr& input, bool strict) {
     }
     pending = std::move(remaining);
   }
+  return pending;
+}
 
+// What propagation left: constraints with a free scalar are closed by a golden-section search on
+// the loop residual; the rest fail (strict) or are skipped.
+void close_remaining_loops(const Assembly& assembly, std::map<std::string, Placement>& solved,
+                           const std::vector<Constraint>& pending, bool strict) {
   for (const Constraint& constraint : pending) {
     const std::string a_id = constraint.connector_a().component_id();
     const std::string b_id = constraint.connector_b().component_id();
@@ -190,6 +183,33 @@ AssemblyPtr solve_assembly_constraints(const AssemblyPtr& input, bool strict) {
         bounds->first, bounds->second);
     solved.insert_or_assign(unknown_id, solve_other_component(assembly, constraint, known_side, known_placement, best));
   }
+}
+
+}  // namespace
+
+AssemblyPtr solve_assembly_constraints(const AssemblyPtr& input, bool strict) {
+  if (!input)
+    throw TypeError("assembly must be an Assembly");
+  const Value definition_runtime = definition_runtime_of(*input);
+  const Value authored = authored_placements_of(*input);
+  if (input->constraints().empty())
+    return input;
+  if (input->grounded_component_ids().empty()) {
+    throw ValueError("assembly constraints require at least one grounded component");
+  }
+
+  Assembly assembly = *input;
+  std::map<std::string, Placement> solved;
+  for (const std::string& id : assembly.grounded_component_ids())
+    solved.emplace(id, assembly.get_component(id).placement);
+
+  std::vector<Constraint> pending;
+  for (const Constraint& constraint : assembly.constraints()) {
+    if (!constraint.is_coupling())
+      pending.push_back(constraint);
+  }
+  pending = propagate_from_grounded(assembly, solved, std::move(pending), strict);
+  close_remaining_loops(assembly, solved, pending, strict);
 
   std::vector<std::string> unsolved;
   for (const Component& component : assembly.components()) {

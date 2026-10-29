@@ -366,17 +366,13 @@ Shape clone_semantic_view(const Shape& shape) {
   return shape.clone_view();
 }
 
-Shape assign_tag(const Shape& scope, const TagTargets& targets, std::string_view tag, TopologyPropagation topology,
-                 LineagePolicy lineage, const TagAssignOptions& options) {
-  const std::string normalized = normalize_tag(tag, true);
-  Recorder* const recorder = current_recorder();
-  const std::optional<SelectorSource> source_node = graph_source_of(scope);
-  const int source_slot = source_node ? source_node->output_slot : output_slot_of(scope);
+namespace {
 
-  Shape view = options.clone_scope ? clone_semantic_view(scope) : scope;
-
+// Resolves the tag targets against the scope's view: through a selector (anchored to the scope's graph
+// node when it declares none) or from explicit shapes. Fills `target` with the recorded description.
+std::vector<Shape> resolve_tag_targets(const TagTargets& targets, const Shape& view,
+                                       const std::optional<SelectorSource>& source_node, TagTarget& target) {
   std::vector<Shape> selected;
-  TagTarget target;
   if (const SelectorPtr& given = targets.selector()) {
     SelectorPtr selector = given;
     if (source_node) {
@@ -400,20 +396,14 @@ Shape assign_tag(const Shape& scope, const TagTargets& targets, std::string_view
     target.kind = TagTargetKind::ExplicitRefs;
     target.refs = shape_refs(explicit_shapes);
   }
+  return selected;
+}
 
-  std::unordered_set<std::string> seen;
-  for (const Shape& item : selected)
-    if (!seen.insert(item.topo_id()).second)
-      throw ValueError("tag assignment targets contain ambiguous duplicate entities");
-  if (selected.empty())
-    throw ValueError("tag assignment resolved no targets");
-
-  std::optional<NodeReservation> reservation;
-  if (recorder != nullptr && source_node)
-    reservation = recorder->reserve_node("n");
-
-  // The picks are handles of the scope's own view: they carry no container link, so a recorded
-  // reference is named from the scope's node (the SDK stamps every entity of a recorded output).
+// References of the selected shapes for the binding's evidence. The picks are handles of the scope's
+// own view: they carry no container link, so a recorded reference is named from the scope's node
+// (the SDK stamps every entity of a recorded output).
+Value selected_ref_values(const std::vector<Shape>& selected, const std::optional<NodeReservation>& reservation,
+                          const std::optional<SelectorSource>& source_node, int source_slot) {
   const auto scoped_ref = [&](const Shape& item) -> std::optional<Value> {
     if (auto ref = shape_ref(item))
       return ref;
@@ -431,21 +421,28 @@ Shape assign_tag(const Shape& scope, const TagTargets& targets, std::string_view
     return ref;
   };
   Value selected_refs = Value::array();
-  {
-    std::vector<Value> refs;
-    for (const Shape& item : selected) {
-      if (auto ref = scoped_ref(item))
-        refs.push_back(std::move(*ref));
-    }
-    if (refs.size() == selected.size()) {
-      for (Value& ref : refs)
-        selected_refs.push_back(std::move(ref));
-    } else {
-      for (const Value& ref : shape_refs(selected))
-        selected_refs.push_back(ref);
-    }
+  std::vector<Value> refs;
+  for (const Shape& item : selected) {
+    if (auto ref = scoped_ref(item))
+      refs.push_back(std::move(*ref));
   }
+  // All-or-nothing: if any pick cannot be named from the scope, fall back to plain shape references.
+  if (refs.size() == selected.size()) {
+    for (Value& ref : refs)
+      selected_refs.push_back(std::move(ref));
+  } else {
+    for (const Value& ref : shape_refs(selected))
+      selected_refs.push_back(ref);
+  }
+  return selected_refs;
+}
 
+// The user-operation tag binding; with a reserved node its id is derived from the node (deterministic),
+// otherwise a fresh id is minted.
+TagBinding make_tag_binding(const std::string& normalized, TopologyPropagation topology, LineagePolicy lineage,
+                            const TagAssignOptions& options, std::size_t selected_count, Value selected_refs,
+                            TagTarget target, const std::optional<NodeReservation>& reservation,
+                            const std::optional<SelectorSource>& source_node, int source_slot) {
   TagBinding binding;
   binding.tag = normalized;
   binding.policy.mut().producer.kind = TagProducerKind::UserOperation;
@@ -459,7 +456,7 @@ Shape assign_tag(const Shape& scope, const TagTargets& targets, std::string_view
   binding.policy.mut().propagation.lineage = lineage;
   binding.evidence.mut().kind = TagEvidenceKind::QueryExecution;
   binding.evidence.mut().data.set("authoring_source", options.authoring_source);
-  binding.evidence.mut().data.set("selected_count", static_cast<std::int64_t>(selected.size()));
+  binding.evidence.mut().data.set("selected_count", static_cast<std::int64_t>(selected_count));
   binding.evidence.mut().data.set("selected_refs", std::move(selected_refs));
   if (options.extra_evidence.is_object())
     for (const auto& [key, value] : options.extra_evidence.as_object())
@@ -472,7 +469,37 @@ Shape assign_tag(const Shape& scope, const TagTargets& targets, std::string_view
   else
     binding.binding_id = new_binding_id();
   binding.validate();
+  return binding;
+}
 
+}  // namespace
+
+Shape assign_tag(const Shape& scope, const TagTargets& targets, std::string_view tag, TopologyPropagation topology,
+                 LineagePolicy lineage, const TagAssignOptions& options) {
+  const std::string normalized = normalize_tag(tag, true);
+  Recorder* const recorder = current_recorder();
+  const std::optional<SelectorSource> source_node = graph_source_of(scope);
+  const int source_slot = source_node ? source_node->output_slot : output_slot_of(scope);
+
+  Shape view = options.clone_scope ? clone_semantic_view(scope) : scope;
+
+  TagTarget target;
+  std::vector<Shape> selected = resolve_tag_targets(targets, view, source_node, target);
+  std::unordered_set<std::string> seen;
+  for (const Shape& item : selected)
+    if (!seen.insert(item.topo_id()).second)
+      throw ValueError("tag assignment targets contain ambiguous duplicate entities");
+  if (selected.empty())
+    throw ValueError("tag assignment resolved no targets");
+
+  std::optional<NodeReservation> reservation;
+  if (recorder != nullptr && source_node)
+    reservation = recorder->reserve_node("n");
+
+  Value selected_refs = selected_ref_values(selected, reservation, source_node, source_slot);
+  const TagBinding binding =
+      make_tag_binding(normalized, topology, lineage, options, selected.size(), std::move(selected_refs),
+                       std::move(target), reservation, source_node, source_slot);
   for (Shape& item : selected)
     item.add_binding(binding);
 
