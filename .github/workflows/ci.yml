@@ -135,7 +135,7 @@ jobs:
         env:
           ASAN_OPTIONS: halt_on_error=1:abort_on_error=1:detect_leaks=1:strict_string_checks=1:check_initialization_order=1
           LSAN_OPTIONS: suppressions=${{ github.workspace }}/src/cpp/tools/lsan.supp:print_suppressions=0
-          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1:suppressions=${{ github.workspace }}/src/cpp/tools/ubsan.supp
         run: ctest --test-dir build/asan --output-on-failure -j"$(nproc)"
 
   clang-tidy:
