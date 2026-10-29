@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "scad/core/engaged.hpp"
 #include "scad/core/error.hpp"
 #include "solver_detail.hpp"
 
@@ -17,6 +18,12 @@ namespace {
 struct Endpoint {
   std::optional<Constraint> support;  // empty: grounded
 };
+
+// The radius of a gear, belt or rack_pinion constraint: Constraint's validation rejects a coupling that
+// lacks the radii of its kind, and the callers pick the radii by that same kind.
+double coupling_radius(const OptionalDouble& radius) {
+  return require_engaged(radius, "a gear, belt or rack_pinion constraint carries the radii of its kind");
+}
 
 bool is_grounded(const Assembly& assembly, const std::string& component_id) {
   const auto& grounded = assembly.grounded_component_ids();
@@ -96,12 +103,14 @@ double phase_from_supports(const Assembly& assembly, const Constraint& coupling,
   const double scalar_a = endpoint_scalar(assembly, a);
   const double scalar_b = endpoint_scalar(assembly, b);
   if (coupling.constraint_kind() == "gear") {
-    return *coupling.pitch_radius_a() * radians(scalar_a) + *coupling.pitch_radius_b() * radians(scalar_b);
+    return coupling_radius(coupling.pitch_radius_a()) * radians(scalar_a) +
+           coupling_radius(coupling.pitch_radius_b()) * radians(scalar_b);
   }
   if (coupling.constraint_kind() == "belt") {
-    return *coupling.pulley_radius_a() * radians(scalar_a) - *coupling.pulley_radius_b() * radians(scalar_b);
+    return coupling_radius(coupling.pulley_radius_a()) * radians(scalar_a) -
+           coupling_radius(coupling.pulley_radius_b()) * radians(scalar_b);
   }
-  return scalar_a + *coupling.pitch_radius() * radians(scalar_b);
+  return scalar_a + coupling_radius(coupling.pitch_radius()) * radians(scalar_b);
 }
 
 // The coordinates that satisfy the coupling when one side is free: {target_a, target_b}.
@@ -111,15 +120,20 @@ struct Targets {
 
 Targets coupled_targets(const Constraint& coupling, double phase, double scalar_a, double scalar_b) {
   if (coupling.constraint_kind() == "gear") {
-    return {degrees((phase - *coupling.pitch_radius_b() * radians(scalar_b)) / *coupling.pitch_radius_a()),
-            degrees((phase - *coupling.pitch_radius_a() * radians(scalar_a)) / *coupling.pitch_radius_b())};
+    return {degrees((phase - coupling_radius(coupling.pitch_radius_b()) * radians(scalar_b)) /
+                    coupling_radius(coupling.pitch_radius_a())),
+            degrees((phase - coupling_radius(coupling.pitch_radius_a()) * radians(scalar_a)) /
+                    coupling_radius(coupling.pitch_radius_b()))};
   }
   if (coupling.constraint_kind() == "belt") {
-    return {degrees((phase + *coupling.pulley_radius_b() * radians(scalar_b)) / *coupling.pulley_radius_a()),
-            degrees((*coupling.pulley_radius_a() * radians(scalar_a) - phase) / *coupling.pulley_radius_b())};
+    return {degrees((phase + coupling_radius(coupling.pulley_radius_b()) * radians(scalar_b)) /
+                    coupling_radius(coupling.pulley_radius_a())),
+            degrees((coupling_radius(coupling.pulley_radius_a()) * radians(scalar_a) - phase) /
+                    coupling_radius(coupling.pulley_radius_b()))};
   }
   // rack and pinion: the rack coordinate is a length, the pinion's an angle.
-  return {phase - *coupling.pitch_radius() * radians(scalar_b), degrees((phase - scalar_a) / *coupling.pitch_radius())};
+  return {phase - coupling_radius(coupling.pitch_radius()) * radians(scalar_b),
+          degrees((phase - scalar_a) / coupling_radius(coupling.pitch_radius()))};
 }
 
 }  // namespace
@@ -156,11 +170,11 @@ ConstraintResidual measure_coupling_residual(const Assembly& assembly, const Con
                                    constraint.phase_offset().value_or(0.0));
   double angular_error = 0.0;
   if (constraint.constraint_kind() == "gear") {
-    angular_error = degrees(residual / *constraint.pitch_radius_b());
+    angular_error = degrees(residual / coupling_radius(constraint.pitch_radius_b()));
   } else if (constraint.constraint_kind() == "belt") {
-    angular_error = degrees(residual / *constraint.pulley_radius_b());
+    angular_error = degrees(residual / coupling_radius(constraint.pulley_radius_b()));
   } else if (constraint.constraint_kind() == "rack_pinion") {
-    angular_error = degrees(residual / *constraint.pitch_radius());
+    angular_error = degrees(residual / coupling_radius(constraint.pitch_radius()));
   }
   return {constraint.constraint_id(), residual, std::abs(angular_error), residual <= kPlacementTolerance};
 }

@@ -6,6 +6,7 @@
 #include <cctype>
 #include <cmath>
 
+#include "scad/core/engaged.hpp"
 #include "scad/core/error.hpp"
 
 namespace scad::product {
@@ -77,9 +78,9 @@ Value ConnectorAnchor::to_dict() const {
   Value out = Value::object();
   out.set("anchor_kind", kind_);
   if (kind_ == "geometry") {
-    out.set("geometry_ref", geometry_ref_->to_dict());
+    out.set("geometry_ref", require_engaged(geometry_ref_, "a geometry anchor carries its geometry_ref").to_dict());
   } else {
-    out.set("placement", placement_->to_dict());
+    out.set("placement", require_engaged(placement_, "a placement anchor carries its placement").to_dict());
   }
   return out;
 }
@@ -234,8 +235,9 @@ Placement placement_from_geometry_ref(const GeometryRef& ref) {
 Placement resolve_connector_placement(const Connector& connector) {
   const ConnectorAnchor& anchor = connector.anchor();
   if (anchor.anchor_kind() == "geometry")
-    return placement_from_geometry_ref(*anchor.geometry_ref());
-  return *anchor.placement();
+    return placement_from_geometry_ref(
+        require_engaged(anchor.geometry_ref(), "a geometry anchor carries its geometry_ref"));
+  return require_engaged(anchor.placement(), "a placement anchor carries its placement");
 }
 
 }  // namespace scad::product

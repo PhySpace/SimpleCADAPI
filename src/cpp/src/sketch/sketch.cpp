@@ -9,6 +9,7 @@
 #include <random>
 #include <set>
 
+#include "scad/core/engaged.hpp"
 #include "scad/core/error.hpp"
 #include "scad/sketch/bspline_params.hpp"
 #include "scad/sketch/diagnostics.hpp"
@@ -540,7 +541,7 @@ SketchSolveResult Sketch::solve(const SketchSolveRequest& request) {
 const SketchSolveResult& Sketch::solved_result() {
   if (!last_solve_)
     (void)solve(SketchSolveRequest{});
-  return *last_solve_;
+  return require_engaged(last_solve_, "solve() records its result in last_solve_ before it returns");
 }
 
 // ---- plane ----------------------------------------------------------------

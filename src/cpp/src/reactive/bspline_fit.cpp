@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <limits>
 
+#include "scad/core/engaged.hpp"
 #include "scad/core/error.hpp"
 
 namespace scad::reactive {
@@ -553,12 +554,15 @@ BSplineFit fit_cubic_bspline_control_points(const std::vector<std::vector<double
     interior_knots = std::move(next);
   }
 
+  // max_controls >= kDegree + 1 was checked above, so max_insertions >= 0 and the loop ran at least once.
+  BSplineFit& closest =
+      require_engaged(best, "the cubic B-spline fit loop runs at least once (max_control_points >= 4)");
   if (!options.raise_on_failure) {
-    best->converged = false;
-    return *best;
+    closest.converged = false;
+    return closest;
   }
   throw ValueError("failed to fit a cubic B-spline within tolerance " + general(tolerance) + "; best max_error=" +
-                   general(best->max_error) + " with " + std::to_string(best->control_count()) + " control points");
+                   general(closest.max_error) + " with " + std::to_string(closest.control_count()) + " control points");
 }
 
 }  // namespace scad::reactive

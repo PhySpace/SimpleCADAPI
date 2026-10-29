@@ -63,11 +63,13 @@ double loop_residual_at_scalar(const Assembly& assembly, const Constraint& const
 // limits, else the current relative scalar projected into them, else none (the current one is used).
 std::optional<double> propagation_scalar(const Assembly& assembly, const Constraint& constraint) {
   const Bounds bounds = constraint_scalar_bounds(constraint);
-  if (constraint.constraint_kind() == "revolute" && constraint.drive_angle_degrees()) {
-    return project_scalar(*constraint.drive_angle_degrees(), bounds);
+  if (const auto& drive_angle = constraint.drive_angle_degrees();
+      constraint.constraint_kind() == "revolute" && drive_angle) {
+    return project_scalar(*drive_angle, bounds);
   }
-  if (constraint.constraint_kind() == "prismatic" && constraint.drive_distance()) {
-    return project_scalar(*constraint.drive_distance(), bounds);
+  if (const auto& drive_distance = constraint.drive_distance();
+      constraint.constraint_kind() == "prismatic" && drive_distance) {
+    return project_scalar(*drive_distance, bounds);
   }
   if (bounds)
     return project_scalar(constraint_current_scalar(assembly, constraint), bounds);

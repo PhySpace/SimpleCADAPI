@@ -7,6 +7,7 @@
 #include <functional>
 
 #include "internal.hpp"
+#include "scad/core/engaged.hpp"
 #include "scad/ops/features/diagnostics.hpp"
 #include "scad/topo/diagnostic_image.hpp"
 #include "scad/semantic/tracking.hpp"
@@ -62,7 +63,8 @@ struct BlendAttempt {
     image.view = "default";
     image.caption = diagnosis->evidence_caption;
     char size[32];
-    std::snprintf(size, sizeof size, "%.1f", *attempt.size);
+    std::snprintf(size, sizeof size, "%.1f",
+                  require_engaged(attempt.size, "a diagnosis exists only for an attempt that recorded its size"));
     image.dedup_key = diagnosis->failure_kind + "|" + size;
     image.shapes.push_back(solid);
     for (const Edge& edge : diagnosis->evidence_edges)

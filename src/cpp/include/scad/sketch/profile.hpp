@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "scad/core/engaged.hpp"
 #include "scad/core/value.hpp"
 #include "scad/core/vec.hpp"
 #include "scad/sketch/sketch.hpp"
@@ -26,7 +27,7 @@ class SketchProfileId {
 
   bool is_index() const noexcept { return !id_.has_value(); }
   int index() const noexcept { return index_; }
-  const std::string& id() const { return *id_; }
+  const std::string& id() const { return require_engaged(id_, "id() is only valid when is_index() is false"); }
   // The JSON form recorded in metadata: a number or a string.
   Value to_value() const { return id_ ? Value(*id_) : Value(index_); }
 

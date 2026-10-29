@@ -70,14 +70,14 @@ Value node_payload(const ScalarNode& node) {
       out.set("kind", "var");
       out.set("name", v.name());
       out.set("default", v.default_value());
-      if (v.comment() && !v.comment()->empty())
-        out.set("comment", *v.comment());
-      if (v.tolerance())
-        out.set("tolerance", v.tolerance()->to_value());
-      if (v.unit())
-        out.set("unit", unit_to_payload(*v.unit()));
-      if (v.tolerance_unit())
-        out.set("tolerance_unit", unit_to_payload(*v.tolerance_unit()));
+      if (const auto& comment = v.comment(); comment && !comment->empty())
+        out.set("comment", *comment);
+      if (const auto& tolerance = v.tolerance(); tolerance)
+        out.set("tolerance", tolerance->to_value());
+      if (const auto& unit = v.unit(); unit)
+        out.set("unit", unit_to_payload(*unit));
+      if (const auto& tolerance_unit = v.tolerance_unit(); tolerance_unit)
+        out.set("tolerance_unit", unit_to_payload(*tolerance_unit));
       break;
     }
     case NodeType::Expr: {

@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "scad/core/engaged.hpp"
 #include "scad/core/scalar.hpp"
 #include "scad/core/value.hpp"
 #include "scad/sketch/ordered_map.hpp"
@@ -50,7 +51,7 @@ class SketchTarget {
   SketchTarget(const char* path) : path_(path) {}             // NOLINT(google-explicit-constructor)
 
   bool is_ref() const noexcept { return ref_.has_value(); }
-  const SketchRef& ref() const { return *ref_; }
+  const SketchRef& ref() const { return require_engaged(ref_, "ref() is only valid when is_ref() is true"); }
   const std::string& path() const noexcept { return path_; }
 
  private:

@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 
+#include "scad/core/engaged.hpp"
 #include "scad/core/vec.hpp"
 #include "scad/ops/features/support.hpp"
 #include "scad/ops/geometry/geometry.hpp"
@@ -109,7 +110,7 @@ void add_tooth_edges(SketchBuilder& sketch, const ExternalGearPlan& plan) {
 
     sketch.arc(numbered("arc_root_", i), rs, re, "center");
     if (needs_root_connectors) {
-      BSplineData fillet = *plan.left_fillet;
+      BSplineData fillet = require_engaged(plan.left_fillet, "root connectors exist only with their left fillet");
       fillet.control_points = transform_bspline_control_points(fillet.control_points, turn);
       sketch.bspline(numbered("fillet_left_", i), re, tooth_point(i, "bs"), fillet);
     }
@@ -128,7 +129,7 @@ void add_tooth_edges(SketchBuilder& sketch, const ExternalGearPlan& plan) {
     sketch.bspline(numbered("bspline_right_", i), te, right_flank_end, right);
 
     if (needs_root_connectors) {
-      BSplineData fillet = *plan.right_fillet;
+      BSplineData fillet = require_engaged(plan.right_fillet, "root connectors exist only with their right fillet");
       fillet.control_points = transform_bspline_control_points(fillet.control_points, turn);
       sketch.bspline(numbered("fillet_right_", i), be, next_rs, fillet);
     }

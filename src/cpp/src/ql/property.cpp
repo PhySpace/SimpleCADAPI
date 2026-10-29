@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <utility>
 
+#include "scad/core/engaged.hpp"
 #include "scad/core/error.hpp"
 #include "scad/kernel/properties.hpp"
 #include "scad/kernel/topology.hpp"
@@ -292,7 +293,7 @@ kernel::BoundingBox EvalContext::bbox(const Shape& shape) const {
     slot.value = kernel::bounding_box(shape.wrapped());
     slot.known = true;
   }
-  return *slot.value;
+  return require_engaged(slot.value, "the bounding box is memoised only after kernel::bounding_box returned it");
 }
 
 // ---- MetadataPath ---------------------------------------------------------------------------------

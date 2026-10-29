@@ -117,7 +117,8 @@ const std::string& ShapeSelector::target_kind() const noexcept {
   return impl_->target_kind;
 }
 const ShapeSelector* ShapeSelector::source_selector() const noexcept {
-  return impl_->source_selector ? &*impl_->source_selector : nullptr;
+  const auto& source = impl_->source_selector;
+  return source ? &*source : nullptr;
 }
 const std::optional<TraversalSpec>& ShapeSelector::traversal() const noexcept {
   return impl_->traversal;
@@ -277,9 +278,10 @@ ShapeSelector ShapeSelector::incident_face_count(std::int64_t exactly_count) con
 // ---- the semantic-layer seam
 // -----------------------------------------------------------------------------------------------
 std::optional<SelectorSource> ShapeSelector::source() const {
-  if (!impl_->source_node_id)
+  const auto& node_id = impl_->source_node_id;
+  if (!node_id)
     return std::nullopt;
-  return SelectorSource{*impl_->source_node_id, impl_->source_output_slot.value_or(0)};
+  return SelectorSource{*node_id, impl_->source_output_slot.value_or(0)};
 }
 
 std::shared_ptr<const scad::ShapeSelector> ShapeSelector::from_source(const SelectorSource& anchor) const {

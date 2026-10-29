@@ -41,8 +41,8 @@ double Session::var_value(std::string_view name) const {
 void Session::check_var_value(const Var& var, double value) const {
   if (!std::isfinite(value))
     throw ValueError("Binding '" + var.name() + "' must be finite");
-  if (var.unit())
-    var.unit()->to_canonical(value);  // out-of-range values fail here, not in the middle of a recompute
+  if (const auto& unit = var.unit(); unit)
+    unit->to_canonical(value);  // out-of-range values fail here, not in the middle of a recompute
 }
 
 void Session::set_var(std::string_view name, double value) {

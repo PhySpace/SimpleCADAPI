@@ -67,13 +67,17 @@ bool constraint_reports_match(const Value& actual, const Value& expected) {
     if (!a || !b || *a != *b)
       return false;
   }
-  const auto a = residuals_by_id(*actual.find("residuals"));
-  const auto b = residuals_by_id(*expected.find("residuals"));
-  if (!a || !b || a->size() != b->size())
+  const auto actual_residuals = residuals_by_id(*actual.find("residuals"));
+  const auto expected_residuals = residuals_by_id(*expected.find("residuals"));
+  if (!actual_residuals || !expected_residuals)
     return false;
-  for (const auto& [id, left] : *a) {
-    const auto right = b->find(id);
-    if (right == b->end())
+  const auto& a = *actual_residuals;
+  const auto& b = *expected_residuals;
+  if (a.size() != b.size())
+    return false;
+  for (const auto& [id, left] : a) {
+    const auto right = b.find(id);
+    if (right == b.end())
       return false;
     const Value& l = *left;
     const Value& r = *right->second;

@@ -320,12 +320,13 @@ std::string ScalarNode::repr() const {
     case NodeType::Var: {
       const auto& v = static_cast<const Var&>(*this);
       std::string tolerance = "None";
-      if (v.tolerance()) {
-        tolerance = "DimensionTolerance(lower_deviation=" + py_float_repr(v.tolerance()->lower_deviation()) +
-                    ", upper_deviation=" + py_float_repr(v.tolerance()->upper_deviation()) + ")";
+      if (const auto& bounds = v.tolerance(); bounds) {
+        tolerance = "DimensionTolerance(lower_deviation=" + py_float_repr(bounds->lower_deviation()) +
+                    ", upper_deviation=" + py_float_repr(bounds->upper_deviation()) + ")";
       }
+      const auto& comment = v.comment();
       return "Var(name=" + py_str_repr(v.name()) + ", default=" + py_float_repr(v.default_value()) +
-             ", comment=" + (v.comment() ? py_str_repr(*v.comment()) : "None") + ", expr_id=" + py_str_repr(expr_id()) +
+             ", comment=" + (comment ? py_str_repr(*comment) : "None") + ", expr_id=" + py_str_repr(expr_id()) +
              ", tolerance=" + tolerance + ", unit=" + optional_unit_repr(v.unit()) +
              ", tolerance_unit=" + optional_unit_repr(v.tolerance_unit()) + ")";
     }

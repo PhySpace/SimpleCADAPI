@@ -219,11 +219,13 @@ std::optional<bool> edge_is_concave_side_probe(const TopoDS_Solid& solid, const 
                                                const TopoDS_Edge& edge) {
   try {
     const gp_Pnt middle = midpoint_of(edge);
-    const std::array<std::optional<Vec3>, 2> normals{outward_normal_at(a, middle), outward_normal_at(b, middle)};
-    if (!normals[0] || !normals[1])
+    const std::optional<Vec3> normal_a = outward_normal_at(a, middle);
+    const std::optional<Vec3> normal_b = outward_normal_at(b, middle);
+    if (!normal_a || !normal_b)
       return std::nullopt;
+    const std::array<Vec3, 2> normals{*normal_a, *normal_b};
     for (const auto& [first, second] : {std::pair{0, 1}, std::pair{1, 0}}) {
-      const Vec3 delta = *normals[static_cast<std::size_t>(first)] - *normals[static_cast<std::size_t>(second)];
+      const Vec3 delta = normals[static_cast<std::size_t>(first)] - normals[static_cast<std::size_t>(second)];
       const double length = delta.norm();
       // Equal normals: tangent faces, left to the tangent-adjacency probe.
       if (length < tol::kNegligibleLength)

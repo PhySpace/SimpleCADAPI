@@ -2,6 +2,7 @@
 
 #include <optional>
 
+#include "scad/core/engaged.hpp"
 #include "scad/core/error.hpp"
 #include "scad/ql/compare.hpp"
 #include "text.hpp"
@@ -117,7 +118,8 @@ Value Key::evaluate(const Shape& shape, const EvalContext& ctx) const {
       return k.fallback;
     }
     case KeyType::Property: {
-      std::optional<Value> found = k.property->lookup(shape, ctx);
+      std::optional<Value> found =
+          require_engaged(k.property, "a Property key carries its property path").lookup(shape, ctx);
       return found ? std::move(*found) : k.fallback;
     }
     case KeyType::CenterAxis: {

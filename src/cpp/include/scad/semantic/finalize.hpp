@@ -38,6 +38,7 @@
 #include <utility>
 #include <vector>
 
+#include "scad/core/engaged.hpp"
 #include "scad/core/value.hpp"
 #include "scad/semantic/selection.hpp"
 #include "scad/semantic/tracked_result.hpp"
@@ -130,8 +131,9 @@ inline Solid finalize_tracked_solid(TrackedResult tracked, FinalizeSpec spec) {
 
 // Booleans: the caller has already checked that `result.solid` is set.
 inline Solid finalize_tracked_solid(TrackedBooleanResult result, FinalizeSpec spec) {
-  return Solid(finalize_tracked_shape(*std::move(result.solid), std::move(result.delta),
-                                      std::move(result.delta_entries), std::move(spec)));
+  return Solid(finalize_tracked_shape(
+      require_engaged(std::move(result.solid), "the caller checked that the boolean produced a solid"),
+      std::move(result.delta), std::move(result.delta_entries), std::move(spec)));
 }
 
 // _finalize_derived_shape: record a shape that has no tracking evidence of its own.

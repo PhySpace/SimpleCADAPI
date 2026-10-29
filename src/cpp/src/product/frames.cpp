@@ -35,11 +35,11 @@ double constraint_current_scalar(const Assembly& assembly, const Constraint& con
 }
 
 Bounds constraint_scalar_bounds(const Constraint& constraint) {
-  if (constraint.constraint_kind() == "revolute" && constraint.angle_limit()) {
-    return std::pair{constraint.angle_limit()->lower_value(), constraint.angle_limit()->upper_value()};
+  if (const auto& limit = constraint.angle_limit(); constraint.constraint_kind() == "revolute" && limit) {
+    return std::pair{limit->lower_value(), limit->upper_value()};
   }
-  if (constraint.constraint_kind() == "prismatic" && constraint.distance_limit()) {
-    return std::pair{constraint.distance_limit()->lower_value(), constraint.distance_limit()->upper_value()};
+  if (const auto& limit = constraint.distance_limit(); constraint.constraint_kind() == "prismatic" && limit) {
+    return std::pair{limit->lower_value(), limit->upper_value()};
   }
   return std::nullopt;
 }
@@ -62,11 +62,11 @@ Placement constraint_motion_from_current(const Assembly& assembly, const Constra
   if (constraint.constraint_kind() == "fixed")
     return identity_placement();
   if (constraint.constraint_kind() == "revolute") {
-    return rotate_z_placement(constraint.drive_angle_degrees() ? *constraint.drive_angle_degrees()
-                                                               : constraint_current_scalar(assembly, constraint));
+    const auto& drive_angle = constraint.drive_angle_degrees();
+    return rotate_z_placement(drive_angle ? *drive_angle : constraint_current_scalar(assembly, constraint));
   }
-  return translate_z_placement(constraint.drive_distance() ? *constraint.drive_distance()
-                                                           : constraint_current_scalar(assembly, constraint));
+  const auto& drive_distance = constraint.drive_distance();
+  return translate_z_placement(drive_distance ? *drive_distance : constraint_current_scalar(assembly, constraint));
 }
 
 double angular_error_degrees(const Placement& relative) {

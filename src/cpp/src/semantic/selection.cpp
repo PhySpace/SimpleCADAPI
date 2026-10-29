@@ -509,7 +509,7 @@ Shape assign_tag(const Shape& scope, const TagTargets& targets, std::string_view
     record.params = object({{"tag_binding", binding.to_value()}});
     record.inputs.push_back({scope, "scope"});
     if (reservation)
-      record.node_id = reservation->node_id;
+      record.node_id = reservation.value().node_id;  // engaged: just tested; value() never throws here
     recorder->record(record, {view});
   }
   return view;

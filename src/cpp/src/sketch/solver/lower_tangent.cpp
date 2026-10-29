@@ -135,12 +135,16 @@ void lower_tangent(Model& m, const SketchConstraint& c) {
   };
   if (!is_curve_kind(kind_a) && !is_curve_kind(kind_b))
     throw unsupported();
+  // The validated end of each curve target ("start" or "end"); empty for a target that is not a curve.
+  std::string curve_end[2];
   for (int i = 0; i < 2; ++i) {
     if (!is_curve_kind(kinds[i]))
       continue;
-    if (!at[i] || (*at[i] != "start" && *at[i] != "end")) {
+    const std::optional<std::string>& requested = at[i];
+    if (!requested || (*requested != "start" && *requested != "end")) {
       throw ValueError("Tangent constraint '" + c.id + "' requires at_" + (i == 0 ? "a" : "b") + "='start' or 'end'");
     }
+    curve_end[i] = *requested;
   }
 
   const bool has_line = kind_a == kLineKind || kind_b == kLineKind;
@@ -150,12 +154,12 @@ void lower_tangent(Model& m, const SketchConstraint& c) {
     if (kinds[line_index] != kLineKind)
       throw unsupported();
     const LineRef line = m.line(*refs[line_index]);
-    const Tangent tangent = curve_tangent(m, *refs[curve], *at[curve]);
+    const Tangent tangent = curve_tangent(m, *refs[curve], curve_end[curve]);
     if (kinds[curve] == kArcKind) {
       // The line direction is perpendicular to the radius at the selected endpoint.
       const SketchEntity& arc = m.entity(*refs[curve]);
       const Pt center = m.point_by_id(arc.point_id("center"));
-      const Pt endpoint = m.point_by_id(arc.point_id(*at[curve] == "end" ? "end" : "start"));
+      const Pt endpoint = m.point_by_id(arc.point_id(curve_end[curve] == "end" ? "end" : "start"));
       m.equation([=](const Env& e) { return dot(line.direction(e), e(endpoint) - e(center)); });
     } else {
       m.equation([=](const Env& e) { return cross(tangent(e), line.direction(e)); });
@@ -163,8 +167,8 @@ void lower_tangent(Model& m, const SketchConstraint& c) {
     return;
   }
   if (is_curve_kind(kind_a) && is_curve_kind(kind_b)) {
-    const Tangent ta = curve_tangent(m, ref_a, *at[0]);
-    const Tangent tb = curve_tangent(m, ref_b, *at[1]);
+    const Tangent ta = curve_tangent(m, ref_a, curve_end[0]);
+    const Tangent tb = curve_tangent(m, ref_b, curve_end[1]);
     m.equation([=](const Env& e) { return cross(ta(e), tb(e)); });
     return;
   }

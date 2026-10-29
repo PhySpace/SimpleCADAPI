@@ -19,7 +19,8 @@ bool is_lower_alpha(char c) {
 }
 
 std::string sketch_tag_of(const Sketch& sketch) {
-  return safe_semantic_tag("sketch", sketch.name() && !sketch.name()->empty() ? *sketch.name() : sketch.sketch_id());
+  const auto& name = sketch.name();
+  return safe_semantic_tag("sketch", name && !name->empty() ? *name : sketch.sketch_id());
 }
 
 std::string profile_tag_of(const SketchProfile& payload) {
@@ -36,7 +37,8 @@ Value source_sketch_metadata(const Sketch& sketch, const SketchProfileId& profil
                              const ProfileList& inner) {
   Value out = Value::object();
   out.set("sketch_id", sketch.sketch_id());
-  out.set("name", sketch.name() ? Value(*sketch.name()) : Value());
+  const auto& name = sketch.name();
+  out.set("name", name ? Value(*name) : Value());
   out.set("plane", sketch.plane());
   out.set("profile", profile.to_value());
   out.set("profile_id", payload.id);
@@ -57,7 +59,8 @@ Value edge_metadata(const Sketch& sketch, const std::string& entity_id, const Sk
                     const SketchProfile& payload, const std::string& loop_role) {
   Value out = Value::object();
   out.set("sketch_id", sketch.sketch_id());
-  out.set("sketch_name", sketch.name() ? Value(*sketch.name()) : Value());
+  const auto& name = sketch.name();
+  out.set("sketch_name", name ? Value(*name) : Value());
   out.set("entity_id", entity_id);
   out.set("kind", sketch.entities().at(entity_id).kind);
   out.set("profile", profile.to_value());

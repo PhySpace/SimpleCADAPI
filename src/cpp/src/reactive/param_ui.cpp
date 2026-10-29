@@ -306,7 +306,7 @@ ParamUi parse_ui_comment(std::string_view text) {
       (key == "unit" ? parsed.unit : parsed.label) = arg.value.text;
     }
   }
-  if (parsed.step && parsed.step->value <= 0) {
+  if (const auto step = parsed.step; step && step->value <= 0) {
     ui.issues.push_back("step must be positive");
     return ui;
   }
