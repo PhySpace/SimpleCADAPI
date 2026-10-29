@@ -70,12 +70,10 @@ jobs:
 
   cpp-tests:
     # The engine's own doctest executables (one per area), Release, no sanitizer: what the Python jobs below never run.
-    # Advisory until it has run green once on Linux.
     name: C++ tests (Release)
     needs: occt
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    continue-on-error: true
     steps:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -100,13 +98,12 @@ jobs:
         run: ctest --test-dir build/release --output-on-failure -j"$(nproc)"
 
   sanitize:
-    # Advisory until it has run green once: it has never been executed, the OCCT it links is not instrumented (leaks
-    # inside OCCT's static singletons may be reported), and only the doctest executables are built (no Python layer).
+    # The OCCT it links is not instrumented, so OCCT's own reports are suppressed (tools/ubsan.supp, tools/lsan.supp);
+    # only the doctest executables are built (no Python layer).
     name: C++ tests (ASan + UBSan)
     needs: occt
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    continue-on-error: true
     steps:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -227,9 +224,8 @@ jobs:
         run: uv run pytest src/cpp/tests/python -q
 
       - name: Check the type stubs are current
-        # Advisory until it has passed once on Linux: the checked-in stubs were generated on macOS arm64.
+        # The checked-in stubs (generated on macOS arm64) are reproduced on Linux.
         if: matrix.python-version == '3.12'
-        continue-on-error: true
         run: |
           uv pip install pybind11-stubgen==2.5.5
           PYTHON="uv run --no-sync python" src/cpp/tools/gen_stubs.sh --check

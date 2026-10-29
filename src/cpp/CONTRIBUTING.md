@@ -278,7 +278,7 @@ the golden parity tests (layer 2), the old suite (layer 3) and `test/test_public
 `docs/NATIVE_PROGRESS.md` records the latest numbers.
 
 `src/cpp/tools/gen_stubs.sh` generates the type stubs of `_native` with `pybind11-stubgen==2.5.5` (`--check` compares
-against the checked-in ones; they are checked in under `src/simplecadapi/_cpp/_native/`, and CI runs `--check` (advisory until it has passed once on Linux: the checked-in files were generated on macOS)). `src/cpp/tools/landing_plan.py` prints the
+against the checked-in ones; they are checked in under `src/simplecadapi/_cpp/_native/`, and CI runs `--check` ). `src/cpp/tools/landing_plan.py` prints the
 pull-request partition described in `docs/LANDING_PLAN.md`.
 
 ## 11. Before you send a change
