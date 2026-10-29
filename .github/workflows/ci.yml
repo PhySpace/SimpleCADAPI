@@ -68,6 +68,37 @@ jobs:
       - name: Audit
         run: python3 src/cpp/tools/check_occt_guard.py --strict
 
+  cpp-tests:
+    # The engine's own doctest executables (one per area), Release, no sanitizer: what the Python jobs below never run.
+    # Advisory until it has run green once on Linux.
+    name: C++ tests (Release)
+    needs: occt
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    continue-on-error: true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Restore the static OpenCASCADE build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/occt
+          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py') }}
+          fail-on-cache-miss: true
+
+      - name: Configure
+        run: >
+          cmake -S src/cpp -B build/release -G Ninja
+          -DCMAKE_BUILD_TYPE=Release -DSCAD_BUILD_PYTHON=OFF -DSCAD_BUILD_TESTS=ON
+          -DSCAD_OCCT_PREFIX="$HOME/occt"
+
+      - name: Build
+        run: cmake --build build/release -j"$(nproc)"
+
+      - name: Run the doctest executables
+        run: ctest --test-dir build/release --output-on-failure -j"$(nproc)"
+
   sanitize:
     # Advisory until it has run green once: it has never been executed, the OCCT it links is not instrumented (leaks
     # inside OCCT's static singletons may be reported), and only the doctest executables are built (no Python layer).
@@ -139,7 +170,9 @@ jobs:
         run: |
           base="${{ github.event.pull_request.base.sha || github.event.before }}"
           if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then base="HEAD~1"; fi
-          files=$(git diff --name-only --diff-filter=d "$base" HEAD -- 'src/cpp/src/*.cpp' 'src/cpp/bindings/*.cpp' || true)
+          # The engine only: the bindings need Python.h and pybind11, which a configure without the Python layer
+          # (SCAD_BUILD_PYTHON=OFF) does not put in the compile database.
+          files=$(git diff --name-only --diff-filter=d "$base" HEAD -- 'src/cpp/src/*.cpp' || true)
           if [ -z "$files" ]; then echo "no C++ sources changed"; exit 0; fi
           # shellcheck disable=SC2086
           clang-tidy -p build/tidy --quiet $files
