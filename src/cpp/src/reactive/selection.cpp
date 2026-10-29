@@ -60,12 +60,9 @@ double number_or(const Value* value, double fallback) {
   return value != nullptr && value->is_number() ? value->as_double() : fallback;
 }
 
-// _geo_selector_score: how far `shape` is from what the selector describes (0 = the same).
-double geo_selector_score(const Shape& shape, const Value& selector) {
-  const Value* kind = selector.find("kind");
-  if (kind == nullptr || !kind->is_string() || kind->as_string() != kind_name(shape.kind()))
-    return 1e12;
-
+// Distance of the shape's bounding box corners from the selector's "bbox" (0 when it declares none;
+// 1e6 when the box is malformed).
+double bbox_distance(const Shape& shape, const Value& selector) {
   double score = 0.0;
   if (const Value* bbox = selector.find("bbox"); bbox != nullptr && bbox->is_object()) {
     const Value* lo = bbox->find("min");
@@ -78,12 +75,12 @@ double geo_selector_score(const Shape& shape, const Value& selector) {
               Vec3{box.xmax, box.ymax, box.zmax}.distance(vec_of(hi));
     }
   }
-  score *= 10.0;
-  if (const Value* expected = selector.find("geom_type"); expected != nullptr && expected->is_string()) {
-    const auto actual = shape_geom_type(shape);
-    if (actual && *actual != expected->as_string())
-      score += 1e6;
-  }
+  return score;
+}
+
+// Adds the per-kind terms to `score`, in the order the Python scorer adds them (float sums are order-sensitive).
+// A missing center/coordinates/normal costs 1e6.
+double add_kind_terms(double score, const Shape& shape, const Value& selector) {
   const auto center_term = [&](double weight) {
     return has_vec(selector.find("center")) ? shape.center().distance(vec_of(selector.find("center"))) * weight : 1e6;
   };
@@ -143,6 +140,22 @@ double geo_selector_score(const Shape& shape, const Value& selector) {
       break;
   }
   return score;
+}
+
+// _geo_selector_score: how far `shape` is from what the selector describes (0 = the same).
+double geo_selector_score(const Shape& shape, const Value& selector) {
+  const Value* kind = selector.find("kind");
+  if (kind == nullptr || !kind->is_string() || kind->as_string() != kind_name(shape.kind()))
+    return 1e12;
+
+  double score = bbox_distance(shape, selector);
+  score *= 10.0;
+  if (const Value* expected = selector.find("geom_type"); expected != nullptr && expected->is_string()) {
+    const auto actual = shape_geom_type(shape);
+    if (actual && *actual != expected->as_string())
+      score += 1e6;
+  }
+  return add_kind_terms(score, shape, selector);
 }
 
 }  // namespace

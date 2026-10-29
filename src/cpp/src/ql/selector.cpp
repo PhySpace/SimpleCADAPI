@@ -351,58 +351,112 @@ Value ShapeSelector::to_value() const {
   return out;
 }
 
+namespace {
+
+// The payload member `name`, or nullptr when it is absent or null.
+const Value* present_member(const Value& data, std::string_view name) {
+  const Value* found = data.find(name);
+  return found != nullptr && !found->is_null() ? found : nullptr;
+}
+
+std::string required_target_kind(const Value& data) {
+  const Value* found = data.find("target_kind");
+  if (found == nullptr)
+    missing_key("target_kind");
+  return string_of(*found);
+}
+
+struct ParsedSetOperation {
+  std::string op;
+  std::vector<ShapeSelector> operands;
+};
+
+// {"op": "intersection", "operands": [...]}: at least two operands of the selector's own target kind.
+ParsedSetOperation parse_set_operation(const Value& raw, const Value& data) {
+  if (!raw.is_object())
+    throw ValueError("selector set_operation must be an object");
+  if (!has_exactly(raw, {"op", "operands"}))
+    throw ValueError("selector set_operation has invalid fields");
+  ParsedSetOperation out;
+  out.op = text::lower(text::strip(string_of(*raw.find("op"))));
+  if (out.op != "intersection")
+    throw ValueError("unsupported selector set operation: " + out.op);
+  const Value& raw_operands = *raw.find("operands");
+  if (!raw_operands.is_array() || raw_operands.size() < 2)
+    throw ValueError("selector intersection requires at least two operands");
+  out.operands = selectors_from(raw_operands);
+  const std::string kind = required_target_kind(data);
+  if (std::any_of(out.operands.begin(), out.operands.end(),
+                  [&](const ShapeSelector& s) { return s.target_kind() != kind; }))
+    throw ValueError("selector intersection operands must match target_kind");
+  return out;
+}
+
+struct ParsedIncidentFaces {
+  std::vector<ShapeSelector> selectors;
+  bool distinct = false;
+};
+
+// {"selectors": [...], "distinct": bool}: only valid on edge selectors, and the selectors must select faces.
+ParsedIncidentFaces parse_incident_faces(const Value& raw, const Value& data) {
+  if (!raw.is_object() || !has_exactly(raw, {"selectors", "distinct"}))
+    throw ValueError("selector incident_faces has invalid fields");
+  const Value* kind = data.find("target_kind");
+  if (kind == nullptr || text::lower(string_of(*kind)) != "edge")
+    throw ValueError("incident_faces is only valid for edge selectors");
+  const Value& raw_selectors = *raw.find("selectors");
+  if (!raw_selectors.is_array() || raw_selectors.size() == 0)
+    throw ValueError("incident_faces requires one or more selectors");
+  ParsedIncidentFaces out;
+  out.selectors = selectors_from(raw_selectors);
+  if (std::any_of(out.selectors.begin(), out.selectors.end(),
+                  [](const ShapeSelector& s) { return s.target_kind() != "face"; }))
+    throw ValueError("incident_faces selectors must select faces");
+  out.distinct = truthy(*raw.find("distinct"));
+  return out;
+}
+
+// The ordering keys: the "order_keys" list when present, else the single "order_key" with "order_desc".
+// A list without a single key also sets the single key to its last entry (`order_key`).
+std::vector<std::pair<Key, bool>> parse_order_keys(const Value& data, std::optional<Key>& order_key) {
+  std::vector<std::pair<Key, bool>> order_keys;
+  const Value* raw_keys = data.find("order_keys");
+  if (raw_keys != nullptr && raw_keys->is_array()) {
+    for (const Value& item : raw_keys->as_array()) {
+      const Value* key_object = item.is_object() ? object_member(item, "key") : nullptr;
+      if (key_object == nullptr)
+        throw ValueError("selector order_keys entries must contain a key object");
+      const Value* desc = item.find("desc");
+      order_keys.emplace_back(Key::from_value(*key_object), desc != nullptr && truthy(*desc));
+    }
+    if (!order_key && !order_keys.empty())
+      order_key = order_keys.back().first;
+  } else if (order_key) {
+    const Value* desc = data.find("order_desc");
+    order_keys.emplace_back(*order_key, desc != nullptr && truthy(*desc));
+  }
+  return order_keys;
+}
+
+}  // namespace
+
 ShapeSelector ShapeSelector::from_value(const Value& data) {
   if (!data.is_object())
     throw ValueError("selector payload must be an object");
   auto impl = std::make_shared<Impl>();
   Impl& m = *impl;
-  const auto target_kind = [&]() -> std::string {
-    const Value* found = data.find("target_kind");
-    if (found == nullptr)
-      missing_key("target_kind");
-    return string_of(*found);
-  };
-  const auto present = [&](std::string_view name) -> const Value* {
-    const Value* found = data.find(name);
-    return found != nullptr && !found->is_null() ? found : nullptr;
-  };
 
-  if (const Value* raw = present("set_operation")) {
-    if (!raw->is_object())
-      throw ValueError("selector set_operation must be an object");
-    if (!has_exactly(*raw, {"op", "operands"}))
-      throw ValueError("selector set_operation has invalid fields");
-    std::string op_name = text::lower(text::strip(string_of(*raw->find("op"))));
-    if (op_name != "intersection")
-      throw ValueError("unsupported selector set operation: " + op_name);
-    const Value& raw_operands = *raw->find("operands");
-    if (!raw_operands.is_array() || raw_operands.size() < 2)
-      throw ValueError("selector intersection requires at least two operands");
-    m.operands = selectors_from(raw_operands);
-    const std::string kind = target_kind();
-    if (std::any_of(m.operands.begin(), m.operands.end(),
-                    [&](const ShapeSelector& s) { return s.target_kind() != kind; }))
-      throw ValueError("selector intersection operands must match target_kind");
-    m.set_operation = std::move(op_name);
+  if (const Value* raw = present_member(data, "set_operation")) {
+    ParsedSetOperation parsed = parse_set_operation(*raw, data);
+    m.operands = std::move(parsed.operands);
+    m.set_operation = std::move(parsed.op);
   }
-
-  if (const Value* raw = present("incident_faces")) {
-    if (!raw->is_object() || !has_exactly(*raw, {"selectors", "distinct"}))
-      throw ValueError("selector incident_faces has invalid fields");
-    const Value* kind = data.find("target_kind");
-    if (kind == nullptr || text::lower(string_of(*kind)) != "edge")
-      throw ValueError("incident_faces is only valid for edge selectors");
-    const Value& raw_selectors = *raw->find("selectors");
-    if (!raw_selectors.is_array() || raw_selectors.size() == 0)
-      throw ValueError("incident_faces requires one or more selectors");
-    m.incident_face_selectors = selectors_from(raw_selectors);
-    if (std::any_of(m.incident_face_selectors.begin(), m.incident_face_selectors.end(),
-                    [](const ShapeSelector& s) { return s.target_kind() != "face"; }))
-      throw ValueError("incident_faces selectors must select faces");
-    m.incident_faces_distinct = truthy(*raw->find("distinct"));
+  if (const Value* raw = present_member(data, "incident_faces")) {
+    ParsedIncidentFaces parsed = parse_incident_faces(*raw, data);
+    m.incident_face_selectors = std::move(parsed.selectors);
+    m.incident_faces_distinct = parsed.distinct;
   }
-
-  if (const Value* raw = present("incident_face_cardinality")) {
+  if (const Value* raw = present_member(data, "incident_face_cardinality")) {
     if (!raw->is_object() || !has_exactly(*raw, {"exactly"}))
       throw ValueError("incident_face_cardinality only supports exactly");
     m.incident_face_cardinality = integer_of(*raw->find("exactly"));
@@ -416,27 +470,12 @@ ShapeSelector ShapeSelector::from_value(const Value& data) {
     m.predicate = Predicate::from_value(*raw);
   if (const Value* raw = object_member(data, "order_key"))
     m.order_key = Key::from_value(*raw);
+  m.order_keys = parse_order_keys(data, m.order_key);
 
-  const Value* raw_keys = data.find("order_keys");
-  if (raw_keys != nullptr && raw_keys->is_array()) {
-    for (const Value& item : raw_keys->as_array()) {
-      const Value* key_object = item.is_object() ? object_member(item, "key") : nullptr;
-      if (key_object == nullptr)
-        throw ValueError("selector order_keys entries must contain a key object");
-      const Value* desc = item.find("desc");
-      m.order_keys.emplace_back(Key::from_value(*key_object), desc != nullptr && truthy(*desc));
-    }
-    if (!m.order_key && !m.order_keys.empty())
-      m.order_key = m.order_keys.back().first;
-  } else if (m.order_key) {
-    const Value* desc = data.find("order_desc");
-    m.order_keys.emplace_back(*m.order_key, desc != nullptr && truthy(*desc));
-  }
-
-  m.target_kind = target_kind();
+  m.target_kind = required_target_kind(data);
   if (const Value* desc = data.find("order_desc"))
     m.order_desc = truthy(*desc);
-  if (const Value* limit = present("limit"))
+  if (const Value* limit = present_member(data, "limit"))
     m.limit_count = integer_of(*limit);
   if (const Value* raw = data.find("cardinality")) {
     if (!raw->is_object())
@@ -444,7 +483,7 @@ ShapeSelector ShapeSelector::from_value(const Value& data) {
     for (const auto& [name, count] : raw->as_object())
       m.cardinality.emplace_back(name, integer_of(count));
   }
-  if (const Value* raw = present("source_node_id")) {
+  if (const Value* raw = present_member(data, "source_node_id")) {
     m.source_node_id = string_of(*raw);
     const Value* slot = data.find("source_output_slot");
     m.source_output_slot = slot != nullptr ? static_cast<int>(integer_of(*slot)) : 0;

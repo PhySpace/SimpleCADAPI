@@ -121,96 +121,120 @@ std::string Shape::repr() const {
   return "Shape()";
 }
 
+namespace {
+
+// Each helper appends the multi-line description of one kind (the layout of the Python __str__).
+void describe_vertex(std::string& out, const Shape& shape, const std::string& pad) {
+  const Vec3 c = Vertex(shape).coordinates();
+  append(out, pad + "Vertex:");
+  append(out, pad + "  coordinates: [" + f3(c.x) + ", " + f3(c.y) + ", " + f3(c.z) + "]");
+}
+
+void describe_edge(std::string& out, const Shape& shape, const std::string& pad) {
+  const Edge e(shape);
+  append(out, pad + "Edge:");
+  append(out, pad + "  length: " + f3(e.length()));
+  try {
+    const Vec3 a = e.start_vertex().coordinates(), b = e.end_vertex().coordinates();
+    append(out, pad + "  vertices:");
+    append(out, pad + "    start: (" + g6(a.x) + ", " + g6(a.y) + ", " + g6(a.z) + ")");
+    append(out, pad + "    end: (" + g6(b.x) + ", " + g6(b.y) + ", " + g6(b.z) + ")");
+  } catch (const std::exception&) {
+    append(out, pad + "  vertices: [unable to retrieve, usually a closed edge]");
+  }
+}
+
+void describe_wire(std::string& out, const Shape& shape, const std::string& pad, int indent) {
+  const Wire w(shape);
+  const auto edges = w.edges();
+  append(out, pad + "Wire:");
+  append(out, pad + "  edge_count: " + std::to_string(edges.size()));
+  append(out, pad + std::string("  closed: ") + (w.is_closed() ? "True" : "False"));
+  if (!edges.empty()) {
+    append(out, pad + "  edges:");
+    for (std::size_t i = 0; i < edges.size(); ++i) {
+      append(out, pad + "    edge_" + std::to_string(i) + ":");
+      append(out, edges[i].to_string(indent + 3));
+    }
+  }
+}
+
+// Normal and wires may fail to evaluate on degenerate faces; each failure prints "[unable to retrieve]".
+void describe_face(std::string& out, const Shape& shape, const std::string& pad, int indent) {
+  const Face f(shape);
+  append(out, pad + "Face:");
+  append(out, pad + "  area: " + f3(f.area()) + ", center: " + vec_repr(f.center()));
+  try {
+    const Vec3 n = f.normal_at();
+    append(out, pad + "  normal: [" + f3(n.x) + ", " + f3(n.y) + ", " + f3(n.z) + "]");
+  } catch (const std::exception&) {
+    append(out, pad + "  normal: [unable to retrieve]");
+  }
+  try {
+    append(out, pad + "  outer_wire:");
+    append(out, f.outer_wire().to_string(indent + 2));
+  } catch (const std::exception&) {
+    append(out, pad + "  outer_wire: [unable to retrieve]");
+  }
+  try {
+    for (const Wire& inner : f.inner_wires()) {
+      append(out, pad + "  inner_wire:");
+      append(out, inner.to_string(indent + 2));
+    }
+  } catch (const std::exception&) {
+    append(out, pad + "  inner_wires: [unable to retrieve]");
+  }
+}
+
+void describe_solid(std::string& out, const Shape& shape, const std::string& pad, int indent) {
+  const Solid s(shape);
+  const auto faces = s.faces();
+  append(out, pad + "Solid:");
+  append(out, pad + "  volume: " + f3(s.volume()));
+  append(out, pad + "  face_count: " + std::to_string(faces.size()));
+  append(out, pad + "  edge_count: " + std::to_string(s.edges().size()));
+  if (!faces.empty()) {
+    append(out, pad + "  faces:");
+    for (std::size_t i = 0; i < faces.size(); ++i) {
+      append(out, pad + "    face_" + std::to_string(i) + ":");
+      append(out, faces[i].to_string(indent + 3));
+    }
+  }
+}
+
+void describe_compound(std::string& out, const Shape& shape, const std::string& pad) {
+  const Compound c(shape);
+  append(out, pad + "Compound:");
+  append(out, pad + "  solid_count: " + std::to_string(c.solids().size()));
+  append(out, pad + "  volume: " + f3(c.volume()));
+}
+
+}  // namespace
+
 std::string Shape::to_string(int indent) const {
   const std::string pad = spaces(indent);
   std::string out;
   switch (kind()) {
-    case Kind::Vertex: {
-      const Vec3 c = Vertex(*this).coordinates();
-      append(out, pad + "Vertex:");
-      append(out, pad + "  coordinates: [" + f3(c.x) + ", " + f3(c.y) + ", " + f3(c.z) + "]");
+    case Kind::Vertex:
+      describe_vertex(out, *this, pad);
       break;
-    }
-    case Kind::Edge: {
-      const Edge e(*this);
-      append(out, pad + "Edge:");
-      append(out, pad + "  length: " + f3(e.length()));
-      try {
-        const Vec3 a = e.start_vertex().coordinates(), b = e.end_vertex().coordinates();
-        append(out, pad + "  vertices:");
-        append(out, pad + "    start: (" + g6(a.x) + ", " + g6(a.y) + ", " + g6(a.z) + ")");
-        append(out, pad + "    end: (" + g6(b.x) + ", " + g6(b.y) + ", " + g6(b.z) + ")");
-      } catch (const std::exception&) {
-        append(out, pad + "  vertices: [unable to retrieve, usually a closed edge]");
-      }
+    case Kind::Edge:
+      describe_edge(out, *this, pad);
       break;
-    }
-    case Kind::Wire: {
-      const Wire w(*this);
-      const auto edges = w.edges();
-      append(out, pad + "Wire:");
-      append(out, pad + "  edge_count: " + std::to_string(edges.size()));
-      append(out, pad + std::string("  closed: ") + (w.is_closed() ? "True" : "False"));
-      if (!edges.empty()) {
-        append(out, pad + "  edges:");
-        for (std::size_t i = 0; i < edges.size(); ++i) {
-          append(out, pad + "    edge_" + std::to_string(i) + ":");
-          append(out, edges[i].to_string(indent + 3));
-        }
-      }
+    case Kind::Wire:
+      describe_wire(out, *this, pad, indent);
       break;
-    }
-    case Kind::Face: {
-      const Face f(*this);
-      append(out, pad + "Face:");
-      append(out, pad + "  area: " + f3(f.area()) + ", center: " + vec_repr(f.center()));
-      try {
-        const Vec3 n = f.normal_at();
-        append(out, pad + "  normal: [" + f3(n.x) + ", " + f3(n.y) + ", " + f3(n.z) + "]");
-      } catch (const std::exception&) {
-        append(out, pad + "  normal: [unable to retrieve]");
-      }
-      try {
-        append(out, pad + "  outer_wire:");
-        append(out, f.outer_wire().to_string(indent + 2));
-      } catch (const std::exception&) {
-        append(out, pad + "  outer_wire: [unable to retrieve]");
-      }
-      try {
-        for (const Wire& inner : f.inner_wires()) {
-          append(out, pad + "  inner_wire:");
-          append(out, inner.to_string(indent + 2));
-        }
-      } catch (const std::exception&) {
-        append(out, pad + "  inner_wires: [unable to retrieve]");
-      }
+    case Kind::Face:
+      describe_face(out, *this, pad, indent);
       break;
-    }
     case Kind::Shell:
       return repr();
-    case Kind::Solid: {
-      const Solid s(*this);
-      const auto faces = s.faces();
-      append(out, pad + "Solid:");
-      append(out, pad + "  volume: " + f3(s.volume()));
-      append(out, pad + "  face_count: " + std::to_string(faces.size()));
-      append(out, pad + "  edge_count: " + std::to_string(s.edges().size()));
-      if (!faces.empty()) {
-        append(out, pad + "  faces:");
-        for (std::size_t i = 0; i < faces.size(); ++i) {
-          append(out, pad + "    face_" + std::to_string(i) + ":");
-          append(out, faces[i].to_string(indent + 3));
-        }
-      }
+    case Kind::Solid:
+      describe_solid(out, *this, pad, indent);
       break;
-    }
-    case Kind::Compound: {
-      const Compound c(*this);
-      append(out, pad + "Compound:");
-      append(out, pad + "  solid_count: " + std::to_string(c.solids().size()));
-      append(out, pad + "  volume: " + f3(c.volume()));
+    case Kind::Compound:
+      describe_compound(out, *this, pad);
       break;
-    }
   }
   append(out, tags_and_metadata(*this, indent + 1));
   return out;

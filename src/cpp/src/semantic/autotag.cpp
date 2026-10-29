@@ -523,21 +523,13 @@ DeltaEntries entries_from_delta(const TopoDelta& delta) {
   return result;
 }
 
-Shape apply_tracking_tags(Shape result, const TopoDelta& delta, const DeltaEntries& given_entries,
-                          const TrackingContext& context) {
-  const DeltaEntries entries = given_entries.empty() ? entries_from_delta(delta) : given_entries;
-  const std::string& op = context.op;
+namespace {
 
-  TopologyIndex source_faces, source_edges;
-  for (const Shape& source : context.sources) {
-    for (const Shape& face : faces_of(source))
-      source_faces.add(face);
-    for (const Shape& edge : edges_of(source))
-      source_edges.add(edge);
-  }
+using SourceTargets = std::map<std::string, std::set<std::string>>;
 
-  // Which result faces a source edge's projected tags may land on: only a one-to-one story is told.
-  std::map<std::string, std::set<std::string>> topology_source_targets;
+// Which result faces a source edge's projected tags may land on: only a one-to-one story is told.
+SourceTargets topology_source_targets_of(const DeltaEntries& entries) {
+  SourceTargets topology_source_targets;
   for (const auto& [target_id, entry] : entries) {
     if (upper(py_str(entry.find("kind") != nullptr ? *entry.find("kind") : Value(""))) != "FACE")
       continue;
@@ -548,7 +540,13 @@ Shape apply_tracking_tags(Shape result, const TopoDelta& delta, const DeltaEntri
         topology_source_targets[py_str(*source_id)].insert(target_id);
     }
   }
+  return topology_source_targets;
+}
 
+// Sets the track, role bindings, lineage coverage and projected source tags on every result face.
+void tag_result_faces(Shape& result, const DeltaEntries& entries, const std::string& op,
+                      const TopologyIndex& source_faces, const TopologyIndex& source_edges,
+                      const SourceTargets& topology_source_targets) {
   for (Shape& face : faces_of(result)) {
     const std::string topo_id = topology_key(face);
     const auto entry = matching_entry(entries, topo_id, Kind::Face);
@@ -569,12 +567,35 @@ Shape apply_tracking_tags(Shape result, const TopoDelta& delta, const DeltaEntri
     if (!source_edges.empty() && proven)
       project_source_bindings(face, *entry, source_edges, op, false, topology_source_targets);
   }
+}
 
-  std::set<std::string> section_ids;
-  for (const TopoRef& ref : delta.section_edges)
-    if (ref.kind == Kind::Edge)
-      section_ids.insert(ref.topo_id);
+// An edge the kernel reported only as a section edge: its track is a generated, proven intersection.
+void mark_section_edge_without_witness(Value& track) {
+  Value section_witness = object({{"kind", "topology_change"},
+                                  {"topo_kind", "EDGE"},
+                                  {"source_kind", Value()},
+                                  {"event", "generated"},
+                                  {"origin_role", Value()},
+                                  {"input_topo_id", Value()},
+                                  {"derivation", "intersection"},
+                                  {"coverage", "complete"},
+                                  {"status", "proven"},
+                                  {"evidence_kind", "kernel_section_edges"},
+                                  {"section", true}});
+  Value witnesses = Value::array();
+  witnesses.push_back(std::move(section_witness));
+  Value generated = Value::array();
+  generated.push_back("generated");
+  track.set("coverage", "complete");
+  track.set("status", "proven");
+  track.set("event", "generated");
+  track.set("events", std::move(generated));
+  track.set("witnesses", std::move(witnesses));
+}
 
+// Same for edges; section edges (from the boolean's section result) get a track even without an entry.
+void tag_result_edges(Shape& result, const DeltaEntries& entries, const std::string& op,
+                      const std::set<std::string>& section_ids, const TopologyIndex& source_edges) {
   for (Shape& edge : edges_of(result)) {
     const std::string topo_id = topology_key(edge);
     const auto entry = matching_entry(entries, topo_id, Kind::Edge);
@@ -588,28 +609,8 @@ Shape apply_tracking_tags(Shape result, const TopoDelta& delta, const DeltaEntri
     if (section_ids.count(topo_id) != 0) {
       track.set("section", true);
       track.set("derivation", "intersection");
-      if (!entry) {
-        Value section_witness = object({{"kind", "topology_change"},
-                                        {"topo_kind", "EDGE"},
-                                        {"source_kind", Value()},
-                                        {"event", "generated"},
-                                        {"origin_role", Value()},
-                                        {"input_topo_id", Value()},
-                                        {"derivation", "intersection"},
-                                        {"coverage", "complete"},
-                                        {"status", "proven"},
-                                        {"evidence_kind", "kernel_section_edges"},
-                                        {"section", true}});
-        Value witnesses = Value::array();
-        witnesses.push_back(std::move(section_witness));
-        Value generated = Value::array();
-        generated.push_back("generated");
-        track.set("coverage", "complete");
-        track.set("status", "proven");
-        track.set("event", "generated");
-        track.set("events", std::move(generated));
-        track.set("witnesses", std::move(witnesses));
-      }
+      if (!entry)
+        mark_section_edge_without_witness(track);
     }
     edge.set_metadata_deferred("track", track);
     apply_operation_role_bindings(edge, track, op);
@@ -617,6 +618,31 @@ Shape apply_tracking_tags(Shape result, const TopoDelta& delta, const DeltaEntri
     if (entry && !source_edges.empty() && py_str(*track.find("status")) == "proven")
       carry_source_lineage(edge, *entry, source_edges, op);
   }
+}
+
+}  // namespace
+
+Shape apply_tracking_tags(Shape result, const TopoDelta& delta, const DeltaEntries& given_entries,
+                          const TrackingContext& context) {
+  const DeltaEntries entries = given_entries.empty() ? entries_from_delta(delta) : given_entries;
+  const std::string& op = context.op;
+
+  TopologyIndex source_faces, source_edges;
+  for (const Shape& source : context.sources) {
+    for (const Shape& face : faces_of(source))
+      source_faces.add(face);
+    for (const Shape& edge : edges_of(source))
+      source_edges.add(edge);
+  }
+
+  const SourceTargets topology_source_targets = topology_source_targets_of(entries);
+  tag_result_faces(result, entries, op, source_faces, source_edges, topology_source_targets);
+
+  std::set<std::string> section_ids;
+  for (const TopoRef& ref : delta.section_edges)
+    if (ref.kind == Kind::Edge)
+      section_ids.insert(ref.topo_id);
+  tag_result_edges(result, entries, op, section_ids, source_edges);
   return result;
 }
 

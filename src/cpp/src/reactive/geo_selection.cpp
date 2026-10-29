@@ -186,18 +186,10 @@ Value make_selector_hint(const Shape& shape) {
   return hint;
 }
 
-Value make_geo_exact_selector(const Shape& shape, const Shape* source) {
-  Value selector = Value::object();
-  selector.set("mode", "geo_exact");
-  selector.set("kind", shape_kind_token(shape));
-  Value geo = shape.get_metadata("geo", Value::object());
-  if (geo.is_null())
-    geo = Value::object();
-  if (shape.kind() == Kind::Edge && source != nullptr) {
-    if (const auto index = wrapper_edge_index(*source, shape))
-      geo.set("edge_index", *index);
-  }
-  selector.set("metadata_geo", std::move(geo));
+namespace {
+
+// A face loaded from a BREP region snapshot also names its snapshot and source face id.
+void add_brep_region_ref(Value& selector, const Shape& shape) {
   if (shape.kind() == Kind::Face) {
     const Value provenance = shape.get_metadata("provenance");
     if (provenance.is_object()) {
@@ -211,13 +203,10 @@ Value make_geo_exact_selector(const Shape& shape, const Shape* source) {
       }
     }
   }
-  try {
-    selector.set("bbox", bbox_payload(shape));
-  } catch (const std::exception&) {
-  }
-  if (const auto geom = shape_geom_type(shape))
-    selector.set("geom_type", *geom);
+}
 
+// The kind-specific measurements that make up the exact selector (compared by geo_selector_score).
+void add_kind_measurements(Value& selector, const Shape& shape) {
   switch (shape.kind()) {
     case Kind::Vertex:
       selector.set("coordinates", vec_list(shape.as<Vertex>().coordinates()));
@@ -266,6 +255,31 @@ Value make_geo_exact_selector(const Shape& shape, const Shape* source) {
       break;
     }
   }
+}
+
+}  // namespace
+
+Value make_geo_exact_selector(const Shape& shape, const Shape* source) {
+  Value selector = Value::object();
+  selector.set("mode", "geo_exact");
+  selector.set("kind", shape_kind_token(shape));
+  Value geo = shape.get_metadata("geo", Value::object());
+  if (geo.is_null())
+    geo = Value::object();
+  if (shape.kind() == Kind::Edge && source != nullptr) {
+    if (const auto index = wrapper_edge_index(*source, shape))
+      geo.set("edge_index", *index);
+  }
+  selector.set("metadata_geo", std::move(geo));
+  add_brep_region_ref(selector, shape);
+  try {
+    selector.set("bbox", bbox_payload(shape));
+  } catch (const std::exception&) {
+  }
+  if (const auto geom = shape_geom_type(shape))
+    selector.set("geom_type", *geom);
+
+  add_kind_measurements(selector, shape);
   return selector;
 }
 

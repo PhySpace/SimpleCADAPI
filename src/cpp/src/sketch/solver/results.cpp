@@ -105,10 +105,12 @@ double bspline_length(const SolvedGeometry& solved, const SketchEntity& entity) 
 
 }  // namespace
 
-SolvedGeometry assemble_solution(const Model& model, const std::vector<double>& x) {
-  const Reader read{model, x};
+namespace {
+
+// Point and radius values read from the solver vector: points first (entities, then spline poles),
+// then circle and arc radii (an arc's radius is its centre-to-start distance).
+void read_points_and_radii(const Model& model, const Reader& read, SolvedGeometry& out) {
   const Sketch& sketch = model.sketch;
-  SolvedGeometry out;
 
   for (const auto& [id, entity] : sketch.entities()) {
     if (entity.kind == kPointKind)
@@ -134,63 +136,77 @@ SolvedGeometry assemble_solution(const Model& model, const std::vector<double>& 
     out.scalars.set("arc:" + id + ":radius", radius);
     out.scalars.set("arc:" + id + ":diameter", 2.0 * radius);
   }
+}
 
-  for (const auto& [id, entity] : sketch.entities()) {
-    Value solved = Value::object();
-    solved.set("kind", entity.kind);
-    if (entity.kind == kPointKind) {
-      solved.set("point", point_value(out.points.at(id)));
-    } else if (entity.kind == kLineKind) {
-      const SketchPoint2 start = out.points.at(entity.point_id("start"));
-      const SketchPoint2 end = out.points.at(entity.point_id("end"));
-      solved.set("start", point_value(start));
-      solved.set("end", point_value(end));
-      solved.set("length", distance(start, end));
-    } else if (entity.kind == kCircleKind) {
-      const double radius = out.scalars.at("circle:" + id + ":radius");
-      solved.set("center", point_value(out.points.at(entity.point_id("center"))));
-      solved.set("radius", radius);
-      solved.set("diameter", 2.0 * radius);
-    } else if (entity.kind == kArcKind) {
-      const SketchPoint2 center = out.points.at(entity.point_id("center"));
-      const SketchPoint2 start = out.points.at(entity.point_id("start"));
-      const SketchPoint2 end = out.points.at(entity.point_id("end"));
-      const double radius = out.scalars.at("arc:" + id + ":radius");
-      const double sweep = sweep_of(center, start, end);
-      solved.set("center", point_value(center));
-      solved.set("start", point_value(start));
-      solved.set("end", point_value(end));
-      solved.set("radius", radius);
-      solved.set("sweep", sweep);
-      solved.set("length", radius * sweep);
-    } else if (entity.kind == kEllipseKind) {
-      const SketchPoint2 center = out.points.at(entity.point_id("center"));
-      const SketchPoint2 major = out.points.at(entity.point_id("major"));
-      const SketchPoint2 minor = out.points.at(entity.point_id("minor"));
-      solved.set("center", point_value(center));
-      solved.set("major_point", point_value(major));
-      solved.set("minor_point", point_value(minor));
-      solved.set("major_radius", distance(center, major));
-      solved.set("minor_radius", distance(center, minor));
-      solved.set("angle", std::atan2(major.second - center.second, major.first - center.first) * 180.0 / kPi);
-    } else if (entity.kind == kBSplineKind) {
-      const SplineModel& spline = model.splines.at(id);
-      Value::Array poles;
-      for (std::size_t i = 0; i < spline.poles.size(); ++i) {
-        poles.push_back(point_value(out.points.at("bspline:" + id + ":pole:" + std::to_string(i))));
-      }
-      solved.set("degree", spline.definition.degree);
-      solved.set("control_points", Value(std::move(poles)));
-      solved.set("knots", *entity.data.find("knots"));
-      solved.set("multiplicities", *entity.data.find("multiplicities"));
-      solved.set("weights", *entity.data.find("weights"));
-      solved.set("periodic", spline.definition.periodic);
-      solved.set("segment_count", static_cast<int>(spline.segments.size()));
-      solved.set("solver_representation", spline.cubic_bezier ? "cubic_bezier" : "fixed_shape");
-    } else {
-      continue;
+// The solved description of one entity (what inspection reports), or nullopt for kinds it does not describe.
+std::optional<Value> solved_entity_value(const Model& model, const std::string& id, const SketchEntity& entity,
+                                         const SolvedGeometry& out) {
+  Value solved = Value::object();
+  solved.set("kind", entity.kind);
+  if (entity.kind == kPointKind) {
+    solved.set("point", point_value(out.points.at(id)));
+  } else if (entity.kind == kLineKind) {
+    const SketchPoint2 start = out.points.at(entity.point_id("start"));
+    const SketchPoint2 end = out.points.at(entity.point_id("end"));
+    solved.set("start", point_value(start));
+    solved.set("end", point_value(end));
+    solved.set("length", distance(start, end));
+  } else if (entity.kind == kCircleKind) {
+    const double radius = out.scalars.at("circle:" + id + ":radius");
+    solved.set("center", point_value(out.points.at(entity.point_id("center"))));
+    solved.set("radius", radius);
+    solved.set("diameter", 2.0 * radius);
+  } else if (entity.kind == kArcKind) {
+    const SketchPoint2 center = out.points.at(entity.point_id("center"));
+    const SketchPoint2 start = out.points.at(entity.point_id("start"));
+    const SketchPoint2 end = out.points.at(entity.point_id("end"));
+    const double radius = out.scalars.at("arc:" + id + ":radius");
+    const double sweep = sweep_of(center, start, end);
+    solved.set("center", point_value(center));
+    solved.set("start", point_value(start));
+    solved.set("end", point_value(end));
+    solved.set("radius", radius);
+    solved.set("sweep", sweep);
+    solved.set("length", radius * sweep);
+  } else if (entity.kind == kEllipseKind) {
+    const SketchPoint2 center = out.points.at(entity.point_id("center"));
+    const SketchPoint2 major = out.points.at(entity.point_id("major"));
+    const SketchPoint2 minor = out.points.at(entity.point_id("minor"));
+    solved.set("center", point_value(center));
+    solved.set("major_point", point_value(major));
+    solved.set("minor_point", point_value(minor));
+    solved.set("major_radius", distance(center, major));
+    solved.set("minor_radius", distance(center, minor));
+    solved.set("angle", std::atan2(major.second - center.second, major.first - center.first) * 180.0 / kPi);
+  } else if (entity.kind == kBSplineKind) {
+    const SplineModel& spline = model.splines.at(id);
+    Value::Array poles;
+    for (std::size_t i = 0; i < spline.poles.size(); ++i) {
+      poles.push_back(point_value(out.points.at("bspline:" + id + ":pole:" + std::to_string(i))));
     }
-    out.entities.set(id, std::move(solved));
+    solved.set("degree", spline.definition.degree);
+    solved.set("control_points", Value(std::move(poles)));
+    solved.set("knots", *entity.data.find("knots"));
+    solved.set("multiplicities", *entity.data.find("multiplicities"));
+    solved.set("weights", *entity.data.find("weights"));
+    solved.set("periodic", spline.definition.periodic);
+    solved.set("segment_count", static_cast<int>(spline.segments.size()));
+    solved.set("solver_representation", spline.cubic_bezier ? "cubic_bezier" : "fixed_shape");
+  } else {
+    return std::nullopt;
+  }
+  return solved;
+}
+
+}  // namespace
+
+SolvedGeometry assemble_solution(const Model& model, const std::vector<double>& x) {
+  const Reader read{model, x};
+  SolvedGeometry out;
+  read_points_and_radii(model, read, out);
+  for (const auto& [id, entity] : model.sketch.entities()) {
+    if (std::optional<Value> solved = solved_entity_value(model, id, entity, out))
+      out.entities.set(id, std::move(*solved));
   }
   return out;
 }

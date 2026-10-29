@@ -217,8 +217,8 @@ std::vector<ErrorEvidence> collect_evidence(const EvidenceRequest& request) {
 }
 
 // ---- the cardinality message
-// ---------------------------------------------------------------------------------------------- One letter per kind,
-// so error text and rendered evidence can say "F3" and "E7" unambiguously.
+//
+// One letter per kind, so error text and rendered evidence can say "F3" and "E7" unambiguously.
 std::string symbol_prefix(const std::string& target_kind) {
   if (target_kind == "face")
     return "F";
@@ -237,40 +237,39 @@ std::string symbol_prefix(const std::string& target_kind) {
   return text::upper(std::string_view(target_kind).substr(0, 1));
 }
 
-[[noreturn]] void cardinality_failure(const std::string& target_kind, const std::vector<Shape>& matched,
-                                      std::int64_t expected, const std::string& mode, const Scope& scope) {
-  const std::vector<Shape> candidates = detail::scope_items(scope, target_kind);
-  const std::string prefix = symbol_prefix(target_kind);
-  const IdentitySet matched_set(matched.begin(), matched.end());
-  const auto matched_count = static_cast<std::int64_t>(matched.size());
-
-  // Symbols follow the candidate enumeration, so hits and near misses share one naming for the scope.
+// Inventory rows for the hits and (at most 8) near misses, and which candidates were hits.
+struct CardinalityInventory {
   std::vector<InventoryEntry> inventory;
-  std::vector<char> is_hit(candidates.size(), 0);
+  std::vector<char> is_hit;
+};
+
+// Symbols follow the candidate enumeration, so hits and near misses share one naming for the scope.
+CardinalityInventory cardinality_inventory(const std::vector<Shape>& candidates, const IdentitySet& matched_set,
+                                           const std::string& prefix) {
+  CardinalityInventory out;
+  out.is_hit.assign(candidates.size(), 0);
   std::size_t near_misses_listed = 0;
   for (std::size_t i = 0; i < candidates.size(); ++i) {
     const bool hit = matched_set.contains(candidates[i]);
     if (hit) {
-      is_hit[i] = 1;
+      out.is_hit[i] = 1;
     } else {
       if (near_misses_listed >= 8)
         continue;
       ++near_misses_listed;
     }
-    inventory.push_back(
+    out.inventory.push_back(
         {prefix + std::to_string(i + 1), hit ? "hit" : "near_miss", entity_geometry_summary(candidates[i])});
   }
+  return out;
+}
 
-  const std::vector<std::vector<std::size_t>> groups = target_kind == "face" && matched.size() > 1
-                                                           ? face_logical_groups(matched)
-                                                           : std::vector<std::vector<std::size_t>>{};
-
-  std::vector<ErrorMeasurement> measurements = {
-      {"matched_count", static_cast<double>(matched.size()), ""},
-      {"candidate_count", static_cast<double>(candidates.size()), ""},
-      {"expected_count", static_cast<double>(expected), ""},
-  };
-
+// What to try: group hints for seam-split faces, then too-many / too-few advice.
+std::vector<std::string> cardinality_repair(const std::vector<Shape>& candidates, const std::vector<Shape>& matched,
+                                            const std::vector<std::vector<std::size_t>>& groups,
+                                            const std::vector<char>& is_hit, const std::string& prefix,
+                                            std::int64_t expected) {
+  const auto matched_count = static_cast<std::int64_t>(matched.size());
   std::unordered_map<Shape, std::size_t, IdentityHash, IdentityEqual> candidate_index;
   for (std::size_t i = 0; i < candidates.size(); ++i)
     candidate_index[candidates[i]] = i;
@@ -306,6 +305,28 @@ std::string symbol_prefix(const std::string& target_kind) {
         "Booleans and fillets re-split topology; re-derive the selector from the newest shape instead of "
         "reusing one resolved earlier.");
   }
+  return repair;
+}
+
+[[noreturn]] void cardinality_failure(const std::string& target_kind, const std::vector<Shape>& matched,
+                                      std::int64_t expected, const std::string& mode, const Scope& scope) {
+  const std::vector<Shape> candidates = detail::scope_items(scope, target_kind);
+  const std::string prefix = symbol_prefix(target_kind);
+  const IdentitySet matched_set(matched.begin(), matched.end());
+
+  CardinalityInventory listed = cardinality_inventory(candidates, matched_set, prefix);
+
+  const std::vector<std::vector<std::size_t>> groups = target_kind == "face" && matched.size() > 1
+                                                           ? face_logical_groups(matched)
+                                                           : std::vector<std::vector<std::size_t>>{};
+
+  std::vector<ErrorMeasurement> measurements = {
+      {"matched_count", static_cast<double>(matched.size()), ""},
+      {"candidate_count", static_cast<double>(candidates.size()), ""},
+      {"expected_count", static_cast<double>(expected), ""},
+  };
+
+  std::vector<std::string> repair = cardinality_repair(candidates, matched, groups, listed.is_hit, prefix, expected);
 
   std::vector<Shape> near_misses;
   for (const Shape& candidate : candidates) {
@@ -342,7 +363,7 @@ std::string symbol_prefix(const std::string& target_kind) {
   guidance.measurements = std::move(measurements);
   guidance.evidence = collect_evidence(request);
   guidance.repair = std::move(repair);
-  guidance.inventory = std::move(inventory);
+  guidance.inventory = std::move(listed.inventory);
   throw Error(operation, std::move(guidance));
 }
 

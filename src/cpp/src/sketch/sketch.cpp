@@ -385,6 +385,64 @@ Sketch& Sketch::add_ellipse(const std::string& entity_id, const SketchRef& cente
   return *this;
 }
 
+namespace {
+
+// A non-periodic spline starts and ends at its start/end points: a pole given as a ref must be that
+// point, a literal pole is overwritten with its coordinates.
+void pin_end_poles(std::vector<Value>& poles, const std::string& start_id, const std::string& end_id,
+                   const SketchPoint2& start_point, const SketchPoint2& end_point) {
+  const auto literal = [](const SketchPoint2& p) { return Value(Value::Array{Value(p.first), Value(p.second)}); };
+  if (poles.front().is_object()) {
+    if (poles.front().find("point_id")->as_string() != start_id) {
+      throw ValueError("The first B-spline control-point ref must match start");
+    }
+  } else {
+    poles.front() = literal(start_point);
+  }
+  if (poles.back().is_object()) {
+    if (poles.back().find("point_id")->as_string() != end_id) {
+      throw ValueError("The last B-spline control-point ref must match end");
+    }
+  } else {
+    poles.back() = literal(end_point);
+  }
+}
+
+// The stored form of a B-spline: normalized poles, full knot vector with multiplicities, weights or null.
+SketchEntity make_bspline_entity(const std::string& entity_id, bool construction, const std::string& start_id,
+                                 const std::string& end_id, const std::vector<Value>& poles, int degree,
+                                 const BSplineKnots& resolved_knots,
+                                 const std::optional<std::vector<double>>& resolved_weights, bool periodic) {
+  SketchEntity entity;
+  entity.id = entity_id;
+  entity.kind = std::string(kBSplineKind);
+  entity.construction = construction;
+  entity.data.set("start", start_id);
+  entity.data.set("end", end_id);
+  entity.data.set("control_points", Value(Value::Array(poles.begin(), poles.end())));
+  entity.data.set("degree", degree);
+  Value::Array knot_values;
+  for (const double knot : resolved_knots.knots)
+    knot_values.emplace_back(knot);
+  entity.data.set("knots", Value(std::move(knot_values)));
+  Value::Array multiplicity_values;
+  for (const int mult : resolved_knots.multiplicities)
+    multiplicity_values.emplace_back(mult);
+  entity.data.set("multiplicities", Value(std::move(multiplicity_values)));
+  if (resolved_weights) {
+    Value::Array weight_values;
+    for (const double weight : *resolved_weights)
+      weight_values.emplace_back(weight);
+    entity.data.set("weights", Value(std::move(weight_values)));
+  } else {
+    entity.data.set("weights", Value());
+  }
+  entity.data.set("periodic", periodic);
+  return entity;
+}
+
+}  // namespace
+
 Sketch& Sketch::add_bspline(const std::string& entity_id, const SketchRef& start, const SketchRef& end,
                             const std::vector<SketchControlPoint>& control_points, int degree,
                             const std::optional<std::vector<Scalar>>& knots,
@@ -432,50 +490,11 @@ Sketch& Sketch::add_bspline(const std::string& entity_id, const SketchRef& start
 
   const SketchPoint2 start_point = entity_xy(start_id);
   const SketchPoint2 end_point = entity_xy(end_id);
-  const auto literal = [](const SketchPoint2& p) { return Value(Value::Array{Value(p.first), Value(p.second)}); };
-  if (!periodic) {
-    if (poles.front().is_object()) {
-      if (poles.front().find("point_id")->as_string() != start_id) {
-        throw ValueError("The first B-spline control-point ref must match start");
-      }
-    } else {
-      poles.front() = literal(start_point);
-    }
-    if (poles.back().is_object()) {
-      if (poles.back().find("point_id")->as_string() != end_id) {
-        throw ValueError("The last B-spline control-point ref must match end");
-      }
-    } else {
-      poles.back() = literal(end_point);
-    }
-  }
+  if (!periodic)
+    pin_end_poles(poles, start_id, end_id, start_point, end_point);
 
-  SketchEntity entity;
-  entity.id = entity_id;
-  entity.kind = std::string(kBSplineKind);
-  entity.construction = construction;
-  entity.data.set("start", start_id);
-  entity.data.set("end", end_id);
-  entity.data.set("control_points", Value(Value::Array(poles.begin(), poles.end())));
-  entity.data.set("degree", degree);
-  Value::Array knot_values;
-  for (const double knot : resolved_knots.knots)
-    knot_values.emplace_back(knot);
-  entity.data.set("knots", Value(std::move(knot_values)));
-  Value::Array multiplicity_values;
-  for (const int mult : resolved_knots.multiplicities)
-    multiplicity_values.emplace_back(mult);
-  entity.data.set("multiplicities", Value(std::move(multiplicity_values)));
-  if (resolved_weights) {
-    Value::Array weight_values;
-    for (const double weight : *resolved_weights)
-      weight_values.emplace_back(weight);
-    entity.data.set("weights", Value(std::move(weight_values)));
-  } else {
-    entity.data.set("weights", Value());
-  }
-  entity.data.set("periodic", periodic);
-  add_entity(std::move(entity));
+  add_entity(make_bspline_entity(entity_id, construction, start_id, end_id, poles, degree, resolved_knots,
+                                 resolved_weights, periodic));
   return *this;
 }
 
