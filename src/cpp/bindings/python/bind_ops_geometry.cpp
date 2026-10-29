@@ -3,6 +3,7 @@
 // defaults (keyword-only where Python is keyword-only), plus the create_* aliases.
 #include "bindings.hpp"
 
+#include "scad/core/tolerance.hpp"
 #include "scad/io/brep_region.hpp"
 
 #include <BRepAdaptor_Curve.hxx>
@@ -154,13 +155,14 @@ void bind_splines(py::module_& m) {
     };
   };
   m.def("make_interpolated_spline_redge", interpolated(&make_interpolated_spline_redge), py::kw_only(),
-        py::arg("points"), py::arg("periodic") = false, py::arg("tolerance") = 1.0e-6,
+        py::arg("points"), py::arg("periodic") = false, py::arg("tolerance") = tol::kSplineInterpolation,
         "Interpolate an exact B-spline edge through the supplied points.");
   m.def("make_interpolated_spline_rwire", interpolated(&make_interpolated_spline_rwire), py::kw_only(),
-        py::arg("points"), py::arg("periodic") = false, py::arg("tolerance") = 1.0e-6,
+        py::arg("points"), py::arg("periodic") = false, py::arg("tolerance") = tol::kSplineInterpolation,
         "Create a one-edge wire that interpolates the supplied points.");
   m.def("make_periodic_spline_rwire", &make_periodic_spline_rwire, py::kw_only(), py::arg("points"),
-        py::arg("tolerance") = 1.0e-6, "Create a closed periodic spline wire interpolating the supplied points.");
+        py::arg("tolerance") = tol::kSplineInterpolation,
+        "Create a closed periodic spline wire interpolating the supplied points.");
 }
 
 void bind_helix(py::module_& m) {

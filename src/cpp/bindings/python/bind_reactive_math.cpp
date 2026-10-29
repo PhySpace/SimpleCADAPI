@@ -1,6 +1,7 @@
 // simplecadapi.math: fit_cubic_bspline_control_points and BSplineFitResult.
 #include "bind_reactive_common.hpp"
 
+#include "scad/core/tolerance.hpp"
 #include "scad/core/error.hpp"
 #include <cmath>
 
@@ -104,9 +105,10 @@ void bind_reactive_math(py::module_& m) {
           }
           return sr::fit_cubic_bspline_control_points(samples, options);
         },
-        py::arg("sample_points"), py::kw_only(), py::arg("tolerance") = 1e-3,
-        py::arg("max_control_points") = py::none(), py::arg("fairing") = 1e-6, py::arg("duplicate_tolerance") = 1e-12,
-        py::arg("knot_tolerance") = 1e-9, py::arg("raise_on_failure") = true,
+        py::arg("sample_points"), py::kw_only(), py::arg("tolerance") = tol::kFitError,
+        py::arg("max_control_points") = py::none(), py::arg("fairing") = 1e-6,
+        py::arg("duplicate_tolerance") = tol::kDuplicateParameter,
+        py::arg("knot_tolerance") = tol::kInteriorKnotSpacing, py::arg("raise_on_failure") = true,
         "Fit a minimal cubic B-spline control polygon to sampled curve points.");
   };
   bind_into(math);

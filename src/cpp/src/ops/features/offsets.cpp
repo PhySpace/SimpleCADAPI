@@ -12,6 +12,7 @@
 #include <set>
 
 #include "internal.hpp"
+#include "scad/core/tolerance.hpp"
 #include "scad/kernel/convert.hpp"
 #include "scad/ops/features/blends.hpp"
 
@@ -67,7 +68,7 @@ Solid draft_rsolid(const Solid& solid, const FaceSelection& faces_to_draft, cons
   const Vec3 global_origin = features_detail::place_point(origin);
   Vec3 global_normal = features_detail::place_vector(normal);
   const double magnitude = global_normal.norm();
-  if (magnitude <= 1e-14)
+  if (magnitude <= tol::kUndefinedNormal)
     throw ValueError("plane_normal must be nonzero");
   global_normal = global_normal / magnitude;
 

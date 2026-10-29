@@ -2,6 +2,7 @@
 #include <cmath>
 #include <map>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/core/error.hpp"
 #include "scad/render/render.hpp"
 
@@ -78,9 +79,9 @@ Camera fit_camera(double elevation_deg, double azimuth_deg, const Bounds& bounds
   cam.target = center;
   cam.forward = -dir;
   Vec3 right = cam.forward.cross(up_hint);
-  if (right.norm() < 1e-12)
+  if (right.norm() < tol::kDegenerateNorm)
     right = cam.forward.cross(Vec3{0, 1, 0});
-  if (right.norm() < 1e-12)
+  if (right.norm() < tol::kDegenerateNorm)
     right = cam.forward.cross(Vec3{1, 0, 0});
   cam.right = right.normalized();
   cam.up = cam.right.cross(cam.forward).normalized();

@@ -6,6 +6,7 @@
 
 #include <mutex>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/core/error.hpp"
 #include "scad/sketch/native_solver.hpp"
 #include "scad/sketch/operators.hpp"
@@ -239,7 +240,7 @@ void bind_data_classes(py::module_& m) {
   py::class_<SketchSolverOptions>(m, "SketchSolverOptions")
       .def(
           py::init([](double tolerance, int max_iterations) { return SketchSolverOptions{tolerance, max_iterations}; }),
-          py::arg("tolerance") = 1e-7, py::arg("max_iterations") = 80)
+          py::arg("tolerance") = tol::kSketchSolveResidual, py::arg("max_iterations") = 80)
       .def_readonly("tolerance", &SketchSolverOptions::tolerance)
       .def_readonly("max_iterations", &SketchSolverOptions::max_iterations);
 
@@ -489,7 +490,8 @@ void bind_sketch_class(py::module_& m) {
             return s.solve(request);
           },
           py::kw_only(), py::arg("require_fully_constrained") = false, py::arg("strict") = true,
-          py::arg("tolerance") = 1e-7, py::arg("max_iterations") = 80, py::arg("backend") = py::none())
+          py::arg("tolerance") = tol::kSketchSolveResidual, py::arg("max_iterations") = 80,
+          py::arg("backend") = py::none())
       .def("solved_result", [](Sketch& s) { return s.solved_result(); })
       .def(
           "make_wire",
@@ -625,7 +627,7 @@ void bind_solve_operators(py::module_& m) {
         return inspect_sketch_rsketchresult(sketch, request_of(fully, strict, tolerance, max_iterations));
       },
       py::arg("sketch"), py::kw_only(), py::arg("require_fully_constrained") = false, py::arg("strict") = true,
-      py::arg("tolerance") = 1e-7, py::arg("max_iterations") = 80);
+      py::arg("tolerance") = tol::kSketchSolveResidual, py::arg("max_iterations") = 80);
   m.def(
       "make_wire_from_sketch_rwire",
       [](const Sketch& sketch, const SketchProfileId& profile, bool fully, bool strict, double tolerance,
@@ -633,7 +635,7 @@ void bind_solve_operators(py::module_& m) {
         return make_wire_from_sketch_rwire(sketch, profile, request_of(fully, strict, tolerance, max_iterations));
       },
       py::arg("sketch"), py::arg("profile") = 0, py::kw_only(), py::arg("require_fully_constrained") = false,
-      py::arg("strict") = true, py::arg("tolerance") = 1e-7, py::arg("max_iterations") = 80);
+      py::arg("strict") = true, py::arg("tolerance") = tol::kSketchSolveResidual, py::arg("max_iterations") = 80);
   m.def(
       "make_face_from_sketch_rface",
       [](const Sketch& sketch, const SketchProfileId& profile, const std::vector<SketchProfileId>& inner, bool fully,
@@ -643,7 +645,7 @@ void bind_solve_operators(py::module_& m) {
       },
       py::arg("sketch"), py::arg("profile") = 0, py::kw_only(),
       py::arg("inner_profiles") = std::vector<SketchProfileId>{}, py::arg("require_fully_constrained") = false,
-      py::arg("strict") = true, py::arg("tolerance") = 1e-7, py::arg("max_iterations") = 80);
+      py::arg("strict") = true, py::arg("tolerance") = tol::kSketchSolveResidual, py::arg("max_iterations") = 80);
 }
 
 }  // namespace

@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "metadata.hpp"
+#include "scad/core/tolerance.hpp"
 #include "scad/core/error.hpp"
 #include "scad/ops/features/features.hpp"
 #include "scad/ops/geometry/geometry.hpp"
@@ -81,7 +82,7 @@ Solid make_nut_rsolid(double diameter, double width, double height, const NutOpt
   }
 
   const Solid body = make_nut_body(nut_style, resolved_width, resolved_height, options.knurl_count);
-  const double epsilon = std::max(1e-5, resolved_diameter * 1e-4);
+  const double epsilon = std::max(tol::kCutterOverrunFloor, resolved_diameter * tol::kCutterOverrunRelative);
   const bool through = hole_style == "through";
   const double cut_start = through ? -epsilon : hole_start;
   const double cut_height = through ? hole_depth + 2.0 * epsilon : hole_depth + epsilon;

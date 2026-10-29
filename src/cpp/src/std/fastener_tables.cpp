@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/std/fastener_tables.hpp"
 
 #include <algorithm>
@@ -45,7 +46,7 @@ constexpr std::array<HexHeadRow, 17> kMetricHexHead{{
 
 // math.isclose(candidate, nominal, rel_tol=0, abs_tol=1e-9)
 bool matches_catalog(double candidate, double diameter) {
-  return std::fabs(candidate - diameter) <= 1e-9;
+  return std::fabs(candidate - diameter) <= tol::kCatalogDiameter;
 }
 
 }  // namespace

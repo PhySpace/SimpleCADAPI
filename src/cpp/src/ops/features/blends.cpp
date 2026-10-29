@@ -1,4 +1,5 @@
 // fillet_rsolid, chamfer_rsolid (operators/features.py).
+#include "scad/core/tolerance.hpp"
 #include "scad/ops/features/blends.hpp"
 
 #include <algorithm>
@@ -154,7 +155,7 @@ namespace {
 std::vector<std::pair<Face, Face>> chamfer_reference_face_pairs(const std::vector<Edge>& edges,
                                                                 const Vec3& reference_direction) {
   const double norm = reference_direction.norm();
-  if (norm <= 1e-12)
+  if (norm <= tol::kDegenerateNorm)
     throw ValueError("chamfer reference_direction must be non-zero");
   const Vec3 direction = reference_direction / norm;
   std::vector<std::pair<Face, Face>> pairs;

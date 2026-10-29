@@ -10,6 +10,7 @@
 #include <cmath>
 
 #include "internal.hpp"
+#include "scad/core/tolerance.hpp"
 #include "scad/kernel/convert.hpp"
 #include "scad/ops/features/transforms.hpp"
 
@@ -127,14 +128,14 @@ Solid transform_rsolid(const Solid& solid, const std::vector<std::vector<Scalar>
   }
   const std::array<double, 4> last{0, 0, 0, 1};
   for (std::size_t j = 0; j < 4; ++j) {
-    if (std::abs(values[3][j] - last[j]) > 1e-12)
+    if (std::abs(values[3][j] - last[j]) > tol::kAffineBottomRow)
       throw ValueError("perspective transforms cannot define an affine solid");
   }
   Mat3 affine{};
   for (std::size_t i = 0; i < 3; ++i)
     for (std::size_t j = 0; j < 3; ++j)
       affine[i][j] = values[i][j];
-  if (std::abs(determinant(affine)) < 1e-14)
+  if (std::abs(determinant(affine)) < tol::kSingularDeterminant)
     throw ValueError("matrix must be nonsingular");
 
   const Mat3 basis = current_basis();

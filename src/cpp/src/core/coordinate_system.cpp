@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/core/coordinate_system.hpp"
 
 #include <cmath>
@@ -145,7 +146,7 @@ CoordinateSystem workplane_frame(const Vec3& origin, const Vec3& normal, const V
 
   Vec3 global_y = global_normal.cross(global_x);
   const double y_norm = global_y.norm();
-  if (y_norm < 1e-10) {
+  if (y_norm < tol::kParallelCrossNorm) {
     // x_dir is parallel to the normal: pick any perpendicular.
     const Vec3 temp_x = std::abs(global_normal.x) < 0.9 ? Vec3{1, 0, 0} : Vec3{0, 1, 0};
     global_y = global_normal.cross(temp_x);

@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/ql/diagnostics.hpp"
 
 #include <BRepAdaptor_Curve.hxx>
@@ -161,24 +162,25 @@ bool same_surface(const SurfaceKey& a, const SurfaceKey& b) {
   switch (a.type) {
     case GeomAbs_Plane: {
       const double parallel = std::abs(a.plane.Axis().Direction().Dot(b.plane.Axis().Direction()));
-      return parallel >= 0.999 && std::abs(a.plane.Distance(b.plane.Location())) < 1e-6;
+      return parallel >= tol::kParallelAxisCosine &&
+             std::abs(a.plane.Distance(b.plane.Location())) < tol::kSurfaceCoincidentDistance;
     }
     case GeomAbs_Cylinder: {
-      if (std::abs(a.cylinder.Radius() - b.cylinder.Radius()) > 1e-7)
+      if (std::abs(a.cylinder.Radius() - b.cylinder.Radius()) > tol::kSurfaceRadiusMatch)
         return false;
       const gp_Dir da = a.cylinder.Axis().Direction();
-      if (std::abs(da.Dot(b.cylinder.Axis().Direction())) < 0.999)
+      if (std::abs(da.Dot(b.cylinder.Axis().Direction())) < tol::kParallelAxisCosine)
         return false;
       const gp_Pnt oa = a.cylinder.Axis().Location();
       const gp_Pnt ob = b.cylinder.Axis().Location();
       const double delta[3] = {ob.X() - oa.X(), ob.Y() - oa.Y(), ob.Z() - oa.Z()};
       const double along = delta[0] * da.X() + delta[1] * da.Y() + delta[2] * da.Z();
       const double off[3] = {delta[0] - along * da.X(), delta[1] - along * da.Y(), delta[2] - along * da.Z()};
-      return std::sqrt(off[0] * off[0] + off[1] * off[1] + off[2] * off[2]) < 1e-6;
+      return std::sqrt(off[0] * off[0] + off[1] * off[1] + off[2] * off[2]) < tol::kSurfaceCoincidentDistance;
     }
     case GeomAbs_Sphere:
-      return a.sphere.Location().Distance(b.sphere.Location()) < 1e-6 &&
-             std::abs(a.sphere.Radius() - b.sphere.Radius()) < 1e-7;
+      return a.sphere.Location().Distance(b.sphere.Location()) < tol::kSurfaceCoincidentDistance &&
+             std::abs(a.sphere.Radius() - b.sphere.Radius()) < tol::kSurfaceRadiusMatch;
     case GeomAbs_Cone:
     case GeomAbs_Torus:
       return !a.handle.IsNull() && a.handle.get() == b.handle.get();

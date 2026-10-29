@@ -10,6 +10,7 @@
 #include <variant>
 #include <vector>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/core/scalar.hpp"
 #include "scad/core/value.hpp"
 #include "scad/core/vec.hpp"
@@ -48,8 +49,8 @@ struct SurfaceFillingSettings {
   int points_per_curve = 15;
   int iterations = 2;
   bool anisotropic = false;
-  double tolerance_2d = 1e-5;
-  double tolerance_3d = 1e-4;
+  double tolerance_2d = tol::kFillingTolerance2d;
+  double tolerance_3d = tol::kFillingTolerance3d;
   double angular_tolerance = 0.01;
   double curvature_tolerance = 0.1;
   int max_degree = 8;

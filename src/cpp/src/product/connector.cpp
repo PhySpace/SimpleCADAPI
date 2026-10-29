@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/product/connector.hpp"
 
 #include <algorithm>
@@ -172,7 +173,7 @@ Vec3 selector_vec(const Value& selector, std::string_view key, const Vec3& fallb
 Vec3 normalized_or_throw(const Vec3& value, const char* field) {
   const Vec3 vec = finite_vec3(value, field);
   const double length = vec.norm();
-  if (length <= 1e-9)
+  if (length <= tol::kNegligibleLength)
     throw ValueError(std::string(field) + " must be a non-zero vector");
   return {vec.x / length, vec.y / length, vec.z / length};
 }

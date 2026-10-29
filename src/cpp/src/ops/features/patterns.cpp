@@ -2,6 +2,7 @@
 #include <cmath>
 
 #include "internal.hpp"
+#include "scad/core/tolerance.hpp"
 #include "scad/ops/features/transforms.hpp"
 
 namespace scad {
@@ -37,7 +38,7 @@ std::vector<Shape> linear_pattern_rsolidlist(const Shape& shape, const Scalar3& 
       throw ValueError("The pattern spacing must be greater than zero");
     const Vec3 direction_value = evaluate_point(direction, "direction");
     const double norm = direction_value.norm();
-    if (norm <= 1e-15 || !std::isfinite(norm))
+    if (norm <= tol::kZeroDirectionNorm || !std::isfinite(norm))
       throw ValueError("The pattern direction cannot be a zero vector");
     const Vec3 unit = direction_value / norm;
 

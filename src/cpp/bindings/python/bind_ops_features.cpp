@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/core/error.hpp"
 #include "scad/ops/features/features.hpp"
 #include "scad/ql/ql.hpp"
@@ -288,7 +289,8 @@ void bind_derived(py::module_& m) {
                         [&] { return offset_rsolid(solid, amount, selection, {tolerance, kind}); });
       },
       py::arg("solid"), py::arg("amount"), py::arg("openings") = py::tuple(), py::kw_only(),
-      py::arg("tolerance") = 1e-4, py::arg("kind") = "ARC", "Offset a solid outward (positive) or inward (negative).");
+      py::arg("tolerance") = tol::kOffsetTolerance, py::arg("kind") = "ARC",
+      "Offset a solid outward (positive) or inward (negative).");
 
   m.def(
       "draft_rsolid",

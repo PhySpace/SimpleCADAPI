@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/sketch/bspline_params.hpp"
 
 #include <cmath>
@@ -23,7 +24,7 @@ BSplineKnots collapse_knot_vector(const std::vector<double>& values) {
   }
   BSplineKnots out;
   for (const double value : values) {
-    if (!out.knots.empty() && std::abs(value - out.knots.back()) <= 1e-12) {
+    if (!out.knots.empty() && std::abs(value - out.knots.back()) <= tol::kDuplicateParameter) {
       ++out.multiplicities.back();
     } else {
       out.knots.push_back(value);

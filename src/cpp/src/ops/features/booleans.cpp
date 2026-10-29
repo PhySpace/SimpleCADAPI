@@ -1,4 +1,5 @@
 // union_rsolid, cut_rsolid, intersect_rsolid (operators/boolean.py).
+#include "scad/core/tolerance.hpp"
 #include "scad/ops/features/booleans.hpp"
 
 #include <cmath>
@@ -23,9 +24,9 @@ constexpr const char* kCutOp = "make_cut_rsolid";
 constexpr const char* kCutListOp = "make_cut_rsolid_list";
 constexpr const char* kIntersectOp = "make_intersect_rsolid";
 
-constexpr double kUnionTolFactor = 1e-7;
-constexpr double kUnionTolMin = 1e-7;
-constexpr double kUnionTolMax = 1e-5;
+constexpr double kUnionTolFactor = tol::kFuzzyUnionRelative;
+constexpr double kUnionTolMin = tol::kFuzzyUnionMin;
+constexpr double kUnionTolMax = tol::kFuzzyUnionMax;
 
 const ErrorSpec& union_spec() {
   static const ErrorSpec spec{
@@ -312,7 +313,7 @@ CutRun run_cuts(const std::vector<Solid>& solids, const CutOptions& options, Tra
         next.push_back(piece);
         continue;
       }
-      if (kernel::volume(overlap.front()) < 1e-12) {
+      if (kernel::volume(overlap.front()) < tol::kEmptyVolume) {
         too_small = true;
         next.push_back(piece);
         continue;
@@ -471,7 +472,7 @@ Solid intersect_rsolid(const std::vector<Solid>& solids) {
         result_solid = *tracked.solid;
         deltas.push_back(std::move(tracked.delta));
         merge_entries(merged_entries, std::move(tracked.delta_entries));
-        if (kernel::volume(result_solid.wrapped()) < 1e-12) {
+        if (kernel::volume(result_solid.wrapped()) < tol::kEmptyVolume) {
           empty_result = true;
           throw ValueError("The intersection is empty or its volume is too small");
         }

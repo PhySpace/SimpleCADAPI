@@ -8,6 +8,7 @@
 #include <set>
 
 #include "probes.hpp"
+#include "scad/core/tolerance.hpp"
 #include "scad/kernel/topology.hpp"
 #include "scad/ops/features/diagnostics.hpp"
 #include "scad/ops/features/support.hpp"
@@ -133,7 +134,7 @@ void raise_loft_failure_if_diagnosed(const std::vector<Shape>& sections, std::st
   for (std::size_t i = 0; i + 1 < facts.size(); ++i) {
     const SectionFacts &a = facts[i], &b = facts[i + 1];
     const double distance = a.centroid.distance(b.centroid);
-    if (distance > 1e-9)
+    if (distance > tol::kCoincidentPoints)
       continue;
     findings.push_back(b.id + " coincides with " + a.id + " (centroid distance " + g3(distance) + " mm)");
     implicated.insert({a.id, b.id});
@@ -178,7 +179,7 @@ void raise_loft_failure_if_diagnosed(const std::vector<Shape>& sections, std::st
   // Station order: project the centroids on the first-to-last axis; any backtrack is out of order.
   const Vec3 first = facts.front().centroid, last = facts.back().centroid;
   const double axis_norm = first.distance(last);
-  if (axis_norm > 1e-9 && facts.size() > 2) {
+  if (axis_norm > tol::kNegligibleLength && facts.size() > 2) {
     const Vec3 axis = last - first;
     std::vector<double> projections;
     for (const SectionFacts& fact : facts)

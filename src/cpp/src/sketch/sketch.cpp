@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/sketch/sketch.hpp"
 #include "scad/topo/recorder.hpp"
 
@@ -17,7 +18,7 @@ namespace scad {
 
 namespace {
 
-constexpr double kPointEps = 1e-9;
+constexpr double kPointEps = tol::kCoincidentPoints;
 
 thread_local const SketchIdAllocatorScope::Allocator* g_id_allocator = nullptr;
 
@@ -545,12 +546,12 @@ SketchPlaneFrame Sketch::plane_frame() const {
         throw ValueError("Sketch plane origin and axes must contain finite values");
     }
     const double x_length = x_axis.norm();
-    if (x_length <= 1.0e-15)
+    if (x_length <= tol::kZeroDirectionNorm)
       throw ValueError("Sketch plane x_axis must be non-zero");
     x_axis = x_axis / x_length;
     y_axis = y_axis - x_axis * y_axis.dot(x_axis);
     const double y_length = y_axis.norm();
-    if (y_length <= 1.0e-15)
+    if (y_length <= tol::kZeroDirectionNorm)
       throw ValueError("Sketch plane x_axis and y_axis must not be parallel");
     y_axis = y_axis / y_length;
     Vec3 normal = x_axis.cross(y_axis);

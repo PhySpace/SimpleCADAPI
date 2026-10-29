@@ -41,6 +41,7 @@
 #include <BRepTools_History.hxx>
 #include <TopoDS_Shape.hxx>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/core/vec.hpp"
 #include "scad/kernel/builders.hpp"  // kernel::Axes3
 #include "scad/semantic/tracked_result.hpp"
@@ -159,7 +160,8 @@ TrackedBooleanResult tracked_cut(const Solid& body, const Solid& tool);
 
 // tracked_union: a two-solid fuse with `track_union_history` on top.  ValueError
 // unless the fuse yields exactly one solid.  Glue is opt-in (see kernel::fuse_shapes_with_history).
-TrackedBooleanResult tracked_union(const Solid& body, const Solid& tool, bool glue = false, double tol = 1e-7);
+TrackedBooleanResult tracked_union(const Solid& body, const Solid& tool, bool glue = false,
+                                   double tol = tol::kFuzzyUnionMin);
 
 // track_union_history: the delta of an N-ary union already performed with
 // kernel::fuse_shapes_with_history(solids, ..., clean).  Input i has origin

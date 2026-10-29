@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/reactive/bspline_fit.hpp"
 
 #include <algorithm>
@@ -12,7 +13,7 @@ namespace scad::reactive {
 namespace {
 
 constexpr int kDegree = 3;
-constexpr double kKnotMergeTolerance = 1e-12;
+constexpr double kKnotMergeTolerance = tol::kDuplicateParameter;
 
 // Dense row-major matrix.
 struct Matrix {

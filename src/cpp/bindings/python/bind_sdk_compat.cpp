@@ -6,6 +6,7 @@
 #include "bind_product_args.hpp"
 #include "bind_reactive_common.hpp"
 #include "py_lifetime.hpp"
+#include "scad/core/tolerance.hpp"
 #include "scad/topo/diagnostic_image.hpp"
 
 #include <BRepAdaptor_Curve.hxx>
@@ -586,7 +587,7 @@ void bind_sdk_compat(py::module_& m) {
           pts.push_back(Vec3{p[0], p[1], p[2]});
         return Edge(kernel::make_interpolated_bspline_edge(pts, periodic, tolerance));
       },
-      py::arg("points"), py::kw_only(), py::arg("periodic") = false, py::arg("tolerance") = 1e-6,
+      py::arg("points"), py::kw_only(), py::arg("periodic") = false, py::arg("tolerance") = tol::kSplineInterpolation,
       "An interpolating B-spline edge through the points (GeomAPI_Interpolate).");
   m.def(
       "_bspline_curve_of",

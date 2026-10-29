@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/ops/geometry/plane.hpp"
 
 #include <algorithm>
@@ -15,14 +16,14 @@ namespace scad {
 
 PlaneAxes orthonormal_plane_axes(const Vec3& normal) {
   const double norm = normal.norm();
-  if (norm <= 1e-12)
+  if (norm <= tol::kDegenerateNorm)
     throw ValueError("The normal vector cannot be a zero vector");
   const Vec3 z = normal / norm;
   const Vec3 reference = std::abs(z.z) > 0.9 ? Vec3{1.0, 0.0, 0.0} : Vec3{0.0, 0.0, 1.0};
   // Gram-Schmidt: the reference stays away from z, so the projection never degenerates.
   Vec3 x = reference - z * reference.dot(z);
   const double x_norm = x.norm();
-  if (x_norm <= 1e-12)
+  if (x_norm <= tol::kDegenerateNorm)
     throw ValueError("Cannot build a local coordinate system from the given normal vector");
   x = x / x_norm;
   Vec3 y = z.cross(x);

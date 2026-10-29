@@ -28,6 +28,7 @@
 #include <cmath>
 #include <unordered_set>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/core/error.hpp"
 #include "scad/kernel/cast.hpp"
 #include "scad/kernel/convert.hpp"
@@ -287,7 +288,7 @@ TrackedResult tracked_twisted_sweep(const Face& profile, const Vec3& axis, const
     const TopoDS_Shape end_face = kernel::apply_transform(face, translation.Multiplied(rotation));
 
     // The skins plus a cap at each end close into a shell.
-    BRepBuilderAPI_Sewing sewing(1.0e-6, true);
+    BRepBuilderAPI_Sewing sewing(tol::kSewing, true);
     for (const TopoDS_Shape& skinned : skins)
       sewing.Add(skinned);
     sewing.Add(face);

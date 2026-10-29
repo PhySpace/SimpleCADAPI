@@ -26,6 +26,7 @@
 #include <cmath>
 
 #include "internal.hpp"
+#include "scad/core/tolerance.hpp"
 #include "scad/kernel/convert.hpp"
 #include "scad/kernel/properties.hpp"
 #include "scad/kernel/topology.hpp"
@@ -65,7 +66,8 @@ bool crosses_direction(const TopoDS_Face& face, const Vec3& axis) {
       gp_Vec normal;
       properties.Normal(u0 + u * (u1 - u0), v0 + v * (v1 - v0), point, normal);
       const double length = normal.Magnitude();
-      if (length > 1e-14 && std::abs(normal.X() * axis.x + normal.Y() * axis.y + normal.Z() * axis.z) / length > 1e-8)
+      if (length > tol::kUndefinedNormal &&
+          std::abs(normal.X() * axis.x + normal.Y() * axis.y + normal.Z() * axis.z) / length > 1e-8)
         return true;
     }
   }
@@ -102,7 +104,7 @@ std::vector<TopoDS_Shape> contact_surfaces(const TopoDS_Shape& target, const Top
   if (touched.empty())
     throw ValueError("No target boundary surfaces found in extrusion intersection");
 
-  BRepBuilderAPI_Sewing sewing(1e-6);
+  BRepBuilderAPI_Sewing sewing(tol::kSewing);
   for (const TopoDS_Face& face : touched) {
     if (crosses_direction(face, axis))
       sewing.Add(face);
@@ -138,7 +140,7 @@ std::vector<TopoDS_Solid> split_on_surface(const TopoDS_Shape& prism, const Topo
   gp_Pnt point;
   gp_Vec normal;
   BRepGProp_Face(reference_face).Normal((u0 + u1) / 2, (v0 + v1) / 2, point, normal);
-  if (normal.Magnitude() <= 1e-14)
+  if (normal.Magnitude() <= tol::kUndefinedNormal)
     throw ValueError("Undefined normal on termination surface");
   normal.Normalize();
   const gp_Pnt reference = point.Translated(normal);
@@ -176,7 +178,7 @@ Solid extrude_until_rsolid(const Face& profile, const std::vector<Solid>& target
   const Vec3 values = finite_vector(direction, "direction");
   const Vec3 global_direction = features_detail::place_vector(values);
   const double magnitude = global_direction.norm();
-  if (!std::isfinite(magnitude) || magnitude <= 1e-14)
+  if (!std::isfinite(magnitude) || magnitude <= tol::kUndefinedNormal)
     throw ValueError("direction must be a finite nonzero vector");
   Vec3 axis = global_direction / magnitude;
   if (mode == "PREVIOUS" || mode == "FIRST")
@@ -190,7 +192,7 @@ Solid extrude_until_rsolid(const Face& profile, const std::vector<Solid>& target
     const TopoDS_Compound bound_target = compound_of(target_shapes);
     const kernel::BoundingBox box = kernel::bounding_box(compound_of({profile.wrapped(), bound_target}));
     const double length = std::sqrt(box.xlen() * box.xlen() + box.ylen() * box.ylen() + box.zlen() * box.zlen());
-    if (length <= 1e-12)
+    if (length <= tol::kDegenerateNorm)
       throw ValueError("Degenerate profile and target bounds");
 
     const TopoDS_Shape prism = BRepPrimAPI_MakePrism(profile.wrapped(), kernel::to_vec(axis * length)).Shape();
@@ -219,7 +221,7 @@ Solid extrude_until_rsolid(const Face& profile, const std::vector<Solid>& target
     if (std::abs(chosen_volume - prism_volume) <= std::max(1e-8, std::abs(prism_volume) * 1e-9)) {
       throw ValueError("Target termination surface does not completely cover the extrusion profile");
     }
-    if (chosen_volume <= 1e-12 || !BRepCheck_Analyzer(*best).IsValid()) {
+    if (chosen_volume <= tol::kEmptyVolume || !BRepCheck_Analyzer(*best).IsValid()) {
       throw ValueError("Target surface did not completely cover a valid limited extrusion");
     }
     return *best;

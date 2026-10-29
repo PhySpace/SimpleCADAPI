@@ -1,4 +1,5 @@
 // translate_shape, rotate_shape, mirror_shape (operators/transform.py).
+#include "scad/core/tolerance.hpp"
 #include "scad/ops/features/transforms.hpp"
 
 #include "internal.hpp"
@@ -96,7 +97,7 @@ Shape mirror_shape(const Shape& shape, const Scalar3& plane_origin, const Scalar
     FeatureRecord rec(kMirrorOp);
     const Vec3 global_origin = features_detail::place_point(rec.point("plane_origin", plane_origin));
     const Vec3 global_normal = features_detail::place_vector(rec.point("plane_normal", plane_normal));
-    if (global_normal.norm() < 1e-10)
+    if (global_normal.norm() < tol::kMirrorNormalNorm)
       throw ValueError("The mirror plane normal cannot be a zero vector");
 
     if (shape.kind() == Kind::Solid) {

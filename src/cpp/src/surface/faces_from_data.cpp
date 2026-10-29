@@ -14,6 +14,7 @@
 
 #include "finalize.hpp"
 #include "internal.hpp"
+#include "scad/core/tolerance.hpp"
 #include "scad/core/coordinate_system.hpp"
 #include "scad/kernel/convert.hpp"
 #include "scad/surface/fitter.hpp"
@@ -173,9 +174,9 @@ Face make_cylindrical_surface_rface(const Scalar& radius, const ScalarRange& u_r
       throw ValueError("origin, axis, and x_direction must be finite 3D values");
     const double axis_norm = axis.norm();
     const double x_norm = x_direction.norm();
-    if (axis_norm <= 1e-12 || x_norm <= 1e-12)
+    if (axis_norm <= tol::kDegenerateNorm || x_norm <= tol::kDegenerateNorm)
       throw ValueError("axis and x_direction must be non-zero");
-    if (std::abs(axis.dot(x_direction)) / (axis_norm * x_norm) >= 1.0 - 1e-12)
+    if (std::abs(axis.dot(x_direction)) / (axis_norm * x_norm) >= 1.0 - tol::kParallelCosineGap)
       throw ValueError("axis and x_direction must not be parallel");
 
     const CoordinateSystem& cs = current_cs();

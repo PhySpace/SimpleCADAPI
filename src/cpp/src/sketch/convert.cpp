@@ -6,6 +6,7 @@
 #include <TopoDS.hxx>
 #include <gp_Ax2.hxx>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/core/error.hpp"
 #include "scad/kernel/convert.hpp"
 #include "scad/kernel/curves.hpp"
@@ -15,7 +16,7 @@ namespace scad::sketch_detail {
 
 namespace {
 
-constexpr double kPointEps = 1e-9;
+constexpr double kPointEps = tol::kCoincidentPoints;
 
 // OCCT's canonical in-plane X axis for a normal (what make_circle_redge uses).
 Vec3 default_plane_x_direction(const Vec3& normal) {
@@ -39,7 +40,7 @@ TopoDS_Edge arc_edge(const Sketch& sketch, const SketchSolveResult& result, cons
   const SketchPoint2 cp = result.solved_points.at(entity.point_id("center"));
   const double start_radius = std::hypot(sp.first - cp.first, sp.second - cp.second);
   const double end_radius = std::hypot(ep.first - cp.first, ep.second - cp.second);
-  const double radius_tolerance = std::max(kPointEps, start_radius * 1.0e-7);
+  const double radius_tolerance = std::max(kPointEps, start_radius * tol::kArcRadiusRelative);
   if (start_radius <= kPointEps)
     throw ValueError("Sketch arc '" + eid + "' has zero radius");
   if (std::abs(start_radius - end_radius) > radius_tolerance) {
@@ -50,7 +51,7 @@ TopoDS_Edge arc_edge(const Sketch& sketch, const SketchSolveResult& result, cons
   double sweep = std::fmod(end_angle - start_angle, 2.0 * kPi);
   if (sweep < 0.0)
     sweep += 2.0 * kPi;  // Python's `% (2 pi)` is non-negative
-  if (sweep <= 1.0e-12)
+  if (sweep <= tol::kArcSweepZero)
     throw ValueError("Sketch arc '" + eid + "' has a zero sweep");
   const double middle_angle = start_angle + 0.5 * sweep;
   const Vec3 middle = sketch.point3(

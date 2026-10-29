@@ -1,5 +1,6 @@
 #include "bindings.hpp"
 
+#include "scad/core/tolerance.hpp"
 #include "scad/core/coordinate_system.hpp"
 #include <cmath>
 #include <cstdio>
@@ -36,14 +37,14 @@ void bind_core(py::module_& m) {
       .def("norm", [](const PyVec3& p) { return p.v.norm(); })
       .def("normalized",
            [](const PyVec3& p) {
-             if (p.v.norm() <= 1e-15)
+             if (p.v.norm() <= scad::tol::kZeroDirectionNorm)
                throw scad::ValueError("Cannot normalize a zero-length vector");
              return PyVec3{p.v.normalized()};
            })
       .def("getAngle",
            [](const PyVec3& p, const scad::Vec3& o) {
              const double sn = p.v.norm(), on = o.norm();
-             if (sn <= 1e-15 || on <= 1e-15)
+             if (sn <= scad::tol::kZeroDirectionNorm || on <= scad::tol::kZeroDirectionNorm)
                throw scad::ValueError("Cannot compute angle with a zero-length vector");
              return std::acos(std::max(-1.0, std::min(1.0, p.v.dot(o) / (sn * on))));
            })

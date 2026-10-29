@@ -1,4 +1,5 @@
 // extrude_rsolid (operators/features.py).
+#include "scad/core/tolerance.hpp"
 #include "scad/ops/features/extrusion.hpp"
 
 #include "internal.hpp"
@@ -51,7 +52,7 @@ Solid extrude_rsolid(const Shape& profile, const Scalar3& direction, const Scala
     if (distance_value <= 0)
       throw ValueError("The extrusion distance must be greater than zero");
     const Vec3 global_direction = features_detail::place_vector(rec.point("direction", direction));
-    if (global_direction.norm() <= 1e-15)
+    if (global_direction.norm() <= tol::kZeroDirectionNorm)
       throw ValueError("The extrusion direction cannot be a zero vector");
 
     const Face face = extrusion_face(profile);

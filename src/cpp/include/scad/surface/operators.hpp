@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/surface/types.hpp"
 #include "scad/topo/shape.hpp"
 
@@ -26,7 +27,7 @@ struct CylindricalSurfaceOptions {
   ScalarVec3 origin{0, 0, 0};
   ScalarVec3 axis{0, 0, 1};
   std::optional<ScalarVec3> x_direction;  // default: the canonical in-plane X for `axis`
-  Scalar tolerance = 1e-7;
+  Scalar tolerance = tol::kSurfaceTrim;
   TagPrefix tag_prefix;
 };
 
@@ -36,7 +37,7 @@ Face make_cylindrical_surface_rface(const Scalar& radius, const ScalarRange& u_r
                                     const CylindricalSurfaceOptions& options = {});
 
 struct FitPointGridOptions {
-  double tolerance = 1e-3;
+  double tolerance = tol::kFitError;
   int degree_min = 3;
   int degree_max = 8;
   std::optional<std::array<double, 3>> smoothing;  // three non-negative smoothing weights
@@ -53,7 +54,7 @@ Face make_ruled_surface_rface(const Edge& edge_a, const Edge& edge_b, const TagP
 
 // A Gordon Face interpolating a network of intersecting profile and guide edges.
 Face make_gordon_surface_rface(const std::vector<Edge>& profiles, const std::vector<Edge>& guides,
-                               double tolerance = 1e-3, const TagPrefix& tag_prefix = std::nullopt);
+                               double tolerance = tol::kFitError, const TagPrefix& tag_prefix = std::nullopt);
 
 struct SurfacePatchOptions {
   std::vector<Vec3> points;  // extra points to pass through (current coordinate system)
@@ -69,7 +70,7 @@ Face make_surface_patch_rface(const std::vector<SurfaceBoundary>& boundaries, co
 
 struct TrimSurfaceOptions {
   std::vector<Wire> holes;
-  double tolerance = 1e-7;
+  double tolerance = tol::kSurfaceTrim;
   TagPrefix tag_prefix;
 };
 
@@ -91,18 +92,18 @@ struct LoftShellTags {
 Shell loft_rshell(const std::vector<LoftSection>& sections, bool ruled = false, const LoftShellTags& tags = {});
 
 // Sew faces into exactly one connected Shell.
-Shell sew_faces_rshell(const std::vector<Face>& faces, double tolerance = 1e-6,
+Shell sew_faces_rshell(const std::vector<Face>& faces, double tolerance = tol::kSewing,
                        const TagPrefix& tag_prefix = std::nullopt);
 
 // One oriented Solid from one valid closed Shell.
 Solid make_solid_from_shell_rsolid(const Shell& shell, const TagPrefix& tag_prefix = std::nullopt);
 
 // The unique closed and open free boundary wires of a Shell (closed ones first).
-std::vector<Wire> free_boundaries_rwirelist(const Shell& shell, double tolerance = 1e-6);
+std::vector<Wire> free_boundaries_rwirelist(const Shell& shell, double tolerance = tol::kSewing);
 
 struct FillHolesOptions {
   std::optional<std::vector<int>> hole_indices;  // indices into free_boundaries_rwirelist; default: all
-  double tolerance = 1e-6;
+  double tolerance = tol::kSewing;
   std::optional<SurfaceFillingSettings> settings;
   TagPrefix tag_prefix;
 };

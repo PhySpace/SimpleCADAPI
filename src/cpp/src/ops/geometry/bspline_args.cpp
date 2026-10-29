@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/ops/geometry/bspline_args.hpp"
 
 #include <cmath>
@@ -40,7 +41,7 @@ Knots collapse_knot_vector(const ScalarList& knots) {
   }
   Knots out;
   for (const double value : values) {
-    if (!out.unique.empty() && std::abs(value - out.unique.back()) <= 1e-12) {
+    if (!out.unique.empty() && std::abs(value - out.unique.back()) <= tol::kDuplicateParameter) {
       ++out.multiplicities.back();
     } else {
       out.unique.push_back(value);

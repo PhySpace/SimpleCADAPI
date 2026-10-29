@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "metadata.hpp"
+#include "scad/core/tolerance.hpp"
 #include "scad/core/error.hpp"
 #include "scad/ops/features/features.hpp"
 #include "scad/ops/geometry/geometry.hpp"
@@ -93,7 +94,7 @@ std::vector<Solid> drive_cutters(const std::string& drive_style, double drive_si
                                  double head_height) {
   if (drive_style == "none")
     return {};
-  const double epsilon = std::max(1e-5, head_height * 1e-4);
+  const double epsilon = std::max(tol::kCutterOverrunFloor, head_height * tol::kCutterOverrunRelative);
   const Scalar3 cutter_origin = scalar3(0.0, 0.0, -head_height - epsilon);
   const double cutter_height = drive_depth + epsilon;
   const double slot_width = std::max(drive_size * 0.22, epsilon * 10.0);
@@ -204,7 +205,7 @@ Solid make_bolt_rsolid(double diameter, double length, const BoltOptions& option
     throw ValueError("underhead_fillet_radius is too large for the shank and head dimensions");
   }
 
-  const double epsilon = std::max(1e-5, resolved_diameter * 1e-4);
+  const double epsilon = std::max(tol::kCutterOverrunFloor, resolved_diameter * tol::kCutterOverrunRelative);
   double thread_phase_degrees = 0.0;
   const Solid shank = make_cylinder_rsolid(major_radius, resolved_length + epsilon, scalar3(0.0, 0.0, -epsilon),
                                            scalar3(0.0, 0.0, 1.0));

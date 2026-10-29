@@ -4,6 +4,7 @@
 #include <numeric>
 
 #include "probes.hpp"
+#include "scad/core/tolerance.hpp"
 #include "scad/kernel/booleans.hpp"
 #include "scad/kernel/properties.hpp"
 #include "scad/kernel/topology.hpp"
@@ -176,7 +177,7 @@ std::optional<BooleanDiagnosis> diagnose_boolean_failure(const std::vector<Solid
 
     for (const auto& [pair, approach] : approaches) {
       if (approach.gap <= tol &&
-          overlap_volume(operands[pair.first].wrapped(), operands[pair.second].wrapped()) < 1e-12) {
+          overlap_volume(operands[pair.first].wrapped(), operands[pair.second].wrapped()) < tol::kEmptyVolume) {
         return contact_diagnosis(operands[pair.first], operands[pair.second], approach, tol, operation_kind);
       }
     }

@@ -8,16 +8,17 @@
 #include <optional>
 #include <vector>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/core/value.hpp"
 
 namespace scad::reactive {
 
 struct BSplineFitOptions {
-  double tolerance = 1e-3;                // maximum Euclidean error at the samples
-  std::optional<int> max_control_points;  // default: the cleaned sample count (at least 4)
-  double fairing = 1e-6;                  // second-difference regularization weight
-  double duplicate_tolerance = 1e-12;     // consecutive samples closer than this are merged
-  double knot_tolerance = 1e-9;           // spacing threshold for interior knots
+  double tolerance = tol::kFitError;                      // maximum Euclidean error at the samples
+  std::optional<int> max_control_points;                  // default: the cleaned sample count (at least 4)
+  double fairing = 1e-6;                                  // second-difference regularization weight
+  double duplicate_tolerance = tol::kDuplicateParameter;  // consecutive samples closer than this are merged
+  double knot_tolerance = tol::kInteriorKnotSpacing;      // spacing threshold for interior knots
   bool raise_on_failure = true;
 };
 

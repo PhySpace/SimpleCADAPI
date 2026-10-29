@@ -4,6 +4,7 @@
 #include <optional>
 #include <vector>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/ops/geometry/types.hpp"
 #include "scad/topo/shape.hpp"
 
@@ -28,13 +29,14 @@ Wire make_spline_rwire(const SplineSpec& spec);
 struct SplineInterpolation {
   std::vector<ScalarPoint> points;
   bool periodic = false;  // closed: the first point need not be repeated at the end
-  Scalar tolerance = Scalar(1.0e-6);
+  Scalar tolerance = Scalar(tol::kSplineInterpolation);
 };
 
 // Error "make_interpolated_spline_redge" / "_rwire": too few or coincident points.
 Edge make_interpolated_spline_redge(const SplineInterpolation& spec);
 Wire make_interpolated_spline_rwire(const SplineInterpolation& spec);
 // make_interpolated_spline_rwire with periodic = true.
-Wire make_periodic_spline_rwire(const std::vector<ScalarPoint>& points, const Scalar& tolerance = Scalar(1.0e-6));
+Wire make_periodic_spline_rwire(const std::vector<ScalarPoint>& points,
+                                const Scalar& tolerance = Scalar(tol::kSplineInterpolation));
 
 }  // namespace scad

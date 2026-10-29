@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/std/gear_profiles.hpp"
 
 #include <algorithm>
@@ -62,7 +63,7 @@ Sketch build_gear_profile_sketch(int n_teeth, double module, double pressure_ang
   const double tip_radius = geo.tip_radius;
   const double tooth_angle = geo.tooth_angle;
   const double flank_start_radius = std::max(base_radius, root_radius);
-  const bool needs_root_connectors = root_radius < base_radius - 1e-8;
+  const bool needs_root_connectors = root_radius < base_radius - tol::kBaseCircleClearance;
   const double t_flank_start = involute_t_for_radius(base_radius, flank_start_radius);
   const double flank_start_span = t_flank_start - std::atan(t_flank_start);
   const double left_flank_start_angle = geo.left_start + flank_start_span;

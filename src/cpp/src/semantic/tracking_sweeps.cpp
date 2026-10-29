@@ -7,6 +7,7 @@
 #include <gp_Ax1.hxx>
 #include <gp_Vec.hxx>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/core/error.hpp"
 #include "scad/kernel/cast.hpp"
 #include "scad/kernel/convert.hpp"
@@ -47,7 +48,7 @@ TrackedResult track_swept_profile(Sweep& sweep, const Face& profile, const Solid
 
 TrackedResult tracked_extrude(const Face& profile, const Vec3& direction, double distance) {
   const double norm = direction.norm();
-  if (norm <= 1e-15)
+  if (norm <= tol::kZeroDirectionNorm)
     throw ValueError("Extrude direction cannot be zero-length");
   const Vec3 offset = direction / norm * distance;
 

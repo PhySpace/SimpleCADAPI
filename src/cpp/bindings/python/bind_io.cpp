@@ -13,6 +13,7 @@
 #include <optional>
 #include <vector>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/core/error.hpp"
 #include "scad/io/brep.hpp"
 #include "scad/io/brep_region.hpp"
@@ -549,7 +550,7 @@ void bind_files(py::module_& m) {
       [](const std::filesystem::path& path, double sewing_tolerance) {
         return cast_shape(io::import_stl_shape(path, sewing_tolerance));
       },
-      py::arg("path"), py::arg("sewing_tolerance") = 1e-6,
+      py::arg("path"), py::arg("sewing_tolerance") = tol::kSewing,
       "Read an STL as a faceted BREP (a Solid when the triangles close up).");
   m.def(
       "export_obj",

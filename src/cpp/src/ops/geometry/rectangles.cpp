@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/ops/geometry/rectangles.hpp"
 
 #include <array>
@@ -57,7 +58,7 @@ std::vector<Vec3> placed_corners(double width, double height, const Scalar3& cen
   const Vec3 center_global = cs.transform_point(evaluate_point(center, "center"));
   const Vec3 normal_value = evaluate_point(normal, "normal");
   const double normal_norm = cs.transform_vector(normal_value).norm();
-  if (normal_norm <= 1e-15 || !std::isfinite(normal_norm))
+  if (normal_norm <= tol::kZeroDirectionNorm || !std::isfinite(normal_norm))
     throw ValueError("The normal vector cannot be a zero vector");
 
   const PlaneAxes axes = orthonormal_plane_axes(normal_value);

@@ -18,6 +18,7 @@
 #include <array>
 #include <cmath>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/kernel/convert.hpp"
 #include "scad/kernel/topology.hpp"
 #include "scad/ops/features/support.hpp"
@@ -76,7 +77,7 @@ EdgeEnd edge_end(const BRepAdaptor_Curve& curve, bool at_start) {
   if (toward == parameter)
     return end;
   const Vec3 along = vec_of(curve.Value(toward)) - vec_of(end.point);
-  if (along.norm() >= 1e-12)
+  if (along.norm() >= tol::kDegenerateNorm)
     end.inward = along.normalized();
   return end;
 }
@@ -204,7 +205,7 @@ std::optional<bool> edge_is_concave(const TopoDS_Solid& solid, const TopoDS_Face
       return std::nullopt;
     const Vec3 bisector = *na + *nb;
     const double length = bisector.norm();
-    if (length < 1e-9)
+    if (length < tol::kNegligibleLength)
       return std::nullopt;
     return inside(solid, offset_point(middle, bisector, 1e-3 / length));
   } catch (const std::exception&) {
@@ -225,7 +226,7 @@ std::optional<bool> edge_is_concave_side_probe(const TopoDS_Solid& solid, const 
       const Vec3 delta = *normals[static_cast<std::size_t>(first)] - *normals[static_cast<std::size_t>(second)];
       const double length = delta.norm();
       // Equal normals: tangent faces, left to the tangent-adjacency probe.
-      if (length < 1e-9)
+      if (length < tol::kNegligibleLength)
         continue;
       if (inside(solid, offset_point(middle, delta, 1e-3 / length)))
         return true;

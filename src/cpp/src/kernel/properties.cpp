@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/kernel/properties.hpp"
 
 #include <BRepAdaptor_Surface.hxx>
@@ -55,7 +56,7 @@ double volume(const TopoDS_Shape& shape) {
     GProp_GProps props;
     // Knot-span integration: the fixed-order routine loses precision on
     // rational curves and can crash on affine-transformed trims.
-    BRepGProp::VolumePropertiesGK(shape, props, 1e-9, true, true);
+    BRepGProp::VolumePropertiesGK(shape, props, tol::kVolumeIntegration, true, true);
     return props.Mass();
   });
 }
@@ -63,7 +64,7 @@ double volume(const TopoDS_Shape& shape) {
 double volume_estimate(const TopoDS_Shape& shape) {
   return occt_guard([&] {
     GProp_GProps props;
-    BRepGProp::VolumePropertiesGK(shape, props, 1e-5, true, true);
+    BRepGProp::VolumePropertiesGK(shape, props, tol::kVolumeEstimate, true, true);
     return props.Mass();
   });
 }
@@ -92,7 +93,7 @@ Vec3 center_of_mass(const TopoDS_Shape& shape) {
       case TopAbs_COMPSOLID:
       case TopAbs_COMPOUND:
         try {
-          BRepGProp::VolumePropertiesGK(shape, props, 1e-9, true, true);
+          BRepGProp::VolumePropertiesGK(shape, props, tol::kVolumeIntegration, true, true);
           if (mass_point(props, point))
             return point;
         } catch (...) {

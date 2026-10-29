@@ -4,6 +4,7 @@
 #include <gp_Dir.hxx>
 
 #include "internal.hpp"
+#include "scad/core/tolerance.hpp"
 #include "scad/kernel/convert.hpp"
 #include "scad/ops/features/sweeps.hpp"
 
@@ -31,7 +32,7 @@ Solid sweep_multisection_rsolid(const std::vector<Shape>& profiles, const Wire& 
     } else if (direction) {
       const Vec3 values = finite_vector(*direction, "binormal");
       const Vec3 placed = features_detail::place_vector(values);
-      if (placed.norm() < 1e-12)
+      if (placed.norm() < tol::kDegenerateNorm)
         throw ValueError("binormal direction must be nonzero");
       builder.SetMode(kernel::to_dir(placed, "binormal"));
       rotate = true;

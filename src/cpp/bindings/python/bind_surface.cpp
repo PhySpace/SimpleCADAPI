@@ -26,6 +26,7 @@
 #include <TopoDS_Wire.hxx>
 #include <gp_Circ.hxx>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/reactive/expr.hpp"
 #include "scad/reactive/units.hpp"
 #include "scad/surface/hooks.hpp"
@@ -146,9 +147,9 @@ void bind_surface(py::module_& m) {
              return settings;
            }),
            py::arg("degree") = 3, py::arg("points_per_curve") = 15, py::arg("iterations") = 2,
-           py::arg("anisotropic") = false, py::arg("tolerance_2d") = 1e-5, py::arg("tolerance_3d") = 1e-4,
-           py::arg("angular_tolerance") = 0.01, py::arg("curvature_tolerance") = 0.1, py::arg("max_degree") = 8,
-           py::arg("max_segments") = 9)
+           py::arg("anisotropic") = false, py::arg("tolerance_2d") = tol::kFillingTolerance2d,
+           py::arg("tolerance_3d") = tol::kFillingTolerance3d, py::arg("angular_tolerance") = 0.01,
+           py::arg("curvature_tolerance") = 0.1, py::arg("max_degree") = 8, py::arg("max_segments") = 9)
       .def_readonly("degree", &SurfaceFillingSettings::degree)
       .def_readonly("points_per_curve", &SurfaceFillingSettings::points_per_curve)
       .def_readonly("iterations", &SurfaceFillingSettings::iterations)
@@ -185,7 +186,7 @@ void bind_surface(py::module_& m) {
       },
       py::arg("radius"), py::arg("u_range"), py::arg("v_range"), py::arg("origin") = ScalarVec3{0.0, 0.0, 0.0},
       py::arg("axis") = ScalarVec3{0.0, 0.0, 1.0}, py::arg("x_direction") = py::none(), py::kw_only(),
-      py::arg("tolerance") = Scalar(1e-7), py::arg("tag_prefix") = py::none(),
+      py::arg("tolerance") = Scalar(tol::kSurfaceTrim), py::arg("tag_prefix") = py::none(),
       "Create a finite cylindrical carrier Face over explicit U/V ranges (U in raw radians, at most one turn).");
 
   m.def(
@@ -198,7 +199,7 @@ void bind_surface(py::module_& m) {
                                              .smoothing = smoothing,
                                              .tag_prefix = tag_prefix});
       },
-      py::arg("points"), py::kw_only(), py::arg("tolerance") = 1e-3, py::arg("degree_min") = 3,
+      py::arg("points"), py::kw_only(), py::arg("tolerance") = tol::kFitError, py::arg("degree_min") = 3,
       py::arg("degree_max") = 8, py::arg("smoothing") = py::none(), py::arg("tag_prefix") = py::none(),
       "Fit a B-spline Face through a rectangular 3D point grid.");
 
@@ -214,7 +215,7 @@ void bind_surface(py::module_& m) {
       "make_gordon_surface_rface",
       [](const std::vector<Edge>& profiles, const std::vector<Edge>& guides, double tolerance,
          const TagPrefix& tag_prefix) { return make_gordon_surface_rface(profiles, guides, tolerance, tag_prefix); },
-      py::arg("profiles"), py::arg("guides"), py::kw_only(), py::arg("tolerance") = 1e-3,
+      py::arg("profiles"), py::arg("guides"), py::kw_only(), py::arg("tolerance") = tol::kFitError,
       py::arg("tag_prefix") = py::none(), "Create a Gordon Face from intersecting profile and guide edge networks.");
 
   m.def(
@@ -236,7 +237,7 @@ void bind_surface(py::module_& m) {
         return trim_surface_rface(carrier, outer, {.holes = holes, .tolerance = tolerance, .tag_prefix = tag_prefix});
       },
       py::arg("carrier"), py::arg("outer"), py::arg("holes") = std::vector<Wire>{}, py::kw_only(),
-      py::arg("tolerance") = 1e-7, py::arg("tag_prefix") = py::none(),
+      py::arg("tolerance") = tol::kSurfaceTrim, py::arg("tag_prefix") = py::none(),
       "Trim a carrier Face to exactly one connected Face.");
 
   m.def(
@@ -270,7 +271,7 @@ void bind_surface(py::module_& m) {
       [](const std::vector<Face>& faces, double tolerance, const TagPrefix& tag_prefix) {
         return sew_faces_rshell(faces, tolerance, tag_prefix);
       },
-      py::arg("faces"), py::kw_only(), py::arg("tolerance") = 1e-6, py::arg("tag_prefix") = py::none(),
+      py::arg("faces"), py::kw_only(), py::arg("tolerance") = tol::kSewing, py::arg("tag_prefix") = py::none(),
       "Sew faces into exactly one connected Shell.");
 
   m.def(
@@ -282,7 +283,7 @@ void bind_surface(py::module_& m) {
   m.def(
       "free_boundaries_rwirelist",
       [](const Shell& shell, double tolerance) { return free_boundaries_rwirelist(shell, tolerance); },
-      py::arg("shell"), py::kw_only(), py::arg("tolerance") = 1e-6,
+      py::arg("shell"), py::kw_only(), py::arg("tolerance") = tol::kSewing,
       "Return unique closed and open free boundary wires of a Shell.");
 
   m.def(
@@ -293,7 +294,7 @@ void bind_surface(py::module_& m) {
             shell,
             {.hole_indices = hole_indices, .tolerance = tolerance, .settings = settings, .tag_prefix = tag_prefix});
       },
-      py::arg("shell"), py::arg("hole_indices") = py::none(), py::kw_only(), py::arg("tolerance") = 1e-6,
+      py::arg("shell"), py::arg("hole_indices") = py::none(), py::kw_only(), py::arg("tolerance") = tol::kSewing,
       py::arg("settings") = py::none(), py::arg("tag_prefix") = py::none(),
       "Fill selected closed free boundaries and return a sewn Shell.");
 

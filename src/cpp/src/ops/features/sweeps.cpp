@@ -1,4 +1,5 @@
 // loft_rsolid, sweep_rsolid, twisted_sweep_rsolid (operators/features.py).
+#include "scad/core/tolerance.hpp"
 #include "scad/ops/features/sweeps.hpp"
 
 #include <algorithm>
@@ -149,7 +150,7 @@ Solid twisted_sweep_rsolid(const Shape& profile, const Scalar& distance, const S
     const Vec3 global_axis = features_detail::place_vector(rec.point("axis", axis));
     const Vec3 global_origin = features_detail::place_point(rec.point("origin", origin));
     const double axis_norm = global_axis.norm();
-    if (!std::isfinite(axis_norm) || axis_norm <= 1.0e-15)
+    if (!std::isfinite(axis_norm) || axis_norm <= tol::kZeroDirectionNorm)
       throw ValueError("axis must be a finite non-zero vector");
 
     const OutputTags output = features_detail::sweep_output_tags(options.tags, "twisted_sweep.start",

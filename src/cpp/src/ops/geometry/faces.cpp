@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/ops/geometry/faces.hpp"
 
 #include <cmath>
@@ -84,7 +85,7 @@ Face make_face_from_wires_rface(const Shape& outer_wire, const std::vector<Shape
 
     const Vec3 global_normal = place_vector(normal, "normal");
     const double norm = global_normal.norm();
-    if (norm <= 1e-15 || !std::isfinite(norm))
+    if (norm <= tol::kZeroDirectionNorm || !std::isfinite(norm))
       throw ValueError("normal must be a non-zero finite vector");
 
     std::vector<TopoDS_Wire> raw_inner;

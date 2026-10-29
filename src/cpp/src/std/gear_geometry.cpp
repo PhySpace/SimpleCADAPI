@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/std/gear_geometry.hpp"
 
 #include <algorithm>
@@ -90,7 +91,7 @@ InternalToothGeometry compute_internal_tooth_geometry(int n_teeth, double module
     return base_half_angle + (t - std::atan(t));
   };
   g.flank_tip_radius = std::max(g.base_radius, g.tip_radius);
-  g.needs_tip_connectors = g.tip_radius < g.base_radius - 1e-8;
+  g.needs_tip_connectors = g.tip_radius < g.base_radius - tol::kBaseCircleClearance;
   const double tip_half_angle = half_angle_at(g.flank_tip_radius);
   const double root_half_angle = half_angle_at(g.root_radius);
 

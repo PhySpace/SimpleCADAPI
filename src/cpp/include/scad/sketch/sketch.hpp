@@ -15,6 +15,7 @@
 #include <string_view>
 #include <vector>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/core/scalar.hpp"
 #include "scad/core/value.hpp"
 #include "scad/core/vec.hpp"
@@ -41,7 +42,7 @@ struct SketchControlPoint {
 struct SketchSolveRequest {
   bool require_fully_constrained = false;
   bool strict = true;
-  double tolerance = 1e-7;
+  double tolerance = tol::kSketchSolveResidual;
   int max_iterations = 80;
   // Null: the process default backend.
   std::shared_ptr<SketchSolverBackend> backend;

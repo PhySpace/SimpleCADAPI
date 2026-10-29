@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/product/placement.hpp"
 
 #include <cmath>
@@ -9,7 +10,7 @@ namespace scad::product {
 
 namespace {
 
-constexpr double kAxisTolerance = 1e-9;
+constexpr double kAxisTolerance = tol::kNegligibleLength;
 constexpr double kOrthogonalTolerance = 1e-7;
 constexpr double kExactTolerance = 2.0e-6;
 

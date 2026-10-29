@@ -14,6 +14,7 @@
 #include <cmath>
 
 #include "internal.hpp"
+#include "scad/core/tolerance.hpp"
 #include "scad/kernel/booleans.hpp"
 #include "scad/kernel/convert.hpp"
 #include "scad/kernel/topology.hpp"
@@ -53,7 +54,7 @@ Solid extrude_taper_rsolid(const Face& profile, const Scalar3& vector, const Sca
     throw ValueError("taper must be finite and between -90 and 90 degrees");
   const Vec3 displacement = features_detail::place_vector(values);
   const double length = displacement.norm();
-  if (length <= 1e-12)
+  if (length <= tol::kDegenerateNorm)
     throw ValueError("extrusion vector must be nonzero");
 
   const TopoDS_Face face = TopoDS::Face(profile.wrapped());
