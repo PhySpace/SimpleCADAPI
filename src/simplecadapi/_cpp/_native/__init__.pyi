@@ -704,7 +704,7 @@ def _sample_edge_points(edge: AnyShape, samples: typing.SupportsInt | typing.Sup
     """
 def _set_diagnostic_image_provider(provider: typing.Any) -> None:
     """
-    Install provider(kind, operation, view, caption, dedup_key, shapes, payload, highlight_edges) -> evidence dict or None: it draws the pictures a failing operation asks for.  None removes it.
+    Install provider(kind, operation, view, caption, dedup_key, shapes, payload) -> evidence dict or None: it draws the pictures a failing operation asks for.  None removes it.
     """
 def canonical_brep_bytes(shape: AnyShape) -> bytes:
     """
