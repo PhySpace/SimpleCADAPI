@@ -40,9 +40,17 @@ def volume(shape):
     return props.Mass()
 
 
-def test_the_sdk_wrapped_shape_is_not_an_ocp_shape():
+def test_the_sdks_own_binding_is_not_an_ocp_shape(monkeypatch):
+    """The SDK's own OCCT binding (what `.wrapped` was before it became an OCP shape) is rejected by OCP functions."""
+    monkeypatch.setenv("SCA_WRAPPED", "native")
     with pytest.raises(TypeError, match="incompatible"):
         BRepGProp.VolumeProperties_s(part().wrapped, GProp_GProps())
+
+
+def test_wrapped_is_an_ocp_shape_when_ocp_is_installed(monkeypatch):
+    monkeypatch.delenv("SCA_WRAPPED", raising=False)
+    solid = part()
+    assert math.isclose(volume(solid.wrapped), solid.get_volume(), rel_tol=1e-12)
 
 
 def test_to_ocp_measures_like_the_sdk():
