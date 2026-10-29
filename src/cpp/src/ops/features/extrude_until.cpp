@@ -73,6 +73,7 @@ bool crosses_direction(const TopoDS_Face& face, const Vec3& axis) {
 }
 
 // The target's boundary faces the prism touches, sewn into surfaces.
+// occt_guard: the caller extrude_until_rsolid runs this inside occt_guard.
 std::vector<TopoDS_Shape> contact_surfaces(const TopoDS_Shape& target, const TopoDS_Shape& prism, const Vec3& axis) {
   BRepAlgoAPI_Common common(target, prism);
   common.Build();
@@ -118,6 +119,7 @@ std::vector<TopoDS_Shape> contact_surfaces(const TopoDS_Shape& target, const Top
 }
 
 // The parts of the prism on one side of `surface`: the near (`keep_top`) or the far one.
+// occt_guard: the caller extrude_until_rsolid runs this inside occt_guard.
 std::vector<TopoDS_Solid> split_on_surface(const TopoDS_Shape& prism, const TopoDS_Shape& surface, bool keep_top) {
   TopTools_ListOfShape arguments, tools;
   arguments.Append(prism);

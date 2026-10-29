@@ -222,6 +222,7 @@ TopoDS_Face single_trimmed_face(const TopoDS_Shape& shape, const std::string& de
   return faces.front();
 }
 
+// occt_guard: the caller trim_surface_rface runs this inside operator_scope (which is guarded + occt_guard).
 TopoDS_Face trim_surface_face(const TopoDS_Face& carrier, const TopoDS_Wire& outer,
                               const std::vector<TopoDS_Wire>& holes, double tolerance) {
   const Handle(Geom_Surface) surface = BRep_Tool::Surface(carrier);

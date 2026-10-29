@@ -6,7 +6,8 @@
 
 Heuristic, not exact: the "function" is the outermost non-namespace, non-type brace block around the site, and the
 site passes if that block mentions occt_guard / rethrow_occt_failure.  A function that is only ever called from inside
-an occt_guard lambda is reported although it is fine (a false positive: wrap it anyway or note it).  Exit status is 0
+an occt_guard lambda says so with a comment `// occt_guard: the caller <name> runs this inside occt_guard` (above or
+in the function); without it, it is reported.  Exit status is 0
 unless --strict is given and violations exist.
 """
 from __future__ import annotations
@@ -22,7 +23,10 @@ BUILDER = re.compile(
 CONSTRUCT = re.compile(
     r"(?:\bnew\s+|make_(?:unique|shared)\s*<\s*)?\b(?:BRepAlgoAPI_(?:Fuse|Cut|Common|Section)|BRepFilletAPI_\w+|"
     r"BRepOffsetAPI_\w+)\b(?:\s*>)?\s*(?:\w+\s*[({;=]|[({])")
-GUARD = re.compile(r"\b(occt_guard|rethrow_occt_failure)\b")
+GUARD = re.compile(r"\b(occt_guard|operator_scope|rethrow_occt_failure)\b")  # operator_scope = guarded + occt_guard
+# A helper that is only ever called from inside a guard says so, once, above (or in) the function; the audit takes
+# the claim at its word, and a reviewer can check the one caller it names.
+CALLER_GUARDS = re.compile(r"occt_guard:\s*the caller\b")
 SKIP_DIRS = {"build", "third_party", "occt_dev"}
 
 
@@ -92,7 +96,8 @@ def scan(path: Path):
         span = next(((s, e) for s, e in spans if s <= m.start() <= e), None)
         if span is None:
             continue  # declaration at class/namespace scope (member), not a call site
-        if not GUARD.search(code[span[0]:span[1]]):
+        claim = raw[max(0, span[0] - 400):span[1]]
+        if not GUARD.search(code[span[0]:span[1]]) and not CALLER_GUARDS.search(claim):
             hits.append((raw.count("\n", 0, m.start()) + 1, BUILDER.search(after).group(1)))
     return hits
 

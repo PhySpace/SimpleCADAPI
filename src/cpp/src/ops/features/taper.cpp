@@ -24,6 +24,7 @@ namespace scad {
 namespace {
 
 // The loft of `wire` to its planar offset moved by `move`: one tapered layer.
+// occt_guard: the caller extrude_taper_rsolid runs this inside occt_guard.
 TopoDS_Shape tapered_layer(const TopoDS_Wire& wire, double offset, const gp_Trsf& move) {
   BRepOffsetAPI_MakeOffset offsetter(wire, GeomAbs_Intersection, false);
   offsetter.Perform(offset);

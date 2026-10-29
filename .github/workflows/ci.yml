@@ -56,18 +56,17 @@ jobs:
         run: CLANG_FORMAT=clang-format src/cpp/tools/check_format.sh
 
   occt-guard:
-    # Lists builder constructions (boolean / fillet / offset) outside an occt_guard function.  Non-blocking until the
-    # reported sites are fixed; then add --strict and drop continue-on-error.
+    # Every boolean / fillet / offset builder is constructed in a function that runs under occt_guard (or says, with
+    # `// occt_guard: the caller X ...`, that its one caller does).  See src/cpp/tools/check_occt_guard.py.
     name: OCCT guard audit
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    continue-on-error: true
     steps:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Audit
-        run: python3 src/cpp/tools/check_occt_guard.py
+        run: python3 src/cpp/tools/check_occt_guard.py --strict
 
   sanitize:
     name: C++ tests (ASan + UBSan)

@@ -5,6 +5,8 @@
 // call in module.cpp -- nothing else is shared.
 #pragma once
 
+#include <exception>
+#include <functional>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -12,6 +14,7 @@
 #include <memory>
 #include <string>
 
+#include "exceptions.hpp"
 #include "scad/core/scalar.hpp"
 #include "scad/core/value.hpp"
 #include "scad/core/vec.hpp"
@@ -42,8 +45,7 @@ struct PyVec3 {
   scad::Vec3 v;
 };
 
-// Installs the exception translator (scad::Error -> simplecadapi._cpp.SimpleCADError,
-// plain scad exceptions -> the matching builtin, OCCT failures -> RuntimeError).
+// Installs the module's exception translator and the General handler.
 void register_exceptions(py::module_& m);
 
 // Python value -> scad::Value (None, bool, int, float, str, list/tuple, dict).

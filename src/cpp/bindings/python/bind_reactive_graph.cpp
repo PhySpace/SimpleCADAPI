@@ -94,13 +94,15 @@ void bind_reactive_graph(py::module_& m) {
   py::dict scope;
   py::exec(kStaleSource, scope);
   m.attr("StaleLineageError") = scope["StaleLineageError"];
-  py::register_exception_translator([](std::exception_ptr p) {
+  add_exception_handler(ExceptionPriority::Specific, [](std::exception_ptr p) {
     try {
-      if (p)
-        std::rethrow_exception(p);
+      std::rethrow_exception(p);
     } catch (const sr::StaleLineageError& e) {
       py::object cls = py::module_::import("simplecadapi._cpp._native").attr("StaleLineageError");
       PyErr_SetObject(cls.ptr(), cls(e.node_id()).ptr());
+      return true;
+    } catch (...) {  // another type: the next handler
+      return false;
     }
   });
 

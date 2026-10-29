@@ -91,6 +91,7 @@
 #include <gp_Vec.hxx>
 #include <gp_Vec2d.hxx>
 
+#include "../exceptions.hpp"
 #include "occt.hpp"
 
 namespace scad::pybind::occt {
@@ -244,16 +245,18 @@ void bind_query(py::module_& m) {
         PyErr_NewException("simplecadapi._cpp._native._occt.Standard_Failure", PyExc_Exception, nullptr);
     Py_INCREF(failure_type);
     m.attr("Standard_Failure") = py::reinterpret_borrow<py::object>(failure_type);
-    py::register_exception_translator([](std::exception_ptr p) {
+    add_exception_handler(ExceptionPriority::Occt, [](std::exception_ptr p) {
       try {
-        if (p)
-          std::rethrow_exception(p);
+        std::rethrow_exception(p);
       } catch (const Standard_Failure& e) {
         const char* msg = e.GetMessageString();
         std::string text = e.DynamicType()->Name();
         if (msg != nullptr && *msg != '\0')
           text += std::string(": ") + msg;
         PyErr_SetString(failure_type, text.c_str());
+        return true;
+      } catch (...) {  // another type: the next handler
+        return false;
       }
     });
   }

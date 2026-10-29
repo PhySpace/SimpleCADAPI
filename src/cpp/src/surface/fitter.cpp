@@ -52,6 +52,8 @@ class OcctSurfaceFitter final : public SurfaceFitter {
     return builder.Surface();
   }
 
+  // occt_guard: the caller fill_face is only called from operator_scope bodies (faces_from_edges.cpp, shell_ops.cpp),
+  // which are guarded.
   TopoDS_Face fill(const FillingProblem& problem) const override {
     const SurfaceFillingSettings& s = problem.settings;
     BRepOffsetAPI_MakeFilling builder(s.degree, s.points_per_curve, s.iterations, s.anisotropic, s.tolerance_2d,

@@ -56,6 +56,7 @@ void validate_sections(const std::vector<LoftSection>& sections) {
     throw ValueError("loft_rshell allows Vertex sections only at the start or end");
 }
 
+// occt_guard: the caller loft_rshell runs this inside occt_guard.
 TopoDS_Shell make_loft_shell(const std::vector<LoftSection>& sections, bool ruled) {
   BRepOffsetAPI_ThruSections builder(false, ruled);
   builder.CheckCompatibility(true);

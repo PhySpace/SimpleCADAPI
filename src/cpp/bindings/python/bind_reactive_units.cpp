@@ -70,13 +70,15 @@ void bind_reactive_units(py::module_& m) {
   py::dict scope;
   py::exec(kUnitErrorSource, scope);
   m.attr("UnitValidationError") = scope["UnitValidationError"];
-  py::register_exception_translator([](std::exception_ptr p) {
+  add_exception_handler(ExceptionPriority::Specific, [](std::exception_ptr p) {
     try {
-      if (p)
-        std::rethrow_exception(p);
+      std::rethrow_exception(p);
     } catch (const scad::reactive::UnitValidationError& e) {
       py::object cls = py::module_::import("simplecadapi._cpp._native").attr("UnitValidationError");
       PyErr_SetObject(cls.ptr(), cls(e.guidance().what_happened).ptr());
+      return true;
+    } catch (...) {  // another type: the next handler
+      return false;
     }
   });
 

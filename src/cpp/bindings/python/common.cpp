@@ -1,7 +1,9 @@
 // Exception translation and Value <-> Python conversion.
 #include "bindings.hpp"
 
+#include <algorithm>
 #include <stdexcept>
+#include <vector>
 
 #include <pybind11/eval.h>
 
@@ -90,33 +92,64 @@ void set_python_error(const Exception& e) {
 
 }  // namespace
 
-void register_exceptions(py::module_&) {
-  py::register_exception_translator([](std::exception_ptr p) {
+namespace {
+
+struct Handler {
+  ExceptionPriority priority;
+  ExceptionHandler handle;
+};
+
+std::vector<Handler>& handlers() {
+  static std::vector<Handler> registered;
+  return registered;
+}
+
+bool translate_general(std::exception_ptr p) {
+  try {
+    std::rethrow_exception(p);
+  } catch (const Error& e) {
     try {
-      if (p)
-        std::rethrow_exception(p);
-    } catch (const Error& e) {
-      try {
-        py::object errors = py::module_::import("simplecadapi._cpp.errors");
-        // The message-first families are real classes in the SDK: which one this is travels with the error.
-        const char* family = "";
-        if (dynamic_cast<const UnsupportedQueryCapabilityError*>(&e) != nullptr)
-          family = "UnsupportedQueryCapabilityError";
-        else if (dynamic_cast<const SemanticCapabilityError*>(&e) != nullptr)
-          family = "SemanticCapabilityError";
-        else if (dynamic_cast<const TagValidationError*>(&e) != nullptr)
-          family = "TagValidationError";
-        py::object exc = errors.attr("make_error")(e.operation(), guidance_to_dict(e), std::string(e.what()), family);
-        PyErr_SetObject(reinterpret_cast<PyObject*>(Py_TYPE(exc.ptr())), exc.ptr());
-      } catch (const py::error_already_set&) {
-        // errors.py unavailable (partial import): degrade to a plain ValueError with the same text.
-        PyErr_Clear();
-        PyErr_SetString(PyExc_ValueError, e.what());
-      }
-    } catch (const Exception& e) {
-      set_python_error(e);
+      py::object errors = py::module_::import("simplecadapi._cpp.errors");
+      // The message-first families are real classes in the SDK: which one this is travels with the error.
+      const char* family = "";
+      if (dynamic_cast<const UnsupportedQueryCapabilityError*>(&e) != nullptr)
+        family = "UnsupportedQueryCapabilityError";
+      else if (dynamic_cast<const SemanticCapabilityError*>(&e) != nullptr)
+        family = "SemanticCapabilityError";
+      else if (dynamic_cast<const TagValidationError*>(&e) != nullptr)
+        family = "TagValidationError";
+      py::object exc = errors.attr("make_error")(e.operation(), guidance_to_dict(e), std::string(e.what()), family);
+      PyErr_SetObject(reinterpret_cast<PyObject*>(Py_TYPE(exc.ptr())), exc.ptr());
+    } catch (const py::error_already_set&) {
+      // errors.py unavailable (partial import): degrade to a plain ValueError with the same text.
+      PyErr_Clear();
+      PyErr_SetString(PyExc_ValueError, e.what());
     }
-    // Anything else falls through to pybind11's built-in translators.
+    return true;
+  } catch (const Exception& e) {
+    set_python_error(e);
+    return true;
+  } catch (...) {  // not a scad exception: the next handler, then pybind11's own translators
+    return false;
+  }
+}
+
+}  // namespace
+
+void add_exception_handler(ExceptionPriority priority, ExceptionHandler handler) {
+  auto& all = handlers();
+  all.push_back({priority, std::move(handler)});
+  std::stable_sort(all.begin(), all.end(), [](const Handler& a, const Handler& b) { return a.priority < b.priority; });
+}
+
+void register_exceptions(py::module_&) {
+  add_exception_handler(ExceptionPriority::General, translate_general);
+  py::register_exception_translator([](std::exception_ptr p) {
+    if (!p)
+      return;
+    for (const Handler& handler : handlers())
+      if (handler.handle(p))
+        return;
   });
 }
 
