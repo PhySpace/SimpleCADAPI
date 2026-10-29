@@ -26,6 +26,23 @@ if [ ! -e "$src/_native.pyi" ] && [ ! -d "$src/_native" ]; then
   exit 2
 fi
 
+# pybind11-stubgen writes the re-export imports in set order, which differs from run to run: sort every run of
+# consecutive import lines so that the output is reproducible (and the --check below means something).
+"$py" - "$src" <<'PY'
+import pathlib, sys
+
+for path in pathlib.Path(sys.argv[1]).rglob("*.pyi"):
+    lines, out, run = path.read_text().split("\n"), [], []
+    for line in lines + [""]:
+        if line.startswith(("from ", "import ")):
+            run.append(line)
+            continue
+        out.extend(sorted(run))
+        run = []
+        out.append(line)
+    path.write_text("\n".join(out[:-1]))
+PY
+
 if [ "$mode" = "check" ]; then
   status=0
   if [ -e "$src/_native.pyi" ]; then

@@ -1,13 +1,19 @@
 """
 SimpleCADAPI on OpenCASCADE, implemented in C++ (pybind11).
 """
+from . import _brep_region
+from . import _geometry_testing
+from . import _internal_mesh
+from . import _occt
+from . import _surface_testing
+from . import _testing
+from . import std
 from __future__ import annotations
 from builtins import StaleLineageError
 from builtins import UnitValidationError
-import collections.abc
-import numpy
-import numpy.typing
-import simplecadapi.core
+from simplecadapi import math
+from simplecadapi import ql
+from simplecadapi import surface
 from simplecadapi.core import Compound
 from simplecadapi.core import CoordinateSystem
 from simplecadapi.core import Edge
@@ -21,7 +27,6 @@ from simplecadapi.core import Wire
 from simplecadapi.core import get_current_cs
 from simplecadapi.core import use_coordinate_system
 from simplecadapi.kernel.ocp_properties import Vec3
-from simplecadapi import math
 from simplecadapi.math import BSplineFitResult
 from simplecadapi.math import fit_cubic_bspline_control_points
 from simplecadapi.operators._diagnostics import BlendDiagnosis
@@ -62,54 +67,54 @@ from simplecadapi.operators.geometry import make_box_rsolid
 from simplecadapi.operators.geometry import make_box_rsolid as create_box
 from simplecadapi.operators.geometry import make_circle_redge
 from simplecadapi.operators.geometry import make_circle_redge as create_circle_edge
-from simplecadapi.operators.geometry import make_circle_rface as create_circle_face
 from simplecadapi.operators.geometry import make_circle_rface
-from simplecadapi.operators.geometry import make_circle_rwire as create_circle_wire
+from simplecadapi.operators.geometry import make_circle_rface as create_circle_face
 from simplecadapi.operators.geometry import make_circle_rwire
+from simplecadapi.operators.geometry import make_circle_rwire as create_circle_wire
 from simplecadapi.operators.geometry import make_cone_rsolid
-from simplecadapi.operators.geometry import make_cylinder_rsolid as create_cylinder
 from simplecadapi.operators.geometry import make_cylinder_rsolid
+from simplecadapi.operators.geometry import make_cylinder_rsolid as create_cylinder
 from simplecadapi.operators.geometry import make_ellipse_redge
 from simplecadapi.operators.geometry import make_ellipse_rface
 from simplecadapi.operators.geometry import make_ellipse_rwire
-from simplecadapi.operators.geometry import make_face_from_wire_rface as create_face_from_wire
 from simplecadapi.operators.geometry import make_face_from_wire_rface
+from simplecadapi.operators.geometry import make_face_from_wire_rface as create_face_from_wire
 from simplecadapi.operators.geometry import make_face_from_wires_rface
 from simplecadapi.operators.geometry import make_face_from_wires_rface as create_face_from_wires
 from simplecadapi.operators.geometry import make_helix_redge
 from simplecadapi.operators.geometry import make_helix_redge as create_helix
-from simplecadapi.operators.geometry import make_helix_rwire as create_helix_wire
 from simplecadapi.operators.geometry import make_helix_rwire
+from simplecadapi.operators.geometry import make_helix_rwire as create_helix_wire
 from simplecadapi.operators.geometry import make_interpolated_spline_redge
 from simplecadapi.operators.geometry import make_interpolated_spline_redge as create_interpolated_spline
-from simplecadapi.operators.geometry import make_interpolated_spline_rwire as create_interpolated_spline_wire
 from simplecadapi.operators.geometry import make_interpolated_spline_rwire
+from simplecadapi.operators.geometry import make_interpolated_spline_rwire as create_interpolated_spline_wire
 from simplecadapi.operators.geometry import make_line_redge
 from simplecadapi.operators.geometry import make_line_redge as create_line
-from simplecadapi.operators.geometry import make_periodic_spline_rwire as create_periodic_spline_wire
 from simplecadapi.operators.geometry import make_periodic_spline_rwire
+from simplecadapi.operators.geometry import make_periodic_spline_rwire as create_periodic_spline_wire
 from simplecadapi.operators.geometry import make_point_rvertex
 from simplecadapi.operators.geometry import make_point_rvertex as create_point
 from simplecadapi.operators.geometry import make_polyline_rwire
 from simplecadapi.operators.geometry import make_polyline_rwire as create_polyline_wire
-from simplecadapi.operators.geometry import make_rectangle_rface as create_rectangle_face
 from simplecadapi.operators.geometry import make_rectangle_rface
-from simplecadapi.operators.geometry import make_rectangle_rwire as create_rectangle_wire
+from simplecadapi.operators.geometry import make_rectangle_rface as create_rectangle_face
 from simplecadapi.operators.geometry import make_rectangle_rwire
-from simplecadapi.operators.geometry import make_segment_redge as create_segment
+from simplecadapi.operators.geometry import make_rectangle_rwire as create_rectangle_wire
 from simplecadapi.operators.geometry import make_segment_redge
-from simplecadapi.operators.geometry import make_segment_rwire as create_segment_wire
+from simplecadapi.operators.geometry import make_segment_redge as create_segment
 from simplecadapi.operators.geometry import make_segment_rwire
-from simplecadapi.operators.geometry import make_sphere_rsolid as create_sphere
+from simplecadapi.operators.geometry import make_segment_rwire as create_segment_wire
 from simplecadapi.operators.geometry import make_sphere_rsolid
-from simplecadapi.operators.geometry import make_spline_redge as create_spline
+from simplecadapi.operators.geometry import make_sphere_rsolid as create_sphere
 from simplecadapi.operators.geometry import make_spline_redge
-from simplecadapi.operators.geometry import make_spline_rwire as create_spline_wire
+from simplecadapi.operators.geometry import make_spline_redge as create_spline
 from simplecadapi.operators.geometry import make_spline_rwire
-from simplecadapi.operators.geometry import make_three_point_arc_redge as create_arc
+from simplecadapi.operators.geometry import make_spline_rwire as create_spline_wire
 from simplecadapi.operators.geometry import make_three_point_arc_redge
-from simplecadapi.operators.geometry import make_three_point_arc_rwire as create_arc_wire
+from simplecadapi.operators.geometry import make_three_point_arc_redge as create_arc
 from simplecadapi.operators.geometry import make_three_point_arc_rwire
+from simplecadapi.operators.geometry import make_three_point_arc_rwire as create_arc_wire
 from simplecadapi.operators.geometry import make_wire_from_edges_rwire
 from simplecadapi.operators.geometry import make_wire_from_edges_rwire as create_wire_from_edges
 from simplecadapi.operators.product import add_belt_constraint_rassembly
@@ -217,7 +222,6 @@ from simplecadapi.params.expr import tan
 from simplecadapi.params.expr import var
 from simplecadapi.params.frame import FrameGraph
 from simplecadapi.params.frame import FrameNode
-import simplecadapi.params.units
 from simplecadapi.params.units import Dimension
 from simplecadapi.params.units import Unit
 from simplecadapi.params.units import canonical_unit_for_dimension
@@ -248,7 +252,6 @@ from simplecadapi.product.part import Part
 from simplecadapi.product.placement import Placement
 from simplecadapi.product.solver import inspect_assembly_constraints
 from simplecadapi.product.solver import solve_assembly_constraints
-from simplecadapi import ql
 from simplecadapi.recording.graph import GraphSession
 from simplecadapi.recording.graph import get_active_session
 from simplecadapi.recording.graph import isolated_recording
@@ -260,7 +263,6 @@ from simplecadapi.sketch import SketchConstraintDiagnostic
 from simplecadapi.sketch import SketchEntity
 from simplecadapi.sketch import SketchRef
 from simplecadapi.sketch import SketchSolveResult
-from simplecadapi import surface
 from simplecadapi.surface import SurfaceBoundary
 from simplecadapi.surface import SurfaceFillingSettings
 from simplecadapi.surface import fill_holes_rshell
@@ -275,13 +277,13 @@ from simplecadapi.surface import make_solid_from_shell_rsolid
 from simplecadapi.surface import make_surface_patch_rface
 from simplecadapi.surface import sew_faces_rshell
 from simplecadapi.surface import trim_surface_rface
+from simplecadapi.topology import tagging
 from simplecadapi.topology.model import OperationGraph
 from simplecadapi.topology.model import OperationNode
 from simplecadapi.topology.model import SemanticDelta
 from simplecadapi.topology.model import SemanticRef
 from simplecadapi.topology.model import same_node_content
 from simplecadapi.topology.model import upstream_closure
-from simplecadapi.topology import tagging
 from simplecadapi.topology.tagging import LineageDerivation
 from simplecadapi.topology.tagging import LineagePolicy
 from simplecadapi.topology.tagging import TagAttachment
@@ -302,14 +304,12 @@ from simplecadapi.topology.tagging import TagTargetKind
 from simplecadapi.topology.tagging import TopologyPropagation
 from simplecadapi.topology.tracking import TrackingPolicy
 from simplecadapi.topology.tracking import current_tracking_policy
+import collections.abc
+import numpy
+import numpy.typing
+import simplecadapi.core
+import simplecadapi.params.units
 import typing
-from . import _brep_region
-from . import _geometry_testing
-from . import _internal_mesh
-from . import _occt
-from . import _surface_testing
-from . import _testing
-from . import std
 __all__: list[str] = ['ANGLE', 'AREA', 'AnyShape', 'Assembly', 'BSplineFitResult', 'BlendDiagnosis', 'BooleanDiagnosis', 'CM', 'CUBIC_CM', 'CUBIC_FOOT', 'CUBIC_INCH', 'CUBIC_M', 'CUBIC_MM', 'Component', 'Compound', 'Connector', 'ConnectorAnchor', 'ConnectorRef', 'Const', 'Constraint', 'ConstraintReport', 'ConstraintResidual', 'CoordinateSystem', 'DEGREE', 'DIMENSIONLESS', 'Dimension', 'DimensionTolerance', 'Edge', 'ExecutorRegistry', 'Expr', 'ExprBase', 'ExpressionGraph', 'FOOT', 'Face', 'FrameGraph', 'FrameNode', 'GeometryRef', 'GraphSession', 'INCH', 'LENGTH', 'LineageDerivation', 'LineagePolicy', 'M', 'MM', 'Material', 'Mesh', 'NodeFailure', 'ONE', 'OperationGraph', 'OperationNode', 'PERCENT', 'Part', 'Placement', 'PublicConnectorRef', 'RADIAN', 'RecomputeReport', 'RenderFrame', 'RenderPanel', 'RenderScene', 'SQUARE_CM', 'SQUARE_FOOT', 'SQUARE_INCH', 'SQUARE_M', 'SQUARE_MM', 'ScalarLimit', 'SemanticDelta', 'SemanticRef', 'Shell', 'SimpleWorkplane', 'Sketch', 'SketchConstraint', 'SketchConstraintDiagnostic', 'SketchEntity', 'SketchRef', 'SketchSolveResult', 'SketchSolverBackend', 'SketchSolverOptions', 'Solid', 'StaleLineageError', 'SurfaceBoundary', 'SurfaceFillingSettings', 'TagAttachment', 'TagBinding', 'TagBindingScope', 'TagCertainty', 'TagEvidence', 'TagEvidenceKind', 'TagLifecycle', 'TagLineageWitness', 'TagPolicy', 'TagProducer', 'TagProducerKind', 'TagPropagation', 'TagScope', 'TagTarget', 'TagTargetKind', 'TopologyPropagation', 'TrackingPolicy', 'Unit', 'UnitValidationError', 'VOLUME', 'Var', 'Vec3', 'Vertex', 'WORLD_CS', 'Wire', 'Workplane', 'acos', 'add_arc_rsketch', 'add_belt_constraint_rassembly', 'add_bspline_rsketch', 'add_circle_rsketch', 'add_component_rassembly', 'add_connector_rpart', 'add_ellipse_rsketch', 'add_fixed_constraint_rassembly', 'add_gear_constraint_rassembly', 'add_line_rsketch', 'add_point_rsketch', 'add_prismatic_constraint_rassembly', 'add_rack_pinion_constraint_rassembly', 'add_revolute_constraint_rassembly', 'apply_tag', 'apply_tag_rselection', 'asin', 'assert_blend_volume_monotonic', 'assign_material_rpart', 'atan', 'atan2', 'boolean_rsolidlist', 'canonical_brep_bytes', 'canonical_bytes', 'canonical_hash', 'canonical_unit_for_dimension', 'canonicalize_params', 'chamfer_rsolid', 'clone_semantic_view', 'const', 'constrain_angle_rsketch', 'constrain_coincident_rsketch', 'constrain_collinear_rsketch', 'constrain_concentric_rsketch', 'constrain_connect_rsketch', 'constrain_diameter_rsketch', 'constrain_distance_rsketch', 'constrain_distance_x_rsketch', 'constrain_distance_y_rsketch', 'constrain_equal_length_rsketch', 'constrain_equal_radius_rsketch', 'constrain_fix_rsketch', 'constrain_horizontal_rsketch', 'constrain_length_rsketch', 'constrain_line_distance_rsketch', 'constrain_major_radius_rsketch', 'constrain_midpoint_points_rsketch', 'constrain_midpoint_rsketch', 'constrain_minor_radius_rsketch', 'constrain_mirror_rsketch', 'constrain_normal_rsketch', 'constrain_parallel_rsketch', 'constrain_perpendicular_rsketch', 'constrain_point_on_rsketch', 'constrain_points_horizontal_rsketch', 'constrain_points_vertical_rsketch', 'constrain_radius_rsketch', 'constrain_symmetric_rsketch', 'constrain_tangent_rsketch', 'constrain_vertical_rsketch', 'constraint_reports_match', 'convert_value', 'cos', 'create_angle_arc', 'create_angle_arc_wire', 'create_arc', 'create_arc_wire', 'create_box', 'create_circle_edge', 'create_circle_face', 'create_circle_wire', 'create_cylinder', 'create_face_from_wire', 'create_face_from_wires', 'create_helix', 'create_helix_wire', 'create_interpolated_spline', 'create_interpolated_spline_wire', 'create_line', 'create_periodic_spline_wire', 'create_point', 'create_polyline_wire', 'create_rectangle_face', 'create_rectangle_wire', 'create_segment', 'create_segment_wire', 'create_sphere', 'create_spline', 'create_spline_wire', 'create_wire_from_edges', 'current_tracking_policy', 'cut_rsolid', 'cut_rsolid_list', 'deserialize_shape', 'diagnose_blend_failure', 'diagnose_boolean_failure', 'draft_rsolid', 'evaluate_scalar', 'evaluate_value', 'explain_tag', 'export_brep', 'export_glb', 'export_obj', 'export_step', 'export_step_assembly', 'export_stl', 'expression_uses_units', 'extrude_rsolid', 'extrude_taper_rsolid', 'extrude_until_rsolid', 'fill_holes_rshell', 'fillet_rsolid', 'find_registered_node', 'fit_cubic_bspline_control_points', 'fit_point_grid_rface', 'forget_graph_nodes', 'free_boundaries_rwirelist', 'from_brep', 'get_active_session', 'get_current_cs', 'get_default_sketch_solver_backend', 'get_sketch_entity_rsketchref', 'get_sketch_point_rsketchref', 'get_sketch_solver_backend', 'get_unit', 'global_executor_registry', 'ground_component_rassembly', 'helical_sweep_rsolid', 'identity_placement_rplacement', 'import_brep', 'import_step', 'import_stl', 'import_stl_shape', 'infer_dimension', 'inspect_assembly_constraints', 'inspect_assembly_constraints_rconstraintreport', 'inspect_sketch_rsketchresult', 'intersect_rsolid', 'isolated_recording', 'lift_scalar', 'linear_pattern_rsolidlist', 'list_tags', 'load_brep_region_rshell', 'load_brep_region_rsolid', 'loft_rshell', 'loft_rsolid', 'make_2d_cut_rface', 'make_2d_intersect_rface', 'make_2d_union_rface', 'make_angle_arc_redge', 'make_angle_arc_rwire', 'make_assembly_rassembly', 'make_bezier_surface_rface', 'make_box_rsolid', 'make_circle_redge', 'make_circle_rface', 'make_circle_rwire', 'make_compound_from_assembly_rcompound', 'make_cone_rsolid', 'make_connector_ref_rconnectorref', 'make_cylinder_rsolid', 'make_cylindrical_surface_rface', 'make_edge_connector_rconnector', 'make_ellipse_redge', 'make_ellipse_rface', 'make_ellipse_rwire', 'make_face_connector_rconnector', 'make_face_from_sketch_rface', 'make_face_from_wire_rface', 'make_face_from_wires_rface', 'make_gordon_surface_rface', 'make_helix_redge', 'make_helix_rwire', 'make_interpolated_spline_redge', 'make_interpolated_spline_rwire', 'make_line_redge', 'make_material_rmaterial', 'make_param_spec', 'make_part_rpart', 'make_periodic_spline_rwire', 'make_placement_connector_rconnector', 'make_placement_rplacement', 'make_point_rvertex', 'make_polyline_rwire', 'make_rectangle_rface', 'make_rectangle_rwire', 'make_ruled_surface_rface', 'make_scalar_limit_rscalarlimit', 'make_segment_redge', 'make_segment_rwire', 'make_sketch_rsketch', 'make_solid_from_shell_rsolid', 'make_sphere_rsolid', 'make_spline_redge', 'make_spline_rwire', 'make_surface_patch_rface', 'make_three_point_arc_redge', 'make_three_point_arc_rwire', 'make_vertex_connector_rconnector', 'make_wire_from_edges_rwire', 'make_wire_from_sketch_rwire', 'math', 'measure_constraint_residual_rconstraintresidual', 'mesh', 'mirror_shape', 'offset_rsolid', 'parse_ui_comment', 'place_component_rassembly', 'ql', 'radial_pattern_rsolidlist', 'raise_loft_failure_if_diagnosed', 'record_operation_if_active', 'recording_active', 'referenced_expressions', 'register_executor', 'register_graph_nodes', 'register_node', 'register_sketch_solver_backend', 'render_auto_view', 'render_default_threads', 'render_edge_polylines', 'render_scene', 'render_view_preset', 'resolve_connector', 'resolve_connector_placement', 'resolve_connector_ref_placement', 'resolve_item_connector', 'resolve_item_connector_placement', 'revolve_rsolid', 'rotate_shape', 'same_node_content', 'scale_rsolid', 'select_edges_by_tag', 'select_faces_by_tag', 'serialize_shape', 'set_default_sketch_solver_backend', 'set_producer_version', 'set_public_connector_rassembly', 'sew_faces_rshell', 'shell_rsolid', 'sin', 'sketch_solver_backend', 'solve_assembly_constraints', 'solve_assembly_constraints_rassembly', 'sqrt', 'std', 'step_bytes', 'surface', 'suspend_graph_recording', 'sweep_multisection_rsolid', 'sweep_rsolid', 'tagging', 'tan', 'tessellate_solid', 'tracking_policy_scope', 'transform_rsolid', 'translate_shape', 'trim_surface_rface', 'twisted_sweep_rsolid', 'unground_component_rassembly', 'union_rsolid', 'unit_from_payload', 'unit_to_payload', 'upstream_closure', 'use_coordinate_system', 'var']
 class AnyShape:
     """
