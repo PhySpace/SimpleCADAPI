@@ -30,13 +30,17 @@ SewnShell sew_faces_with_history(const std::vector<TopoDS_Face>& faces, double t
   sewing.SetLocalTolerancesMode(false);
   sewing.SetMinTolerance(tolerance);
   sewing.SetMaxTolerance(tolerance);
-  for (const TopoDS_Face& face : faces) sewing.Add(face);
+  for (const TopoDS_Face& face : faces)
+    sewing.Add(face);
   sewing.Perform();
-  if (sewing.NbMultipleEdges() != 0) throw ValueError("face sewing produced non-manifold multiple edges");
-  if (sewing.NbDeletedFaces() != 0) throw ValueError("face sewing deleted one or more input faces");
+  if (sewing.NbMultipleEdges() != 0)
+    throw ValueError("face sewing produced non-manifold multiple edges");
+  if (sewing.NbDeletedFaces() != 0)
+    throw ValueError("face sewing deleted one or more input faces");
 
   const TopoDS_Shape shape = sewing.SewedShape();
-  if (shape.IsNull()) throw ValueError("OCP sewing returned a null shape");
+  if (shape.IsNull())
+    throw ValueError("OCP sewing returned a null shape");
   TopoDS_Shell shell;
   if (shape.ShapeType() == TopAbs_SHELL) {
     shell = TopoDS::Shell(shape);
@@ -62,12 +66,15 @@ SewnShell sew_faces_with_history(const std::vector<TopoDS_Face>& faces, double t
       throw ValueError("face sewing history did not retain one input face");
     std::vector<int> matches;
     for (std::size_t i = 0; i < result_faces.size(); ++i)
-      if (result_faces[i].IsSame(mapped)) matches.push_back(static_cast<int>(i));
-    if (matches.size() != 1) throw ValueError("face sewing history is incomplete or ambiguous");
+      if (result_faces[i].IsSame(mapped))
+        matches.push_back(static_cast<int>(i));
+    if (matches.size() != 1)
+      throw ValueError("face sewing history is incomplete or ambiguous");
     out.result_face_indices.push_back(matches.front());
   }
   const std::set<int> distinct(out.result_face_indices.begin(), out.result_face_indices.end());
-  if (distinct.size() != result_faces.size()) throw ValueError("face sewing history is not one-to-one");
+  if (distinct.size() != result_faces.size())
+    throw ValueError("face sewing history is not one-to-one");
   return out;
 }
 
@@ -81,7 +88,8 @@ std::vector<TopoDS_Wire> free_boundaries(const TopoDS_Shape& shell, double toler
   for (const TopoDS_Shape& group : {analysis.GetClosedWires(), analysis.GetOpenWires()})
     for (const TopoDS_Wire& wire : kernel::wires_of(group)) {
       const bool seen = std::any_of(unique.begin(), unique.end(), [&](const TopoDS_Wire& w) { return w.IsSame(wire); });
-      if (!seen) unique.push_back(wire);
+      if (!seen)
+        unique.push_back(wire);
     }
   return unique;
 }
@@ -94,16 +102,20 @@ Shell sew_faces_rshell(const std::vector<Face>& faces, double tolerance, const T
   static const ErrorSpec kSpec{
       "sew_faces_rshell",
       "Failed to sew faces into one shell.",
-      {"Faces are disconnected or their gaps exceed tolerance.", "The sewing result contains multiple shell components.",
-       "Faces built with make_surface_patch_rface re-fit their boundary edges, so patches no longer share exact boundaries."},
+      {"Faces are disconnected or their gaps exceed tolerance.",
+       "The sewing result contains multiple shell components.",
+       "Faces built with make_surface_patch_rface re-fit their boundary edges, so patches no longer share exact "
+       "boundaries."},
       {"Pass connected Face objects and a positive sewing tolerance.",
        "When freeform patches must share exact boundary edges, build them with make_gordon_surface_rface on a shared "
        "edge network before sewing."}};
   return operator_scope(kSpec, [&] {
-    if (faces.empty()) throw ValueError("sew_faces_rshell requires a non-empty Face sequence");
+    if (faces.empty())
+      throw ValueError("sew_faces_rshell requires a non-empty Face sequence");
     require_positive_finite(tolerance, "tolerance");
     std::vector<TopoDS_Face> raw;
-    for (const Face& face : faces) raw.push_back(TopoDS::Face(face.wrapped()));
+    for (const Face& face : faces)
+      raw.push_back(TopoDS::Face(face.wrapped()));
     SewnShell sewn = sew_faces_with_history(raw, tolerance);
 
     Value params = Value::object();
@@ -114,7 +126,8 @@ Shell sew_faces_rshell(const std::vector<Face>& faces, double tolerance, const T
                       .tag_prefix = tag_prefix,
                       .sources = faces,
                       .result_face_indices = std::move(sewn.result_face_indices)};
-    for (const Face& face : faces) output.record.inputs.push_back({face, "face"});
+    for (const Face& face : faces)
+      output.record.inputs.push_back({face, "face"});
     return finalize_surface_output(Shell(sewn.shell), std::move(output));
   });
 }

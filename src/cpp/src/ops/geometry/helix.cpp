@@ -38,26 +38,31 @@ TopoDS_Wire helix_wire(double pitch, double height, double radius, const Scalar3
 
 Edge make_helix_redge(const Scalar& pitch, const Scalar& height, const Scalar& radius, const Scalar3& center,
                       const Scalar3& dir, std::string_view handedness) {
-  static const ErrorSpec kSpec{kEdgeOp,
-                               "Failed to create a helix edge.",
-                               {"Pitch, height, or radius is not positive.", "The center or direction vector is invalid.",
-                                "The kernel rejected the helix definition."},
-                               {"Use positive pitch, height, and radius values.",
-                                "Pass a valid center and a non-zero direction vector.",
-                                "Inspect the evaluated helix parameters before retrying."}};
+  static const ErrorSpec kSpec{
+      kEdgeOp,
+      "Failed to create a helix edge.",
+      {"Pitch, height, or radius is not positive.", "The center or direction vector is invalid.",
+       "The kernel rejected the helix definition."},
+      {"Use positive pitch, height, and radius values.", "Pass a valid center and a non-zero direction vector.",
+       "Inspect the evaluated helix parameters before retrying."}};
   return guarded(kSpec, [&] {
-    if (handedness != "Right" && handedness != "Left") throw ValueError("handedness must be 'Right' or 'Left'");
+    if (handedness != "Right" && handedness != "Left")
+      throw ValueError("handedness must be 'Right' or 'Left'");
     const double pitch_value = evaluate_scalar(pitch, "pitch");
     const double height_value = evaluate_scalar(height, "height");
     const double radius_value = evaluate_scalar(radius, "radius");
-    if (pitch_value <= 0) throw ValueError("The pitch must be greater than zero");
-    if (height_value <= 0) throw ValueError("The height must be greater than zero");
-    if (radius_value <= 0) throw ValueError("The radius must be greater than zero");
+    if (pitch_value <= 0)
+      throw ValueError("The pitch must be greater than zero");
+    if (height_value <= 0)
+      throw ValueError("The height must be greater than zero");
+    if (radius_value <= 0)
+      throw ValueError("The radius must be greater than zero");
 
     // The edge belongs to the wire it was found in, like the Python wrapper tree.
     const Wire wire(helix_wire(pitch_value, height_value, radius_value, center, dir, handedness));
     std::vector<Edge> edges = wire.edges();
-    if (edges.empty()) throw ValueError("Cannot extract edges from the helix");
+    if (edges.empty())
+      throw ValueError("Cannot extract edges from the helix");
     return finalize_primitive_with(std::move(edges.front()), kEdgeOp, [&] {
       return helix_record(kEdgeOp, "edge", pitch, height, radius, center, dir, handedness);
     });
@@ -67,15 +72,16 @@ Edge make_helix_redge(const Scalar& pitch, const Scalar& height, const Scalar& r
 Wire make_helix_rwire(const Scalar& pitch, const Scalar& height, const Scalar& radius, const Scalar3& center,
                       const Scalar3& dir, std::string_view handedness) {
   static constexpr const char* kOp = "make_helix_rwire";
-  static const ErrorSpec kSpec{kOp,
-                               "Failed to create a helix wire.",
-                               {"The helix parameters are invalid.", "The direction vector is zero or malformed.",
-                                "The kernel rejected the wire geometry."},
-                               {"Use positive pitch, height, and radius values.",
-                                "Pass a valid center and a non-zero direction vector.",
-                                "Retry after logging the evaluated helix parameters."}};
+  static const ErrorSpec kSpec{
+      kOp,
+      "Failed to create a helix wire.",
+      {"The helix parameters are invalid.", "The direction vector is zero or malformed.",
+       "The kernel rejected the wire geometry."},
+      {"Use positive pitch, height, and radius values.", "Pass a valid center and a non-zero direction vector.",
+       "Retry after logging the evaluated helix parameters."}};
   return guarded(kSpec, [&] {
-    if (graph_recording()) return make_wire_from_edges_rwire({make_helix_redge(pitch, height, radius, center, dir, handedness)});
+    if (graph_recording())
+      return make_wire_from_edges_rwire({make_helix_redge(pitch, height, radius, center, dir, handedness)});
     const TopoDS_Wire wire = helix_wire(evaluate_scalar(pitch, "pitch"), evaluate_scalar(height, "height"),
                                         evaluate_scalar(radius, "radius"), center, dir, handedness);
     return finalize_primitive_with(Wire(wire), "make_helix_wire", [&] {

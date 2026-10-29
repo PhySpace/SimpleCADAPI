@@ -32,7 +32,8 @@ struct HeadSize {
 
 HeadSize default_head_dimensions(double diameter, const std::string& head_style) {
   if (head_style == "hex") {
-    if (const auto catalog = metric_hex_head_dimensions(diameter)) return {catalog->width, catalog->height};
+    if (const auto catalog = metric_hex_head_dimensions(diameter))
+      return {catalog->width, catalog->height};
   }
   double width_factor = 2.0;
   double height_factor = 0.60;
@@ -62,36 +63,42 @@ Edge underhead_edge(const Solid& solid, double shank_radius) {
       candidates.push_back(edge);
     }
   }
-  if (candidates.size() != 1) throw ValueError("could not identify one circular underhead transition edge");
+  if (candidates.size() != 1)
+    throw ValueError("could not identify one circular underhead transition edge");
   return candidates.front();
 }
 
 Solid make_bolt_head(const std::string& head_style, double width, double height, double shank_radius) {
   const Scalar3 below_head = scalar3(0.0, 0.0, -height);
   const Scalar3 axis = scalar3(0.0, 0.0, 1.0);
-  if (head_style == "hex") return make_across_flats_prism(6, width, -height, height);
-  if (head_style == "square") return make_box_rsolid(width, width, height, below_head);
-  if (head_style == "cylindrical") return make_cylinder_rsolid(width / 2.0, height, below_head, axis);
-  if (head_style == "countersunk") return make_cone_rsolid(width / 2.0, height, shank_radius, below_head, axis);
+  if (head_style == "hex")
+    return make_across_flats_prism(6, width, -height, height);
+  if (head_style == "square")
+    return make_box_rsolid(width, width, height, below_head);
+  if (head_style == "cylindrical")
+    return make_cylinder_rsolid(width / 2.0, height, below_head, axis);
+  if (head_style == "countersunk")
+    return make_cone_rsolid(width / 2.0, height, shank_radius, below_head, axis);
 
   const double radius = width / 2.0;
-  const Wire profile = make_polyline_rwire({scalar3(0.0, 0.0, -height), scalar3(radius * 0.42, 0.0, -height),
-                                            scalar3(radius * 0.82, 0.0, -height * 0.62),
-                                            scalar3(radius, 0.0, -height * 0.22), scalar3(radius, 0.0, 0.0),
-                                            scalar3(0.0, 0.0, 0.0)},
-                                           /*closed=*/true);
+  const Wire profile = make_polyline_rwire(
+      {scalar3(0.0, 0.0, -height), scalar3(radius * 0.42, 0.0, -height), scalar3(radius * 0.82, 0.0, -height * 0.62),
+       scalar3(radius, 0.0, -height * 0.22), scalar3(radius, 0.0, 0.0), scalar3(0.0, 0.0, 0.0)},
+      /*closed=*/true);
   const Face face = make_face_from_wire_rface(profile, scalar3(0.0, -1.0, 0.0));
   return revolve_rsolid(face, axis, 360.0, scalar3(0.0, 0.0, 0.0));
 }
 
 std::vector<Solid> drive_cutters(const std::string& drive_style, double drive_size, double drive_depth,
                                  double head_height) {
-  if (drive_style == "none") return {};
+  if (drive_style == "none")
+    return {};
   const double epsilon = std::max(1e-5, head_height * 1e-4);
   const Scalar3 cutter_origin = scalar3(0.0, 0.0, -head_height - epsilon);
   const double cutter_height = drive_depth + epsilon;
   const double slot_width = std::max(drive_size * 0.22, epsilon * 10.0);
-  if (drive_style == "slot") return {make_box_rsolid(drive_size, slot_width, cutter_height, cutter_origin)};
+  if (drive_style == "slot")
+    return {make_box_rsolid(drive_size, slot_width, cutter_height, cutter_origin)};
   if (drive_style == "cross") {
     return {make_box_rsolid(drive_size, slot_width, cutter_height, cutter_origin),
             make_box_rsolid(slot_width, drive_size, cutter_height, cutter_origin)};
@@ -112,7 +119,8 @@ Solid make_bolt_rsolid(double diameter, double length, const BoltOptions& option
       choice("thread_style", options.thread_style, {"auto", "full", "none", "partial"});
   std::string thread_style = requested_thread_style;
   if (requested_thread_style == "auto") {
-    if (options.thread_length) throw ValueError("thread_length requires thread_style='partial'");
+    if (options.thread_length)
+      throw ValueError("thread_length requires thread_style='partial'");
     thread_style = resolved_length <= 3.0 * resolved_diameter ? "full" : "partial";
   }
   const std::string thread_detail = choice("thread_detail", options.thread_detail, {"cosmetic", "modeled"});
@@ -122,7 +130,8 @@ Solid make_bolt_rsolid(double diameter, double length, const BoltOptions& option
   const HeadSize default_head = default_head_dimensions(resolved_diameter, head_style);
   const double head_width = optional_positive("head_width", options.head_width, default_head.width);
   const double head_height = optional_positive("head_height", options.head_height, default_head.height);
-  if (head_width <= resolved_diameter) throw ValueError("head_width must be greater than diameter");
+  if (head_width <= resolved_diameter)
+    throw ValueError("head_width must be greater than diameter");
   const std::optional<double> head_across_corners =
       head_style == "hex" ? std::optional<double>(head_width / std::cos(kPi / 6.0)) : std::nullopt;
 
@@ -136,11 +145,12 @@ Solid make_bolt_rsolid(double diameter, double length, const BoltOptions& option
     pitch_source = resolved.source;
     std::tie(pitch_diameter, basic_minor_diameter) = metric_thread_dimensions(resolved_diameter, pitch);
   }
-  const double default_depth = thread_form == "v" && pitch > 0.0 ? (resolved_diameter - basic_minor_diameter) / 2.0
-                                                                 : pitch * 0.5;
+  const double default_depth =
+      thread_form == "v" && pitch > 0.0 ? (resolved_diameter - basic_minor_diameter) / 2.0 : pitch * 0.5;
   const double depth = options.thread_depth ? positive_finite("thread_depth", *options.thread_depth) : default_depth;
   const double major_radius = resolved_diameter / 2.0;
-  if (thread_style != "none" && depth >= major_radius) throw ValueError("thread_depth must be smaller than the bolt radius");
+  if (thread_style != "none" && depth >= major_radius)
+    throw ValueError("thread_depth must be smaller than the bolt radius");
   const double modeled_minor_diameter = resolved_diameter - 2.0 * depth;
 
   double thread_length = 0.0;
@@ -148,7 +158,8 @@ Solid make_bolt_rsolid(double diameter, double length, const BoltOptions& option
   if (thread_style == "none") {
     thread_start = resolved_length;
   } else if (thread_style == "full") {
-    if (options.thread_length) throw ValueError("thread_length is only valid when thread_style='partial'");
+    if (options.thread_length)
+      throw ValueError("thread_length is only valid when thread_style='partial'");
     thread_length = resolved_length;
   } else {
     if (!options.thread_length) {
@@ -160,7 +171,8 @@ Solid make_bolt_rsolid(double diameter, double length, const BoltOptions& option
     } else {
       thread_length = positive_finite("thread_length", *options.thread_length);
     }
-    if (thread_length <= 0.0) throw ValueError("partial threads require positive unthreaded shank length");
+    if (thread_length <= 0.0)
+      throw ValueError("partial threads require positive unthreaded shank length");
     if (thread_style == "partial" && thread_length >= resolved_length) {
       throw ValueError("partial thread_length must be smaller than length");
     }
@@ -175,15 +187,18 @@ Solid make_bolt_rsolid(double diameter, double length, const BoltOptions& option
   if (drive_style != "none") {
     drive_size = optional_positive("drive_size", options.drive_size, head_width * 0.48);
     drive_depth = optional_positive("drive_depth", options.drive_depth, head_height * 0.28);
-    if (drive_size >= head_width * 0.85) throw ValueError("drive_size is too large for head_width");
-    if (drive_depth >= head_height * 0.8) throw ValueError("drive_depth is too large for head_height");
+    if (drive_size >= head_width * 0.85)
+      throw ValueError("drive_size is too large for head_width");
+    if (drive_depth >= head_height * 0.8)
+      throw ValueError("drive_depth is too large for head_height");
   } else if (options.drive_size || options.drive_depth) {
     throw ValueError("drive_size and drive_depth require a non-'none' drive_style");
   }
 
   const double default_fillet_radius = head_style == "countersunk" ? 0.0 : resolved_diameter * 0.06;
-  const double fillet_radius = non_negative_finite(
-      "underhead_fillet_radius", options.underhead_fillet_radius ? *options.underhead_fillet_radius : default_fillet_radius);
+  const double fillet_radius =
+      non_negative_finite("underhead_fillet_radius",
+                          options.underhead_fillet_radius ? *options.underhead_fillet_radius : default_fillet_radius);
   const double maximum_fillet_radius = std::min(major_radius * 0.3, head_height * 0.25);
   if (fillet_radius > maximum_fillet_radius) {
     throw ValueError("underhead_fillet_radius is too large for the shank and head dimensions");
@@ -205,7 +220,8 @@ Solid make_bolt_rsolid(double diameter, double length, const BoltOptions& option
   UnionOptions fuse;
   fuse.glue = false;
   Solid bolt = union_rsolid({head, shank}, fuse);
-  if (fillet_radius > 0.0) bolt = fillet_rsolid(bolt, std::vector<Edge>{underhead_edge(bolt, major_radius)}, fillet_radius);
+  if (fillet_radius > 0.0)
+    bolt = fillet_rsolid(bolt, std::vector<Edge>{underhead_edge(bolt, major_radius)}, fillet_radius);
 
   double modeled_thread_start = thread_start;
   double modeled_thread_length = thread_length;
@@ -223,9 +239,9 @@ Solid make_bolt_rsolid(double diameter, double length, const BoltOptions& option
     spec.thread_form = thread_form;
     Solid cutter = make_thread_cutter(spec);
     const double inner_radius = major_radius - depth;
-    const double maximum_removed_volume = kPi * (major_radius * major_radius - inner_radius * inner_radius) * modeled_thread_length;
-    thread_phase_degrees =
-        select_external_thread_phase(bolt, cutter, bolt.volume() - maximum_removed_volume);
+    const double maximum_removed_volume =
+        kPi * (major_radius * major_radius - inner_radius * inner_radius) * modeled_thread_length;
+    thread_phase_degrees = select_external_thread_phase(bolt, cutter, bolt.volume() - maximum_removed_volume);
     cutter = rotate_thread_cutter(cutter, thread_phase_degrees);
     CutOptions cut;
     cut.skip_non_intersecting = false;
@@ -235,14 +251,15 @@ Solid make_bolt_rsolid(double diameter, double length, const BoltOptions& option
   bolt = Solid(apply_tag(bolt, "group.fasteners"));
   bolt.set_metadata(
       "std.fastener.bolt",
-      Dict("diameter", resolved_diameter)("length", resolved_length)("head_style", head_style)("head_width", head_width)(
-          "head_height", head_height)("head_across_corners", number_or_null(head_across_corners))(
-          "drive_style", drive_style)("drive_size", drive_size)("drive_depth", drive_depth)(
-          "requested_thread_style", requested_thread_style)("thread_style", thread_style)(
-          "thread_detail", thread_detail)("thread_form", thread_form)("thread_pitch", pitch)(
-          "thread_pitch_source", pitch_source)("thread_depth", depth)("pitch_diameter", pitch_diameter)(
-          "basic_minor_diameter", basic_minor_diameter)("modeled_minor_diameter", modeled_minor_diameter)(
-          "thread_start", thread_start)("thread_length", thread_length)("modeled_thread_start", modeled_thread_start)(
+      Dict("diameter", resolved_diameter)("length", resolved_length)("head_style", head_style)(
+          "head_width", head_width)("head_height", head_height)(
+          "head_across_corners", number_or_null(head_across_corners))("drive_style", drive_style)(
+          "drive_size", drive_size)("drive_depth", drive_depth)("requested_thread_style", requested_thread_style)(
+          "thread_style", thread_style)("thread_detail", thread_detail)("thread_form", thread_form)(
+          "thread_pitch", pitch)("thread_pitch_source", pitch_source)("thread_depth", depth)(
+          "pitch_diameter", pitch_diameter)("basic_minor_diameter", basic_minor_diameter)(
+          "modeled_minor_diameter", modeled_minor_diameter)("thread_start", thread_start)(
+          "thread_length", thread_length)("modeled_thread_start", modeled_thread_start)(
           "modeled_thread_length", modeled_thread_length)("thread_phase_degrees", thread_phase_degrees)(
           "underhead_fillet_radius", fillet_radius)("recommended_mating_hole_chamfer_min", fillet_radius)
           .take());

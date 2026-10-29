@@ -32,12 +32,13 @@ TEST_CASE("a failing loft says which stations are the problem") {
   CHECK(coincident.guidance().what_happened.find("S2 coincides with S1") != std::string::npos);
   std::vector<std::string> implicated;
   for (const InventoryEntry& entry : coincident.guidance().inventory) {
-    if (entry.status == "implicated") implicated.push_back(entry.symbol);
+    if (entry.status == "implicated")
+      implicated.push_back(entry.symbol);
   }
   CHECK(implicated == std::vector<std::string>{"S1", "S2"});
 
-  const Wire open = make_wire_from_edges_rwire({make_line_redge(scalar3(0, 0, 0), scalar3(10, 0, 0)),
-                                                make_line_redge(scalar3(10, 0, 0), scalar3(10, 6, 0))});
+  const Wire open = make_wire_from_edges_rwire(
+      {make_line_redge(scalar3(0, 0, 0), scalar3(10, 0, 0)), make_line_redge(scalar3(10, 0, 0), scalar3(10, 6, 0))});
   const Error not_closed = failure_of([&] { (void)loft_rsolid({rect, open}); });
   CHECK(not_closed.guidance().inventory.at(1).status == "implicated");
   CHECK(failure_of([&] { (void)loft_rsolid({rect}); }).operation() == "loft_rsolid");

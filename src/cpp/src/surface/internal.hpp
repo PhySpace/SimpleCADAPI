@@ -51,7 +51,7 @@ void note_symbolic(SymbolicArgs& out, std::string name, const Scalar& value);
 Value to_value(const TagPrefix& tag_prefix);
 
 // BRepBuilderAPI_MakeFace(surface, Precision::Confusion()); ValueError when OpenCASCADE refuses.
-TopoDS_Face face_from_surface(const Handle(Geom_Surface)& surface);
+TopoDS_Face face_from_surface(const Handle(Geom_Surface) & surface);
 
 // The face the fitter fills over `problem`, trimmed by `holes` when there are any.
 TopoDS_Face fill_face(const FillingProblem& problem, const std::vector<TopoDS_Wire>& holes);

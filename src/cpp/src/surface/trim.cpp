@@ -57,7 +57,8 @@ bool fits_parameter_bounds(const std::vector<double>& values, double lower, doub
                        [&](double v) { return lower - tolerance <= v && v <= upper + tolerance; });
   const std::vector<double> checked = unwrap_periodic(values, *period);
   const auto [lowest, highest] = std::minmax_element(checked.begin(), checked.end());
-  if (*highest - *lowest > upper - lower + 2.0 * tolerance) return false;
+  if (*highest - *lowest > upper - lower + 2.0 * tolerance)
+    return false;
   const double minimum_shift = std::ceil((lower - tolerance - *lowest) / *period);
   const double maximum_shift = std::floor((upper + tolerance - *highest) / *period);
   return minimum_shift <= maximum_shift;
@@ -65,7 +66,7 @@ bool fits_parameter_bounds(const std::vector<double>& values, double lower, doub
 
 // ---- sampling -----------------------------------------------------------------------------------
 // By arc length, densely enough to preserve periodic winding.
-std::vector<double> curve_sample_parameters(const BRepAdaptor_Curve& adaptor, const Handle(Geom_Surface)& surface) {
+std::vector<double> curve_sample_parameters(const BRepAdaptor_Curve& adaptor, const Handle(Geom_Surface) & surface) {
   int sample_count = 65;
   const GeomAbs_CurveType type = adaptor.GetType();
   if (type == GeomAbs_BSplineCurve || type == GeomAbs_BezierCurve)
@@ -80,12 +81,14 @@ std::vector<double> curve_sample_parameters(const BRepAdaptor_Curve& adaptor, co
   const GCPnts_UniformAbscissa sampler(adaptor, sample_count);
   std::vector<double> parameters;
   if (sampler.IsDone() && sampler.NbPoints() >= sample_count) {
-    for (int i = 1; i <= sampler.NbPoints(); ++i) parameters.push_back(sampler.Parameter(i));
+    for (int i = 1; i <= sampler.NbPoints(); ++i)
+      parameters.push_back(sampler.Parameter(i));
     return parameters;
   }
   const double first = adaptor.FirstParameter();
   const double last = adaptor.LastParameter();
-  for (int i = 0; i < sample_count; ++i) parameters.push_back(first + (last - first) * i / (sample_count - 1));
+  for (int i = 0; i < sample_count; ++i)
+    parameters.push_back(first + (last - first) * i / (sample_count - 1));
   return parameters;
 }
 
@@ -97,13 +100,18 @@ double wire_uv_area(const TopoDS_Wire& wire, const TopoDS_Face& support) {
     const TopoDS_Edge edge = explorer.Current();
     double first = 0.0, last = 0.0;
     const Handle(Geom2d_Curve) pcurve = BRep_Tool::CurveOnSurface(edge, support, first, last);
-    if (pcurve.IsNull()) throw ValueError("trim wire edge has no pcurve on the carrier");
+    if (pcurve.IsNull())
+      throw ValueError("trim wire edge has no pcurve on the carrier");
     std::vector<double> parameters;
-    for (int i = 0; i < 8; ++i) parameters.push_back(first + (last - first) * i / 7.0);
-    if (edge.Orientation() == TopAbs_REVERSED) std::reverse(parameters.begin(), parameters.end());
-    for (std::size_t i = 0; i + 1 < parameters.size(); ++i) points.push_back(pcurve->Value(parameters[i]));
+    for (int i = 0; i < 8; ++i)
+      parameters.push_back(first + (last - first) * i / 7.0);
+    if (edge.Orientation() == TopAbs_REVERSED)
+      std::reverse(parameters.begin(), parameters.end());
+    for (std::size_t i = 0; i + 1 < parameters.size(); ++i)
+      points.push_back(pcurve->Value(parameters[i]));
   }
-  if (points.size() < 3) throw ValueError("trim wire has fewer than three UV samples");
+  if (points.size() < 3)
+    throw ValueError("trim wire has fewer than three UV samples");
   double twice_area = 0.0;
   for (std::size_t i = 0; i < points.size(); ++i) {
     const gp_Pnt2d& a = points[i];
@@ -130,9 +138,11 @@ void validate_trim_wire_domain(const TopoDS_Wire& wire, const TopoDS_Face& carri
     const TopoDS_Edge edge = explorer.Current();
     const BRepAdaptor_Curve adaptor(edge);
     std::vector<double> parameters = curve_sample_parameters(adaptor, surface);
-    if (edge.Orientation() == TopAbs_REVERSED) std::reverse(parameters.begin(), parameters.end());
+    if (edge.Orientation() == TopAbs_REVERSED)
+      std::reverse(parameters.begin(), parameters.end());
     for (std::size_t sample = 0; sample < parameters.size(); ++sample) {
-      if (edge_index != 0 && sample == 0) continue;
+      if (edge_index != 0 && sample == 0)
+        continue;
       const GeomAPI_ProjectPointOnSurf projection(adaptor.Value(parameters[sample]), surface);
       if (projection.NbPoints() == 0)
         throw ValueError("trim edge " + std::to_string(edge_index) + " could not be projected onto the carrier");
@@ -142,7 +152,8 @@ void validate_trim_wire_domain(const TopoDS_Wire& wire, const TopoDS_Face& carri
       v_values.push_back(v);
     }
   }
-  if (edge_index < 1) throw ValueError("trim wire contains no edges");
+  if (edge_index < 1)
+    throw ValueError("trim wire contains no edges");
 
   const std::optional<double> u_period = surface->IsUPeriodic() ? std::optional(surface->UPeriod()) : std::nullopt;
   const std::optional<double> v_period = surface->IsVPeriodic() ? std::optional(surface->VPeriod()) : std::nullopt;
@@ -151,13 +162,15 @@ void validate_trim_wire_domain(const TopoDS_Wire& wire, const TopoDS_Face& carri
     u_tolerance = tolerance / cylinder->Radius();
   const bool u_outside = u_period && !fits_parameter_bounds(u_values, u_min, u_max, u_tolerance, u_period);
   const bool v_outside = v_period && !fits_parameter_bounds(v_values, v_min, v_max, tolerance, v_period);
-  if (u_outside || v_outside) throw ValueError("trim wire lies outside the bounded carrier parameter domain");
+  if (u_outside || v_outside)
+    throw ValueError("trim wire lies outside the bounded carrier parameter domain");
 }
 
 // ---- projection ---------------------------------------------------------------------------------------
 TopoDS_Wire project_trim_wire(const TopoDS_Wire& wire, const TopoDS_Face& support, double tolerance) {
   BRepBuilderAPI_Copy copied(wire, true, false);
-  if (!copied.IsDone() || copied.Shape().IsNull()) throw ValueError("OCP could not copy the trim wire");
+  if (!copied.IsDone() || copied.Shape().IsNull())
+    throw ValueError("OCP could not copy the trim wire");
   TopoDS_Wire result = TopoDS::Wire(copied.Shape());
 
   ShapeFix_Edge edge_fix;
@@ -168,24 +181,29 @@ TopoDS_Wire project_trim_wire(const TopoDS_Wire& wire, const TopoDS_Face& suppor
     edge_fix.FixAddPCurve(edge, support, false, tolerance);
     double first = 0.0, last = 0.0;
     const Handle(Geom2d_Curve) pcurve = BRep_Tool::CurveOnSurface(edge, support, first, last);
-    if (pcurve.IsNull()) throw ValueError("trim edge " + index + " could not be projected");
+    if (pcurve.IsNull())
+      throw ValueError("trim edge " + index + " could not be projected");
 
     GeomLib_CheckCurveOnSurface check(new BRepAdaptor_Curve(edge), tolerance);
-    check.Perform(new Adaptor3d_CurveOnSurface(new Geom2dAdaptor_Curve(pcurve, first, last), new BRepAdaptor_Surface(support)));
+    check.Perform(
+        new Adaptor3d_CurveOnSurface(new Geom2dAdaptor_Curve(pcurve, first, last), new BRepAdaptor_Surface(support)));
     if (!check.IsDone() || check.ErrorStatus() != 0)
       throw ValueError("trim edge " + index + " could not be validated against the carrier");
     if (check.MaxDistance() > tolerance)
       throw ValueError("trim edge " + index + " deviates from the carrier beyond tolerance");
     edge_fix.FixSameParameter(edge, support, tolerance);
   }
-  if (edge_count < 1) throw ValueError("trim wire contains no edges");
+  if (edge_count < 1)
+    throw ValueError("trim wire contains no edges");
 
   ShapeFix_Wire wire_fix(result, support, tolerance);
   wire_fix.Perform();
   result = wire_fix.Wire();
-  if (result.IsNull() || !BRepCheck_Analyzer(result).IsValid()) throw ValueError("projected trim wire is invalid");
+  if (result.IsNull() || !BRepCheck_Analyzer(result).IsValid())
+    throw ValueError("projected trim wire is invalid");
   BRepCheck_Wire wire_check(result);
-  if (wire_check.Closed() != BRepCheck_NoError) throw ValueError("projected trim wire must be closed");
+  if (wire_check.Closed() != BRepCheck_NoError)
+    throw ValueError("projected trim wire must be closed");
   TopoDS_Edge first_intersection, second_intersection;
   if (wire_check.SelfIntersect(support, first_intersection, second_intersection) != BRepCheck_NoError)
     throw ValueError("projected trim wire must be simple and non-self-intersecting");
@@ -193,7 +211,8 @@ TopoDS_Wire project_trim_wire(const TopoDS_Wire& wire, const TopoDS_Face& suppor
 }
 
 TopoDS_Face single_trimmed_face(const TopoDS_Shape& shape, const std::string& description) {
-  if (shape.ShapeType() == TopAbs_FACE) return TopoDS::Face(shape);
+  if (shape.ShapeType() == TopAbs_FACE)
+    return TopoDS::Face(shape);
   const std::vector<TopoDS_Face> faces = kernel::faces_of(shape);
   if (faces.empty())
     throw ValueError(description + " must produce exactly one connected Face; intersection is empty");
@@ -203,22 +222,25 @@ TopoDS_Face single_trimmed_face(const TopoDS_Shape& shape, const std::string& de
   return faces.front();
 }
 
-TopoDS_Face trim_surface_face(const TopoDS_Face& carrier, const TopoDS_Wire& outer, const std::vector<TopoDS_Wire>& holes,
-                              double tolerance) {
+TopoDS_Face trim_surface_face(const TopoDS_Face& carrier, const TopoDS_Wire& outer,
+                              const std::vector<TopoDS_Wire>& holes, double tolerance) {
   const Handle(Geom_Surface) surface = BRep_Tool::Surface(carrier);
   if ((surface->IsUPeriodic() || surface->IsVPeriodic()) && !holes.empty())
     throw ValueError("periodic carrier trimming with holes is not supported");
   validate_closed_trim_wire(outer, "outer");
-  for (std::size_t i = 0; i < holes.size(); ++i) validate_closed_trim_wire(holes[i], "hole " + std::to_string(i));
+  for (std::size_t i = 0; i < holes.size(); ++i)
+    validate_closed_trim_wire(holes[i], "hole " + std::to_string(i));
   validate_trim_wire_domain(outer, carrier, tolerance);
-  for (const TopoDS_Wire& wire : holes) validate_trim_wire_domain(wire, carrier, tolerance);
+  for (const TopoDS_Wire& wire : holes)
+    validate_trim_wire_domain(wire, carrier, tolerance);
 
   BRepBuilderAPI_MakeFace support_builder;
   support_builder.Init(surface, false, tolerance);
   const TopoDS_Face support = support_builder.Face();
   TopoDS_Wire outer_wire = project_trim_wire(outer, support, tolerance);
   std::vector<TopoDS_Wire> hole_wires;
-  for (const TopoDS_Wire& wire : holes) hole_wires.push_back(project_trim_wire(wire, support, tolerance));
+  for (const TopoDS_Wire& wire : holes)
+    hole_wires.push_back(project_trim_wire(wire, support, tolerance));
 
   // The requested loop must run the way the carrier's own outer loop does.
   const double carrier_area = wire_uv_area(BRepTools::OuterWire(carrier), carrier);
@@ -234,7 +256,8 @@ TopoDS_Face trim_surface_face(const TopoDS_Face& carrier, const TopoDS_Wire& out
     face_builder.Add(outer_area * area > 0.0 ? TopoDS::Wire(wire.Reversed()) : wire);
   }
   face_builder.Build();
-  if (!face_builder.IsDone() || face_builder.Face().IsNull()) throw ValueError("OCP could not build the trimmed surface face");
+  if (!face_builder.IsDone() || face_builder.Face().IsNull())
+    throw ValueError("OCP could not build the trimmed surface face");
   const TopoDS_Face requested_face = face_builder.Face();
 
   TopTools_ListOfShape arguments, tools;
@@ -247,12 +270,13 @@ TopoDS_Face trim_surface_face(const TopoDS_Face& carrier, const TopoDS_Wire& out
   common.SetUseOBB(true);
   common.SetNonDestructive(true);
   common.Build();
-  if (!common.IsDone()) throw ValueError("OCP could not intersect the trim with the bounded carrier");
+  if (!common.IsDone())
+    throw ValueError("OCP could not intersect the trim with the bounded carrier");
   if (common.Shape().IsNull())
-    throw ValueError(
-        "trimmed carrier intersection must produce exactly one connected Face; intersection is empty");
+    throw ValueError("trimmed carrier intersection must produce exactly one connected Face; intersection is empty");
   const TopoDS_Face face = single_trimmed_face(common.Shape(), "trimmed carrier intersection");
-  if (!BRepCheck_Analyzer(face).IsValid()) throw ValueError("trimmed surface face is invalid");
+  if (!BRepCheck_Analyzer(face).IsValid())
+    throw ValueError("trimmed surface face is invalid");
   return face;
 }
 
@@ -271,7 +295,8 @@ Face trim_surface_rface(const Face& carrier, const Wire& outer, const TrimSurfac
   return operator_scope(kSpec, [&] {
     const double tolerance = require_positive_finite(options.tolerance, "tolerance");
     std::vector<TopoDS_Wire> holes;
-    for (const Wire& hole : options.holes) holes.push_back(TopoDS::Wire(hole.wrapped()));
+    for (const Wire& hole : options.holes)
+      holes.push_back(TopoDS::Wire(hole.wrapped()));
 
     const TopoDS_Face trimmed =
         trim_surface_face(TopoDS::Face(carrier.wrapped()), TopoDS::Wire(outer.wrapped()), holes, tolerance);
@@ -280,7 +305,8 @@ Face trim_surface_rface(const Face& carrier, const Wire& outer, const TrimSurfac
     params.set("hole_count", static_cast<std::int64_t>(holes.size()));
     params.set("tolerance", tolerance);
     params.set("tag_prefix", to_value(options.tag_prefix));
-    FaceOutput output{.record = {.op = "trim_surface_rface", .params = std::move(params)}, .tag_prefix = options.tag_prefix};
+    FaceOutput output{.record = {.op = "trim_surface_rface", .params = std::move(params)},
+                      .tag_prefix = options.tag_prefix};
     output.record.inputs.push_back({carrier, "carrier"});
     output.record.inputs.push_back({outer, "outer"});
     output.fragment_sources = {carrier, outer};

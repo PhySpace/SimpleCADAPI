@@ -14,8 +14,7 @@ const ErrorSpec& normalize_spec() {
   static const ErrorSpec spec{
       "CoordinateSystem._normalize",
       "A zero-length vector cannot be normalized.",
-      {"The input vector is exactly (0, 0, 0).",
-       "The input values collapsed to zero after numeric conversion."},
+      {"The input vector is exactly (0, 0, 0).", "The input values collapsed to zero after numeric conversion."},
       {"Provide a non-zero direction vector.", "Check upstream calculations that produce this vector."}};
   return spec;
 }
@@ -36,8 +35,7 @@ const ErrorSpec& point_spec() {
   static const ErrorSpec spec{
       "CoordinateSystem.transform_point",
       "The point contains non-finite numeric values.",
-      {"A previous computation produced NaN or infinity.",
-       "The point was assembled from invalid expression results."},
+      {"A previous computation produced NaN or infinity.", "The point was assembled from invalid expression results."},
       {"Inspect the upstream values used to build the point.",
        "Replace NaN or infinity with finite numeric coordinates before calling this API."}};
   return spec;
@@ -47,8 +45,7 @@ const ErrorSpec& vector_spec() {
   static const ErrorSpec spec{
       "CoordinateSystem.transform_vector",
       "The vector contains non-finite numeric values.",
-      {"A previous computation produced NaN or infinity.",
-       "The direction vector was derived from invalid geometry."},
+      {"A previous computation produced NaN or infinity.", "The direction vector was derived from invalid geometry."},
       {"Inspect the upstream direction calculation.",
        "Ensure all vector components are finite numbers before calling this API."}};
   return spec;
@@ -56,7 +53,8 @@ const ErrorSpec& vector_spec() {
 
 Vec3 normalize_or_raise(const Vec3& v) {
   const double n = v.norm();
-  if (n == 0.0) raise_harness_error(normalize_spec(), "vector=" + to_string(v));
+  if (n == 0.0)
+    raise_harness_error(normalize_spec(), "vector=" + to_string(v));
   return v / n;
 }
 
@@ -77,8 +75,7 @@ std::vector<const CoordinateSystem*>& cs_stack() {
 
 CoordinateSystem::CoordinateSystem() : origin_{0, 0, 0}, x_{1, 0, 0}, y_{0, 1, 0}, z_{0, 0, 1} {}
 
-CoordinateSystem::CoordinateSystem(const Vec3& origin, const Vec3& x_axis, const Vec3& y_axis)
-    : origin_(origin) {
+CoordinateSystem::CoordinateSystem(const Vec3& origin, const Vec3& x_axis, const Vec3& y_axis) : origin_(origin) {
   try {
     if (!origin.is_finite() || !x_axis.is_finite() || !y_axis.is_finite())
       throw ValueError("origin and axes must be finite");
@@ -93,12 +90,14 @@ CoordinateSystem::CoordinateSystem(const Vec3& origin, const Vec3& x_axis, const
 }
 
 Vec3 CoordinateSystem::transform_point(const Vec3& local) const {
-  if (!local.is_finite()) raise_harness_error(point_spec(), "point=" + scad::to_string(local));
+  if (!local.is_finite())
+    raise_harness_error(point_spec(), "point=" + scad::to_string(local));
   return origin_ + x_ * local.x + y_ * local.y + z_ * local.z;
 }
 
 Vec3 CoordinateSystem::transform_vector(const Vec3& local) const {
-  if (!local.is_finite()) raise_harness_error(vector_spec(), "vector=" + scad::to_string(local));
+  if (!local.is_finite())
+    raise_harness_error(vector_spec(), "vector=" + scad::to_string(local));
   return x_ * local.x + y_ * local.y + z_ * local.z;
 }
 
@@ -131,7 +130,9 @@ CoordinateSystemScope::CoordinateSystemScope(CoordinateSystem cs) : cs_(std::mov
   cs_stack().push_back(&cs_);
 }
 
-CoordinateSystemScope::~CoordinateSystemScope() { cs_stack().pop_back(); }
+CoordinateSystemScope::~CoordinateSystemScope() {
+  cs_stack().pop_back();
+}
 
 namespace {
 
@@ -166,24 +167,28 @@ CoordinateSystem workplane_frame(const Vec3& origin, const Vec3& normal, const V
 Workplane::Workplane(const Vec3& origin, const Vec3& normal, const Vec3& x_dir)
     : cs_(workplane_frame(origin, normal, x_dir)) {}
 
-Workplane::~Workplane() { exit(); }
+Workplane::~Workplane() {
+  exit();
+}
 
 void Workplane::enter() {
-  if (entered_) throw RuntimeError("Workplane is already entered");
+  if (entered_)
+    throw RuntimeError("Workplane is already entered");
   cs_stack().push_back(&cs_);
   entered_ = true;
 }
 
 void Workplane::exit() noexcept {
-  if (!entered_) return;
+  if (!entered_)
+    return;
   auto& stack = cs_stack();
-  if (!stack.empty()) stack.pop_back();
+  if (!stack.empty())
+    stack.pop_back();
   entered_ = false;
 }
 
 std::string Workplane::repr() const {
-  return "SimpleWorkplane(origin=" + scad::to_string(cs_.origin()) +
-         ", normal=" + scad::to_string(cs_.z_axis()) + ")";
+  return "SimpleWorkplane(origin=" + scad::to_string(cs_.origin()) + ", normal=" + scad::to_string(cs_.z_axis()) + ")";
 }
 
 std::string Workplane::to_string(int indent, bool show_coordinate_system) const {

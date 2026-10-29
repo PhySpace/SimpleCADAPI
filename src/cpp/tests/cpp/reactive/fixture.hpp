@@ -20,7 +20,9 @@
 
 namespace scad::reactive::testing {
 
-inline Solid build_box(double w, double h, double d) { return Solid(BRepPrimAPI_MakeBox(w, h, d).Shape()); }
+inline Solid build_box(double w, double h, double d) {
+  return Solid(BRepPrimAPI_MakeBox(w, h, d).Shape());
+}
 
 inline Shape build_translated(const Shape& shape, double dx) {
   gp_Trsf move;
@@ -47,8 +49,10 @@ class Fixture {
   Fixture() {
     registry.add("synth_box", [this](const Value& p, const std::vector<OpInput>&, const ScalarValues&) {
       ++calls["synth_box"];
-      const double w = p.find("width")->as_double(), h = p.find("height")->as_double(), d = p.find("depth")->as_double();
-      if (w <= 0 || h <= 0 || d <= 0) throw ValueError("box sizes must be positive");
+      const double w = p.find("width")->as_double(), h = p.find("height")->as_double(),
+                   d = p.find("depth")->as_double();
+      if (w <= 0 || h <= 0 || d <= 0)
+        throw ValueError("box sizes must be positive");
       return std::vector<Shape>{build_box(w, h, d)};
     });
     registry.add("synth_translate", [this](const Value& p, const std::vector<OpInput>& in, const ScalarValues&) {
@@ -82,9 +86,12 @@ class Fixture {
     rec.params.set("width", wv);
     rec.params.set("height", hv);
     rec.params.set("depth", dv);
-    if (w.symbolic()) rec.symbolic.emplace_back("width", w);
-    if (h.symbolic()) rec.symbolic.emplace_back("height", h);
-    if (d.symbolic()) rec.symbolic.emplace_back("depth", d);
+    if (w.symbolic())
+      rec.symbolic.emplace_back("width", w);
+    if (h.symbolic())
+      rec.symbolic.emplace_back("height", h);
+    if (d.symbolic())
+      rec.symbolic.emplace_back("depth", d);
     record_operation(rec, {out});
     return out;
   }
@@ -96,7 +103,8 @@ class Fixture {
     rec.op = "synth_translate";
     rec.params = Value::object();
     rec.params.set("dx", dv);
-    if (dx.symbolic()) rec.symbolic.emplace_back("dx", dx);
+    if (dx.symbolic())
+      rec.symbolic.emplace_back("dx", dx);
     rec.inputs.push_back(OpInput{shape, "body"});
     record_operation(rec, {out});
     return out;

@@ -26,15 +26,22 @@ using detail::upper;
 
 // ---- Python-flavoured reads of witness dictionaries ------------------------------
 
-const Value* member(const Value& dict, std::string_view key) { return dict.find(key); }
+const Value* member(const Value& dict, std::string_view key) {
+  return dict.find(key);
+}
 
-bool present(const Value* v) { return v != nullptr && !v->is_null(); }
+bool present(const Value* v) {
+  return v != nullptr && !v->is_null();
+}
 
 // str(value) as Python prints it.
 std::string py_str(const Value& v) {
-  if (v.is_string()) return v.as_string();
-  if (v.is_null()) return "None";
-  if (v.is_bool()) return v.as_bool() ? "True" : "False";
+  if (v.is_string())
+    return v.as_string();
+  if (v.is_null())
+    return "None";
+  if (v.is_bool())
+    return v.as_bool() ? "True" : "False";
   return v.dump();
 }
 
@@ -46,24 +53,35 @@ std::string str_of(const Value& dict, std::string_view key, std::string fallback
 
 // _event_name: stripped lower-case name, or nullopt.
 std::optional<std::string> event_name(const Value* v) {
-  if (!present(v)) return std::nullopt;
+  if (!present(v))
+    return std::nullopt;
   std::string token = lower(detail::strip(py_str(*v)));
-  if (token.empty()) return std::nullopt;
+  if (token.empty())
+    return std::nullopt;
   return token;
 }
 
-Value optional_text(const std::optional<std::string>& s) { return s ? Value(*s) : Value(); }
+Value optional_text(const std::optional<std::string>& s) {
+  return s ? Value(*s) : Value();
+}
 
 bool truthy(const Value* v) {
-  if (v == nullptr || v->is_null()) return false;
-  if (v->is_bool()) return v->as_bool();
-  if (v->is_int()) return v->as_int() != 0;
-  if (v->is_double()) return v->as_double() != 0.0;
-  if (v->is_string()) return !v->as_string().empty();
+  if (v == nullptr || v->is_null())
+    return false;
+  if (v->is_bool())
+    return v->as_bool();
+  if (v->is_int())
+    return v->as_int() != 0;
+  if (v->is_double())
+    return v->as_double() != 0.0;
+  if (v->is_string())
+    return !v->as_string().empty();
   return v->size() != 0;
 }
 
-std::string kind_token(Kind kind) { return upper(kind_name(kind)); }
+std::string kind_token(Kind kind) {
+  return upper(kind_name(kind));
+}
 
 // ---- delta entries ----------------------------------------------------------------
 
@@ -86,7 +104,8 @@ std::vector<Value> normalized_witnesses(const Value& entry) {
   const Value* raw = member(entry, "witnesses");
   if (raw != nullptr && raw->is_array() && raw->size() != 0) {
     for (const Value& item : raw->as_array())
-      if (item.is_object()) out.push_back(item);
+      if (item.is_object())
+        out.push_back(item);
     return out;
   }
   out.push_back(entry);
@@ -96,20 +115,24 @@ std::vector<Value> normalized_witnesses(const Value& entry) {
 // _matching_entry
 std::optional<Value> matching_entry(const DeltaEntries& entries, std::string_view topo_id, Kind kind) {
   const Value* entry = by_key(entries, topo_id);
-  if (entry == nullptr || !entry->is_object()) return std::nullopt;
+  if (entry == nullptr || !entry->is_object())
+    return std::nullopt;
   const std::string expected = kind_token(kind);
   std::vector<Value> witnesses;
   for (Value& witness : normalized_witnesses(*entry)) {
     const Value* own = member(witness, "kind");
     const Value* fallback = member(*entry, "kind");
     const std::string actual = own != nullptr ? py_str(*own) : (fallback != nullptr ? py_str(*fallback) : expected);
-    if (upper(actual) == expected) witnesses.push_back(std::move(witness));
+    if (upper(actual) == expected)
+      witnesses.push_back(std::move(witness));
   }
-  if (witnesses.empty()) return std::nullopt;
+  if (witnesses.empty())
+    return std::nullopt;
   Value matched = *entry;
   matched.set("kind", expected);
   Value list = Value::array();
-  for (Value& w : witnesses) list.push_back(std::move(w));
+  for (Value& w : witnesses)
+    list.push_back(std::move(w));
   matched.set("witnesses", std::move(list));
   return matched;
 }
@@ -131,35 +154,44 @@ Value normalized_tracking_witness(const Value& witness, Kind default_kind) {
       {"evidence_kind", lower(str_of(witness, "evidence_kind", "kernel_history"))},
   });
   for (const std::string_view key : {"result_role", "evidence_method", "project_source_tags"})
-    if (const Value* v = member(witness, key); present(v)) result.set(std::string(key), *v);
-  if (const Value* refs = member(witness, "parent_refs"); present(refs)) result.set("parent_refs", *refs);
-  if (truthy(member(witness, "section"))) result.set("section", true);
+    if (const Value* v = member(witness, key); present(v))
+      result.set(std::string(key), *v);
+  if (const Value* refs = member(witness, "parent_refs"); present(refs))
+    result.set("parent_refs", *refs);
+  if (truthy(member(witness, "section")))
+    result.set("section", true);
   return result;
 }
 
 Value sorted_strings(const std::set<std::string>& items) {
   Value out = Value::array();
-  for (const auto& item : items) out.push_back(item);
+  for (const auto& item : items)
+    out.push_back(item);
   return out;
 }
 
 // _tracking_payload
 Value tracking_payload(const Value& entry, std::string_view op, std::string_view topo_id, Kind kind) {
   std::vector<Value> witnesses;
-  for (const Value& item : normalized_witnesses(entry)) witnesses.push_back(normalized_tracking_witness(item, kind));
+  for (const Value& item : normalized_witnesses(entry))
+    witnesses.push_back(normalized_tracking_witness(item, kind));
 
   std::set<std::string> events, origin_roles, result_roles;
   bool all_complete = !witnesses.empty(), all_proven = !witnesses.empty();
   for (const Value& w : witnesses) {
-    if (const Value* v = member(w, "event"); present(v)) events.insert(py_str(*v));
-    if (const Value* v = member(w, "origin_role"); present(v)) origin_roles.insert(py_str(*v));
-    if (const Value* v = member(w, "result_role"); present(v)) result_roles.insert(py_str(*v));
+    if (const Value* v = member(w, "event"); present(v))
+      events.insert(py_str(*v));
+    if (const Value* v = member(w, "origin_role"); present(v))
+      origin_roles.insert(py_str(*v));
+    if (const Value* v = member(w, "result_role"); present(v))
+      result_roles.insert(py_str(*v));
     all_complete = all_complete && py_str(*member(w, "coverage")) == "complete";
     all_proven = all_proven && py_str(*member(w, "status")) == "proven";
   }
 
   Value list = Value::array();
-  for (Value& w : witnesses) list.push_back(std::move(w));
+  for (Value& w : witnesses)
+    list.push_back(std::move(w));
   Value payload = object({
       {"schema_version", "1.0"},
       {"kind", "topology_change"},
@@ -174,9 +206,12 @@ Value tracking_payload(const Value& entry, std::string_view op, std::string_view
       {"result_roles", sorted_strings(result_roles)},
       {"witnesses", std::move(list)},
   });
-  if (events.size() == 1) payload.set("event", *events.begin());
-  if (origin_roles.size() == 1) payload.set("origin_role", *origin_roles.begin());
-  if (result_roles.size() == 1) payload.set("result_role", *result_roles.begin());
+  if (events.size() == 1)
+    payload.set("event", *events.begin());
+  if (origin_roles.size() == 1)
+    payload.set("origin_role", *origin_roles.begin());
+  if (result_roles.size() == 1)
+    payload.set("result_role", *result_roles.begin());
   return payload;
 }
 
@@ -212,8 +247,9 @@ Value expand_unknown_track(const Value& args) {
 }();
 
 void set_unknown_track(Shape& shape, std::string_view op, const std::string& topo_id, Kind kind) {
-  shape.set_metadata_recipe("track", kUnknownTrackRecipe,
-                            Value(Value::Array{Value(std::string(op)), Value(topo_id), Value(static_cast<std::int64_t>(kind))}));
+  shape.set_metadata_recipe(
+      "track", kUnknownTrackRecipe,
+      Value(Value::Array{Value(std::string(op)), Value(topo_id), Value(static_cast<std::int64_t>(kind))}));
 }
 
 // ---- lineage and projection --------------------------------------------------------
@@ -236,18 +272,21 @@ void carry_source_lineage(Shape& target, const Value& entry, const TopologyIndex
   for (const Value& witness : normalized_witnesses(entry)) {
     const std::string derivation_token = lower(str_of(witness, "derivation", "unknown"));
     const auto derivation = lineage_derivation_or_none(derivation_token);
-    if (!derivation) continue;  // an operation role can be complete without proving tag lineage
+    if (!derivation)
+      continue;  // an operation role can be complete without proving tag lineage
     const Shape* source = source_of(witness, sources);
-    if (source == nullptr) continue;
+    if (source == nullptr)
+      continue;
 
     const std::string coverage = str_of(witness, "coverage", "complete");
     TagEvidence evidence;
     evidence.kind = TagEvidenceKind::TopologyChange;
-    evidence.data = object({{"op", std::string(op)},
-                            {"event", optional_text(event_name(member(witness, "event")))},
-                            {"origin_role", member(witness, "origin_role") != nullptr ? *member(witness, "origin_role") : Value()},
-                            {"coverage", coverage},
-                            {"derivation", derivation_token}});
+    evidence.data =
+        object({{"op", std::string(op)},
+                {"event", optional_text(event_name(member(witness, "event")))},
+                {"origin_role", member(witness, "origin_role") != nullptr ? *member(witness, "origin_role") : Value()},
+                {"coverage", coverage},
+                {"derivation", derivation_token}});
 
     std::vector<TagBinding> bindings = source->local_tag_bindings();
     for (const TagLineageWitness& carried : source->lineage_witnesses())
@@ -256,12 +295,16 @@ void carry_source_lineage(Shape& target, const Value& entry, const TopologyIndex
     // One binding per id; the later record of an id replaces the earlier, keeping its place.
     std::vector<TagBinding> unique;
     for (TagBinding& binding : bindings) {
-      const auto at = std::find_if(unique.begin(), unique.end(), [&](const TagBinding& b) { return b.binding_id == binding.binding_id; });
-      if (at != unique.end()) *at = std::move(binding);
-      else unique.push_back(std::move(binding));
+      const auto at = std::find_if(unique.begin(), unique.end(),
+                                   [&](const TagBinding& b) { return b.binding_id == binding.binding_id; });
+      if (at != unique.end())
+        *at = std::move(binding);
+      else
+        unique.push_back(std::move(binding));
     }
     for (const TagBinding& binding : unique) {
-      if (!lineage_policy_allows(binding.propagation(), *derivation)) continue;
+      if (!lineage_policy_allows(binding.propagation(), *derivation))
+        continue;
       target.add_tag_lineage(binding, *derivation, source->topo_id(), evidence, coverage);
     }
   }
@@ -270,7 +313,8 @@ void carry_source_lineage(Shape& target, const Value& entry, const TopologyIndex
 // _apply_operation_role_bindings
 void apply_operation_role_bindings(Shape& target, const Value& track, std::string_view op) {
   const Value* witnesses = member(track, "witnesses");
-  if (witnesses == nullptr || !witnesses->is_array()) return;
+  if (witnesses == nullptr || !witnesses->is_array())
+    return;
   for (const Value& witness : witnesses->as_array()) {
     const Value* role = member(witness, "result_role");
     if (!present(role) || py_str(*member(witness, "status")) != "proven" ||
@@ -283,19 +327,23 @@ void apply_operation_role_bindings(Shape& target, const Value& track, std::strin
   }
 }
 
-bool is_dict(const Value* v) { return v != nullptr && v->is_object(); }
+bool is_dict(const Value* v) {
+  return v != nullptr && v->is_object();
+}
 
 // _project_source_bindings
 void project_source_bindings(Shape& target, const Value& entry, const TopologyIndex& sources, std::string_view op,
                              bool require_lineage_policy,
                              const std::map<std::string, std::set<std::string>>& topology_source_targets) {
   for (const Value& witness : normalized_witnesses(entry)) {
-    if (!truthy(member(witness, "project_source_tags"))) continue;
+    if (!truthy(member(witness, "project_source_tags")))
+      continue;
     if (lower(str_of(witness, "coverage", "partial")) != "complete" ||
         lower(str_of(witness, "status", "unknown")) != "proven")
       continue;
     const Shape* source = source_of(witness, sources);
-    if (source == nullptr) continue;
+    if (source == nullptr)
+      continue;
 
     const std::string derivation = lower(str_of(witness, "derivation", "unknown"));
     const std::optional<std::string> event = event_name(member(witness, "event"));
@@ -319,32 +367,36 @@ void project_source_bindings(Shape& target, const Value& entry, const TopologyIn
       const bool is_user = binding.producer().kind == TagProducerKind::UserOperation;
       const bool is_prior_projection = binding.producer().kind == TagProducerKind::AutoRule &&
                                        binding.producer().rule_id == "simplecad.feature_source_tag_projection";
-      const bool is_output_naming =
-          is_dict(member(evidence, "operation_output_role")) || is_dict(member(evidence, "source_operation_output_role"));
+      const bool is_output_naming = is_dict(member(evidence, "operation_output_role")) ||
+                                    is_dict(member(evidence, "source_operation_output_role"));
       const bool is_topology_naming =
           is_dict(member(evidence, "topology_name")) || is_dict(member(evidence, "source_topology_name"));
 
       if (is_topology_naming) {
         std::set<std::string> source_ids;
         for (const Value& item : normalized_witnesses(entry))
-          if (const Value* id = member(item, "input_topo_id"); present(id)) source_ids.insert(py_str(*id));
+          if (const Value* id = member(item, "input_topo_id"); present(id))
+            source_ids.insert(py_str(*id));
         // Python looks the table up by the source's entity id although it is keyed by kernel id, so
         // a topology-named binding is never projected through this path; kept for parity.
         const auto exact = topology_source_targets.find(source->topo_id());
         const bool exact_match = exact != topology_source_targets.end() && exact->second.size() == 1 &&
                                  *exact->second.begin() == target.topo_id();
-        if (source_ids.size() != 1 || !exact_match) continue;  // never project a topology identity through a split or merge
+        if (source_ids.size() != 1 || !exact_match)
+          continue;  // never project a topology identity through a split or merge
       }
       if (require_lineage_policy) {
-        if ((!is_output_naming && !is_topology_naming) || (!is_user && !is_prior_projection)) continue;
+        if ((!is_output_naming && !is_topology_naming) || (!is_user && !is_prior_projection))
+          continue;
       } else if (!(is_user || is_prior_projection)) {
         continue;
       }
       if (require_lineage_policy && !lineage_policy_allows(binding.propagation(), parse_lineage_derivation(derivation)))
         continue;
-      target.add_binding(projected_tag_binding(
-          binding, op, role, source->topo_id(), target.topo_id(), evidence_method,
-          target.kind() == Kind::Face && is_topology_naming ? TopologyPropagation::Downward : TopologyPropagation::Local));
+      target.add_binding(projected_tag_binding(binding, op, role, source->topo_id(), target.topo_id(), evidence_method,
+                                               target.kind() == Kind::Face && is_topology_naming
+                                                   ? TopologyPropagation::Downward
+                                                   : TopologyPropagation::Local));
     }
   }
 }
@@ -352,9 +404,11 @@ void project_source_bindings(Shape& target, const Value& entry, const TopologyIn
 // _lineage_coverage
 std::string lineage_coverage(const Value& entry, const TopologyIndex& sources) {
   for (const Value& witness : normalized_witnesses(entry)) {
-    if (lower(str_of(witness, "coverage", "partial")) != "complete") return "partial";
+    if (lower(str_of(witness, "coverage", "partial")) != "complete")
+      return "partial";
     const Value* id = member(witness, "input_topo_id");
-    if (present(id) && sources.find(py_str(*id)) == nullptr) return "partial";
+    if (present(id) && sources.find(py_str(*id)) == nullptr)
+      return "partial";
   }
   return "complete";
 }
@@ -363,23 +417,35 @@ std::string lineage_coverage(const Value& entry, const TopologyIndex& sources) {
 
 std::vector<Shape> faces_of(const Shape& shape) {
   switch (shape.kind()) {
-    case Kind::Face: return {shape};
-    case Kind::Shell: return detail::as_shapes(Shell(shape).faces());
-    case Kind::Solid: return detail::as_shapes(Solid(shape).faces());
-    case Kind::Compound: return detail::as_shapes(Compound(shape).faces());
-    default: return {};
+    case Kind::Face:
+      return {shape};
+    case Kind::Shell:
+      return detail::as_shapes(Shell(shape).faces());
+    case Kind::Solid:
+      return detail::as_shapes(Solid(shape).faces());
+    case Kind::Compound:
+      return detail::as_shapes(Compound(shape).faces());
+    default:
+      return {};
   }
 }
 
 std::vector<Shape> edges_of(const Shape& shape) {
   switch (shape.kind()) {
-    case Kind::Edge: return {shape};
-    case Kind::Wire: return detail::as_shapes(Wire(shape).edges());
-    case Kind::Face: return detail::as_shapes(Face(shape).edges());
-    case Kind::Shell: return detail::as_shapes(Shell(shape).edges());
-    case Kind::Solid: return detail::as_shapes(Solid(shape).edges());
-    case Kind::Compound: return detail::as_shapes(Compound(shape).edges());
-    default: return {};
+    case Kind::Edge:
+      return {shape};
+    case Kind::Wire:
+      return detail::as_shapes(Wire(shape).edges());
+    case Kind::Face:
+      return detail::as_shapes(Face(shape).edges());
+    case Kind::Shell:
+      return detail::as_shapes(Shell(shape).edges());
+    case Kind::Solid:
+      return detail::as_shapes(Solid(shape).edges());
+    case Kind::Compound:
+      return detail::as_shapes(Compound(shape).edges());
+    default:
+      return {};
   }
 }
 
@@ -388,9 +454,13 @@ std::vector<Shape> edges_of(const Shape& shape) {
 // ---------------------------------------------------------------------------
 // Public pieces
 // ---------------------------------------------------------------------------
-std::string topology_key(const Shape& shape) { return kernel_topo_id(shape.wrapped()); }
+std::string topology_key(const Shape& shape) {
+  return kernel_topo_id(shape.wrapped());
+}
 
-void TopologyIndex::add(const Shape& shape) { shapes_.insert_or_assign(topology_key(shape), shape); }
+void TopologyIndex::add(const Shape& shape) {
+  shapes_.insert_or_assign(topology_key(shape), shape);
+}
 
 const Shape* TopologyIndex::find(std::string_view id) const {
   const auto it = shapes_.find(id);
@@ -399,10 +469,13 @@ const Shape* TopologyIndex::find(std::string_view id) const {
 
 std::string operation_alias(std::string_view op) {
   std::string token = lower(detail::strip(op));
-  if (detail::starts_with(token, "op.")) token.erase(0, 3);
-  if (detail::starts_with(token, "make_")) token.erase(0, 5);
+  if (detail::starts_with(token, "op."))
+    token.erase(0, 3);
+  if (detail::starts_with(token, "make_"))
+    token.erase(0, 5);
   for (const std::string_view suffix : {"_rsolid", "_rshape", "_rface", "_rwire", "_redge"})
-    if (detail::ends_with(token, suffix)) return token.substr(0, token.size() - suffix.size());
+    if (detail::ends_with(token, suffix))
+      return token.substr(0, token.size() - suffix.size());
   return token;
 }
 
@@ -410,7 +483,8 @@ DeltaEntries entries_from_delta(const TopoDelta& delta) {
   DeltaEntries result;
   for (const TopoEntry& entry : delta.entries) {
     Value parents = Value::array();
-    for (const TopoRef& ref : entry.parent_refs) parents.push_back(ref_value(ref));
+    for (const TopoRef& ref : entry.parent_refs)
+      parents.push_back(ref_value(ref));
     const auto metadata = [&](std::string_view key, Value fallback) {
       const Value* v = entry.metadata.find(key);
       return v != nullptr ? *v : std::move(fallback);
@@ -433,16 +507,15 @@ DeltaEntries entries_from_delta(const TopoDelta& delta) {
     auto found = result.find(entry.ref.topo_id);
     if (found == result.end()) {
       found = result
-                  .emplace(entry.ref.topo_id,
-                           object({{"topo_id", entry.ref.topo_id},
-                                   {"kind", kind_token(entry.ref.kind)},
-                                   {"event", event},
-                                   {"origin_role", optional_text(entry.origin_role)},
-                                   {"input_topo_id", input_id},
-                                   {"derivation", *witness.find("derivation")},
-                                   {"coverage", *witness.find("coverage")},
-                                   {"status", *witness.find("status")},
-                                   {"witnesses", Value::array()}}))
+                  .emplace(entry.ref.topo_id, object({{"topo_id", entry.ref.topo_id},
+                                                      {"kind", kind_token(entry.ref.kind)},
+                                                      {"event", event},
+                                                      {"origin_role", optional_text(entry.origin_role)},
+                                                      {"input_topo_id", input_id},
+                                                      {"derivation", *witness.find("derivation")},
+                                                      {"coverage", *witness.find("coverage")},
+                                                      {"status", *witness.find("status")},
+                                                      {"witnesses", Value::array()}}))
                   .first;
     }
     found->second.find("witnesses")->push_back(std::move(witness));
@@ -457,14 +530,17 @@ Shape apply_tracking_tags(Shape result, const TopoDelta& delta, const DeltaEntri
 
   TopologyIndex source_faces, source_edges;
   for (const Shape& source : context.sources) {
-    for (const Shape& face : faces_of(source)) source_faces.add(face);
-    for (const Shape& edge : edges_of(source)) source_edges.add(edge);
+    for (const Shape& face : faces_of(source))
+      source_faces.add(face);
+    for (const Shape& edge : edges_of(source))
+      source_edges.add(edge);
   }
 
   // Which result faces a source edge's projected tags may land on: only a one-to-one story is told.
   std::map<std::string, std::set<std::string>> topology_source_targets;
   for (const auto& [target_id, entry] : entries) {
-    if (upper(py_str(entry.find("kind") != nullptr ? *entry.find("kind") : Value(""))) != "FACE") continue;
+    if (upper(py_str(entry.find("kind") != nullptr ? *entry.find("kind") : Value(""))) != "FACE")
+      continue;
     for (const Value& witness : normalized_witnesses(entry)) {
       const Value* source_id = member(witness, "input_topo_id");
       if (truthy(member(witness, "project_source_tags")) && upper(str_of(witness, "source_kind", "")) == "EDGE" &&
@@ -490,12 +566,14 @@ Shape apply_tracking_tags(Shape result, const TopoDelta& delta, const DeltaEntri
       carry_source_lineage(face, *entry, source_faces, op);
       project_source_bindings(face, *entry, source_faces, op, true, topology_source_targets);
     }
-    if (!source_edges.empty() && proven) project_source_bindings(face, *entry, source_edges, op, false, topology_source_targets);
+    if (!source_edges.empty() && proven)
+      project_source_bindings(face, *entry, source_edges, op, false, topology_source_targets);
   }
 
   std::set<std::string> section_ids;
   for (const TopoRef& ref : delta.section_edges)
-    if (ref.kind == Kind::Edge) section_ids.insert(ref.topo_id);
+    if (ref.kind == Kind::Edge)
+      section_ids.insert(ref.topo_id);
 
   for (Shape& edge : edges_of(result)) {
     const std::string topo_id = topology_key(edge);
@@ -505,7 +583,8 @@ Shape apply_tracking_tags(Shape result, const TopoDelta& delta, const DeltaEntri
       edge.set_runtime_deferred("semantic.lineage.coverage", "partial");
       continue;  // the unknown payload names no roles, so there is nothing else to apply
     }
-    Value track = entry ? tracking_payload(*entry, op, topo_id, Kind::Edge) : unknown_tracking_payload(op, topo_id, Kind::Edge);
+    Value track =
+        entry ? tracking_payload(*entry, op, topo_id, Kind::Edge) : unknown_tracking_payload(op, topo_id, Kind::Edge);
     if (section_ids.count(topo_id) != 0) {
       track.set("section", true);
       track.set("derivation", "intersection");

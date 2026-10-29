@@ -44,8 +44,8 @@ PrimitiveBuild build_box_primitive(const Vec3& corner, double dx, double dy, dou
 // Axis-aligned/oriented cylinder: base circle centre `origin`, direction `axis`.
 PrimitiveBuild build_cylinder_primitive(const Vec3& origin, const Vec3& axis, double radius, double height);
 // Cone frustum; `top_radius == 0` gives a point (no top face, hence no "cone.end" role).
-PrimitiveBuild build_cone_primitive(const Vec3& origin, const Vec3& axis, double bottom_radius,
-                                    double top_radius, double height);
+PrimitiveBuild build_cone_primitive(const Vec3& origin, const Vec3& axis, double bottom_radius, double top_radius,
+                                    double height);
 
 TopoDS_Solid make_box_solid(const Vec3& corner, double dx, double dy, double dz);
 TopoDS_Solid make_cylinder_solid(const Vec3& origin, const Vec3& axis, double radius, double height);

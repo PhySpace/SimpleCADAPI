@@ -38,7 +38,9 @@ Sketch rectangle(const char* name = "rect") {
   return s;
 }
 
-bool has_tag(const Shape& shape, const std::string& tag) { return shape.has_tag(tag, TagScope::Local); }
+bool has_tag(const Shape& shape, const std::string& tag) {
+  return shape.has_tag(tag, TagScope::Local);
+}
 
 double mass(const Face& face) {
   GProp_GProps props;
@@ -122,7 +124,8 @@ TEST_CASE("a constrained rectangle promotes to a face with topology identity tag
   for (const Edge& edge : face.edges()) {
     bool named = false;
     for (const char* entity : {"bottom", "right", "top", "left"}) {
-      if (has_tag(edge, std::string("sketch_entity.") + entity) && has_tag(edge, std::string("sketch.rect.entity.") + entity)) {
+      if (has_tag(edge, std::string("sketch_entity.") + entity) &&
+          has_tag(edge, std::string("sketch.rect.entity.") + entity)) {
         named = true;
         const auto explained = edge.explain_tag(std::string("sketch.rect.entity.") + entity, TagScope::Local);
         REQUIRE_FALSE(explained.empty());
@@ -133,7 +136,8 @@ TEST_CASE("a constrained rectangle promotes to a face with topology identity tag
   }
   CHECK(seen == 4);
   bool profile_named = false;
-  for (const Wire& wire : face.wires()) profile_named = profile_named || has_tag(wire, "sketch.rect.profile.bottom");
+  for (const Wire& wire : face.wires())
+    profile_named = profile_named || has_tag(wire, "sketch.rect.profile.bottom");
   CHECK(profile_named);
   CHECK(has_tag(face, "sketch.rect.profile.bottom"));
   const Value promotion = face.get_metadata("sketch_promotion");
@@ -145,7 +149,8 @@ TEST_CASE("wire promotion tags the wire and its edges") {
   CHECK(wire.is_closed());
   CHECK(wire.edges().size() == 4);
   CHECK(has_tag(wire, "sketch.rect.profile.bottom"));
-  for (const Edge& edge : wire.edges()) CHECK(edge.explain_tag("sketch.rect.entity.bottom", TagScope::Local).size() <= 1);
+  for (const Edge& edge : wire.edges())
+    CHECK(edge.explain_tag("sketch.rect.entity.bottom", TagScope::Local).size() <= 1);
 }
 
 TEST_CASE("a circle sketch promotes to a circular face") {
@@ -183,7 +188,8 @@ TEST_CASE("explicit hole profiles promote to a face with inner wires") {
 
 TEST_CASE("a reversed outer loop on the YZ plane still faces the plane normal") {
   Sketch s = make_sketch_rsketch("reversed_profile", Value("YZ"));
-  for (const auto& [id, x, y] : {std::tuple{"p0", 0.0, 0.0}, {"p1", 0.0, 4.0}, {"p2", 4.0, 4.0}, {"p3", 4.0, 0.0}, {"hole_center", 2.0, 2.0}}) {
+  for (const auto& [id, x, y] :
+       {std::tuple{"p0", 0.0, 0.0}, {"p1", 0.0, 4.0}, {"p2", 4.0, 4.0}, {"p3", 4.0, 0.0}, {"hole_center", 2.0, 2.0}}) {
     s = add_point_rsketch(s, id, x, y);
   }
   s = add_line_rsketch(s, "left", "p0", "p1");
@@ -212,7 +218,8 @@ TEST_CASE("the sketch plane follows the active workplane") {
 
 TEST_CASE("open chains promote to wires but not to faces; branches are named") {
   Sketch s = make_sketch_rsketch("chain");
-  for (const auto& [id, x, y] : {std::tuple{"p0", 0.0, 0.0}, {"p1", 10.0, 0.0}, {"p2", 10.0, 8.0}}) s = add_point_rsketch(s, id, x, y);
+  for (const auto& [id, x, y] : {std::tuple{"p0", 0.0, 0.0}, {"p1", 10.0, 0.0}, {"p2", 10.0, 8.0}})
+    s = add_point_rsketch(s, id, x, y);
   s = add_line_rsketch(s, "run", "p0", "p1");
   s = add_line_rsketch(s, "rise", "p1", "p2");
   s = constrain_fix_rsketch(s, "p0");
@@ -249,7 +256,12 @@ TEST_CASE("open chains promote to wires but not to faces; branches are named") {
 
 TEST_CASE("a mixed sketch promotes a chain by id and the loop by default") {
   Sketch s = make_sketch_rsketch("mixed");
-  for (const auto& [id, x, y] : {std::tuple{"a", 0.0, 0.0}, {"b", 4.0, 0.0}, {"c", 4.0, 3.0}, {"d", 0.0, 3.0}, {"e", 8.0, 1.0}, {"f", 12.0, 1.0}}) {
+  for (const auto& [id, x, y] : {std::tuple{"a", 0.0, 0.0},
+                                 {"b", 4.0, 0.0},
+                                 {"c", 4.0, 3.0},
+                                 {"d", 0.0, 3.0},
+                                 {"e", 8.0, 1.0},
+                                 {"f", 12.0, 1.0}}) {
     s = add_point_rsketch(s, id, x, y);
   }
   s = add_line_rsketch(s, "rb", "a", "b");
@@ -274,21 +286,25 @@ TEST_CASE("arc and B-spline profiles build faces on an arbitrary plane") {
   s = add_point_rsketch(s, "center", 0.0, 0.0);
   s = add_arc_rsketch(s, "upper", "right", "left", "center");
   s = add_bspline_rsketch(s, "lower", "left", "right",
-                          {SketchControlPoint("left"), SketchControlPoint(-1.0, -1.5), SketchControlPoint(1.0, -1.5), SketchControlPoint("right")},
+                          {SketchControlPoint("left"), SketchControlPoint(-1.0, -1.5), SketchControlPoint(1.0, -1.5),
+                           SketchControlPoint("right")},
                           3, std::vector<Scalar>{0.0, 1.0}, std::vector<int>{4, 4});
   const Face face = make_face_from_sketch_rface(s);
   const Vec3 normal = face.normal_at();
   CHECK(normal.x == doctest::Approx(1.0));
   CHECK(normal.y == doctest::Approx(0.0).epsilon(1e-6));
-  for (const Vertex& vertex : face.edges().at(0).vertices()) CHECK(vertex.coordinates().x == doctest::Approx(10.0));
+  for (const Vertex& vertex : face.edges().at(0).vertices())
+    CHECK(vertex.coordinates().x == doctest::Approx(10.0));
   CHECK(s.entities().at("lower").data.find("control_points")->as_array()[0].find("point_id")->as_string() == "left");
 }
 
 TEST_CASE("a closed rational B-spline with one seam point promotes to the exact circle") {
   const double w = std::sqrt(0.5);
-  const std::vector<std::pair<double, double>> poles{{1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}, {1, 0}};
+  const std::vector<std::pair<double, double>> poles{{1, 0},   {1, 1},  {0, 1},  {-1, 1}, {-1, 0},
+                                                     {-1, -1}, {0, -1}, {1, -1}, {1, 0}};
   std::vector<SketchControlPoint> control;
-  for (const auto& [x, y] : poles) control.emplace_back(x, y);
+  for (const auto& [x, y] : poles)
+    control.emplace_back(x, y);
   Sketch s = add_point_rsketch(make_sketch_rsketch("closed-rational"), "seam", 1.0, 0.0);
   s = add_bspline_rsketch(s, "boundary", "seam", "seam", control, 2, std::vector<Scalar>{0, 0.25, 0.5, 0.75, 1},
                           std::vector<int>{3, 2, 2, 2, 3}, std::vector<Scalar>{1, w, 1, w, 1, w, 1, w, 1});
@@ -303,7 +319,8 @@ TEST_CASE("ellipse promotion") {
   s = add_point_rsketch(s, "m", 0.0, 2.0);
   s = add_ellipse_rsketch(s, "oval", "c", "M", "m");
   CHECK(make_face_from_sketch_rface(s).area() == doctest::Approx(kPi * 8.0).epsilon(1e-6));
-  Sketch bad = add_point_rsketch(add_point_rsketch(add_point_rsketch(make_sketch_rsketch("bad"), "c", 0, 0), "M", 0, 0), "m", 0, 1);
+  Sketch bad = add_point_rsketch(add_point_rsketch(add_point_rsketch(make_sketch_rsketch("bad"), "c", 0, 0), "M", 0, 0),
+                                 "m", 0, 1);
   CHECK_THROWS_AS((void)add_ellipse_rsketch(bad, "oval", "c", "M", "m"), Error);
 }
 
@@ -317,8 +334,13 @@ TEST_CASE("operations are recorded with the Python names") {
   s = constrain_horizontal_rsketch(s, "l");
   s = constrain_connect_rsketch(s, "a", "a");
   (void)make_wire_from_sketch_rwire(s);
-  const std::vector<std::string> expected{"make_sketch_rsketch", "add_point_rsketch", "add_point_rsketch", "add_line_rsketch",
-                                           "make_constrain_horizontal_rsketch", "make_constrain_coincident_rsketch", "make_wire_from_sketch_rwire"};
+  const std::vector<std::string> expected{"make_sketch_rsketch",
+                                          "add_point_rsketch",
+                                          "add_point_rsketch",
+                                          "add_line_rsketch",
+                                          "make_constrain_horizontal_rsketch",
+                                          "make_constrain_coincident_rsketch",
+                                          "make_wire_from_sketch_rwire"};
   CHECK(recorder.ops == expected);
   CHECK(recorder.output_counts.back() == 1);
 }
@@ -352,7 +374,8 @@ TEST_CASE("backends are pluggable and the default is the native solver") {
 
   Sketch s = add_point_rsketch(make_sketch_rsketch("custom"), "p", 0.0, 0.0);
   Sketch working = s;
-  const SketchSolveResult result = working.solve({.strict = false, .backend = get_sketch_solver_backend("test-offset")});
+  const SketchSolveResult result =
+      working.solve({.strict = false, .backend = get_sketch_solver_backend("test-offset")});
   CHECK(result.solved_points.at("p") == SketchPoint2{3.0, 4.0});
   CHECK(result.backend == "test-offset");
   CHECK(backend->last_tolerance == 1e-7);

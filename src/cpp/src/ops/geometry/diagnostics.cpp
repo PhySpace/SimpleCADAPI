@@ -31,7 +31,8 @@ std::optional<EdgeEnds> edge_ends(const Edge& edge) {
   for (TopExp_Explorer explorer(edge.wrapped(), TopAbs_VERTEX); explorer.More() && points.size() < 2; explorer.Next()) {
     points.push_back(kernel::vertex_point(TopoDS::Vertex(explorer.Current())));
   }
-  if (points.size() != 2) return std::nullopt;
+  if (points.size() != 2)
+    return std::nullopt;
   return EdgeEnds{points[0], points[1]};
 }
 
@@ -63,11 +64,13 @@ class Chains {
   }
   void join(std::size_t a, std::size_t b) {
     const std::size_t root_a = find(a), root_b = find(b);
-    if (root_a != root_b) parent_[root_a] = root_b;
+    if (root_a != root_b)
+      parent_[root_a] = root_b;
   }
   int count() {
     int roots = 0;
-    for (std::size_t i = 0; i < parent_.size(); ++i) roots += find(i) == i ? 1 : 0;
+    for (std::size_t i = 0; i < parent_.size(); ++i)
+      roots += find(i) == i ? 1 : 0;
     return roots;
   }
 
@@ -80,12 +83,14 @@ class Chains {
 std::optional<WireGapDiagnosis> diagnose_open_wire(const Wire& wire) {
   try {
     const std::vector<Edge> edges = wire.edges();
-    if (edges.empty()) return std::nullopt;
+    if (edges.empty())
+      return std::nullopt;
     std::vector<EdgeEnds> ends;
     ends.reserve(edges.size());
     for (const Edge& edge : edges) {
       const std::optional<EdgeEnds> probed = edge_ends(edge);
-      if (!probed) return std::nullopt;
+      if (!probed)
+        return std::nullopt;
       ends.push_back(*probed);
     }
 
@@ -102,7 +107,9 @@ std::optional<WireGapDiagnosis> diagnose_open_wire(const Wire& wire) {
     }
     const double tolerance = std::max(std::max(highest - lowest, 1e-9) * 1e-6, 1e-9);
 
-    const auto end_of = [&](std::size_t edge, int end) -> const Vec3& { return end == 0 ? ends[edge].start : ends[edge].end; };
+    const auto end_of = [&](std::size_t edge, int end) -> const Vec3& {
+      return end == 0 ? ends[edge].start : ends[edge].end;
+    };
     std::vector<std::array<bool, 2>> matched(edges.size(), {false, false});
     Chains chains(edges.size());
     for (std::size_t a = 0; a < edges.size(); ++a) {
@@ -122,10 +129,12 @@ std::optional<WireGapDiagnosis> diagnose_open_wire(const Wire& wire) {
     std::vector<Dangling> dangling;
     for (std::size_t edge = 0; edge < edges.size(); ++edge) {
       for (int end = 0; end < 2; ++end) {
-        if (!matched[edge][static_cast<std::size_t>(end)]) dangling.push_back({edge, end_of(edge, end)});
+        if (!matched[edge][static_cast<std::size_t>(end)])
+          dangling.push_back({edge, end_of(edge, end)});
       }
     }
-    if (dangling.size() < 2) return std::nullopt;
+    if (dangling.size() < 2)
+      return std::nullopt;
 
     // The closest dangling pair; a lone segment's own two ends are a legitimate pair.
     double best = std::numeric_limits<double>::infinity();
@@ -183,32 +192,35 @@ void raise_open_wire_failure(std::string_view operation, const Wire& wire, std::
     image.kind = "wire_plan_render";
     image.operation = std::string(operation);
     image.view = "best-fit plane projection";
-    image.caption = "orange edges mark the gap ends: " + four_digits(diagnosis->gap_distance) + " mm apart at " + p1 +
-                    " <-> " + p2;
+    image.caption =
+        "orange edges mark the gap ends: " + four_digits(diagnosis->gap_distance) + " mm apart at " + p1 + " <-> " + p2;
     image.dedup_key = std::string(operation) + "|open_wire|" + four_digits(diagnosis->gap_distance);
     image.shapes = {wire};
     Value marks = Value::array();
-    for (const auto& [point, label] : {std::pair<Vec3, const char*>{diagnosis->point_a, "P1"}, {diagnosis->point_b, "P2"}}) {
+    for (const auto& [point, label] :
+         {std::pair<Vec3, const char*>{diagnosis->point_a, "P1"}, {diagnosis->point_b, "P2"}}) {
       Value mark = Value::object();
       Value coordinates = Value::array();
-      for (const double component : point.array()) coordinates.push_back(Value(component));
+      for (const double component : point.array())
+        coordinates.push_back(Value(component));
       mark.set("point", std::move(coordinates));
       mark.set("label", std::string(label));
       mark.set("tone", "highlight");
       marks.push_back(std::move(mark));
     }
     image.payload.set("marks", std::move(marks));
-    if (auto picture = diagnostic_image(image)) evidence.push_back(std::move(*picture));
+    if (auto picture = diagnostic_image(image))
+      evidence.push_back(std::move(*picture));
   } else {
     repair.push_back("check that the wire's endpoints meet head-to-tail in order");
   }
 
-  const ErrorSpec spec{std::string(operation),
-                       what_happened,
-                       {"The wire's endpoints do not meet head-to-tail, leaving a gap.",
-                        "The wire consists of several disconnected pieces.",
-                        "A sketch profile was promoted before it was closed."},
-                       {"Locate the gap ends from the P1/P2 coordinates in Measurements and bridge them."}};
+  const ErrorSpec spec{
+      std::string(operation),
+      what_happened,
+      {"The wire's endpoints do not meet head-to-tail, leaving a gap.",
+       "The wire consists of several disconnected pieces.", "A sketch profile was promoted before it was closed."},
+      {"Locate the gap ends from the P1/P2 coordinates in Measurements and bridge them."}};
   raise_harness_error(spec, std::string{}, std::move(measurements), std::move(repair), {}, std::move(evidence));
 }
 

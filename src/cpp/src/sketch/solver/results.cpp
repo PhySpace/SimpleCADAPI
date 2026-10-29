@@ -12,11 +12,17 @@ namespace {
 
 constexpr double kTwoPi = 2.0 * kPi;
 
-Value point_value(const SketchPoint2& p) { return Value(Value::Array{Value(p.first), Value(p.second)}); }
+Value point_value(const SketchPoint2& p) {
+  return Value(Value::Array{Value(p.first), Value(p.second)});
+}
 
-double distance(const SketchPoint2& a, const SketchPoint2& b) { return std::hypot(a.first - b.first, a.second - b.second); }
+double distance(const SketchPoint2& a, const SketchPoint2& b) {
+  return std::hypot(a.first - b.first, a.second - b.second);
+}
 
-double positive_mod(double value, double modulus) { return value - modulus * std::floor(value / modulus); }
+double positive_mod(double value, double modulus) {
+  return value - modulus * std::floor(value / modulus);
+}
 
 double sweep_of(const SketchPoint2& center, const SketchPoint2& start, const SketchPoint2& end) {
   const double start_angle = std::atan2(start.second - center.second, start.first - center.first);
@@ -37,19 +43,22 @@ struct Reader {
 
 // Cox-de Boor evaluation of a (rational) B-spline at `parameter`, clamped to the
 // valid knot range exactly like the Python adapter (which samples [0, 1]).
-SketchPoint2 evaluate_bspline(const std::vector<SketchPoint2>& poles, int degree, const std::vector<double>& unique_knots,
-                              const std::vector<int>& multiplicities, double parameter,
-                              const std::optional<std::vector<double>>& weights) {
+SketchPoint2 evaluate_bspline(const std::vector<SketchPoint2>& poles, int degree,
+                              const std::vector<double>& unique_knots, const std::vector<int>& multiplicities,
+                              double parameter, const std::optional<std::vector<double>>& weights) {
   std::vector<double> knots;
   for (std::size_t i = 0; i < unique_knots.size(); ++i) {
-    for (int k = 0; k < multiplicities[i]; ++k) knots.push_back(unique_knots[i]);
+    for (int k = 0; k < multiplicities[i]; ++k)
+      knots.push_back(unique_knots[i]);
   }
   const std::size_t d = static_cast<std::size_t>(degree);
   const double u = std::min(std::max(parameter, knots[d]), knots[knots.size() - d - 1]);
-  if (u >= knots[knots.size() - d - 1]) return poles.back();
+  if (u >= knots[knots.size() - d - 1])
+    return poles.back();
 
   std::vector<double> basis(knots.size() - 1, 0.0);
-  for (std::size_t i = 0; i + 1 < knots.size(); ++i) basis[i] = (knots[i] <= u && u < knots[i + 1]) ? 1.0 : 0.0;
+  for (std::size_t i = 0; i + 1 < knots.size(); ++i)
+    basis[i] = (knots[i] <= u && u < knots[i + 1]) ? 1.0 : 0.0;
   for (std::size_t current = 1; current <= d; ++current) {
     std::vector<double> next(basis.size() - 1, 0.0);
     for (std::size_t i = 0; i < next.size(); ++i) {
@@ -71,7 +80,8 @@ SketchPoint2 evaluate_bspline(const std::vector<SketchPoint2>& poles, int degree
     px += weighted * poles[i].first;
     py += weighted * poles[i].second;
   }
-  if (std::abs(denominator) <= 1e-18) throw ValueError("B-spline evaluation produced a zero rational denominator");
+  if (std::abs(denominator) <= 1e-18)
+    throw ValueError("B-spline evaluation produced a zero rational denominator");
   return {px / denominator, py / denominator};
 }
 
@@ -101,10 +111,12 @@ SolvedGeometry assemble_solution(const Model& model, const std::vector<double>& 
   SolvedGeometry out;
 
   for (const auto& [id, entity] : sketch.entities()) {
-    if (entity.kind == kPointKind) out.points.set(id, read.point(model.points.at(id)));
+    if (entity.kind == kPointKind)
+      out.points.set(id, read.point(model.points.at(id)));
   }
   for (const auto& [id, entity] : sketch.entities()) {
-    if (entity.kind != kBSplineKind) continue;
+    if (entity.kind != kBSplineKind)
+      continue;
     const SplineModel& spline = model.splines.at(id);
     for (std::size_t i = 0; i < spline.poles.size(); ++i) {
       out.points.set("bspline:" + id + ":pole:" + std::to_string(i), read.point(spline.poles[i]));
@@ -112,10 +124,12 @@ SolvedGeometry assemble_solution(const Model& model, const std::vector<double>& 
   }
 
   for (const auto& [id, entity] : sketch.entities()) {
-    if (entity.kind == kCircleKind) out.scalars.set("circle:" + id + ":radius", read.value(model.radius_params.at(id)));
+    if (entity.kind == kCircleKind)
+      out.scalars.set("circle:" + id + ":radius", read.value(model.radius_params.at(id)));
   }
   for (const auto& [id, entity] : sketch.entities()) {
-    if (entity.kind != kArcKind) continue;
+    if (entity.kind != kArcKind)
+      continue;
     const double radius = distance(out.points.at(entity.point_id("center")), out.points.at(entity.point_id("start")));
     out.scalars.set("arc:" + id + ":radius", radius);
     out.scalars.set("arc:" + id + ":diameter", 2.0 * radius);
@@ -210,7 +224,8 @@ void add_measurements(const Model& model, SolvedGeometry& solved) {
       const SketchEntity& entity = model.entity(target(0));
       const std::string radius_key = (entity.kind == kCircleKind ? "circle:" : "arc:") + entity.id + ":radius";
       const double* radius = solved.scalars.find(radius_key);
-      if (radius == nullptr) throw ValueError("No solved radius for '" + entity.id + "'");
+      if (radius == nullptr)
+        throw ValueError("No solved radius for '" + entity.id + "'");
       value = *radius * (kind == "diameter" ? 2.0 : 1.0);
     } else if (kind == "major_radius" || kind == "minor_radius") {
       const SketchEntity& ellipse = model.entity(target(0));
@@ -235,7 +250,8 @@ void add_measurements(const Model& model, SolvedGeometry& solved) {
       const double dx = b_end.first - b_start.first;
       const double dy = b_end.second - b_start.second;
       const double length = std::hypot(dx, dy);
-      if (length <= 1e-18) throw ValueError("A line-distance measurement requires a non-degenerate line");
+      if (length <= 1e-18)
+        throw ValueError("A line-distance measurement requires a non-degenerate line");
       value = std::abs((dx * (probe.second - b_start.second) - dy * (probe.first - b_start.first)) / length);
     } else {
       throw ValueError("Constraint kind '" + kind + "' cannot be used as a reference measurement");

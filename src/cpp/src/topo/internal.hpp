@@ -33,14 +33,15 @@ class SemanticState {
         runtime_(other.runtime_ ? std::make_unique<Value>(*other.runtime_) : nullptr),
         deferred_(other.deferred_) {}
   SemanticState& operator=(const SemanticState& other) {
-    if (this != &other) *this = SemanticState(other);
+    if (this != &other)
+      *this = SemanticState(other);
     return *this;
   }
   SemanticState(SemanticState&&) noexcept = default;
   SemanticState& operator=(SemanticState&&) noexcept = default;
 
-  std::vector<TagBinding> bindings;          // every stored binding, in insertion order: local and legacy snapshots
-  std::vector<TagLineageWitness> lineage;    // evidence for lineage-scope tags
+  std::vector<TagBinding> bindings;        // every stored binding, in insertion order: local and legacy snapshots
+  std::vector<TagLineageWitness> lineage;  // evidence for lineage-scope tags
   // The graph node that produced this output (the SDK keeps the node object in the value's runtime).  Opaque
   // here: the reactive layer owns its type.  It keeps the node, and so its upstream, alive with the value.
   std::shared_ptr<const void> graph_node;
@@ -98,7 +99,8 @@ class SemanticState {
   // One value, without expanding anything else (a deferred one is unpacked into `scratch`).
   const Value* peek(bool runtime, std::string_view key, Value& scratch) const {
     if (const Value* dict = (runtime ? runtime_ : metadata_).get())
-      if (const Value* found = dict->find(key)) return found;
+      if (const Value* found = dict->find(key))
+        return found;
     const Value* found = nullptr;
     each_deferred([&](bool is_runtime, std::uint32_t, Symbol k, std::string_view bytes) {
       if (is_runtime == runtime && k == key) {
@@ -121,7 +123,9 @@ class SemanticState {
       (runtime ? this->runtime() : this->metadata()).set(std::move(key), std::move(value));
     }
   }
-  bool empty_dictionaries() const noexcept { return dict_size(false) == 0 && dict_size(true) == 0 && deferred_.empty(); }
+  bool empty_dictionaries() const noexcept {
+    return dict_size(false) == 0 && dict_size(true) == 0 && deferred_.empty();
+  }
   void clear_dictionaries() {
     metadata_.reset();
     runtime_.reset();
@@ -135,7 +139,8 @@ class SemanticState {
     return empty;
   }
   static Value& dictionary(std::unique_ptr<Value>& slot) {
-    if (!slot) slot = std::make_unique<Value>(Value::object());
+    if (!slot)
+      slot = std::make_unique<Value>(Value::object());
     return *slot;
   }
   std::size_t dict_size(bool runtime) const noexcept {
@@ -154,7 +159,8 @@ class SemanticState {
     for (int shift = 0; at < in.size(); shift += 7) {
       const auto byte = static_cast<unsigned char>(in[at++]);
       v |= static_cast<std::uint64_t>(byte & 0x7F) << shift;
-      if ((byte & 0x80) == 0) break;
+      if ((byte & 0x80) == 0)
+        break;
     }
     return v;
   }
@@ -173,7 +179,8 @@ class SemanticState {
   }
 
   void settle(bool runtime) const {
-    if (deferred_.empty()) return;
+    if (deferred_.empty())
+      return;
     std::unique_ptr<Value>& slot = runtime ? runtime_ : metadata_;
     std::string rest;
     each_deferred([&](bool is_runtime, std::uint32_t pos, Symbol key, std::string_view bytes) {
@@ -186,7 +193,8 @@ class SemanticState {
         rest.append(bytes);
         return;
       }
-      if (!slot) slot = std::make_unique<Value>(Value::object());
+      if (!slot)
+        slot = std::make_unique<Value>(Value::object());
       auto& members = slot->as_object();
       members.insert(members.begin() + static_cast<std::ptrdiff_t>(std::min<std::size_t>(pos, members.size())),
                      Value::Member{key.str(), PackedValue::unpack_bytes(bytes)});
@@ -216,7 +224,7 @@ struct Entity {
   // Face only: position of the outer wire among its wires in explorer order (-2: not asked yet,
   // -1: none).  Which wire is outer does not depend on the occurrence, and OuterWire is costly.
   std::int16_t outer_index = -2;
-  Symbol topo_id;  // "face_3": the name table is shared by every root, so ids cost a pointer
+  Symbol topo_id;      // "face_3": the name table is shared by every root, so ids cost a pointer
   TopoDS_Shape shape;  // first occurrence seen; handles keep their own
   std::unique_ptr<SemanticState> sem;
   std::vector<std::weak_ptr<Entity>> parents;
@@ -225,7 +233,8 @@ struct Entity {
   std::unique_ptr<std::vector<TopoDS_Wire>> free_wires;
 
   SemanticState& state() {
-    if (!sem) sem = std::make_unique<SemanticState>();
+    if (!sem)
+      sem = std::make_unique<SemanticState>();
     return *sem;
   }
   const SemanticState* state_if() const noexcept { return sem.get(); }
@@ -277,8 +286,10 @@ class Registry {
   void for_each_entity(F&& visit) const {
     for (const Table& table : tables_) {
       for (const auto& slot : table.by_index)
-        if (slot) visit(*slot);
-      for (const auto& item : table.foreign) visit(*item.second);
+        if (slot)
+          visit(*slot);
+      for (const auto& item : table.foreign)
+        visit(*item.second);
     }
   }
 

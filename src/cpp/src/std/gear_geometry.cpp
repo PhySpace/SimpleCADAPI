@@ -10,7 +10,8 @@
 namespace scad::stdlib {
 
 double pressure_angle_to_radians(double pressure_angle) {
-  if (!std::isfinite(pressure_angle)) throw ValueError("pressure_angle must be finite");
+  if (!std::isfinite(pressure_angle))
+    throw ValueError("pressure_angle must be finite");
   if (pressure_angle <= 0.0 || pressure_angle >= 90.0) {
     throw ValueError("pressure_angle must be greater than 0 and less than 90 degrees");
   }
@@ -27,13 +28,15 @@ ToothGeometry compute_tooth_geometry(int n_teeth, double module, double pressure
   g.pitch_radius = module * n_teeth / 2.0;
   g.base_radius = g.pitch_radius * std::cos(pressure_angle);
   g.tip_radius = options.tip_radius ? *options.tip_radius : g.pitch_radius + addendum;
-  g.root_radius = options.root_radius ? *options.root_radius
-                                      : std::max(g.pitch_radius - addendum - clearance, g.base_radius * 0.5);
-  if (g.tip_radius <= g.root_radius) throw ValueError("tip radius must be greater than root radius");
+  g.root_radius =
+      options.root_radius ? *options.root_radius : std::max(g.pitch_radius - addendum - clearance, g.base_radius * 0.5);
+  if (g.tip_radius <= g.root_radius)
+    throw ValueError("tip radius must be greater than root radius");
 
   g.tooth_angle = 2.0 * kPi / n_teeth;
   const double pitch_tooth_thickness = kPi * module / 2.0 - backlash;
-  if (pitch_tooth_thickness <= 0.0) throw ValueError("backlash must be smaller than the circular tooth thickness");
+  if (pitch_tooth_thickness <= 0.0)
+    throw ValueError("backlash must be smaller than the circular tooth thickness");
   const double pitch_half_angle = pitch_tooth_thickness / (2.0 * g.pitch_radius);
   const double inv_alpha = std::tan(pressure_angle) - pressure_angle;
   const double base_half_angle = pitch_half_angle + inv_alpha;
@@ -59,7 +62,8 @@ InternalRingRadii internal_ring_radii(int n_teeth, double module, double rim_thi
   r.pitch = module * n_teeth / 2.0;
   r.tip = r.pitch - addendum;
   r.root = r.pitch + addendum + clearance;
-  if (r.tip <= 0.0) throw ValueError("internal tooth tip radius must be positive");
+  if (r.tip <= 0.0)
+    throw ValueError("internal tooth tip radius must be positive");
   r.outer = r.root + rim_thickness;
   return r;
 }
@@ -133,8 +137,9 @@ std::vector<Point2> rack_profile_points(double module, int n_teeth, double press
 Point2 cycloidal_disc_point(double theta, int n_lobes, double ring_pin_pitch_radius, double roller_radius,
                             double eccentricity) {
   const int pin_count = n_lobes + 1;
-  const double phi = std::atan2(std::sin((1.0 - pin_count) * theta),
-                                ring_pin_pitch_radius / (eccentricity * pin_count) - std::cos((1.0 - pin_count) * theta));
+  const double phi =
+      std::atan2(std::sin((1.0 - pin_count) * theta),
+                 ring_pin_pitch_radius / (eccentricity * pin_count) - std::cos((1.0 - pin_count) * theta));
   return {ring_pin_pitch_radius * std::cos(theta) - roller_radius * std::cos(theta + phi) -
               eccentricity * std::cos(pin_count * theta),
           -ring_pin_pitch_radius * std::sin(theta) + roller_radius * std::sin(theta + phi) +

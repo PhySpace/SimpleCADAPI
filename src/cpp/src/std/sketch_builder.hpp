@@ -58,7 +58,8 @@ class SketchBuilder {
   void bspline(const std::string& id, const std::string& start, const std::string& end, const BSplineData& data) {
     std::vector<SketchControlPoint> poles;
     poles.reserve(data.control_points.size());
-    for (const Point2& pole : data.control_points) poles.emplace_back(pole.x, pole.y);
+    for (const Point2& pole : data.control_points)
+      poles.emplace_back(pole.x, pole.y);
     std::vector<Scalar> knots(data.knots.begin(), data.knots.end());
     if (functional_) {
       sketch_ = add_bspline_rsketch(sketch_, id, start, end, poles, data.degree, knots, data.multiplicities);

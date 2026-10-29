@@ -19,13 +19,18 @@ using features_detail::vector_display;
 
 constexpr std::size_t kMaxPairProbes = 256;  // the quadratic probe is capped, not allowed to hang the failure path
 
-std::string g4(double value) { return general_format(value, 4); }
+std::string g4(double value) {
+  return general_format(value, 4);
+}
 
-Vec3 closure_vector(const ClosestApproach& approach) { return approach.point_b - approach.point_a; }
+Vec3 closure_vector(const ClosestApproach& approach) {
+  return approach.point_b - approach.point_a;
+}
 
 BooleanDiagnosis disjoint_diagnosis(const std::vector<Solid>& operands, std::size_t index_a, std::size_t index_b,
                                     const ClosestApproach& approach, double tol, std::string_view kind) {
-  const std::string label_a = "operand " + std::to_string(index_a + 1), label_b = "operand " + std::to_string(index_b + 1);
+  const std::string label_a = "operand " + std::to_string(index_a + 1),
+                    label_b = "operand " + std::to_string(index_b + 1);
   const Vec3 move = closure_vector(approach);
   BooleanDiagnosis out;
   out.failure_kind = "disjoint";
@@ -92,7 +97,8 @@ BooleanDiagnosis contact_diagnosis(const Solid& solid_a, const Solid& solid_b, c
 double overlap_volume(const TopoDS_Shape& a, const TopoDS_Shape& b) {
   try {
     double total = 0.0;
-    for (const TopoDS_Solid& solid : kernel::solids_of(kernel::common_shapes({a, b}))) total += kernel::volume(solid);
+    for (const TopoDS_Solid& solid : kernel::solids_of(kernel::common_shapes({a, b})))
+      total += kernel::volume(solid);
     return total;
   } catch (const std::exception&) {
     return 0.0;
@@ -112,11 +118,13 @@ class Clusters {
   }
   void join(std::size_t a, std::size_t b) {
     const std::size_t root_a = find(a), root_b = find(b);
-    if (root_a != root_b) parent_[root_a] = root_b;
+    if (root_a != root_b)
+      parent_[root_a] = root_b;
   }
   std::size_t count() {
     std::size_t roots = 0;
-    for (std::size_t i = 0; i < parent_.size(); ++i) roots += find(i) == i ? 1 : 0;
+    for (std::size_t i = 0; i < parent_.size(); ++i)
+      roots += find(i) == i ? 1 : 0;
     return roots;
   }
 
@@ -131,10 +139,12 @@ std::optional<BooleanDiagnosis> diagnose_boolean_failure(const std::vector<Solid
                                                          std::string_view operation_kind) {
   try {
     const std::size_t count = operands.size();
-    if (count < 2) return std::nullopt;
+    if (count < 2)
+      return std::nullopt;
     const double tol = effective_tol.value_or(0.0);
     // Unprobed pairs might connect the clusters, so a nearest-pair claim could misattribute.
-    if (count * (count - 1) / 2 > kMaxPairProbes) return std::nullopt;
+    if (count * (count - 1) / 2 > kMaxPairProbes)
+      return std::nullopt;
 
     std::map<std::pair<std::size_t, std::size_t>, ClosestApproach> approaches;
     for (std::size_t i = 0; i < count; ++i) {
@@ -147,21 +157,26 @@ std::optional<BooleanDiagnosis> diagnose_boolean_failure(const std::vector<Solid
 
     Clusters clusters(count);
     for (const auto& [pair, approach] : approaches) {
-      if (approach.gap <= tol) clusters.join(pair.first, pair.second);
+      if (approach.gap <= tol)
+        clusters.join(pair.first, pair.second);
     }
 
     if (clusters.count() > 1) {
       const std::pair<const std::pair<std::size_t, std::size_t>, ClosestApproach>* best = nullptr;
       for (const auto& entry : approaches) {
-        if (clusters.find(entry.first.first) == clusters.find(entry.first.second)) continue;
-        if (best == nullptr || entry.second.gap < best->second.gap) best = &entry;
+        if (clusters.find(entry.first.first) == clusters.find(entry.first.second))
+          continue;
+        if (best == nullptr || entry.second.gap < best->second.gap)
+          best = &entry;
       }
-      if (best == nullptr) return std::nullopt;
+      if (best == nullptr)
+        return std::nullopt;
       return disjoint_diagnosis(operands, best->first.first, best->first.second, best->second, tol, operation_kind);
     }
 
     for (const auto& [pair, approach] : approaches) {
-      if (approach.gap <= tol && overlap_volume(operands[pair.first].wrapped(), operands[pair.second].wrapped()) < 1e-12) {
+      if (approach.gap <= tol &&
+          overlap_volume(operands[pair.first].wrapped(), operands[pair.second].wrapped()) < 1e-12) {
         return contact_diagnosis(operands[pair.first], operands[pair.second], approach, tol, operation_kind);
       }
     }

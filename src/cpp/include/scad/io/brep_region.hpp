@@ -108,7 +108,7 @@ RegionFile read_artifact(const std::filesystem::path& path, std::string_view sha
 // Creating a snapshot (inspect/brep/snapshots.py, without face selection)
 // ---------------------------------------------------------------------------
 struct RegionSource {
-  std::string name;          // the STEP file's name
+  std::string name;  // the STEP file's name
   std::size_t byte_length = 0;
   std::string content_hash;  // "sha256:<hex>" of the STEP bytes
   int transferred_root_count = 1;
@@ -118,8 +118,7 @@ struct RegionSource {
 // one per face in the shell's MapShapes order).  The artifact is decoded again
 // before it is returned, as the Python writer does.
 Bytes make_region_artifact(const TopoDS_Shape& shape, RegionRootKind kind, const RegionSource& source,
-                           const std::vector<std::string>& source_face_ids = {},
-                           std::string_view ocp_version = {});
+                           const std::vector<std::string>& source_face_ids = {}, std::string_view ocp_version = {});
 
 // `copy_step_region_rpath(path, output_path)` for a whole solid: reads one STEP
 // solid, writes the `.scadbrep` atomically.  Returns the absolute output path.

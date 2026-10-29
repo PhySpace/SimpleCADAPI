@@ -17,9 +17,12 @@ using namespace stdlib;
 namespace {
 
 void require_gear_dimensions(int n_teeth, double module, double gear_height) {
-  if (n_teeth < 3) throw ValueError("n_teeth must be at least 3");
-  if (module <= 0) throw ValueError("module must be positive");
-  if (gear_height <= 0) throw ValueError("gear_height must be positive");
+  if (n_teeth < 3)
+    throw ValueError("n_teeth must be at least 3");
+  if (module <= 0)
+    throw ValueError("module must be positive");
+  if (gear_height <= 0)
+    throw ValueError("gear_height must be positive");
 }
 
 ToothOptions tooth_options(const ToothTuning& tuning) {
@@ -42,14 +45,16 @@ Solid make_spur_gear_rsolid(int n_teeth, double module, double pressure_angle, d
 Solid make_straight_bevel_gear_rsolid(int n_teeth, double module, double pitch_angle, double pressure_angle,
                                       double face_width, const ToothTuning& tuning) {
   const TrackingPolicyScope graph(TrackingPolicy::Graph);
-  if (n_teeth < 3) throw ValueError("n_teeth must be at least 3");
+  if (n_teeth < 3)
+    throw ValueError("n_teeth must be at least 3");
   const double resolved_module = validate_positive("module", module);
   const double resolved_face_width = validate_positive("face_width", face_width);
   const double resolved_backlash = validate_non_negative("backlash", tuning.backlash);
   const double resolved_addendum = validate_positive("addendum_factor", tuning.addendum_factor);
   const double resolved_clearance = validate_non_negative("clearance_factor", tuning.clearance_factor);
   const double pressure_angle_radians = pressure_angle_to_radians(pressure_angle);
-  if (!std::isfinite(pitch_angle)) throw ValueError("pitch_angle must be finite");
+  if (!std::isfinite(pitch_angle))
+    throw ValueError("pitch_angle must be finite");
   if (pitch_angle <= 0.0 || pitch_angle >= 90.0) {
     throw ValueError("pitch_angle must be greater than 0 and less than 90 degrees");
   }
@@ -77,14 +82,13 @@ Solid make_straight_bevel_gear_rsolid(int n_teeth, double module, double pitch_a
   inner_wire = translate_shape(inner_wire, scalar3(0.0, 0.0, axial_width));
 
   Solid gear = loft_rsolid({outer_wire, inner_wire}, /*ruled=*/true);
-  gear.set_metadata("std.gear.straight_bevel",
-                    Dict("n_teeth", n_teeth)("module", resolved_module)("pitch_angle", pitch_angle)(
-                        "pressure_angle", pressure_angle)("face_width", resolved_face_width)(
-                        "axial_width", axial_width)("outer_pitch_radius", outer_pitch_radius)(
-                        "outer_cone_distance", outer_cone_distance)("inner_scale", inner_scale)(
-                        "addendum_factor", resolved_addendum)("clearance_factor", resolved_clearance)(
-                        "backlash", resolved_backlash)
-                        .take());
+  gear.set_metadata(
+      "std.gear.straight_bevel",
+      Dict("n_teeth", n_teeth)("module", resolved_module)("pitch_angle", pitch_angle)("pressure_angle", pressure_angle)(
+          "face_width", resolved_face_width)("axial_width", axial_width)("outer_pitch_radius", outer_pitch_radius)(
+          "outer_cone_distance", outer_cone_distance)("inner_scale", inner_scale)("addendum_factor", resolved_addendum)(
+          "clearance_factor", resolved_clearance)("backlash", resolved_backlash)
+          .take());
   return gear;
 }
 
@@ -92,7 +96,8 @@ Solid make_helical_gear_rsolid(int n_teeth, double module, double pressure_angle
                                double gear_height, const ToothTuning& tuning) {
   const TrackingPolicyScope graph(TrackingPolicy::Graph);
   require_gear_dimensions(n_teeth, module, gear_height);
-  if (helix_angle == 0) return make_spur_gear_rsolid(n_teeth, module, pressure_angle, gear_height, tuning);
+  if (helix_angle == 0)
+    return make_spur_gear_rsolid(n_teeth, module, pressure_angle, gear_height, tuning);
 
   const double pa = pressure_angle_to_radians(pressure_angle);
   const double twist_total = helix_twist_degrees(gear_height, helix_angle, module * n_teeth);
@@ -104,7 +109,8 @@ Solid make_herringbone_gear_rsolid(int n_teeth, double module, double pressure_a
                                    double gear_height, const ToothTuning& tuning) {
   const TrackingPolicyScope graph(TrackingPolicy::Graph);
   require_gear_dimensions(n_teeth, module, gear_height);
-  if (helix_angle == 0) return make_spur_gear_rsolid(n_teeth, module, pressure_angle, gear_height, tuning);
+  if (helix_angle == 0)
+    return make_spur_gear_rsolid(n_teeth, module, pressure_angle, gear_height, tuning);
 
   const double pa = pressure_angle_to_radians(pressure_angle);
   const double half_height = gear_height / 2.0;

@@ -47,7 +47,8 @@ class FeatureRecord {
   FeatureRecord& input(const Shape& shape, std::string role);
   template <class T>
   FeatureRecord& inputs(const std::vector<T>& shapes, const std::string& role) {
-    for (const T& shape : shapes) input(shape, role);
+    for (const T& shape : shapes)
+      input(shape, role);
     return *this;
   }
 
@@ -79,7 +80,8 @@ PickParams capture_picks(const Shape& source, const std::vector<Shape>& picked, 
                          bool refs_first);
 
 template <class T, class C>
-PickParams capture_picks(const Shape& source, const std::vector<T>& picked, const std::vector<C>& candidates, bool refs_first) {
+PickParams capture_picks(const Shape& source, const std::vector<T>& picked, const std::vector<C>& candidates,
+                         bool refs_first) {
   return capture_picks(source, std::vector<Shape>(picked.begin(), picked.end()),
                        std::vector<Shape>(candidates.begin(), candidates.end()), refs_first);
 }
@@ -92,7 +94,7 @@ template <class T>
 class Selection {
  public:
   Selection() = default;
-  Selection(std::vector<T> items) : items_(std::move(items)) {}          // NOLINT(google-explicit-constructor)
+  Selection(std::vector<T> items) : items_(std::move(items)) {}              // NOLINT(google-explicit-constructor)
   Selection(ql::ShapeSelector selector) : selector_(std::move(selector)) {}  // NOLINT(google-explicit-constructor)
 
   // A selector may call back into Python (ql property resolvers): a binding keeps
@@ -100,9 +102,11 @@ class Selection {
   bool is_selector() const noexcept { return selector_.has_value(); }
 
   std::vector<T> resolve(const Shape& scope) const {
-    if (!selector_) return items_;
+    if (!selector_)
+      return items_;
     std::vector<T> picked;
-    for (const Shape& shape : selector_->resolve(scope)) picked.emplace_back(shape);
+    for (const Shape& shape : selector_->resolve(scope))
+      picked.emplace_back(shape);
     return picked;
   }
 
@@ -136,7 +140,8 @@ Vec3 finite_vector(const Scalar3& value, std::string_view name);
 void inherit_metadata(Shape& target, std::initializer_list<const Shape*> sources);
 template <class T>
 void inherit_metadata(Shape& target, const std::vector<T>& sources) {
-  for (const T& source : sources) inherit_metadata(target, {&source});
+  for (const T& source : sources)
+    inherit_metadata(target, {&source});
 }
 
 // repr() of a Python float: the shortest text that reads back as the same number.

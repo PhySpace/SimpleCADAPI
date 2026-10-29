@@ -14,7 +14,8 @@ namespace scad::sketch_solver {
 class Matrix {
  public:
   Matrix() = default;
-  Matrix(int rows, int cols) : rows_(rows), cols_(cols), a_(static_cast<std::size_t>(rows) * static_cast<std::size_t>(cols), 0.0) {}
+  Matrix(int rows, int cols)
+      : rows_(rows), cols_(cols), a_(static_cast<std::size_t>(rows) * static_cast<std::size_t>(cols), 0.0) {}
 
   int rows() const noexcept { return rows_; }
   int cols() const noexcept { return cols_; }

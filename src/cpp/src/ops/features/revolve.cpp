@@ -26,7 +26,8 @@ Face revolution_face(const Shape& profile) {
   switch (profile.kind()) {
     case Kind::Wire: {
       const Wire wire(profile);
-      if (!wire.is_closed()) throw ValueError("The wire to revolve must be closed");
+      if (!wire.is_closed())
+        throw ValueError("The wire to revolve must be closed");
       return features_detail::face_of_wire(wire);
     }
     case Kind::Face:
@@ -41,12 +42,14 @@ Face revolution_face(const Shape& profile) {
 Solid revolve_rsolid(const Shape& profile, const Scalar3& axis, const Scalar& angle, const Scalar3& origin,
                      const SweepTags& tags) {
   return guarded(revolve_spec(), [&]() -> Solid {
-    const OutputTags output = features_detail::sweep_output_tags(tags, "revolution.start", "revolution.end", "revolution.side");
+    const OutputTags output =
+        features_detail::sweep_output_tags(tags, "revolution.start", "revolution.end", "revolution.side");
     plan_output_tags(kRevolveOp, output);
 
     FeatureRecord rec(kRevolveOp);
     const double angle_value = rec.scalar("angle", angle);
-    if (angle_value <= 0) throw ValueError("The revolve angle must be greater than zero");
+    if (angle_value <= 0)
+      throw ValueError("The revolve angle must be greater than zero");
     const Vec3 global_axis = features_detail::place_vector(rec.point("axis", axis));
     const Vec3 global_origin = features_detail::place_point(rec.point("origin", origin));
 

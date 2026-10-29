@@ -7,8 +7,12 @@ namespace scad::io {
 
 namespace {
 
-constexpr std::uint32_t rotr(std::uint32_t x, int n) { return std::rotr(x, n); }
-constexpr std::uint32_t rotl(std::uint32_t x, int n) { return std::rotl(x, n); }
+constexpr std::uint32_t rotr(std::uint32_t x, int n) {
+  return std::rotr(x, n);
+}
+constexpr std::uint32_t rotl(std::uint32_t x, int n) {
+  return std::rotl(x, n);
+}
 
 constexpr std::uint32_t kSha256K[64] = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -38,7 +42,8 @@ void store_be64(unsigned char* p, std::uint64_t v) {
 std::string padded(std::string_view data) {
   std::string out(data);
   out.push_back(static_cast<char>(0x80));
-  while (out.size() % 64 != 56) out.push_back('\0');
+  while (out.size() % 64 != 56)
+    out.push_back('\0');
   unsigned char length[8];
   store_be64(length, static_cast<std::uint64_t>(data.size()) * 8U);
   out.append(reinterpret_cast<const char*>(length), 8);
@@ -48,13 +53,13 @@ std::string padded(std::string_view data) {
 }  // namespace
 
 Sha256Digest sha256(std::string_view data) noexcept {
-  std::uint32_t h[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-                        0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
+  std::uint32_t h[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
   const std::string message = padded(data);
   const auto* bytes = reinterpret_cast<const unsigned char*>(message.data());
   for (std::size_t offset = 0; offset < message.size(); offset += 64) {
     std::uint32_t w[64];
-    for (int i = 0; i < 16; ++i) w[i] = load_be32(bytes + offset + 4 * static_cast<std::size_t>(i));
+    for (int i = 0; i < 16; ++i)
+      w[i] = load_be32(bytes + offset + 4 * static_cast<std::size_t>(i));
     for (int i = 16; i < 64; ++i) {
       const std::uint32_t s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >> 3);
       const std::uint32_t s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >> 10);
@@ -68,12 +73,27 @@ Sha256Digest sha256(std::string_view data) noexcept {
       const std::uint32_t big0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
       const std::uint32_t maj = (a & b) ^ (a & c) ^ (b & c);
       const std::uint32_t t2 = big0 + maj;
-      hh = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
+      hh = g;
+      g = f;
+      f = e;
+      e = d + t1;
+      d = c;
+      c = b;
+      b = a;
+      a = t1 + t2;
     }
-    h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
+    h[0] += a;
+    h[1] += b;
+    h[2] += c;
+    h[3] += d;
+    h[4] += e;
+    h[5] += f;
+    h[6] += g;
+    h[7] += hh;
   }
   Sha256Digest digest{};
-  for (std::size_t i = 0; i < 8; ++i) store_be32(digest.data() + 4 * i, h[i]);
+  for (std::size_t i = 0; i < 8; ++i)
+    store_be32(digest.data() + 4 * i, h[i]);
   return digest;
 }
 
@@ -83,22 +103,42 @@ Sha1Digest sha1(std::string_view data) noexcept {
   const auto* bytes = reinterpret_cast<const unsigned char*>(message.data());
   for (std::size_t offset = 0; offset < message.size(); offset += 64) {
     std::uint32_t w[80];
-    for (int i = 0; i < 16; ++i) w[i] = load_be32(bytes + offset + 4 * static_cast<std::size_t>(i));
-    for (int i = 16; i < 80; ++i) w[i] = rotl(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
+    for (int i = 0; i < 16; ++i)
+      w[i] = load_be32(bytes + offset + 4 * static_cast<std::size_t>(i));
+    for (int i = 16; i < 80; ++i)
+      w[i] = rotl(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
     std::uint32_t a = h[0], b = h[1], c = h[2], d = h[3], e = h[4];
     for (int i = 0; i < 80; ++i) {
       std::uint32_t f, k;
-      if (i < 20) { f = (b & c) | (~b & d); k = 0x5A827999; }
-      else if (i < 40) { f = b ^ c ^ d; k = 0x6ED9EBA1; }
-      else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDC; }
-      else { f = b ^ c ^ d; k = 0xCA62C1D6; }
+      if (i < 20) {
+        f = (b & c) | (~b & d);
+        k = 0x5A827999;
+      } else if (i < 40) {
+        f = b ^ c ^ d;
+        k = 0x6ED9EBA1;
+      } else if (i < 60) {
+        f = (b & c) | (b & d) | (c & d);
+        k = 0x8F1BBCDC;
+      } else {
+        f = b ^ c ^ d;
+        k = 0xCA62C1D6;
+      }
       const std::uint32_t t = rotl(a, 5) + f + e + k + w[i];
-      e = d; d = c; c = rotl(b, 30); b = a; a = t;
+      e = d;
+      d = c;
+      c = rotl(b, 30);
+      b = a;
+      a = t;
     }
-    h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e;
+    h[0] += a;
+    h[1] += b;
+    h[2] += c;
+    h[3] += d;
+    h[4] += e;
   }
   Sha1Digest digest{};
-  for (std::size_t i = 0; i < 5; ++i) store_be32(digest.data() + 4 * i, h[i]);
+  for (std::size_t i = 0; i < 5; ++i)
+    store_be32(digest.data() + 4 * i, h[i]);
   return digest;
 }
 
@@ -118,7 +158,9 @@ std::string sha256_hex(std::string_view data) {
   return to_hex(digest.data(), digest.size());
 }
 
-std::string sha256_tagged(std::string_view data) { return "sha256:" + sha256_hex(data); }
+std::string sha256_tagged(std::string_view data) {
+  return "sha256:" + sha256_hex(data);
+}
 
 std::string uuid5_url_hex(std::string_view name) {
   // uuid.NAMESPACE_URL = 6ba7b811-9dad-11d1-80b4-00c04fd430c8
@@ -139,13 +181,15 @@ std::uint32_t crc32(std::string_view data, std::uint32_t seed) noexcept {
     std::array<std::uint32_t, 256> table{};
     for (std::uint32_t i = 0; i < 256; ++i) {
       std::uint32_t c = i;
-      for (int k = 0; k < 8; ++k) c = (c & 1U) ? (0xEDB88320U ^ (c >> 1)) : (c >> 1);
+      for (int k = 0; k < 8; ++k)
+        c = (c & 1U) ? (0xEDB88320U ^ (c >> 1)) : (c >> 1);
       table[i] = c;
     }
     return table;
   }();
   std::uint32_t crc = ~seed;
-  for (const char ch : data) crc = kTable[(crc ^ static_cast<unsigned char>(ch)) & 0xffU] ^ (crc >> 8);
+  for (const char ch : data)
+    crc = kTable[(crc ^ static_cast<unsigned char>(ch)) & 0xffU] ^ (crc >> 8);
   return ~crc;
 }
 

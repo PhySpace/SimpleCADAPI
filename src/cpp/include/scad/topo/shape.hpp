@@ -118,7 +118,7 @@ class Shape {
   // effective on an entity holding legacy snapshots, and for the lineage scope
   // unless the entity's lineage coverage is complete.
   std::vector<TagBinding> list_tag_bindings(TagScope scope = TagScope::Effective) const;
-  std::vector<TagBinding> local_tag_bindings() const;       // attachment == local
+  std::vector<TagBinding> local_tag_bindings() const;  // attachment == local
   std::vector<TagBinding> legacy_effective_bindings() const;
   std::vector<InheritedTagBinding> inherited_tag_bindings_with_paths() const;
   std::vector<TagBinding> inherited_tag_bindings() const;
@@ -178,8 +178,7 @@ class Shape {
   std::string to_string(int indent = 0) const;
 
  protected:
-  Shape(TopoDS_Shape occurrence, std::shared_ptr<Entity> entity,
-        std::shared_ptr<Registry> registry) noexcept;
+  Shape(TopoDS_Shape occurrence, std::shared_ptr<Entity> entity, std::shared_ptr<Registry> registry) noexcept;
   // A new root over `shape`, which must be of kind `expected`.
   Shape(const TopoDS_Shape& shape, Kind expected);
 
@@ -248,9 +247,9 @@ class Face : public Shape {
   double area() const;
   Vec3 normal_at(double u = 0.5, double v = 0.5) const;
   Wire outer_wire() const;
-  std::vector<Wire> wires() const;        // outer first
+  std::vector<Wire> wires() const;  // outer first
   std::vector<Wire> inner_wires() const;
-  std::vector<Edge> edges() const;        // outer wire's edges, then the inner wires'
+  std::vector<Edge> edges() const;  // outer wire's edges, then the inner wires'
   std::vector<Face> adjacent_faces() const;
 };
 

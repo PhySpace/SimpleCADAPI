@@ -27,7 +27,8 @@ ProfileWire single_edge_wire(const std::string& entity_id, const TopoDS_Edge& ed
   const TopoDS_Wire wire_shape = kernel::make_wire_from_edges({edge});
   ProfileWire out{Wire(wire_shape), {}};
   // Remember the wire's own edge: that is the occurrence promotion matches against.
-  for (const TopoDS_Edge& wire_edge : kernel::edges_of(wire_shape)) out.entity_edges.emplace_back(entity_id, wire_edge);
+  for (const TopoDS_Edge& wire_edge : kernel::edges_of(wire_shape))
+    out.entity_edges.emplace_back(entity_id, wire_edge);
   return out;
 }
 
@@ -39,18 +40,21 @@ TopoDS_Edge arc_edge(const Sketch& sketch, const SketchSolveResult& result, cons
   const double start_radius = std::hypot(sp.first - cp.first, sp.second - cp.second);
   const double end_radius = std::hypot(ep.first - cp.first, ep.second - cp.second);
   const double radius_tolerance = std::max(kPointEps, start_radius * 1.0e-7);
-  if (start_radius <= kPointEps) throw ValueError("Sketch arc '" + eid + "' has zero radius");
+  if (start_radius <= kPointEps)
+    throw ValueError("Sketch arc '" + eid + "' has zero radius");
   if (std::abs(start_radius - end_radius) > radius_tolerance) {
     throw ValueError("Sketch arc '" + eid + "' endpoints are not equidistant from its center");
   }
   const double start_angle = std::atan2(sp.second - cp.second, sp.first - cp.first);
   const double end_angle = std::atan2(ep.second - cp.second, ep.first - cp.first);
   double sweep = std::fmod(end_angle - start_angle, 2.0 * kPi);
-  if (sweep < 0.0) sweep += 2.0 * kPi;  // Python's `% (2 pi)` is non-negative
-  if (sweep <= 1.0e-12) throw ValueError("Sketch arc '" + eid + "' has a zero sweep");
+  if (sweep < 0.0)
+    sweep += 2.0 * kPi;  // Python's `% (2 pi)` is non-negative
+  if (sweep <= 1.0e-12)
+    throw ValueError("Sketch arc '" + eid + "' has a zero sweep");
   const double middle_angle = start_angle + 0.5 * sweep;
-  const Vec3 middle = sketch.point3({cp.first + start_radius * std::cos(middle_angle),
-                                     cp.second + start_radius * std::sin(middle_angle)});
+  const Vec3 middle = sketch.point3(
+      {cp.first + start_radius * std::cos(middle_angle), cp.second + start_radius * std::sin(middle_angle)});
   return kernel::make_arc_three_point_edge(sketch.point3(sp), middle, sketch.point3(ep));
 }
 
@@ -65,7 +69,8 @@ TopoDS_Edge bspline_edge(const Sketch& sketch, const SketchSolveResult& result, 
   spec.degree = definition.degree;
   spec.knots = definition.knots;
   spec.multiplicities = definition.multiplicities;
-  if (definition.weights) spec.weights = *definition.weights;
+  if (definition.weights)
+    spec.weights = *definition.weights;
   spec.periodic = definition.periodic;
   return kernel::make_bspline_edge(spec);
 }
@@ -87,7 +92,8 @@ ProfileWire edge_entities_wire(const Sketch& sketch, const SketchProfile& profil
     } else {
       throw ValueError("Unsupported edge kind '" + entity.kind + "' in edge path profile");
     }
-    if (profile.reversed[i]) edge = TopoDS::Edge(edge.Reversed());
+    if (profile.reversed[i])
+      edge = TopoDS::Edge(edge.Reversed());
     edges.push_back(edge);
     entity_ids.push_back(entity.id);
   }
@@ -97,7 +103,8 @@ ProfileWire edge_entities_wire(const Sketch& sketch, const SketchProfile& profil
     throw ValueError("Sketch profile wire edge count changed during kernel construction");
   }
   ProfileWire out{Wire(wire_shape), {}};
-  for (std::size_t i = 0; i < entity_ids.size(); ++i) out.entity_edges.emplace_back(entity_ids[i], wire_edges[i]);
+  for (std::size_t i = 0; i < entity_ids.size(); ++i)
+    out.entity_edges.emplace_back(entity_ids[i], wire_edges[i]);
   return out;
 }
 
@@ -120,7 +127,8 @@ ProfileWire wire_from_profile(const Sketch& sketch, const SketchProfile& profile
                                                        profile.normal, profile.major_direction);
     return single_edge_wire(profile.entity_ids.at(0), edge);
   }
-  if (profile.kind == "edge_loop" || profile.kind == "edge_chain") return edge_entities_wire(sketch, profile);
+  if (profile.kind == "edge_loop" || profile.kind == "edge_chain")
+    return edge_entities_wire(sketch, profile);
   throw ValueError("Unsupported sketch profile kind '" + profile.kind + "'");
 }
 

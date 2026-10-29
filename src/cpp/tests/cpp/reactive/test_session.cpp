@@ -16,7 +16,9 @@ bool has(const std::vector<std::string>& ids, const std::string& id) {
   return std::find(ids.begin(), ids.end(), id) != ids.end();
 }
 
-std::string node_of(const Shape& shape) { return lineage_of(shape)->node_id; }
+std::string node_of(const Shape& shape) {
+  return lineage_of(shape)->node_id;
+}
 
 // boxA(w, h, d) and boxB are joined by a pair after boxA is translated by dx.
 struct Model {
@@ -307,7 +309,8 @@ TEST_CASE("a face picked from an output becomes a selection and follows its sour
   session.start();
   const Solid box = fx.box(w, 20.0, 30.0);
   const auto faces = box.faces();
-  const auto found = std::find_if(faces.begin(), faces.end(), [](const Face& face) { return face.bounding_box().zmin > 29.0; });
+  const auto found =
+      std::find_if(faces.begin(), faces.end(), [](const Face& face) { return face.bounding_box().zmin > 29.0; });
   REQUIRE(found != faces.end());
   const Face top = *found;
   const Solid derived = fx.pick_box(top, 1.0);
@@ -504,7 +507,9 @@ TEST_CASE("operations recorded in a workplane recompute in it") {
 TEST_CASE("the executor registry") {
   ExecutorRegistry registry(false);
   CHECK(registry.operations().empty());
-  const Executor noop = [](const Value&, const std::vector<OpInput>&, const ScalarValues&) { return std::vector<Shape>{}; };
+  const Executor noop = [](const Value&, const std::vector<OpInput>&, const ScalarValues&) {
+    return std::vector<Shape>{};
+  };
   registry.add("one", noop);
   CHECK_THROWS_AS(registry.add("one", noop), ValueError);
   CHECK_THROWS_AS(registry.add("empty", Executor{}), ValueError);
@@ -572,10 +577,12 @@ TEST_CASE("upstream_closure visits shared inputs once, inputs first") {
   CHECK(closure.size() == 10);
   CHECK(closure.back() == top);
   std::unordered_map<std::string, std::size_t> position;
-  for (std::size_t i = 0; i < closure.size(); ++i) position[closure[i]->node_id] = i;
+  for (std::size_t i = 0; i < closure.size(); ++i)
+    position[closure[i]->node_id] = i;
   CHECK(position.size() == 10);
   for (const NodePtr& node : closure) {
-    for (const NodePtr& input : node->inputs) CHECK(position[input->node_id] < position[node->node_id]);
+    for (const NodePtr& input : node->inputs)
+      CHECK(position[input->node_id] < position[node->node_id]);
   }
 }
 
@@ -736,7 +743,8 @@ TEST_CASE("OperationBuilder records scalars and registers like an operator would
   int runs = 0;
   registry.add("op_box", [&runs](const Value& p, const std::vector<OpInput>&, const ScalarValues&) {
     ++runs;
-    return std::vector<Shape>{build_box(p.find("size")->as_array()[0].as_double(), p.find("size")->as_array()[1].as_double(), 1.0)};
+    return std::vector<Shape>{
+        build_box(p.find("size")->as_array()[0].as_double(), p.find("size")->as_array()[1].as_double(), 1.0)};
   });
   const auto op_box = [](const Scalar& x, const Scalar& y) {
     OperationBuilder rec("op_box");

@@ -64,8 +64,9 @@ TEST_CASE("make_box_rsolid fails as the operator, with the Python guidance") {
 }
 
 TEST_CASE("make_cylinder_rsolid has kernel face and edge roles") {
-  const Solid cylinder = make_cylinder_rsolid(2.0, 5.0, scalar3(0, 0, 0), scalar3(0, 0, 1),
-                                              {.tag_prefix = "shaft", .start_face_tag = "role.base", .seam_edge_tag = "role.seam"});
+  const Solid cylinder =
+      make_cylinder_rsolid(2.0, 5.0, scalar3(0, 0, 0), scalar3(0, 0, 1),
+                           {.tag_prefix = "shaft", .start_face_tag = "role.base", .seam_edge_tag = "role.seam"});
   CHECK(cylinder.volume() == doctest::Approx(kPi * 4 * 5));
   CHECK(cylinder.faces().size() == 3);
   CHECK(count_with_tag(cylinder.faces(), "shaft.face.start") == 1);
@@ -95,7 +96,8 @@ TEST_CASE("make_cone_rsolid builds cones and frustums") {
 }
 
 TEST_CASE("a pointed cone has no end face to tag") {
-  const auto error = failure_of([] { make_cone_rsolid(2.0, 4.0, 0.0, scalar3(0, 0, 0), scalar3(0, 0, 1), {.end_face_tag = "role.outlet"}); });
+  const auto error = failure_of(
+      [] { make_cone_rsolid(2.0, 4.0, 0.0, scalar3(0, 0, 0), scalar3(0, 0, 1), {.end_face_tag = "role.outlet"}); });
   REQUIRE(error);
   CHECK(error->operation() == "semantic_query");
   CHECK(error->guidance().what_happened.find("requires exactly one kernel-proven result, got 0") != std::string::npos);

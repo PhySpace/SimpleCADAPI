@@ -15,13 +15,15 @@ namespace scad {
 
 PlaneAxes orthonormal_plane_axes(const Vec3& normal) {
   const double norm = normal.norm();
-  if (norm <= 1e-12) throw ValueError("The normal vector cannot be a zero vector");
+  if (norm <= 1e-12)
+    throw ValueError("The normal vector cannot be a zero vector");
   const Vec3 z = normal / norm;
   const Vec3 reference = std::abs(z.z) > 0.9 ? Vec3{1.0, 0.0, 0.0} : Vec3{0.0, 0.0, 1.0};
   // Gram-Schmidt: the reference stays away from z, so the projection never degenerates.
   Vec3 x = reference - z * reference.dot(z);
   const double x_norm = x.norm();
-  if (x_norm <= 1e-12) throw ValueError("Cannot build a local coordinate system from the given normal vector");
+  if (x_norm <= 1e-12)
+    throw ValueError("Cannot build a local coordinate system from the given normal vector");
   x = x / x_norm;
   Vec3 y = z.cross(x);
   y = y / y.norm();
@@ -39,7 +41,8 @@ namespace {
 
 Vec3 member_or(const Value& plane, const char* key, const Vec3& fallback) {
   const Value* member = plane.find(key);
-  if (member == nullptr) return fallback;
+  if (member == nullptr)
+    return fallback;
   if (!member->is_array() || member->as_array().size() != 3) {
     throw ValueError("Sketch plane origin and axes must be 3-vectors");
   }
@@ -48,10 +51,14 @@ Vec3 member_or(const Value& plane, const char* key, const Vec3& fallback) {
 }
 
 PlaneFrame named_plane(std::string token) {
-  std::transform(token.begin(), token.end(), token.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
-  if (token == "XY") return {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
-  if (token == "XZ") return {{0, 0, 0}, {1, 0, 0}, {0, 0, 1}};
-  if (token == "YZ") return {{0, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+  std::transform(token.begin(), token.end(), token.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+  if (token == "XY")
+    return {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+  if (token == "XZ")
+    return {{0, 0, 0}, {1, 0, 0}, {0, 0, 1}};
+  if (token == "YZ")
+    return {{0, 0, 0}, {0, 1, 0}, {0, 0, 1}};
   throw ValueError("Sketch plane must be 'XY', 'XZ', 'YZ', or a plane mapping");
 }
 

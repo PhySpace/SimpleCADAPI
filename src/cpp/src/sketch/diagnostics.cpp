@@ -25,7 +25,8 @@ std::string general(double value) {
 }
 
 std::optional<double> numeric(const SketchConstraint& constraint) {
-  if (!constraint.value) return std::nullopt;
+  if (!constraint.value)
+    return std::nullopt;
   try {
     return evaluate_scalar(*constraint.value, "value");
   } catch (const std::exception&) {
@@ -35,7 +36,8 @@ std::optional<double> numeric(const SketchConstraint& constraint) {
 
 std::set<std::string> target_ids(const SketchConstraint& constraint) {
   std::set<std::string> ids;
-  for (const SketchRef& target : constraint.targets) ids.insert(target.entity_id);
+  for (const SketchRef& target : constraint.targets)
+    ids.insert(target.entity_id);
   return ids;
 }
 
@@ -47,11 +49,14 @@ bool intersects(const std::set<std::string>& a, const std::set<std::string>& b) 
 std::string describe(const SketchConstraint& constraint) {
   std::string rendered;
   for (const SketchRef& target : constraint.targets) {
-    if (!rendered.empty()) rendered += ", ";
+    if (!rendered.empty())
+      rendered += ", ";
     rendered += target.entity_id;
-    if (!target.subentity.empty() && target.subentity != "geometry") rendered += "." + target.subentity;
+    if (!target.subentity.empty() && target.subentity != "geometry")
+      rendered += "." + target.subentity;
   }
-  if (const auto value = numeric(constraint)) rendered += " = " + general(*value);
+  if (const auto value = numeric(constraint))
+    rendered += " = " + general(*value);
   return constraint.kind + "(" + rendered + ")";
 }
 
@@ -65,13 +70,13 @@ std::vector<InventoryEntry> constraint_inventory(const Sketch& sketch,
     listed.insert(constraint->id);
   }
   for (const SketchConstraint* constraint : related) {
-    entries.push_back({constraint->id, "near miss",
-                       describe(*constraint) + " (shares entities with the failed set)"});
+    entries.push_back({constraint->id, "near miss", describe(*constraint) + " (shares entities with the failed set)"});
     listed.insert(constraint->id);
   }
   std::vector<const SketchConstraint*> uninvolved;
   for (const SketchConstraint& constraint : sketch.constraints()) {
-    if (listed.count(constraint.id) == 0) uninvolved.push_back(&constraint);
+    if (listed.count(constraint.id) == 0)
+      uninvolved.push_back(&constraint);
   }
   for (std::size_t i = 0; i < uninvolved.size() && i < kMaxInventoryOkRows; ++i) {
     entries.push_back({uninvolved[i]->id, "ok", describe(*uninvolved[i])});
@@ -86,7 +91,8 @@ std::vector<InventoryEntry> constraint_inventory(const Sketch& sketch,
 std::string join(const std::vector<std::string>& parts, const std::string& separator) {
   std::string out;
   for (const std::string& part : parts) {
-    if (!out.empty()) out += separator;
+    if (!out.empty())
+      out += separator;
     out += part;
   }
   return out;
@@ -94,14 +100,12 @@ std::string join(const std::vector<std::string>& parts, const std::string& separ
 
 }  // namespace
 
-
 // The picture of a failing sketch: its geometry at the solver's positions, what the failure implicates in orange, what
 // is related in purple (diagnostic_image: drawn by whoever registered a provider; nothing without one).
-static std::optional<ErrorEvidence> sketch_picture(const Sketch& sketch, const SketchSolveResult& result,
-                                            const std::string& mode, const std::string& caption,
-                                            const std::set<std::string>& highlight, const std::set<std::string>& neighbours,
-                                            const std::vector<std::pair<std::string, std::string>>& constraint_labels,
-                                            const std::string& dedup_key) {
+static std::optional<ErrorEvidence> sketch_picture(
+    const Sketch& sketch, const SketchSolveResult& result, const std::string& mode, const std::string& caption,
+    const std::set<std::string>& highlight, const std::set<std::string>& neighbours,
+    const std::vector<std::pair<std::string, std::string>>& constraint_labels, const std::string& dedup_key) {
   DiagnosticImage image;
   image.kind = "sketch_render";
   image.operation = "sketch_solve";
@@ -110,7 +114,8 @@ static std::optional<ErrorEvidence> sketch_picture(const Sketch& sketch, const S
   image.dedup_key = dedup_key;
   const auto names = [](const std::set<std::string>& ids) {
     Value out = Value::array();
-    for (const std::string& id : ids) out.push_back(Value(id));
+    for (const std::string& id : ids)
+      out.push_back(Value(id));
     return out;
   };
   Value points = Value::object();
@@ -131,7 +136,8 @@ static std::optional<ErrorEvidence> sketch_picture(const Sketch& sketch, const S
   image.payload.set("sketch", sketch.to_value());
   image.payload.set("solved_points", std::move(points));
   Value scalars = Value::object();
-  for (const auto& [id, value] : result.solved_scalars) scalars.set(id, Value(value));
+  for (const auto& [id, value] : result.solved_scalars)
+    scalars.set(id, Value(value));
   image.payload.set("solved_scalars", std::move(scalars));
   image.payload.set("highlight", names(highlight));
   image.payload.set("near", names(neighbours));
@@ -148,7 +154,8 @@ void raise_sketch_solve_failure(const Sketch& sketch, const SketchSolveResult& r
   }
   std::vector<const SketchConstraint*> failed;
   for (const SketchConstraint& constraint : sketch.constraints()) {
-    if (failed_ids.count(constraint.id) != 0) failed.push_back(&constraint);
+    if (failed_ids.count(constraint.id) != 0)
+      failed.push_back(&constraint);
   }
 
   // Related = not itself failed but shares an entity with a failed constraint:
@@ -160,10 +167,13 @@ void raise_sketch_solve_failure(const Sketch& sketch, const SketchSolveResult& r
   }
   std::vector<const SketchConstraint*> related;
   for (const SketchConstraint& constraint : sketch.constraints()) {
-    if (failed_ids.count(constraint.id) != 0) continue;
-    if (intersects(target_ids(constraint), implicated)) related.push_back(&constraint);
+    if (failed_ids.count(constraint.id) != 0)
+      continue;
+    if (intersects(target_ids(constraint), implicated))
+      related.push_back(&constraint);
   }
-  if (related.size() > kMaxRelatedConstraints) related.resize(kMaxRelatedConstraints);
+  if (related.size() > kMaxRelatedConstraints)
+    related.resize(kMaxRelatedConstraints);
 
   std::vector<ErrorMeasurement> measurements{
       {"constraint count", static_cast<double>(sketch.constraints().size()), ""},
@@ -182,7 +192,8 @@ void raise_sketch_solve_failure(const Sketch& sketch, const SketchSolveResult& r
     std::vector<std::string> partners;
     const auto own = target_ids(*constraint);
     for (const SketchConstraint* partner : related) {
-      if (intersects(target_ids(*partner), own)) partners.push_back(partner->id);
+      if (intersects(target_ids(*partner), own))
+        partners.push_back(partner->id);
     }
     std::string line = "Delete or relax " + constraint->id + "(" + describe(*constraint) + ")";
     if (!partners.empty()) {
@@ -196,7 +207,8 @@ void raise_sketch_solve_failure(const Sketch& sketch, const SketchSolveResult& r
                                                        "radius",   "diameter",   "angle",      "ratio"};
     std::vector<std::string> dimension_side;
     for (const SketchConstraint* constraint : failed) {
-      if (kDimensionKinds.count(constraint->kind) != 0) dimension_side.push_back(constraint->id);
+      if (kDimensionKinds.count(constraint->kind) != 0)
+        dimension_side.push_back(constraint->id);
     }
     if (!dimension_side.empty()) {
       repair.push_back("Prefer relaxing dimension-type constraints first (" + join(dimension_side, ", ") +
@@ -220,9 +232,10 @@ void raise_sketch_solve_failure(const Sketch& sketch, const SketchSolveResult& r
       "Sketch solve failed with status '" + result.status + "' (backend " + result.backend + ")";
   if (!failed.empty()) {
     std::vector<std::string> described;
-    for (const SketchConstraint* constraint : failed) described.push_back(constraint->id + "(" + describe(*constraint) + ")");
-    what_happened += "; the solver named " + std::to_string(failed.size()) +
-                     " failing constraint(s): " + join(described, "; ");
+    for (const SketchConstraint* constraint : failed)
+      described.push_back(constraint->id + "(" + describe(*constraint) + ")");
+    what_happened +=
+        "; the solver named " + std::to_string(failed.size()) + " failing constraint(s): " + join(described, "; ");
   } else {
     what_happened += "; the solver did not name individual constraints";
   }
@@ -234,7 +247,8 @@ void raise_sketch_solve_failure(const Sketch& sketch, const SketchSolveResult& r
       const auto ids = target_ids(*constraint);
       neighbours.insert(ids.begin(), ids.end());
     }
-    for (const std::string& id : implicated) neighbours.erase(id);
+    for (const std::string& id : implicated)
+      neighbours.erase(id);
     std::vector<std::pair<std::string, std::string>> labels;
     std::vector<std::string> failed_names;
     for (const SketchConstraint* constraint : failed) {
@@ -242,12 +256,14 @@ void raise_sketch_solve_failure(const Sketch& sketch, const SketchSolveResult& r
       failed_names.push_back(constraint->id);
     }
     std::sort(failed_names.begin(), failed_names.end());
-    const std::string caption = "status=" + result.status + ", backend=" + result.backend +
-                                ": orange = entities implicated by failed constraints (" +
-                                (failed_names.empty() ? std::string("solver did not name any") : join(failed_names, ", ")) +
-                                "), purple = related constraints sharing those entities";
-    if (auto picture = sketch_picture(sketch, result, result.status, caption, implicated, neighbours, labels,
-                                      "sketch:" + sketch.sketch_id() + ":" + result.status + ":" + join(failed_names, ",")))
+    const std::string caption =
+        "status=" + result.status + ", backend=" + result.backend +
+        ": orange = entities implicated by failed constraints (" +
+        (failed_names.empty() ? std::string("solver did not name any") : join(failed_names, ", ")) +
+        "), purple = related constraints sharing those entities";
+    if (auto picture =
+            sketch_picture(sketch, result, result.status, caption, implicated, neighbours, labels,
+                           "sketch:" + sketch.sketch_id() + ":" + result.status + ":" + join(failed_names, ",")))
       evidence.push_back(std::move(*picture));
   }
   const ErrorSpec spec{
@@ -273,7 +289,8 @@ void raise_sketch_underconstrained(const Sketch& sketch, const SketchSolveResult
   }
   std::vector<std::string> unreferenced;
   for (const auto& [id, entity] : sketch.entities()) {
-    if (referenced.count(id) == 0) unreferenced.push_back(id);
+    if (referenced.count(id) == 0)
+      unreferenced.push_back(id);
   }
 
   std::vector<ErrorMeasurement> measurements{
@@ -284,8 +301,9 @@ void raise_sketch_underconstrained(const Sketch& sketch, const SketchSolveResult
 
   std::vector<std::string> repair;
   if (!unreferenced.empty()) {
-    const std::vector<std::string> shown(unreferenced.begin(),
-                                         unreferenced.begin() + static_cast<std::ptrdiff_t>(std::min<std::size_t>(12, unreferenced.size())));
+    const std::vector<std::string> shown(
+        unreferenced.begin(),
+        unreferenced.begin() + static_cast<std::ptrdiff_t>(std::min<std::size_t>(12, unreferenced.size())));
     const std::string more =
         unreferenced.size() > 12 ? " (+" + std::to_string(unreferenced.size() - 12) + " more)" : "";
     repair.push_back("These entities are not referenced by any constraint \xE2\x80\x94 fix or dimension them first: " +
@@ -302,12 +320,14 @@ void raise_sketch_underconstrained(const Sketch& sketch, const SketchSolveResult
   std::vector<InventoryEntry> inventory;
   const std::size_t listed = std::min(unreferenced.size(), kMaxInventoryOkRows + 8);
   for (std::size_t i = 0; i < listed; ++i) {
-    inventory.push_back({unreferenced[i], "unconstrained",
-                         sketch.entities().at(unreferenced[i]).kind + " \xE2\x80\x94 not referenced by any constraint"});
+    inventory.push_back(
+        {unreferenced[i], "unconstrained",
+         sketch.entities().at(unreferenced[i]).kind + " \xE2\x80\x94 not referenced by any constraint"});
   }
   if (!referenced.empty()) {
-    inventory.push_back({"(" + std::to_string(referenced.size()) + " constrained)", "ok",
-                         "entities referenced by at least one constraint (may still be partially free \xE2\x80\x94 see DOF)"});
+    inventory.push_back(
+        {"(" + std::to_string(referenced.size()) + " constrained)", "ok",
+         "entities referenced by at least one constraint (may still be partially free \xE2\x80\x94 see DOF)"});
   }
 
   std::string what_happened = "Sketch solve succeeded geometrically but " + std::to_string(result.dof) +
@@ -320,20 +340,20 @@ void raise_sketch_underconstrained(const Sketch& sketch, const SketchSolveResult
     const std::string caption = std::to_string(result.dof) +
                                 " DOF remain: orange = entities no constraint references (certainly free); the solver "
                                 "accepted the geometry but cannot hold it";
-    if (auto picture = sketch_picture(sketch, result, "underconstrained", caption,
-                                      std::set<std::string>(unreferenced.begin(), unreferenced.end()), {}, {},
-                                      "sketch:" + sketch.sketch_id() + ":underconstrained:" + std::to_string(result.dof)))
+    if (auto picture =
+            sketch_picture(sketch, result, "underconstrained", caption,
+                           std::set<std::string>(unreferenced.begin(), unreferenced.end()), {}, {},
+                           "sketch:" + sketch.sketch_id() + ":underconstrained:" + std::to_string(result.dof)))
       evidence.push_back(std::move(*picture));
   }
-  const ErrorSpec spec{
-      "sketch_solve",
-      what_happened,
-      {"Points or curves were added without fix/dimension constraints.",
-       "require_fully_constrained=True was set before the profile's dimensions were fully specified."},
-      {"Constrain the entities listed as [unconstrained] in the inventory.",
-       "Re-inspect with inspect_sketch_rsketchresult until the DOF reaches 0."}};
-  raise_harness_error(spec, "sketch_id=" + sketch.sketch_id() + ", backend=" + result.backend,
-                      std::move(measurements), std::move(repair), std::move(inventory), std::move(evidence));
+  const ErrorSpec spec{"sketch_solve",
+                       what_happened,
+                       {"Points or curves were added without fix/dimension constraints.",
+                        "require_fully_constrained=True was set before the profile's dimensions were fully specified."},
+                       {"Constrain the entities listed as [unconstrained] in the inventory.",
+                        "Re-inspect with inspect_sketch_rsketchresult until the DOF reaches 0."}};
+  raise_harness_error(spec, "sketch_id=" + sketch.sketch_id() + ", backend=" + result.backend, std::move(measurements),
+                      std::move(repair), std::move(inventory), std::move(evidence));
 }
 
 }  // namespace scad

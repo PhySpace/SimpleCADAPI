@@ -17,7 +17,9 @@ using namespace scad::io;
 
 namespace {
 
-Solid make_box(double x, double y, double z) { return Solid(BRepPrimAPI_MakeBox(x, y, z).Solid()); }
+Solid make_box(double x, double y, double z) {
+  return Solid(BRepPrimAPI_MakeBox(x, y, z).Solid());
+}
 
 TagBinding sample_binding(const std::string& tag, bool explicit_refs = false) {
   TagBinding b;
@@ -97,7 +99,8 @@ TEST_CASE("serialize/deserialize round-trips geometry, tags, bindings, metadata 
   const Face face_back = restored.faces()[2];
   CHECK(face_back.topo_id() == face.topo_id());
   REQUIRE(face_back.local_bindings().size() == 1);
-  CHECK(python_json_dumps(face_back.local_bindings()[0].to_value()) == python_json_dumps(face.local_bindings()[0].to_value()));
+  CHECK(python_json_dumps(face_back.local_bindings()[0].to_value()) ==
+        python_json_dumps(face.local_bindings()[0].to_value()));
   REQUIRE(face_back.lineage_witnesses().size() == 1);
   CHECK(face_back.lineage_witnesses()[0].coverage == "partial");
   CHECK(python_json_dumps(face_back.lineage_witnesses()[0].to_value()) == python_json_dumps(witness.to_value()));
@@ -173,7 +176,7 @@ TEST_CASE("the serialized header is documented big-endian") {
   REQUIRE(bytes.size() > 40);
   CHECK(bytes.substr(0, 8) == "SCADSHAP");
   CHECK(static_cast<unsigned char>(bytes[8]) == 0);
-  CHECK(static_cast<unsigned char>(bytes[9]) == 1);  // major 1
+  CHECK(static_cast<unsigned char>(bytes[9]) == 1);   // major 1
   CHECK(static_cast<unsigned char>(bytes[11]) == 0);  // minor 0
   std::uint64_t state_size = 0, brep_size = 0;
   for (int i = 0; i < 8; ++i) {
@@ -183,6 +186,7 @@ TEST_CASE("the serialized header is documented big-endian") {
   CHECK(bytes.size() == 40 + state_size + brep_size);
   CHECK(bytes.substr(40 + state_size, 24) == "\nOpen CASCADE Topology V");
   std::uint32_t crc = 0;
-  for (int i = 0; i < 4; ++i) crc = (crc << 8) | static_cast<unsigned char>(bytes[32 + static_cast<std::size_t>(i)]);
+  for (int i = 0; i < 4; ++i)
+    crc = (crc << 8) | static_cast<unsigned char>(bytes[32 + static_cast<std::size_t>(i)]);
   CHECK(crc == crc32(std::string_view(bytes).substr(40)));
 }

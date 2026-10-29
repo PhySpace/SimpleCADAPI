@@ -20,7 +20,8 @@ TrackedResult track_transform(const Solid& shape, const gp_Trsf& trsf, const cha
   return occt_guard([&] {
     BRepBuilderAPI_Transform xform(shape.wrapped(), trsf, /*Copy=*/true);
     xform.Build();
-    if (!xform.IsDone()) throw ValueError(failure);
+    if (!xform.IsDone())
+      throw ValueError(failure);
 
     const Solid result(kernel::as_solid(xform.Shape()));
     tracking::DeltaBuilder delta;

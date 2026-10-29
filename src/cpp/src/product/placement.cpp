@@ -16,7 +16,8 @@ constexpr double kExactTolerance = 2.0e-6;
 Vec3 normalize_axis(const Vec3& value, const char* field) {
   const Vec3 vec = finite_vec3(value, field);
   const double length = vec.norm();
-  if (length <= kAxisTolerance) throw ValueError(std::string(field) + " must be a non-zero vector");
+  if (length <= kAxisTolerance)
+    throw ValueError(std::string(field) + " must be a non-zero vector");
   return {vec.x / length, vec.y / length, vec.z / length};
 }
 
@@ -26,10 +27,12 @@ Placement::Placement(Vec3 origin, Vec3 x_axis, Vec3 y_axis) {
   origin_ = finite_vec3(origin, "origin");
   x_ = normalize_axis(x_axis, "x_axis");
   y_ = normalize_axis(y_axis, "y_axis");
-  if (std::abs(x_.dot(y_)) > kOrthogonalTolerance) throw ValueError("x_axis and y_axis must be orthogonal");
+  if (std::abs(x_.dot(y_)) > kOrthogonalTolerance)
+    throw ValueError("x_axis and y_axis must be orthogonal");
   const Vec3 z = x_.cross(y_);
   const double z_norm = z.norm();
-  if (z_norm <= kAxisTolerance) throw ValueError("x_axis and y_axis must define a right-handed frame");
+  if (z_norm <= kAxisTolerance)
+    throw ValueError("x_axis and y_axis must define a right-handed frame");
   z_ = {z.x / z_norm, z.y / z_norm, z.z / z_norm};
 }
 
@@ -43,14 +46,17 @@ Placement Placement::from_exact_frame(const Vec3& origin, const Vec3& x_axis, co
   const Vec3 z = finite_vec3(z_axis, "z_axis");
   const std::pair<const char*, Vec3> axes[] = {{"x_axis", x}, {"y_axis", y}, {"z_axis", z}};
   for (const auto& [name, axis] : axes) {
-    if (std::abs(axis.norm() - 1.0) > kExactTolerance) throw ValueError(std::string(name) + " must be a unit vector");
+    if (std::abs(axis.norm() - 1.0) > kExactTolerance)
+      throw ValueError(std::string(name) + " must be a unit vector");
   }
   const std::pair<const char*, double> dots[] = {
       {"x_axis/y_axis", x.dot(y)}, {"x_axis/z_axis", x.dot(z)}, {"y_axis/z_axis", y.dot(z)}};
   for (const auto& [name, dot] : dots) {
-    if (std::abs(dot) > kExactTolerance) throw ValueError(std::string(name) + " must be orthogonal");
+    if (std::abs(dot) > kExactTolerance)
+      throw ValueError(std::string(name) + " must be orthogonal");
   }
-  if (x.cross(y).dot(z) <= 0.9) throw ValueError("axes must define a right-handed frame");
+  if (x.cross(y).dot(z) <= 0.9)
+    throw ValueError("axes must define a right-handed frame");
   return Placement(Exact{}, o, x, y, z);
 }
 
@@ -84,7 +90,9 @@ bool Placement::operator==(const Placement& other) const noexcept {
   return origin_ == other.origin_ && x_ == other.x_ && y_ == other.y_ && z_ == other.z_;
 }
 
-Placement identity_placement() { return Placement(Vec3{0, 0, 0}); }
+Placement identity_placement() {
+  return Placement(Vec3{0, 0, 0});
+}
 
 Placement inverse_placement(const Placement& placement) {
   const Vec3& o = placement.origin();

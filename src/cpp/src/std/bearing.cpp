@@ -32,7 +32,8 @@ int infer_ball_count(double ball_pitch_radius, double ball_diameter) {
 
 int validate_ball_count(const std::optional<int>& ball_count, double ball_pitch_radius, double ball_diameter) {
   const int resolved = ball_count ? *ball_count : infer_ball_count(ball_pitch_radius, ball_diameter);
-  if (resolved < 3) throw ValueError("ball_count must be at least 3");
+  if (resolved < 3)
+    throw ValueError("ball_count must be at least 3");
   const double chord_spacing = 2.0 * ball_pitch_radius * std::sin(kPi / resolved);
   if (chord_spacing <= ball_diameter) {
     throw ValueError("ball_count is too high for ball_diameter on the bearing pitch circle");
@@ -47,7 +48,8 @@ Face axis_face(const Solid& solid, double target_z) {
   double best_distance = 0.0;
   double best_area = 0.0;
   for (const Face& face : solid.faces()) {
-    if (face.normal_at().z < 0.7) continue;
+    if (face.normal_at().z < 0.7)
+      continue;
     const double distance = std::fabs(face.center().z - target_z);
     const double area = face.area();
     if (!best || distance < best_distance || (distance == best_distance && area > best_area)) {
@@ -56,7 +58,8 @@ Face axis_face(const Solid& solid, double target_z) {
       best_area = area;
     }
   }
-  if (!best) throw ValueError("no +Z bearing axis face found");
+  if (!best)
+    throw ValueError("no +Z bearing axis face found");
   return *best;
 }
 
@@ -96,7 +99,8 @@ sp::AssemblyPtr make_ball_bearing_rassembly(double bore_diameter, double outer_d
   const double ball_diameter_value = validate_positive("ball_diameter", ball_diameter);
   const double raceway_clearance = validate_non_negative("raceway_clearance", options.raceway_clearance);
   const double edge_chamfer = validate_non_negative("edge_chamfer", options.edge_chamfer);
-  if (outer_diameter_value <= bore_diameter_value) throw ValueError("outer_diameter must be greater than bore_diameter");
+  if (outer_diameter_value <= bore_diameter_value)
+    throw ValueError("outer_diameter must be greater than bore_diameter");
 
   const double bore_radius = bore_diameter_value / 2.0;
   const double outer_radius = outer_diameter_value / 2.0;
@@ -115,15 +119,14 @@ sp::AssemblyPtr make_ball_bearing_rassembly(double bore_diameter, double outer_d
     throw ValueError("bearing_width must be greater than ball_diameter plus raceway_clearance");
   }
   const double smallest_feature = std::min({inner_wall_thickness, outer_wall_thickness, axial_clearance});
-  if (edge_chamfer >= smallest_feature) throw ValueError("edge_chamfer must be smaller than the thinnest bearing feature");
+  if (edge_chamfer >= smallest_feature)
+    throw ValueError("edge_chamfer must be smaller than the thinnest bearing feature");
   const int ball_count = validate_ball_count(options.ball_count, ball_pitch_radius, ball_diameter_value);
 
-  const Solid outer_ring =
-      make_race_ring_solid(ball_pitch_radius + ball_radius * 0.75, outer_radius, ball_pitch_radius, groove_radius,
-                           bearing_width_value, edge_chamfer, RingRole::Outer);
-  const Solid inner_ring =
-      make_race_ring_solid(bore_radius, ball_pitch_radius - ball_radius * 0.75, ball_pitch_radius, groove_radius,
-                           bearing_width_value, edge_chamfer, RingRole::Inner);
+  const Solid outer_ring = make_race_ring_solid(ball_pitch_radius + ball_radius * 0.75, outer_radius, ball_pitch_radius,
+                                                groove_radius, bearing_width_value, edge_chamfer, RingRole::Outer);
+  const Solid inner_ring = make_race_ring_solid(bore_radius, ball_pitch_radius - ball_radius * 0.75, ball_pitch_radius,
+                                                groove_radius, bearing_width_value, edge_chamfer, RingRole::Inner);
   Solid ball = make_sphere_rsolid(ball_radius, scalar3(0.0, 0.0, 0.0));
   const bool fuse = options.fuse_rolling_elements;
   if (fuse) {
@@ -136,7 +139,8 @@ sp::AssemblyPtr make_ball_bearing_rassembly(double bore_diameter, double outer_d
   }
   ball = Solid(apply_tag(ball, "role.rolling_element"));
   ball = Solid(apply_tag(ball, "group.ball_bearing"));
-  ball.set_metadata("std.bearing.ball", Dict("diameter", ball_diameter_value)("pitch_radius", ball_pitch_radius).take());
+  ball.set_metadata("std.bearing.ball",
+                    Dict("diameter", ball_diameter_value)("pitch_radius", ball_pitch_radius).take());
 
   Solid fused_rolling_ring = outer_ring;
   if (fuse) {
@@ -146,7 +150,8 @@ sp::AssemblyPtr make_ball_bearing_rassembly(double bore_diameter, double outer_d
     std::vector<Solid> pieces{outer_ring};
     for (int index = 0; index < ball_count; ++index) {
       const double angle = 2.0 * kPi * index / ball_count;
-      pieces.push_back(make_sphere_rsolid(ball_radius, scalar3(fuse_radius * std::cos(angle), fuse_radius * std::sin(angle), 0.0)));
+      pieces.push_back(
+          make_sphere_rsolid(ball_radius, scalar3(fuse_radius * std::cos(angle), fuse_radius * std::sin(angle), 0.0)));
     }
     UnionOptions fuse_options;
     fuse_options.glue = false;
@@ -156,13 +161,16 @@ sp::AssemblyPtr make_ball_bearing_rassembly(double bore_diameter, double outer_d
   }
 
   const std::string& assembly_id = options.assembly_id;
-  const sp::PartPtr outer_part = with_material(
-      part_with_axis_connector(assembly_id + "_outer_ring", fused_rolling_ring, "Outer bearing ring", bearing_width_value / 2.0),
-      options.material);
-  const sp::PartPtr inner_part = with_material(
-      part_with_axis_connector(assembly_id + "_inner_ring", inner_ring, "Inner bearing ring", bearing_width_value / 2.0),
-      options.material);
-  const sp::PartPtr ball_part = with_material(sp::make_part_rpart(assembly_id + "_ball", ball, "Bearing ball"), options.material);
+  const sp::PartPtr outer_part =
+      with_material(part_with_axis_connector(assembly_id + "_outer_ring", fused_rolling_ring, "Outer bearing ring",
+                                             bearing_width_value / 2.0),
+                    options.material);
+  const sp::PartPtr inner_part =
+      with_material(part_with_axis_connector(assembly_id + "_inner_ring", inner_ring, "Inner bearing ring",
+                                             bearing_width_value / 2.0),
+                    options.material);
+  const sp::PartPtr ball_part =
+      with_material(sp::make_part_rpart(assembly_id + "_ball", ball, "Bearing ball"), options.material);
 
   sp::AssemblyPtr assembly = sp::make_assembly_rassembly(assembly_id, "Ball bearing");
   assembly = sp::add_component_rassembly(*assembly, outer_part, "outer_ring", sp::identity_placement_rplacement());
@@ -177,7 +185,8 @@ sp::AssemblyPtr make_ball_bearing_rassembly(double bore_diameter, double outer_d
       const double angle_degrees = 360.0 * index / ball_count;
       ball_component_ids.push_back(component_id);
       ball_angles.set(component_id, angle_degrees);
-      assembly = sp::add_component_rassembly(*assembly, ball_part, component_id, ball_placement(ball_pitch_radius, angle_degrees));
+      assembly = sp::add_component_rassembly(*assembly, ball_part, component_id,
+                                             ball_placement(ball_pitch_radius, angle_degrees));
     }
   }
 
@@ -186,7 +195,8 @@ sp::AssemblyPtr make_ball_bearing_rassembly(double bore_diameter, double outer_d
       sp::make_connector_ref_rconnectorref("inner_ring", "axis"),
       options.drive_angle_degrees ? std::optional<Scalar>(Scalar(*options.drive_angle_degrees)) : std::nullopt, {},
       "Inner ring spins in outer ring");
-  assembly = sp::set_public_connector_rassembly(*assembly, "outer_axis", "outer_ring", "axis", "Outer ring housing axis");
+  assembly =
+      sp::set_public_connector_rassembly(*assembly, "outer_axis", "outer_ring", "axis", "Outer ring housing axis");
   assembly = sp::set_public_connector_rassembly(*assembly, "inner_axis", "inner_ring", "axis", "Inner ring shaft axis");
 
   assembly->set_metadata(
@@ -202,8 +212,8 @@ sp::AssemblyPtr make_ball_bearing_rassembly(double bore_diameter, double outer_d
           "rolling_elements_fused", fuse)("rolling_element_fuse_overlap",
                                           fuse ? Value(options.rolling_element_fuse_overlap) : Value())(
           "rolling_element_fuse_mode", fuse ? "outer_ring_union" : "components")("axis_connector_id", "axis")(
-          "outer_axis_connector_id", "outer_axis")("inner_axis_connector_id", "inner_axis")(
-          "revolute_constraint_id", "inner_outer_revolute")
+          "outer_axis_connector_id", "outer_axis")("inner_axis_connector_id", "inner_axis")("revolute_constraint_id",
+                                                                                            "inner_outer_revolute")
           .take());
   return assembly;
 }

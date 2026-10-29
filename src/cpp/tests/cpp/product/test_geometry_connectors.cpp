@@ -7,7 +7,8 @@ namespace {
 
 Face top_face(const Solid& box) {
   for (const Face& face : box.faces()) {
-    if (face.normal_at().z > 0.99) return face;
+    if (face.normal_at().z > 0.99)
+      return face;
   }
   FAIL("no top face");
   return box.faces().front();

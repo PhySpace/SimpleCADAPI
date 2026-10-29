@@ -22,14 +22,16 @@ namespace {
 
 std::set<std::string> role_names(const PrimitiveBuild& built) {
   std::set<std::string> names;
-  for (const auto& witness : built.roles) names.insert(std::string(witness.role));
+  for (const auto& witness : built.roles)
+    names.insert(std::string(witness.role));
   return names;
 }
 
 // Every witness is a sub-shape of the solid that was built.
 void check_roles_in_solid(const PrimitiveBuild& built) {
   SubShapeIndex index(built.solid);
-  for (const auto& witness : built.roles) CHECK_MESSAGE(index.contains(witness.shape), witness.role);
+  for (const auto& witness : built.roles)
+    CHECK_MESSAGE(index.contains(witness.shape), witness.role);
 }
 
 }  // namespace
@@ -41,14 +43,15 @@ TEST_CASE("box: volume, corner and six named faces") {
   CHECK(bounds.xmin == doctest::Approx(1.0));
   CHECK(bounds.ymax == doctest::Approx(5.0));
   CHECK(bounds.zmax == doctest::Approx(7.0));
-  CHECK(role_names(box) == std::set<std::string>{"box.bottom", "box.top", "box.front", "box.back", "box.left",
-                                                  "box.right"});
+  CHECK(role_names(box) ==
+        std::set<std::string>{"box.bottom", "box.top", "box.front", "box.back", "box.left", "box.right"});
   check_roles_in_solid(box);
 
   // OCCT's names: bottom/top are -Z/+Z; left/right are -Y/+Y; back/front are -X/+X.
   const auto centre_of = [&](std::string_view role) {
     for (const auto& w : box.roles) {
-      if (w.role == role) return center_of_mass(w.shape);
+      if (w.role == role)
+        return center_of_mass(w.shape);
     }
     return Vec3{};
   };
@@ -79,12 +82,14 @@ TEST_CASE("cylinder: volume, three faces, three edges") {
   const PrimitiveBuild cylinder = build_cylinder_primitive({0, 0, 1}, {0, 0, 1}, 2.0, 5.0);
   CHECK(volume(cylinder.solid) == doctest::Approx(kPi * 4.0 * 5.0));
   CHECK(role_names(cylinder) == std::set<std::string>{"cylinder.start", "cylinder.end", "cylinder.side",
-                                                       "cylinder.start_boundary", "cylinder.end_boundary",
-                                                       "cylinder.seam"});
+                                                      "cylinder.start_boundary", "cylinder.end_boundary",
+                                                      "cylinder.seam"});
   check_roles_in_solid(cylinder);
   for (const auto& w : cylinder.roles) {
-    if (w.role == "cylinder.start") CHECK(center_of_mass(w.shape).z == doctest::Approx(1.0));
-    if (w.role == "cylinder.end") CHECK(center_of_mass(w.shape).z == doctest::Approx(6.0));
+    if (w.role == "cylinder.start")
+      CHECK(center_of_mass(w.shape).z == doctest::Approx(1.0));
+    if (w.role == "cylinder.end")
+      CHECK(center_of_mass(w.shape).z == doctest::Approx(6.0));
   }
   CHECK(volume(make_cylinder_solid({0, 0, 0}, {1, 0, 0}, 1.0, 2.0)) == doctest::Approx(2.0 * kPi));
 }

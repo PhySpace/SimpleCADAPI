@@ -16,7 +16,8 @@ using Points = std::vector<std::vector<double>>;
 
 double distance(const std::vector<double>& a, const std::vector<double>& b) {
   double sum = 0;
-  for (std::size_t i = 0; i < a.size(); ++i) sum += (a[i] - b[i]) * (a[i] - b[i]);
+  for (std::size_t i = 0; i < a.size(); ++i)
+    sum += (a[i] - b[i]) * (a[i] - b[i]);
   return std::sqrt(sum);
 }
 
@@ -33,7 +34,8 @@ Points semicircle() {
 
 TEST_CASE("a line fits with the minimal cubic controls") {
   Points samples;
-  for (int i = 0; i < 8; ++i) samples.push_back({static_cast<double>(i), 0.0, 0.0});
+  for (int i = 0; i < 8; ++i)
+    samples.push_back({static_cast<double>(i), 0.0, 0.0});
   const BSplineFit fit = fit_cubic_bspline_control_points(samples, {.tolerance = 1e-10});
   CHECK(fit.converged);
   CHECK(fit.control_count() == 4);
@@ -56,7 +58,8 @@ TEST_CASE("a semicircle adaptively inserts simple knots") {
   const auto multiplicities = fit.multiplicities();
   CHECK(multiplicities.front() == 4);
   CHECK(multiplicities.back() == 4);
-  for (std::size_t i = 1; i + 1 < multiplicities.size(); ++i) CHECK(multiplicities[i] == 1);
+  for (std::size_t i = 1; i + 1 < multiplicities.size(); ++i)
+    CHECK(multiplicities[i] == 1);
   for (std::size_t i = 0; i < samples.size(); ++i) {
     CHECK(distance(fit.evaluate(fit.sample_parameters[i]), samples[i]) <= fit.tolerance);
   }

@@ -32,11 +32,19 @@ namespace {
 constexpr std::string_view kCoverageKey = "semantic.lineage.coverage";
 constexpr std::size_t kNone = std::numeric_limits<std::size_t>::max();
 
-bool is_local(const TagBinding& b) noexcept { return b.attachment == TagAttachment::Local; }
-bool is_legacy(const TagBinding& b) noexcept { return b.attachment == TagAttachment::EffectiveLegacy; }
-bool is_downward(const TagBinding& b) noexcept { return b.propagation().topology == TopologyPropagation::Downward; }
+bool is_local(const TagBinding& b) noexcept {
+  return b.attachment == TagAttachment::Local;
+}
+bool is_legacy(const TagBinding& b) noexcept {
+  return b.attachment == TagAttachment::EffectiveLegacy;
+}
+bool is_downward(const TagBinding& b) noexcept {
+  return b.propagation().topology == TopologyPropagation::Downward;
+}
 
-bool starts_with(std::string_view s, std::string_view prefix) { return s.substr(0, prefix.size()) == prefix; }
+bool starts_with(std::string_view s, std::string_view prefix) {
+  return s.substr(0, prefix.size()) == prefix;
+}
 
 [[noreturn]] void legacy_scope_unsupported() {
   throw UnsupportedQueryCapabilityError("legacy effective tag snapshots only support effective scope");
@@ -50,13 +58,15 @@ bool starts_with(std::string_view s, std::string_view prefix) { return s.substr(
 std::vector<std::shared_ptr<Entity>> direct_parents(Registry& registry, const Entity& entity) {
   std::vector<std::shared_ptr<Entity>> out;
   auto add = [&out](std::shared_ptr<Entity> parent) {
-    if (parent && std::find(out.begin(), out.end(), parent) == out.end()) out.push_back(std::move(parent));
+    if (parent && std::find(out.begin(), out.end(), parent) == out.end())
+      out.push_back(std::move(parent));
   };
   auto containing = [&](Kind parent_kind) {
     std::size_t found = 0;
     const auto& map = registry.ancestors(entity.kind, parent_kind);
     const int index = map.FindIndex(entity.shape);
-    if (index == 0) return found;
+    if (index == 0)
+      return found;
     for (TopTools_ListIteratorOfListOfShape it(map.FindFromIndex(index)); it.More(); it.Next()) {
       add(registry.acquire(parent_kind, it.Value()));
       ++found;
@@ -64,17 +74,28 @@ std::vector<std::shared_ptr<Entity>> direct_parents(Registry& registry, const En
     return found;
   };
   switch (entity.kind) {
-    case Kind::Vertex: containing(Kind::Edge); break;
-    case Kind::Edge: containing(Kind::Wire); break;
-    case Kind::Wire: containing(Kind::Face); break;
-    case Kind::Face:
-      if (containing(Kind::Solid) == 0) containing(Kind::Shell);
+    case Kind::Vertex:
+      containing(Kind::Edge);
       break;
-    case Kind::Solid: containing(Kind::Compound); break;
+    case Kind::Edge:
+      containing(Kind::Wire);
+      break;
+    case Kind::Wire:
+      containing(Kind::Face);
+      break;
+    case Kind::Face:
+      if (containing(Kind::Solid) == 0)
+        containing(Kind::Shell);
+      break;
+    case Kind::Solid:
+      containing(Kind::Compound);
+      break;
     case Kind::Shell:
-    case Kind::Compound: break;
+    case Kind::Compound:
+      break;
   }
-  for (const auto& weak : entity.parents) add(weak.lock());
+  for (const auto& weak : entity.parents)
+    add(weak.lock());
   return out;
 }
 
@@ -96,20 +117,25 @@ void walk_inherited(Registry& registry, const std::shared_ptr<Entity>& start, Vi
     if (i > 0) {
       if (const SemanticState* state = nodes[i].entity->state_if()) {
         for (const TagBinding& binding : state->bindings) {
-          if (!is_local(binding) || !is_downward(binding)) continue;
-          if (!seen_bindings.insert(binding.binding_id).second) continue;
-          if (visit(binding, nodes, i)) return;
+          if (!is_local(binding) || !is_downward(binding))
+            continue;
+          if (!seen_bindings.insert(binding.binding_id).second)
+            continue;
+          if (visit(binding, nodes, i))
+            return;
         }
       }
     }
     for (auto& parent : direct_parents(registry, *nodes[i].entity))
-      if (seen_entities.insert(parent.get()).second) nodes.push_back({std::move(parent), i});
+      if (seen_entities.insert(parent.get()).second)
+        nodes.push_back({std::move(parent), i});
   }
 }
 
 std::vector<std::string> path_of(const std::vector<AncestorNode>& nodes, std::size_t index) {
   std::vector<std::string> path;  // ancestor first, the shape itself last
-  for (; index != kNone; index = nodes[index].from) path.push_back(nodes[index].entity->topo_id.str());
+  for (; index != kNone; index = nodes[index].from)
+    path.push_back(nodes[index].entity->topo_id.str());
   return path;
 }
 
@@ -132,12 +158,16 @@ void Shape::add_binding(TagBinding binding) {
   SemanticState& state = entity_->state();
   const bool duplicate = std::any_of(state.bindings.begin(), state.bindings.end(),
                                      [&](const TagBinding& b) { return b.binding_id == binding.binding_id; });
-  if (duplicate) return;
-  if (is_downward(binding)) registry_->has_downward_bindings = true;
+  if (duplicate)
+    return;
+  if (is_downward(binding))
+    registry_->has_downward_bindings = true;
   state.bindings.push_back(std::move(binding));
 }
 
-void Shape::add_tag(std::string_view tag) { add_binding(internal_tag_binding(normalize_tag(tag, true))); }
+void Shape::add_tag(std::string_view tag) {
+  add_binding(internal_tag_binding(normalize_tag(tag, true)));
+}
 
 void Shape::apply_tag(std::string_view tag, bool propagate) {
   InternalTagOptions options;
@@ -162,17 +192,20 @@ void Shape::add_lineage_witness(TagLineageWitness witness) {
   SemanticState& state = entity_->state();
   const bool duplicate = std::any_of(state.lineage.begin(), state.lineage.end(),
                                      [&](const TagLineageWitness& w) { return same_witness(w, witness); });
-  if (!duplicate) state.lineage.push_back(std::move(witness));
+  if (!duplicate)
+    state.lineage.push_back(std::move(witness));
 }
 
 std::size_t Shape::remove_tag_bindings(std::string_view tag, TagProducerKind matching) {
   const std::string normalized = normalize_tag(tag, true);
   SemanticState* state = entity_->sem.get();
-  if (state == nullptr) return 0;
+  if (state == nullptr)
+    return 0;
   const auto doomed = [&](const TagBinding& b) { return b.tag == normalized && b.producer().kind == matching; };
   const auto removed = static_cast<std::size_t>(std::count_if(state->bindings.begin(), state->bindings.end(), doomed));
   if (removed != 0) {
-    state->bindings.erase(std::remove_if(state->bindings.begin(), state->bindings.end(), doomed), state->bindings.end());
+    state->bindings.erase(std::remove_if(state->bindings.begin(), state->bindings.end(), doomed),
+                          state->bindings.end());
   }
   return removed;
 }
@@ -180,24 +213,29 @@ std::size_t Shape::remove_tag_bindings(std::string_view tag, TagProducerKind mat
 std::size_t Shape::remove_tag_bindings(std::string_view tag, const TagProducer& matching) {
   const std::string normalized = normalize_tag(tag, true);
   SemanticState* state = entity_->sem.get();
-  if (state == nullptr) return 0;
+  if (state == nullptr)
+    return 0;
   const auto doomed = [&](const TagBinding& b) { return b.tag == normalized && b.producer() == matching; };
   const auto removed = static_cast<std::size_t>(std::count_if(state->bindings.begin(), state->bindings.end(), doomed));
   if (removed != 0) {
-    state->bindings.erase(std::remove_if(state->bindings.begin(), state->bindings.end(), doomed), state->bindings.end());
+    state->bindings.erase(std::remove_if(state->bindings.begin(), state->bindings.end(), doomed),
+                          state->bindings.end());
   }
   return removed;
 }
 
 bool Shape::remove_tag(std::string_view tag, TagScope scope) {
-  if (scope != TagScope::Local) throw ValueError("only local tags can be removed");
+  if (scope != TagScope::Local)
+    throw ValueError("only local tags can be removed");
   return remove_tag_bindings(tag, TagProducerKind::UserOperation) != 0;
 }
 
 bool Shape::remove_tag_binding(std::string_view binding_id) {
-  if (binding_id.empty()) throw ValueError("binding_id must be a non-empty string");
+  if (binding_id.empty())
+    throw ValueError("binding_id must be a non-empty string");
   SemanticState* state = entity_->sem.get();
-  if (state == nullptr) return false;
+  if (state == nullptr)
+    return false;
   const auto before = state->bindings.size();
   state->bindings.erase(std::remove_if(state->bindings.begin(), state->bindings.end(),
                                        [&](const TagBinding& b) { return b.binding_id == binding_id; }),
@@ -206,11 +244,14 @@ bool Shape::remove_tag_binding(std::string_view binding_id) {
 }
 
 void Shape::replace_local_tag_bindings(std::vector<TagBinding> bindings) {
-  for (const auto& b : bindings) b.validate();
+  for (const auto& b : bindings)
+    b.validate();
   SemanticState& state = entity_->state();
   state.bindings.erase(std::remove_if(state.bindings.begin(), state.bindings.end(), is_local), state.bindings.end());
-  if (any_downward(bindings)) registry_->has_downward_bindings = true;
-  for (auto& b : bindings) state.bindings.push_back(std::move(b));
+  if (any_downward(bindings))
+    registry_->has_downward_bindings = true;
+  for (auto& b : bindings)
+    state.bindings.push_back(std::move(b));
 }
 
 void Shape::set_legacy_tags(const std::vector<std::string>& tags) {
@@ -245,20 +286,23 @@ const std::vector<TagLineageWitness>& Shape::lineage_witnesses() const {
 std::vector<TagBinding> Shape::local_tag_bindings() const {
   std::vector<TagBinding> out;
   for (const auto& b : local_bindings())
-    if (is_local(b)) out.push_back(b);
+    if (is_local(b))
+      out.push_back(b);
   return out;
 }
 
 std::vector<TagBinding> Shape::legacy_effective_bindings() const {
   std::vector<TagBinding> out;
   for (const auto& b : local_bindings())
-    if (is_legacy(b)) out.push_back(b);
+    if (is_legacy(b))
+      out.push_back(b);
   return out;
 }
 
 std::vector<InheritedTagBinding> Shape::inherited_tag_bindings_with_paths() const {
   std::vector<InheritedTagBinding> out;
-  if (!registry_->has_downward_bindings) return out;
+  if (!registry_->has_downward_bindings)
+    return out;
   walk_inherited(*registry_, entity_,
                  [&](const TagBinding& binding, const std::vector<AncestorNode>& nodes, std::size_t at) {
                    out.push_back({binding, path_of(nodes, at)});
@@ -269,7 +313,8 @@ std::vector<InheritedTagBinding> Shape::inherited_tag_bindings_with_paths() cons
 
 std::vector<TagBinding> Shape::inherited_tag_bindings() const {
   std::vector<TagBinding> out;
-  if (!registry_->has_downward_bindings) return out;
+  if (!registry_->has_downward_bindings)
+    return out;
   walk_inherited(*registry_, entity_, [&](const TagBinding& binding, const std::vector<AncestorNode>&, std::size_t) {
     out.push_back(binding);
     return false;
@@ -288,7 +333,8 @@ std::vector<TagBinding> Shape::lineage_tag_bindings() const {
                                           available);
   }
   std::vector<TagBinding> out;
-  if (state == nullptr) return out;
+  if (state == nullptr)
+    return out;
   for (const auto& w : state->lineage)
     if (w.coverage != "complete")
       throw UnsupportedQueryCapabilityError("lineage tag scope has incomplete lineage witnesses");
@@ -301,43 +347,57 @@ std::vector<TagBinding> Shape::lineage_tag_bindings() const {
 
 std::vector<TagBinding> Shape::list_tag_bindings(TagScope scope) const {
   const SemanticState* state = entity_->state_if();
-  if (scope != TagScope::Effective && state != nullptr && state->has_legacy()) legacy_scope_unsupported();
+  if (scope != TagScope::Effective && state != nullptr && state->has_legacy())
+    legacy_scope_unsupported();
   switch (scope) {
-    case TagScope::Local: return local_tag_bindings();
-    case TagScope::Inherited: return inherited_tag_bindings();
-    case TagScope::Lineage: return lineage_tag_bindings();
-    case TagScope::Effective: break;
+    case TagScope::Local:
+      return local_tag_bindings();
+    case TagScope::Inherited:
+      return inherited_tag_bindings();
+    case TagScope::Lineage:
+      return lineage_tag_bindings();
+    case TagScope::Effective:
+      break;
   }
   std::vector<TagBinding> all = local_tag_bindings();
-  for (auto& b : inherited_tag_bindings()) all.push_back(std::move(b));
-  for (auto& b : legacy_effective_bindings()) all.push_back(std::move(b));
+  for (auto& b : inherited_tag_bindings())
+    all.push_back(std::move(b));
+  for (auto& b : legacy_effective_bindings())
+    all.push_back(std::move(b));
   std::vector<TagBinding> unique;
   std::set<std::string> seen;
   for (auto& b : all)
-    if (seen.insert(b.binding_id).second) unique.push_back(std::move(b));
+    if (seen.insert(b.binding_id).second)
+      unique.push_back(std::move(b));
   return unique;
 }
 
 std::vector<std::string> Shape::list_tags(TagScope scope) const {
   const SemanticState* state = entity_->state_if();
-  if (scope != TagScope::Effective && state != nullptr && state->has_legacy()) legacy_scope_unsupported();
+  if (scope != TagScope::Effective && state != nullptr && state->has_legacy())
+    legacy_scope_unsupported();
   std::set<std::string> names;
   switch (scope) {
     case TagScope::Local:
       if (state != nullptr)
         for (const auto& b : state->bindings)
-          if (!is_legacy(b)) names.insert(b.tag.str());
+          if (!is_legacy(b))
+            names.insert(b.tag.str());
       break;
     case TagScope::Inherited:
-      for (const auto& b : inherited_tag_bindings()) names.insert(b.tag);
+      for (const auto& b : inherited_tag_bindings())
+        names.insert(b.tag);
       break;
     case TagScope::Lineage:
-      for (const auto& b : lineage_tag_bindings()) names.insert(b.tag);
+      for (const auto& b : lineage_tag_bindings())
+        names.insert(b.tag);
       break;
     case TagScope::Effective:
       if (state != nullptr)
-        for (const auto& b : state->bindings) names.insert(b.tag.str());
-      for (const auto& b : inherited_tag_bindings()) names.insert(b.tag.str());
+        for (const auto& b : state->bindings)
+          names.insert(b.tag.str());
+      for (const auto& b : inherited_tag_bindings())
+        names.insert(b.tag.str());
       break;
   }
   return {names.begin(), names.end()};
@@ -346,23 +406,27 @@ std::vector<std::string> Shape::list_tags(TagScope scope) const {
 bool Shape::has_stored_tag(std::string_view tag) const {
   const SemanticState* state = entity_->state_if();
   const std::optional<Symbol> symbol = Symbol::find(tag);
-  if (!symbol || state == nullptr) return false;
+  if (!symbol || state == nullptr)
+    return false;
   return std::any_of(state->bindings.begin(), state->bindings.end(),
                      [&](const TagBinding& b) { return b.tag == *symbol && !is_legacy(b); });
 }
 
 bool Shape::has_tag(std::string_view tag, TagScope scope) const {
   const SemanticState* state = entity_->state_if();
-  if (scope != TagScope::Effective && state != nullptr && state->has_legacy()) legacy_scope_unsupported();
+  if (scope != TagScope::Effective && state != nullptr && state->has_legacy())
+    legacy_scope_unsupported();
   // The lineage scope answers (or refuses: incomplete history) whatever the name is.
   if (scope == TagScope::Lineage) {
     const auto bindings = lineage_tag_bindings();
     const std::optional<Symbol> wanted = Symbol::find(tag);
-    return wanted && std::any_of(bindings.begin(), bindings.end(), [&](const TagBinding& b) { return b.tag == *wanted; });
+    return wanted &&
+           std::any_of(bindings.begin(), bindings.end(), [&](const TagBinding& b) { return b.tag == *wanted; });
   }
   // A name nobody interned cannot be held by any binding.
   const std::optional<Symbol> symbol = Symbol::find(tag);
-  if (!symbol) return false;
+  if (!symbol)
+    return false;
   const auto holds = [&](bool legacy) {
     return state != nullptr && std::any_of(state->bindings.begin(), state->bindings.end(), [&](const TagBinding& b) {
              return b.tag == *symbol && is_legacy(b) == legacy;
@@ -370,7 +434,8 @@ bool Shape::has_tag(std::string_view tag, TagScope scope) const {
   };
   const auto stored = [&] { return holds(false); };
   const auto inherited = [&] {
-    if (!registry_->has_downward_bindings) return false;
+    if (!registry_->has_downward_bindings)
+      return false;
     bool found = false;
     walk_inherited(*registry_, entity_, [&](const TagBinding& b, const std::vector<AncestorNode>&, std::size_t) {
       found = b.tag == *symbol;
@@ -379,8 +444,10 @@ bool Shape::has_tag(std::string_view tag, TagScope scope) const {
     return found;
   };
   switch (scope) {
-    case TagScope::Local: return stored();
-    case TagScope::Inherited: return inherited();
+    case TagScope::Local:
+      return stored();
+    case TagScope::Inherited:
+      return inherited();
     case TagScope::Effective:
       return stored() || holds(true) || inherited();
     case TagScope::Lineage: {
@@ -398,7 +465,8 @@ std::vector<Value> Shape::explain_tag(std::string_view tag, TagScope scope) cons
 
   std::vector<Value> explanations;
   for (const TagBinding& binding : list_tag_bindings(scope)) {
-    if (binding.tag != normalized) continue;
+    if (binding.tag != normalized)
+      continue;
     Value item = Value::object();
     item.set("scope", std::string(scad::to_string(scope)));
     item.set("binding_id", binding.binding_id.str());
@@ -412,7 +480,8 @@ std::vector<Value> Shape::explain_tag(std::string_view tag, TagScope scope) cons
     if (via != inherited.end()) {
       item.set("attachment", std::string(scad::to_string(TagAttachment::Inherited)));
       Value path = Value::array();
-      for (const auto& id : via->path) path.push_back(id);
+      for (const auto& id : via->path)
+        path.push_back(id);
       item.set("topology_path", std::move(path));
     }
 
@@ -430,7 +499,8 @@ std::vector<Value> Shape::explain_tag(std::string_view tag, TagScope scope) cons
         witnesses.push_back(std::move(entry));
       }
     }
-    if (witnesses.size() != 0) item.set("lineage", std::move(witnesses));
+    if (witnesses.size() != 0)
+      item.set("lineage", std::move(witnesses));
     explanations.push_back(std::move(item));
   }
   return explanations;
@@ -450,27 +520,34 @@ bool Shape::has_metadata_key(std::string_view key) const {
 
 void Shape::set_metadata_deferred(std::string_view key, const Value& value) {
   SemanticState& state = entity_->state();
-  if (state.has_key(false, key)) state.metadata().set(std::string(key), value);
-  else state.defer(false, Symbol(key), value);
+  if (state.has_key(false, key))
+    state.metadata().set(std::string(key), value);
+  else
+    state.defer(false, Symbol(key), value);
 }
 
 void Shape::set_metadata_recipe(std::string_view key, unsigned char recipe, const Value& args) {
   SemanticState& state = entity_->state();
-  if (state.has_key(false, key)) state.metadata().set(std::string(key), PackedValue::from_recipe(recipe, args).unpack());
-  else state.defer_packed(false, Symbol(key), PackedValue::from_recipe(recipe, args));
+  if (state.has_key(false, key))
+    state.metadata().set(std::string(key), PackedValue::from_recipe(recipe, args).unpack());
+  else
+    state.defer_packed(false, Symbol(key), PackedValue::from_recipe(recipe, args));
 }
 
 void Shape::set_runtime_deferred(std::string_view key, const Value& value) {
   SemanticState& state = entity_->state();
-  if (state.has_key(true, key)) state.runtime().set(std::string(key), value);
-  else state.defer(true, Symbol(key), value);
+  if (state.has_key(true, key))
+    state.runtime().set(std::string(key), value);
+  else
+    state.defer(true, Symbol(key), value);
 }
 
 Value Shape::get_metadata(std::string_view key, Value fallback) const {
   const SemanticState* state = entity_->state_if();
   if (state != nullptr) {
     Value scratch;
-    if (const Value* v = state->peek(false, key, scratch)) return *v;
+    if (const Value* v = state->peek(false, key, scratch))
+      return *v;
   }
   return fallback;
 }
@@ -489,7 +566,8 @@ Value Shape::get_runtime(std::string_view key, Value fallback) const {
   const SemanticState* state = entity_->state_if();
   if (state != nullptr) {
     Value scratch;
-    if (const Value* v = state->peek(true, key, scratch)) return *v;
+    if (const Value* v = state->peek(true, key, scratch))
+      return *v;
   }
   return fallback;
 }
@@ -515,7 +593,8 @@ void Shape::copy_tag_state_from(const Shape& source) {
   SemanticState& to = entity_->state();
   to.bindings = from->bindings;
   to.lineage = from->lineage;
-  if (any_downward(to.bindings)) registry_->has_downward_bindings = true;
+  if (any_downward(to.bindings))
+    registry_->has_downward_bindings = true;
 }
 
 // _copy_semantic_state_from: tags, lineage, and the metadata/runtime that is not tied to
@@ -525,9 +604,11 @@ void Shape::copy_semantic_state_from(const Shape& source) {
   const SemanticState* from = source.entity_->state_if();
   SemanticState& to = entity_->state();
   to.clear_dictionaries();
-  if (from == nullptr) return;
+  if (from == nullptr)
+    return;
   for (const auto& [key, value] : from->metadata().as_object())
-    if (key != "graph" && key != "topo_ref") to.metadata().set(key, value);
+    if (key != "graph" && key != "topo_ref")
+      to.metadata().set(key, value);
   for (const auto& [key, value] : from->runtime().as_object())
     if (!starts_with(key, "graph.") && !starts_with(key, "topo.") && !starts_with(key, "mesh."))
       to.runtime().set(key, value);
@@ -540,7 +621,9 @@ namespace {
 std::atomic<std::size_t> g_clone_views{0};
 }
 
-std::size_t Shape::clone_view_count() noexcept { return g_clone_views.load(std::memory_order_relaxed); }
+std::size_t Shape::clone_view_count() noexcept {
+  return g_clone_views.load(std::memory_order_relaxed);
+}
 
 Shape Shape::clone_view() const {
   g_clone_views.fetch_add(1, std::memory_order_relaxed);
@@ -551,7 +634,8 @@ Shape Shape::clone_view() const {
   const auto copy_state = [&](const Entity& source, Entity& target) {
     if (const SemanticState* state = source.state_if()) {
       target.state() = *state;
-      if (any_downward(state->bindings)) to.has_downward_bindings = true;
+      if (any_downward(state->bindings))
+        to.has_downward_bindings = true;
     }
   };
   const auto copy_entity = [&](const Entity& source, Entity& target) {
@@ -562,7 +646,8 @@ Shape Shape::clone_view() const {
       target.free_wires = std::make_unique<std::vector<TopoDS_Wire>>(*source.free_wires);
       for (const TopoDS_Wire& wire : *source.free_wires) {
         const auto wire_source = from.peek(Kind::Wire, wire);
-        if (wire_source == nullptr || wire_source->state_if() == nullptr) continue;
+        if (wire_source == nullptr || wire_source->state_if() == nullptr)
+          continue;
         const auto wire_target = to.acquire(Kind::Wire, wire);
         wire_target->topo_id = wire_source->topo_id;
         copy_state(*wire_source, *wire_target);
@@ -573,7 +658,8 @@ Shape Shape::clone_view() const {
   if (shape_.IsSame(from.root())) {
     // Same root, same numbering: only entities that hold state need visiting.
     from.for_each_entity([&](const Entity& source) {
-      if (source.state_if() == nullptr || !to.contains(source.kind, source.shape)) return;
+      if (source.state_if() == nullptr || !to.contains(source.kind, source.shape))
+        return;
       copy_entity(source, *to.acquire(source.kind, source.shape));
     });
     return view;
@@ -581,7 +667,7 @@ Shape Shape::clone_view() const {
 
   // A sub-shape handle: the new root numbers its entities from scratch, so give every
   // one of them the id it has in the source and copy what the source knows.
-  static constexpr Kind kinds[] = {Kind::Vertex, Kind::Edge,  Kind::Wire,  Kind::Face,
+  static constexpr Kind kinds[] = {Kind::Vertex, Kind::Edge,  Kind::Wire,    Kind::Face,
                                    Kind::Shell,  Kind::Solid, Kind::Compound};
   for (const Kind kind : kinds) {
     TopTools_IndexedMapOfShape members;

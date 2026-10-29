@@ -34,28 +34,38 @@ double real_number(const py::handle& value, std::string_view label) {
 
 double finite_real(const py::handle& value, std::string_view label) {
   const double result = real_number(value, label);
-  if (!std::isfinite(result)) throw scad::ValueError(std::string(label) + " must be finite");
+  if (!std::isfinite(result))
+    throw scad::ValueError(std::string(label) + " must be finite");
   return result;
 }
 
 scad::Bindings bindings_from(const py::object& mapping) {
   scad::Bindings out;
-  if (mapping.is_none()) return out;
+  if (mapping.is_none())
+    return out;
   for (const auto& item : py::cast<py::dict>(mapping)) {
-    out[py::cast<std::string>(item.first)] = real_number(item.second, "Binding '" + py::cast<std::string>(item.first) + "'");
+    out[py::cast<std::string>(item.first)] =
+        real_number(item.second, "Binding '" + py::cast<std::string>(item.first) + "'");
   }
   return out;
 }
 
 py::object shape_to_python(const scad::Shape& shape) {
   switch (shape.kind()) {
-    case scad::Kind::Vertex: return py::cast(scad::Vertex(shape));
-    case scad::Kind::Edge: return py::cast(scad::Edge(shape));
-    case scad::Kind::Wire: return py::cast(scad::Wire(shape));
-    case scad::Kind::Face: return py::cast(scad::Face(shape));
-    case scad::Kind::Shell: return py::cast(scad::Shell(shape));
-    case scad::Kind::Solid: return py::cast(scad::Solid(shape));
-    case scad::Kind::Compound: return py::cast(scad::Compound(shape));
+    case scad::Kind::Vertex:
+      return py::cast(scad::Vertex(shape));
+    case scad::Kind::Edge:
+      return py::cast(scad::Edge(shape));
+    case scad::Kind::Wire:
+      return py::cast(scad::Wire(shape));
+    case scad::Kind::Face:
+      return py::cast(scad::Face(shape));
+    case scad::Kind::Shell:
+      return py::cast(scad::Shell(shape));
+    case scad::Kind::Solid:
+      return py::cast(scad::Solid(shape));
+    case scad::Kind::Compound:
+      return py::cast(scad::Compound(shape));
   }
   return py::cast(shape);
 }

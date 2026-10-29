@@ -31,7 +31,9 @@ struct Sidecar {
       face_ids = {"face:0", "face:1", "face:2", "face:3", "face:4", "face:5"};
       shape = io::require_single_valid_shell(solid);
     }
-    const io::Bytes bytes = io::make_region_artifact(shape, kind, {.name = "box.step", .byte_length = 1, .content_hash = "sha256:" + std::string(64, 'a')}, face_ids);
+    const io::Bytes bytes = io::make_region_artifact(
+        shape, kind, {.name = "box.step", .byte_length = 1, .content_hash = "sha256:" + std::string(64, 'a')},
+        face_ids);
     file = directory / "region.scadbrep";
     io::write_file(file, bytes);
     sha256 = io::sha256_tagged(bytes);
@@ -77,7 +79,8 @@ TEST_CASE("load_brep_region_rshell loads a face region") {
 
 TEST_CASE("snapshot failures are reported by the operator that was asked") {
   const Sidecar sidecar(io::RegionRootKind::Solid);
-  const auto wrong_hash = failure_of([&] { load_brep_region_rsolid(sidecar.path(), "sha256:" + std::string(64, '0')); });
+  const auto wrong_hash =
+      failure_of([&] { load_brep_region_rsolid(sidecar.path(), "sha256:" + std::string(64, '0')); });
   REQUIRE(wrong_hash);
   CHECK(wrong_hash->operation() == "brep_region");  // the io layer's own error passes through
 
@@ -95,5 +98,6 @@ TEST_CASE("while recording, the locator must be relative") {
   Recording recording;
   const auto absolute = failure_of([&] { load_brep_region_rsolid(sidecar.path(), sidecar.sha256); });
   REQUIRE(absolute);
-  CHECK(absolute->guidance().technical_details.find("GraphSession requires a relative .scadbrep path") != std::string::npos);
+  CHECK(absolute->guidance().technical_details.find("GraphSession requires a relative .scadbrep path") !=
+        std::string::npos);
 }

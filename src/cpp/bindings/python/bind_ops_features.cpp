@@ -22,33 +22,43 @@ using namespace scad;
 // ---- conversions ---------------------------------------------------------------------------------------------
 py::object shape_to_py(const Shape& s) {
   switch (s.kind()) {
-    case Kind::Vertex: return py::cast(Vertex(s));
-    case Kind::Edge: return py::cast(Edge(s));
-    case Kind::Wire: return py::cast(Wire(s));
-    case Kind::Face: return py::cast(Face(s));
-    case Kind::Shell: return py::cast(Shell(s));
-    case Kind::Solid: return py::cast(Solid(s));
-    case Kind::Compound: return py::cast(Compound(s));
+    case Kind::Vertex:
+      return py::cast(Vertex(s));
+    case Kind::Edge:
+      return py::cast(Edge(s));
+    case Kind::Wire:
+      return py::cast(Wire(s));
+    case Kind::Face:
+      return py::cast(Face(s));
+    case Kind::Shell:
+      return py::cast(Shell(s));
+    case Kind::Solid:
+      return py::cast(Solid(s));
+    case Kind::Compound:
+      return py::cast(Compound(s));
   }
   return py::none();
 }
 
 py::list shapes_to_py(const std::vector<Shape>& shapes) {
   py::list out;
-  for (const Shape& shape : shapes) out.append(shape_to_py(shape));
+  for (const Shape& shape : shapes)
+    out.append(shape_to_py(shape));
   return out;
 }
 
 py::list solids_to_py(const std::vector<Solid>& solids) {
   py::list out;
-  for (const Solid& solid : solids) out.append(py::cast(solid));
+  for (const Solid& solid : solids)
+    out.append(py::cast(solid));
   return out;
 }
 
 // A list of shapes of one kind, or a ql selector that finds them.
 template <class T>
 Selection<T> selection_from(const py::object& value) {
-  if (py::isinstance<ql::ShapeSelector>(value)) return Selection<T>(value.cast<const ql::ShapeSelector&>());
+  if (py::isinstance<ql::ShapeSelector>(value))
+    return Selection<T>(value.cast<const ql::ShapeSelector&>());
   std::vector<T> items;
   for (const py::handle item : value) {
     if (!py::isinstance<T>(item)) {
@@ -59,23 +69,27 @@ Selection<T> selection_from(const py::object& value) {
   return Selection<T>(std::move(items));
 }
 
-
 // A 3-vector argument that Python validates itself: any sequence of numbers, ValueError unless it
 // holds exactly three.
 Scalar3 vector_arg(const py::object& value, const char* name) {
   const std::string message = std::string(name) + " must contain three finite numbers";
-  if ((py::isinstance<py::str>(value) || py::isinstance<py::bytes>(value)) || !py::hasattr(value, "__len__") || !py::hasattr(value, "__getitem__")) throw ValueError(message);
+  if ((py::isinstance<py::str>(value) || py::isinstance<py::bytes>(value)) || !py::hasattr(value, "__len__") ||
+      !py::hasattr(value, "__getitem__"))
+    throw ValueError(message);
   const py::sequence items = py::reinterpret_borrow<py::sequence>(value);
-  if (items.size() != 3) throw ValueError(message);
+  if (items.size() != 3)
+    throw ValueError(message);
   Scalar3 out;
-  for (std::size_t i = 0; i < 3; ++i) out[i] = items[i].cast<Scalar>();
+  for (std::size_t i = 0; i < 3; ++i)
+    out[i] = items[i].cast<Scalar>();
   return out;
 }
 
 std::vector<Shape> shape_list(const py::object& value, const char* complaint) {
   std::vector<Shape> out;
   for (const py::handle item : value) {
-    if (!py::isinstance<Shape>(item)) throw TypeError(complaint);
+    if (!py::isinstance<Shape>(item))
+      throw TypeError(complaint);
     out.push_back(item.cast<Shape>());
   }
   return out;
@@ -83,8 +97,10 @@ std::vector<Shape> shape_list(const py::object& value, const char* complaint) {
 
 // An operator that takes `tracking_policy`: the enum member or its string value.
 std::string policy_text(const py::object& value) {
-  if (py::isinstance<py::str>(value)) return value.cast<std::string>();
-  if (py::hasattr(value, "value")) return py::str(value.attr("value")).cast<std::string>();
+  if (py::isinstance<py::str>(value))
+    return value.cast<std::string>();
+  if (py::hasattr(value, "value"))
+    return py::str(value.attr("value")).cast<std::string>();
   return py::str(value).cast<std::string>();
 }
 
@@ -92,12 +108,17 @@ std::string policy_text(const py::object& value) {
 template <class F>
 auto unlocked(bool keep_gil, F&& body) {
   std::optional<py::gil_scoped_release> release;
-  if (!keep_gil) release.emplace();
+  if (!keep_gil)
+    release.emplace();
   return body();
 }
 
-py::tuple unit_z() { return py::make_tuple(0, 0, 1); }
-py::tuple origin() { return py::make_tuple(0, 0, 0); }
+py::tuple unit_z() {
+  return py::make_tuple(0, 0, 1);
+}
+py::tuple origin() {
+  return py::make_tuple(0, 0, 0);
+}
 
 // ---- sweeps of a profile ------------------------------------------------------------------------------------
 SweepTags sweep_tags(OptionalString tag_prefix, OptionalString result_tag, OptionalString start, OptionalString end,
@@ -109,7 +130,8 @@ void bind_extrusion(py::module_& m) {
   m.def(
       "extrude_rsolid",
       [](const Shape& profile, const Scalar3& direction, const Scalar& distance, OptionalString tag_prefix,
-         OptionalString result_tag, OptionalString start_face_tag, OptionalString end_face_tag, OptionalString side_faces_tag) {
+         OptionalString result_tag, OptionalString start_face_tag, OptionalString end_face_tag,
+         OptionalString side_faces_tag) {
         const SweepTags tags = sweep_tags(std::move(tag_prefix), std::move(result_tag), std::move(start_face_tag),
                                           std::move(end_face_tag), std::move(side_faces_tag));
         return unlocked(false, [&] { return extrude_rsolid(profile, direction, distance, tags); });
@@ -120,16 +142,17 @@ void bind_extrusion(py::module_& m) {
 
   m.def(
       "revolve_rsolid",
-      [](const Shape& profile, const Scalar3& axis, const Scalar& angle, const Scalar3& origin, OptionalString tag_prefix,
-         OptionalString result_tag, OptionalString start_face_tag, OptionalString end_face_tag, OptionalString side_faces_tag) {
+      [](const Shape& profile, const Scalar3& axis, const Scalar& angle, const Scalar3& origin,
+         OptionalString tag_prefix, OptionalString result_tag, OptionalString start_face_tag,
+         OptionalString end_face_tag, OptionalString side_faces_tag) {
         const SweepTags tags = sweep_tags(std::move(tag_prefix), std::move(result_tag), std::move(start_face_tag),
                                           std::move(end_face_tag), std::move(side_faces_tag));
         return unlocked(false, [&] { return revolve_rsolid(profile, axis, angle, origin, tags); });
       },
-      py::arg("profile"), py::arg("axis") = unit_z(), py::arg("angle") = 360, py::arg("origin") = origin(), py::kw_only(),
-      py::arg("tag_prefix") = py::none(), py::arg("result_tag") = py::none(), py::arg("start_face_tag") = py::none(),
-      py::arg("end_face_tag") = py::none(), py::arg("side_faces_tag") = py::none(),
-      "Create a revolved solid, with optional kernel-role-based tags.");
+      py::arg("profile"), py::arg("axis") = unit_z(), py::arg("angle") = 360, py::arg("origin") = origin(),
+      py::kw_only(), py::arg("tag_prefix") = py::none(), py::arg("result_tag") = py::none(),
+      py::arg("start_face_tag") = py::none(), py::arg("end_face_tag") = py::none(),
+      py::arg("side_faces_tag") = py::none(), "Create a revolved solid, with optional kernel-role-based tags.");
 }
 
 // ---- local features ------------------------------------------------------------------------------------------
@@ -143,20 +166,23 @@ void bind_blends(py::module_& m) {
         return unlocked(selection.is_selector(), [&] { return fillet_rsolid(solid, selection, radius, tags); });
       },
       py::arg("solid"), py::arg("edges"), py::arg("radius"), py::kw_only(), py::arg("result_tag") = py::none(),
-      py::arg("generated_faces_tag") = py::none(), "Apply fillets, with optional tagging of kernel-proven patch faces.");
+      py::arg("generated_faces_tag") = py::none(),
+      "Apply fillets, with optional tagging of kernel-proven patch faces.");
 
   m.def(
       "chamfer_rsolid",
       [](const Solid& solid, const py::object& edges, const Scalar& distance, std::optional<double> angle,
          std::optional<Vec3> reference_direction, OptionalString result_tag, OptionalString generated_faces_tag) {
         const EdgeSelection selection = selection_from<Edge>(edges);
-        const ChamferOptions options{angle, reference_direction, {std::move(result_tag), std::move(generated_faces_tag)}};
+        const ChamferOptions options{
+            angle, reference_direction, {std::move(result_tag), std::move(generated_faces_tag)}};
         return unlocked(selection.is_selector(), [&] { return chamfer_rsolid(solid, selection, distance, options); });
       },
       py::arg("solid"), py::arg("edges"), py::arg("distance"), py::kw_only(), py::arg("angle") = py::none(),
       py::arg("reference_direction") = py::none(), py::arg("result_tag") = py::none(),
       py::arg("generated_faces_tag") = py::none(),
-      "Apply chamfers, with optional tagging of kernel-proven patch faces.\n\nWithout ``angle`` the chamfer is symmetric. "
+      "Apply chamfers, with optional tagging of kernel-proven patch faces.\n\nWithout ``angle`` the chamfer is "
+      "symmetric. "
       "With ``angle`` (degrees between the chamfer face and the reference face) the second leg is "
       "``distance * tan(angle)``; ``reference_direction`` picks the reference face per edge.");
 
@@ -170,20 +196,21 @@ void bind_blends(py::module_& m) {
                              std::move(closing_faces_tag), std::move(wall_edges_tag)};
         return unlocked(selection.is_selector(), [&] { return shell_rsolid(solid, selection, thickness, tags); });
       },
-      py::arg("solid"), py::arg("faces_to_remove"), py::arg("thickness"), py::kw_only(), py::arg("result_tag") = py::none(),
-      py::arg("body_faces_tag") = py::none(), py::arg("offset_faces_tag") = py::none(),
-      py::arg("closing_faces_tag") = py::none(), py::arg("wall_edges_tag") = py::none(),
-      "Shell a solid, with optional kernel-role-based face tags.");
+      py::arg("solid"), py::arg("faces_to_remove"), py::arg("thickness"), py::kw_only(),
+      py::arg("result_tag") = py::none(), py::arg("body_faces_tag") = py::none(),
+      py::arg("offset_faces_tag") = py::none(), py::arg("closing_faces_tag") = py::none(),
+      py::arg("wall_edges_tag") = py::none(), "Shell a solid, with optional kernel-role-based face tags.");
 }
-
 
 // ---- sweeps through sections ---------------------------------------------------------------------------------
 void bind_sweeps(py::module_& m) {
   m.def(
       "loft_rsolid",
       [](const py::object& profiles, bool ruled, const py::object& tracking_policy, OptionalString tag_prefix,
-         OptionalString result_tag, OptionalString start_face_tag, OptionalString end_face_tag, OptionalString side_faces_tag) {
-        const std::vector<Shape> sections = shape_list(profiles, "loft_rsolid sections must contain only Wire or Vertex objects");
+         OptionalString result_tag, OptionalString start_face_tag, OptionalString end_face_tag,
+         OptionalString side_faces_tag) {
+        const std::vector<Shape> sections =
+            shape_list(profiles, "loft_rsolid sections must contain only Wire or Vertex objects");
         const LoftOptions options{policy_text(tracking_policy),
                                   sweep_tags(std::move(tag_prefix), std::move(result_tag), std::move(start_face_tag),
                                              std::move(end_face_tag), std::move(side_faces_tag))};
@@ -202,30 +229,34 @@ void bind_sweeps(py::module_& m) {
                                           std::move(end_face_tag), std::move(side_faces_tag));
         return unlocked(false, [&] { return sweep_rsolid(profile, path, is_frenet, tags); });
       },
-      py::arg("profile"), py::arg("path"), py::arg("is_frenet") = false, py::kw_only(), py::arg("tag_prefix") = py::none(),
-      py::arg("result_tag") = py::none(), py::arg("start_face_tag") = py::none(), py::arg("end_face_tag") = py::none(),
-      py::arg("side_faces_tag") = py::none(), "Create a swept solid, with optional kernel-role-based tags.");
+      py::arg("profile"), py::arg("path"), py::arg("is_frenet") = false, py::kw_only(),
+      py::arg("tag_prefix") = py::none(), py::arg("result_tag") = py::none(), py::arg("start_face_tag") = py::none(),
+      py::arg("end_face_tag") = py::none(), py::arg("side_faces_tag") = py::none(),
+      "Create a swept solid, with optional kernel-role-based tags.");
 
   m.def(
       "twisted_sweep_rsolid",
-      [](const Shape& profile, const Scalar& distance, const Scalar& twist_angle, const Scalar3& axis, const Scalar3& origin,
-         const Scalar& guide_radius, OptionalString tag_prefix, OptionalString result_tag, OptionalString start_face_tag,
-         OptionalString end_face_tag, OptionalString side_faces_tag) {
-        const TwistedSweepOptions options{guide_radius, sweep_tags(std::move(tag_prefix), std::move(result_tag),
-                                                                   std::move(start_face_tag), std::move(end_face_tag),
-                                                                   std::move(side_faces_tag))};
-        return unlocked(false, [&] { return twisted_sweep_rsolid(profile, distance, twist_angle, axis, origin, options); });
+      [](const Shape& profile, const Scalar& distance, const Scalar& twist_angle, const Scalar3& axis,
+         const Scalar3& origin, const Scalar& guide_radius, OptionalString tag_prefix, OptionalString result_tag,
+         OptionalString start_face_tag, OptionalString end_face_tag, OptionalString side_faces_tag) {
+        const TwistedSweepOptions options{
+            guide_radius, sweep_tags(std::move(tag_prefix), std::move(result_tag), std::move(start_face_tag),
+                                     std::move(end_face_tag), std::move(side_faces_tag))};
+        return unlocked(false,
+                        [&] { return twisted_sweep_rsolid(profile, distance, twist_angle, axis, origin, options); });
       },
-      py::arg("profile"), py::arg("distance"), py::arg("twist_angle"), py::arg("axis") = unit_z(), py::arg("origin") = origin(),
-      py::kw_only(), py::arg("guide_radius") = 1.0, py::arg("tag_prefix") = py::none(), py::arg("result_tag") = py::none(),
-      py::arg("start_face_tag") = py::none(), py::arg("end_face_tag") = py::none(), py::arg("side_faces_tag") = py::none(),
+      py::arg("profile"), py::arg("distance"), py::arg("twist_angle"), py::arg("axis") = unit_z(),
+      py::arg("origin") = origin(), py::kw_only(), py::arg("guide_radius") = 1.0, py::arg("tag_prefix") = py::none(),
+      py::arg("result_tag") = py::none(), py::arg("start_face_tag") = py::none(), py::arg("end_face_tag") = py::none(),
+      py::arg("side_faces_tag") = py::none(),
       "Sweep a planar profile along a straight axis with linear rotation (twist_angle in degrees).");
 
   m.def(
       "helical_sweep_rsolid",
       [](const Wire& profile, const Scalar& pitch, const Scalar& height, const Scalar& radius, const Scalar3& center,
          const Scalar3& dir, const std::string& handedness) {
-        return unlocked(false, [&] { return helical_sweep_rsolid(profile, pitch, height, radius, center, dir, handedness); });
+        return unlocked(false,
+                        [&] { return helical_sweep_rsolid(profile, pitch, height, radius, center, dir, handedness); });
       },
       py::arg("profile"), py::arg("pitch"), py::arg("height"), py::arg("radius"), py::arg("center") = origin(),
       py::arg("dir") = unit_z(), py::kw_only(), py::arg("handedness") = "Right",
@@ -236,8 +267,10 @@ void bind_sweeps(py::module_& m) {
       [](const py::object& profiles, const Wire& path, bool is_frenet, const py::object& binormal) {
         const std::vector<Shape> sections = shape_list(profiles, "sections must be Face or Wire");
         std::optional<Binormal> aux;
-        if (py::isinstance<Wire>(binormal)) aux = Binormal(binormal.cast<Wire>());
-        else if (!binormal.is_none()) aux = Binormal(vector_arg(binormal, "binormal"));
+        if (py::isinstance<Wire>(binormal))
+          aux = Binormal(binormal.cast<Wire>());
+        else if (!binormal.is_none())
+          aux = Binormal(vector_arg(binormal, "binormal"));
         return unlocked(false, [&] { return sweep_multisection_rsolid(sections, path, is_frenet, aux); });
       },
       py::arg("profiles"), py::arg("path"), py::arg("is_frenet") = false, py::arg("binormal") = py::none(),
@@ -248,19 +281,22 @@ void bind_sweeps(py::module_& m) {
 void bind_derived(py::module_& m) {
   m.def(
       "offset_rsolid",
-      [](const Solid& solid, const Scalar& amount, const py::object& openings, double tolerance, const std::string& kind) {
+      [](const Solid& solid, const Scalar& amount, const py::object& openings, double tolerance,
+         const std::string& kind) {
         const FaceSelection selection = selection_from<Face>(openings);
-        return unlocked(selection.is_selector(), [&] { return offset_rsolid(solid, amount, selection, {tolerance, kind}); });
+        return unlocked(selection.is_selector(),
+                        [&] { return offset_rsolid(solid, amount, selection, {tolerance, kind}); });
       },
-      py::arg("solid"), py::arg("amount"), py::arg("openings") = py::tuple(), py::kw_only(), py::arg("tolerance") = 1e-4,
-      py::arg("kind") = "ARC", "Offset a solid outward (positive) or inward (negative).");
+      py::arg("solid"), py::arg("amount"), py::arg("openings") = py::tuple(), py::kw_only(),
+      py::arg("tolerance") = 1e-4, py::arg("kind") = "ARC", "Offset a solid outward (positive) or inward (negative).");
 
   m.def(
       "draft_rsolid",
       [](const Solid& solid, const py::object& faces_to_draft, const Scalar& angle, const py::object& plane_origin,
          const py::object& plane_normal) {
         const FaceSelection selection = selection_from<Face>(faces_to_draft);
-        const Scalar3 origin_value = vector_arg(plane_origin, "plane_origin"), normal_value = vector_arg(plane_normal, "plane_normal");
+        const Scalar3 origin_value = vector_arg(plane_origin, "plane_origin"),
+                      normal_value = vector_arg(plane_normal, "plane_normal");
         return unlocked(selection.is_selector(),
                         [&] { return draft_rsolid(solid, selection, angle, origin_value, normal_value); });
       },
@@ -285,7 +321,8 @@ void bind_derived(py::module_& m) {
           targets.push_back(target.cast<Solid>());
         } else {
           for (const py::handle item : target) {
-            if (!py::isinstance<Solid>(item)) throw TypeError("target must be a Solid or a sequence of Solid");
+            if (!py::isinstance<Solid>(item))
+              throw TypeError("target must be a Solid or a sequence of Solid");
             targets.push_back(item.cast<Solid>());
           }
         }
@@ -310,9 +347,9 @@ void bind_derived(py::module_& m) {
       [](const Solid& solid, const std::vector<std::vector<Scalar>>& matrix) {
         return unlocked(false, [&] { return transform_rsolid(solid, matrix); });
       },
-      py::arg("solid"), py::arg("matrix"), "Apply a finite nonsingular 4x4 affine matrix in the current coordinate system.");
+      py::arg("solid"), py::arg("matrix"),
+      "Apply a finite nonsingular 4x4 affine matrix in the current coordinate system.");
 }
-
 
 // ---- tracking policy and the failure diagnoses ------------------------------------------------------------------
 // `with tracking_policy_scope(TrackingPolicy.GRAPH): ...`
@@ -340,14 +377,20 @@ void bind_tracking_policy(py::module_& m) {
   m.attr("TrackingPolicy") = py::module_::import("enum").attr("Enum")("TrackingPolicy", members, **kwargs);
 
   py::class_<PolicyScope, std::shared_ptr<PolicyScope>>(m, "_TrackingPolicyScope")
-      .def("__enter__", [](const std::shared_ptr<PolicyScope>& scope) { scope->enter(); return scope; })
+      .def("__enter__",
+           [](const std::shared_ptr<PolicyScope>& scope) {
+             scope->enter();
+             return scope;
+           })
       .def("__exit__", [](PolicyScope& scope, const py::args&) { scope.exit(); });
   m.def(
       "tracking_policy_scope",
       [](const py::object& policy) {
         const std::string text = policy_text(policy);
-        if (text == "full") return std::make_shared<PolicyScope>(TrackingPolicy::Full);
-        if (text == "graph") return std::make_shared<PolicyScope>(TrackingPolicy::Graph);
+        if (text == "full")
+          return std::make_shared<PolicyScope>(TrackingPolicy::Full);
+        if (text == "graph")
+          return std::make_shared<PolicyScope>(TrackingPolicy::Graph);
         throw ValueError("'" + text + "' is not a valid TrackingPolicy");
       },
       py::arg("policy"), "Run a block with graph-only or full topology tracking.");
@@ -359,7 +402,8 @@ py::list measurements_to_py(const std::vector<ErrorMeasurement>& measurements) {
   for (const ErrorMeasurement& item : measurements) {
     py::dict entry;
     entry["name"] = item.name;
-    if (const auto* number = std::get_if<double>(&item.value)) entry["value"] = *number;
+    if (const auto* number = std::get_if<double>(&item.value))
+      entry["value"] = *number;
     else {
       const auto& v = std::get<std::array<double, 3>>(item.value);
       entry["value"] = py::make_tuple(v[0], v[1], v[2]);
@@ -386,11 +430,14 @@ void bind_diagnostics(py::module_& m) {
 
   m.def(
       "diagnose_blend_failure",
-      [](const Solid& solid, const py::list& edges, double size_value, const std::string& operation_kind, const py::object& retry_single) {
+      [](const Solid& solid, const py::list& edges, double size_value, const std::string& operation_kind,
+         const py::object& retry_single) {
         std::vector<Edge> items;
-        for (const py::handle item : edges) items.push_back(item.cast<Edge>());
+        for (const py::handle item : edges)
+          items.push_back(item.cast<Edge>());
         BlendRetry retry;
-        if (!retry_single.is_none()) retry = [&](const Edge& edge) { return py::bool_(retry_single(py::cast(edge))).cast<bool>(); };
+        if (!retry_single.is_none())
+          retry = [&](const Edge& edge) { return py::bool_(retry_single(py::cast(edge))).cast<bool>(); };
         return diagnose_blend_failure(solid, items, size_value, operation_kind, retry);
       },
       py::arg("solid"), py::arg("edges"), py::kw_only(), py::arg("size_value"), py::arg("operation_kind"),
@@ -401,17 +448,20 @@ void bind_diagnostics(py::module_& m) {
       [](const Solid& source, const Solid& result, const std::string&, const std::string& operation_kind,
          std::optional<double> size_value, const py::list& edges) {
         std::vector<Edge> items;
-        for (const py::handle item : edges) items.push_back(item.cast<Edge>());
+        for (const py::handle item : edges)
+          items.push_back(item.cast<Edge>());
         assert_blend_volume_monotonic(source, result, operation_kind, size_value, items);
       },
       py::arg("source"), py::arg("result"), py::kw_only(), py::arg("operation"), py::arg("operation_kind"),
-      py::arg("size_value"), py::arg("edges"), "Raise when an all-convex blend returned more material than it was given.");
+      py::arg("size_value"), py::arg("edges"),
+      "Raise when an all-convex blend returned more material than it was given.");
 
   m.def(
       "diagnose_boolean_failure",
       [](const py::list& operands, std::optional<double> effective_tol, const std::string& operation_kind) {
         std::vector<Solid> solids;
-        for (const py::handle item : operands) solids.push_back(item.cast<Solid>());
+        for (const py::handle item : operands)
+          solids.push_back(item.cast<Solid>());
         return diagnose_boolean_failure(solids, effective_tol, operation_kind);
       },
       py::arg("operands"), py::kw_only(), py::arg("effective_tol"), py::arg("operation_kind") = "union",
@@ -431,7 +481,8 @@ void flatten_solids(const py::handle& value, std::string_view operation, std::ve
   if (py::isinstance<Solid>(value)) {
     out.push_back(value.cast<Solid>());
   } else if (py::isinstance<py::list>(value) || py::isinstance<py::tuple>(value)) {
-    for (const py::handle item : value) flatten_solids(item, operation, out);
+    for (const py::handle item : value)
+      flatten_solids(item, operation, out);
   } else {
     reject_boolean_operand(operation);
   }
@@ -439,14 +490,16 @@ void flatten_solids(const py::handle& value, std::string_view operation, std::ve
 
 std::vector<Solid> flattened(const py::args& args, std::string_view operation) {
   std::vector<Solid> out;
-  for (const py::handle item : args) flatten_solids(item, operation, out);
+  for (const py::handle item : args)
+    flatten_solids(item, operation, out);
   return out;
 }
 
 std::vector<Solid> solid_group(const py::object& group) {
   std::vector<Solid> out;
   for (const py::handle item : group) {
-    if (!py::isinstance<Solid>(item)) throw TypeError("boolean groups must contain Solid values");
+    if (!py::isinstance<Solid>(item))
+      throw TypeError("boolean groups must contain Solid values");
     out.push_back(item.cast<Solid>());
   }
   return out;
@@ -504,13 +557,15 @@ void bind_booleans(py::module_& m) {
       py::arg("left"), py::arg("right"), py::arg("operation"),
       "Apply a set boolean to two body groups, retaining every result solid.");
 
-  const auto bind_2d = [&m](const char* name, Face (*fn)(const Shape&, const Shape&), const char* first, const char* second,
-                            const char* doc) {
+  const auto bind_2d = [&m](const char* name, Face (*fn)(const Shape&, const Shape&), const char* first,
+                            const char* second, const char* doc) {
     m.def(
         name,
         [fn, name, first, second](const py::object& a, const py::object& b) {
-          if (!py::isinstance<Shape>(a)) reject_face_operand(name, first);
-          if (!py::isinstance<Shape>(b)) reject_face_operand(name, second);
+          if (!py::isinstance<Shape>(a))
+            reject_face_operand(name, first);
+          if (!py::isinstance<Shape>(b))
+            reject_face_operand(name, second);
           const Shape& left = a.cast<const Shape&>();
           const Shape& right = b.cast<const Shape&>();
           return unlocked(false, [&] { return fn(left, right); });
@@ -518,7 +573,8 @@ void bind_booleans(py::module_& m) {
         py::arg(first), py::arg(second), doc);
   };
   bind_2d("make_2d_cut_rface", &make_2d_cut_rface, "body", "tool", "Subtract one 2D face from another.");
-  bind_2d("make_2d_union_rface", &make_2d_union_rface, "face_a", "face_b", "Compute the boolean union of two 2D faces.");
+  bind_2d("make_2d_union_rface", &make_2d_union_rface, "face_a", "face_b",
+          "Compute the boolean union of two 2D faces.");
   bind_2d("make_2d_intersect_rface", &make_2d_intersect_rface, "face_a", "face_b",
           "Compute the boolean intersection of two 2D faces.");
 }
@@ -550,14 +606,18 @@ void bind_transforms(py::module_& m) {
   m.def(
       "linear_pattern_rsolidlist",
       [](const Shape& shape, const Scalar3& direction, int count, const Scalar& spacing) {
-        return shapes_to_py(unlocked(false, [&] { return linear_pattern_rsolidlist(shape, direction, count, spacing); }));
+        return shapes_to_py(
+            unlocked(false, [&] { return linear_pattern_rsolidlist(shape, direction, count, spacing); }));
       },
-      py::arg("shape"), py::arg("direction"), py::arg("count"), py::arg("spacing"), "Create a linear pattern of solids.");
+      py::arg("shape"), py::arg("direction"), py::arg("count"), py::arg("spacing"),
+      "Create a linear pattern of solids.");
 
   m.def(
       "radial_pattern_rsolidlist",
-      [](const Shape& shape, const Scalar3& center, const Scalar3& axis, int count, const Scalar& total_rotation_angle) {
-        return shapes_to_py(unlocked(false, [&] { return radial_pattern_rsolidlist(shape, center, axis, count, total_rotation_angle); }));
+      [](const Shape& shape, const Scalar3& center, const Scalar3& axis, int count,
+         const Scalar& total_rotation_angle) {
+        return shapes_to_py(unlocked(
+            false, [&] { return radial_pattern_rsolidlist(shape, center, axis, count, total_rotation_angle); }));
       },
       py::arg("shape"), py::arg("center"), py::arg("axis"), py::arg("count"), py::arg("total_rotation_angle"),
       "Create a radial pattern of solids.");

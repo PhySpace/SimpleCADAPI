@@ -37,10 +37,10 @@ struct UiNumber {
 struct ParamUi {
   std::string control;  // requested: "slider" | "number" | "toggle"; empty = follow the value
   std::optional<UiNumber> min, max, step;
-  std::optional<std::string> unit;   // display label; wins over the variable's own unit
+  std::optional<std::string> unit;  // display label; wins over the variable's own unit
   std::optional<std::string> label;
   std::string group;
-  std::vector<std::string> issues;   // problems parsing the description
+  std::vector<std::string> issues;  // problems parsing the description
 
   bool operator==(const ParamUi&) const = default;
   bool empty() const noexcept {

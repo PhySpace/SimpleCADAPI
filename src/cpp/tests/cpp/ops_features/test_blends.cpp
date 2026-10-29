@@ -32,7 +32,8 @@ TEST_CASE("chamfer: symmetric and angled") {
   const Solid cube = box(10, 10, 10);
   const Edge edge = [&] {
     for (const Edge& e : edges_at_z(cube, 10.0)) {
-      if (e.center().y < -4.999) return e;
+      if (e.center().y < -4.999)
+        return e;
     }
     throw 0;
   }();

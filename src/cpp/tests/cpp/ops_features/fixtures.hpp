@@ -14,21 +14,27 @@
 
 namespace scad::feature_test {
 
-inline bool has_tag(const Shape& shape, std::string_view tag) { return shape.has_tag(tag, TagScope::Effective); }
+inline bool has_tag(const Shape& shape, std::string_view tag) {
+  return shape.has_tag(tag, TagScope::Effective);
+}
 
 template <class T>
 std::size_t count_tagged(const std::vector<T>& shapes, std::string_view tag) {
-  return static_cast<std::size_t>(std::count_if(shapes.begin(), shapes.end(), [&](const T& s) { return has_tag(s, tag); }));
+  return static_cast<std::size_t>(
+      std::count_if(shapes.begin(), shapes.end(), [&](const T& s) { return has_tag(s, tag); }));
 }
 
-inline Solid box(double w, double h, double d, const Scalar3& at = scalar3(0, 0, 0)) { return make_box_rsolid(w, h, d, at); }
+inline Solid box(double w, double h, double d, const Scalar3& at = scalar3(0, 0, 0)) {
+  return make_box_rsolid(w, h, d, at);
+}
 
 // The faces of `solid` whose outward normal points along `axis` (0, 1, 2).
 inline std::vector<Face> faces_facing(const Solid& solid, int axis) {
   std::vector<Face> out;
   for (const Face& face : solid.faces()) {
     const Vec3 n = face.normal_at();
-    if ((axis == 0 ? n.x : axis == 1 ? n.y : n.z) > 0.9) out.push_back(face);
+    if ((axis == 0 ? n.x : axis == 1 ? n.y : n.z) > 0.9)
+      out.push_back(face);
   }
   return out;
 }
@@ -37,7 +43,8 @@ inline std::vector<Face> faces_facing(const Solid& solid, int axis) {
 inline std::vector<Edge> edges_at_z(const Solid& solid, double z, double tolerance = 1e-6) {
   std::vector<Edge> out;
   for (const Edge& edge : solid.edges()) {
-    if (std::abs(edge.center().z - z) < tolerance) out.push_back(edge);
+    if (std::abs(edge.center().z - z) < tolerance)
+      out.push_back(edge);
   }
   return out;
 }
@@ -56,7 +63,8 @@ Error failure_of(F&& call) {
 
 inline double measurement(const Error& error, std::string_view name) {
   for (const ErrorMeasurement& m : error.guidance().measurements) {
-    if (m.name == name) return std::get<double>(m.value);
+    if (m.name == name)
+      return std::get<double>(m.value);
   }
   FAIL("no measurement " << name);
   return 0.0;

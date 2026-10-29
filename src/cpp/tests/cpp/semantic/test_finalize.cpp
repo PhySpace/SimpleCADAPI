@@ -44,7 +44,8 @@ class TestRecorder final : public Recorder {
   }
   std::vector<std::string> ops() const {
     std::vector<std::string> out;
-    for (const auto& e : entries) out.push_back(e.record.op);
+    for (const auto& e : entries)
+      out.push_back(e.record.op);
     return out;
   }
 
@@ -55,7 +56,8 @@ class TestRecorder final : public Recorder {
 
 template <class T>
 std::size_t count_with_tag(const std::vector<T>& shapes, std::string_view tag, TagScope scope = TagScope::Local) {
-  return static_cast<std::size_t>(std::count_if(shapes.begin(), shapes.end(), [&](const T& s) { return s.has_tag(tag, scope); }));
+  return static_cast<std::size_t>(
+      std::count_if(shapes.begin(), shapes.end(), [&](const T& s) { return s.has_tag(tag, scope); }));
 }
 
 OpRecord record_for(std::string_view op, std::vector<OpInput> inputs = {}) {
@@ -70,21 +72,24 @@ OpRecord record_for(std::string_view op, std::vector<OpInput> inputs = {}) {
 
 TEST_CASE("role tags are normalized against the operation's table") {
   const auto assignments = normalize_operation_role_tags(
-      "make_extrude_rsolid", {{"extrusion.side", "part.sides"}, {"extrusion.start", "part.start"}, {"extrusion.end", std::nullopt}});
+      "make_extrude_rsolid",
+      {{"extrusion.side", "part.sides"}, {"extrusion.start", "part.start"}, {"extrusion.end", std::nullopt}});
   REQUIRE(assignments.size() == 2);
   CHECK(assignments[0].role == "extrusion.start");  // table order, not request order
   CHECK(assignments[1].cardinality == RoleCardinality::Many);
 
   CHECK_THROWS_WITH_AS((void)normalize_operation_role_tags("make_extrude_rsolid", {{"extrusion.start", "A"}}),
                        doctest::Contains("not normalized"), ValueError);
-  CHECK_THROWS_AS((void)normalize_operation_role_tags("make_extrude_rsolid", {{"extrusion.start", "a.b"}, {"extrusion.start", "c.d"}}),
+  CHECK_THROWS_AS((void)normalize_operation_role_tags("make_extrude_rsolid",
+                                                      {{"extrusion.start", "a.b"}, {"extrusion.start", "c.d"}}),
                   ValueError);
   try {
     (void)normalize_operation_role_tags("make_extrude_rsolid", {{"box.top", "a.b"}});
     FAIL("an unknown role was accepted");
   } catch (const ValueError& e) {
     CHECK(std::string(e.what()) ==
-          "unsupported output role(s) for make_extrude_rsolid: box.top; expected one of extrusion.start, extrusion.end, extrusion.side");
+          "unsupported output role(s) for make_extrude_rsolid: box.top; expected one of extrusion.start, "
+          "extrusion.end, extrusion.side");
   }
   CHECK_THROWS_AS((void)operation_output_roles("make_nothing"), Exception);
 }
@@ -144,7 +149,8 @@ TEST_CASE("an extrusion: tracking projection, role tags, result tag and prefix")
   spec.record = record_for("make_extrude_rsolid", {{profile, "profile"}});
   spec.tags.tag_prefix = "part";
   spec.tags.result_tag = "role.result";
-  spec.tags.roles = {{"extrusion.start", "role.start_face"}, {"extrusion.end", "role.end_face"}, {"extrusion.side", "role.side_face"}};
+  spec.tags.roles = {
+      {"extrusion.start", "role.start_face"}, {"extrusion.end", "role.end_face"}, {"extrusion.side", "role.side_face"}};
   spec.roles.start = "extrusion.start";
   spec.roles.end = "extrusion.end";
   spec.roles.side = "extrusion.side";
@@ -163,7 +169,8 @@ TEST_CASE("an extrusion: tracking projection, role tags, result tag and prefix")
   CHECK(count_with_tag(faces, "face.extrusion.start") == 1);  // the kernel-proven role binding
 
   // The topology-name tags of faces are downward: the face's edges inherit them.
-  const Face start = *std::find_if(faces.begin(), faces.end(), [](const Face& f) { return f.has_tag("part.face.start", TagScope::Local); });
+  const Face start = *std::find_if(faces.begin(), faces.end(),
+                                   [](const Face& f) { return f.has_tag("part.face.start", TagScope::Local); });
   CHECK(start.edges().front().has_tag("part.face.start", TagScope::Inherited));
 
   // The solid carries the summary, its faces the typed envelope.
@@ -189,7 +196,8 @@ TEST_CASE("the same finalize records every tag assignment as a graph node") {
   spec.tags.roles = {{"extrusion.start", "role.start_face"}};
   const Solid solid = finalize_tracked_solid(std::move(tracked), std::move(spec));
 
-  REQUIRE(recorder.ops() == std::vector<std::string>{"make_extrude_rsolid", "apply_tag_rselection", "apply_tag_rselection"});
+  REQUIRE(recorder.ops() ==
+          std::vector<std::string>{"make_extrude_rsolid", "apply_tag_rselection", "apply_tag_rselection"});
   const OpRecord& main = recorder.entries[0].record;
   CHECK(main.delta.has_value());
   CHECK(main.delta->roles.size() == 6);
@@ -202,10 +210,12 @@ TEST_CASE("the same finalize records every tag assignment as a graph node") {
   CHECK(binding.find("scope")->find("node_id")->as_string() == recorder.entries[0].node_id);
   CHECK(binding.find("producer")->find("node_id")->as_string() == recorder.entries[1].node_id);
   CHECK(binding.find("binding_id")->as_string() ==
-        "tag_binding_" + uuid5_url_hex("simplecad:user-tag:g_test:" + recorder.entries[1].node_id + ":role.start_face"));
+        "tag_binding_" +
+            uuid5_url_hex("simplecad:user-tag:g_test:" + recorder.entries[1].node_id + ":role.start_face"));
   CHECK(binding.find("evidence")->find("authoring_source")->as_string() == "simplecadapi.make_extrude_rsolid.role_tag");
   CHECK(binding.find("evidence")->find("operation_output_role")->find("role")->as_string() == "extrusion.start");
-  CHECK(binding.find("target")->find("selector")->find("predicate")->find("data")->find("role")->as_string() == "extrusion.start");
+  CHECK(binding.find("target")->find("selector")->find("predicate")->find("data")->find("role")->as_string() ==
+        "extrusion.start");
   CHECK(role_node.inputs.size() == 1);
 
   // The result is the last assignment's output, a view; the first output is untouched.
@@ -222,7 +232,7 @@ TEST_CASE("box face roles and tag_prefix name exactly one face each") {
   spec.tags.tag_prefix = "housing";
   spec.tags.result_tag = "part.housing";
   spec.tags.roles = {{"box.bottom", "anchor.base"}, {"box.right", "role.mounting_surface"}};
-  spec.roles.faces = {{"box.bottom", "bottom"}, {"box.top", "top"}, {"box.front", "front"},
+  spec.roles.faces = {{"box.bottom", "bottom"}, {"box.top", "top"},   {"box.front", "front"},
                       {"box.back", "back"},     {"box.left", "left"}, {"box.right", "right"}};
   const Solid box = finalize_tracked_solid(std::move(tracked), std::move(spec));
 
@@ -237,8 +247,8 @@ TEST_CASE("box face roles and tag_prefix name exactly one face each") {
 
 TEST_CASE("a prefix on an extrusion names side faces after the profile's edge tags") {
   Face profile = rectangle_face(2, 1);
-  const Shape tagged_profile =
-      apply_profile_tag_prefix(profile, std::nullopt, std::vector<std::string>{"a", "b", "c", "d"}, "simplecadapi.test");
+  const Shape tagged_profile = apply_profile_tag_prefix(
+      profile, std::nullopt, std::vector<std::string>{"a", "b", "c", "d"}, "simplecadapi.test");
   CHECK(count_with_tag(profile.edges(), "a") == 1);
 
   TrackedResult tracked = tracked_extrude(Face(tagged_profile), {0, 0, 1}, 3.0);
@@ -253,8 +263,10 @@ TEST_CASE("a prefix on an extrusion names side faces after the profile's edge ta
   std::set<std::string> side_tags;
   for (const Face& face : solid.faces())
     for (const auto& tag : face.list_tags(TagScope::Local))
-      if (tag.rfind("swept.face.side.", 0) == 0) side_tags.insert(tag);
-  CHECK(side_tags == std::set<std::string>{"swept.face.side.a", "swept.face.side.b", "swept.face.side.c", "swept.face.side.d"});
+      if (tag.rfind("swept.face.side.", 0) == 0)
+        side_tags.insert(tag);
+  CHECK(side_tags ==
+        std::set<std::string>{"swept.face.side.a", "swept.face.side.b", "swept.face.side.c", "swept.face.side.d"});
   CHECK(count_with_tag(solid.faces(), "swept.face.side") == 4);
 }
 
@@ -276,7 +288,8 @@ TEST_CASE("profile prefixes tag the shape and its edges") {
 
 TEST_CASE("user tags follow a cut only through proven lineage") {
   Solid body = box_solid(10, 10, 10);
-  for (Face& face : body.faces()) face.add_binding(user_tag_binding("role.source_face"));
+  for (Face& face : body.faces())
+    face.add_binding(user_tag_binding("role.source_face"));
   const Solid tool = cylinder_solid(2.0, 15.0, {3, 3, -2.5});
 
   TrackedBooleanResult cut = tracked_cut(body, tool);
@@ -289,12 +302,14 @@ TEST_CASE("user tags follow a cut only through proven lineage") {
   for (const Face& face : result.faces()) {
     const Value track = face.get_metadata("track");
     CHECK(track.find("kind")->as_string() == "topology_change");
-    const bool from_body = std::any_of(track.find("origin_roles")->as_array().begin(), track.find("origin_roles")->as_array().end(),
-                                       [](const Value& v) { return v.as_string() == "body"; });
+    const bool from_body =
+        std::any_of(track.find("origin_roles")->as_array().begin(), track.find("origin_roles")->as_array().end(),
+                    [](const Value& v) { return v.as_string() == "body"; });
     if (from_body && track.find("status")->as_string() == "proven") {
       CHECK_FALSE(face.has_tag("role.source_face", TagScope::Effective));
       const std::string coverage = face.get_runtime("semantic.lineage.coverage").as_string();
-      if (coverage == "complete" && face.has_tag("role.source_face", TagScope::Lineage)) lineage_seen = true;
+      if (coverage == "complete" && face.has_tag("role.source_face", TagScope::Lineage))
+        lineage_seen = true;
     }
   }
   CHECK(lineage_seen);
@@ -359,7 +374,8 @@ TEST_CASE("semantic ids are unique within a recorded session only") {
   RecorderScope scope(&recorder);
   reserve_semantic_id("part", "p1");
   reserve_semantic_id("assembly", "p1");
-  CHECK_THROWS_WITH_AS(reserve_semantic_id("part", "p1"), doctest::Contains("duplicate part id in active GraphSession: p1"), ValueError);
+  CHECK_THROWS_WITH_AS(reserve_semantic_id("part", "p1"),
+                       doctest::Contains("duplicate part id in active GraphSession: p1"), ValueError);
 }
 
 TEST_CASE("lineage helpers carry only what the policy allows") {
@@ -401,10 +417,9 @@ TEST_CASE("the call-site in finalize.hpp's header comment compiles as written") 
   TrackedResult tracked = tracked_extrude(profile, {0, 0, 1}, 1.0);
   tracked.shape.apply_tag("solid.extrusion", false);
   const Solid solid = finalize_tracked_solid(
-      std::move(tracked),
-      {.record = {.op = kOp, .params = Value::object(), .inputs = {{profile, "profile"}}},
-       .tags = tags,
-       .roles = {.start = "extrusion.start", .end = "extrusion.end", .side = "extrusion.side"}});
+      std::move(tracked), {.record = {.op = kOp, .params = Value::object(), .inputs = {{profile, "profile"}}},
+                           .tags = tags,
+                           .roles = {.start = "extrusion.start", .end = "extrusion.end", .side = "extrusion.side"}});
   CHECK(solid.has_tag("mount.solid", TagScope::Local));
   CHECK(count_with_tag(solid.faces(), "role.first") == 1);
   CHECK(count_with_tag(solid.faces(), "mount.face.end") == 1);

@@ -28,7 +28,7 @@ TopoDS_Shape apply_transform(const TopoDS_Shape& shape, const gp_Trsf& trsf, boo
 TopoDS_Shape translate_shape(const TopoDS_Shape& shape, const Vec3& vector);
 TopoDS_Shape rotate_shape(const TopoDS_Shape& shape, double angle_degrees, const Vec3& axis, const Vec3& origin);
 TopoDS_Shape mirror_shape(const TopoDS_Shape& shape, const Vec3& plane_origin, const Vec3& plane_normal);
-TopoDS_Shape place_shape(const TopoDS_Shape& shape, const Vec3& origin, const Vec3& x_axis,
-                         const Vec3& y_axis, const Vec3& z_axis);
+TopoDS_Shape place_shape(const TopoDS_Shape& shape, const Vec3& origin, const Vec3& x_axis, const Vec3& y_axis,
+                         const Vec3& z_axis);
 
 }  // namespace scad::kernel

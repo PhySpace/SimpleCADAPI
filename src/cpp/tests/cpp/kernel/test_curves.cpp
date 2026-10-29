@@ -88,7 +88,8 @@ TEST_CASE("B-spline edges: explicit definition and interpolation") {
 
   const std::vector<Vec3> points{{0, 0, 0}, {1, 1, 0}, {2, 0, 0}, {3, 1, 0}};
   const TopoDS_Edge through = make_interpolated_bspline_edge(points);
-  for (const Vec3& p : points) CHECK(distance_to(through, p) < 1e-6);
+  for (const Vec3& p : points)
+    CHECK(distance_to(through, p) < 1e-6);
   CHECK_THROWS(make_interpolated_bspline_edge({{0, 0, 0}}));
 }
 
@@ -104,8 +105,9 @@ TEST_CASE("wires from edges and from points") {
   // Two points make one segment: there is nothing to close.
   CHECK(edges_of(make_polyline_wire({{0, 0, 0}, {1, 0, 0}}, true)).size() == 1);
 
-  CHECK_THROWS_AS((void)make_wire_from_edges({make_line_edge({0, 0, 0}, {1, 0, 0}), make_line_edge({5, 5, 5}, {6, 5, 5})}),
-                  KernelError);
+  CHECK_THROWS_AS(
+      (void)make_wire_from_edges({make_line_edge({0, 0, 0}, {1, 0, 0}), make_line_edge({5, 5, 5}, {6, 5, 5})}),
+      KernelError);
   CHECK_THROWS_AS((void)make_polyline_wire({}), KernelError);
 }
 

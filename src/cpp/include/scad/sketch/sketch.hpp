@@ -31,11 +31,11 @@ struct SketchControlPoint {
   std::array<double, 2> xy{0.0, 0.0};
 
   SketchControlPoint() = default;
-  SketchControlPoint(SketchTarget target) : point(std::move(target)) {}   // NOLINT(google-explicit-constructor)
+  SketchControlPoint(SketchTarget target) : point(std::move(target)) {}           // NOLINT(google-explicit-constructor)
   SketchControlPoint(std::string path) : point(SketchTarget(std::move(path))) {}  // NOLINT
-  SketchControlPoint(const char* path) : point(SketchTarget(path)) {}     // NOLINT
+  SketchControlPoint(const char* path) : point(SketchTarget(path)) {}             // NOLINT
   SketchControlPoint(double x, double y) : xy{x, y} {}
-  SketchControlPoint(std::array<double, 2> literal) : xy(literal) {}      // NOLINT
+  SketchControlPoint(std::array<double, 2> literal) : xy(literal) {}  // NOLINT
 };
 
 struct SketchSolveRequest {
@@ -109,8 +109,8 @@ class Sketch {
                    bool construction = false);
   Sketch& add_circle(const std::string& entity_id, const SketchRef& center, const Scalar& radius,
                      bool construction = false);
-  Sketch& add_arc(const std::string& entity_id, const SketchRef& start, const SketchRef& end,
-                  const SketchRef& center, bool construction = false);
+  Sketch& add_arc(const std::string& entity_id, const SketchRef& start, const SketchRef& end, const SketchRef& center,
+                  bool construction = false);
   Sketch& add_ellipse(const std::string& entity_id, const SketchRef& center, const SketchRef& major_point,
                       const SketchRef& minor_point, bool construction = false);
   Sketch& add_bspline(const std::string& entity_id, const SketchRef& start, const SketchRef& end,

@@ -62,8 +62,7 @@ class CoordinateSystemScope {
 // expressed in the *current* system, then pushes it.
 class Workplane {
  public:
-  Workplane(const Vec3& origin = {0, 0, 0}, const Vec3& normal = {0, 0, 1},
-            const Vec3& x_dir = {1, 0, 0});
+  Workplane(const Vec3& origin = {0, 0, 0}, const Vec3& normal = {0, 0, 1}, const Vec3& x_dir = {1, 0, 0});
   // The stack holds the address of cs_, so a Workplane never moves.
   Workplane(const Workplane&) = delete;
   Workplane& operator=(const Workplane&) = delete;

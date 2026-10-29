@@ -87,7 +87,8 @@ TEST_CASE("bolt: every head and drive style builds") {
     options.drive_style = style.drive;
     options.thread_detail = "cosmetic";
     options.thread_style = std::string(style.head) == "countersunk" ? "none" : "auto";
-    if (std::string(style.head) == "square") options.thread_style = "partial";
+    if (std::string(style.head) == "square")
+      options.thread_style = "partial";
     const Solid bolt = make_bolt_rsolid(8.0, 24.0, options);
     CHECK_MESSAGE(bolt.volume() == Approx(style.volume).epsilon(1e-6), style.head);
   }

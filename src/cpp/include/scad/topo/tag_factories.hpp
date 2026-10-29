@@ -20,14 +20,14 @@ namespace scad {
 // ---------------------------------------------------------------------------
 
 struct UserTagOptions {
-  std::optional<std::string> node_id;        // producer.node_id; also scope.node_id unless scope_node_id is set
+  std::optional<std::string> node_id;  // producer.node_id; also scope.node_id unless scope_node_id is set
   std::optional<std::string> scope_node_id;
   int output_slot = 0;
-  std::optional<TagTarget> target;           // default: scope_root
+  std::optional<TagTarget> target;  // default: scope_root
   TopologyPropagation topology = TopologyPropagation::Local;
   LineagePolicy lineage = LineagePolicy::ContinuationFragment;
   std::vector<LineageDerivation> explicit_derivations;
-  std::optional<TagEvidence> evidence;       // default: user_assertion {authoring_source: simplecadapi.apply_tag}
+  std::optional<TagEvidence> evidence;  // default: user_assertion {authoring_source: simplecadapi.apply_tag}
 };
 
 // user_tag_binding: a canonical user assertion with explicit frozen policies.
@@ -78,7 +78,8 @@ inline bool lineage_policy_allows(const Cow<TagPropagation>& propagation, Lineag
 struct TagPolicy {
   std::vector<std::string> propagate_prefixes{"role.", "anchor.", "group."};
   std::vector<std::string> propagate_exact{"top", "bottom", "left", "right", "front", "back", "side", "surface"};
-  std::vector<std::string> block_prefixes{"feature.", "state.", "face.", "edge.", "wire.", "vertex.", "solid.", "legacy."};
+  std::vector<std::string> block_prefixes{"feature.", "state.",  "face.",  "edge.",
+                                          "wire.",    "vertex.", "solid.", "legacy."};
   std::vector<std::string> block_exact;
 
   // The old registry hint; assignment policy does not consult it.

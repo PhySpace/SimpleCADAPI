@@ -28,11 +28,13 @@ namespace {
 
 std::vector<std::string> golden(const std::string& name) {
   for (const auto& c : tracking_golden::kCases) {
-    if (name != c.name) continue;
+    if (name != c.name)
+      continue;
     std::vector<std::string> lines;
     std::istringstream in(c.text);
     for (std::string line; std::getline(in, line);) {
-      if (!line.empty()) lines.push_back(line);
+      if (!line.empty())
+        lines.push_back(line);
     }
     std::sort(lines.begin() + 1, lines.end());  // line 0 is the counts
     return lines;
@@ -44,10 +46,12 @@ std::vector<std::string> golden(const std::string& name) {
 std::string difference(const std::vector<std::string>& expected, const std::vector<std::string>& actual) {
   std::string out;
   for (const std::string& line : expected) {
-    if (std::find(actual.begin(), actual.end(), line) == actual.end()) out += "\n  missing   " + line;
+    if (std::find(actual.begin(), actual.end(), line) == actual.end())
+      out += "\n  missing   " + line;
   }
   for (const std::string& line : actual) {
-    if (std::find(expected.begin(), expected.end(), line) == expected.end()) out += "\n  unexpected " + line;
+    if (std::find(expected.begin(), expected.end(), line) == expected.end())
+      out += "\n  unexpected " + line;
   }
   return out;
 }
@@ -111,9 +115,8 @@ TEST_CASE("tracking vs reference: fillet, chamfer, shell") {
   expect_golden("fillet_all", tracked_fillet(box, box.edges(), 1.0), {box.wrapped()});
 
   const std::vector<Face> faces = box.faces();
-  const Face top = *std::max_element(faces.begin(), faces.end(), [](const Face& a, const Face& b) {
-    return a.center().z < b.center().z;
-  });
+  const Face top = *std::max_element(faces.begin(), faces.end(),
+                                     [](const Face& a, const Face& b) { return a.center().z < b.center().z; });
   expect_golden("shell", tracked_shell(box, {top}, 1.0), {box.wrapped()});
 }
 

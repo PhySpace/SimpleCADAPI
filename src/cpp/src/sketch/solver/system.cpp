@@ -8,10 +8,12 @@ namespace scad::sketch_solver {
 
 Dual Env::operator()(int param) const {
   const Param& p = table_[param];
-  if (p.unknown < 0) return Dual(p.value);
+  if (p.unknown < 0)
+    return Dual(p.value);
   auto found = std::find(slots_->begin(), slots_->end(), p.unknown);
   if (found == slots_->end()) {
-    if (writable_ == nullptr) throw RuntimeError("sketch solver: equation touched an unregistered unknown");
+    if (writable_ == nullptr)
+      throw RuntimeError("sketch solver: equation touched an unregistered unknown");
     if (static_cast<int>(writable_->size()) >= kSlots) {
       throw ValueError("A sketch constraint involves more unknowns than the native solver supports (" +
                        std::to_string(kSlots) + ")");
@@ -40,13 +42,15 @@ Pt ParamTable::add_point(double x, double y, bool fixed) {
 
 void ParamTable::assign_unknowns() {
   unknown_count_ = 0;
-  for (Param& p : params_) p.unknown = p.fixed ? -1 : unknown_count_++;
+  for (Param& p : params_)
+    p.unknown = p.fixed ? -1 : unknown_count_++;
 }
 
 std::vector<double> ParamTable::initial_unknowns() const {
   std::vector<double> x(static_cast<std::size_t>(unknown_count_), 0.0);
   for (const Param& p : params_) {
-    if (p.unknown >= 0) x[static_cast<std::size_t>(p.unknown)] = p.value;
+    if (p.unknown >= 0)
+      x[static_cast<std::size_t>(p.unknown)] = p.value;
   }
   return x;
 }
@@ -59,7 +63,8 @@ void System::begin_block(std::string constraint_id) {
 }
 
 void System::add_equation(Residual fn) {
-  if (blocks.empty()) begin_block("");
+  if (blocks.empty())
+    begin_block("");
   Equation eq;
   eq.fn = std::move(fn);
   equations.push_back(std::move(eq));
@@ -79,7 +84,8 @@ void System::finalize() {
 void System::evaluate(const std::vector<std::size_t>& active, const std::vector<double>& x,
                       std::vector<double>& residual, Matrix* jacobian) const {
   residual.assign(active.size(), 0.0);
-  if (jacobian != nullptr) *jacobian = Matrix(static_cast<int>(active.size()), params.unknown_count());
+  if (jacobian != nullptr)
+    *jacobian = Matrix(static_cast<int>(active.size()), params.unknown_count());
   for (std::size_t row = 0; row < active.size(); ++row) {
     const Equation& eq = equations[active[row]];
     const Env env(params, x.data(), static_cast<const std::vector<int>&>(eq.slots));
@@ -98,8 +104,10 @@ std::vector<std::size_t> System::active_equations(const std::vector<bool>& block
   for (std::size_t b = 0; b < blocks.size(); ++b) {
     const Block& block = blocks[b];
     const bool on = block.constraint_id.empty() || (b < block_enabled.size() && block_enabled[b]);
-    if (!on) continue;
-    for (std::size_t i = 0; i < block.count; ++i) active.push_back(block.first + i);
+    if (!on)
+      continue;
+    for (std::size_t i = 0; i < block.count; ++i)
+      active.push_back(block.first + i);
   }
   return active;
 }

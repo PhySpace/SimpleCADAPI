@@ -31,16 +31,15 @@ Solid make_helical_gear_rsolid(int n_teeth, double module, double pressure_angle
                                double gear_height = 8.0, const ToothTuning& tuning = {});
 
 // Two opposite twisted halves sharing the rotated centre section, fused.
-Solid make_herringbone_gear_rsolid(int n_teeth, double module, double pressure_angle = 20.0,
-                                   double helix_angle = 32.0, double gear_height = 10.0,
-                                   const ToothTuning& tuning = {});
+Solid make_herringbone_gear_rsolid(int n_teeth, double module, double pressure_angle = 20.0, double helix_angle = 32.0,
+                                   double gear_height = 10.0, const ToothTuning& tuning = {});
 
 // Internal gears: the rim and the inward tooth profile are one multi-loop face.  `tuning.backlash`
 // widens the tooth space.
 Solid make_spur_ring_gear_rsolid(int n_teeth, double module, double pressure_angle = 20.0, double gear_height = 6.0,
                                  double rim_thickness = 3.0, const ToothTuning& tuning = {});
-Solid make_helical_ring_gear_rsolid(int n_teeth, double module, double pressure_angle = 20.0,
-                                    double helix_angle = 25.0, double gear_height = 8.0, double rim_thickness = 3.0,
+Solid make_helical_ring_gear_rsolid(int n_teeth, double module, double pressure_angle = 20.0, double helix_angle = 25.0,
+                                    double gear_height = 8.0, double rim_thickness = 3.0,
                                     const ToothTuning& tuning = {});
 Solid make_herringbone_ring_gear_rsolid(int n_teeth, double module, double pressure_angle = 20.0,
                                         double helix_angle = 30.0, double gear_height = 10.0,
@@ -59,14 +58,13 @@ struct CycloidalDiscOptions {
 
 // A one-tooth-difference cycloidal reducer disc: one fitted B-spline per lobe, an optional bore
 // and output-pin clearance holes.  Metadata "std.gear.cycloidal_disc".
-Solid make_cycloidal_disc_rsolid(int n_lobes, double ring_pin_pitch_radius, double roller_radius,
-                                 double eccentricity, double gear_height = 6.0,
-                                 const CycloidalDiscOptions& options = {});
+Solid make_cycloidal_disc_rsolid(int n_lobes, double ring_pin_pitch_radius, double roller_radius, double eccentricity,
+                                 double gear_height = 6.0, const CycloidalDiscOptions& options = {});
 
 // Racks with trapezoidal teeth, along X, centred on the origin.
 Solid make_spur_rack_rsolid(double module, int n_teeth = 10, double pressure_angle = 20.0, double rack_height = 6.0);
-Solid make_helical_rack_rsolid(double module, int n_teeth = 10, double pressure_angle = 20.0,
-                               double helix_angle = 25.0, double rack_height = 8.0);
+Solid make_helical_rack_rsolid(double module, int n_teeth = 10, double pressure_angle = 20.0, double helix_angle = 25.0,
+                               double rack_height = 8.0);
 Solid make_herringbone_rack_rsolid(double module, int n_teeth = 10, double pressure_angle = 20.0,
                                    double helix_angle = 30.0, double rack_height = 10.0);
 

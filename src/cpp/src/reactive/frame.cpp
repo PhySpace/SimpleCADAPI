@@ -13,7 +13,8 @@ Value vec_value(const Vec3& v) {
 }
 
 Vec3 vec_from(const Value* value, const Vec3& fallback) {
-  if (value == nullptr || !value->is_array() || value->size() != 3) return fallback;
+  if (value == nullptr || !value->is_array() || value->size() != 3)
+    return fallback;
   const auto& a = value->as_array();
   return {a[0].as_double(), a[1].as_double(), a[2].as_double()};
 }
@@ -38,7 +39,8 @@ const FrameNode& FrameGraph::add(FrameNode node) {
 
 FrameNode FrameGraph::ensure_frame(std::string frame_id, const Vec3& origin, const Vec3& x_axis, const Vec3& y_axis,
                                    const Vec3& z_axis, std::optional<std::string> parent_frame_id, Value metadata) {
-  return add(FrameNode{std::move(frame_id), origin, x_axis, y_axis, z_axis, std::move(parent_frame_id), std::move(metadata)});
+  return add(
+      FrameNode{std::move(frame_id), origin, x_axis, y_axis, z_axis, std::move(parent_frame_id), std::move(metadata)});
 }
 
 const FrameNode* FrameGraph::get(std::string_view frame_id) const {
@@ -67,11 +69,14 @@ Value FrameGraph::to_value() const {
 FrameGraph FrameGraph::from_value(const Value& payload) {
   FrameGraph graph;
   const Value* nodes = payload.find("nodes");
-  if (nodes == nullptr || !nodes->is_array()) return graph;
+  if (nodes == nullptr || !nodes->is_array())
+    return graph;
   for (const Value& item : nodes->as_array()) {
-    if (!item.is_object()) continue;
+    if (!item.is_object())
+      continue;
     const Value* id = item.find("frame_id");
-    if (id == nullptr) continue;
+    if (id == nullptr)
+      continue;
     FrameNode node;
     node.frame_id = id->is_string() ? id->as_string() : id->dump();
     node.origin = vec_from(item.find("origin"), {0, 0, 0});
@@ -81,7 +86,8 @@ FrameGraph FrameGraph::from_value(const Value& payload) {
     if (const Value* parent = item.find("parent_frame_id"); parent != nullptr && parent->is_string()) {
       node.parent_frame_id = parent->as_string();
     }
-    if (const Value* meta = item.find("metadata"); meta != nullptr && meta->is_object()) node.metadata = *meta;
+    if (const Value* meta = item.find("metadata"); meta != nullptr && meta->is_object())
+      node.metadata = *meta;
     graph.add(std::move(node));
   }
   return graph;

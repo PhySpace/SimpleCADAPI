@@ -83,8 +83,8 @@ struct RecomputeOptions {
 class Session final : public Recorder {
  public:
   struct Options {
-    std::string graph_id;                 // random when empty
-    std::optional<std::string> ns;        // prefix of every id the session allocates
+    std::string graph_id;           // random when empty
+    std::optional<std::string> ns;  // prefix of every id the session allocates
     // Stamp a durable reference ("topo.ref", the Python SDK's runtime key) on every
     // sub-shape of every output.  Off by default: topo_ref_of() derives the same
     // reference on demand for any sub-shape reached by enumeration, so a face or edge
@@ -98,8 +98,8 @@ class Session final : public Recorder {
     // Where an operation was called from (a node's `source`): asked for once per recorded node, with
     // the thread holding whatever it needs.  Empty: nodes carry no source.
     std::function<std::optional<Value>()> source_provider;
-    std::size_t memo_capacity = 128;      // computations whose outputs are kept for reuse; 0 = none
-    ExecutorRegistry* registry = nullptr; // nullptr: ExecutorRegistry::global()
+    std::size_t memo_capacity = 128;       // computations whose outputs are kept for reuse; 0 = none
+    ExecutorRegistry* registry = nullptr;  // nullptr: ExecutorRegistry::global()
   };
 
   Session() : Session(Options{}) {}
@@ -200,7 +200,7 @@ class Session final : public Recorder {
   // nodes that depend on the variable become Dirty; nothing is recomputed.
   void set_var(std::string_view name, double value);
   void set_vars(const std::vector<std::pair<std::string, double>>& values);  // all or nothing
-  void reset_var(std::string_view name);                                       // back to the default
+  void reset_var(std::string_view name);                                     // back to the default
   void reset_vars();
 
   // ---- change impact --------------------------------------------------------
@@ -236,9 +236,9 @@ class Session final : public Recorder {
     std::string key;  // digest the outputs were computed under
     NodeStatus status = NodeStatus::Clean;
     std::exception_ptr error;
-    std::vector<ExternalInput> externals;    // in binding order
-    std::vector<std::string> var_names;      // variables the node's own scalars use
-    bool value_output = false;               // its one output is a value (a Part, a Sketch): no shape is produced
+    std::vector<ExternalInput> externals;  // in binding order
+    std::vector<std::string> var_names;    // variables the node's own scalars use
+    bool value_output = false;             // its one output is a value (a Part, a Sketch): no shape is produced
   };
 
   NodePtr record_impl(const OpRecord& record, const std::vector<Shape>& outputs, bool selection);
@@ -249,7 +249,8 @@ class Session final : public Recorder {
   NodePtr ensure_source_has_own_selection_node(const Shape& source);
   std::optional<Shape> selection_source_for(const Shape& shape);
   std::vector<std::string> record_geo_selection_nodes(const Shape& source, const Shape& selected);
-  InputBinding bind_input(const OpInput& input, std::vector<NodePtr>& input_nodes, std::vector<ExternalInput>& externals);
+  InputBinding bind_input(const OpInput& input, std::vector<NodePtr>& input_nodes,
+                          std::vector<ExternalInput>& externals);
   void attach_outputs(const NodePtr& node, const std::vector<Shape>& outputs, bool selection);
   void note_var_use(const OperationNode& node, NodeState& state);
   std::string node_key(const OperationNode& node, const Value& params) const;

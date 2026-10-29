@@ -23,14 +23,16 @@ Mat3 multiply(const Mat3& a, const Mat3& b) {
   Mat3 out{};
   for (std::size_t i = 0; i < 3; ++i)
     for (std::size_t j = 0; j < 3; ++j)
-      for (std::size_t k = 0; k < 3; ++k) out[i][j] += a[i][k] * b[k][j];
+      for (std::size_t k = 0; k < 3; ++k)
+        out[i][j] += a[i][k] * b[k][j];
   return out;
 }
 
 Mat3 transposed(const Mat3& m) {
   Mat3 out{};
   for (std::size_t i = 0; i < 3; ++i)
-    for (std::size_t j = 0; j < 3; ++j) out[i][j] = m[j][i];
+    for (std::size_t j = 0; j < 3; ++j)
+      out[i][j] = m[j][i];
   return out;
 }
 
@@ -59,7 +61,8 @@ TopoDS_Shape general_transform(const TopoDS_Shape& solid, const Mat3& linear, co
   return occt_guard([&]() -> TopoDS_Shape {
     gp_GTrsf transform;
     for (int row = 0; row < 3; ++row) {
-      for (int col = 0; col < 3; ++col) transform.SetValue(row + 1, col + 1, linear[static_cast<std::size_t>(row)][static_cast<std::size_t>(col)]);
+      for (int col = 0; col < 3; ++col)
+        transform.SetValue(row + 1, col + 1, linear[static_cast<std::size_t>(row)][static_cast<std::size_t>(col)]);
     }
     transform.SetValue(1, 4, translation.x);
     transform.SetValue(2, 4, translation.y);
@@ -67,7 +70,8 @@ TopoDS_Shape general_transform(const TopoDS_Shape& solid, const Mat3& linear, co
     const TopoDS_Shape copied = BRepBuilderAPI_Copy(solid, true, false).Shape();
     BRepBuilderAPI_GTransform builder(copied, transform, true);
     builder.Build();
-    if (!builder.IsDone()) throw ValueError(failure);
+    if (!builder.IsDone())
+      throw ValueError(failure);
     return builder.Shape();
   });
 }
@@ -77,7 +81,8 @@ TopoDS_Shape general_transform(const TopoDS_Shape& solid, const Mat3& linear, co
 Solid scale_rsolid(const Solid& solid, const Scalar3& factors, const Scalar3& center) {
   const Vec3 values = finite_vector(factors, "factors");
   const Vec3 center_value = finite_vector(center, "center");
-  if (values.x == 0 || values.y == 0 || values.z == 0) throw ValueError("scale factors must be nonzero");
+  if (values.x == 0 || values.y == 0 || values.z == 0)
+    throw ValueError("scale factors must be nonzero");
   const Vec3 global_center = features_detail::place_point(center_value);
 
   TopoDS_Shape scaled;
@@ -87,7 +92,8 @@ Solid scale_rsolid(const Solid& solid, const Scalar3& factors, const Scalar3& ce
       transform.SetScale(kernel::to_pnt(global_center), values.x);
       BRepBuilderAPI_Transform builder(solid.wrapped(), transform, true);
       builder.Build();
-      if (!builder.IsDone()) throw ValueError("kernel could not scale the solid");
+      if (!builder.IsDone())
+        throw ValueError("kernel could not scale the solid");
       return builder.Shape();
     });
   } else {
@@ -109,21 +115,27 @@ Solid transform_rsolid(const Solid& solid, const std::vector<std::vector<Scalar>
   // Shape and finiteness first: the numbers are read from the evaluated expressions.
   FeatureRecord rec("make_transform_rsolid");
   const std::vector<std::vector<double>> values = rec.matrix("matrix", matrix);
-  const bool shaped = values.size() == 4 && std::all_of(values.begin(), values.end(), [](const auto& row) { return row.size() == 4; });
-  if (!shaped) throw ValueError("matrix must be a finite 4x4 affine matrix");
+  const bool shaped =
+      values.size() == 4 && std::all_of(values.begin(), values.end(), [](const auto& row) { return row.size() == 4; });
+  if (!shaped)
+    throw ValueError("matrix must be a finite 4x4 affine matrix");
   for (const auto& row : values) {
     for (const double v : row) {
-      if (!std::isfinite(v)) throw ValueError("matrix must be a finite 4x4 affine matrix");
+      if (!std::isfinite(v))
+        throw ValueError("matrix must be a finite 4x4 affine matrix");
     }
   }
   const std::array<double, 4> last{0, 0, 0, 1};
   for (std::size_t j = 0; j < 4; ++j) {
-    if (std::abs(values[3][j] - last[j]) > 1e-12) throw ValueError("perspective transforms cannot define an affine solid");
+    if (std::abs(values[3][j] - last[j]) > 1e-12)
+      throw ValueError("perspective transforms cannot define an affine solid");
   }
   Mat3 affine{};
   for (std::size_t i = 0; i < 3; ++i)
-    for (std::size_t j = 0; j < 3; ++j) affine[i][j] = values[i][j];
-  if (std::abs(determinant(affine)) < 1e-14) throw ValueError("matrix must be nonsingular");
+    for (std::size_t j = 0; j < 3; ++j)
+      affine[i][j] = values[i][j];
+  if (std::abs(determinant(affine)) < 1e-14)
+    throw ValueError("matrix must be nonsingular");
 
   const Mat3 basis = current_basis();
   const Vec3 origin = features_detail::place_point({0, 0, 0});

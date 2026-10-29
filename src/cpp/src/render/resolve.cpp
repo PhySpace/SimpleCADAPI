@@ -9,12 +9,15 @@ namespace scad::render::detail {
 namespace {
 
 double sinc(double x) {
-  if (x == 0.0) return 1.0;
+  if (x == 0.0)
+    return 1.0;
   x *= kPi;
   return std::sin(x) / x;
 }
 
-double lanczos3(double x) { return (-3.0 < x && x < 3.0) ? sinc(x) * sinc(x / 3.0) : 0.0; }
+double lanczos3(double x) {
+  return (-3.0 < x && x < 3.0) ? sinc(x) * sinc(x / 3.0) : 0.0;
+}
 
 struct Taps {
   std::vector<int> first, count;
@@ -42,7 +45,8 @@ Taps make_taps(int in_size, int out_size, Resolve mode) {
       w.push_back(static_cast<float>(v));
       total += v;
     }
-    for (float& v : w) v = static_cast<float>(v / total);
+    for (float& v : w)
+      v = static_cast<float>(v / total);
     t.first[static_cast<std::size_t>(xx)] = xmin;
     t.count[static_cast<std::size_t>(xx)] = xmax - xmin;
     t.weights[static_cast<std::size_t>(xx)] = std::move(w);
@@ -50,7 +54,9 @@ Taps make_taps(int in_size, int out_size, Resolve mode) {
   return t;
 }
 
-inline std::uint8_t clip8(float v) { return static_cast<std::uint8_t>(std::clamp(std::floor(v + 0.5f), 0.0f, 255.0f)); }
+inline std::uint8_t clip8(float v) {
+  return static_cast<std::uint8_t>(std::clamp(std::floor(v + 0.5f), 0.0f, 255.0f));
+}
 
 }  // namespace
 
@@ -70,8 +76,10 @@ void reduce(const std::uint8_t* src, int src_w, int src_h, int factor, Resolve m
       const std::uint8_t* p = row + static_cast<std::size_t>(xt.first[static_cast<std::size_t>(x)]) * 4;
       float acc[3] = {0, 0, 0};
       for (std::size_t k = 0; k < w.size(); ++k)
-        for (int c = 0; c < 3; ++c) acc[c] += w[k] * p[4 * k + static_cast<std::size_t>(c)];
-      for (int c = 0; c < 3; ++c) out[4 * x + c] = clip8(acc[c]);
+        for (int c = 0; c < 3; ++c)
+          acc[c] += w[k] * p[4 * k + static_cast<std::size_t>(c)];
+      for (int c = 0; c < 3; ++c)
+        out[4 * x + c] = clip8(acc[c]);
       out[4 * x + 3] = 255;
     }
   });
@@ -82,10 +90,13 @@ void reduce(const std::uint8_t* src, int src_w, int src_h, int factor, Resolve m
     for (int x = 0; x < dw; ++x) {
       float acc[3] = {0, 0, 0};
       for (std::size_t k = 0; k < w.size(); ++k) {
-        const std::uint8_t* p = tmp.data() + (static_cast<std::size_t>(first) + k) * static_cast<std::size_t>(dw) * 4 + static_cast<std::size_t>(x) * 4;
-        for (int c = 0; c < 3; ++c) acc[c] += w[k] * p[c];
+        const std::uint8_t* p = tmp.data() + (static_cast<std::size_t>(first) + k) * static_cast<std::size_t>(dw) * 4 +
+                                static_cast<std::size_t>(x) * 4;
+        for (int c = 0; c < 3; ++c)
+          acc[c] += w[k] * p[c];
       }
-      for (int c = 0; c < 3; ++c) out[4 * x + c] = clip8(acc[c]);
+      for (int c = 0; c < 3; ++c)
+        out[4 * x + c] = clip8(acc[c]);
       out[4 * x + 3] = 255;
     }
   });

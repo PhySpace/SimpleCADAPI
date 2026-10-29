@@ -38,7 +38,9 @@ struct TempDir {
   }
 };
 
-TopoDS_Shape box(double x, double y, double z) { return BRepPrimAPI_MakeBox(x, y, z).Solid(); }
+TopoDS_Shape box(double x, double y, double z) {
+  return BRepPrimAPI_MakeBox(x, y, z).Solid();
+}
 
 TopoDS_Shape moved(const TopoDS_Shape& s, double dx) {
   gp_Trsf t;
@@ -152,7 +154,8 @@ TEST_CASE("STL: export_stl_shape writes ASCII facets, one per mesh triangle") {
   const Bytes text = read_file(file);
   CHECK(text.rfind("solid ", 0) == 0);
   std::size_t facets = 0;
-  for (std::size_t at = text.find("facet normal"); at != std::string::npos; at = text.find("facet normal", at + 1)) ++facets;
+  for (std::size_t at = text.find("facet normal"); at != std::string::npos; at = text.find("facet normal", at + 1))
+    ++facets;
   CHECK(facets == 12);
   const Mesh m = read_stl(file);
   CHECK(m.triangle_count() == 12);
@@ -175,7 +178,8 @@ TEST_CASE("STL: reader rejects junk, handles ASCII without a header word") {
   const Mesh m = read_stl_bytes(ascii);
   CHECK(m.triangle_count() == 1);
   CHECK(m.normals[2] == doctest::Approx(1.0F));
-  CHECK_THROWS_AS((void)read_stl_bytes("solid t\n facet normal 0 0 1\n outer loop\n vertex 0 0 0\n vertex 1 0 x\n"), Error);
+  CHECK_THROWS_AS((void)read_stl_bytes("solid t\n facet normal 0 0 1\n outer loop\n vertex 0 0 0\n vertex 1 0 x\n"),
+                  Error);
 }
 
 TEST_CASE("STL: a mesh sews back into a closed solid") {
@@ -197,8 +201,10 @@ TEST_CASE("OBJ: v and f records with 17 significant digits") {
   std::size_t v = 0, f = 0;
   for (std::size_t at = 0; at < text.size();) {
     const std::size_t end = text.find('\n', at);
-    if (text.compare(at, 2, "v ") == 0) ++v;
-    if (text.compare(at, 2, "f ") == 0) ++f;
+    if (text.compare(at, 2, "v ") == 0)
+      ++v;
+    if (text.compare(at, 2, "f ") == 0)
+      ++f;
     at = end + 1;
   }
   CHECK(v == 8);

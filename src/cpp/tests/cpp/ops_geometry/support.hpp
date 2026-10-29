@@ -14,12 +14,15 @@
 
 namespace scad::geometry_test {
 
-inline bool has_tag(const Shape& shape, const std::string& tag) { return shape.has_tag(tag, TagScope::Local); }
+inline bool has_tag(const Shape& shape, const std::string& tag) {
+  return shape.has_tag(tag, TagScope::Local);
+}
 
 template <class Handles>
 int count_with_tag(const Handles& handles, const std::string& tag) {
   int count = 0;
-  for (const auto& handle : handles) count += has_tag(handle, tag) ? 1 : 0;
+  for (const auto& handle : handles)
+    count += has_tag(handle, tag) ? 1 : 0;
   return count;
 }
 
@@ -51,7 +54,8 @@ struct Recording {
   ~Recording() { session.stop(); }
   std::vector<std::string> ops() const {
     std::vector<std::string> out;
-    for (const auto& node : session.graph().nodes()) out.push_back(node->op);
+    for (const auto& node : session.graph().nodes())
+      out.push_back(node->op);
     return out;
   }
 };

@@ -79,13 +79,15 @@ Cache& cache() {
 
 std::shared_ptr<const TriMesh> cached_mesh_detached(const Shape& solid, double linear_tolerance,
                                                     double angular_tolerance, std::string* error) {
-  if (auto hit = cache().find(solid.wrapped(), linear_tolerance, angular_tolerance)) return hit;
+  if (auto hit = cache().find(solid.wrapped(), linear_tolerance, angular_tolerance))
+    return hit;
   try {
     auto built = std::make_shared<const TriMesh>(build_solid_trimesh(solid, linear_tolerance, angular_tolerance));
     cache().insert(solid.wrapped(), linear_tolerance, angular_tolerance, built);
     return built;
   } catch (const std::exception& failure) {
-    if (error != nullptr) *error = failure.what();
+    if (error != nullptr)
+      *error = failure.what();
     return nullptr;
   }
 }
@@ -105,6 +107,8 @@ std::string mesh_error(const Shape& solid) {
   return value.is_string() ? value.as_string() : std::string();
 }
 
-void clear_mesh_cache() { cache().clear(); }
+void clear_mesh_cache() {
+  cache().clear();
+}
 
 }  // namespace scad::io

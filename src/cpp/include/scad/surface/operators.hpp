@@ -19,8 +19,7 @@ namespace scad {
 
 // A trimmed Face carrying a tensor-product Bezier surface.  `control_points` are in the current
 // coordinate system; `weights` (positive, same grid shape) make the surface rational.
-Face make_bezier_surface_rface(const PointGrid& control_points,
-                               const std::optional<WeightGrid>& weights = std::nullopt,
+Face make_bezier_surface_rface(const PointGrid& control_points, const std::optional<WeightGrid>& weights = std::nullopt,
                                const TagPrefix& tag_prefix = std::nullopt);
 
 struct CylindricalSurfaceOptions {
@@ -66,8 +65,7 @@ struct SurfacePatchOptions {
 // A constrained boundary network filled into one Face, optionally with holes.  The filling kernel
 // re-fits every boundary edge: patches that must share exact edges and sew into a closed shell
 // belong to make_gordon_surface_rface on a shared edge network.
-Face make_surface_patch_rface(const std::vector<SurfaceBoundary>& boundaries,
-                              const SurfacePatchOptions& options = {});
+Face make_surface_patch_rface(const std::vector<SurfaceBoundary>& boundaries, const SurfacePatchOptions& options = {});
 
 struct TrimSurfaceOptions {
   std::vector<Wire> holes;

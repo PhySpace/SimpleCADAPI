@@ -12,7 +12,9 @@ std::vector<ScalarPoint> poles() {
   return {{0.0, 0.0, 0.0}, {0.6, 1.0, 0.0}, {1.4, 1.0, 0.0}, {2.0, 0.0, 0.0}};
 }
 
-std::string what(const std::unique_ptr<Error>& error) { return error ? error->guidance().technical_details : std::string("(no error)"); }
+std::string what(const std::unique_ptr<Error>& error) {
+  return error ? error->guidance().technical_details : std::string("(no error)");
+}
 
 }  // namespace
 
@@ -40,7 +42,8 @@ TEST_CASE("spline definitions are validated with the Python messages") {
   CHECK(what(fails({.control_points = poles(), .degree = 0})) == "ValueError: degree must be at least 1");
   CHECK(what(fails({.control_points = poles(), .degree = 30})) == "ValueError: degree must be 25 or lower");
   CHECK(what(fails({.control_points = {}})) == "ValueError: control_points must contain at least one point");
-  CHECK(what(fails({.control_points = {{0.0}, {1.0}, {2.0}, {3.0}}})) == "ValueError: control point 0 must be 2D or 3D");
+  CHECK(what(fails({.control_points = {{0.0}, {1.0}, {2.0}, {3.0}}})) ==
+        "ValueError: control point 0 must be 2D or 3D");
   CHECK(what(fails({.control_points = {{0.0, 0.0}, {1.0, 1.0}, {2.0, 0.0}}})) ==
         "ValueError: control point count must be at least degree + 1");
   CHECK(what(fails({.control_points = poles(), .multiplicities = std::vector<int>{4, 4}})) ==
@@ -58,7 +61,8 @@ TEST_CASE("knot normalisation") {
   CHECK(bspline::default_knots(5, 3, false).multiplicities == std::vector<int>{4, 1, 4});
   CHECK(bspline::default_knots(4, 3, true).unique.size() == 5);
   CHECK(bspline::default_knots(4, 3, false).multiplicities == std::vector<int>{4, 4});
-  CHECK_THROWS_WITH_AS(bspline::default_knots(3, 3, false), "control point count must be at least degree + 1", ValueError);
+  CHECK_THROWS_WITH_AS(bspline::default_knots(3, 3, false), "control point count must be at least degree + 1",
+                       ValueError);
   CHECK_THROWS_WITH_AS(bspline::normalize_knots(4, 3, false, ScalarList{0.0, 1.0}, std::vector<int>{3, 4}),
                        "sum(multiplicities) must equal 8 for this non-periodic B-spline", ValueError);
   CHECK_THROWS_WITH_AS(bspline::normalize_knots(4, 3, true, ScalarList{0.0, 0.5, 1.0}, std::vector<int>{1, 1, 1}),
@@ -85,10 +89,13 @@ TEST_CASE("interpolated splines") {
 
   CHECK(what(failure_of([] { make_interpolated_spline_redge({.points = {{0.0, 0.0, 0.0}}}); })) ==
         "ValueError: interpolation requires at least 2 points");
-  CHECK(what(failure_of([] { make_interpolated_spline_redge({.points = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}}, .periodic = true}); })) ==
-        "ValueError: interpolation requires at least 3 distinct points");
-  CHECK(what(failure_of([] { make_interpolated_spline_redge({.points = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}}}); })) ==
-        "ValueError: interpolation points 0 and 1 are within the interpolation tolerance");
-  CHECK(what(failure_of([] { make_interpolated_spline_redge({.points = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}}, .tolerance = Scalar(0.0)}); })) ==
-        "ValueError: tolerance must be a finite positive value");
+  CHECK(what(failure_of([] {
+          make_interpolated_spline_redge({.points = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}}, .periodic = true});
+        })) == "ValueError: interpolation requires at least 3 distinct points");
+  CHECK(what(failure_of([] {
+          make_interpolated_spline_redge({.points = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}}});
+        })) == "ValueError: interpolation points 0 and 1 are within the interpolation tolerance");
+  CHECK(what(failure_of([] {
+          make_interpolated_spline_redge({.points = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}}, .tolerance = Scalar(0.0)});
+        })) == "ValueError: tolerance must be a finite positive value");
 }

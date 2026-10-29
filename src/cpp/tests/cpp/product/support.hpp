@@ -17,7 +17,9 @@ namespace scad::product_test {
 using namespace scad;
 using namespace scad::product;
 
-inline Placement at(double x, double y, double z) { return Placement(Vec3{x, y, z}); }
+inline Placement at(double x, double y, double z) {
+  return Placement(Vec3{x, y, z});
+}
 
 // A unit box Part with a placement connector "axis" at `connector_origin`.
 inline PartPtr part_with_axis(const std::string& id, const Vec3& connector_origin = {0, 0, 0}) {
@@ -58,7 +60,8 @@ struct Recording {
   ~Recording() { session.stop(); }
   std::vector<std::string> ops() const {
     std::vector<std::string> out;
-    for (const auto& node : session.graph().nodes()) out.push_back(node->op);
+    for (const auto& node : session.graph().nodes())
+      out.push_back(node->op);
     return out;
   }
 };

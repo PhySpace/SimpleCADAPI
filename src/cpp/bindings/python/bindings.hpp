@@ -60,7 +60,8 @@ struct type_caster<scad::Vec3> {
   PYBIND11_TYPE_CASTER(scad::Vec3, const_name("tuple[float, float, float]"));
 
   bool load(handle src, bool /*convert*/) {
-    if (!src) return false;
+    if (!src)
+      return false;
     // A Vec3 object (or anything with x, y, z attributes).
     if (hasattr(src, "x") && hasattr(src, "y") && hasattr(src, "z") && !isinstance<sequence>(src)) {
       try {
@@ -70,9 +71,11 @@ struct type_caster<scad::Vec3> {
         return false;
       }
     }
-    if (!(isinstance<sequence>(src) || isinstance<array>(src))) return false;
+    if (!(isinstance<sequence>(src) || isinstance<array>(src)))
+      return false;
     sequence seq = reinterpret_borrow<sequence>(src);
-    if (seq.size() != 3) return false;
+    if (seq.size() != 3)
+      return false;
     double v[3];
     for (std::size_t i = 0; i < 3; ++i) {
       object item = seq[i];
@@ -86,9 +89,7 @@ struct type_caster<scad::Vec3> {
     return true;
   }
 
-  static handle cast(const scad::Vec3& v, return_value_policy, handle) {
-    return make_tuple(v.x, v.y, v.z).release();
-  }
+  static handle cast(const scad::Vec3& v, return_value_policy, handle) { return make_tuple(v.x, v.y, v.z).release(); }
 };
 
 // Scalar <- float | int | an expression object (anything holding an ExprPtr).
@@ -98,7 +99,8 @@ struct type_caster<scad::Scalar> {
   PYBIND11_TYPE_CASTER(scad::Scalar, const_name("float | Expr"));
 
   bool load(handle src, bool convert) {
-    if (!src) return false;
+    if (!src)
+      return false;
     // An Expr/Var exposed by the reactive module.
     if (object expr_type = scad_expr_type(); expr_type && !expr_type.is_none() && isinstance(src, expr_type)) {
       value = scad::Scalar(src.cast<scad::ExprPtr>());
@@ -118,7 +120,8 @@ struct type_caster<scad::Scalar> {
   }
 
   static handle cast(const scad::Scalar& s, return_value_policy, handle) {
-    if (s.symbolic()) return pybind11::cast(s.expr()).release();
+    if (s.symbolic())
+      return pybind11::cast(s.expr()).release();
     return PyFloat_FromDouble(s.literal());
   }
 

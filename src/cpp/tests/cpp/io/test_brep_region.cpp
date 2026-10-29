@@ -28,7 +28,8 @@ std::string base64_decode(const std::string& text) {
   unsigned buffer = 0;
   int bits = 0;
   for (const char c : text) {
-    if (c == '=') break;
+    if (c == '=')
+      break;
     buffer = (buffer << 6) | static_cast<unsigned>(alphabet.find(c));
     bits += 6;
     if (bits >= 8) {
@@ -48,7 +49,9 @@ const Value& reference() {
   return value;
 }
 
-Bytes artifact(const char* name) { return base64_decode(reference().find(name)->find("artifact_b64")->as_string()); }
+Bytes artifact(const char* name) {
+  return base64_decode(reference().find(name)->find("artifact_b64")->as_string());
+}
 
 struct TempDir {
   fs::path path = fs::temp_directory_path() / "scad_io_region";
@@ -65,7 +68,8 @@ struct TempDir {
 // Rewrites the manifest of an artifact and keeps the container consistent.
 Bytes with_manifest(const Bytes& original, const std::function<void(Value&)>& edit) {
   std::uint64_t manifest_size = 0;
-  for (int i = 0; i < 8; ++i) manifest_size = (manifest_size << 8) | static_cast<unsigned char>(original[16 + static_cast<std::size_t>(i)]);
+  for (int i = 0; i < 8; ++i)
+    manifest_size = (manifest_size << 8) | static_cast<unsigned char>(original[16 + static_cast<std::size_t>(i)]);
   Value manifest = parse_json(original.substr(32, static_cast<std::size_t>(manifest_size)));
   const std::string payload = original.substr(32 + static_cast<std::size_t>(manifest_size));
   edit(manifest);
@@ -80,7 +84,8 @@ TEST_CASE("brep_region: artifacts written by the Python SDK decode (box, cylinde
     const DecodedRegion region = decode_artifact(artifact(name), RegionRootKind::Solid);
     CHECK(region.root_kind == RegionRootKind::Solid);
     CHECK(region.shape.ShapeType() == TopAbs_SOLID);
-    CHECK(kernel::volume(region.shape) == doctest::Approx(reference().find(name)->find("volume")->as_double()).epsilon(1e-9));
+    CHECK(kernel::volume(region.shape) ==
+          doctest::Approx(reference().find(name)->find("volume")->as_double()).epsilon(1e-9));
     CHECK(region.manifest.find("profile")->as_string().rfind("scadbrep-1-ocp-7.9.3.1-", 0) == 0);
   }
   const DecodedRegion top = decode_artifact(artifact("box_top"), RegionRootKind::Shell);
@@ -120,7 +125,8 @@ TEST_CASE("brep_region: writing and reading our own snapshots") {
 
   // A shell needs its face ids; a solid must not be given any.
   CHECK_THROWS_AS((void)make_region_artifact(cylinder, RegionRootKind::Solid, source, {"face:0"}), ValueError);
-  CHECK_THROWS_AS((void)make_region_artifact(BRepPrimAPI_MakeBox(1, 1, 1).Solid(), RegionRootKind::Shell, source), ValueError);
+  CHECK_THROWS_AS((void)make_region_artifact(BRepPrimAPI_MakeBox(1, 1, 1).Solid(), RegionRootKind::Shell, source),
+                  ValueError);
 }
 
 TEST_CASE("brep_region: tampering is rejected with a brep_region error") {
@@ -157,19 +163,23 @@ TEST_CASE("brep_region: tampering is rejected with a brep_region error") {
           "other OCCT minor");
   rejects(with_manifest(good, [](Value& m) { m.find("shape")->set("volume", 5000.0); }), "descriptor drift");
   rejects(with_manifest(good, [](Value& m) { m.find("shape")->set("face_count", 7); }), "count drift");
-  rejects(with_manifest(good, [](Value& m) { m.find("shape")->find("face_fingerprints")->as_array()[0].set("area", 1.0); }),
-          "face geometry drift");
-  rejects(with_manifest(good, [](Value& m) { m.find("provenance")->set("construction", "approximate"); }), "provenance");
+  rejects(
+      with_manifest(good, [](Value& m) { m.find("shape")->find("face_fingerprints")->as_array()[0].set("area", 1.0); }),
+      "face geometry drift");
+  rejects(with_manifest(good, [](Value& m) { m.find("provenance")->set("construction", "approximate"); }),
+          "provenance");
   rejects(with_manifest(good, [](Value& m) { m.find("coordinate_system")->set("length_unit", "m"); }), "unit");
   rejects(with_manifest(good, [](Value& m) { m.find("source")->set("content_hash", "sha256:xyz"); }), "source hash");
 
   // A manifest that is valid JSON but not RFC 8785 canonical (spaces) is refused.
   std::uint64_t manifest_size = 0;
-  for (int i = 0; i < 8; ++i) manifest_size = (manifest_size << 8) | static_cast<unsigned char>(good[16 + static_cast<std::size_t>(i)]);
+  for (int i = 0; i < 8; ++i)
+    manifest_size = (manifest_size << 8) | static_cast<unsigned char>(good[16 + static_cast<std::size_t>(i)]);
   const std::string manifest = good.substr(32, static_cast<std::size_t>(manifest_size));
   const std::string reformatted = python_json_dumps(parse_json(manifest), true, true);
   Bytes rebuilt = good.substr(0, 16);
-  for (int shift = 56; shift >= 0; shift -= 8) rebuilt.push_back(static_cast<char>((reformatted.size() >> shift) & 0xFF));
+  for (int shift = 56; shift >= 0; shift -= 8)
+    rebuilt.push_back(static_cast<char>((reformatted.size() >> shift) & 0xFF));
   rebuilt += good.substr(24, 8) + reformatted + good.substr(32 + static_cast<std::size_t>(manifest_size));
   rejects(rebuilt, "non-canonical JSON");
 }
@@ -187,11 +197,13 @@ TEST_CASE("brep_region: read_artifact checks the digest and confines replay to i
   // The digest may omit the prefix and use any case.
   CHECK_NOTHROW((void)read_artifact(dir.path / "sub" / "body.scadbrep", digest.substr(7), RegionRootKind::Solid));
   std::string upper = digest;
-  for (char& c : upper) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+  for (char& c : upper)
+    c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
   CHECK_NOTHROW((void)read_artifact(dir.path / "sub" / "body.scadbrep", " " + upper + " ", RegionRootKind::Solid));
 
-  CHECK_THROWS_WITH_AS((void)read_artifact(dir.path / "sub" / "body.scadbrep", sha256_tagged("other"), RegionRootKind::Solid),
-                       doctest::Contains("SHA-256"), Error);
+  CHECK_THROWS_WITH_AS(
+      (void)read_artifact(dir.path / "sub" / "body.scadbrep", sha256_tagged("other"), RegionRootKind::Solid),
+      doctest::Contains("SHA-256"), Error);
   CHECK_THROWS_AS((void)read_artifact(dir.path / "missing.scadbrep", digest, RegionRootKind::Solid), Error);
 
   const std::optional<fs::path> root = dir.path;
@@ -221,9 +233,11 @@ TEST_CASE("brep_region: copy_step_solid_region reproduces copy_step_region_rpath
   const RegionFile file = read_artifact(out, sha256_tagged(data), RegionRootKind::Solid);
   CHECK(kernel::volume(file.shape) == doctest::Approx(6000.0));
   CHECK(file.manifest.find("source")->find("name")->as_string() == "target.step");
-  CHECK(file.manifest.find("source")->find("content_hash")->as_string() == sha256_tagged(read_file(dir.path / "target.step")));
+  CHECK(file.manifest.find("source")->find("content_hash")->as_string() ==
+        sha256_tagged(read_file(dir.path / "target.step")));
   CHECK_THROWS_AS((void)copy_step_solid_region(dir.path / "target.step", dir.path / "target.txt"), ValueError);
-  CHECK_THROWS_AS((void)copy_step_solid_region(dir.path / "target.step", dir.path / "no_dir" / "x.scadbrep"), ValueError);
+  CHECK_THROWS_AS((void)copy_step_solid_region(dir.path / "target.step", dir.path / "no_dir" / "x.scadbrep"),
+                  ValueError);
   CHECK_THROWS_AS((void)copy_step_solid_region(dir.path / "absent.step", dir.path / "x.scadbrep"), ValueError);
 }
 

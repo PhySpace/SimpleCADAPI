@@ -21,20 +21,25 @@ std::string g6(double v) {
   return buf;
 }
 
-std::string vec_repr(const Vec3& v) { return "Vec3(" + g6(v.x) + ", " + g6(v.y) + ", " + g6(v.z) + ")"; }
+std::string vec_repr(const Vec3& v) {
+  return "Vec3(" + g6(v.x) + ", " + g6(v.y) + ", " + g6(v.z) + ")";
+}
 
 std::string tag_list(const Shape& s) {
   std::string out = "[";
   bool first = true;
   for (const auto& t : s.list_tags()) {
-    if (!first) out += ", ";
+    if (!first)
+      out += ", ";
     first = false;
     out += "'" + t + "'";
   }
   return out + "]";
 }
 
-std::string spaces(int indent) { return std::string(static_cast<std::size_t>(indent) * 2, ' '); }
+std::string spaces(int indent) {
+  return std::string(static_cast<std::size_t>(indent) * 2, ' ');
+}
 
 std::string tags_and_metadata(const Shape& s, int indent) {
   const std::string pad = spaces(indent);
@@ -42,23 +47,28 @@ std::string tags_and_metadata(const Shape& s, int indent) {
   const auto tags = s.list_tags();
   if (!tags.empty()) {
     out += pad + "tags: [";
-    for (std::size_t i = 0; i < tags.size(); ++i) out += (i ? ", " : "") + tags[i];
+    for (std::size_t i = 0; i < tags.size(); ++i)
+      out += (i ? ", " : "") + tags[i];
     out += "]";
   }
   const Value& meta = s.metadata();
   if (meta.is_object() && meta.size() > 0) {
     auto members = meta.as_object();
     std::sort(members.begin(), members.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
-    if (!out.empty()) out += "\n";
+    if (!out.empty())
+      out += "\n";
     out += pad + "metadata:";
-    for (const auto& [key, value] : members) out += "\n" + pad + "  " + key + ": " + value.dump();
+    for (const auto& [key, value] : members)
+      out += "\n" + pad + "  " + key + ": " + value.dump();
   }
   return out;
 }
 
 void append(std::string& out, const std::string& line) {
-  if (line.empty()) return;
-  if (!out.empty()) out += "\n";
+  if (line.empty())
+    return;
+  if (!out.empty())
+    out += "\n";
   out += line;
 }
 
@@ -75,8 +85,8 @@ std::string Shape::repr() const {
       std::string ends;
       try {
         const Vec3 a = e.start_vertex().coordinates(), b = e.end_vertex().coordinates();
-        ends = "from: (" + g6(a.x) + ", " + g6(a.y) + ", " + g6(a.z) + "), to: (" + g6(b.x) + ", " + g6(b.y) +
-               ", " + g6(b.z) + ")";
+        ends = "from: (" + g6(a.x) + ", " + g6(a.y) + ", " + g6(a.z) + "), to: (" + g6(b.x) + ", " + g6(b.y) + ", " +
+               g6(b.z) + ")";
       } catch (const std::exception&) {
         ends = "from: [unable to retrieve], to: [unable to retrieve], usually this is a closed edge";
       }

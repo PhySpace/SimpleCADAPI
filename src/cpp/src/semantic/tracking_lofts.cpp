@@ -45,19 +45,26 @@ namespace scad {
 
 TrackedResult tracked_loft(const std::vector<Shape>& profiles, bool ruled) {
   // ThruSections crashes the process on a single section instead of failing.
-  if (profiles.size() < 2) throw ValueError("Loft requires at least two profiles");
+  if (profiles.size() < 2)
+    throw ValueError("Loft requires at least two profiles");
   return occt_guard([&] {
     BRepOffsetAPI_ThruSections loft(/*isSolid=*/true, ruled);
     loft.CheckCompatibility(true);
     for (const Shape& profile : profiles) {
       switch (profile.kind()) {
-        case Kind::Vertex: loft.AddVertex(TopoDS::Vertex(profile.wrapped())); break;
-        case Kind::Wire: loft.AddWire(TopoDS::Wire(profile.wrapped())); break;
-        default: throw TypeError("loft profiles must be wires or vertices");
+        case Kind::Vertex:
+          loft.AddVertex(TopoDS::Vertex(profile.wrapped()));
+          break;
+        case Kind::Wire:
+          loft.AddWire(TopoDS::Wire(profile.wrapped()));
+          break;
+        default:
+          throw TypeError("loft profiles must be wires or vertices");
       }
     }
     loft.Build();
-    if (!loft.IsDone()) throw ValueError("Loft failed: OCC build did not complete");
+    if (!loft.IsDone())
+      throw ValueError("Loft failed: OCC build did not complete");
 
     const Solid result(kernel::as_solid(loft.Shape()));
     tracking::DeltaBuilder delta;
@@ -66,7 +73,8 @@ TrackedResult tracked_loft(const std::vector<Shape>& profiles, bool ruled) {
     if (tracking::history_wanted()) {
       tracking::BuilderHistory history(loft);
       for (std::size_t i = 0; i < profiles.size(); ++i) {
-        if (profiles[i].kind() == Kind::Vertex) continue;
+        if (profiles[i].kind() == Kind::Vertex)
+          continue;
         const std::string origin = "profile_" + std::to_string(i);
         tracking::QuerySpec spec;
         spec.origin_role = origin;
@@ -88,15 +96,19 @@ TrackedResult tracked_loft(const std::vector<Shape>& profiles, bool ruled) {
       // A point end has no cap: the cap faces are the ones no side role claimed.
       std::unordered_set<std::string> side_faces;
       for (const tracking::RoleWitness& role : delta.roles) {
-        if (role.role == "loft.side" && role.kind == Kind::Face) side_faces.insert(role.topo_id);
+        if (role.role == "loft.side" && role.kind == Kind::Face)
+          side_faces.insert(role.topo_id);
       }
       std::vector<TopoDS_Shape> caps;
       for (const TopoDS_Face& face : kernel::faces_of(result.wrapped())) {
-        if (!side_faces.contains(kernel_topo_id(face))) caps.push_back(face);
+        if (!side_faces.contains(kernel_topo_id(face)))
+          caps.push_back(face);
       }
       std::vector<std::string_view> cap_roles;
-      if (starts_with_wire) cap_roles.push_back("loft.start");
-      if (ends_with_wire) cap_roles.push_back("loft.end");
+      if (starts_with_wire)
+        cap_roles.push_back("loft.start");
+      if (ends_with_wire)
+        cap_roles.push_back("loft.end");
       if (caps.size() != cap_roles.size()) {
         throw ValueError("Loft point-profile topology did not produce the expected endpoint caps");
       }
@@ -124,8 +136,10 @@ TrackedResult tracked_sweep(const Face& profile, const Wire& path, bool is_frene
     sweep.SetMode(is_frenet);
     sweep.Add(outer, /*WithContact=*/false, /*WithCorrection=*/false);
     sweep.Build();
-    if (!sweep.IsDone()) throw ValueError("Sweep failed: OCC build did not complete");
-    if (!sweep.MakeSolid()) throw ValueError("Sweep failed: OCC solid conversion did not complete");
+    if (!sweep.IsDone())
+      throw ValueError("Sweep failed: OCC build did not complete");
+    if (!sweep.MakeSolid())
+      throw ValueError("Sweep failed: OCC solid conversion did not complete");
 
     const Solid result(kernel::as_solid(sweep.Shape()));
     tracking::DeltaBuilder delta;
@@ -156,10 +170,14 @@ namespace {
 
 std::string_view pipe_error_name(BRepBuilderAPI_PipeError status) noexcept {
   switch (status) {
-    case BRepBuilderAPI_PipeDone: return "BRepBuilderAPI_PipeDone";
-    case BRepBuilderAPI_PipeNotDone: return "BRepBuilderAPI_PipeNotDone";
-    case BRepBuilderAPI_PlaneNotIntersectGuide: return "BRepBuilderAPI_PlaneNotIntersectGuide";
-    case BRepBuilderAPI_ImpossibleContact: return "BRepBuilderAPI_ImpossibleContact";
+    case BRepBuilderAPI_PipeDone:
+      return "BRepBuilderAPI_PipeDone";
+    case BRepBuilderAPI_PipeNotDone:
+      return "BRepBuilderAPI_PipeNotDone";
+    case BRepBuilderAPI_PlaneNotIntersectGuide:
+      return "BRepBuilderAPI_PlaneNotIntersectGuide";
+    case BRepBuilderAPI_ImpossibleContact:
+      return "BRepBuilderAPI_ImpossibleContact";
   }
   return "BRepBuilderAPI_PipeNotDone";
 }
@@ -213,10 +231,12 @@ TrackedResult tracked_twisted_sweep(const Face& profile, const Vec3& axis, const
     const gp_Pnt start = kernel::to_pnt(origin);
     const gp_Pnt end = kernel::to_pnt(origin + axis * distance);
     BRepBuilderAPI_MakeEdge spine_edge_builder(start, end);
-    if (!spine_edge_builder.IsDone()) throw ValueError("Twisted sweep failed to build its straight spine");
+    if (!spine_edge_builder.IsDone())
+      throw ValueError("Twisted sweep failed to build its straight spine");
     const TopoDS_Edge spine_edge = spine_edge_builder.Edge();
     BRepBuilderAPI_MakeWire spine_builder(spine_edge);
-    if (!spine_builder.IsDone()) throw ValueError("Twisted sweep failed to build its spine wire");
+    if (!spine_builder.IsDone())
+      throw ValueError("Twisted sweep failed to build its spine wire");
     const TopoDS_Wire spine = spine_builder.Wire();
 
     // The rotation law: a straight line on a cylinder around the axis, whose
@@ -225,9 +245,11 @@ TrackedResult tracked_twisted_sweep(const Face& profile, const Vec3& axis, const
         new Geom_CylindricalSurface(gp_Ax3(start, axis_dir, reference_dir), guide_radius);
     const GCE2d_MakeSegment guide_curve(gp_Pnt2d(0.0, 0.0), gp_Pnt2d(twist_angle * kPi / 180.0, distance));
     BRepBuilderAPI_MakeEdge guide_edge_builder(guide_curve.Value(), cylinder);
-    if (!guide_edge_builder.IsDone()) throw ValueError("Twisted sweep failed to build its rotation guide");
+    if (!guide_edge_builder.IsDone())
+      throw ValueError("Twisted sweep failed to build its rotation guide");
     BRepBuilderAPI_MakeWire guide_builder(guide_edge_builder.Edge());
-    if (!guide_builder.IsDone()) throw ValueError("Twisted sweep failed to build its rotation guide wire");
+    if (!guide_builder.IsDone())
+      throw ValueError("Twisted sweep failed to build its rotation guide wire");
     const TopoDS_Wire guide = guide_builder.Wire();
     BRepLib::BuildCurves3d(guide, 1.0e-7, GeomAbs_C1, 14, 2000);
 
@@ -248,7 +270,8 @@ TrackedResult tracked_twisted_sweep(const Face& profile, const Vec3& axis, const
 
     // Every wire of the profile -- outer and holes -- is swept into its own skin.
     std::vector<TopoDS_Wire> wires{kernel::outer_wire_of(face)};
-    for (const TopoDS_Wire& inner : kernel::inner_wires_of(face)) wires.push_back(inner);
+    for (const TopoDS_Wire& inner : kernel::inner_wires_of(face))
+      wires.push_back(inner);
     std::vector<TopoDS_Shape> skins;
     double surface_error = 0.0;
     for (const TopoDS_Wire& wire : wires) {
@@ -265,7 +288,8 @@ TrackedResult tracked_twisted_sweep(const Face& profile, const Vec3& axis, const
 
     // The skins plus a cap at each end close into a shell.
     BRepBuilderAPI_Sewing sewing(1.0e-6, true);
-    for (const TopoDS_Shape& skinned : skins) sewing.Add(skinned);
+    for (const TopoDS_Shape& skinned : skins)
+      sewing.Add(skinned);
     sewing.Add(face);
     sewing.Add(end_face);
     sewing.Perform();
@@ -276,12 +300,15 @@ TrackedResult tracked_twisted_sweep(const Face& profile, const Vec3& axis, const
       shell = TopoDS::Shell(sewed);
     } else if (!sewed.IsNull() && sewed.ShapeType() == TopAbs_COMPOUND) {
       const TopExp_Explorer explorer(sewed, TopAbs_SHELL);
-      if (explorer.More()) shell = TopoDS::Shell(explorer.Current());
+      if (explorer.More())
+        shell = TopoDS::Shell(explorer.Current());
     }
-    if (shell.IsNull()) throw ValueError("Twisted sweep failed to sew its shells into a closed skin");
+    if (shell.IsNull())
+      throw ValueError("Twisted sweep failed to sew its shells into a closed skin");
 
     BRepBuilderAPI_MakeSolid solid_builder(shell);
-    if (!solid_builder.IsDone()) throw ValueError("Twisted sweep failed to convert its shell into a solid");
+    if (!solid_builder.IsDone())
+      throw ValueError("Twisted sweep failed to convert its shell into a solid");
     TopoDS_Solid solid = solid_builder.Solid();
     BRepLib::OrientClosedSolid(solid);
 
@@ -299,15 +326,20 @@ TrackedResult tracked_twisted_sweep(const Face& profile, const Vec3& axis, const
     const bool has_start = axial_cap_face(result.wrapped(), axis, 0.0, start_cap);
     const bool has_end = axial_cap_face(result.wrapped(), axis, distance, end_cap);
     std::unordered_set<std::string> cap_ids;
-    if (has_start) cap_ids.insert(kernel_topo_id(start_cap));
-    if (has_end) cap_ids.insert(kernel_topo_id(end_cap));
+    if (has_start)
+      cap_ids.insert(kernel_topo_id(start_cap));
+    if (has_end)
+      cap_ids.insert(kernel_topo_id(end_cap));
 
     for (const TopoDS_Face& wall : kernel::faces_of(result.wrapped())) {
-      if (cap_ids.contains(kernel_topo_id(wall))) continue;
+      if (cap_ids.contains(kernel_topo_id(wall)))
+        continue;
       tracking::add_operation_role(delta.roles, in_result, wall, "twisted_sweep.side", "SewnSide");
     }
-    if (has_start) tracking::add_operation_role(delta.roles, in_result, start_cap, "twisted_sweep.start", "sewn_cap");
-    if (has_end) tracking::add_operation_role(delta.roles, in_result, end_cap, "twisted_sweep.end", "sewn_cap");
+    if (has_start)
+      tracking::add_operation_role(delta.roles, in_result, start_cap, "twisted_sweep.start", "sewn_cap");
+    if (has_end)
+      tracking::add_operation_role(delta.roles, in_result, end_cap, "twisted_sweep.end", "sewn_cap");
     return tracking::to_result(result, std::move(delta));
   });
 }

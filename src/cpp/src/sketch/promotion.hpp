@@ -37,8 +37,7 @@ struct Promotion : PromotionLoops {
 // _promote_sketch_profile: solve a working copy, pick the profile(s), build the
 // wire or face in world coordinates, and attach the promotion metadata.
 Promotion promote_sketch_profile(const Sketch& sketch, const SketchProfileId& profile, PromotionTarget target,
-                                 const std::vector<SketchProfileId>& inner_profiles,
-                                 const SketchSolveRequest& request);
+                                 const std::vector<SketchProfileId>& inner_profiles, const SketchSolveRequest& request);
 
 // ---- promotion_semantics.cpp: everything that hangs tags and metadata on the result ----
 

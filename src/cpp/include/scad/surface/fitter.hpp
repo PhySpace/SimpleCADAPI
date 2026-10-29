@@ -60,8 +60,7 @@ class SurfaceFitter {
   // The Gordon interpolation of a curve network: `profiles` run in u, `guides` in v, and
   // every profile must meet every guide within `tolerance`.
   virtual Handle(Geom_BSplineSurface) gordon(const std::vector<Handle(Geom_Curve)>& profiles,
-                                             const std::vector<Handle(Geom_Curve)>& guides,
-                                             double tolerance) const = 0;
+                                             const std::vector<Handle(Geom_Curve)>& guides, double tolerance) const = 0;
 };
 
 // The provider in use; the OpenCASCADE one unless replaced.

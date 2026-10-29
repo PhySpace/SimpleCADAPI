@@ -31,7 +31,8 @@ std::optional<ErrorEvidence> diagnostic_image(const DiagnosticImage& request) {
     const std::lock_guard<std::mutex> lock(slot().mutex);
     provider = slot().provider;
   }
-  if (!provider) return std::nullopt;
+  if (!provider)
+    return std::nullopt;
   try {
     return provider(request);
   } catch (const std::exception&) {

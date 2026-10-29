@@ -20,11 +20,14 @@ namespace scad::kernel {
 
 namespace {
 
-Vec3 centre_of(const GProp_GProps& props) { return from_pnt(props.CentreOfMass()); }
+Vec3 centre_of(const GProp_GProps& props) {
+  return from_pnt(props.CentreOfMass());
+}
 
 // The centre when the reported mass is meaningfully non-zero.
 bool mass_point(const GProp_GProps& props, Vec3& out, double eps = 1e-12) {
-  if (std::abs(props.Mass()) <= eps) return false;
+  if (std::abs(props.Mass()) <= eps)
+    return false;
   out = centre_of(props);
   return true;
 }
@@ -70,7 +73,8 @@ BoundingBox bounding_box(const TopoDS_Shape& shape) {
     Bnd_Box box;
     box.SetGap(0.0);
     BRepBndLib::AddOptimal(shape, box, false, false);
-    if (box.IsVoid()) throw ValueError("shape has no bounding box (empty or null shape)");
+    if (box.IsVoid())
+      throw ValueError("shape has no bounding box (empty or null shape)");
     BoundingBox out;
     box.Get(out.xmin, out.ymin, out.zmin, out.xmax, out.ymax, out.zmax);
     return out;
@@ -78,7 +82,8 @@ BoundingBox bounding_box(const TopoDS_Shape& shape) {
 }
 
 Vec3 center_of_mass(const TopoDS_Shape& shape) {
-  if (shape.IsNull()) throw ValueError("center_of_mass of a null shape");
+  if (shape.IsNull())
+    throw ValueError("center_of_mass of a null shape");
   return occt_guard([&]() -> Vec3 {
     Vec3 point;
     GProp_GProps props;
@@ -88,7 +93,8 @@ Vec3 center_of_mass(const TopoDS_Shape& shape) {
       case TopAbs_COMPOUND:
         try {
           BRepGProp::VolumePropertiesGK(shape, props, 1e-9, true, true);
-          if (mass_point(props, point)) return point;
+          if (mass_point(props, point))
+            return point;
         } catch (...) {
         }
         if (shape.ShapeType() == TopAbs_COMPOUND) {
@@ -96,13 +102,15 @@ Vec3 center_of_mass(const TopoDS_Shape& shape) {
           try {
             GProp_GProps surface;
             BRepGProp::SurfaceProperties(shape, surface);
-            if (mass_point(surface, point)) return point;
+            if (mass_point(surface, point))
+              return point;
           } catch (...) {
           }
           try {
             GProp_GProps linear;
             BRepGProp::LinearProperties(shape, linear);
-            if (mass_point(linear, point)) return point;
+            if (mass_point(linear, point))
+              return point;
           } catch (...) {
           }
         }
@@ -111,7 +119,8 @@ Vec3 center_of_mass(const TopoDS_Shape& shape) {
       case TopAbs_SHELL:
         try {
           BRepGProp::SurfaceProperties(shape, props);
-          if (mass_point(props, point)) return point;
+          if (mass_point(props, point))
+            return point;
         } catch (...) {
         }
         return bounding_box(shape).center();
@@ -119,7 +128,8 @@ Vec3 center_of_mass(const TopoDS_Shape& shape) {
       case TopAbs_EDGE:
         try {
           BRepGProp::LinearProperties(shape, props);
-          if (mass_point(props, point)) return point;
+          if (mass_point(props, point))
+            return point;
         } catch (...) {
         }
         return bounding_box(shape).center();
@@ -134,7 +144,8 @@ Vec3 center_of_mass(const TopoDS_Shape& shape) {
 double distance(const TopoDS_Shape& a, const TopoDS_Shape& b) {
   return occt_guard([&] {
     BRepExtrema_DistShapeShape dist(a, b);
-    if (!dist.IsDone()) throw ValueError("OCCT distance calculation failed");
+    if (!dist.IsDone())
+      throw ValueError("OCCT distance calculation failed");
     return dist.Value();
   });
 }
@@ -150,7 +161,8 @@ Vec3 face_normal_at(const TopoDS_Face& face, double u, double v) {
     if (!props.IsNormalDefined())
       throw ValueError("Face normal is not defined at the requested parameters");
     gp_Dir n = props.Normal();
-    if (face.Orientation() == TopAbs_REVERSED) n.Reverse();
+    if (face.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
     return from_dir(n);
   });
 }

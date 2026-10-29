@@ -12,7 +12,9 @@ ScalarPtr ExpressionGraph::get(std::string_view expr_id) const {
   return found == index_.end() ? nullptr : nodes_[found->second];
 }
 
-ScalarPtr ExpressionGraph::register_expr(const Scalar& value) { return register_expr(lift_scalar(value)); }
+ScalarPtr ExpressionGraph::register_expr(const Scalar& value) {
+  return register_expr(lift_scalar(value));
+}
 
 ScalarPtr ExpressionGraph::register_expr(const ScalarPtr& expr) {
   std::vector<ScalarPtr> staged;
@@ -37,10 +39,12 @@ ScalarPtr ExpressionGraph::register_expr(const ScalarPtr& expr) {
       staged_index.emplace(node->expr_id(), staged.size());
       staged.push_back(node);
     }
-    if (!validated.insert(node.get()).second) continue;
+    if (!validated.insert(node.get()).second)
+      continue;
     if (node->type() == NodeType::Expr) {
       const auto& args = static_cast<const Expr&>(*node).args();
-      for (auto it = args.rbegin(); it != args.rend(); ++it) stack.push_back(&*it);
+      for (auto it = args.rbegin(); it != args.rend(); ++it)
+        stack.push_back(&*it);
     }
   }
   expr->inference();  // throws before anything is committed
@@ -66,10 +70,14 @@ Value node_payload(const ScalarNode& node) {
       out.set("kind", "var");
       out.set("name", v.name());
       out.set("default", v.default_value());
-      if (v.comment() && !v.comment()->empty()) out.set("comment", *v.comment());
-      if (v.tolerance()) out.set("tolerance", v.tolerance()->to_value());
-      if (v.unit()) out.set("unit", unit_to_payload(*v.unit()));
-      if (v.tolerance_unit()) out.set("tolerance_unit", unit_to_payload(*v.tolerance_unit()));
+      if (v.comment() && !v.comment()->empty())
+        out.set("comment", *v.comment());
+      if (v.tolerance())
+        out.set("tolerance", v.tolerance()->to_value());
+      if (v.unit())
+        out.set("unit", unit_to_payload(*v.unit()));
+      if (v.tolerance_unit())
+        out.set("tolerance_unit", unit_to_payload(*v.tolerance_unit()));
       break;
     }
     case NodeType::Expr: {
@@ -77,7 +85,8 @@ Value node_payload(const ScalarNode& node) {
       out.set("kind", "expr");
       out.set("op", e.op());
       Value args = Value::array();
-      for (const ScalarPtr& arg : e.args()) args.push_back(arg->expr_id());
+      for (const ScalarPtr& arg : e.args())
+        args.push_back(arg->expr_id());
       out.set("args", args);
       break;
     }
@@ -95,7 +104,8 @@ Value ExpressionGraph::to_value() const {
     std::size_t next;
   };
   for (const ScalarPtr& root : nodes_) {
-    if (seen.count(root->expr_id()) != 0) continue;
+    if (seen.count(root->expr_id()) != 0)
+      continue;
     seen.insert(root->expr_id());
     std::vector<Frame> stack{{root.get(), 0}};
     while (!stack.empty()) {
@@ -104,7 +114,8 @@ Value ExpressionGraph::to_value() const {
       const std::size_t arity = node->type() == NodeType::Expr ? static_cast<const Expr&>(*node).args().size() : 0;
       if (frame.next < arity) {
         const ScalarNode* child = static_cast<const Expr&>(*node).args()[frame.next++].get();
-        if (seen.insert(child->expr_id()).second) stack.push_back({child, 0});
+        if (seen.insert(child->expr_id()).second)
+          stack.push_back({child, 0});
         continue;
       }
       ordered.push_back(node);
@@ -112,7 +123,8 @@ Value ExpressionGraph::to_value() const {
     }
   }
   Value nodes = Value::array();
-  for (const ScalarNode* node : ordered) nodes.push_back(node_payload(*node));
+  for (const ScalarNode* node : ordered)
+    nodes.push_back(node_payload(*node));
   Value out = Value::object();
   out.set("nodes", std::move(nodes));
   return out;
@@ -121,26 +133,33 @@ Value ExpressionGraph::to_value() const {
 namespace {
 
 double payload_number(const Value& value, std::string_view label) {
-  if (!value.is_number()) throw TypeError(std::string(label) + " must be a real number");
+  if (!value.is_number())
+    throw TypeError(std::string(label) + " must be a real number");
   return value.as_double();
 }
 
 }  // namespace
 
 ExpressionGraph ExpressionGraph::from_value(const Value& payload) {
-  if (!payload.is_object()) throw TypeError("Expression graph payload must be an object");
+  if (!payload.is_object())
+    throw TypeError("Expression graph payload must be an object");
   const Value* raw = payload.find("nodes");
   Value empty = Value::array();
-  if (raw == nullptr) raw = &empty;
-  if (!raw->is_array()) throw TypeError("Expression graph 'nodes' must be an array");
+  if (raw == nullptr)
+    raw = &empty;
+  if (!raw->is_array())
+    throw TypeError("Expression graph 'nodes' must be an array");
 
   std::vector<std::pair<std::string, const Value*>> payloads;
   std::unordered_map<std::string, const Value*> by_id;
   for (const Value& node : raw->as_array()) {
-    if (!node.is_object()) throw TypeError("Expression graph nodes must be objects");
+    if (!node.is_object())
+      throw TypeError("Expression graph nodes must be objects");
     const Value* id = node.find("expr_id");
-    if (id == nullptr) throw ValueError("Expression graph node is missing 'expr_id'");
-    if (!id->is_string() || id->as_string().empty()) throw ValueError("Expression graph node id must be non-empty");
+    if (id == nullptr)
+      throw ValueError("Expression graph node is missing 'expr_id'");
+    if (!id->is_string() || id->as_string().empty())
+      throw ValueError("Expression graph node id must be non-empty");
     if (!by_id.emplace(id->as_string(), &node).second) {
       throw ValueError("Duplicate expression node id '" + id->as_string() + "'");
     }
@@ -159,17 +178,21 @@ ExpressionGraph ExpressionGraph::from_value(const Value& payload) {
     ExpressionGraph& graph;
 
     ScalarPtr build(const std::string& id) {
-      if (const auto it = built.find(id); it != built.end()) return it->second;
-      if (visiting.count(id) != 0) throw ValueError("Expression graph contains a cycle at '" + id + "'");
+      if (const auto it = built.find(id); it != built.end())
+        return it->second;
+      if (visiting.count(id) != 0)
+        throw ValueError("Expression graph contains a cycle at '" + id + "'");
       const auto found = by_id.find(id);
-      if (found == by_id.end()) throw ValueError("Unknown expression dependency '" + id + "'");
+      if (found == by_id.end())
+        throw ValueError("Unknown expression dependency '" + id + "'");
       const Value& node = *found->second;
       visiting.insert(id);
       const Value* kind = node.find("kind");
       ScalarPtr expr;
       if (kind != nullptr && kind->is_string() && kind->as_string() == "const") {
         const Value* value = node.find("value");
-        if (value == nullptr) throw ValueError("Constant expression node '" + id + "' is missing 'value'");
+        if (value == nullptr)
+          throw ValueError("Constant expression node '" + id + "' is missing 'value'");
         expr = Const::make(payload_number(*value, "value"), id);
       } else if (kind != nullptr && kind->is_string() && kind->as_string() == "var") {
         const Value* name = node.find("name");
@@ -177,34 +200,44 @@ ExpressionGraph ExpressionGraph::from_value(const Value& payload) {
         if (name == nullptr || def == nullptr) {
           throw ValueError("Variable expression node '" + id + "' requires 'name' and 'default'");
         }
-        if (!name->is_string()) throw ValueError("Variable name must be a non-empty string");
+        if (!name->is_string())
+          throw ValueError("Variable name must be a non-empty string");
         VarSpec spec;
         spec.name = name->as_string();
         spec.default_value = payload_number(*def, "Variable default");
         spec.expr_id = id;
         if (const Value* comment = node.find("comment"); comment != nullptr && !comment->is_null()) {
-          if (!comment->is_string()) throw ValueError("Variable comment must be a string when provided");
+          if (!comment->is_string())
+            throw ValueError("Variable comment must be a string when provided");
           spec.comment = comment->as_string();
         }
         if (const Value* tol = node.find("tolerance"); tol != nullptr && !tol->is_null()) {
           spec.tolerance = DimensionTolerance::from_value(*tol);
         }
-        if (const Value* unit = node.find("unit")) spec.unit = unit_from_payload(*unit);
-        if (const Value* unit = node.find("tolerance_unit")) spec.tolerance_unit = unit_from_payload(*unit);
+        if (const Value* unit = node.find("unit"))
+          spec.unit = unit_from_payload(*unit);
+        if (const Value* unit = node.find("tolerance_unit"))
+          spec.tolerance_unit = unit_from_payload(*unit);
         expr = Var::make(std::move(spec));
       } else if (kind != nullptr && kind->is_string() && kind->as_string() == "expr") {
         const Value* op = node.find("op");
-        if (op == nullptr) throw ValueError("Derived expression node '" + id + "' is missing 'op'");
+        if (op == nullptr)
+          throw ValueError("Derived expression node '" + id + "' is missing 'op'");
         const Value* raw_args = node.find("args");
         Value none = Value::array();
-        if (raw_args == nullptr) raw_args = &none;
-        if (!raw_args->is_array()) throw TypeError("Expression node '" + id + "' field 'args' must be an array");
+        if (raw_args == nullptr)
+          raw_args = &none;
+        if (!raw_args->is_array())
+          throw TypeError("Expression node '" + id + "' field 'args' must be an array");
         for (const Value& arg : raw_args->as_array()) {
-          if (!arg.is_string()) throw TypeError("Expression node '" + id + "' dependencies must be string ids");
+          if (!arg.is_string())
+            throw TypeError("Expression node '" + id + "' dependencies must be string ids");
         }
-        if (!op->is_string()) throw TypeError("Expression op must be a string");
+        if (!op->is_string())
+          throw TypeError("Expression op must be a string");
         std::vector<ScalarPtr> args;
-        for (const Value& arg : raw_args->as_array()) args.push_back(build(arg.as_string()));
+        for (const Value& arg : raw_args->as_array())
+          args.push_back(build(arg.as_string()));
         expr = Expr::make(op->as_string(), std::move(args), id);
       } else {
         throw ValueError("Unknown expression node kind: " + (kind ? kind->dump() : std::string("None")));
@@ -217,20 +250,24 @@ ExpressionGraph ExpressionGraph::from_value(const Value& payload) {
     }
   };
   Builder builder{by_id, built, visiting, graph};
-  for (const auto& [id, node] : payloads) builder.build(id);
-  for (const ScalarPtr& node : graph.nodes_) node->inference();
+  for (const auto& [id, node] : payloads)
+    builder.build(id);
+  for (const ScalarPtr& node : graph.nodes_)
+    node->inference();
   return graph;
 }
 
 bool is_discrete_param_name(std::string_view key) {
   std::string lower(key);
-  std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  std::transform(lower.begin(), lower.end(), lower.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
   const auto ends_with = [&lower](std::string_view suffix) {
     return lower.size() >= suffix.size() && lower.compare(lower.size() - suffix.size(), suffix.size(), suffix) == 0;
   };
-  if (ends_with("_indices")) return true;
-  static constexpr std::string_view kNames[] = {"edge_count",   "face_count",   "geo_selector", "removed_face_count",
-                                                "profile_count", "profile",      "count",        "degree",
+  if (ends_with("_indices"))
+    return true;
+  static constexpr std::string_view kNames[] = {"edge_count",     "face_count",   "geo_selector", "removed_face_count",
+                                                "profile_count",  "profile",      "count",        "degree",
                                                 "multiplicities", "output_count", "periodic",     "tag_binding"};
   return std::find(std::begin(kNames), std::end(kNames), lower) != std::end(kNames);
 }
@@ -238,15 +275,18 @@ bool is_discrete_param_name(std::string_view key) {
 namespace {
 
 Value numbers_as_floats(const Value& value) {
-  if (value.is_int()) return Value(static_cast<double>(value.as_int()));
+  if (value.is_int())
+    return Value(static_cast<double>(value.as_int()));
   if (value.is_array()) {
     Value out = value.is_tuple() ? Value::tuple() : Value::array();
-    for (const Value& item : value.as_array()) out.push_back(numbers_as_floats(item));
+    for (const Value& item : value.as_array())
+      out.push_back(numbers_as_floats(item));
     return out;
   }
   if (value.is_object()) {
     Value out = Value::object();
-    for (const auto& [key, item] : value.as_object()) out.set(key, numbers_as_floats(item));
+    for (const auto& [key, item] : value.as_object())
+      out.set(key, numbers_as_floats(item));
     return out;
   }
   return value;
@@ -257,10 +297,12 @@ void pad_like(Value& exprs, const Value& numeric) {
   if (exprs.is_array() && numeric.is_array()) {
     Value::Array& items = exprs.as_array();
     items.resize(numeric.size());
-    for (std::size_t i = 0; i < items.size(); ++i) pad_like(items[i], numeric.as_array()[i]);
+    for (std::size_t i = 0; i < items.size(); ++i)
+      pad_like(items[i], numeric.as_array()[i]);
   } else if (exprs.is_object() && numeric.is_object()) {
     for (auto& [key, item] : exprs.as_object()) {
-      if (const Value* match = numeric.find(key)) pad_like(item, *match);
+      if (const Value* match = numeric.find(key))
+        pad_like(item, *match);
     }
   }
 }
@@ -276,10 +318,12 @@ CanonicalParams canonicalize_params(const Value& params, const SymbolicParams& s
   }
   for (const auto& [name, scalar] : symbolic) {
     const ParamPath path = ParamPath::parse(name);
-    if (is_discrete_param_name(path.key)) continue;
+    if (is_discrete_param_name(path.key))
+      continue;
     const ScalarPtr expr = graph.register_expr(scalar);
     const Value* present = find_param(out.numeric, path);
-    if (present == nullptr || !present->is_number()) set_param(out.numeric, path, Value(scalar.value()));
+    if (present == nullptr || !present->is_number())
+      set_param(out.numeric, path, Value(scalar.value()));
     Value ref = Value::object();
     ref.set("expr_id", expr->expr_id());
     set_param(out.exprs, path, std::move(ref));
@@ -300,19 +344,24 @@ std::vector<ScalarPtr> referenced_expressions(const Value& param_exprs, const Ex
         const Value* id = value.find("expr_id");
         if (value.size() == 1 && id != nullptr && id->is_string()) {
           ScalarPtr expr = graph.get(id->as_string());
-          if (!expr) throw KeyError("unknown expression id '" + id->as_string() + "'");
-          if (seen.insert(id->as_string()).second) found.push_back(std::move(expr));
+          if (!expr)
+            throw KeyError("unknown expression id '" + id->as_string() + "'");
+          if (seen.insert(id->as_string()).second)
+            found.push_back(std::move(expr));
           return;
         }
-        for (const auto& member : value.as_object()) visit(member.second);
+        for (const auto& member : value.as_object())
+          visit(member.second);
       } else if (value.is_array()) {
-        for (const Value& item : value.as_array()) visit(item);
+        for (const Value& item : value.as_array())
+          visit(item);
       }
     }
   };
   Visitor visitor{graph, found, seen};
   if (param_exprs.is_object()) {
-    for (const auto& member : param_exprs.as_object()) visitor.visit(member.second);
+    for (const auto& member : param_exprs.as_object())
+      visitor.visit(member.second);
   }
   return found;
 }

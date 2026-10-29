@@ -15,8 +15,8 @@ namespace scad {
 
 class BindingId {
  public:
-  BindingId();                                                // the empty id (invalid as a binding id)
-  BindingId(std::string_view text);                           // NOLINT(google-explicit-constructor)
+  BindingId();                                                               // the empty id (invalid as a binding id)
+  BindingId(std::string_view text);                                          // NOLINT(google-explicit-constructor)
   BindingId(const std::string& text) : BindingId(std::string_view(text)) {}  // NOLINT
   BindingId(const char* text) : BindingId(std::string_view(text)) {}         // NOLINT
 

@@ -22,25 +22,33 @@ constexpr std::string_view kStateFormat = "scad-shape-state";
 constexpr std::int64_t kStateVersion = 1;
 constexpr std::string_view kDerivedRuntimePrefix = "mesh.";  // derived data: recomputed, never stored
 
-constexpr std::array<Kind, 7> kAllKinds{Kind::Vertex, Kind::Edge, Kind::Wire, Kind::Face,
+constexpr std::array<Kind, 7> kAllKinds{Kind::Vertex, Kind::Edge,  Kind::Wire,    Kind::Face,
                                         Kind::Shell,  Kind::Solid, Kind::Compound};
 
 TopAbs_ShapeEnum topabs_of(Kind kind) {
   switch (kind) {
-    case Kind::Vertex: return TopAbs_VERTEX;
-    case Kind::Edge: return TopAbs_EDGE;
-    case Kind::Wire: return TopAbs_WIRE;
-    case Kind::Face: return TopAbs_FACE;
-    case Kind::Shell: return TopAbs_SHELL;
-    case Kind::Solid: return TopAbs_SOLID;
-    case Kind::Compound: return TopAbs_COMPOUND;
+    case Kind::Vertex:
+      return TopAbs_VERTEX;
+    case Kind::Edge:
+      return TopAbs_EDGE;
+    case Kind::Wire:
+      return TopAbs_WIRE;
+    case Kind::Face:
+      return TopAbs_FACE;
+    case Kind::Shell:
+      return TopAbs_SHELL;
+    case Kind::Solid:
+      return TopAbs_SOLID;
+    case Kind::Compound:
+      return TopAbs_COMPOUND;
   }
   return TopAbs_SHAPE;
 }
 
 Kind kind_from_name(const std::string& name) {
   for (const Kind kind : kAllKinds)
-    if (kind_name(kind) == name) return kind;
+    if (kind_name(kind) == name)
+      return kind;
   throw ValueError("the shape state names an unknown entity kind '" + name + "'");
 }
 
@@ -51,7 +59,8 @@ bool is_derived(const std::string& runtime_key) {
 Value stored_runtime(const Value& runtime) {
   Value out = Value::object();
   for (const auto& [key, item] : runtime.as_object())
-    if (!is_derived(key)) out.set(key, item);
+    if (!is_derived(key))
+      out.set(key, item);
   return out;
 }
 
@@ -66,17 +75,20 @@ Value capture_entities(const Shape& root) {
       const auto& bindings = entity.local_bindings();
       const auto& lineage = entity.lineage_witnesses();
       Value runtime = stored_runtime(entity.runtime());
-      if (bindings.empty() && lineage.empty() && entity.metadata().size() == 0 && runtime.size() == 0) continue;
+      if (bindings.empty() && lineage.empty() && entity.metadata().size() == 0 && runtime.size() == 0)
+        continue;
 
       Value record = Value::object();
       record.set("kind", std::string(kind_name(kind)));
       record.set("index", index);
       record.set("topo_id", entity.topo_id());
       Value binding_values = Value::array();
-      for (const TagBinding& b : bindings) binding_values.push_back(b.to_value());
+      for (const TagBinding& b : bindings)
+        binding_values.push_back(b.to_value());
       record.set("bindings", std::move(binding_values));
       Value lineage_values = Value::array();
-      for (const TagLineageWitness& w : lineage) lineage_values.push_back(w.to_value());
+      for (const TagLineageWitness& w : lineage)
+        lineage_values.push_back(w.to_value());
       record.set("lineage", std::move(lineage_values));
       record.set("metadata", entity.metadata());
       record.set("runtime", std::move(runtime));
@@ -87,9 +99,11 @@ Value capture_entities(const Shape& root) {
 }
 
 const Value& required(const Value& object, std::string_view key) {
-  if (!object.is_object()) throw ValueError("the shape state is malformed: expected an object");
+  if (!object.is_object())
+    throw ValueError("the shape state is malformed: expected an object");
   const Value* found = object.find(key);
-  if (found == nullptr) throw ValueError("the shape state is malformed: missing '" + std::string(key) + "'");
+  if (found == nullptr)
+    throw ValueError("the shape state is malformed: missing '" + std::string(key) + "'");
   return *found;
 }
 
@@ -111,8 +125,10 @@ void restore_entities(const Shape& root, const Value& entities) {
       entity.add_binding(detail::binding_from_value(binding));
     for (const Value& witness : required(record, "lineage").as_array())
       entity.add_lineage_witness(detail::witness_from_value(witness));
-    for (const auto& [key, item] : required(record, "metadata").as_object()) entity.set_metadata(key, item);
-    for (const auto& [key, item] : required(record, "runtime").as_object()) entity.set_runtime(key, item);
+    for (const auto& [key, item] : required(record, "metadata").as_object())
+      entity.set_metadata(key, item);
+    for (const auto& [key, item] : required(record, "runtime").as_object())
+      entity.set_runtime(key, item);
   }
 }
 
@@ -130,11 +146,9 @@ const ErrorSpec& deserialize_spec() {
   static const ErrorSpec spec{
       "deserialize_shape",
       "Failed to restore a serialized shape.",
-      {"The bytes are truncated or corrupted.",
-       "The bytes were not produced by serialize() (wrong magic or checksum).",
+      {"The bytes are truncated or corrupted.", "The bytes were not produced by serialize() (wrong magic or checksum).",
        "The bytes use a newer incompatible format version."},
-      {"Pass exactly the bytes serialize() returned.",
-       "Re-serialize the shape with this library version."}};
+      {"Pass exactly the bytes serialize() returned.", "Re-serialize the shape with this library version."}};
   return spec;
 }
 
@@ -181,7 +195,8 @@ Shape deserialize(std::string_view bytes) {
     const std::uint16_t minor = header.u16();
     if (major != kSerializeMajorVersion)
       throw ValueError("unsupported serialized shape version " + std::to_string(major) + "." + std::to_string(minor));
-    if (header.u32() != 0) throw ValueError("the serialized shape uses unsupported flags");
+    if (header.u32() != 0)
+      throw ValueError("the serialized shape uses unsupported flags");
     const std::uint64_t state_size = header.u64();
     const std::uint64_t brep_size = header.u64();
     const std::uint32_t checksum = header.u32();
@@ -189,13 +204,17 @@ Shape deserialize(std::string_view bytes) {
     if (state_size > header.remaining() || brep_size != header.remaining() - state_size)
       throw ValueError("the serialized shape's length does not match its header");
     const std::string_view body = bytes.substr(kHeaderSize);
-    if (crc32(body) != checksum) throw ValueError("the serialized shape is corrupted (checksum mismatch)");
+    if (crc32(body) != checksum)
+      throw ValueError("the serialized shape is corrupted (checksum mismatch)");
 
     detail::ByteReader state_reader(body.substr(0, static_cast<std::size_t>(state_size)), "shape state");
     const Value state = detail::decode_value(state_reader);
-    if (state_reader.remaining() != 0) throw ValueError("the shape state has trailing data");
-    if (required(state, "format").as_string() != kStateFormat) throw ValueError("the shape state has a wrong format tag");
-    if (required(state, "version").as_int() != kStateVersion) throw ValueError("unsupported shape state version");
+    if (state_reader.remaining() != 0)
+      throw ValueError("the shape state has trailing data");
+    if (required(state, "format").as_string() != kStateFormat)
+      throw ValueError("the shape state has a wrong format tag");
+    if (required(state, "version").as_int() != kStateVersion)
+      throw ValueError("unsupported shape state version");
 
     const TopoDS_Shape geometry = from_brep_bytes(body.substr(static_cast<std::size_t>(state_size)));
     Shape root = Shape::from_occt(geometry);

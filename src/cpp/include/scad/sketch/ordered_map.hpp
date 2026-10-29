@@ -37,11 +37,13 @@ class OrderedMap {
 
   // KeyError when absent (dict[key]).
   const V& at(std::string_view key) const {
-    if (const V* value = find(key)) return *value;
+    if (const V* value = find(key))
+      return *value;
     throw Exception(PyKind::KeyError, "'" + std::string(key) + "'");
   }
   V& at(std::string_view key) {
-    if (V* value = find(key)) return *value;
+    if (V* value = find(key))
+      return *value;
     throw Exception(PyKind::KeyError, "'" + std::string(key) + "'");
   }
 
@@ -56,14 +58,16 @@ class OrderedMap {
     return items_.back().second;
   }
   V& operator[](std::string_view key) {
-    if (V* existing = find(key)) return *existing;
+    if (V* existing = find(key))
+      return *existing;
     return set(std::string(key), V{});
   }
 
   std::vector<std::string> keys() const {
     std::vector<std::string> out;
     out.reserve(items_.size());
-    for (const auto& item : items_) out.push_back(item.first);
+    for (const auto& item : items_)
+      out.push_back(item.first);
     return out;
   }
 

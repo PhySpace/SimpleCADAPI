@@ -16,7 +16,7 @@ struct SplineSpec {
   double degree = 3;                        // an integer from 1 to 25 (a double so that 3.5 is rejected as Python does)
   std::optional<ScalarList> knots;          // distinct knots, or a full non-decreasing vector
   std::optional<std::vector<int>> multiplicities;  // requires `knots` to be the distinct ones
-  std::optional<ScalarList> weights;        // one positive weight per pole (rational spline)
+  std::optional<ScalarList> weights;               // one positive weight per pole (rational spline)
   bool periodic = false;
 };
 

@@ -27,7 +27,9 @@ using namespace scad::io;
 
 namespace {
 
-TopoDS_Shape box(double x, double y, double z) { return BRepPrimAPI_MakeBox(x, y, z).Solid(); }
+TopoDS_Shape box(double x, double y, double z) {
+  return BRepPrimAPI_MakeBox(x, y, z).Solid();
+}
 
 // Signed volume of a closed, outward-wound triangle mesh (divergence theorem).
 double mesh_volume(const Mesh& m) {
@@ -100,10 +102,12 @@ TEST_CASE("mesh(): a box is 12 triangles on 24 unshared vertices, wound outward"
   CHECK(m.face_ranges.size() == 6);
   CHECK(mesh_volume(m) == doctest::Approx(6000.0).epsilon(1e-6));
   std::multiset<std::uint32_t> faces(m.face_ids.begin(), m.face_ids.end());
-  for (std::uint32_t f = 0; f < 6; ++f) CHECK(faces.count(f) == 2);
+  for (std::uint32_t f = 0; f < 6; ++f)
+    CHECK(faces.count(f) == 2);
   for (std::size_t i = 0; i < m.vertex_count(); ++i) {
-    const double n = std::sqrt(double(m.normals[3 * i]) * m.normals[3 * i] + double(m.normals[3 * i + 1]) * m.normals[3 * i + 1] +
-                               double(m.normals[3 * i + 2]) * m.normals[3 * i + 2]);
+    const double n =
+        std::sqrt(double(m.normals[3 * i]) * m.normals[3 * i] + double(m.normals[3 * i + 1]) * m.normals[3 * i + 1] +
+                  double(m.normals[3 * i + 2]) * m.normals[3 * i + 2]);
     CHECK(n == doctest::Approx(1.0).epsilon(1e-5));
   }
   const auto bounds = m.bounds();
@@ -115,7 +119,8 @@ TEST_CASE("mesh(): per-vertex normals point out of the solid") {
   const TopoDS_Shape sphere = BRepPrimAPI_MakeSphere(5.0).Solid();
   const Mesh m = mesh(sphere);
   for (std::size_t i = 0; i < m.vertex_count(); ++i) {
-    const double dot = double(m.vertices[3 * i]) * m.normals[3 * i] + double(m.vertices[3 * i + 1]) * m.normals[3 * i + 1] +
+    const double dot = double(m.vertices[3 * i]) * m.normals[3 * i] +
+                       double(m.vertices[3 * i + 1]) * m.normals[3 * i + 1] +
                        double(m.vertices[3 * i + 2]) * m.normals[3 * i + 2];
     CHECK(dot > 0.0);  // the sphere is centred at the origin: outward normals have a positive dot with the position
   }
@@ -169,8 +174,10 @@ TEST_CASE("mesh(): the same shape meshed from several threads gives the same mes
   std::vector<std::thread> threads;
   for (std::size_t i = 0; i < counts.size(); ++i)
     threads.emplace_back([&, i] { counts[i] = mesh(sphere).triangle_count(); });
-  for (auto& t : threads) t.join();
-  for (const std::size_t c : counts) CHECK(c == expected);
+  for (auto& t : threads)
+    t.join();
+  for (const std::size_t c : counts)
+    CHECK(c == expected);
 }
 
 TEST_CASE("tessellate_face_with_normals: per-corner normals follow the face orientation") {
@@ -182,12 +189,15 @@ TEST_CASE("tessellate_face_with_normals: per-corner normals follow the face orie
     for (const auto& corners : t.corner_normals())
       for (const Vec3& n : corners) {
         CHECK(n.norm() == doctest::Approx(1.0).epsilon(1e-5));
-        if (n.z > 0.99) ++up;
-        if (n.z < -0.99) ++down;
+        if (n.z > 0.99)
+          ++up;
+        if (n.z < -0.99)
+          ++down;
       }
     // The winding and the normals agree on the outward side.
     const auto& tri = t.triangles.front();
-    const Vec3 flat = (t.vertices[tri[1]] - t.vertices[tri[0]]).cross(t.vertices[tri[2]] - t.vertices[tri[0]]).normalized();
+    const Vec3 flat =
+        (t.vertices[tri[1]] - t.vertices[tri[0]]).cross(t.vertices[tri[2]] - t.vertices[tri[0]]).normalized();
     CHECK(flat.dot(t.corner_normals().front()[0]) > 0.99);
   }
   CHECK(up == 6);
@@ -213,8 +223,8 @@ TEST_CASE("build_solid_trimesh and cached_mesh") {
 
   const auto first = cached_mesh(solid);
   REQUIRE(first != nullptr);
-  CHECK(cached_mesh(solid) == first);                     // cache hit
-  CHECK(cached_mesh(solid, 0.1, 0.1) != first);           // different tolerance
+  CHECK(cached_mesh(solid) == first);            // cache hit
+  CHECK(cached_mesh(solid, 0.1, 0.1) != first);  // different tolerance
   CHECK(mesh_error(solid).empty());
   gp_Trsf move;
   move.SetTranslation(gp_Vec(1, 2, 3));

@@ -45,9 +45,9 @@ struct SketchRef {
 class SketchTarget {
  public:
   SketchTarget() = default;  // empty path: only so binding layers can default-construct a slot
-  SketchTarget(SketchRef ref) : ref_(std::move(ref)) {}                 // NOLINT(google-explicit-constructor)
-  SketchTarget(std::string path) : path_(std::move(path)) {}            // NOLINT(google-explicit-constructor)
-  SketchTarget(const char* path) : path_(path) {}                       // NOLINT(google-explicit-constructor)
+  SketchTarget(SketchRef ref) : ref_(std::move(ref)) {}       // NOLINT(google-explicit-constructor)
+  SketchTarget(std::string path) : path_(std::move(path)) {}  // NOLINT(google-explicit-constructor)
+  SketchTarget(const char* path) : path_(path) {}             // NOLINT(google-explicit-constructor)
 
   bool is_ref() const noexcept { return ref_.has_value(); }
   const SketchRef& ref() const { return *ref_; }

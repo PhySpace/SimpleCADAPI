@@ -23,10 +23,12 @@ namespace {
 }
 
 [[noreturn]] void raise_missing_executor(const OperationNode& node) {
-  const ErrorSpec spec(node.op, "The engine cannot recompute '" + node.op + "' (node " + node.node_id + "): no executor is registered for it.",
-                       {"The operator area that records this operation has not registered an executor."},
-                       {"Register one with scad::reactive::ExecutorRegistry::add(\"" + node.op +
-                        "\", ...), as described in scad/reactive/registry.hpp."});
+  const ErrorSpec spec(
+      node.op,
+      "The engine cannot recompute '" + node.op + "' (node " + node.node_id + "): no executor is registered for it.",
+      {"The operator area that records this operation has not registered an executor."},
+      {"Register one with scad::reactive::ExecutorRegistry::add(\"" + node.op +
+       "\", ...), as described in scad/reactive/registry.hpp."});
   raise_harness_error(spec, "No executor registered for operation '" + node.op + "'");
 }
 
@@ -35,31 +37,39 @@ namespace {
 void Session::mark_dirty(const std::vector<std::string>& node_ids) {
   for (const std::string& id : node_ids) {
     NodeState& state = state_of(id);
-    if (state.status == NodeStatus::Clean) state.status = NodeStatus::Dirty;
+    if (state.status == NodeStatus::Clean)
+      state.status = NodeStatus::Dirty;
   }
 }
 
-NodeStatus Session::status(std::string_view node_id) const { return state_of(node_id).status; }
+NodeStatus Session::status(std::string_view node_id) const {
+  return state_of(node_id).status;
+}
 
-std::exception_ptr Session::failure(std::string_view node_id) const { return state_of(node_id).error; }
+std::exception_ptr Session::failure(std::string_view node_id) const {
+  return state_of(node_id).error;
+}
 
 std::vector<std::string> Session::dirty_nodes() const {
   std::vector<std::string> out;
   for (const NodePtr& node : graph_.nodes()) {
-    if (state_of(node->node_id).status != NodeStatus::Clean) out.push_back(node->node_id);
+    if (state_of(node->node_id).status != NodeStatus::Clean)
+      out.push_back(node->node_id);
   }
   return out;
 }
 
 const std::vector<Shape>* Session::memo_find(const std::string& key) {
   const auto found = memo_index_.find(key);
-  if (found == memo_index_.end()) return nullptr;
+  if (found == memo_index_.end())
+    return nullptr;
   memo_.splice(memo_.begin(), memo_, found->second);  // most recently used first
   return &memo_.front().second;
 }
 
 void Session::memo_insert(const std::string& key, const std::vector<Shape>& outputs) {
-  if (options_.memo_capacity == 0) return;
+  if (options_.memo_capacity == 0)
+    return;
   if (const auto found = memo_index_.find(key); found != memo_index_.end()) {
     found->second->second = outputs;
     memo_.splice(memo_.begin(), memo_, found->second);
@@ -81,10 +91,12 @@ RecomputeReport Session::recompute(const RecomputeOptions& options) {
   // Insertion order is a topological order: a node is always added after the nodes it consumes.
   for (const NodePtr& node : graph_.nodes()) {
     NodeState& state = state_of(node->node_id);
-    if (state.status == NodeStatus::Clean) continue;
+    if (state.status == NodeStatus::Clean)
+      continue;
 
     const bool blocked = std::any_of(node->bindings.begin(), node->bindings.end(), [this](const InputBinding& b) {
-      if (b.external()) return false;
+      if (b.external())
+        return false;
       const NodeStatus s = state_of(b.node_id).status;
       return s == NodeStatus::Failed || s == NodeStatus::Blocked;
     });
@@ -129,7 +141,8 @@ RecomputeReport Session::recompute(const RecomputeOptions& options) {
       }
 
       const Executor executor = registry_->find(node->op);
-      if (!executor) raise_missing_executor(*node);
+      if (!executor)
+        raise_missing_executor(*node);
 
       std::vector<OpInput> inputs;
       inputs.reserve(node->bindings.size());
@@ -148,12 +161,13 @@ RecomputeReport Session::recompute(const RecomputeOptions& options) {
         // Executors re-run operators under the conditions the operation was recorded in:
         // its workplane, the edited variable values, and no recording.
         const RecorderSuspend suspended;
-        const CoordinateSystemScope placement(node->frame ? CoordinateSystem(node->frame->origin, node->frame->x_axis, node->frame->y_axis)
-                                                          : CoordinateSystem());
+        const CoordinateSystemScope placement(
+            node->frame ? CoordinateSystem(node->frame->origin, node->frame->x_axis, node->frame->y_axis)
+                        : CoordinateSystem());
         outputs = occt_guard([&] { return executor(params, inputs, scalars); });
         if (static_cast<int>(outputs.size()) != node->output_count && !(state.value_output && outputs.empty())) {
-          throw RuntimeError("executor returned " + std::to_string(outputs.size()) + " output(s); the operation recorded " +
-                             std::to_string(node->output_count));
+          throw RuntimeError("executor returned " + std::to_string(outputs.size()) +
+                             " output(s); the operation recorded " + std::to_string(node->output_count));
         }
       } catch (const std::exception& e) {
         raise_recompute_error(*node, e);
@@ -170,11 +184,13 @@ RecomputeReport Session::recompute(const RecomputeOptions& options) {
     } catch (const std::exception& e) {
       state.status = NodeStatus::Failed;
       state.error = std::current_exception();
-      if (!first_error) first_error = state.error;
+      if (!first_error)
+        first_error = state.error;
       report.failed.push_back(NodeFailure{node->node_id, node->op, e.what(), state.error});
     }
   }
-  if (options.throw_on_error && first_error) std::rethrow_exception(first_error);
+  if (options.throw_on_error && first_error)
+    std::rethrow_exception(first_error);
   return report;
 }
 

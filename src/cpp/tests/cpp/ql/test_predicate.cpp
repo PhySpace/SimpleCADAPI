@@ -10,17 +10,21 @@ namespace {
 
 Value track_of(std::initializer_list<Value::Member> members) {
   Value track = Value::object();
-  for (const auto& [name, item] : members) track.set(name, item);
+  for (const auto& [name, item] : members)
+    track.set(name, item);
   return track;
 }
 
 Value list_of(std::initializer_list<const char*> items) {
   Value out = Value::array();
-  for (const char* item : items) out.push_back(item);
+  for (const char* item : items)
+    out.push_back(item);
   return out;
 }
 
-Face first_face(const Solid& solid) { return solid.faces().front(); }
+Face first_face(const Solid& solid) {
+  return solid.faces().front();
+}
 
 // A local binding the way operators leave one behind: evidence data names its source.
 TagBinding projected_binding(std::string tag_name, std::string field, std::string source) {
@@ -145,8 +149,10 @@ TEST_CASE("prop: geometry compares exactly, integer constants against float meas
 TEST_CASE("curve_type and surface_type are geom.type equality, case-insensitively") {
   const Solid cyl = ql_test::cylinder(1, 2);
   int circles = 0, cylinders = 0;
-  for (const Edge& e : cyl.edges()) circles += curve_type("circle")(e);
-  for (const Face& f : cyl.faces()) cylinders += surface_type("Cylinder")(f);
+  for (const Edge& e : cyl.edges())
+    circles += curve_type("circle")(e);
+  for (const Face& f : cyl.faces())
+    cylinders += surface_type("Cylinder")(f);
   CHECK(circles == 2);
   CHECK(cylinders == 1);
   CHECK(curve_type("circle").data().find("value")->as_string() == "CIRCLE");
@@ -290,7 +296,8 @@ TEST_CASE("curve_type / surface_type payloads compare the kernel type directly")
   const Predicate p = Predicate::from_value(payload_leaf("surface_type", data));
   const Solid cyl = ql_test::cylinder(1, 2);
   int hits = 0;
-  for (const Face& f : cyl.faces()) hits += p(f);
+  for (const Face& f : cyl.faces())
+    hits += p(f);
   CHECK(hits == 1);
   CHECK_FALSE(p(cyl));
 }

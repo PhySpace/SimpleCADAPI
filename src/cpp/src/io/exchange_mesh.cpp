@@ -31,14 +31,13 @@ namespace scad::io {
 namespace {
 
 const ErrorSpec& export_stl_spec() {
-  static const ErrorSpec spec{"export_stl",
-                              "Failed to export the shapes as STL.",
-                              {"The shapes are empty, null, or cannot be tessellated by OpenCASCADE.",
-                               "linear_deflection or angular_deflection_degrees is out of range.",
-                               "The destination is not writable."},
-                              {"Pass valid solids.",
-                               "Use a positive linear_deflection and an angular deflection in (0, 180].",
-                               "Write to a directory that exists and is writable."}};
+  static const ErrorSpec spec{
+      "export_stl",
+      "Failed to export the shapes as STL.",
+      {"The shapes are empty, null, or cannot be tessellated by OpenCASCADE.",
+       "linear_deflection or angular_deflection_degrees is out of range.", "The destination is not writable."},
+      {"Pass valid solids.", "Use a positive linear_deflection and an angular deflection in (0, 180].",
+       "Write to a directory that exists and is writable."}};
   return spec;
 }
 
@@ -51,46 +50,51 @@ const ErrorSpec& export_stl_shape_spec() {
 }
 
 const ErrorSpec& import_stl_spec() {
-  static const ErrorSpec spec{"import_stl",
-                              "Failed to read the STL file.",
-                              {"The file does not exist or is not binary or ASCII STL.",
-                               "The file is truncated or holds no triangles."},
-                              {"Check the path and the file's origin.", "Re-export the model as STL."}};
+  static const ErrorSpec spec{
+      "import_stl",
+      "Failed to read the STL file.",
+      {"The file does not exist or is not binary or ASCII STL.", "The file is truncated or holds no triangles."},
+      {"Check the path and the file's origin.", "Re-export the model as STL."}};
   return spec;
 }
 
 const ErrorSpec& export_obj_spec() {
-  static const ErrorSpec spec{"export_obj",
-                              "Failed to export the shapes as OBJ.",
-                              {"The shapes are empty, null, or cannot be tessellated by OpenCASCADE.",
-                               "linear_deflection or angular_deflection_degrees is out of range.",
-                               "The destination is not writable."},
-                              {"Pass valid solids.",
-                               "Use a positive linear_deflection and an angular deflection in (0, 180].",
-                               "Write to a directory that exists and is writable."}};
+  static const ErrorSpec spec{
+      "export_obj",
+      "Failed to export the shapes as OBJ.",
+      {"The shapes are empty, null, or cannot be tessellated by OpenCASCADE.",
+       "linear_deflection or angular_deflection_degrees is out of range.", "The destination is not writable."},
+      {"Pass valid solids.", "Use a positive linear_deflection and an angular deflection in (0, 180].",
+       "Write to a directory that exists and is writable."}};
   return spec;
 }
 
 const ErrorSpec& export_glb_spec() {
-  static const ErrorSpec spec{"export_glb",
-                              "Failed to export the shapes as GLB.",
-                              {"The shapes are empty, null, or cannot be tessellated by OpenCASCADE.",
-                               "The destination is not writable."},
-                              {"Pass valid shapes.", "Write to a directory that exists and is writable."}};
+  static const ErrorSpec spec{
+      "export_glb",
+      "Failed to export the shapes as GLB.",
+      {"The shapes are empty, null, or cannot be tessellated by OpenCASCADE.", "The destination is not writable."},
+      {"Pass valid shapes.", "Write to a directory that exists and is writable."}};
   return spec;
 }
 
 void put_le32(std::string& out, std::uint32_t v) {
-  for (int shift = 0; shift < 32; shift += 8) out.push_back(static_cast<char>((v >> shift) & 0xFF));
+  for (int shift = 0; shift < 32; shift += 8)
+    out.push_back(static_cast<char>((v >> shift) & 0xFF));
 }
-void put_le_float(std::string& out, float v) { put_le32(out, std::bit_cast<std::uint32_t>(v)); }
+void put_le_float(std::string& out, float v) {
+  put_le32(out, std::bit_cast<std::uint32_t>(v));
+}
 
 std::uint32_t get_le32(std::string_view bytes, std::size_t at) {
   std::uint32_t v = 0;
-  for (std::size_t i = 0; i < 4; ++i) v |= static_cast<std::uint32_t>(static_cast<unsigned char>(bytes[at + i])) << (8 * i);
+  for (std::size_t i = 0; i < 4; ++i)
+    v |= static_cast<std::uint32_t>(static_cast<unsigned char>(bytes[at + i])) << (8 * i);
   return v;
 }
-float get_le_float(std::string_view bytes, std::size_t at) { return std::bit_cast<float>(get_le32(bytes, at)); }
+float get_le_float(std::string_view bytes, std::size_t at) {
+  return std::bit_cast<float>(get_le32(bytes, at));
+}
 
 Vec3 point_of(const std::vector<double>& v, std::int32_t index) {
   const auto i = static_cast<std::size_t>(index) * 3;
@@ -115,16 +119,20 @@ Vec3 facet_normal(const Vec3& a, const Vec3& b, const Vec3& c) {
 // Surface tessellation of whole shape lists
 // ---------------------------------------------------------------------------
 std::vector<TopoDS_Shape> surface_solids(const TopoDS_Shape& shape) {
-  if (shape.IsNull()) throw ValueError("cannot mesh a null shape");
+  if (shape.IsNull())
+    throw ValueError("cannot mesh a null shape");
   std::vector<TopoDS_Shape> solids;
-  for (const TopoDS_Solid& solid : kernel::solids_of(shape)) solids.push_back(solid);
-  if (solids.empty()) solids.push_back(shape);  // a shell or face still has a surface to mesh
+  for (const TopoDS_Solid& solid : kernel::solids_of(shape))
+    solids.push_back(solid);
+  if (solids.empty())
+    solids.push_back(shape);  // a shell or face still has a surface to mesh
   return solids;
 }
 
 WeldedMesh tessellate_surface(const std::vector<TopoDS_Shape>& shapes, const SurfaceMeshParameters& parameters,
                               std::size_t* solid_count) {
-  if (shapes.empty()) throw ValueError("No shapes to export");
+  if (shapes.empty())
+    throw ValueError("No shapes to export");
   WeldedMesh merged;
   std::size_t solids = 0;
   for (const TopoDS_Shape& shape : shapes) {
@@ -132,11 +140,13 @@ WeldedMesh tessellate_surface(const std::vector<TopoDS_Shape>& shapes, const Sur
       const WeldedMesh part = tessellate_solid(solid, parameters);
       const auto offset = static_cast<std::int32_t>(merged.vertex_count());
       merged.vertices.insert(merged.vertices.end(), part.vertices.begin(), part.vertices.end());
-      for (const auto& t : part.triangles) merged.triangles.push_back({t[0] + offset, t[1] + offset, t[2] + offset});
+      for (const auto& t : part.triangles)
+        merged.triangles.push_back({t[0] + offset, t[1] + offset, t[2] + offset});
       ++solids;
     }
   }
-  if (solid_count != nullptr) *solid_count = solids;
+  if (solid_count != nullptr)
+    *solid_count = solids;
   return merged;
 }
 
@@ -169,11 +179,14 @@ Bytes binary_stl_bytes(const WeldedMesh& mesh) {
     const Vec3 a = point_of(mesh.vertices, t[0]), b = point_of(mesh.vertices, t[1]), c = point_of(mesh.vertices, t[2]);
     const Vec3 n = (b - a).cross(c - a);
     const double length = n.norm();
-    if (length == 0.0 || !std::isfinite(length)) throw RuntimeError("STL tessellation contains a collapsed triangle");
+    if (length == 0.0 || !std::isfinite(length))
+      throw RuntimeError("STL tessellation contains a collapsed triangle");
     const Vec3 unit = n / length;
-    for (const double v : {unit.x, unit.y, unit.z}) put_le_float(out, static_cast<float>(v));
+    for (const double v : {unit.x, unit.y, unit.z})
+      put_le_float(out, static_cast<float>(v));
     for (const Vec3& p : {a, b, c})
-      for (const double v : {p.x, p.y, p.z}) put_le_float(out, static_cast<float>(v));
+      for (const double v : {p.x, p.y, p.z})
+        put_le_float(out, static_cast<float>(v));
     out.append(2, '\0');
   }
   return out;
@@ -203,7 +216,8 @@ void write_ascii_stl(const Mesh& m, const std::filesystem::path& path) {
   for (std::size_t t = 0; t < m.triangle_count(); ++t) {
     const Vec3 a = vertex(m.triangles[3 * t]), b = vertex(m.triangles[3 * t + 1]), c = vertex(m.triangles[3 * t + 2]);
     const Vec3 n = facet_normal(a, b, c);
-    out << " facet normal " << scientific(n.x) << ' ' << scientific(n.y) << ' ' << scientific(n.z) << "\n  outer loop\n";
+    out << " facet normal " << scientific(n.x) << ' ' << scientific(n.y) << ' ' << scientific(n.z)
+        << "\n  outer loop\n";
     for (const Vec3& p : {a, b, c})
       out << "   vertex " << scientific(p.x) << ' ' << scientific(p.y) << ' ' << scientific(p.z) << '\n';
     out << "  endloop\n endfacet\n";
@@ -218,7 +232,8 @@ void export_stl_ascii(const std::vector<TopoDS_Shape>& shapes, const std::filesy
                       const MeshParameters& parameters) {
   guarded(export_stl_shape_spec(), [&] {
     const Mesh m = mesh(make_compound(shapes), parameters);
-    if (m.empty()) throw ValueError("STL write failed: the shapes have no triangulated faces");
+    if (m.empty())
+      throw ValueError("STL write failed: the shapes have no triangulated faces");
     write_ascii_stl(m, path);
   });
 }
@@ -248,7 +263,9 @@ struct BitKeyHash {
   }
 };
 
-std::uint32_t bits_of(float v) { return v == 0.0F ? 0U : std::bit_cast<std::uint32_t>(v); }  // fold -0.0 into 0.0
+std::uint32_t bits_of(float v) {
+  return v == 0.0F ? 0U : std::bit_cast<std::uint32_t>(v);
+}  // fold -0.0 into 0.0
 
 // Triangle soup (9 floats per triangle) -> indexed mesh.
 Mesh index_soup(const std::vector<float>& soup) {
@@ -263,10 +280,12 @@ Mesh index_soup(const std::vector<float>& soup) {
       const float* p = &soup[t * 9 + k * 3];
       const BitKey key{bits_of(p[0]), bits_of(p[1]), bits_of(p[2])};
       const auto [slot, inserted] = index_of.try_emplace(key, static_cast<std::uint32_t>(mesh.vertex_count()));
-      if (inserted) mesh.vertices.insert(mesh.vertices.end(), {p[0], p[1], p[2]});
+      if (inserted)
+        mesh.vertices.insert(mesh.vertices.end(), {p[0], p[1], p[2]});
       ids[k] = slot->second;
     }
-    if (ids[0] == ids[1] || ids[1] == ids[2] || ids[0] == ids[2]) continue;  // zero area
+    if (ids[0] == ids[1] || ids[1] == ids[2] || ids[0] == ids[2])
+      continue;  // zero area
     mesh.triangles.insert(mesh.triangles.end(), {ids[0], ids[1], ids[2]});
   }
   // Area-weighted vertex normals.
@@ -285,22 +304,27 @@ Mesh index_soup(const std::vector<float>& soup) {
   mesh.normals.reserve(sums.size() * 3);
   for (const Vec3& s : sums) {
     const Vec3 n = s.normalized();
-    mesh.normals.insert(mesh.normals.end(), {static_cast<float>(n.x), static_cast<float>(n.y), static_cast<float>(n.z)});
+    mesh.normals.insert(mesh.normals.end(),
+                        {static_cast<float>(n.x), static_cast<float>(n.y), static_cast<float>(n.z)});
   }
   mesh.face_ids.assign(mesh.triangle_count(), 0);
   mesh.face_ranges.push_back({0, 0, static_cast<std::uint32_t>(mesh.triangle_count())});
   return mesh;
 }
 
-bool is_space(char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\f' || c == '\v'; }
+bool is_space(char c) {
+  return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\f' || c == '\v';
+}
 
 std::vector<float> parse_ascii_stl(std::string_view text) {
   std::vector<float> soup;
   std::size_t pos = 0;
   const auto next_token = [&]() -> std::string_view {
-    while (pos < text.size() && is_space(text[pos])) ++pos;
+    while (pos < text.size() && is_space(text[pos]))
+      ++pos;
     const std::size_t begin = pos;
-    while (pos < text.size() && !is_space(text[pos])) ++pos;
+    while (pos < text.size() && !is_space(text[pos]))
+      ++pos;
     return text.substr(begin, pos - begin);
   };
   std::size_t vertices_in_facet = 0;
@@ -315,11 +339,13 @@ std::vector<float> parse_ascii_stl(std::string_view text) {
       }
       ++vertices_in_facet;
     } else if (token == "endfacet") {
-      if (vertices_in_facet != 3) throw ValueError("ASCII STL has a facet without exactly three vertices");
+      if (vertices_in_facet != 3)
+        throw ValueError("ASCII STL has a facet without exactly three vertices");
       vertices_in_facet = 0;
     }
   }
-  if (vertices_in_facet != 0) throw ValueError("ASCII STL ends inside a facet");
+  if (vertices_in_facet != 0)
+    throw ValueError("ASCII STL ends inside a facet");
   return soup;
 }
 
@@ -337,7 +363,8 @@ Mesh read_stl_bytes(std::string_view bytes) {
         const std::size_t base = 84 + t * 50 + 12;  // skip the stored normal: it is recomputed from the vertices
         for (std::size_t k = 0; k < 9; ++k) {
           const float v = get_le_float(bytes, base + k * 4);
-          if (!std::isfinite(v)) throw ValueError("binary STL holds a non-finite coordinate");
+          if (!std::isfinite(v))
+            throw ValueError("binary STL holds a non-finite coordinate");
           soup.push_back(v);
         }
       }
@@ -346,9 +373,11 @@ Mesh read_stl_bytes(std::string_view bytes) {
     } else {
       throw ValueError("the bytes are neither binary nor ASCII STL");
     }
-    if (soup.empty()) throw ValueError("the STL holds no triangles");
+    if (soup.empty())
+      throw ValueError("the STL holds no triangles");
     Mesh mesh = index_soup(soup);
-    if (mesh.empty()) throw ValueError("the STL holds only degenerate triangles");
+    if (mesh.empty())
+      throw ValueError("the STL holds only degenerate triangles");
     return mesh;
   });
 }
@@ -358,7 +387,8 @@ Mesh read_stl(const std::filesystem::path& path) {
 }
 
 TopoDS_Shape stl_to_shape(const Mesh& mesh, double sewing_tolerance) {
-  if (mesh.empty()) throw ValueError("cannot build a shape from an empty mesh");
+  if (mesh.empty())
+    throw ValueError("cannot build a shape from an empty mesh");
   if (!std::isfinite(sewing_tolerance) || sewing_tolerance <= 0.0)
     throw ValueError("sewing_tolerance must be a positive finite value");
   return occt_guard([&]() -> TopoDS_Shape {
@@ -371,16 +401,20 @@ TopoDS_Shape stl_to_shape(const Mesh& mesh, double sewing_tolerance) {
     for (std::size_t t = 0; t < mesh.triangle_count(); ++t) {
       BRepBuilderAPI_MakePolygon polygon(point(mesh.triangles[3 * t]), point(mesh.triangles[3 * t + 1]),
                                          point(mesh.triangles[3 * t + 2]), /*Close=*/Standard_True);
-      if (!polygon.IsDone()) continue;
+      if (!polygon.IsDone())
+        continue;
       BRepBuilderAPI_MakeFace face(polygon.Wire(), /*OnlyPlane=*/Standard_True);
-      if (!face.IsDone()) continue;
+      if (!face.IsDone())
+        continue;
       sewing.Add(face.Face());
       ++added;
     }
-    if (added == 0) throw ValueError("every triangle of the mesh is degenerate");
+    if (added == 0)
+      throw ValueError("every triangle of the mesh is degenerate");
     sewing.Perform();
     TopoDS_Shape sewn = sewing.SewedShape();
-    if (sewn.IsNull()) throw RuntimeError("OpenCASCADE could not sew the triangles");
+    if (sewn.IsNull())
+      throw RuntimeError("OpenCASCADE could not sew the triangles");
 
     std::vector<TopoDS_Shell> shells;
     for (TopExp_Explorer explorer(sewn, TopAbs_SHELL); explorer.More(); explorer.Next())
@@ -407,8 +441,9 @@ Shape import_stl_shape(const std::filesystem::path& path, double sewing_toleranc
 Bytes obj_bytes(const WeldedMesh& mesh) {
   Bytes out = "# SimpleCAD OpenCASCADE BREP tessellation\n";
   for (std::size_t i = 0; i < mesh.vertex_count(); ++i) {
-    out += "v " + detail::format_general(mesh.vertices[3 * i], 17) + ' ' + detail::format_general(mesh.vertices[3 * i + 1], 17) +
-           ' ' + detail::format_general(mesh.vertices[3 * i + 2], 17) + '\n';
+    out += "v " + detail::format_general(mesh.vertices[3 * i], 17) + ' ' +
+           detail::format_general(mesh.vertices[3 * i + 1], 17) + ' ' +
+           detail::format_general(mesh.vertices[3 * i + 2], 17) + '\n';
   }
   for (const auto& t : mesh.triangles)
     out += "f " + std::to_string(t[0] + 1) + ' ' + std::to_string(t[1] + 1) + ' ' + std::to_string(t[2] + 1) + '\n';
@@ -429,7 +464,8 @@ SurfaceExportReport export_obj(const std::vector<TopoDS_Shape>& shapes, const st
 // GLB
 // ---------------------------------------------------------------------------
 Bytes glb_bytes(const Mesh& mesh) {
-  if (mesh.empty()) throw ValueError("cannot export an empty mesh");
+  if (mesh.empty())
+    throw ValueError("cannot export an empty mesh");
   const std::size_t index_bytes = mesh.triangles.size() * 4;
   const std::size_t position_bytes = mesh.vertices.size() * 4;
   const std::size_t normal_bytes = mesh.normals.size() * 4;
@@ -438,7 +474,8 @@ Bytes glb_bytes(const Mesh& mesh) {
   const auto box = mesh.bounds();
   const auto triple = [](const std::array<float, 3>& v) {
     Value a = Value::array();
-    for (const float f : v) a.push_back(static_cast<double>(f));
+    for (const float f : v)
+      a.push_back(static_cast<double>(f));
     return a;
   };
   const auto index_count = static_cast<std::int64_t>(mesh.triangles.size());
@@ -525,13 +562,17 @@ Bytes glb_bytes(const Mesh& mesh) {
   root.set("buffers", std::move(buffers));
 
   std::string json = canonical_json(root);
-  while (json.size() % 4 != 0) json.push_back(' ');
+  while (json.size() % 4 != 0)
+    json.push_back(' ');
 
   std::string bin;
   bin.reserve(total);
-  for (const std::uint32_t i : mesh.triangles) put_le32(bin, i);
-  for (const float v : mesh.vertices) put_le_float(bin, v);
-  for (const float v : mesh.normals) put_le_float(bin, v);
+  for (const std::uint32_t i : mesh.triangles)
+    put_le32(bin, i);
+  for (const float v : mesh.vertices)
+    put_le_float(bin, v);
+  for (const float v : mesh.normals)
+    put_le_float(bin, v);
 
   Bytes out;
   out.reserve(12 + 8 + json.size() + 8 + bin.size());

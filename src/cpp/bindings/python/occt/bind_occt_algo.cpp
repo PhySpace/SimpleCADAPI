@@ -78,8 +78,12 @@ void bind_algo(py::module_& m) {
       .export_values();
   py::class_<StlAPI_Writer>(m, "StlAPI_Writer")
       .def(py::init<>())
-      .def("Write", [](StlAPI_Writer& w, const TopoDS_Shape& shape, const std::string& path) { return w.Write(shape, path.c_str()); },
-           py::arg("theShape"), py::arg("theFileName"));
+      .def(
+          "Write",
+          [](StlAPI_Writer& w, const TopoDS_Shape& shape, const std::string& path) {
+            return w.Write(shape, path.c_str());
+          },
+          py::arg("theShape"), py::arg("theFileName"));
 
   // ---- the builder chain: command -> make-shape -> modify-shape ---------------------------------------------
   py::class_<BRepBuilderAPI_Command>(m, "BRepBuilderAPI_Command").def("IsDone", &BRepBuilderAPI_Command::IsDone);
@@ -96,16 +100,25 @@ void bind_algo(py::module_& m) {
 
   py::class_<BRepBuilderAPI_Transform, BRepBuilderAPI_ModifyShape>(m, "BRepBuilderAPI_Transform")
       .def(py::init<const gp_Trsf&>())
-      .def(py::init<const TopoDS_Shape&, const gp_Trsf&, bool, bool>(), py::arg("S"), py::arg("T"), py::arg("Copy") = false,
-           py::arg("CopyMesh") = false)
-      .def("Perform", [](BRepBuilderAPI_Transform& t, const TopoDS_Shape& s, bool copy, bool copyMesh) { t.Perform(s, copy, copyMesh); },
-           py::arg("S"), py::arg("Copy") = false, py::arg("CopyMesh") = false);
+      .def(py::init<const TopoDS_Shape&, const gp_Trsf&, bool, bool>(), py::arg("S"), py::arg("T"),
+           py::arg("Copy") = false, py::arg("CopyMesh") = false)
+      .def(
+          "Perform",
+          [](BRepBuilderAPI_Transform& t, const TopoDS_Shape& s, bool copy, bool copyMesh) {
+            t.Perform(s, copy, copyMesh);
+          },
+          py::arg("S"), py::arg("Copy") = false, py::arg("CopyMesh") = false);
 
   py::class_<BRepBuilderAPI_Copy, BRepBuilderAPI_ModifyShape>(m, "BRepBuilderAPI_Copy")
       .def(py::init<>())
-      .def(py::init<const TopoDS_Shape&, bool, bool>(), py::arg("S"), py::arg("copyGeom") = true, py::arg("copyMesh") = false)
-      .def("Perform", [](BRepBuilderAPI_Copy& c, const TopoDS_Shape& s, bool copyGeom, bool copyMesh) { c.Perform(s, copyGeom, copyMesh); },
-           py::arg("S"), py::arg("copyGeom") = true, py::arg("copyMesh") = false);
+      .def(py::init<const TopoDS_Shape&, bool, bool>(), py::arg("S"), py::arg("copyGeom") = true,
+           py::arg("copyMesh") = false)
+      .def(
+          "Perform",
+          [](BRepBuilderAPI_Copy& c, const TopoDS_Shape& s, bool copyGeom, bool copyMesh) {
+            c.Perform(s, copyGeom, copyMesh);
+          },
+          py::arg("S"), py::arg("copyGeom") = true, py::arg("copyMesh") = false);
 
   py::class_<BRepBuilderAPI_MakeVertex, BRepBuilderAPI_MakeShape>(m, "BRepBuilderAPI_MakeVertex")
       .def(py::init<const gp_Pnt&>())
@@ -145,8 +158,8 @@ void bind_algo(py::module_& m) {
       .def(py::init<>())
       .def(py::init<const TopoDS_Face&>())
       .def(py::init<const gp_Pln&>())
-      .def(py::init<const gp_Cylinder&, double, double, double, double>(), py::arg("C"), py::arg("UMin"), py::arg("UMax"),
-           py::arg("VMin"), py::arg("VMax"))
+      .def(py::init<const gp_Cylinder&, double, double, double, double>(), py::arg("C"), py::arg("UMin"),
+           py::arg("UMax"), py::arg("VMin"), py::arg("VMax"))
       .def(py::init<const gp_Cone&, double, double, double, double>(), py::arg("C"), py::arg("UMin"), py::arg("UMax"),
            py::arg("VMin"), py::arg("VMax"))
       .def(py::init<const gp_Sphere&, double, double, double, double>(), py::arg("C"), py::arg("UMin"), py::arg("UMax"),
@@ -187,9 +200,12 @@ void bind_algo(py::module_& m) {
       .def("Arguments", [](const BRepAlgoAPI_BuilderAlgo& a) { return a.Arguments(); })
       .def("SetToFillHistory", [](BRepAlgoAPI_BuilderAlgo& a, bool v) { a.SetToFillHistory(v); })
       .def("HasHistory", [](const BRepAlgoAPI_BuilderAlgo& a) { return a.HasHistory(); })
-      .def("SimplifyResult", [](BRepAlgoAPI_BuilderAlgo& a, bool unifyEdges, bool unifyFaces, double angTol) {
-        a.SimplifyResult(unifyEdges, unifyFaces, angTol);
-      }, py::arg("theUnifyEdges") = true, py::arg("theUnifyFaces") = true, py::arg("theAngularTol") = 1e-12)
+      .def(
+          "SimplifyResult",
+          [](BRepAlgoAPI_BuilderAlgo& a, bool unifyEdges, bool unifyFaces, double angTol) {
+            a.SimplifyResult(unifyEdges, unifyFaces, angTol);
+          },
+          py::arg("theUnifyEdges") = true, py::arg("theUnifyFaces") = true, py::arg("theAngularTol") = 1e-12)
       .def("Build", [](BRepAlgoAPI_BuilderAlgo& a) { a.Build(); })
       .def("IsDeleted", [](BRepAlgoAPI_BuilderAlgo& a, const TopoDS_Shape& s) { return a.IsDeleted(s); })
       .def("Modified", [](BRepAlgoAPI_BuilderAlgo& a, const TopoDS_Shape& s) { return a.Modified(s); })
@@ -210,8 +226,10 @@ void bind_algo(py::module_& m) {
 
   py::class_<BRepAlgoAPI_Section, BRepAlgoAPI_BooleanOperation>(m, "BRepAlgoAPI_Section")
       .def(py::init<>())
-      .def(py::init<const TopoDS_Shape&, const TopoDS_Shape&, bool>(), py::arg("S1"), py::arg("S2"), py::arg("PerformNow") = true)
-      .def(py::init<const TopoDS_Shape&, const gp_Pln&, bool>(), py::arg("S1"), py::arg("Pl"), py::arg("PerformNow") = true)
+      .def(py::init<const TopoDS_Shape&, const TopoDS_Shape&, bool>(), py::arg("S1"), py::arg("S2"),
+           py::arg("PerformNow") = true)
+      .def(py::init<const TopoDS_Shape&, const gp_Pln&, bool>(), py::arg("S1"), py::arg("Pl"),
+           py::arg("PerformNow") = true)
       .def("Build", [](BRepAlgoAPI_Section& s) { s.Build(); })
       .def("Init1", [](BRepAlgoAPI_Section& s, const TopoDS_Shape& v) { s.Init1(v); })
       .def("Init2", [](BRepAlgoAPI_Section& s, const TopoDS_Shape& v) { s.Init2(v); })
@@ -249,8 +267,8 @@ void bind_algo(py::module_& m) {
       .def("LastShape", [](BRepPrimAPI_MakeSweep& s) { return s.LastShape(); });
 
   py::class_<BRepPrimAPI_MakePrism, BRepPrimAPI_MakeSweep>(m, "BRepPrimAPI_MakePrism")
-      .def(py::init<const TopoDS_Shape&, const gp_Vec&, bool, bool>(), py::arg("S"), py::arg("V"), py::arg("Copy") = false,
-           py::arg("Canonize") = true);
+      .def(py::init<const TopoDS_Shape&, const gp_Vec&, bool, bool>(), py::arg("S"), py::arg("V"),
+           py::arg("Copy") = false, py::arg("Canonize") = true);
 
   py::class_<BRepFilletAPI_LocalOperation, BRepBuilderAPI_MakeShape>(m, "BRepFilletAPI_LocalOperation");
   py::class_<BRepFilletAPI_MakeFillet, BRepFilletAPI_LocalOperation>(m, "BRepFilletAPI_MakeFillet")
@@ -262,8 +280,9 @@ void bind_algo(py::module_& m) {
 
   py::class_<BRepMesh_IncrementalMesh>(m, "BRepMesh_IncrementalMesh")
       .def(py::init<>())
-      .def(py::init<const TopoDS_Shape&, double, bool, double, bool>(), py::arg("theShape"), py::arg("theLinDeflection"),
-           py::arg("isRelative") = false, py::arg("theAngDeflection") = 0.5, py::arg("isInParallel") = false)
+      .def(py::init<const TopoDS_Shape&, double, bool, double, bool>(), py::arg("theShape"),
+           py::arg("theLinDeflection"), py::arg("isRelative") = false, py::arg("theAngDeflection") = 0.5,
+           py::arg("isInParallel") = false)
       .def("Perform", [](BRepMesh_IncrementalMesh& mesh) { mesh.Perform(); })
       .def("IsDone", [](const BRepMesh_IncrementalMesh& mesh) { return mesh.IsDone(); })
       .def("Shape", [](const BRepMesh_IncrementalMesh& mesh) { return mesh.Shape(); })
@@ -282,7 +301,9 @@ void bind_algo(py::module_& m) {
       .def("Hide", [](HLRBRep_InternalAlgo& a) { a.Hide(); });
   py::class_<HLRBRep_Algo, opencascade::handle<HLRBRep_Algo>, HLRBRep_InternalAlgo>(m, "HLRBRep_Algo")
       .def(py::init<>())
-      .def("Add", [](HLRBRep_Algo& a, const TopoDS_Shape& s, int nbIso) { a.Add(s, nbIso); }, py::arg("S"), py::arg("nbIso") = 0);
+      .def(
+          "Add", [](HLRBRep_Algo& a, const TopoDS_Shape& s, int nbIso) { a.Add(s, nbIso); }, py::arg("S"),
+          py::arg("nbIso") = 0);
 
   py::class_<HLRBRep_HLRToShape>(m, "HLRBRep_HLRToShape")
       .def(py::init<const opencascade::handle<HLRBRep_Algo>&>())
@@ -299,17 +320,24 @@ void bind_algo(py::module_& m) {
 
   // ---- shape upgrade ------------------------------------------------------------------------------------------
   py::class_<ShapeUpgrade_ShapeDivide>(m, "ShapeUpgrade_ShapeDivide")
-      .def("Perform", [](ShapeUpgrade_ShapeDivide& d, bool newContext) { return d.Perform(newContext); }, py::arg("newContext") = true)
+      .def(
+          "Perform", [](ShapeUpgrade_ShapeDivide& d, bool newContext) { return d.Perform(newContext); },
+          py::arg("newContext") = true)
       .def("Result", [](const ShapeUpgrade_ShapeDivide& d) { return d.Result(); });
   py::class_<ShapeUpgrade_ShapeDivideContinuity, ShapeUpgrade_ShapeDivide>(m, "ShapeUpgrade_ShapeDivideContinuity")
       .def(py::init<const TopoDS_Shape&>())
       .def("SetTolerance", [](ShapeUpgrade_ShapeDivideContinuity& d, double t) { d.SetTolerance(t); })
-      .def("SetBoundaryCriterion", [](ShapeUpgrade_ShapeDivideContinuity& d, GeomAbs_Shape c) { d.SetBoundaryCriterion(c); },
-           py::arg("Criterion") = GeomAbs_C1)
-      .def("SetPCurveCriterion", [](ShapeUpgrade_ShapeDivideContinuity& d, GeomAbs_Shape c) { d.SetPCurveCriterion(c); },
-           py::arg("Criterion") = GeomAbs_C1)
-      .def("SetSurfaceCriterion", [](ShapeUpgrade_ShapeDivideContinuity& d, GeomAbs_Shape c) { d.SetSurfaceCriterion(c); },
-           py::arg("Criterion") = GeomAbs_C1);
+      .def(
+          "SetBoundaryCriterion",
+          [](ShapeUpgrade_ShapeDivideContinuity& d, GeomAbs_Shape c) { d.SetBoundaryCriterion(c); },
+          py::arg("Criterion") = GeomAbs_C1)
+      .def(
+          "SetPCurveCriterion", [](ShapeUpgrade_ShapeDivideContinuity& d, GeomAbs_Shape c) { d.SetPCurveCriterion(c); },
+          py::arg("Criterion") = GeomAbs_C1)
+      .def(
+          "SetSurfaceCriterion",
+          [](ShapeUpgrade_ShapeDivideContinuity& d, GeomAbs_Shape c) { d.SetSurfaceCriterion(c); },
+          py::arg("Criterion") = GeomAbs_C1);
 }
 
 }  // namespace scad::pybind::occt

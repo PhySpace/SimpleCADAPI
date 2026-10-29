@@ -36,28 +36,40 @@ class Walker {
 
   // False: outside the fast domain (out_ is then meaningless).
   bool walk(PyObject* o, int depth, const std::vector<std::string_view>* omit = nullptr) {
-    if (o == Py_None) { out_ += "null"; return true; }
-    if (PyBool_Check(o)) { out_ += o == Py_True ? "true" : "false"; return true; }
-    if (PyLong_Check(o)) return integer(o);
+    if (o == Py_None) {
+      out_ += "null";
+      return true;
+    }
+    if (PyBool_Check(o)) {
+      out_ += o == Py_True ? "true" : "false";
+      return true;
+    }
+    if (PyLong_Check(o))
+      return integer(o);
     if (PyUnicode_Check(o)) {
       std::string_view text;
-      if (!utf8(o, text)) return false;
+      if (!utf8(o, text))
+        return false;
       scad::io::canonical_append_string(text, out_);
       return true;
     }
     if (PyFloat_Check(o)) {
       const double d = PyFloat_AS_DOUBLE(o);
-      if (!std::isfinite(d)) return false;
+      if (!std::isfinite(d))
+        return false;
       scad::io::canonical_append_number(d, out_);
       return true;
     }
-    if (depth >= kMaxDepth) return false;
+    if (depth >= kMaxDepth)
+      return false;
     if (PyList_CheckExact(o)) {
       const Py_ssize_t n = PyList_GET_SIZE(o);
       out_.push_back('[');
       for (Py_ssize_t i = 0; i < n; ++i) {
-        if (i) out_.push_back(',');
-        if (!walk(PyList_GET_ITEM(o, i), depth + 1)) return false;
+        if (i)
+          out_.push_back(',');
+        if (!walk(PyList_GET_ITEM(o, i), depth + 1))
+          return false;
       }
       out_.push_back(']');
       return true;
@@ -66,13 +78,16 @@ class Walker {
       const Py_ssize_t n = PyTuple_GET_SIZE(o);
       out_.push_back('[');
       for (Py_ssize_t i = 0; i < n; ++i) {
-        if (i) out_.push_back(',');
-        if (!walk(PyTuple_GET_ITEM(o, i), depth + 1)) return false;
+        if (i)
+          out_.push_back(',');
+        if (!walk(PyTuple_GET_ITEM(o, i), depth + 1))
+          return false;
       }
       out_.push_back(']');
       return true;
     }
-    if (PyDict_CheckExact(o)) return dict(o, depth, omit);
+    if (PyDict_CheckExact(o))
+      return dict(o, depth, omit);
     return false;
   }
 
@@ -96,20 +111,28 @@ class Walker {
   bool integer(PyObject* o) {
     int overflow = 0;
     const long long v = PyLong_AsLongLongAndOverflow(o, &overflow);
-    if (overflow == 0 && v == -1 && PyErr_Occurred()) { PyErr_Clear(); return false; }
+    if (overflow == 0 && v == -1 && PyErr_Occurred()) {
+      PyErr_Clear();
+      return false;
+    }
     if (overflow == 0 && v <= kSafeInt && v >= -kSafeInt) {
       char buffer[24];
       const auto r = std::to_chars(buffer, buffer + sizeof buffer, v);
       out_.append(buffer, r.ptr);
       return true;
     }
-    if (!safe_ints_) return false;
+    if (!safe_ints_)
+      return false;
     // _json_safe: an integer outside the JSON safe range is hashed as the string "int:<decimal>".
     PyObject* text = PyObject_Str(o);
-    if (text == nullptr) { PyErr_Clear(); return false; }
+    if (text == nullptr) {
+      PyErr_Clear();
+      return false;
+    }
     std::string_view digits;
     const bool ok = utf8(text, digits);
-    if (ok) scad::io::canonical_append_string(std::string("int:").append(digits), out_);
+    if (ok)
+      scad::io::canonical_append_string(std::string("int:").append(digits), out_);
     Py_DECREF(text);
     return ok;
   }
@@ -120,10 +143,13 @@ class Walker {
     Py_ssize_t pos = 0;
     PyObject *key = nullptr, *value = nullptr;
     while (PyDict_Next(o, &pos, &key, &value)) {
-      if (!PyUnicode_Check(key)) return false;
+      if (!PyUnicode_Check(key))
+        return false;
       std::string_view name;
-      if (!utf8(key, name)) return false;
-      if (omit != nullptr && std::find(omit->begin(), omit->end(), name) != omit->end()) continue;
+      if (!utf8(key, name))
+        return false;
+      if (omit != nullptr && std::find(omit->begin(), omit->end(), name) != omit->end())
+        continue;
       members.push_back({name, value});
     }
     std::sort(members.begin(), members.end(),
@@ -131,11 +157,13 @@ class Walker {
     out_.push_back('{');
     bool first = true;
     for (const Member& member : members) {
-      if (!first) out_.push_back(',');
+      if (!first)
+        out_.push_back(',');
       first = false;
       scad::io::canonical_append_string(member.key, out_);
       out_.push_back(':');
-      if (!walk(member.value, depth + 1)) return false;
+      if (!walk(member.value, depth + 1))
+        return false;
     }
     out_.push_back('}');
     return true;
@@ -147,13 +175,19 @@ class Walker {
 
 // The keys content_hash drops from the top level.  Values stay owned by the tuple the caller passed.
 bool read_omit(const py::handle& omit, std::vector<std::string_view>& out) {
-  if (omit.is_none()) return true;
-  if (!PyTuple_Check(omit.ptr()) && !PyList_Check(omit.ptr())) return false;
+  if (omit.is_none())
+    return true;
+  if (!PyTuple_Check(omit.ptr()) && !PyList_Check(omit.ptr()))
+    return false;
   for (py::handle item : py::reinterpret_borrow<py::sequence>(omit)) {
-    if (!PyUnicode_Check(item.ptr())) return false;
+    if (!PyUnicode_Check(item.ptr()))
+      return false;
     Py_ssize_t size = 0;
     const char* data = PyUnicode_AsUTF8AndSize(item.ptr(), &size);
-    if (data == nullptr) { PyErr_Clear(); return false; }
+    if (data == nullptr) {
+      PyErr_Clear();
+      return false;
+    }
     out.emplace_back(data, static_cast<std::size_t>(size));
   }
   return true;
@@ -161,17 +195,21 @@ bool read_omit(const py::handle& omit, std::vector<std::string_view>& out) {
 
 py::object canonical_bytes(const py::handle& value, bool safe_ints) {
   Walker walker(safe_ints);
-  if (!walker.walk(value.ptr(), 0)) return py::none();
-  return py::reinterpret_steal<py::object>(PyBytes_FromStringAndSize(walker.out().data(),
-                                                                      static_cast<Py_ssize_t>(walker.out().size())));
+  if (!walker.walk(value.ptr(), 0))
+    return py::none();
+  return py::reinterpret_steal<py::object>(
+      PyBytes_FromStringAndSize(walker.out().data(), static_cast<Py_ssize_t>(walker.out().size())));
 }
 
 py::object canonical_hash(const py::handle& value, const py::handle& omit, bool safe_ints) {
   std::vector<std::string_view> omitted;
-  if (!read_omit(omit, omitted)) return py::none();
-  if (!omitted.empty() && !PyDict_CheckExact(value.ptr())) return py::none();
+  if (!read_omit(omit, omitted))
+    return py::none();
+  if (!omitted.empty() && !PyDict_CheckExact(value.ptr()))
+    return py::none();
   Walker walker(safe_ints);
-  if (!walker.walk(value.ptr(), 0, omitted.empty() ? nullptr : &omitted)) return py::none();
+  if (!walker.walk(value.ptr(), 0, omitted.empty() ? nullptr : &omitted))
+    return py::none();
   return py::str(scad::io::sha256_tagged(walker.out()));
 }
 

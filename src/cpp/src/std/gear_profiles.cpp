@@ -18,15 +18,21 @@ namespace scad::stdlib {
 
 namespace {
 
-std::string tooth_point(int tooth, const char* key) { return "t" + std::to_string(tooth) + "_" + key; }
+std::string tooth_point(int tooth, const char* key) {
+  return "t" + std::to_string(tooth) + "_" + key;
+}
 
-std::string numbered(const char* stem, int index) { return std::string(stem) + std::to_string(index); }
+std::string numbered(const char* stem, int index) {
+  return std::string(stem) + std::to_string(index);
+}
 
 void add_point(SketchBuilder& sketch, int tooth, const char* key, Point2 p) {
   sketch.point(tooth_point(tooth, key), p.x, p.y);
 }
 
-Point2 polar(double radius, double angle) { return {radius * std::cos(angle), radius * std::sin(angle)}; }
+Point2 polar(double radius, double angle) {
+  return {radius * std::cos(angle), radius * std::sin(angle)};
+}
 
 // The three construction circles of a gear sketch, in the order the factories add them.
 void add_construction_circles(SketchBuilder& sketch, const char* first, double first_radius, const char* second,
@@ -65,8 +71,10 @@ Sketch build_gear_profile_sketch(int n_teeth, double module, double pressure_ang
   const double root_right_angle = needs_root_connectors ? geo.right_start : right_flank_start_angle;
   const double prev_right_start = root_right_angle - tooth_angle;
 
-  const BSplineData canonical = involute_bspline_control_points(base_radius, tip_radius, flank_start_radius, 0.0, false);
-  const auto [reversed_knots, reversed_multiplicities] = reverse_bspline_parameters(canonical.knots, canonical.multiplicities);
+  const BSplineData canonical =
+      involute_bspline_control_points(base_radius, tip_radius, flank_start_radius, 0.0, false);
+  const auto [reversed_knots, reversed_multiplicities] =
+      reverse_bspline_parameters(canonical.knots, canonical.multiplicities);
 
   SketchBuilder sketch("gear_" + std::to_string(n_teeth) + "t_m" + python_float_repr(module));
   add_construction_circles(sketch, "root_circle", root_radius, "pitch_circle", geo.pitch_radius, "tip_circle",
@@ -128,8 +136,8 @@ Sketch build_gear_profile_sketch(int n_teeth, double module, double pressure_ang
     sketch.arc(numbered("arc_tip_", i), ts, te, "center");
 
     BSplineData right = canonical;
-    right.control_points =
-        transform_bspline_control_points(canonical.control_points, geo.right_start + turn, /*mirror=*/true, /*reverse=*/true);
+    right.control_points = transform_bspline_control_points(canonical.control_points, geo.right_start + turn,
+                                                            /*mirror=*/true, /*reverse=*/true);
     right.knots = reversed_knots;
     right.multiplicities = reversed_multiplicities;
     sketch.bspline(numbered("bspline_right_", i), te, right_flank_end, right);
@@ -248,7 +256,8 @@ Face build_ring_gear_face(int n_teeth, double module, double pressure_angle, dou
 Face build_rack_profile_face(double module, int n_teeth, double pressure_angle) {
   const std::vector<Point2> points = rack_profile_points(module, n_teeth, pressure_angle);
   SketchBuilder sketch("rack_m" + python_float_repr(module) + "_n" + std::to_string(n_teeth));
-  for (std::size_t i = 0; i < points.size(); ++i) sketch.point("p" + std::to_string(i), points[i].x, points[i].y);
+  for (std::size_t i = 0; i < points.size(); ++i)
+    sketch.point("p" + std::to_string(i), points[i].x, points[i].y);
   for (std::size_t i = 0; i < points.size(); ++i) {
     sketch.line("l" + std::to_string(i), "p" + std::to_string(i), "p" + std::to_string((i + 1) % points.size()));
   }
@@ -287,7 +296,8 @@ Wire build_cycloidal_disc_profile_wire(const CycloidalProfile& profile, Cycloida
     const reactive::BSplineFit fit = reactive::fit_cubic_bspline_control_points(samples, options);
 
     SplineSpec spec;
-    for (const auto& pole : fit.control_points) spec.control_points.push_back({Scalar(pole[0]), Scalar(pole[1]), Scalar(pole[2])});
+    for (const auto& pole : fit.control_points)
+      spec.control_points.push_back({Scalar(pole[0]), Scalar(pole[1]), Scalar(pole[2])});
     spec.degree = fit.degree;
     const std::vector<double> knots = fit.unique_knots();
     spec.knots = ScalarList(knots.begin(), knots.end());
@@ -298,7 +308,8 @@ Wire build_cycloidal_disc_profile_wire(const CycloidalProfile& profile, Cycloida
   }
 
   Wire wire = make_wire_from_edges_rwire(edges);
-  if (fit_data != nullptr) *fit_data = std::move(data);
+  if (fit_data != nullptr)
+    *fit_data = std::move(data);
   return wire;
 }
 

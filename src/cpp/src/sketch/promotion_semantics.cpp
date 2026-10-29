@@ -14,7 +14,9 @@ namespace {
 
 using ProfileList = std::vector<std::pair<SketchProfileId, SketchProfile>>;
 
-bool is_lower_alpha(char c) { return c >= 'a' && c <= 'z'; }
+bool is_lower_alpha(char c) {
+  return c >= 'a' && c <= 'z';
+}
 
 std::string sketch_tag_of(const Sketch& sketch) {
   return safe_semantic_tag("sketch", sketch.name() && !sketch.name()->empty() ? *sketch.name() : sketch.sketch_id());
@@ -82,7 +84,8 @@ TagBinding identity_binding(const std::string& tag, const std::string& kind, con
   Value promotion = Value::object();
   promotion.set("sketch_id", sketch.sketch_id());
   promotion.set("profile_id", profile_id);
-  if (entity_id) promotion.set("entity_id", *entity_id);
+  if (entity_id)
+    promotion.set("entity_id", *entity_id);
   Value evidence = Value::object();
   evidence.set("operation", operation);
   evidence.set("target_topo_id", target_topo_id);
@@ -96,7 +99,8 @@ TagBinding identity_binding(const std::string& tag, const std::string& kind, con
   binding.policy.mut().producer.rule_id = rule_id;
   binding.policy.mut().producer.rule_version = "1.0";
   binding.policy.mut().target.kind = TagTargetKind::ScopeRoot;
-  binding.policy.mut().propagation.topology = kind == "face" ? TopologyPropagation::Downward : TopologyPropagation::Local;
+  binding.policy.mut().propagation.topology =
+      kind == "face" ? TopologyPropagation::Downward : TopologyPropagation::Local;
   binding.policy.mut().propagation.lineage = LineagePolicy::ContinuationFragment;
   binding.evidence.mut().kind = TagEvidenceKind::TopologyChange;
   binding.evidence.mut().data = std::move(evidence);
@@ -115,7 +119,8 @@ const SourceWire& source_wire_for(const PromotionLoops& promotion, const TopoDS_
       ++matches;
     }
   }
-  if (matches != 1) throw ValueError("Sketch promotion cannot establish exact profile-to-wire correspondence");
+  if (matches != 1)
+    throw ValueError("Sketch promotion cannot establish exact profile-to-wire correspondence");
   return *found;
 }
 
@@ -137,17 +142,20 @@ EdgeSource edge_source_for(const PromotionLoops& promotion, const TopoDS_Shape& 
       }
     }
   }
-  if (matches != 1) throw ValueError("Sketch promotion cannot establish exact entity-to-edge correspondence");
+  if (matches != 1)
+    throw ValueError("Sketch promotion cannot establish exact entity-to-edge correspondence");
   return {loop, *entity_id};
 }
 
 std::vector<Wire> wires_of_shape(const Shape& shape) {
-  if (shape.kind() == Kind::Wire) return {Wire(shape)};
+  if (shape.kind() == Kind::Wire)
+    return {Wire(shape)};
   return Face(shape).wires();
 }
 
 std::vector<Edge> edges_of_shape(const Shape& shape) {
-  if (shape.kind() == Kind::Wire) return Wire(shape).edges();
+  if (shape.kind() == Kind::Wire)
+    return Wire(shape).edges();
   return Face(shape).edges();
 }
 
@@ -159,15 +167,19 @@ std::string safe_semantic_tag(const std::string& prefix, const std::string& valu
   const auto not_space = [](unsigned char c) { return !std::isspace(c); };
   raw.erase(raw.begin(), std::find_if(raw.begin(), raw.end(), not_space));
   raw.erase(std::find_if(raw.rbegin(), raw.rend(), not_space).base(), raw.end());
-  if (raw.empty()) raw = "unnamed";
-  std::transform(raw.begin(), raw.end(), raw.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  if (raw.empty())
+    raw = "unnamed";
+  std::transform(raw.begin(), raw.end(), raw.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
   // Runs of anything outside [a-z0-9_-] become one separator; empty segments vanish.
   std::vector<std::string> segments;
   std::string current;
   const auto flush = [&] {
-    if (current.empty()) return;
-    if (!is_lower_alpha(current.front())) current = "id_" + current;
+    if (current.empty())
+      return;
+    if (!is_lower_alpha(current.front()))
+      current = "id_" + current;
     segments.push_back(std::move(current));
     current.clear();
   };
@@ -180,9 +192,11 @@ std::string safe_semantic_tag(const std::string& prefix, const std::string& valu
     }
   }
   flush();
-  if (segments.empty()) segments.push_back("unnamed");
+  if (segments.empty())
+    segments.push_back("unnamed");
   std::string tag = prefix + ".";
-  for (std::size_t i = 0; i < segments.size(); ++i) tag += (i == 0 ? "" : ".") + segments[i];
+  for (std::size_t i = 0; i < segments.size(); ++i)
+    tag += (i == 0 ? "" : ".") + segments[i];
   return normalize_tag(tag, /*strict=*/true);
 }
 
@@ -241,9 +255,8 @@ Value sketch_promotion_map(const Sketch& sketch, const SketchProfileId& profile,
   out.set("profile_id", payload.id);
   out.set("profile_kind", payload.kind);
   out.set("tags", Value(Value::Array{Value(sketch_tag), Value(profile_tag_of(payload))}));
-  out.set("topology_name",
-          topology_name(target_kind.empty() ? "profile" : target_kind, sketch_tag + ".profile." + profile_local,
-                        profile_local));
+  out.set("topology_name", topology_name(target_kind.empty() ? "profile" : target_kind,
+                                         sketch_tag + ".profile." + profile_local, profile_local));
   out.set("loops", Value(std::move(loops)));
   out.set("edges", Value(std::move(edges)));
   return out;
@@ -301,8 +314,8 @@ void apply_sketch_promotion_identity_tags(Shape& shape, const Sketch& sketch, co
       const SourceWire& loop = source_wire_for(promotion, wire.wrapped());
       const std::string loop_id = loop.payload.id.empty() ? "profile" : loop.payload.id;
       const std::string loop_local = local_name(loop_id);
-      wire.add_binding(identity_binding(sketch_prefix + ".profile." + loop_local, "wire", loop_local, operation,
-                                        sketch, loop_id, wire.topo_id(), std::nullopt));
+      wire.add_binding(identity_binding(sketch_prefix + ".profile." + loop_local, "wire", loop_local, operation, sketch,
+                                        loop_id, wire.topo_id(), std::nullopt));
     }
   }
 

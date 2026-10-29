@@ -29,19 +29,24 @@ TagEvidence topology_change(std::string_view change_id = "change_1") {
 
 TEST_CASE("uuid5 and the deterministic bindings reproduce Python's ids") {
   CHECK(uuid5_url_hex("x") == "4cd605e7afa25360b5b9c5e9fb5c76f4");
-  const TagBinding role = operation_role_tag_binding("face.box.top", "make_box_rsolid", "box.top", "face_3", "Generated");
+  const TagBinding role =
+      operation_role_tag_binding("face.box.top", "make_box_rsolid", "box.top", "face_3", "Generated");
   CHECK(role.binding_id == "tag_binding_87d1b369bb7b59a9aa02f73c288c88d2");
-  CHECK(role.to_value().dump() ==
-        R"({"schema_version":"1.0","binding_id":"tag_binding_87d1b369bb7b59a9aa02f73c288c88d2","tag":"face.box.top",)"
-        R"("producer":{"kind":"auto_rule","node_id":null,"rule_id":"simplecad.operation_output_role","rule_version":"1.0"},)"
-        R"("scope":{"node_id":null,"output_slot":0},"target":{"kind":"scope_root"},"attachment":"local",)"
-        R"("propagation":{"topology":"local","lineage":"continuation_fragment"},)"
-        R"("evidence":{"kind":"topology_change","operation":"make_box_rsolid","result_role":"box.top",)"
-        R"("target_topo_id":"face_3","evidence_method":"Generated"},"certainty":"proven","lifecycle":"recompute"})");
+  CHECK(
+      role.to_value().dump() ==
+      R"({"schema_version":"1.0","binding_id":"tag_binding_87d1b369bb7b59a9aa02f73c288c88d2","tag":"face.box.top",)"
+      R"("producer":{"kind":"auto_rule","node_id":null,"rule_id":"simplecad.operation_output_role","rule_version":"1.0"},)"
+      R"("scope":{"node_id":null,"output_slot":0},"target":{"kind":"scope_root"},"attachment":"local",)"
+      R"("propagation":{"topology":"local","lineage":"continuation_fragment"},)"
+      R"("evidence":{"kind":"topology_change","operation":"make_box_rsolid","result_role":"box.top",)"
+      R"("target_topo_id":"face_3","evidence_method":"Generated"},"certainty":"proven","lifecycle":"recompute"})");
 }
 
 TEST_CASE("the other factories have Python's layout") {
-  CHECK(user_tag_binding("role.mount").to_value().dump().find(R"("evidence":{"kind":"user_assertion","authoring_source":"simplecadapi.apply_tag"})") !=
+  CHECK(user_tag_binding("role.mount")
+            .to_value()
+            .dump()
+            .find(R"("evidence":{"kind":"user_assertion","authoring_source":"simplecadapi.apply_tag"})") !=
         std::string::npos);
   const TagBinding internal = internal_tag_binding("face.top");
   CHECK(internal.propagation().lineage == LineagePolicy::None);
@@ -55,11 +60,14 @@ TEST_CASE("the other factories have Python's layout") {
 
 TEST_CASE("projected bindings are deterministic and remember the root of the chain") {
   const TagBinding source = user_tag_binding("role.datum");
-  const TagBinding first = projected_tag_binding(source, "make_extrude_rsolid", "extrusion.side", "edge_1", "face_2", "Generated");
-  const TagBinding again = projected_tag_binding(source, "make_extrude_rsolid", "extrusion.side", "edge_1", "face_2", "Generated");
+  const TagBinding first =
+      projected_tag_binding(source, "make_extrude_rsolid", "extrusion.side", "edge_1", "face_2", "Generated");
+  const TagBinding again =
+      projected_tag_binding(source, "make_extrude_rsolid", "extrusion.side", "edge_1", "face_2", "Generated");
   CHECK(first.binding_id == again.binding_id);
   CHECK(first.evidence->data.find("source_binding_id")->as_string() == source.binding_id);
-  const TagBinding second = projected_tag_binding(first, "make_translate_rshape", "modified", "face_2", "face_9", "Modified");
+  const TagBinding second =
+      projected_tag_binding(first, "make_translate_rshape", "modified", "face_2", "face_9", "Modified");
   CHECK(second.evidence->data.find("source_binding_id")->as_string() == source.binding_id);
   CHECK(second.evidence->data.find("source_topo_id")->as_string() == "edge_1");
 }
@@ -147,7 +155,8 @@ TEST_CASE("downward propagation is computed from ancestors, not copied") {
   CHECK(edge.has_tag("role.mounting_surface", TagScope::Inherited));
   CHECK(vertex.has_tag("role.mounting_surface"));
   CHECK(face.local_tag_bindings().empty() == face.local_bindings().empty());
-  for (const auto& stored : face.local_bindings()) CHECK(stored.binding_id != binding.binding_id);
+  for (const auto& stored : face.local_bindings())
+    CHECK(stored.binding_id != binding.binding_id);
   CHECK(contains(face.list_tags(), "role.mounting_surface"));
 
   // A sub-shape reached without enumerating its parents sees the tag as well.
@@ -181,7 +190,8 @@ TEST_CASE("explain_tag names the inherited path from the ancestor down") {
   const auto own = box.explain_tag("role.mounting_surface", TagScope::Local);
   REQUIRE(own.size() == 1);
   std::vector<std::string> keys;
-  for (const auto& [key, value] : own[0].as_object()) keys.push_back(key);
+  for (const auto& [key, value] : own[0].as_object())
+    keys.push_back(key);
   CHECK(keys == std::vector<std::string>{"scope", "binding_id", "producer", "attachment", "binding"});
   CHECK(own[0].find("attachment")->as_string() == "local");
 }
@@ -255,12 +265,14 @@ TEST_CASE("one token from two producers is one tag but two explanations") {
   const auto explanations = vertex_owner.explain_tag("role.datum", TagScope::Local);
   REQUIRE(explanations.size() == 2);
   std::set<std::string> producers;
-  for (const auto& e : explanations) producers.insert(e.find("producer")->find("kind")->as_string());
+  for (const auto& e : explanations)
+    producers.insert(e.find("producer")->find("kind")->as_string());
   CHECK(producers == std::set<std::string>{"user_operation", "auto_rule"});
 
   CHECK(vertex_owner.remove_tag_bindings("role.datum") == 1);  // the user assertion goes
   CHECK(vertex_owner.list_tags(TagScope::Local) == std::vector<std::string>{"role.datum"});
-  CHECK(vertex_owner.explain_tag("role.datum", TagScope::Local)[0].find("producer")->find("kind")->as_string() == "auto_rule");
+  CHECK(vertex_owner.explain_tag("role.datum", TagScope::Local)[0].find("producer")->find("kind")->as_string() ==
+        "auto_rule");
   CHECK(vertex_owner.remove_tag_bindings("role.datum", automatic.producer()) == 1);
   CHECK_FALSE(vertex_owner.has_tag("role.datum"));
 }
@@ -268,7 +280,8 @@ TEST_CASE("one token from two producers is one tag but two explanations") {
 TEST_CASE("internal and legacy bindings are not user assertions") {
   Solid box = box_solid(1, 1, 1);
   box.add_tag("internal.marker");
-  CHECK(box.explain_tag("internal.marker", TagScope::Local)[0].find("producer")->find("kind")->as_string() == "auto_rule");
+  CHECK(box.explain_tag("internal.marker", TagScope::Local)[0].find("producer")->find("kind")->as_string() ==
+        "auto_rule");
 
   box.set_legacy_tags({"legacy.marker"});
   const auto legacy = box.explain_tag("legacy.marker");
@@ -285,7 +298,7 @@ TEST_CASE("has_tag compares the name as given") {
   Solid box = box_solid(1, 1, 1);
   box.add_tag("box");
   CHECK(box.has_tag("box"));
-  CHECK_FALSE(box.has_tag("Box"));         // not normalized: simply absent
+  CHECK_FALSE(box.has_tag("Box"));  // not normalized: simply absent
   CHECK_THROWS_AS((void)box.explain_tag("Box"), ValueError);
 }
 

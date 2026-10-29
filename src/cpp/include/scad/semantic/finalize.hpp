@@ -164,8 +164,10 @@ std::optional<ValueLineage> finalize_runtime_object(OpRecord record, std::string
 
 // _semantic_delta_for_output: `created` refs "<op>:<slot>"; entity_type "" picks it from the op name.
 SemanticDelta semantic_delta_for_output(std::string_view op, int output_count = 1, std::string_view entity_type = {});
-SemanticDelta semantic_created(std::string_view entity_type, std::string_view entity_id, Value metadata = Value::object());
-SemanticDelta semantic_modified(std::string_view entity_type, std::string_view entity_id, Value metadata = Value::object());
+SemanticDelta semantic_created(std::string_view entity_type, std::string_view entity_id,
+                               Value metadata = Value::object());
+SemanticDelta semantic_modified(std::string_view entity_type, std::string_view entity_id,
+                                Value metadata = Value::object());
 
 // _attach_track_summary: metadata "track" = {op, has_delta, preserved, ..., entry_count}.
 void attach_track_summary(Shape& shape, std::string_view op, const TopoDelta* delta = nullptr,
@@ -201,8 +203,8 @@ Shape apply_topology_identity_tag(Shape scope, const TagTargets& targets, std::s
 Shape copy_exact_topology_identity_tags(Shape target, const std::vector<Shape>& sources, std::string_view operation);
 
 // _attach_lineage_from_source: record `source`'s tags as lineage of `target` under `derivation`.
-void attach_lineage_from_source(const Shape& source, Shape& target, LineageDerivation derivation,
-                                std::string_view op, std::string_view coverage = "complete");
+void attach_lineage_from_source(const Shape& source, Shape& target, LineageDerivation derivation, std::string_view op,
+                                std::string_view coverage = "complete");
 
 // _copy_runtime_state: copy `source`'s runtime values to `target`, except mesh caches.
 void copy_runtime_state(const Shape& source, Shape& target);

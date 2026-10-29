@@ -13,7 +13,8 @@ namespace scad::product {
 
 ScalarLimit::ScalarLimit(double lower_value, double upper_value)
     : lower_(finite_float(lower_value, "lower_value")), upper_(finite_float(upper_value, "upper_value")) {
-  if (lower_ > upper_) throw ValueError("lower_value must be less than or equal to upper_value");
+  if (lower_ > upper_)
+    throw ValueError("lower_value must be less than or equal to upper_value");
 }
 
 bool ScalarLimit::contains(double value) const {
@@ -32,13 +33,16 @@ Value ScalarLimit::to_dict() const {
 // Constraint
 // ---------------------------------------------------------------------------
 
-bool is_coupling_kind(const std::string& kind) noexcept { return kind == "gear" || kind == "belt" || kind == "rack_pinion"; }
+bool is_coupling_kind(const std::string& kind) noexcept {
+  return kind == "gear" || kind == "belt" || kind == "rack_pinion";
+}
 
 namespace {
 
 std::string normalized_kind(const std::string& raw) {
   std::string kind = strip(raw);
-  std::transform(kind.begin(), kind.end(), kind.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  std::transform(kind.begin(), kind.end(), kind.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
   if (kind != "fixed" && kind != "revolute" && kind != "prismatic" && kind != "gear" && kind != "belt" &&
       kind != "rack_pinion") {
     throw ValueError("constraint_kind must be fixed, revolute, prismatic, gear, belt, or rack_pinion");
@@ -60,8 +64,10 @@ void check_kind_rules(const std::string& kind, ConstraintSettings& s) {
     throw ValueError(kind + " constraints do not accept coupling radii or phase_offset");
   }
   if (kind == "fixed") {
-    if (has_drive) throw ValueError("fixed constraints do not accept drive scalars");
-    if (has_limit) throw ValueError("fixed constraints do not accept scalar limits");
+    if (has_drive)
+      throw ValueError("fixed constraints do not accept drive scalars");
+    if (has_limit)
+      throw ValueError("fixed constraints do not accept scalar limits");
   }
   if (kind == "revolute" && (s.drive_distance || s.distance_limit)) {
     throw ValueError("revolute constraints only accept angle scalars");
@@ -70,24 +76,30 @@ void check_kind_rules(const std::string& kind, ConstraintSettings& s) {
     throw ValueError("prismatic constraints only accept distance scalars");
   }
   if (is_coupling_kind(kind)) {
-    if (has_drive) throw ValueError(kind + " constraints do not accept drive scalars");
-    if (has_limit) throw ValueError(kind + " constraints do not accept scalar limits");
-    if (!s.phase_offset) s.phase_offset = 0.0;
+    if (has_drive)
+      throw ValueError(kind + " constraints do not accept drive scalars");
+    if (has_limit)
+      throw ValueError(kind + " constraints do not accept scalar limits");
+    if (!s.phase_offset)
+      s.phase_offset = 0.0;
   }
   if (kind == "gear") {
-    if (!s.pitch_radius_a || !s.pitch_radius_b) throw ValueError("gear constraints require pitch_radius_a and pitch_radius_b");
+    if (!s.pitch_radius_a || !s.pitch_radius_b)
+      throw ValueError("gear constraints require pitch_radius_a and pitch_radius_b");
     if (any_set({&s.pulley_radius_a, &s.pulley_radius_b, &s.pitch_radius})) {
       throw ValueError("gear constraints only accept pitch_radius_a and pitch_radius_b");
     }
   }
   if (kind == "belt") {
-    if (!s.pulley_radius_a || !s.pulley_radius_b) throw ValueError("belt constraints require pulley_radius_a and pulley_radius_b");
+    if (!s.pulley_radius_a || !s.pulley_radius_b)
+      throw ValueError("belt constraints require pulley_radius_a and pulley_radius_b");
     if (any_set({&s.pitch_radius_a, &s.pitch_radius_b, &s.pitch_radius})) {
       throw ValueError("belt constraints only accept pulley_radius_a and pulley_radius_b");
     }
   }
   if (kind == "rack_pinion") {
-    if (!s.pitch_radius) throw ValueError("rack_pinion constraints require pitch_radius");
+    if (!s.pitch_radius)
+      throw ValueError("rack_pinion constraints require pitch_radius");
     if (any_set({&s.pitch_radius_a, &s.pitch_radius_b, &s.pulley_radius_a, &s.pulley_radius_b})) {
       throw ValueError("rack_pinion constraints only accept pitch_radius");
     }
@@ -103,7 +115,8 @@ Constraint::Constraint(std::string constraint_id, std::string constraint_kind, C
       a_(std::move(connector_a)),
       b_(std::move(connector_b)),
       settings_(std::move(settings)) {
-  if (a_ == b_) throw ValueError("constraint cannot connect the same connector ref twice");
+  if (a_ == b_)
+    throw ValueError("constraint cannot connect the same connector ref twice");
   ConstraintSettings& s = settings_;
   optional_float(s.drive_distance, "drive_distance");
   optional_float(s.drive_angle_degrees, "drive_angle_degrees");
@@ -119,8 +132,12 @@ Constraint::Constraint(std::string constraint_id, std::string constraint_kind, C
 
 namespace {
 
-Value optional_value(const OptionalDouble& value) { return value ? Value(*value) : Value(); }
-Value limit_value(const std::optional<ScalarLimit>& limit) { return limit ? limit->to_dict() : Value(); }
+Value optional_value(const OptionalDouble& value) {
+  return value ? Value(*value) : Value();
+}
+Value limit_value(const std::optional<ScalarLimit>& limit) {
+  return limit ? limit->to_dict() : Value();
+}
 
 }  // namespace
 
@@ -173,7 +190,8 @@ namespace {
 
 Value string_array(const std::vector<std::string>& items) {
   Value out = Value::array();
-  for (const std::string& item : items) out.push_back(item);
+  for (const std::string& item : items)
+    out.push_back(item);
   return out;
 }
 
@@ -186,7 +204,8 @@ Value ConstraintReport::to_dict() const {
   out.set("solved_component_ids", string_array(solved_component_ids));
   out.set("unsolved_component_ids", string_array(unsolved_component_ids));
   Value rows = Value::array();
-  for (const ConstraintResidual& residual : residuals) rows.push_back(residual.to_dict());
+  for (const ConstraintResidual& residual : residuals)
+    rows.push_back(residual.to_dict());
   out.set("residuals", std::move(rows));
   return out;
 }

@@ -13,8 +13,8 @@ namespace scad {
 
 class Num {
  public:
-  Num(double value) noexcept : scalar_(value) {}   // NOLINT(google-explicit-constructor)
-  Num(int value) noexcept : scalar_(value) {}      // NOLINT(google-explicit-constructor)
+  Num(double value) noexcept : scalar_(value) {}      // NOLINT(google-explicit-constructor)
+  Num(int value) noexcept : scalar_(value) {}         // NOLINT(google-explicit-constructor)
   Num(Scalar scalar) : scalar_(std::move(scalar)) {}  // NOLINT(google-explicit-constructor)
 
   bool symbolic() const noexcept { return scalar_.symbolic(); }

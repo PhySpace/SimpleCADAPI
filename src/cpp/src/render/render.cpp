@@ -26,16 +26,23 @@ AnchorResult Panel::project(const Vec3& p) const {
 namespace {
 
 using Clock = std::chrono::steady_clock;
-double ms_since(Clock::time_point t) { return std::chrono::duration<double, std::milli>(Clock::now() - t).count(); }
+double ms_since(Clock::time_point t) {
+  return std::chrono::duration<double, std::milli>(Clock::now() - t).count();
+}
 
 }  // namespace
 
 Frame render_scene(const Scene& scene, const RenderOptions& o) {
-  if (o.width < 1 || o.height < 1) throw ValueError("image size must be greater than zero");
-  if (o.supersample < 1 || o.supersample > 4) throw ValueError("supersample must be within 1..4");
-  if (o.views.empty()) throw ValueError("at least one render view is required");
-  if (!(o.zoom > 0.0)) throw ValueError("zoom must be greater than zero");
-  if (o.legend_panel_fraction < 0.0 || o.legend_panel_fraction >= 1.0) throw ValueError("legend_panel_fraction must be in [0, 1)");
+  if (o.width < 1 || o.height < 1)
+    throw ValueError("image size must be greater than zero");
+  if (o.supersample < 1 || o.supersample > 4)
+    throw ValueError("supersample must be within 1..4");
+  if (o.views.empty())
+    throw ValueError("at least one render view is required");
+  if (!(o.zoom > 0.0))
+    throw ValueError("zoom must be greater than zero");
+  if (o.legend_panel_fraction < 0.0 || o.legend_panel_fraction >= 1.0)
+    throw ValueError("legend_panel_fraction must be in [0, 1)");
   const auto t0 = Clock::now();
   const int ss = o.supersample;
   const int threads = o.threads > 0 ? o.threads : default_threads();
@@ -54,7 +61,8 @@ Frame render_scene(const Scene& scene, const RenderOptions& o) {
   target.height = o.height;
   target.ss_width = o.width * ss;
   target.ss_height = o.height * ss;
-  std::vector<std::uint8_t> big(static_cast<std::size_t>(target.ss_width) * static_cast<std::size_t>(target.ss_height) * 4);
+  std::vector<std::uint8_t> big(static_cast<std::size_t>(target.ss_width) * static_cast<std::size_t>(target.ss_height) *
+                                4);
   target.rgba = big.data();
   target.depth = frame.depth.data();
   target.mesh_id = frame.mesh_id.data();
@@ -73,10 +81,12 @@ Frame render_scene(const Scene& scene, const RenderOptions& o) {
   // Scene measures.
   Bounds bounds = scene.bounds();
   double span = bounds.valid ? bounds.span() : 1.0;
-  if (span <= 0.0) span = 1.0;
+  if (span <= 0.0)
+    span = 1.0;
   bool has_ink = false;
   for (const auto& l : scene.lines())
-    if (l.style.width_world < 0.0) has_ink = true;
+    if (l.style.width_world < 0.0)
+      has_ink = true;
   frame.ink_diameter = (has_ink && o.edge_width_scale > 0.0) ? 2.0 * o.edge_width_scale * span : 0.0;
   if (frame.ink_diameter > 0.0 && bounds.valid) {
     const double r = frame.ink_diameter * 0.5;
@@ -98,11 +108,12 @@ Frame render_scene(const Scene& scene, const RenderOptions& o) {
     const int y1 = static_cast<int>(std::lround(static_cast<double>(row + 1) * o.height / rows));
     panel.width = x1 - panel.x;
     panel.height = y1 - panel.y;
-    if (panel.width < 1 || panel.height < 1) throw ValueError("image too small for the requested views");
+    if (panel.width < 1 || panel.height < 1)
+      throw ValueError("image too small for the requested views");
     const ViewSpec& v = o.views[static_cast<std::size_t>(i)];
     panel.label = v.label;
-    panel.camera = fit_camera(v.elevation, v.azimuth, bounds, static_cast<double>(panel.width) / panel.height, o.view_up,
-                              o.zoom);
+    panel.camera =
+        fit_camera(v.elevation, v.azimuth, bounds, static_cast<double>(panel.width) / panel.height, o.view_up, o.zoom);
     detail::PanelParams params;
     params.camera = panel.camera;
     params.rect = {panel.x, panel.y, panel.width, panel.height};
@@ -133,8 +144,10 @@ Frame render_scene(const Scene& scene, const RenderOptions& o) {
         for (int dy = -1; dy <= 1 && !r.visible; ++dy)
           for (int dx = -1; dx <= 1; ++dx) {
             const int x = px + dx, y = py + dy;
-            if (x < panel.x || y < panel.y || x >= panel.x + panel.width || y >= panel.y + panel.height) continue;
-            if (frame.depth[static_cast<std::size_t>(y) * static_cast<std::size_t>(o.width) + static_cast<std::size_t>(x)] >= r.depth - tol) {
+            if (x < panel.x || y < panel.y || x >= panel.x + panel.width || y >= panel.y + panel.height)
+              continue;
+            if (frame.depth[static_cast<std::size_t>(y) * static_cast<std::size_t>(o.width) +
+                            static_cast<std::size_t>(x)] >= r.depth - tol) {
               r.visible = true;
               break;
             }

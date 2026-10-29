@@ -24,7 +24,8 @@ double golden_section_search(const std::function<double(double)>& func, double a
   double fc = func(c);
   double fd = func(d);
   for (int i = 0; i < kGoldenMaxIterations; ++i) {
-    if (b - a <= kGoldenTolerance) break;
+    if (b - a <= kGoldenTolerance)
+      break;
     if (fc < fd) {
       b = d;
       d = c;
@@ -48,7 +49,8 @@ double loop_residual_at_scalar(const Assembly& assembly, const Constraint& const
   const ConnectorRef& unknown_ref = known_side == Side::A ? constraint.connector_b() : constraint.connector_a();
   const ConnectorRef& known_ref = known_side == Side::A ? constraint.connector_a() : constraint.connector_b();
   Placement motion = motion_from_scalar(constraint, candidate_scalar);
-  if (known_side == Side::B) motion = inverse_placement(motion);
+  if (known_side == Side::B)
+    motion = inverse_placement(motion);
   const Placement known_frame = known_placement.compose(connector_local_frame(assembly, known_ref));
   const Placement target_placement =
       known_frame.compose(motion).compose(inverse_placement(connector_local_frame(assembly, unknown_ref)));
@@ -67,23 +69,28 @@ std::optional<double> propagation_scalar(const Assembly& assembly, const Constra
   if (constraint.constraint_kind() == "prismatic" && constraint.drive_distance()) {
     return project_scalar(*constraint.drive_distance(), bounds);
   }
-  if (bounds) return project_scalar(constraint_current_scalar(assembly, constraint), bounds);
+  if (bounds)
+    return project_scalar(constraint_current_scalar(assembly, constraint), bounds);
   return std::nullopt;
 }
 
 Value authored_placements_of(const Assembly& assembly) {
   const Value existing = assembly.get_runtime(kAuthoredPlacementsKey);
-  if (!existing.is_null()) return existing;
+  if (!existing.is_null())
+    return existing;
   Value authored = Value::object();
-  for (const Component& component : assembly.components()) authored.set(component.component_id, component.placement.to_dict());
+  for (const Component& component : assembly.components())
+    authored.set(component.component_id, component.placement.to_dict());
   return authored;
 }
 
 Value definition_runtime_of(const Assembly& assembly) {
   Value out = Value::object();
-  if (!assembly.runtime().is_object()) return out;
+  if (!assembly.runtime().is_object())
+    return out;
   for (const auto& [key, value] : assembly.runtime().as_object()) {
-    if (key.rfind(kDefinitionRuntimePrefix, 0) == 0) out.set(key, value);
+    if (key.rfind(kDefinitionRuntimePrefix, 0) == 0)
+      out.set(key, value);
   }
   return out;
 }
@@ -94,21 +101,25 @@ Value definition_runtime_of(const Assembly& assembly) {
 
 AssemblyPtr solve_assembly_constraints(const AssemblyPtr& input, bool strict) {
   using namespace detail;
-  if (!input) throw TypeError("assembly must be an Assembly");
+  if (!input)
+    throw TypeError("assembly must be an Assembly");
   const Value definition_runtime = definition_runtime_of(*input);
   const Value authored = authored_placements_of(*input);
-  if (input->constraints().empty()) return input;
+  if (input->constraints().empty())
+    return input;
   if (input->grounded_component_ids().empty()) {
     throw ValueError("assembly constraints require at least one grounded component");
   }
 
   Assembly assembly = *input;
   std::map<std::string, Placement> solved;
-  for (const std::string& id : assembly.grounded_component_ids()) solved.emplace(id, assembly.get_component(id).placement);
+  for (const std::string& id : assembly.grounded_component_ids())
+    solved.emplace(id, assembly.get_component(id).placement);
 
   std::vector<Constraint> pending;
   for (const Constraint& constraint : assembly.constraints()) {
-    if (!constraint.is_coupling()) pending.push_back(constraint);
+    if (!constraint.is_coupling())
+      pending.push_back(constraint);
   }
 
   const auto place_other = [&](const Constraint& constraint, Side known_side, const std::string& known_id,
@@ -155,7 +166,8 @@ AssemblyPtr solve_assembly_constraints(const AssemblyPtr& input, bool strict) {
     const std::string b_id = constraint.connector_b().component_id();
     const Bounds bounds = constraint_scalar_bounds(constraint);
     if (!bounds) {
-      if (strict) raise_structural_failure(assembly, StructuralFailure::UnresolvableLoop, &constraint);
+      if (strict)
+        raise_structural_failure(assembly, StructuralFailure::UnresolvableLoop, &constraint);
       continue;
     }
     Side known_side = Side::A;
@@ -164,26 +176,32 @@ AssemblyPtr solve_assembly_constraints(const AssemblyPtr& input, bool strict) {
     } else if (solved.count(b_id) != 0) {
       known_side = Side::B;
     } else {
-      if (strict) raise_structural_failure(assembly, StructuralFailure::NoGroundedPath, &constraint);
+      if (strict)
+        raise_structural_failure(assembly, StructuralFailure::NoGroundedPath, &constraint);
       continue;
     }
     const std::string& known_id = known_side == Side::A ? a_id : b_id;
     const std::string& unknown_id = known_side == Side::A ? b_id : a_id;
     const Placement known_placement = solved.at(known_id);
     const double best = golden_section_search(
-        [&](double scalar) { return loop_residual_at_scalar(assembly, constraint, known_side, known_placement, scalar); },
+        [&](double scalar) {
+          return loop_residual_at_scalar(assembly, constraint, known_side, known_placement, scalar);
+        },
         bounds->first, bounds->second);
     solved.insert_or_assign(unknown_id, solve_other_component(assembly, constraint, known_side, known_placement, best));
   }
 
   std::vector<std::string> unsolved;
   for (const Component& component : assembly.components()) {
-    if (solved.count(component.component_id) == 0) unsolved.push_back(component.component_id);
+    if (solved.count(component.component_id) == 0)
+      unsolved.push_back(component.component_id);
   }
-  if (strict && !unsolved.empty()) raise_structural_failure(assembly, StructuralFailure::UnsolvedComponents, nullptr, unsolved);
+  if (strict && !unsolved.empty())
+    raise_structural_failure(assembly, StructuralFailure::UnsolvedComponents, nullptr, unsolved);
 
   Assembly result = assembly;
-  for (const auto& [id, placement] : solved) result = result.with_component_placement(id, placement);
+  for (const auto& [id, placement] : solved)
+    result = result.with_component_placement(id, placement);
   result = solve_coupling_constraints(result);
   const ConstraintReport report = inspect_assembly_constraints(result);
   if (strict && std::any_of(report.residuals.begin(), report.residuals.end(),
@@ -193,7 +211,8 @@ AssemblyPtr solve_assembly_constraints(const AssemblyPtr& input, bool strict) {
   result.set_runtime("constraint_report", report.to_dict());
   result.set_runtime(std::string(kAuthoredPlacementsKey), authored);
   if (definition_runtime.is_object()) {
-    for (const auto& [key, value] : definition_runtime.as_object()) result.set_runtime(key, value);
+    for (const auto& [key, value] : definition_runtime.as_object())
+      result.set_runtime(key, value);
   }
   return std::make_shared<const Assembly>(std::move(result));
 }

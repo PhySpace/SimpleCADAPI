@@ -36,7 +36,8 @@ struct ToothOptions {
 };
 
 // ValueError for a tuning outside its range, a tip not above the root, a backlash that eats the tooth.
-ToothGeometry compute_tooth_geometry(int n_teeth, double module, double pressure_angle, const ToothOptions& options = {});
+ToothGeometry compute_tooth_geometry(int n_teeth, double module, double pressure_angle,
+                                     const ToothOptions& options = {});
 
 // _internal_ring_radii: (pitch, internal tooth tip, internal root, outer rim).
 struct InternalRingRadii {

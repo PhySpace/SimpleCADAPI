@@ -27,13 +27,15 @@ Value promotion_params(const Sketch& sketch, const SketchProfileId& profile, con
                        const Promotion& promotion, const char* target_kind, const Value* inner_profiles) {
   Value params = Value::object();
   params.set("profile", profile.to_value());
-  if (inner_profiles != nullptr) params.set("inner_profiles", *inner_profiles);
+  if (inner_profiles != nullptr)
+    params.set("inner_profiles", *inner_profiles);
   params.set("sketch", sketch.to_value());
   const Value solve = solve_params(request);
-  for (const auto& [key, value] : solve.as_object()) params.set(key, value);
+  for (const auto& [key, value] : solve.as_object())
+    params.set(key, value);
   params.set("solve_snapshot", promotion.solve_result.to_value());
-  params.set("promotion_map", sketch_promotion_map(sketch, profile, promotion.profile_payload,
-                                                   promotion.inner_profiles, target_kind));
+  params.set("promotion_map",
+             sketch_promotion_map(sketch, profile, promotion.profile_payload, promotion.inner_profiles, target_kind));
   return params;
 }
 
@@ -69,7 +71,8 @@ Wire make_wire_from_sketch_rwire(const Sketch& sketch, const SketchProfileId& pr
     return occt_guard([&] {
       Promotion promotion = promote_sketch_profile(sketch, profile, PromotionTarget::Wire, {}, request);
       Value params = promotion_params(sketch, profile, request, promotion, "wire", nullptr);
-      Shape shape = finalize_sketch_promotion(promotion.shape, "make_wire_from_sketch_rwire", std::move(params), sketch);
+      Shape shape =
+          finalize_sketch_promotion(promotion.shape, "make_wire_from_sketch_rwire", std::move(params), sketch);
       apply_sketch_promotion_identity_tags(shape, sketch, promotion, "make_wire_from_sketch_rwire");
       return Wire(shape);
     });
@@ -87,15 +90,18 @@ Face make_face_from_sketch_rface(const Sketch& sketch, const SketchProfileId& pr
        "The sketch constraints are conflicting or invalid.", "The requested profile index or id does not exist.",
        "An inner profile is outside, intersects, or duplicates the outer profile."},
       {"Build closed profiles with add_line_rsketch(...) or add_circle_rsketch(...).",
-       "Add constraints until the profile can solve cleanly.", "Pass hole loops explicitly with inner_profiles=[...]."}};
+       "Add constraints until the profile can solve cleanly.",
+       "Pass hole loops explicitly with inner_profiles=[...]."}};
   return guarded(kSpec, [&] {
     return occt_guard([&] {
       Promotion promotion = promote_sketch_profile(sketch, profile, PromotionTarget::Face, inner_profiles, request);
       Value::Array inner_values;
-      for (const SketchProfileId& inner : inner_profiles) inner_values.push_back(inner.to_value());
+      for (const SketchProfileId& inner : inner_profiles)
+        inner_values.push_back(inner.to_value());
       const Value inner_value(std::move(inner_values));
       Value params = promotion_params(sketch, profile, request, promotion, "face", &inner_value);
-      Shape shape = finalize_sketch_promotion(promotion.shape, "make_face_from_sketch_rface", std::move(params), sketch);
+      Shape shape =
+          finalize_sketch_promotion(promotion.shape, "make_face_from_sketch_rface", std::move(params), sketch);
       apply_sketch_promotion_identity_tags(shape, sketch, promotion, "make_face_from_sketch_rface");
       return Face(shape);
     });
@@ -103,7 +109,8 @@ Face make_face_from_sketch_rface(const Sketch& sketch, const SketchProfileId& pr
 }
 
 std::vector<Face> sketch_to_faces(const Sketch& sketch) {
-  if (!sketch.entities().empty()) return {make_face_from_sketch_rface(sketch)};
+  if (!sketch.entities().empty())
+    return {make_face_from_sketch_rface(sketch)};
   std::vector<Face> faces;
   for (const Wire& wire : sketch.closed_wires()) {
     faces.emplace_back(kernel::make_face_from_wire(TopoDS::Wire(wire.wrapped())));

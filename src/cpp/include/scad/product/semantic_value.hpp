@@ -16,9 +16,13 @@ namespace scad::product {
 class SemanticValue {
  public:
   void set_metadata(std::string key, Value value) const { metadata_.set(std::move(key), std::move(value)); }
-  Value get_metadata(std::string_view key, Value fallback = {}) const { return lookup(metadata_, key, std::move(fallback)); }
+  Value get_metadata(std::string_view key, Value fallback = {}) const {
+    return lookup(metadata_, key, std::move(fallback));
+  }
   void set_runtime(std::string key, Value value) const { runtime_.set(std::move(key), std::move(value)); }
-  Value get_runtime(std::string_view key, Value fallback = {}) const { return lookup(runtime_, key, std::move(fallback)); }
+  Value get_runtime(std::string_view key, Value fallback = {}) const {
+    return lookup(runtime_, key, std::move(fallback));
+  }
 
   const Value& metadata() const noexcept { return metadata_; }
   const Value& runtime() const noexcept { return runtime_; }

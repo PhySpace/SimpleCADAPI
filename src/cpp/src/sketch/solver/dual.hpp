@@ -25,17 +25,20 @@ struct Dual {
 
 inline Dual operator+(const Dual& a, const Dual& b) {
   Dual r(a.v + b.v);
-  for (int i = 0; i < kSlots; ++i) r.g[static_cast<std::size_t>(i)] = a.g[static_cast<std::size_t>(i)] + b.g[static_cast<std::size_t>(i)];
+  for (int i = 0; i < kSlots; ++i)
+    r.g[static_cast<std::size_t>(i)] = a.g[static_cast<std::size_t>(i)] + b.g[static_cast<std::size_t>(i)];
   return r;
 }
 inline Dual operator-(const Dual& a, const Dual& b) {
   Dual r(a.v - b.v);
-  for (int i = 0; i < kSlots; ++i) r.g[static_cast<std::size_t>(i)] = a.g[static_cast<std::size_t>(i)] - b.g[static_cast<std::size_t>(i)];
+  for (int i = 0; i < kSlots; ++i)
+    r.g[static_cast<std::size_t>(i)] = a.g[static_cast<std::size_t>(i)] - b.g[static_cast<std::size_t>(i)];
   return r;
 }
 inline Dual operator-(const Dual& a) {
   Dual r(-a.v);
-  for (int i = 0; i < kSlots; ++i) r.g[static_cast<std::size_t>(i)] = -a.g[static_cast<std::size_t>(i)];
+  for (int i = 0; i < kSlots; ++i)
+    r.g[static_cast<std::size_t>(i)] = -a.g[static_cast<std::size_t>(i)];
   return r;
 }
 inline Dual operator*(const Dual& a, const Dual& b) {
@@ -59,11 +62,13 @@ inline Dual operator/(const Dual& a, const Dual& b) {
 // d|x|/dx is taken as 0 at x = 0 (a zero-length vector has no direction): the
 // solver then sees a flat residual instead of NaN and the damping handles it.
 inline Dual sqrt(const Dual& a) {
-  if (!(a.v > 0.0)) return Dual(0.0);
+  if (!(a.v > 0.0))
+    return Dual(0.0);
   const double root = std::sqrt(a.v);
   Dual r(root);
   const double scale = 0.5 / root;
-  for (int i = 0; i < kSlots; ++i) r.g[static_cast<std::size_t>(i)] = a.g[static_cast<std::size_t>(i)] * scale;
+  for (int i = 0; i < kSlots; ++i)
+    r.g[static_cast<std::size_t>(i)] = a.g[static_cast<std::size_t>(i)] * scale;
   return r;
 }
 

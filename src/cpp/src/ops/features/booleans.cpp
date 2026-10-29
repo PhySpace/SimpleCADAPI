@@ -33,7 +33,8 @@ const ErrorSpec& union_spec() {
       "Failed to compute the boolean union.",
       {"One or more inputs are not Solid objects.", "At least one input solid is null or invalid.",
        "The inputs are separated beyond tol, so the kernel cannot produce exactly one solid.",
-       "The inputs meet only along an edge, vertex, tangent point, or tangent curve, so their union is not one manifold "
+       "The inputs meet only along an edge, vertex, tangent point, or tangent curve, so their union is not one "
+       "manifold "
        "solid."},
       {"Pass only valid Solid objects or sequences of Solid objects.",
        "For intended face contact, make the solids share a finite-area face and retry; no artificial overlap is "
@@ -68,14 +69,13 @@ const ErrorSpec& cut_list_spec() {
 }
 
 const ErrorSpec& intersect_spec() {
-  static const ErrorSpec spec{
-      "intersect_rsolid",
-      "Failed to compute the boolean intersection.",
-      {"One or more inputs are not Solid objects.", "At least one input solid is invalid.",
-       "The solids do not overlap enough to produce a non-empty single solid.",
-       "The kernel could not compute a stable overlap region."},
-      {"Pass only valid Solid objects.", "Verify that the solids truly overlap in space.",
-       "Move the solids so they share a meaningful overlap volume before intersecting."}};
+  static const ErrorSpec spec{"intersect_rsolid",
+                              "Failed to compute the boolean intersection.",
+                              {"One or more inputs are not Solid objects.", "At least one input solid is invalid.",
+                               "The solids do not overlap enough to produce a non-empty single solid.",
+                               "The kernel could not compute a stable overlap region."},
+                              {"Pass only valid Solid objects.", "Verify that the solids truly overlap in space.",
+                               "Move the solids so they share a meaningful overlap volume before intersecting."}};
   return spec;
 }
 
@@ -83,14 +83,19 @@ const ErrorSpec& intersect_spec() {
 [[noreturn]] void raise_boolean_failure(const ErrorSpec& base, std::string_view kind, const std::exception& error,
                                         const std::vector<Solid>& operands, std::optional<double> tol, bool diagnose,
                                         std::string what_happened = {}) {
-  if (dynamic_cast<const Error*>(&error) != nullptr) raise_harness_error(base, error);
+  if (dynamic_cast<const Error*>(&error) != nullptr)
+    raise_harness_error(base, error);
   std::optional<BooleanDiagnosis> diagnosis;
-  if (diagnose) diagnosis = diagnose_boolean_failure(operands, tol, kind);
+  if (diagnose)
+    diagnosis = diagnose_boolean_failure(operands, tol, kind);
 
   ErrorSpec spec = base;
-  if (!what_happened.empty()) spec.what_happened = std::move(what_happened);
-  if (diagnosis && !diagnosis->what_happened.empty()) spec.what_happened = diagnosis->what_happened;
-  if (diagnosis && !diagnosis->possible_causes.empty()) spec.possible_causes = diagnosis->possible_causes;
+  if (!what_happened.empty())
+    spec.what_happened = std::move(what_happened);
+  if (diagnosis && !diagnosis->what_happened.empty())
+    spec.what_happened = diagnosis->what_happened;
+  if (diagnosis && !diagnosis->possible_causes.empty())
+    spec.possible_causes = diagnosis->possible_causes;
   std::vector<ErrorEvidence> evidence;
   if (diagnosis && !diagnosis->measurements.empty() && diagnosis->evidence_shapes.size() == 2) {
     // The two operands, told apart by colour; the same unmoved failure is drawn once (agent retry loops).
@@ -108,7 +113,8 @@ const ErrorSpec& intersect_spec() {
     labels.push_back(Value("operand 1"));
     labels.push_back(Value("operand 2"));
     image.payload.set("operand_labels", std::move(labels));
-    if (auto picture = diagnostic_image(image)) evidence.push_back(std::move(*picture));
+    if (auto picture = diagnostic_image(image))
+      evidence.push_back(std::move(*picture));
   }
   raise_harness_error(spec, error, diagnosis ? diagnosis->measurements : std::vector<ErrorMeasurement>{},
                       diagnosis ? diagnosis->repair : std::vector<std::string>{}, {}, std::move(evidence));
@@ -122,7 +128,8 @@ bool message_contains(const std::exception& error, std::string_view needle) {
 // fuzzy value would make kernel failures hard to diagnose); the default scales with the extent.
 double resolve_union_tol(const std::vector<Solid>& solids, std::optional<double> tol) {
   if (tol) {
-    if (!std::isfinite(*tol) || *tol < 0.0) throw ValueError("tol must be a finite non-negative number");
+    if (!std::isfinite(*tol) || *tol < 0.0)
+      throw ValueError("tol must be a finite non-negative number");
     return *tol;
   }
   constexpr double inf = std::numeric_limits<double>::infinity();
@@ -133,7 +140,8 @@ double resolve_union_tol(const std::vector<Solid>& solids, std::optional<double>
     high = {std::max(high.x, box.xmax), std::max(high.y, box.ymax), std::max(high.z, box.zmax)};
   }
   const double span = (high - low).norm();
-  if (!std::isfinite(span) || span <= 0) return kUnionTolMin;
+  if (!std::isfinite(span) || span <= 0)
+    return kUnionTolMin;
   return std::min(std::max(span * kUnionTolFactor, kUnionTolMin), kUnionTolMax);
 }
 
@@ -143,18 +151,22 @@ std::optional<std::string> union_separation_diagnostic(const std::vector<TopoDS_
   for (std::size_t i = 0; i < pieces.size(); ++i) {
     for (std::size_t j = i + 1; j < pieces.size(); ++j) {
       const double gap = kernel::distance(pieces[i], pieces[j]);
-      if (gap > tol && (!nearest || gap < *nearest)) nearest = gap;
+      if (gap > tol && (!nearest || gap < *nearest))
+        nearest = gap;
     }
   }
-  if (!nearest) return std::nullopt;
+  if (!nearest)
+    return std::nullopt;
   return "union produced " + std::to_string(pieces.size()) + " separated solids; nearest detected gap is about " +
          general_format(*nearest, 6) + ", which exceeds tol=" + general_format(tol, 6);
 }
 
 Solid require_union_solid(const TopoDS_Shape& result, double tol) {
   const std::vector<TopoDS_Solid> pieces = kernel::solids_of(result);
-  if (pieces.size() == 1) return Solid(pieces.front());
-  if (const auto diagnostic = union_separation_diagnostic(pieces, tol)) throw ValueError(*diagnostic);
+  if (pieces.size() == 1)
+    return Solid(pieces.front());
+  if (const auto diagnostic = union_separation_diagnostic(pieces, tol))
+    throw ValueError(*diagnostic);
   if (pieces.size() > 1) {
     throw ValueError("union produced " + std::to_string(pieces.size()) +
                      " solids at zero detected gap; the inputs likely meet only along an edge, vertex, tangent point, "
@@ -166,29 +178,35 @@ Solid require_union_solid(const TopoDS_Shape& result, double tol) {
 std::vector<TopoDS_Shape> wrapped_of(const std::vector<Solid>& solids) {
   std::vector<TopoDS_Shape> out;
   out.reserve(solids.size());
-  for (const Solid& solid : solids) out.push_back(solid.wrapped());
+  for (const Solid& solid : solids)
+    out.push_back(solid.wrapped());
   return out;
 }
 
 void add_operands(FeatureRecord& rec, const std::vector<Solid>& solids) {
-  for (std::size_t i = 0; i < solids.size(); ++i) rec.input(solids[i], i == 0 ? "body" : "tool");
+  for (std::size_t i = 0; i < solids.size(); ++i)
+    rec.input(solids[i], i == 0 ? "body" : "tool");
 }
 
 // dict.update: later steps win.
 void merge_entries(DeltaEntries& into, DeltaEntries&& from) {
-  for (auto& [key, value] : from) into.insert_or_assign(key, std::move(value));
+  for (auto& [key, value] : from)
+    into.insert_or_assign(key, std::move(value));
 }
 
 void require_nonnull(const std::vector<Solid>& solids, const char* message) {
   for (const Solid& solid : solids) {
-    if (solid.wrapped().IsNull()) throw ValueError(message);
+    if (solid.wrapped().IsNull())
+      throw ValueError(message);
   }
 }
 
 }  // namespace
 
 void reject_boolean_operand(std::string_view operation) {
-  const ErrorSpec* spec = operation == "cut_rsolid" ? &cut_spec() : operation == "intersect_rsolid" ? &intersect_spec() : &union_spec();
+  const ErrorSpec* spec = operation == "cut_rsolid"         ? &cut_spec()
+                          : operation == "intersect_rsolid" ? &intersect_spec()
+                                                            : &union_spec();
   const ValueError cause(std::string(operation) + " only accepts Solid objects");
   raise_harness_error(*spec, cause);
 }
@@ -201,9 +219,11 @@ Solid union_rsolid(const std::vector<Solid>& solids, const UnionOptions& options
   try {
     return occt_guard([&]() -> Solid {
       const TrackingPolicy policy = resolve_tracking_policy(options.tracking_policy);
-      if (solids.empty()) throw ValueError("union_rsolid requires at least one Solid input");
+      if (solids.empty())
+        throw ValueError("union_rsolid requires at least one Solid input");
       require_nonnull(solids, "The input solid is invalid; the union cannot be computed.");
-      if (solids.size() == 1 && !options.clean) return solids.front();
+      if (solids.size() == 1 && !options.clean)
+        return solids.front();
 
       const double tol = resolve_union_tol(solids, options.tol);
       effective_tol = tol;
@@ -212,10 +232,12 @@ Solid union_rsolid(const std::vector<Solid>& solids, const UnionOptions& options
       std::optional<TrackedBooleanResult> tracked;
       Solid fused = [&]() -> Solid {
         if (policy == TrackingPolicy::Full && solids.size() >= 2) {
-          const kernel::FuseHistoryResult run = kernel::fuse_shapes_with_history(shapes, options.glue, tol, options.clean);
+          const kernel::FuseHistoryResult run =
+              kernel::fuse_shapes_with_history(shapes, options.glue, tol, options.clean);
           const Solid result = require_union_solid(run.shape, tol);
           tracked = track_union_history(solids, result, *run.history, run.section_edges);
-          if (!tracked->solid) throw ValueError("union did not produce a valid solid");
+          if (!tracked->solid)
+            throw ValueError("union did not produce a valid solid");
           return *tracked->solid;
         }
         return require_union_solid(kernel::fuse_shapes(shapes, options.glue, tol, options.clean), tol);
@@ -232,12 +254,15 @@ Solid union_rsolid(const std::vector<Solid>& solids, const UnionOptions& options
 
       FinalizeSpec spec;
       spec.record = std::move(rec).take();
-      if (tracked) return finalize_tracked_solid(std::move(*tracked), std::move(spec));
-      if (policy == TrackingPolicy::Graph) return finalize_derived(std::move(fused), std::move(spec));
+      if (tracked)
+        return finalize_tracked_solid(std::move(*tracked), std::move(spec));
+      if (policy == TrackingPolicy::Graph)
+        return finalize_derived(std::move(fused), std::move(spec));
       return finalize_primitive(std::move(fused), std::move(spec.record));
     });
   } catch (const std::exception& error) {
-    const bool separated = dynamic_cast<const ValueError*>(&error) != nullptr && message_contains(error, "union produced ");
+    const bool separated =
+        dynamic_cast<const ValueError*>(&error) != nullptr && message_contains(error, "union produced ");
     raise_boolean_failure(union_spec(), "union", error, solids, effective_tol, /*diagnose=*/true,
                           separated ? std::string(error.what()) : std::string());
   }
@@ -263,21 +288,24 @@ struct CutRun {
 // (a slot through a bar), so the answer is a list: empty when the tools consume the base.
 CutRun run_cuts(const std::vector<Solid>& solids, const CutOptions& options, TrackingPolicy policy,
                 std::string_view operation, bool& no_intersection) {
-  if (solids.empty()) throw ValueError(std::string(operation) + " requires at least one Solid input");
+  if (solids.empty())
+    throw ValueError(std::string(operation) + " requires at least one Solid input");
   CutRun run;
   run.pieces.push_back(solids.front());
 
   for (std::size_t i = 1; i < solids.size(); ++i) {
     const Solid& candidate = solids[i];
     const TopoDS_Shape& s2 = candidate.wrapped();
-    if (s2.IsNull()) throw ValueError("The input solid is invalid; the cut cannot be computed.");
+    if (s2.IsNull())
+      throw ValueError("The input solid is invalid; the cut cannot be computed.");
 
     std::vector<Solid> next;
-    bool met = false;      // some piece intersects this tool
+    bool met = false;  // some piece intersects this tool
     bool too_small = false;
     for (const Solid& piece : run.pieces) {
       const TopoDS_Shape& s1 = piece.wrapped();
-      if (s1.IsNull()) throw ValueError("The input solid is invalid; the cut cannot be computed.");
+      if (s1.IsNull())
+        throw ValueError("The input solid is invalid; the cut cannot be computed.");
 
       const std::vector<TopoDS_Solid> overlap = kernel::solids_of(kernel::common_shapes({s1, s2}));
       if (overlap.empty()) {
@@ -298,10 +326,12 @@ CutRun run_cuts(const std::vector<Solid>& solids, const CutOptions& options, Tra
         run.deltas.push_back(std::move(tracked.delta));
         merge_entries(run.entries, std::move(tracked.delta_entries));
       } else {
-        for (const TopoDS_Solid& part : kernel::solids_of(kernel::cut_shapes(s1, {s2}))) cut_pieces.emplace_back(part);
+        for (const TopoDS_Solid& part : kernel::solids_of(kernel::cut_shapes(s1, {s2})))
+          cut_pieces.emplace_back(part);
       }
       run.intermediates.push_back(piece);
-      for (Solid& part : cut_pieces) next.push_back(std::move(part));
+      for (Solid& part : cut_pieces)
+        next.push_back(std::move(part));
       run.cut_performed = true;
     }
     if (!met && !options.skip_non_intersecting) {
@@ -314,7 +344,8 @@ CutRun run_cuts(const std::vector<Solid>& solids, const CutOptions& options, Tra
   return run;
 }
 
-void record_cut(const std::vector<Solid>& solids, const CutOptions& options, TrackingPolicy policy, FeatureRecord& rec) {
+void record_cut(const std::vector<Solid>& solids, const CutOptions& options, TrackingPolicy policy,
+                FeatureRecord& rec) {
   rec.param("tool_count", Value(static_cast<std::int64_t>(solids.size() - 1)))
       .param("skip_non_intersecting", Value(options.skip_non_intersecting))
       .param("tracking_policy", Value(std::string(to_string(policy))));
@@ -328,11 +359,14 @@ Solid cut_rsolid(const std::vector<Solid>& solids, const CutOptions& options) {
   try {
     return occt_guard([&]() -> Solid {
       const TrackingPolicy policy = resolve_tracking_policy(options.tracking_policy);
-      if (solids.empty()) throw ValueError("cut_rsolid requires at least one Solid input");
-      if (solids.size() == 1) return solids.front();
+      if (solids.empty())
+        throw ValueError("cut_rsolid requires at least one Solid input");
+      if (solids.size() == 1)
+        return solids.front();
 
       CutRun run = run_cuts(solids, options, policy, "cut_rsolid", no_intersection);
-      if (run.pieces.empty()) throw ValueError("The cut failed: OCC returned no valid solid");
+      if (run.pieces.empty())
+        throw ValueError("The cut failed: OCC returned no valid solid");
       if (run.pieces.size() != 1) {
         throw ValueError("cut_rsolid expected a single Solid result but the kernel returned " +
                          std::to_string(run.pieces.size()) +
@@ -350,9 +384,11 @@ Solid cut_rsolid(const std::vector<Solid>& solids, const CutOptions& options) {
       FinalizeSpec spec;
       spec.record = std::move(rec).take();
       if (run.cut_performed && merged) {
-        return finalize_tracked<Solid>(std::move(result_solid), std::move(*merged), std::move(run.entries), std::move(spec));
+        return finalize_tracked<Solid>(std::move(result_solid), std::move(*merged), std::move(run.entries),
+                                       std::move(spec));
       }
-      if (policy == TrackingPolicy::Graph) return finalize_derived(std::move(result_solid), std::move(spec));
+      if (policy == TrackingPolicy::Graph)
+        return finalize_derived(std::move(result_solid), std::move(spec));
       return finalize_primitive(std::move(result_solid), std::move(spec.record));
     });
   } catch (const std::exception& error) {
@@ -365,8 +401,10 @@ std::vector<Solid> cut_rsolid_list(const std::vector<Solid>& solids, const CutOp
   try {
     return occt_guard([&]() -> std::vector<Solid> {
       const TrackingPolicy policy = resolve_tracking_policy(options.tracking_policy);
-      if (solids.empty()) throw ValueError("cut_rsolid_list requires at least one Solid input");
-      if (solids.size() == 1) return {solids.front()};
+      if (solids.empty())
+        throw ValueError("cut_rsolid_list requires at least one Solid input");
+      if (solids.size() == 1)
+        return {solids.front()};
 
       CutRun run = run_cuts(solids, options, policy, "cut_rsolid_list", no_intersection);
 
@@ -388,9 +426,12 @@ std::vector<Solid> cut_rsolid_list(const std::vector<Solid>& solids, const CutOp
       OpRecord record = std::move(rec).take();
       if (Recorder* recorder = current_recorder()) {
         std::vector<Shape> ordered;
-        for (const OpInput& input : record.inputs) ordered.push_back(input.shape);
-        if (auto refs = recorder->input_refs(ordered)) record.params.set("input_refs", std::move(*refs));
-        if (tracked) record.delta = *merged;
+        for (const OpInput& input : record.inputs)
+          ordered.push_back(input.shape);
+        if (auto refs = recorder->input_refs(ordered))
+          record.params.set("input_refs", std::move(*refs));
+        if (tracked)
+          record.delta = *merged;
       }
       record_operation(std::move(record), std::vector<Shape>(pieces.begin(), pieces.end()));
       return pieces;
@@ -407,8 +448,10 @@ Solid intersect_rsolid(const std::vector<Solid>& solids) {
   bool empty_result = false;
   try {
     return occt_guard([&]() -> Solid {
-      if (solids.empty()) throw ValueError("intersect_rsolid requires at least one Solid input");
-      if (solids.size() == 1) return solids.front();
+      if (solids.empty())
+        throw ValueError("intersect_rsolid requires at least one Solid input");
+      if (solids.size() == 1)
+        return solids.front();
 
       Solid result_solid = solids.front();
       std::vector<TopoDelta> deltas;
@@ -417,7 +460,8 @@ Solid intersect_rsolid(const std::vector<Solid>& solids) {
 
       for (std::size_t i = 1; i < solids.size(); ++i) {
         const Solid& candidate = solids[i];
-        if (result_solid.wrapped().IsNull() || candidate.wrapped().IsNull()) throw ValueError("The input solid is invalid; the intersection cannot be computed.");
+        if (result_solid.wrapped().IsNull() || candidate.wrapped().IsNull())
+          throw ValueError("The input solid is invalid; the intersection cannot be computed.");
         TrackedBooleanResult tracked = tracked_intersect(result_solid, candidate);
         if (!tracked.solid) {
           empty_result = true;
@@ -441,8 +485,8 @@ Solid intersect_rsolid(const std::vector<Solid>& solids) {
       add_operands(rec, solids);
       FinalizeSpec spec;
       spec.record = std::move(rec).take();
-      return finalize_tracked<Solid>(std::move(result_solid), std::move(*merge_topo_deltas(deltas)), std::move(merged_entries),
-                                     std::move(spec));
+      return finalize_tracked<Solid>(std::move(result_solid), std::move(*merge_topo_deltas(deltas)),
+                                     std::move(merged_entries), std::move(spec));
     });
   } catch (const std::exception& error) {
     raise_boolean_failure(intersect_spec(), "intersect", error, solids, std::nullopt, empty_result);

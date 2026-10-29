@@ -32,7 +32,9 @@ bool message_has(const std::function<void()>& body, const std::string& needle) {
   return false;
 }
 
-Shell box_shell(const Solid& box) { return sew_faces_rshell(box.faces()); }
+Shell box_shell(const Solid& box) {
+  return sew_faces_rshell(box.faces());
+}
 
 class Capture final : public Recorder {
  public:
@@ -41,7 +43,9 @@ class Capture final : public Recorder {
     std::size_t outputs;
   };
   std::vector<Entry> entries;
-  void record(const OpRecord& record, const std::vector<Shape>& outputs) override { entries.push_back({record, outputs.size()}); }
+  void record(const OpRecord& record, const std::vector<Shape>& outputs) override {
+    entries.push_back({record, outputs.size()});
+  }
 };
 
 }  // namespace
@@ -112,7 +116,8 @@ TEST_CASE("sew_faces_rshell, free_boundaries_rwirelist and make_solid_from_shell
   CHECK(solid.volume() == doctest::Approx(6.0).epsilon(1e-9));
   CHECK(solid.has_tag("body.solid", TagScope::Local));
   int preserved = 0;
-  for (const Face& f : solid.faces()) preserved += f.has_tag("role.preserved_face", TagScope::Local);
+  for (const Face& f : solid.faces())
+    preserved += f.has_tag("role.preserved_face", TagScope::Local);
   CHECK(preserved == 1);
 }
 
@@ -144,9 +149,11 @@ TEST_CASE("fill_holes_rshell closes a lofted tube") {
 
   const Shell one = fill_holes_rshell(tube, {.hole_indices = std::vector<int>{0}});
   CHECK(free_boundaries_rwirelist(one).size() == 1);
-  CHECK(message_has([&] { (void)fill_holes_rshell(tube, {.hole_indices = std::vector<int>{7}}); }, "list index out of range"));
+  CHECK(message_has([&] { (void)fill_holes_rshell(tube, {.hole_indices = std::vector<int>{7}}); },
+                    "list index out of range"));
   const Shell open_tube = sew_faces_rshell({make_bezier_surface_rface(unit_square_grid())});
-  CHECK(message_has([&] { (void)fill_holes_rshell(open_tube, {.hole_indices = std::vector<int>{0}}); }, "is open") == false);
+  CHECK(message_has([&] { (void)fill_holes_rshell(open_tube, {.hole_indices = std::vector<int>{0}}); }, "is open") ==
+        false);
 }
 
 TEST_CASE("every operator records itself; free_boundaries records zero outputs for a closed shell") {
@@ -196,17 +203,23 @@ Vec3 corner(const std::string& label) {
 
 Vec3 point_on(const std::string& face, double u, double v) {
   const double a = (u - 0.5) * 2 * kSide, b = (v - 0.5) * 2 * kSide, o = wave(u, v);
-  if (face == "+z") return {a, b, kSide + o};
-  if (face == "-z") return {a, b, -kSide - o};
-  if (face == "+x") return {kSide + o, a, b};
-  if (face == "-x") return {-kSide - o, a, b};
-  if (face == "+y") return {a, kSide + o, b};
+  if (face == "+z")
+    return {a, b, kSide + o};
+  if (face == "-z")
+    return {a, b, -kSide - o};
+  if (face == "+x")
+    return {kSide + o, a, b};
+  if (face == "-x")
+    return {-kSide - o, a, b};
+  if (face == "+y")
+    return {a, kSide + o, b};
   return {a, -kSide - o, b};
 }
 
 Edge spline(const std::vector<Vec3>& points) {
   Handle(TColgp_HArray1OfPnt) array = new TColgp_HArray1OfPnt(1, static_cast<int>(points.size()));
-  for (std::size_t i = 0; i < points.size(); ++i) array->SetValue(static_cast<int>(i) + 1, gp_Pnt(points[i].x, points[i].y, points[i].z));
+  for (std::size_t i = 0; i < points.size(); ++i)
+    array->SetValue(static_cast<int>(i) + 1, gp_Pnt(points[i].x, points[i].y, points[i].z));
   GeomAPI_Interpolate interpolation(array, false, 1e-5);
   interpolation.Perform();
   return Edge(BRepBuilderAPI_MakeEdge(interpolation.Curve()).Edge());
@@ -215,7 +228,8 @@ Edge spline(const std::vector<Vec3>& points) {
 }  // namespace
 
 TEST_CASE("six Gordon patches on shared edges sew into a closed solid of the exact volume") {
-  if (!surface::gordon_available()) return;
+  if (!surface::gordon_available())
+    return;
   const std::map<std::string, std::array<std::string, 4>> loops = {
       {"+z", {"--+", "+-+", "+++", "-++"}}, {"-z", {"---", "+--", "++-", "-+-"}}, {"+x", {"+--", "++-", "+++", "+-+"}},
       {"-x", {"---", "-+-", "-++", "--+"}}, {"+y", {"-+-", "++-", "+++", "-++"}}, {"-y", {"---", "+--", "+-+", "--+"}}};
@@ -224,7 +238,8 @@ TEST_CASE("six Gordon patches on shared edges sew into a closed solid of the exa
   for (const auto& [face, c] : loops)
     for (std::size_t i = 0; i < 4; ++i) {
       const auto k = key(c[i], c[(i + 1) % 4]);
-      if (!shared.count(k)) shared.emplace(k, line(corner(k.first), corner(k.second)));
+      if (!shared.count(k))
+        shared.emplace(k, line(corner(k.first), corner(k.second)));
     }
   CHECK(shared.size() == 12);
 
@@ -233,21 +248,27 @@ TEST_CASE("six Gordon patches on shared edges sew into a closed solid of the exa
     std::vector<Edge> profiles, guides;
     for (int row = 0; row < kSamples; ++row) {
       const double v = row / double(kSamples - 1);
-      if (row == 0) profiles.push_back(shared.at(key(c[0], c[1])));
-      else if (row == kSamples - 1) profiles.push_back(shared.at(key(c[3], c[2])));
+      if (row == 0)
+        profiles.push_back(shared.at(key(c[0], c[1])));
+      else if (row == kSamples - 1)
+        profiles.push_back(shared.at(key(c[3], c[2])));
       else {
         std::vector<Vec3> pts;
-        for (int k = 0; k < kSamples; ++k) pts.push_back(point_on(face, k / double(kSamples - 1), v));
+        for (int k = 0; k < kSamples; ++k)
+          pts.push_back(point_on(face, k / double(kSamples - 1), v));
         profiles.push_back(spline(pts));
       }
     }
     for (int col = 0; col < kSamples; ++col) {
       const double u = col / double(kSamples - 1);
-      if (col == 0) guides.push_back(shared.at(key(c[0], c[3])));
-      else if (col == kSamples - 1) guides.push_back(shared.at(key(c[1], c[2])));
+      if (col == 0)
+        guides.push_back(shared.at(key(c[0], c[3])));
+      else if (col == kSamples - 1)
+        guides.push_back(shared.at(key(c[1], c[2])));
       else {
         std::vector<Vec3> pts;
-        for (int k = 0; k < kSamples; ++k) pts.push_back(point_on(face, u, k / double(kSamples - 1)));
+        for (int k = 0; k < kSamples; ++k)
+          pts.push_back(point_on(face, u, k / double(kSamples - 1)));
         guides.push_back(spline(pts));
       }
     }

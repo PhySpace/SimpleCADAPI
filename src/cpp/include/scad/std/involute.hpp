@@ -8,7 +8,8 @@
 namespace scad::stdlib {
 
 // How many times the root-fillet and involute-fit helpers ran in this process: what the SDK's tests learn by
-// patching the Python helper and counting its calls (a gear profile builds two canonical root fillets, not one per tooth).
+// patching the Python helper and counting its calls (a gear profile builds two canonical root fillets, not one per
+// tooth).
 std::size_t root_fillet_call_count() noexcept;
 std::size_t involute_fit_call_count() noexcept;
 
@@ -38,13 +39,11 @@ struct BSplineData {
 // B-spline fit (tolerance 1e-4) from 8 * n_segments + 1 samples, rotated by `start_angle`.
 // `mirror` flips y first (the right flank); `reverse` runs the curve backwards.
 BSplineData involute_bspline_control_points(double base_radius, double tip_radius, double start_radius,
-                                            double start_angle, bool mirror, bool reverse = false,
-                                            int n_segments = 6);
+                                            double start_angle, bool mirror, bool reverse = false, int n_segments = 6);
 
 // A cubic Bezier from `start` to `end` leaving along `start_tangent_angle` and arriving along
 // `end_tangent_angle`; handles are 0.45 of the chord.  The transition from the root circle to a flank.
-BSplineData root_fillet_control_points(Point2 start, Point2 end, double start_tangent_angle,
-                                       double end_tangent_angle);
+BSplineData root_fillet_control_points(Point2 start, Point2 end, double start_tangent_angle, double end_tangent_angle);
 
 // Tooth symmetry applied to an already fitted canonical flank: optional mirror about the x axis,
 // rotation by `angle`, optional reversal of the pole order.

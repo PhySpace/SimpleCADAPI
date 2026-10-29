@@ -41,11 +41,15 @@ ScalarUnits probe_units(const Scalar& value) {
   const auto node = reactive::lift_scalar(value);
   ScalarUnits units;
   units.uses_units = reactive::expression_uses_units(node);
-  if (!units.uses_units) return units;
+  if (!units.uses_units)
+    return units;
   const std::optional<reactive::Dimension> dimension = reactive::infer_dimension(node);
-  if (dimension && dimension->is_dimensionless()) units.dimension = UnitDimension::Dimensionless;
-  else if (dimension && *dimension == reactive::kLength) units.dimension = UnitDimension::Length;
-  else units.dimension = UnitDimension::Other;
+  if (dimension && dimension->is_dimensionless())
+    units.dimension = UnitDimension::Dimensionless;
+  else if (dimension && *dimension == reactive::kLength)
+    units.dimension = UnitDimension::Length;
+  else
+    units.dimension = UnitDimension::Other;
   return units;
 }
 
@@ -58,36 +62,51 @@ void bind_surface_testing(py::module_& m) {
   t.def("arc", [pnt](const Vec3& a, const Vec3& b, const Vec3& c) {
     return Edge(BRepBuilderAPI_MakeEdge(GC_MakeArcOfCircle(pnt(a), pnt(b), pnt(c)).Value()).Edge());
   });
-  t.def("spline", [pnt](const std::vector<Vec3>& points, double tolerance) {
-    Handle(TColgp_HArray1OfPnt) array = new TColgp_HArray1OfPnt(1, static_cast<int>(points.size()));
-    for (std::size_t i = 0; i < points.size(); ++i) array->SetValue(static_cast<int>(i) + 1, pnt(points[i]));
-    GeomAPI_Interpolate interpolation(array, false, tolerance);
-    interpolation.Perform();
-    return Edge(BRepBuilderAPI_MakeEdge(interpolation.Curve()).Edge());
-  }, py::arg("points"), py::arg("tolerance") = 1e-5);
+  t.def(
+      "spline",
+      [pnt](const std::vector<Vec3>& points, double tolerance) {
+        Handle(TColgp_HArray1OfPnt) array = new TColgp_HArray1OfPnt(1, static_cast<int>(points.size()));
+        for (std::size_t i = 0; i < points.size(); ++i)
+          array->SetValue(static_cast<int>(i) + 1, pnt(points[i]));
+        GeomAPI_Interpolate interpolation(array, false, tolerance);
+        interpolation.Perform();
+        return Edge(BRepBuilderAPI_MakeEdge(interpolation.Curve()).Edge());
+      },
+      py::arg("points"), py::arg("tolerance") = 1e-5);
   t.def("wire", [](const std::vector<Edge>& edges) {
     BRepBuilderAPI_MakeWire builder;
-    for (const Edge& e : edges) builder.Add(TopoDS::Edge(e.wrapped()));
+    for (const Edge& e : edges)
+      builder.Add(TopoDS::Edge(e.wrapped()));
     return Wire(builder.Wire());
   });
-  t.def("polygon", [pnt](const std::vector<Vec3>& points, bool closed) {
-    BRepBuilderAPI_MakePolygon builder;
-    for (const Vec3& p : points) builder.Add(pnt(p));
-    if (closed) builder.Close();
-    return Wire(builder.Wire());
-  }, py::arg("points"), py::arg("closed") = true);
-  t.def("rectangle", [](double width, double height, const Vec3& center) {
-    BRepBuilderAPI_MakePolygon builder;
-    for (const auto& [dx, dy] : {std::pair{-0.5, -0.5}, std::pair{0.5, -0.5}, std::pair{0.5, 0.5}, std::pair{-0.5, 0.5}})
-      builder.Add(gp_Pnt(center.x + dx * width, center.y + dy * height, center.z));
-    builder.Close();
-    return Wire(builder.Wire());
-  }, py::arg("width"), py::arg("height"), py::arg("center") = Vec3{0, 0, 0});
+  t.def(
+      "polygon",
+      [pnt](const std::vector<Vec3>& points, bool closed) {
+        BRepBuilderAPI_MakePolygon builder;
+        for (const Vec3& p : points)
+          builder.Add(pnt(p));
+        if (closed)
+          builder.Close();
+        return Wire(builder.Wire());
+      },
+      py::arg("points"), py::arg("closed") = true);
+  t.def(
+      "rectangle",
+      [](double width, double height, const Vec3& center) {
+        BRepBuilderAPI_MakePolygon builder;
+        for (const auto& [dx, dy] :
+             {std::pair{-0.5, -0.5}, std::pair{0.5, -0.5}, std::pair{0.5, 0.5}, std::pair{-0.5, 0.5}})
+          builder.Add(gp_Pnt(center.x + dx * width, center.y + dy * height, center.z));
+        builder.Close();
+        return Wire(builder.Wire());
+      },
+      py::arg("width"), py::arg("height"), py::arg("center") = Vec3{0, 0, 0});
   t.def("circle", [](const Vec3& center, double radius) {
     const gp_Circ circle(gp_Ax2(gp_Pnt(center.x, center.y, center.z), gp_Dir(0, 0, 1)), radius);
     return Wire(BRepBuilderAPI_MakeWire(BRepBuilderAPI_MakeEdge(circle).Edge()).Wire());
   });
-  t.def("point", [](double x, double y, double z) { return Vertex(BRepBuilderAPI_MakeVertex(gp_Pnt(x, y, z)).Vertex()); });
+  t.def("point",
+        [](double x, double y, double z) { return Vertex(BRepBuilderAPI_MakeVertex(gp_Pnt(x, y, z)).Vertex()); });
   t.def("is_valid", [](const Shape& shape) { return BRepCheck_Analyzer(shape.wrapped()).IsValid(); });
   t.def("bbox", [](const Shape& shape) {
     const auto b = shape.bounding_box();
@@ -120,9 +139,9 @@ void bind_surface(py::module_& m) {
                        double max_segments) {
              // The SDK's dataclass does not check types: a replayed payload carries 3.0 for 3.
              const auto whole = [](double v) { return static_cast<int>(v); };
-             SurfaceFillingSettings settings{whole(degree),     whole(points_per_curve), whole(iterations), anisotropic,
-                                             tolerance_2d,      tolerance_3d,            angular_tolerance,
-                                             curvature_tolerance, whole(max_degree),     whole(max_segments)};
+             SurfaceFillingSettings settings{
+                 whole(degree), whole(points_per_curve), whole(iterations),   anisotropic,       tolerance_2d,
+                 tolerance_3d,  angular_tolerance,       curvature_tolerance, whole(max_degree), whole(max_segments)};
              settings.validate();
              return settings;
            }),
@@ -157,14 +176,16 @@ void bind_surface(py::module_& m) {
       [](const Scalar& radius, const ScalarRange& u_range, const ScalarRange& v_range, const ScalarVec3& origin,
          const ScalarVec3& axis, const std::optional<ScalarVec3>& x_direction, const Scalar& tolerance,
          const TagPrefix& tag_prefix) {
-        return make_cylindrical_surface_rface(
-            radius, u_range, v_range,
-            {.origin = origin, .axis = axis, .x_direction = x_direction, .tolerance = tolerance, .tag_prefix = tag_prefix});
+        return make_cylindrical_surface_rface(radius, u_range, v_range,
+                                              {.origin = origin,
+                                               .axis = axis,
+                                               .x_direction = x_direction,
+                                               .tolerance = tolerance,
+                                               .tag_prefix = tag_prefix});
       },
-      py::arg("radius"), py::arg("u_range"), py::arg("v_range"),
-      py::arg("origin") = ScalarVec3{0.0, 0.0, 0.0}, py::arg("axis") = ScalarVec3{0.0, 0.0, 1.0},
-      py::arg("x_direction") = py::none(), py::kw_only(), py::arg("tolerance") = Scalar(1e-7),
-      py::arg("tag_prefix") = py::none(),
+      py::arg("radius"), py::arg("u_range"), py::arg("v_range"), py::arg("origin") = ScalarVec3{0.0, 0.0, 0.0},
+      py::arg("axis") = ScalarVec3{0.0, 0.0, 1.0}, py::arg("x_direction") = py::none(), py::kw_only(),
+      py::arg("tolerance") = Scalar(1e-7), py::arg("tag_prefix") = py::none(),
       "Create a finite cylindrical carrier Face over explicit U/V ranges (U in raw radians, at most one turn).");
 
   m.def(
@@ -194,8 +215,7 @@ void bind_surface(py::module_& m) {
       [](const std::vector<Edge>& profiles, const std::vector<Edge>& guides, double tolerance,
          const TagPrefix& tag_prefix) { return make_gordon_surface_rface(profiles, guides, tolerance, tag_prefix); },
       py::arg("profiles"), py::arg("guides"), py::kw_only(), py::arg("tolerance") = 1e-3,
-      py::arg("tag_prefix") = py::none(),
-      "Create a Gordon Face from intersecting profile and guide edge networks.");
+      py::arg("tag_prefix") = py::none(), "Create a Gordon Face from intersecting profile and guide edge networks.");
 
   m.def(
       "make_surface_patch_rface",
@@ -205,8 +225,8 @@ void bind_surface(py::module_& m) {
         return make_surface_patch_rface(
             boundaries, {.points = points, .settings = settings, .holes = holes, .tag_prefix = tag_prefix});
       },
-      py::arg("boundaries"), py::kw_only(), py::arg("points") = std::vector<Vec3>{},
-      py::arg("settings") = py::none(), py::arg("holes") = std::vector<Wire>{}, py::arg("tag_prefix") = py::none(),
+      py::arg("boundaries"), py::kw_only(), py::arg("points") = std::vector<Vec3>{}, py::arg("settings") = py::none(),
+      py::arg("holes") = std::vector<Wire>{}, py::arg("tag_prefix") = py::none(),
       "Fill a constrained boundary network into one Face, optionally with holes.");
 
   m.def(
@@ -227,9 +247,12 @@ void bind_surface(py::module_& m) {
         std::vector<LoftSection> sections;
         sections.reserve(raw_sections.size());
         for (const py::object& item : raw_sections) {
-          if (py::isinstance<Wire>(item)) sections.emplace_back(item.cast<Wire>());
-          else if (py::isinstance<Vertex>(item)) sections.emplace_back(item.cast<Vertex>());
-          else throw TypeError("loft_rshell sections must contain only Wire or Vertex objects");
+          if (py::isinstance<Wire>(item))
+            sections.emplace_back(item.cast<Wire>());
+          else if (py::isinstance<Vertex>(item))
+            sections.emplace_back(item.cast<Vertex>());
+          else
+            throw TypeError("loft_rshell sections must contain only Wire or Vertex objects");
         }
         return loft_rshell(sections, ruled,
                            {.tag_prefix = tag_prefix,
@@ -239,9 +262,8 @@ void bind_surface(py::module_& m) {
                             .side_faces_tag = side_faces_tag});
       },
       py::arg("sections"), py::kw_only(), py::arg("ruled") = false, py::arg("tag_prefix") = py::none(),
-      py::arg("result_tag") = py::none(), py::arg("start_wire_tag") = py::none(),
-      py::arg("end_wire_tag") = py::none(), py::arg("side_faces_tag") = py::none(),
-      "Create an open loft Shell with endpoint-Wire and side-Face naming.");
+      py::arg("result_tag") = py::none(), py::arg("start_wire_tag") = py::none(), py::arg("end_wire_tag") = py::none(),
+      py::arg("side_faces_tag") = py::none(), "Create an open loft Shell with endpoint-Wire and side-Face naming.");
 
   m.def(
       "sew_faces_rshell",
@@ -267,10 +289,9 @@ void bind_surface(py::module_& m) {
       "fill_holes_rshell",
       [](const Shell& shell, const std::optional<std::vector<int>>& hole_indices, double tolerance,
          const std::optional<SurfaceFillingSettings>& settings, const TagPrefix& tag_prefix) {
-        return fill_holes_rshell(shell, {.hole_indices = hole_indices,
-                                         .tolerance = tolerance,
-                                         .settings = settings,
-                                         .tag_prefix = tag_prefix});
+        return fill_holes_rshell(
+            shell,
+            {.hole_indices = hole_indices, .tolerance = tolerance, .settings = settings, .tag_prefix = tag_prefix});
       },
       py::arg("shell"), py::arg("hole_indices") = py::none(), py::kw_only(), py::arg("tolerance") = 1e-6,
       py::arg("settings") = py::none(), py::arg("tag_prefix") = py::none(),

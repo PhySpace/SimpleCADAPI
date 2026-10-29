@@ -47,7 +47,8 @@ inline scad::Solid split_band_solid() {
 template <class T>
 std::vector<std::string> ids(const std::vector<T>& shapes) {
   std::vector<std::string> out;
-  for (const auto& s : shapes) out.push_back(s.topo_id());
+  for (const auto& s : shapes)
+    out.push_back(s.topo_id());
   return out;
 }
 
@@ -55,7 +56,8 @@ inline scad::Compound compound_of(const std::vector<scad::Solid>& solids) {
   BRep_Builder builder;
   TopoDS_Compound compound;
   builder.MakeCompound(compound);
-  for (const scad::Solid& solid : solids) builder.Add(compound, solid.wrapped());
+  for (const scad::Solid& solid : solids)
+    builder.Add(compound, solid.wrapped());
   return scad::Compound(compound);
 }
 

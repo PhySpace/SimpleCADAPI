@@ -9,8 +9,7 @@ namespace scad {
 
 Shape::~Shape() = default;
 
-Shape::Shape(TopoDS_Shape occurrence, std::shared_ptr<Entity> entity,
-             std::shared_ptr<Registry> registry) noexcept
+Shape::Shape(TopoDS_Shape occurrence, std::shared_ptr<Entity> entity, std::shared_ptr<Registry> registry) noexcept
     : shape_(std::move(occurrence)), entity_(std::move(entity)), registry_(std::move(registry)) {}
 
 Shape::Shape(const TopoDS_Shape& shape, Kind expected) {
@@ -38,31 +37,39 @@ Shape Shape::sub(const TopoDS_Shape& shape) const {
 
 Shape Shape::child(const TopoDS_Shape& shape, Kind kind) const {
   auto entity = registry_->acquire(kind, shape);
-  const bool known = std::any_of(entity->parents.begin(), entity->parents.end(), [&](const auto& weak) {
-    return weak.lock() == entity_;
-  });
-  if (!known) entity->parents.push_back(entity_);
+  const bool known = std::any_of(entity->parents.begin(), entity->parents.end(),
+                                 [&](const auto& weak) { return weak.lock() == entity_; });
+  if (!known)
+    entity->parents.push_back(entity_);
   return Shape(shape, std::move(entity), registry_);
 }
 
 Shape Shape::ancestor(const TopoDS_Shape& shape, Kind kind) const {
   auto entity = registry_->acquire(kind, shape);
-  const bool known = std::any_of(entity_->parents.begin(), entity_->parents.end(), [&](const auto& weak) {
-    return weak.lock() == entity;
-  });
-  if (!known) entity_->parents.push_back(entity);
+  const bool known = std::any_of(entity_->parents.begin(), entity_->parents.end(),
+                                 [&](const auto& weak) { return weak.lock() == entity; });
+  if (!known)
+    entity_->parents.push_back(entity);
   return Shape(shape, std::move(entity), registry_);
 }
 
-Kind Shape::kind() const noexcept { return entity_->kind; }
-const std::string& Shape::topo_id() const noexcept { return entity_->topo_id.str(); }
+Kind Shape::kind() const noexcept {
+  return entity_->kind;
+}
+const std::string& Shape::topo_id() const noexcept {
+  return entity_->topo_id.str();
+}
 
-bool Shape::is_same(const Shape& other) const noexcept { return shape_.IsSame(other.shape_); }
+bool Shape::is_same(const Shape& other) const noexcept {
+  return shape_.IsSame(other.shape_);
+}
 bool Shape::same_entity(const Shape& other) const noexcept {
   return registry_ == other.registry_ && entity_ == other.entity_;
 }
 
-void Shape::set_graph_node(std::shared_ptr<const void> node) const { entity_->state().graph_node = std::move(node); }
+void Shape::set_graph_node(std::shared_ptr<const void> node) const {
+  entity_->state().graph_node = std::move(node);
+}
 std::shared_ptr<const void> Shape::graph_node() const {
   const SemanticState* state = entity_->state_if();
   return state != nullptr ? state->graph_node : nullptr;
@@ -87,7 +94,11 @@ std::vector<Shape> Shape::known_parents() const {
   return out;
 }
 
-Vec3 Shape::center() const { return kernel::center_of_mass(shape_); }
-kernel::BoundingBox Shape::bounding_box() const { return kernel::bounding_box(shape_); }
+Vec3 Shape::center() const {
+  return kernel::center_of_mass(shape_);
+}
+kernel::BoundingBox Shape::bounding_box() const {
+  return kernel::bounding_box(shape_);
+}
 
 }  // namespace scad

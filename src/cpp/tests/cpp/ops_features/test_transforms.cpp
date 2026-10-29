@@ -7,7 +7,9 @@ using doctest::Approx;
 
 namespace {
 
-Solid tagged_box() { return box(2, 3, 4); }
+Solid tagged_box() {
+  return box(2, 3, 4);
+}
 
 }  // namespace
 
@@ -68,6 +70,7 @@ TEST_CASE("patterns number their members") {
 
   CHECK(failure_of([&] { (void)linear_pattern_rsolidlist(tiny, scalar3(1, 0, 0), 0, 1.0); }).operation() ==
         "linear_pattern_rsolidlist");
-  CHECK(failure_of([&] { (void)radial_pattern_rsolidlist(arm, scalar3(0, 0, 0), scalar3(0, 0, 1), 3, 0.0); }).operation() ==
-        "radial_pattern_rsolidlist");
+  CHECK(failure_of([&] {
+          (void)radial_pattern_rsolidlist(arm, scalar3(0, 0, 0), scalar3(0, 0, 1), 3, 0.0);
+        }).operation() == "radial_pattern_rsolidlist");
 }

@@ -6,34 +6,44 @@ namespace scad {
 
 std::string_view to_string(TopoEvent event) noexcept {
   switch (event) {
-    case TopoEvent::Preserved: return "preserved";
-    case TopoEvent::Modified: return "modified";
-    case TopoEvent::Generated: return "generated";
-    case TopoEvent::Deleted: return "deleted";
+    case TopoEvent::Preserved:
+      return "preserved";
+    case TopoEvent::Modified:
+      return "modified";
+    case TopoEvent::Generated:
+      return "generated";
+    case TopoEvent::Deleted:
+      return "deleted";
   }
   return "";
 }
 
 namespace {
 
-bool unbound(const std::string& id) { return id.empty() || id == "pending"; }
+bool unbound(const std::string& id) {
+  return id.empty() || id == "pending";
+}
 
 TopoRef bind_ref(TopoRef ref, const std::string& graph_id, const std::string& node_id) {
-  if (unbound(ref.graph_id)) ref.graph_id = graph_id;
-  if (unbound(ref.node_id)) ref.node_id = node_id;
+  if (unbound(ref.graph_id))
+    ref.graph_id = graph_id;
+  if (unbound(ref.node_id))
+    ref.node_id = node_id;
   return ref;
 }
 
 std::vector<TopoRef> bind_refs(const std::vector<TopoRef>& refs, const std::string& g, const std::string& n) {
   std::vector<TopoRef> out;
   out.reserve(refs.size());
-  for (const auto& r : refs) out.push_back(bind_ref(r, g, n));
+  for (const auto& r : refs)
+    out.push_back(bind_ref(r, g, n));
   return out;
 }
 
 Value refs_value(const std::vector<TopoRef>& refs) {
   Value out = Value::array();
-  for (const auto& r : refs) out.push_back(to_value(r));
+  for (const auto& r : refs)
+    out.push_back(to_value(r));
   return out;
 }
 
@@ -63,8 +73,10 @@ TopoDelta bind_topo_delta(const TopoDelta& d, const std::string& g, const std::s
 SemanticDelta bind_semantic_delta(const SemanticDelta& d, const std::string& g, const std::string& n) {
   auto bind = [&](std::vector<SemanticRef> refs) {
     for (auto& r : refs) {
-      if (unbound(r.graph_id)) r.graph_id = g;
-      if (unbound(r.node_id)) r.node_id = n;
+      if (unbound(r.graph_id))
+        r.graph_id = g;
+      if (unbound(r.node_id))
+        r.node_id = n;
     }
     return refs;
   };
@@ -82,7 +94,8 @@ Value to_value(const TopoRef& ref) {
   v.set("node_id", ref.node_id);
   v.set("output_slot", ref.output_slot);
   std::string kind(kind_name(ref.kind));  // the SDK's TopoKind member names are upper case
-  for (char& c : kind) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+  for (char& c : kind)
+    c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
   v.set("kind", std::move(kind));
   v.set("topo_id", ref.topo_id);
   return v;
@@ -100,7 +113,8 @@ Value to_value(const TopoDelta& d) {
     Value item = Value::object();
     item.set("ref", to_value(e.ref));
     std::string event(to_string(e.event));  // the SDK's TopoEvent member names are upper case
-    for (char& c : event) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    for (char& c : event)
+      c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
     item.set("event", std::move(event));
     item.set("origin_role", e.origin_role ? Value(*e.origin_role) : Value());
     item.set("parent_refs", refs_value(e.parent_refs));
