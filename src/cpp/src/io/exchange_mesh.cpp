@@ -465,48 +465,61 @@ SurfaceExportReport export_obj(const std::vector<TopoDS_Shape>& shapes, const st
 // ---------------------------------------------------------------------------
 namespace {
 
+Value glb_accessor(std::int64_t view, std::int64_t component, std::int64_t count, const char* type) {
+  Value a = Value::object();
+  a.set("bufferView", view);
+  a.set("componentType", component);
+  a.set("count", count);
+  a.set("type", type);
+  return a;
+}
+
+Value glb_view(std::size_t offset, std::size_t length, std::int64_t target) {
+  Value v = Value::object();
+  v.set("buffer", 0);
+  v.set("byteOffset", static_cast<std::int64_t>(offset));
+  v.set("byteLength", static_cast<std::int64_t>(length));
+  v.set("target", target);
+  return v;
+}
+
+Value float_triple(const std::array<float, 3>& v) {
+  Value a = Value::array();
+  for (const float f : v)
+    a.push_back(static_cast<double>(f));
+  return a;
+}
+
+// glTF component types: 5125 = UNSIGNED_INT (indices), 5126 = FLOAT; buffer targets: 34963 = ELEMENT_ARRAY_BUFFER,
+// 34962 = ARRAY_BUFFER. POSITION carries the min/max bounds the spec requires.
+Value glb_accessors(const Mesh& mesh) {
+  const auto box = mesh.bounds();
+  const auto index_count = static_cast<std::int64_t>(mesh.triangles.size());
+  const auto vertex_count = static_cast<std::int64_t>(mesh.vertex_count());
+  Value accessors = Value::array();
+  accessors.push_back(glb_accessor(0, 5125, index_count, "SCALAR"));
+  Value positions = glb_accessor(1, 5126, vertex_count, "VEC3");
+  positions.set("min", float_triple(box[0]));
+  positions.set("max", float_triple(box[1]));
+  accessors.push_back(std::move(positions));
+  accessors.push_back(glb_accessor(2, 5126, vertex_count, "VEC3"));
+  return accessors;
+}
+
+Value glb_buffer_views(std::size_t index_bytes, std::size_t position_bytes, std::size_t normal_bytes) {
+  Value views = Value::array();
+  views.push_back(glb_view(0, index_bytes, 34963));
+  views.push_back(glb_view(index_bytes, position_bytes, 34962));
+  views.push_back(glb_view(index_bytes + position_bytes, normal_bytes, 34962));
+  return views;
+}
+
 // The glTF JSON chunk (canonical form, space-padded to 4 bytes): one mesh, one primitive, three
 // accessors over three bufferViews of a single buffer laid out as indices | positions | normals.
 std::string glb_json(const Mesh& mesh, std::size_t index_bytes, std::size_t position_bytes, std::size_t normal_bytes,
                      std::size_t total) {
-  const auto box = mesh.bounds();
-  const auto triple = [](const std::array<float, 3>& v) {
-    Value a = Value::array();
-    for (const float f : v)
-      a.push_back(static_cast<double>(f));
-    return a;
-  };
-  const auto index_count = static_cast<std::int64_t>(mesh.triangles.size());
-  const auto vertex_count = static_cast<std::int64_t>(mesh.vertex_count());
-  const auto accessor = [](std::int64_t view, std::int64_t component, std::int64_t count, const char* type) {
-    Value a = Value::object();
-    a.set("bufferView", view);
-    a.set("componentType", component);
-    a.set("count", count);
-    a.set("type", type);
-    return a;
-  };
-  const auto view = [](std::size_t offset, std::size_t length, std::int64_t target) {
-    Value v = Value::object();
-    v.set("buffer", 0);
-    v.set("byteOffset", static_cast<std::int64_t>(offset));
-    v.set("byteLength", static_cast<std::int64_t>(length));
-    v.set("target", target);
-    return v;
-  };
-
-  Value accessors = Value::array();
-  accessors.push_back(accessor(0, 5125, index_count, "SCALAR"));
-  Value positions = accessor(1, 5126, vertex_count, "VEC3");
-  positions.set("min", triple(box[0]));
-  positions.set("max", triple(box[1]));
-  accessors.push_back(std::move(positions));
-  accessors.push_back(accessor(2, 5126, vertex_count, "VEC3"));
-
-  Value views = Value::array();
-  views.push_back(view(0, index_bytes, 34963));
-  views.push_back(view(index_bytes, position_bytes, 34962));
-  views.push_back(view(index_bytes + position_bytes, normal_bytes, 34962));
+  Value accessors = glb_accessors(mesh);
+  Value views = glb_buffer_views(index_bytes, position_bytes, normal_bytes);
 
   Value ranges = Value::array();
   for (const FaceRange& r : mesh.face_ranges) {

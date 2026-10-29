@@ -50,6 +50,23 @@ Value evaluate_node_params(const OperationNode& node, const Bindings& bindings, 
   return params;
 }
 
+// The shapes the node consumes: external inputs in declaration order, and upstream node outputs by slot.
+template <class OutputsOf, class Externals>
+std::vector<OpInput> gather_inputs(const OperationNode& node, const Externals& externals, const OutputsOf& outputs_of) {
+  std::vector<OpInput> inputs;
+  inputs.reserve(node.bindings.size());
+  std::size_t external = 0;
+  for (const InputBinding& binding : node.bindings) {
+    if (binding.external()) {
+      inputs.push_back(OpInput{externals.at(external++).shape, binding.role});
+    } else {
+      const std::vector<Shape>& produced = outputs_of(binding.node_id);
+      inputs.push_back(OpInput{produced.at(static_cast<std::size_t>(binding.output_slot)), binding.role});
+    }
+  }
+  return inputs;
+}
+
 // Runs the executor under the conditions the operation was recorded in, and checks its output count.
 std::vector<Shape> run_executor(const OperationNode& node, const Executor& executor, const Value& params,
                                 const std::vector<OpInput>& inputs, const ScalarValues& scalars, bool value_output) {
@@ -171,17 +188,9 @@ RecomputeReport Session::recompute(const RecomputeOptions& options) {
       if (!executor)
         raise_missing_executor(*node);
 
-      std::vector<OpInput> inputs;
-      inputs.reserve(node->bindings.size());
-      std::size_t external = 0;
-      for (const InputBinding& binding : node->bindings) {
-        if (binding.external()) {
-          inputs.push_back(OpInput{state.externals.at(external++).shape, binding.role});
-        } else {
-          const std::vector<Shape>& produced = state_of(binding.node_id).outputs;
-          inputs.push_back(OpInput{produced.at(static_cast<std::size_t>(binding.output_slot)), binding.role});
-        }
-      }
+      const std::vector<OpInput> inputs =
+          gather_inputs(*node, state.externals,
+                        [this](const std::string& id) -> const std::vector<Shape>& { return state_of(id).outputs; });
 
       std::vector<Shape> outputs = run_executor(*node, executor, params, inputs, scalars, state.value_output);
       state.outputs = std::move(outputs);
