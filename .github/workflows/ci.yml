@@ -69,10 +69,13 @@ jobs:
         run: python3 src/cpp/tools/check_occt_guard.py --strict
 
   sanitize:
+    # Advisory until it has run green once: it has never been executed, the OCCT it links is not instrumented (leaks
+    # inside OCCT's static singletons may be reported), and only the doctest executables are built (no Python layer).
     name: C++ tests (ASan + UBSan)
     needs: occt
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    continue-on-error: true
     steps:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -191,7 +194,9 @@ jobs:
         run: uv run pytest src/cpp/tests/python -q
 
       - name: Check the type stubs are current
+        # Advisory until it has passed once on Linux: the checked-in stubs were generated on macOS arm64.
         if: matrix.python-version == '3.12'
+        continue-on-error: true
         run: |
           uv pip install pybind11-stubgen==2.5.5
           PYTHON="uv run --no-sync python" src/cpp/tools/gen_stubs.sh --check

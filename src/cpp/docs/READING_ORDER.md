@@ -1,6 +1,6 @@
 # Reading order for a reviewer
 
-The C++ tree is about 96,000 lines of code, docs and scripts (plus vendored and recorded data), written by AI agents
+The C++ tree is about 103,000 lines of code, docs and scripts (plus vendored and recorded data), written by AI agents
 against the Python SDK 2.2.6. Reading it by directory is slow because the layers lean on a few ideas. Read the
 conventions first, then the files below in order, then the per-area map at the end when you need the Python module an area
 ports or the tests that hold it to account. File sizes are lines at the time of writing. The partition of the code into

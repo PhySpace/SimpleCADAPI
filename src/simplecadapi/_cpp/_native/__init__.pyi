@@ -2,15 +2,10 @@
 SimpleCADAPI on OpenCASCADE, implemented in C++ (pybind11).
 """
 from . import _brep_region
-from . import _geometry_testing
 from . import _internal_mesh
 from . import _occt
-from . import _surface_testing
-from . import _testing
 from . import std
 from __future__ import annotations
-from builtins import StaleLineageError
-from builtins import UnitValidationError
 from simplecadapi import math
 from simplecadapi import ql
 from simplecadapi import surface

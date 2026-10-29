@@ -150,7 +150,7 @@ PR 7 does not depend on 4 to 6 (it needs only `semantic` and below), so it can b
 ### PR 10: OCCT shim, wheels, release, research
 
 * **Contents:** `bindings/python/occt/`, `occt_dev/`, `docs/OCCT_BINDINGS.md`, `tools/occt_usage_trace.json`,
-  `src/simplecadapi/_cpp/{occt.py,_occt_layout.json}`, `pyproject.toml`, `.github/workflows/`, `src/cpp/.github/`,
+  `src/simplecadapi/_cpp/{occt.py,_occt_layout.json}`, `pyproject.toml`, `.github/workflows/`,
   `tests/wheel_smoke.py`, `docs/research/`, `tools/research/`.
 * **Proves it:** `python src/cpp/tests/wheel_smoke.py` in a clean environment with only the wheel installed (cibuildwheel runs it);
   a dry run of the release workflow (`workflow_dispatch` with `dry_run`, see `.github/workflows/release.yml`); the editable
@@ -159,9 +159,8 @@ PR 7 does not depend on 4 to 6 (it needs only `semantic` and below), so it can b
   `.github/workflows/release.yml`.
 * **Old tests it answers for:** `test_wrapped_ocp.py` and the `test_inspect_brep*.py` family (the Python layers that still read OCP
   classes through the shim).
-* **Note:** `src/cpp/.github/workflows/{ci,wheels}.yml` are an older pair of workflows nested in `src/cpp`. GitHub reads
-  workflows only from the repository root `.github/workflows`, so they are not run; they are assigned to this PR so that
-  every file has an owner, and are candidates for deletion.
+* **Note:** `src/cpp/.github/workflows/{ci,wheels}.yml` were an older pair of workflows nested in `src/cpp` that GitHub
+  never ran (it reads only the repository root `.github/workflows`); they are deleted.
 
 ## Reviewing and landing
 

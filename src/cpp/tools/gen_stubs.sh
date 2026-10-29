@@ -28,11 +28,24 @@ fi
 
 # pybind11-stubgen writes the re-export imports in set order, which differs from run to run: sort every run of
 # consecutive import lines so that the output is reproducible (and the --check below means something).
-"$py" - "$src" <<'PY'
+# shellcheck disable=SC2086  # $py may carry arguments (e.g. "uv run --no-sync python")
+$py - "$src" <<'PY'
 import pathlib, sys
 
+# Test-only modules are not public typing; two exception classes are created in Python with module "builtins", which
+# no checker can resolve (they stay untyped until they are registered under the module's own name).
+TEST_ONLY = {"_testing", "_geometry_testing", "_surface_testing"}
+UNRESOLVABLE = {"from builtins import StaleLineageError", "from builtins import UnitValidationError"}
 for path in pathlib.Path(sys.argv[1]).rglob("*.pyi"):
+    if path.stem in TEST_ONLY:
+        path.unlink()
+        continue
     lines, out, run = path.read_text().split("\n"), [], []
+    lines = [
+        line
+        for line in lines
+        if line not in UNRESOLVABLE and not (line.startswith("from . import ") and line.split()[-1] in TEST_ONLY)
+    ]
     for line in lines + [""]:
         if line.startswith(("from ", "import ")):
             run.append(line)
