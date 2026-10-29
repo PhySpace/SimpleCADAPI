@@ -13,6 +13,7 @@
 #include <unordered_set>
 
 #include "detail.hpp"
+#include "scad/core/engaged.hpp"
 #include "scad/core/error.hpp"
 #include "scad/topo/recorder.hpp"
 #include "scad/topo/tag_factories.hpp"
@@ -509,7 +510,7 @@ Shape assign_tag(const Shape& scope, const TagTargets& targets, std::string_view
     record.params = object({{"tag_binding", binding.to_value()}});
     record.inputs.push_back({scope, "scope"});
     if (reservation)
-      record.node_id = reservation.value().node_id;  // engaged: just tested; value() never throws here
+      record.node_id = require_engaged(reservation, "a reserved node is tested on the line above").node_id;
     recorder->record(record, {view});
   }
   return view;
