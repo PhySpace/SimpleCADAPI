@@ -1,0 +1,3 @@
+# LeakSanitizer suppressions.  The diagnostic-image slot (src/topo/diagnostic_image.cpp) is intentionally leaked: it
+# stays reachable through a static pointer, so LSan normally does not report it; this is the safety net.
+leak:scad::*::slot

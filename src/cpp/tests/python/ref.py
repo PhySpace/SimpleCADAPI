@@ -9,7 +9,8 @@
 The snippet runs in the *reference* interpreter (the Python SDK on OCP) with
 `scad` = simplecadapi and `result` JSON-serialisable.  The first run on a machine
 that has the reference stores tests/golden/<name>.json; every other machine (the
-Linux VM, CI) reads that file.  Re-record with SCAD_REGOLDEN=1.
+Linux VM, CI) reads that file.  Re-record with SCAD_REGOLDEN=1.  With SCAD_GOLDEN_STRICT=1 (CI) a missing golden is a failure, never a skip or a silent
+recording, and SCAD_REGOLDEN is refused.
 
 Golden files are committed: they are the contract the C++ port is held to.
 """
@@ -58,6 +59,11 @@ def ref_eval(snippet: str, timeout: float = 120.0) -> Any:
 def golden(name: str, snippet: str) -> Any:
     """Golden value for `name`: from tests/golden/<name>.json, recorded on demand."""
     path = GOLDEN_DIR / f"{name}.json"
+    if os.environ.get("SCAD_GOLDEN_STRICT"):
+        if os.environ.get("SCAD_REGOLDEN"):
+            pytest.fail("SCAD_REGOLDEN cannot be combined with SCAD_GOLDEN_STRICT")
+        if not path.exists():
+            pytest.fail(f"golden file {path.name} is missing (SCAD_GOLDEN_STRICT=1 never records one)")
     if path.exists() and not os.environ.get("SCAD_REGOLDEN"):
         return json.loads(path.read_text())
     if not reference_available():
