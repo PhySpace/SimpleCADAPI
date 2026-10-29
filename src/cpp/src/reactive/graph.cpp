@@ -663,6 +663,129 @@ std::string OperationGraph::to_json(int indent) const {
   return out;
 }
 
+namespace {
+
+// One node entry of the payload, validated but not yet built (nodes are added in dependency order).
+struct PendingNode {
+  const Value* data;
+  std::string node_id;
+  std::vector<std::string> inputs;
+};
+
+// Validates every node entry and collects its declared inputs; fills `declared_edges` and `known`.
+std::vector<PendingNode> parse_pending_nodes(const Value& raw_nodes,
+                                             std::set<std::pair<std::string, std::string>>& declared_edges,
+                                             std::set<std::string>& known) {
+  std::vector<PendingNode> pending;
+  for (const Value& nd : raw_nodes.as_array()) {
+    if (!nd.is_object())
+      throw ValueError("graph node entries must be objects");
+    const Value* node_id = nd.find("node_id");
+    const Value* op = nd.find("op");
+    if (node_id == nullptr || !node_id->is_string() || node_id->as_string().empty()) {
+      throw ValueError("graph node_id must be a non-empty string");
+    }
+    const std::string& nid = node_id->as_string();
+    if (op == nullptr || !op->is_string() || op->as_string().empty()) {
+      throw ValueError("graph node '" + nid + "' op must be a non-empty string");
+    }
+    if (const Value* count = nd.find("output_count"); count != nullptr && (!count->is_int() || count->as_int() < 0)) {
+      throw ValueError("graph node '" + nid + "' output_count must be a non-negative integer");
+    }
+    PendingNode item{&nd, nid, {}};
+    if (const Value* inputs = nd.find("inputs")) {
+      bool ok = inputs->is_array();
+      if (ok) {
+        for (const Value& input : inputs->as_array())
+          ok = ok && input.is_string();
+      }
+      if (!ok)
+        throw ValueError("graph node '" + nid + "' inputs must be string ids");
+      for (const Value& input : inputs->as_array())
+        item.inputs.push_back(input.as_string());
+      if (std::set<std::string>(item.inputs.begin(), item.inputs.end()).size() != item.inputs.size()) {
+        throw ValueError("graph node '" + nid + "' contains duplicate inputs");
+      }
+    }
+    for (const std::string& input : item.inputs)
+      declared_edges.emplace(input, nid);
+    if (!known.insert(nid).second)
+      throw ValueError("node id '" + nid + "' already exists in graph");
+    pending.push_back(std::move(item));
+  }
+  return pending;
+}
+
+// The serialised edge list must agree with the node input declarations (a lenient load skips bad edges).
+void check_serialized_edges(const Value& raw_edges, const std::set<std::string>& known,
+                            const std::set<std::pair<std::string, std::string>>& declared_edges, bool strict) {
+  std::set<std::pair<std::string, std::string>> serialized_edges;
+  for (const Value& edge : raw_edges.as_array()) {
+    const bool well_formed =
+        edge.is_array() && edge.size() == 2 && edge.as_array()[0].is_string() && edge.as_array()[1].is_string();
+    if (!well_formed) {
+      if (strict)
+        throw ValueError("malformed graph edge entry: " + edge.dump());
+      continue;
+    }
+    const std::string& src = edge.as_array()[0].as_string();
+    const std::string& dst = edge.as_array()[1].as_string();
+    if (known.count(src) == 0 || known.count(dst) == 0) {
+      if (strict)
+        throw ValueError("graph edge references missing node(s): '" + src + "' -> '" + dst + "'");
+      continue;
+    }
+    if (!serialized_edges.emplace(src, dst).second && strict) {
+      throw ValueError("duplicate graph edge: '" + src + "' -> '" + dst + "'");
+    }
+  }
+  if (strict && serialized_edges != declared_edges)
+    throw ValueError("graph edges do not match node input declarations");
+}
+
+// Rebuilds the NodeSpec of a stored node; `inputs` are its already-placed input nodes.
+NodeSpec node_spec_from_value(const PendingNode& item, std::vector<NodePtr> inputs, const ExpressionGraph* expressions,
+                              const FrameGraph* frames) {
+  const Value& nd = *item.data;
+  NodeSpec spec;
+  spec.op = nd.find("op")->as_string();
+  if (const Value* params = nd.find("params"); params != nullptr && params->is_object())
+    spec.params = *params;
+  if (const Value* exprs = nd.find("param_exprs"); exprs != nullptr && exprs->is_object())
+    spec.param_exprs = *exprs;
+  spec.node_id = item.node_id;
+  if (const Value* count = nd.find("output_count"))
+    spec.output_count = static_cast<int>(count->as_int());
+  if (const Value* ctx = nd.find("context"); ctx != nullptr && !ctx->is_null())
+    spec.context = *ctx;
+  if (const Value* tags = nd.find("tags"); tags != nullptr && tags->is_array()) {
+    for (const Value& tag : tags->as_array()) {
+      if (tag.is_string())
+        spec.tags.insert(tag.as_string());
+    }
+  }
+  if (const Value* source = nd.find("source"); source != nullptr && !source->is_null())
+    spec.source = *source;
+  if (const Value* delta = nd.find("semantic_delta"); delta != nullptr && delta->is_object()) {
+    spec.semantic_delta = semantic_delta_from_value(*delta);
+  }
+  if (const Value* delta = nd.find("topo_delta"); delta != nullptr && delta->is_object()) {
+    spec.topo_delta = topo_delta_from_value(*delta);
+  }
+  if (expressions != nullptr && !spec.param_exprs.is_null())
+    spec.expressions = referenced_expressions(spec.param_exprs, *expressions);
+  if (frames != nullptr) {
+    if (const FrameNode* frame = frames->get("frame:" + item.node_id))
+      spec.frame = *frame;
+  }
+  for (const NodePtr& input : inputs)
+    spec.bindings.push_back(InputBinding{input->node_id, 0, {}});
+  spec.inputs = std::move(inputs);
+  return spec;
+}
+
+}  // namespace
+
 OperationGraph OperationGraph::from_value(const Value& payload, bool strict, const ExpressionGraph* expressions,
                                           const FrameGraph* frames) {
   if (!payload.is_object())
@@ -685,73 +808,10 @@ OperationGraph OperationGraph::from_value(const Value& payload, bool strict, con
   const Value* id = payload.find("graph_id");
   OperationGraph graph(id != nullptr && id->is_string() ? id->as_string() : std::string{});
 
-  struct Pending {
-    const Value* data;
-    std::string node_id;
-    std::vector<std::string> inputs;
-  };
-  std::vector<Pending> pending;
   std::set<std::pair<std::string, std::string>> declared_edges;
   std::set<std::string> known;
-  for (const Value& nd : raw_nodes->as_array()) {
-    if (!nd.is_object())
-      throw ValueError("graph node entries must be objects");
-    const Value* node_id = nd.find("node_id");
-    const Value* op = nd.find("op");
-    if (node_id == nullptr || !node_id->is_string() || node_id->as_string().empty()) {
-      throw ValueError("graph node_id must be a non-empty string");
-    }
-    const std::string& nid = node_id->as_string();
-    if (op == nullptr || !op->is_string() || op->as_string().empty()) {
-      throw ValueError("graph node '" + nid + "' op must be a non-empty string");
-    }
-    if (const Value* count = nd.find("output_count"); count != nullptr && (!count->is_int() || count->as_int() < 0)) {
-      throw ValueError("graph node '" + nid + "' output_count must be a non-negative integer");
-    }
-    Pending item{&nd, nid, {}};
-    if (const Value* inputs = nd.find("inputs")) {
-      bool ok = inputs->is_array();
-      if (ok) {
-        for (const Value& input : inputs->as_array())
-          ok = ok && input.is_string();
-      }
-      if (!ok)
-        throw ValueError("graph node '" + nid + "' inputs must be string ids");
-      for (const Value& input : inputs->as_array())
-        item.inputs.push_back(input.as_string());
-      if (std::set<std::string>(item.inputs.begin(), item.inputs.end()).size() != item.inputs.size()) {
-        throw ValueError("graph node '" + nid + "' contains duplicate inputs");
-      }
-    }
-    for (const std::string& input : item.inputs)
-      declared_edges.emplace(input, nid);
-    if (!known.insert(nid).second)
-      throw ValueError("node id '" + nid + "' already exists in graph");
-    pending.push_back(std::move(item));
-  }
-
-  std::set<std::pair<std::string, std::string>> serialized_edges;
-  for (const Value& edge : raw_edges->as_array()) {
-    const bool well_formed =
-        edge.is_array() && edge.size() == 2 && edge.as_array()[0].is_string() && edge.as_array()[1].is_string();
-    if (!well_formed) {
-      if (strict)
-        throw ValueError("malformed graph edge entry: " + edge.dump());
-      continue;
-    }
-    const std::string& src = edge.as_array()[0].as_string();
-    const std::string& dst = edge.as_array()[1].as_string();
-    if (known.count(src) == 0 || known.count(dst) == 0) {
-      if (strict)
-        throw ValueError("graph edge references missing node(s): '" + src + "' -> '" + dst + "'");
-      continue;
-    }
-    if (!serialized_edges.emplace(src, dst).second && strict) {
-      throw ValueError("duplicate graph edge: '" + src + "' -> '" + dst + "'");
-    }
-  }
-  if (strict && serialized_edges != declared_edges)
-    throw ValueError("graph edges do not match node input declarations");
+  const std::vector<PendingNode> pending = parse_pending_nodes(*raw_nodes, declared_edges, known);
+  check_serialized_edges(*raw_edges, known, declared_edges, strict);
 
   // Add each node once everything it consumes is in.
   std::vector<bool> placed(pending.size(), false);
@@ -761,7 +821,7 @@ OperationGraph OperationGraph::from_value(const Value& payload, bool strict, con
     for (std::size_t i = 0; i < pending.size(); ++i) {
       if (placed[i])
         continue;
-      const Pending& item = pending[i];
+      const PendingNode& item = pending[i];
       std::vector<NodePtr> inputs;
       bool ready = true;
       for (const std::string& input : item.inputs) {
@@ -778,41 +838,7 @@ OperationGraph OperationGraph::from_value(const Value& payload, bool strict, con
       }
       if (!ready)
         continue;
-      const Value& nd = *item.data;
-      NodeSpec spec;
-      spec.op = nd.find("op")->as_string();
-      if (const Value* params = nd.find("params"); params != nullptr && params->is_object())
-        spec.params = *params;
-      if (const Value* exprs = nd.find("param_exprs"); exprs != nullptr && exprs->is_object())
-        spec.param_exprs = *exprs;
-      spec.node_id = item.node_id;
-      if (const Value* count = nd.find("output_count"))
-        spec.output_count = static_cast<int>(count->as_int());
-      if (const Value* ctx = nd.find("context"); ctx != nullptr && !ctx->is_null())
-        spec.context = *ctx;
-      if (const Value* tags = nd.find("tags"); tags != nullptr && tags->is_array()) {
-        for (const Value& tag : tags->as_array()) {
-          if (tag.is_string())
-            spec.tags.insert(tag.as_string());
-        }
-      }
-      if (const Value* source = nd.find("source"); source != nullptr && !source->is_null())
-        spec.source = *source;
-      if (const Value* delta = nd.find("semantic_delta"); delta != nullptr && delta->is_object()) {
-        spec.semantic_delta = semantic_delta_from_value(*delta);
-      }
-      if (const Value* delta = nd.find("topo_delta"); delta != nullptr && delta->is_object()) {
-        spec.topo_delta = topo_delta_from_value(*delta);
-      }
-      if (expressions != nullptr && !spec.param_exprs.is_null())
-        spec.expressions = referenced_expressions(spec.param_exprs, *expressions);
-      if (frames != nullptr) {
-        if (const FrameNode* frame = frames->get("frame:" + item.node_id))
-          spec.frame = *frame;
-      }
-      for (const NodePtr& input : inputs)
-        spec.bindings.push_back(InputBinding{input->node_id, 0, {}});
-      spec.inputs = std::move(inputs);
+      NodeSpec spec = node_spec_from_value(item, std::move(inputs), expressions, frames);
       graph.add_node(std::move(spec));
       placed[i] = true;
       --remaining;

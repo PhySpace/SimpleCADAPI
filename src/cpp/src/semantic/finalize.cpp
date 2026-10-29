@@ -23,6 +23,7 @@ bool in(std::string_view op, std::initializer_list<std::string_view> names) {
 }
 
 // SemanticRef entity type of an operation's output (_semantic_delta_for_output).
+// A flat lookup table of operator names grouped by entity type; kept as one list on purpose.
 std::string entity_type_of(std::string_view op) {
   if (in(op, {"make_point", "make_point_rvertex"}))
     return "Point";

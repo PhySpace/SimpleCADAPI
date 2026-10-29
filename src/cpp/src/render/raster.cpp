@@ -317,24 +317,23 @@ void shade(const MeshView& m, std::uint32_t t, float w1, float w2, const Lightin
 // ---------------------------------------------------------------------------
 // One panel
 // ---------------------------------------------------------------------------
-void draw_panel(const Scene& scene, const PanelParams& P, const Target& T,
-                std::array<std::array<double, 2>, 3>& axes_tips) {
-  const int ss = T.ss;
-  const int pw = P.rect.w * ss, ph = P.rect.h * ss;
-  const int ox = P.rect.x * ss, oy = P.rect.y * ss;
-  const int band_h = 8 * ss;
-  const int bands = (ph + band_h - 1) / band_h;
-  const Camera& cam = P.camera;
-  const Screen screen{&cam, static_cast<double>(pw), static_cast<double>(ph),
-                      1.0 / (2.0 * cam.half_height * cam.aspect), 1.0 / (2.0 * cam.half_height)};
-  const double px_per_world = ph / (2.0 * cam.half_height);
-  const Lighting lighting = make_lighting(cam, P.style);
+namespace {
 
-  // Backgrounds are drawn per band below.
-  const Rgb top = P.bg_top ? *P.bg_top : (P.style == Style::Studio ? Rgb{0, 0, 0} : Rgb{0.78f, 0.84f, 0.90f});
-  const Rgb bottom = P.bg_bottom ? *P.bg_bottom : (P.style == Style::Studio ? Rgb{0, 0, 0} : Rgb{0.94f, 0.96f, 0.98f});
+// Pixel geometry of one panel in supersampled (ss) units, shared by all stages of draw_panel.
+struct PanelGeom {
+  int ss, pw, ph;  // supersample factor, panel size in ss pixels
+  int ox, oy;      // panel origin in the target, ss pixels
+  int band_h, bands;
+};
 
-  // --- mesh views and triangle setup -----------------------------------------------------------
+// Address of the RGBA pixel (x, y) of the panel inside the supersampled target.
+std::uint8_t* target_px(const Target& T, const PanelGeom& g, int x, int y) {
+  return T.rgba + (static_cast<std::size_t>(g.oy + y) * static_cast<std::size_t>(T.ss_width) +
+                   static_cast<std::size_t>(g.ox + x)) *
+                      4;
+}
+
+std::vector<MeshView> make_mesh_views(const Scene& scene, const Lighting& lighting) {
   std::vector<MeshView> views;
   views.reserve(scene.meshes().size());
   for (std::size_t i = 0; i < scene.meshes().size(); ++i) {
@@ -345,68 +344,68 @@ void draw_panel(const Scene& scene, const PanelParams& P, const Target& T,
                      static_cast<std::uint32_t>(mesh.triangle_count()), static_cast<std::uint32_t>(i), mat,
                      e.style.opacity < 0.999f});
   }
-  std::vector<Tri> opaque, translucent;
-  {
-    constexpr std::uint32_t chunk = 8192;
-    for (int pass = 0; pass < 2; ++pass) {
-      std::vector<std::pair<std::size_t, std::uint32_t>> jobs;  // (mesh, first triangle)
-      for (std::size_t i = 0; i < views.size(); ++i)
-        if (views[i].translucent == (pass == 1))
-          for (std::uint32_t t = 0; t < views[i].tri_count; t += chunk)
-            jobs.push_back({i, t});
-      std::vector<std::vector<Tri>> parts(jobs.size());
-      parallel_for(static_cast<int>(jobs.size()), P.threads, [&](int j) {
-        const MeshView& m = views[jobs[static_cast<std::size_t>(j)].first];
-        const std::uint32_t first = jobs[static_cast<std::size_t>(j)].second;
-        const float bias = static_cast<float>(2e-6 * P.span * m.index);
-        auto& out = parts[static_cast<std::size_t>(j)];
-        Tri tri;
-        for (std::uint32_t t = first; t < std::min(first + chunk, m.tri_count); ++t)
-          if (setup_tri(m, t, screen, pw, ph, bias, tri))
-            out.push_back(tri);
-      });
-      auto& dst = pass == 0 ? opaque : translucent;
-      for (auto& p : parts)
-        dst.insert(dst.end(), p.begin(), p.end());
-    }
-    // Far to near; ties by original order, so the blend is deterministic.
-    std::stable_sort(translucent.begin(), translucent.end(), [](const Tri& a, const Tri& b) {
-      return (a.z[0] + a.z[1] + a.z[2]) > (b.z[0] + b.z[1] + b.z[2]);
-    });
-  }
-  auto tri_ranges = [](const std::vector<Tri>& tris) {
-    std::vector<std::pair<int, int>> r;
-    r.reserve(tris.size());
-    for (const Tri& t : tris)
-      r.push_back({t.y0, t.y1});
-    return r;
-  };
-  Csr opaque_bins, translucent_bins;
-  opaque_bins.build(bands, band_h, tri_ranges(opaque));
-  translucent_bins.build(bands, band_h, tri_ranges(translucent));
+  return views;
+}
 
-  // --- lines and points -------------------------------------------------------------------------
+// Projects every triangle (in parallel chunks, concatenated in mesh/triangle order so the result does
+// not depend on the thread count) into screen space; translucent ones are sorted far to near.
+void setup_triangles(const std::vector<MeshView>& views, const PanelParams& P, const Screen& screen, const PanelGeom& g,
+                     std::vector<Tri>& opaque, std::vector<Tri>& translucent) {
+  constexpr std::uint32_t chunk = 8192;
+  for (int pass = 0; pass < 2; ++pass) {
+    std::vector<std::pair<std::size_t, std::uint32_t>> jobs;  // (mesh, first triangle)
+    for (std::size_t i = 0; i < views.size(); ++i)
+      if (views[i].translucent == (pass == 1))
+        for (std::uint32_t t = 0; t < views[i].tri_count; t += chunk)
+          jobs.push_back({i, t});
+    std::vector<std::vector<Tri>> parts(jobs.size());
+    parallel_for(static_cast<int>(jobs.size()), P.threads, [&](int j) {
+      const MeshView& m = views[jobs[static_cast<std::size_t>(j)].first];
+      const std::uint32_t first = jobs[static_cast<std::size_t>(j)].second;
+      // Bias grows with the mesh index: z is eye distance, so on coplanar overlaps the later mesh wins.
+      const float bias = static_cast<float>(2e-6 * P.span * m.index);
+      auto& out = parts[static_cast<std::size_t>(j)];
+      Tri tri;
+      for (std::uint32_t t = first; t < std::min(first + chunk, m.tri_count); ++t)
+        if (setup_tri(m, t, screen, g.pw, g.ph, bias, tri))
+          out.push_back(tri);
+    });
+    auto& dst = pass == 0 ? opaque : translucent;
+    for (auto& p : parts)
+      dst.insert(dst.end(), p.begin(), p.end());
+  }
+  // Far to near; ties by original order, so the blend is deterministic.
+  std::stable_sort(translucent.begin(), translucent.end(),
+                   [](const Tri& a, const Tri& b) { return (a.z[0] + a.z[1] + a.z[2]) > (b.z[0] + b.z[1] + b.z[2]); });
+}
+
+// Appends one capsule segment (points are degenerate segments); culled when it misses the panel.
+void add_seg(std::vector<Seg>& segs, const Screen& screen, const PanelGeom& g, const float* a, const float* b,
+             double width_px_ss, float bias, const Rgb& color) {
+  Seg s{};
+  float za, zb;
+  screen(a, s.x0, s.y0, za);
+  screen(b, s.x1, s.y1, zb);
+  s.z0 = za;
+  s.z1 = zb;
+  s.hw = static_cast<float>(std::max(0.5, width_px_ss * 0.5));
+  s.bias = bias;
+  for (int c = 0; c < 3; ++c)
+    s.rgb[c] = to_u8(color[static_cast<std::size_t>(c)]);
+  const float r = s.hw + 1.0f;
+  s.x_lo = std::max(0, static_cast<int>(std::floor(std::min(s.x0, s.x1) - r)));
+  s.x_hi = std::min(g.pw - 1, static_cast<int>(std::ceil(std::max(s.x0, s.x1) + r)));
+  s.y_lo = std::max(0, static_cast<int>(std::floor(std::min(s.y0, s.y1) - r)));
+  s.y_hi = std::min(g.ph - 1, static_cast<int>(std::ceil(std::max(s.y0, s.y1) + r)));
+  if (s.x_lo > s.x_hi || s.y_lo > s.y_hi)
+    return;
+  segs.push_back(s);
+}
+
+// Ink lines (width and depth bias from the line style, the panel ink diameter, or one pixel) and points.
+std::vector<Seg> collect_segments(const Scene& scene, const PanelParams& P, const Screen& screen, const PanelGeom& g,
+                                  double px_per_world) {
   std::vector<Seg> segs;
-  auto add_seg = [&](const float* a, const float* b, double width_px_ss, float bias, const Rgb& color) {
-    Seg s{};
-    float za, zb;
-    screen(a, s.x0, s.y0, za);
-    screen(b, s.x1, s.y1, zb);
-    s.z0 = za;
-    s.z1 = zb;
-    s.hw = static_cast<float>(std::max(0.5, width_px_ss * 0.5));
-    s.bias = bias;
-    for (int c = 0; c < 3; ++c)
-      s.rgb[c] = to_u8(color[static_cast<std::size_t>(c)]);
-    const float r = s.hw + 1.0f;
-    s.x_lo = std::max(0, static_cast<int>(std::floor(std::min(s.x0, s.x1) - r)));
-    s.x_hi = std::min(pw - 1, static_cast<int>(std::ceil(std::max(s.x0, s.x1) + r)));
-    s.y_lo = std::max(0, static_cast<int>(std::floor(std::min(s.y0, s.y1) - r)));
-    s.y_hi = std::min(ph - 1, static_cast<int>(std::ceil(std::max(s.y0, s.y1) + r)));
-    if (s.x_lo > s.x_hi || s.y_lo > s.y_hi)
-      return;
-    segs.push_back(s);
-  };
   for (const auto& entry : scene.lines()) {
     const LineStyle& st = entry.style;
     double width_ss;
@@ -418,191 +417,256 @@ void draw_panel(const Scene& scene, const PanelParams& P, const Target& T,
       width_ss = st.width_world * px_per_world;
       bias = static_cast<float>(st.depth_bias.value_or(st.width_world * 0.5));
     } else {
-      width_ss = st.width_world < 0.0 ? ss : st.width_px * ss;
+      width_ss = st.width_world < 0.0 ? g.ss : st.width_px * g.ss;
       bias = static_cast<float>(st.depth_bias.value_or(0.001 * P.span));
     }
     const auto& L = entry.lines;
     for (std::size_t p = 0; p < L.count(); ++p)
       for (std::uint32_t k = L.starts[p]; k + 1 < L.starts[p + 1]; ++k)
-        add_seg(&L.points[3 * static_cast<std::size_t>(k)], &L.points[3 * static_cast<std::size_t>(k) + 3], width_ss,
-                bias, st.color);
+        add_seg(segs, screen, g, &L.points[3 * static_cast<std::size_t>(k)],
+                &L.points[3 * static_cast<std::size_t>(k) + 3], width_ss, bias, st.color);
   }
   for (const auto& entry : scene.points())
     for (std::size_t k = 0; k + 2 < entry.xyz.size(); k += 3)
-      add_seg(&entry.xyz[k], &entry.xyz[k], entry.style.size_px * ss, static_cast<float>(0.002 * P.span),
-              entry.style.color);
-  Csr seg_bins;
-  {
-    std::vector<std::pair<int, int>> r;
-    r.reserve(segs.size());
-    for (const Seg& s : segs)
-      r.push_back({s.y_lo, s.y_hi});
-    seg_bins.build(bands, band_h, r);
+      add_seg(segs, screen, g, &entry.xyz[k], &entry.xyz[k], entry.style.size_px * g.ss,
+              static_cast<float>(0.002 * P.span), entry.style.color);
+  return segs;
+}
+
+// Everything the per-band worker reads; all members outlive the parallel_for.
+struct BandInputs {
+  const PanelParams& P;
+  const Target& T;
+  const PanelGeom& g;
+  const Lighting& lighting;
+  const std::vector<MeshView>& views;
+  const std::vector<Tri>& opaque;
+  const std::vector<Tri>& translucent;
+  const std::vector<Seg>& segs;
+  const Csr& opaque_bins;
+  const Csr& translucent_bins;
+  const Csr& seg_bins;
+  Rgb top, bottom;
+};
+
+// Background gradient (bottom -> top) for rows [y0, y1).
+void fill_background(const BandInputs& in, int y0, int y1) {
+  const PanelGeom& g = in.g;
+  for (int y = y0; y < y1; ++y) {
+    const float f = 1.0f - (static_cast<float>(y) + 0.5f) / static_cast<float>(g.ph);  // 0 at the bottom
+    std::uint8_t c[3];
+    for (int k = 0; k < 3; ++k)
+      c[k] = to_u8(in.bottom[static_cast<std::size_t>(k)] +
+                   (in.top[static_cast<std::size_t>(k)] - in.bottom[static_cast<std::size_t>(k)]) * f);
+    std::uint8_t* row = target_px(in.T, g, 0, y);
+    for (int x = 0; x < g.pw; ++x) {
+      row[4 * x] = c[0];
+      row[4 * x + 1] = c[1];
+      row[4 * x + 2] = c[2];
+      row[4 * x + 3] = 255;
+    }
   }
+}
 
-  // --- bands --------------------------------------------------------------------------------------
-  const int fw = P.rect.w;  // panel width in output pixels
-  parallel_for(bands, P.threads, [&](int band) {
-    const int y0 = band * band_h, y1 = std::min(ph, y0 + band_h), rows = y1 - y0;
-    thread_local std::vector<float> depth, bw1, bw2;
-    thread_local std::vector<std::uint32_t> id;
-    const std::size_t count = static_cast<std::size_t>(rows) * static_cast<std::size_t>(pw);
-    depth.assign(count, kInf);
-    id.assign(count, kNone);
-    bw1.resize(count);
-    bw2.resize(count);
-
-    // background gradient (bottom -> top)
-    for (int y = y0; y < y1; ++y) {
-      const float f = 1.0f - (static_cast<float>(y) + 0.5f) / static_cast<float>(ph);  // 0 at the bottom
-      std::uint8_t c[3];
-      for (int k = 0; k < 3; ++k)
-        c[k] = to_u8(bottom[static_cast<std::size_t>(k)] +
-                     (top[static_cast<std::size_t>(k)] - bottom[static_cast<std::size_t>(k)]) * f);
-      std::uint8_t* row =
-          T.rgba +
-          (static_cast<std::size_t>(oy + y) * static_cast<std::size_t>(T.ss_width) + static_cast<std::size_t>(ox)) * 4;
-      for (int x = 0; x < pw; ++x) {
-        row[4 * x] = c[0];
-        row[4 * x + 1] = c[1];
-        row[4 * x + 2] = c[2];
-        row[4 * x + 3] = 255;
+// Output-resolution depth and ids: the centre sample of each ss x ss block.
+void write_depth_and_ids(const BandInputs& in, int y0, int y1, const std::vector<float>& depth,
+                         const std::vector<std::uint32_t>& id) {
+  const PanelGeom& g = in.g;
+  const Target& T = in.T;
+  const int ss = g.ss, fw = in.P.rect.w;  // fw: panel width in output pixels
+  for (int fy = y0 / ss; fy < y1 / ss; ++fy) {
+    const int local_row = fy * ss + ss / 2 - y0;
+    for (int fx = 0; fx < fw; ++fx) {
+      const std::size_t p = static_cast<std::size_t>(local_row) * static_cast<std::size_t>(g.pw) +
+                            static_cast<std::size_t>(fx * ss + ss / 2);
+      const std::size_t o = static_cast<std::size_t>(in.P.rect.y + fy) * static_cast<std::size_t>(T.width) +
+                            static_cast<std::size_t>(in.P.rect.x + fx);
+      T.depth[o] = depth[p];
+      if (id[p] == kNone) {
+        T.mesh_id[o] = -1;
+        T.face_id[o] = -1;
+      } else {
+        const Tri& t = in.opaque[id[p]];
+        T.mesh_id[o] = static_cast<std::int32_t>(t.mesh);
+        T.face_id[o] = static_cast<std::int32_t>(in.views[t.mesh].fid[t.index]);
       }
     }
+  }
+}
 
-    // visibility
-    for (std::uint32_t k = opaque_bins.offsets[static_cast<std::size_t>(band)];
-         k < opaque_bins.offsets[static_cast<std::size_t>(band) + 1]; ++k) {
-      const std::uint32_t ti = opaque_bins.items[k];
-      raster_tri(opaque[ti], y0, y1, [&](int x, int y, float z, float w1, float w2) {
-        const std::size_t p =
-            static_cast<std::size_t>(y - y0) * static_cast<std::size_t>(pw) + static_cast<std::size_t>(x);
-        if (z < depth[p]) {
-          depth[p] = z;
-          id[p] = ti;
-          bw1[p] = w1;
-          bw2[p] = w2;
-        }
-      });
-    }
-    // shading
-    for (int y = y0; y < y1; ++y) {
-      std::uint8_t* row =
-          T.rgba +
-          (static_cast<std::size_t>(oy + y) * static_cast<std::size_t>(T.ss_width) + static_cast<std::size_t>(ox)) * 4;
-      for (int x = 0; x < pw; ++x) {
-        const std::size_t p =
-            static_cast<std::size_t>(y - y0) * static_cast<std::size_t>(pw) + static_cast<std::size_t>(x);
-        if (id[p] == kNone)
-          continue;
-        const Tri& t = opaque[id[p]];
-        float rgb[3];
-        shade(views[t.mesh], t.index, bw1[p], bw2[p], lighting, rgb, nullptr);
-        for (int c = 0; c < 3; ++c)
-          row[4 * x + c] = to_u8(rgb[c]);
+// Renders one band of rows: background, opaque visibility + deferred shading, ink, translucent blend.
+void render_band(const BandInputs& in, int band) {
+  const PanelGeom& g = in.g;
+  const int pw = g.pw;
+  const int y0 = band * g.band_h, y1 = std::min(g.ph, y0 + g.band_h), rows = y1 - y0;
+  thread_local std::vector<float> depth, bw1, bw2;
+  thread_local std::vector<std::uint32_t> id;
+  const std::size_t count = static_cast<std::size_t>(rows) * static_cast<std::size_t>(pw);
+  depth.assign(count, kInf);
+  id.assign(count, kNone);
+  bw1.resize(count);
+  bw2.resize(count);
+
+  fill_background(in, y0, y1);
+
+  // visibility
+  for (std::uint32_t k = in.opaque_bins.offsets[static_cast<std::size_t>(band)];
+       k < in.opaque_bins.offsets[static_cast<std::size_t>(band) + 1]; ++k) {
+    const std::uint32_t ti = in.opaque_bins.items[k];
+    raster_tri(in.opaque[ti], y0, y1, [&](int x, int y, float z, float w1, float w2) {
+      const std::size_t p =
+          static_cast<std::size_t>(y - y0) * static_cast<std::size_t>(pw) + static_cast<std::size_t>(x);
+      if (z < depth[p]) {
+        depth[p] = z;
+        id[p] = ti;
+        bw1[p] = w1;
+        bw2[p] = w2;
       }
+    });
+  }
+  // shading
+  for (int y = y0; y < y1; ++y) {
+    std::uint8_t* row = target_px(in.T, g, 0, y);
+    for (int x = 0; x < pw; ++x) {
+      const std::size_t p =
+          static_cast<std::size_t>(y - y0) * static_cast<std::size_t>(pw) + static_cast<std::size_t>(x);
+      if (id[p] == kNone)
+        continue;
+      const Tri& t = in.opaque[id[p]];
+      float rgb[3];
+      shade(in.views[t.mesh], t.index, bw1[p], bw2[p], in.lighting, rgb, nullptr);
+      for (int c = 0; c < 3; ++c)
+        row[4 * x + c] = to_u8(rgb[c]);
     }
-    // ink lines and points: depth-tested against the surfaces, no depth writes
-    for (std::uint32_t k = seg_bins.offsets[static_cast<std::size_t>(band)];
-         k < seg_bins.offsets[static_cast<std::size_t>(band) + 1]; ++k) {
-      const Seg& s = segs[seg_bins.items[k]];
-      raster_seg(s, y0, y1, [&](int x, int y, float z) {
-        const std::size_t p =
-            static_cast<std::size_t>(y - y0) * static_cast<std::size_t>(pw) + static_cast<std::size_t>(x);
-        if (z > depth[p])
-          return;
-        std::uint8_t* px = T.rgba + (static_cast<std::size_t>(oy + y) * static_cast<std::size_t>(T.ss_width) +
-                                     static_cast<std::size_t>(ox + x)) *
-                                        4;
+  }
+  // ink lines and points: depth-tested against the surfaces, no depth writes
+  for (std::uint32_t k = in.seg_bins.offsets[static_cast<std::size_t>(band)];
+       k < in.seg_bins.offsets[static_cast<std::size_t>(band) + 1]; ++k) {
+    const Seg& s = in.segs[in.seg_bins.items[k]];
+    raster_seg(s, y0, y1, [&](int x, int y, float z) {
+      const std::size_t p =
+          static_cast<std::size_t>(y - y0) * static_cast<std::size_t>(pw) + static_cast<std::size_t>(x);
+      if (z > depth[p])
+        return;
+      std::uint8_t* px = target_px(in.T, g, x, y);
+      px[0] = s.rgb[0];
+      px[1] = s.rgb[1];
+      px[2] = s.rgb[2];
+    });
+  }
+  // translucent surfaces, far to near
+  for (std::uint32_t k = in.translucent_bins.offsets[static_cast<std::size_t>(band)];
+       k < in.translucent_bins.offsets[static_cast<std::size_t>(band) + 1]; ++k) {
+    const Tri& t = in.translucent[in.translucent_bins.items[k]];
+    raster_tri(t, y0, y1, [&](int x, int y, float z, float w1, float w2) {
+      const std::size_t p =
+          static_cast<std::size_t>(y - y0) * static_cast<std::size_t>(pw) + static_cast<std::size_t>(x);
+      if (z >= depth[p])
+        return;
+      float rgb[3], a;
+      shade(in.views[t.mesh], t.index, w1, w2, in.lighting, rgb, &a);
+      std::uint8_t* px = target_px(in.T, g, x, y);
+      for (int c = 0; c < 3; ++c)
+        px[c] = to_u8(static_cast<float>(px[c]) / 255.0f * (1.0f - a) + rgb[c] * a);
+    });
+  }
+  if (in.T.depth)
+    write_depth_and_ids(in, y0, y1, depth, id);
+}
+
+std::vector<std::pair<int, int>> tri_ranges(const std::vector<Tri>& tris) {
+  std::vector<std::pair<int, int>> r;
+  r.reserve(tris.size());
+  for (const Tri& t : tris)
+    r.push_back({t.y0, t.y1});
+  return r;
+}
+
+// vtkAxesActor look-alike: three capsule-built arrows in a 20% viewport, drawn over the finished panel.
+void draw_corner_axes(const PanelParams& P, const Target& T, const PanelGeom& g,
+                      std::array<std::array<double, 2>, 3>& axes_tips) {
+  const Camera& cam = P.camera;
+  const int ss = g.ss, pw = g.pw, ph = g.ph;
+  const int aw = static_cast<int>(std::lround(pw * 0.2)), ah = static_cast<int>(std::lround(ph * 0.2));
+  const int ax0 = pw - aw, ay0 = ph - ah;
+  const double ppw = ah / 2.0;  // pixels per world unit: half_height 1
+  const Vec3 axes[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+  const Rgb colors[3] = {{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}};
+  int order[3] = {0, 1, 2};
+  std::sort(order, order + 3, [&](int a, int b) { return axes[a].dot(cam.forward) > axes[b].dot(cam.forward); });
+  for (int i : order) {
+    const double u = axes[i].dot(cam.right) / (2.0 * (static_cast<double>(aw) / ah)), v = axes[i].dot(cam.up) / 2.0;
+    const float cx = static_cast<float>(ax0 + aw * (0.5 + u)), cy = static_cast<float>(ay0 + ah * (0.5 - v));
+    const float ox0 = static_cast<float>(ax0 + aw * 0.5), oy0 = static_cast<float>(ay0 + ah * 0.5);
+    axes_tips[static_cast<std::size_t>(i)] = {(P.rect.x * ss + static_cast<double>(cx)) / ss,
+                                              (P.rect.y * ss + static_cast<double>(cy)) / ss};
+    // shaft to 80%, then a cone approximated by four shrinking capsules
+    for (int part = 0; part < 5; ++part) {
+      const float f0 = part == 0 ? 0.0f : 0.8f + 0.05f * static_cast<float>(part - 1);
+      const float f1 = part == 0 ? 0.8f : f0 + 0.05f;
+      const double width = part == 0 ? 0.08 : 0.17 * (1.0 - 0.22 * (part - 1));
+      Seg s{};
+      s.x0 = ox0 + (cx - ox0) * f0;
+      s.y0 = oy0 + (cy - oy0) * f0;
+      s.x1 = ox0 + (cx - ox0) * f1;
+      s.y1 = oy0 + (cy - oy0) * f1;
+      s.hw = static_cast<float>(std::max(0.5, width * ppw * 0.5));
+      for (int c = 0; c < 3; ++c)
+        s.rgb[c] = to_u8(colors[i][static_cast<std::size_t>(c)]);
+      s.x_lo = std::max(0, static_cast<int>(std::floor(std::min(s.x0, s.x1) - s.hw - 1)));
+      s.x_hi = std::min(pw - 1, static_cast<int>(std::ceil(std::max(s.x0, s.x1) + s.hw + 1)));
+      s.y_lo = std::max(0, static_cast<int>(std::floor(std::min(s.y0, s.y1) - s.hw - 1)));
+      s.y_hi = std::min(ph - 1, static_cast<int>(std::ceil(std::max(s.y0, s.y1) + s.hw + 1)));
+      raster_seg(s, 0, ph, [&](int x, int y, float) {
+        std::uint8_t* px = target_px(T, g, x, y);
         px[0] = s.rgb[0];
         px[1] = s.rgb[1];
         px[2] = s.rgb[2];
       });
     }
-    // translucent surfaces, far to near
-    for (std::uint32_t k = translucent_bins.offsets[static_cast<std::size_t>(band)];
-         k < translucent_bins.offsets[static_cast<std::size_t>(band) + 1]; ++k) {
-      const Tri& t = translucent[translucent_bins.items[k]];
-      raster_tri(t, y0, y1, [&](int x, int y, float z, float w1, float w2) {
-        const std::size_t p =
-            static_cast<std::size_t>(y - y0) * static_cast<std::size_t>(pw) + static_cast<std::size_t>(x);
-        if (z >= depth[p])
-          return;
-        float rgb[3], a;
-        shade(views[t.mesh], t.index, w1, w2, lighting, rgb, &a);
-        std::uint8_t* px = T.rgba + (static_cast<std::size_t>(oy + y) * static_cast<std::size_t>(T.ss_width) +
-                                     static_cast<std::size_t>(ox + x)) *
-                                        4;
-        for (int c = 0; c < 3; ++c)
-          px[c] = to_u8(static_cast<float>(px[c]) / 255.0f * (1.0f - a) + rgb[c] * a);
-      });
-    }
-    // output-resolution depth and ids: the centre sample of each ss x ss block
-    if (T.depth) {
-      for (int fy = y0 / ss; fy < y1 / ss; ++fy) {
-        const int local_row = fy * ss + ss / 2 - y0;
-        for (int fx = 0; fx < fw; ++fx) {
-          const std::size_t p = static_cast<std::size_t>(local_row) * static_cast<std::size_t>(pw) +
-                                static_cast<std::size_t>(fx * ss + ss / 2);
-          const std::size_t o = static_cast<std::size_t>(P.rect.y + fy) * static_cast<std::size_t>(T.width) +
-                                static_cast<std::size_t>(P.rect.x + fx);
-          T.depth[o] = depth[p];
-          if (id[p] == kNone) {
-            T.mesh_id[o] = -1;
-            T.face_id[o] = -1;
-          } else {
-            const Tri& t = opaque[id[p]];
-            T.mesh_id[o] = static_cast<std::int32_t>(t.mesh);
-            T.face_id[o] = static_cast<std::int32_t>(views[t.mesh].fid[t.index]);
-          }
-        }
-      }
-    }
-  });
-
-  // --- corner axes (vtkAxesActor in a 20% viewport, bottom-right, own camera: parallel scale 1) ----
-  if (P.show_axes) {
-    const int aw = static_cast<int>(std::lround(pw * 0.2)), ah = static_cast<int>(std::lround(ph * 0.2));
-    const int ax0 = pw - aw, ay0 = ph - ah;
-    const double ppw = ah / 2.0;  // pixels per world unit: half_height 1
-    const Vec3 axes[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-    const Rgb colors[3] = {{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}};
-    int order[3] = {0, 1, 2};
-    std::sort(order, order + 3, [&](int a, int b) { return axes[a].dot(cam.forward) > axes[b].dot(cam.forward); });
-    for (int i : order) {
-      const double u = axes[i].dot(cam.right) / (2.0 * (static_cast<double>(aw) / ah)), v = axes[i].dot(cam.up) / 2.0;
-      const float cx = static_cast<float>(ax0 + aw * (0.5 + u)), cy = static_cast<float>(ay0 + ah * (0.5 - v));
-      const float ox0 = static_cast<float>(ax0 + aw * 0.5), oy0 = static_cast<float>(ay0 + ah * 0.5);
-      axes_tips[static_cast<std::size_t>(i)] = {(P.rect.x * ss + static_cast<double>(cx)) / ss,
-                                                (P.rect.y * ss + static_cast<double>(cy)) / ss};
-      // shaft to 80%, then a cone approximated by four shrinking capsules
-      for (int part = 0; part < 5; ++part) {
-        const float f0 = part == 0 ? 0.0f : 0.8f + 0.05f * static_cast<float>(part - 1);
-        const float f1 = part == 0 ? 0.8f : f0 + 0.05f;
-        const double width = part == 0 ? 0.08 : 0.17 * (1.0 - 0.22 * (part - 1));
-        Seg s{};
-        s.x0 = ox0 + (cx - ox0) * f0;
-        s.y0 = oy0 + (cy - oy0) * f0;
-        s.x1 = ox0 + (cx - ox0) * f1;
-        s.y1 = oy0 + (cy - oy0) * f1;
-        s.hw = static_cast<float>(std::max(0.5, width * ppw * 0.5));
-        for (int c = 0; c < 3; ++c)
-          s.rgb[c] = to_u8(colors[i][static_cast<std::size_t>(c)]);
-        s.x_lo = std::max(0, static_cast<int>(std::floor(std::min(s.x0, s.x1) - s.hw - 1)));
-        s.x_hi = std::min(pw - 1, static_cast<int>(std::ceil(std::max(s.x0, s.x1) + s.hw + 1)));
-        s.y_lo = std::max(0, static_cast<int>(std::floor(std::min(s.y0, s.y1) - s.hw - 1)));
-        s.y_hi = std::min(ph - 1, static_cast<int>(std::ceil(std::max(s.y0, s.y1) + s.hw + 1)));
-        raster_seg(s, 0, ph, [&](int x, int y, float) {
-          std::uint8_t* px = T.rgba + (static_cast<std::size_t>(oy + y) * static_cast<std::size_t>(T.ss_width) +
-                                       static_cast<std::size_t>(ox + x)) *
-                                          4;
-          px[0] = s.rgb[0];
-          px[1] = s.rgb[1];
-          px[2] = s.rgb[2];
-        });
-      }
-    }
   }
+}
+
+}  // namespace
+
+void draw_panel(const Scene& scene, const PanelParams& P, const Target& T,
+                std::array<std::array<double, 2>, 3>& axes_tips) {
+  const int ss = T.ss;
+  const int pw = P.rect.w * ss, ph = P.rect.h * ss;
+  const int band_h = 8 * ss;
+  const PanelGeom g{ss, pw, ph, P.rect.x * ss, P.rect.y * ss, band_h, (ph + band_h - 1) / band_h};
+  const Camera& cam = P.camera;
+  const Screen screen{&cam, static_cast<double>(pw), static_cast<double>(ph),
+                      1.0 / (2.0 * cam.half_height * cam.aspect), 1.0 / (2.0 * cam.half_height)};
+  const double px_per_world = ph / (2.0 * cam.half_height);
+  const Lighting lighting = make_lighting(cam, P.style);
+
+  // Backgrounds are drawn per band.
+  const Rgb top = P.bg_top ? *P.bg_top : (P.style == Style::Studio ? Rgb{0, 0, 0} : Rgb{0.78f, 0.84f, 0.90f});
+  const Rgb bottom = P.bg_bottom ? *P.bg_bottom : (P.style == Style::Studio ? Rgb{0, 0, 0} : Rgb{0.94f, 0.96f, 0.98f});
+
+  const std::vector<MeshView> views = make_mesh_views(scene, lighting);
+  std::vector<Tri> opaque, translucent;
+  setup_triangles(views, P, screen, g, opaque, translucent);
+  Csr opaque_bins, translucent_bins, seg_bins;
+  opaque_bins.build(g.bands, band_h, tri_ranges(opaque));
+  translucent_bins.build(g.bands, band_h, tri_ranges(translucent));
+
+  const std::vector<Seg> segs = collect_segments(scene, P, screen, g, px_per_world);
+  {
+    std::vector<std::pair<int, int>> r;
+    r.reserve(segs.size());
+    for (const Seg& s : segs)
+      r.push_back({s.y_lo, s.y_hi});
+    seg_bins.build(g.bands, band_h, r);
+  }
+
+  const BandInputs in{P,        T,   g,     lighting, views, opaque, translucent, segs, opaque_bins, translucent_bins,
+                      seg_bins, top, bottom};
+  parallel_for(g.bands, P.threads, [&](int band) { render_band(in, band); });
+
+  if (P.show_axes)
+    draw_corner_axes(P, T, g, axes_tips);
 }
 
 }  // namespace scad::render::detail

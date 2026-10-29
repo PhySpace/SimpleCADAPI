@@ -398,7 +398,9 @@ struct Validated {
   std::string ocp_version;
 };
 
-Validated validate_manifest(const Value& manifest, std::string_view payload) {
+// Manifest header: key set, profile (same OCP major.minor as this runtime), unit and generator.
+// Returns the profile's OCP version.
+std::string check_manifest_header(const Value& manifest) {
   exact_keys("manifest", manifest,
              {"format", "schema_version", "profile", "coordinate_system", "generator", "source", "region", "shape",
               "provenance"});
@@ -431,7 +433,10 @@ Validated validate_manifest(const Value& manifest, std::string_view payload) {
   exact_keys("generator", generator, {"ocp_version"});
   if (!text_equals(at(generator, "ocp_version"), ocp_version))
     fail("BREP region snapshot OCP version does not match this runtime profile");
+  return ocp_version;
+}
 
+void check_manifest_source(const Value& manifest) {
   const Value& source = at(manifest, "source");
   exact_keys("source", source, {"format", "name", "byte_length", "content_hash", "transferred_root_count"});
   if (!text_equals(at(source, "format"), "step") || !at(source, "name").is_string())
@@ -441,7 +446,10 @@ Validated validate_manifest(const Value& manifest, std::string_view payload) {
     fail("BREP region snapshot source counts are invalid");
   if (!is_sha256(at(source, "content_hash")))
     fail("BREP region snapshot source hash is invalid");
+}
 
+// Checks the region record and returns it (kind and source_face_ids are read back from it by the caller).
+const Value& check_manifest_region(const Value& manifest) {
   const Value& region = at(manifest, "region");
   exact_keys("region", region, {"kind", "source_face_ids"});
   const Value& region_kind = at(region, "kind");
@@ -457,7 +465,12 @@ Validated validate_manifest(const Value& manifest, std::string_view payload) {
     if (unique.size() != region_ids.as_array().size())
       fail("BREP region snapshot source face ids are not unique");
   }
+  return region;
+}
 
+// Checks the shape record against the payload bytes (hash, length, BinTools V4 header) and returns
+// whether the root is a solid. Check order is part of the error contract; do not reorder.
+bool check_manifest_shape(const Value& manifest, const Value& region_kind, std::string_view payload) {
   const Value& shape = at(manifest, "shape");
   exact_keys(
       "shape", shape,
@@ -508,7 +521,11 @@ Validated validate_manifest(const Value& manifest, std::string_view payload) {
     fail("BREP region snapshot payload is not BinTools V4");
   if (!has_bintools_text_header(payload))
     fail("BREP region snapshot BinTools text header is invalid");
+  return is_solid;
+}
 
+// Every face fingerprint record must be well formed, and their source ids must equal the declared list.
+void check_manifest_faces(const Value& shape, const Value& region_ids) {
   const Value& records = at(shape, "face_fingerprints");
   if (!records.is_array() || static_cast<std::int64_t>(records.as_array().size()) != at(shape, "face_count").as_int())
     fail("BREP region snapshot has no face fingerprint records");
@@ -542,7 +559,9 @@ Validated validate_manifest(const Value& manifest, std::string_view payload) {
     declared.push_back(id.as_string());
   if (ids != declared)
     fail("BREP region snapshot face provenance mapping drifted");
+}
 
+void check_manifest_provenance(const Value& manifest) {
   const Value& provenance = at(manifest, "provenance");
   exact_keys(
       "provenance", provenance,
@@ -554,6 +573,16 @@ Validated validate_manifest(const Value& manifest, std::string_view payload) {
       !text_equals(at(provenance, "runtime_dependency"), "embedded_target_derived") ||
       !(replay.is_bool() && !replay.as_bool()))
     fail("BREP region snapshot provenance profile is unsupported");
+}
+
+Validated validate_manifest(const Value& manifest, std::string_view payload) {
+  const std::string ocp_version = check_manifest_header(manifest);
+  check_manifest_source(manifest);
+  const Value& region = check_manifest_region(manifest);
+  const Value& region_kind = at(region, "kind");
+  const bool is_solid = check_manifest_shape(manifest, region_kind, payload);
+  check_manifest_faces(at(manifest, "shape"), at(region, "source_face_ids"));
+  check_manifest_provenance(manifest);
   return {is_solid ? RegionRootKind::Solid : RegionRootKind::Shell, ocp_version};
 }
 
@@ -581,7 +610,15 @@ Bytes encode_artifact(const Value& manifest, std::string_view payload) {
   return artifact;
 }
 
-DecodedRegion decode_artifact(std::string_view bytes, std::optional<RegionRootKind> expected) {
+namespace {
+
+// Header-checked views of the two sections of a container.
+struct ContainerSections {
+  std::string_view manifest_bytes, payload;
+};
+
+// Checks size limits, magic, version, flags and declared lengths; returns the manifest and payload bytes.
+ContainerSections split_container(std::string_view bytes) {
   if (bytes.size() > kBRegionMaxArtifactBytes)
     fail("BREP region snapshot exceeds the size limit");
   if (bytes.size() < kBRegionHeaderSize)
@@ -601,9 +638,12 @@ DecodedRegion decode_artifact(std::string_view bytes, std::optional<RegionRootKi
     fail("BREP region snapshot manifest exceeds the size limit");
   if (payload_size > kBRegionMaxArtifactBytes || kBRegionHeaderSize + manifest_size + payload_size != bytes.size())
     fail("BREP region snapshot length does not match its header");
-  const std::string_view manifest_bytes = bytes.substr(kBRegionHeaderSize, static_cast<std::size_t>(manifest_size));
-  const std::string_view payload = bytes.substr(kBRegionHeaderSize + static_cast<std::size_t>(manifest_size));
+  return {bytes.substr(kBRegionHeaderSize, static_cast<std::size_t>(manifest_size)),
+          bytes.substr(kBRegionHeaderSize + static_cast<std::size_t>(manifest_size))};
+}
 
+// The manifest must be JSON that is byte-identical to its own RFC 8785 canonical form.
+Value parse_canonical_manifest(std::string_view manifest_bytes) {
   Value manifest;
   try {
     manifest = parse_json(manifest_bytes);
@@ -614,15 +654,15 @@ DecodedRegion decode_artifact(std::string_view bytes, std::optional<RegionRootKi
   } catch (const std::exception& e) {
     fail(std::string("BREP region snapshot manifest is not valid canonical JSON: ") + e.what());
   }
-  const Validated validated = validate_manifest(manifest, payload);
-  if (expected && validated.root_kind != *expected)
-    fail(std::string("BREP region snapshot contains ") + std::string(to_string(validated.root_kind)) + ", expected " +
-         std::string(to_string(*expected)));
-  const Value& shape_record = at(manifest, "shape");
+  return manifest;
+}
 
+// Decodes the BinTools payload and proves it is exactly one shape: no triangulation, and re-encoding
+// reproduces the payload length (a longer or shorter payload means trailing or missing data).
+TopoDS_Shape decode_payload_shape(std::string_view payload, RegionRootKind root_kind) {
   TopoDS_Shape shape;
   try {
-    shape = decode_shape(payload, validated.root_kind);
+    shape = decode_shape(payload, root_kind);
   } catch (const Error&) {
     throw;
   } catch (const std::exception& e) {
@@ -631,23 +671,28 @@ DecodedRegion decode_artifact(std::string_view bytes, std::optional<RegionRootKi
   if (has_triangulation(shape))
     fail("BREP region snapshot payload contains triangulation");
   try {
-    if (encode_shape(shape, validated.root_kind).size() != payload.size())
+    if (encode_shape(shape, root_kind).size() != payload.size())
       fail("BREP region snapshot payload has trailing or missing data");
   } catch (const Error&) {
     throw;
   } catch (const std::exception& e) {
     fail(e.what());
   }
+  return shape;
+}
 
+// The stored shape counts / volume must match what OCCT measures on the decoded shape (within
+// close_enough); returns the measured descriptor.
+ShapeDescriptor check_shape_descriptor(const TopoDS_Shape& shape, const Value& shape_record, RegionRootKind root_kind) {
   ShapeDescriptor actual;
   try {
-    actual = shape_descriptor(shape, validated.root_kind);
+    actual = shape_descriptor(shape, root_kind);
   } catch (const std::exception& e) {
     fail(e.what());
   }
   const Value actual_value = actual.to_value();
   for (const char* key : {"root_shape_type", "valid", "solid_count", "shell_count", "face_count", "edge_count",
-                          "vertex_count", validated.root_kind == RegionRootKind::Solid ? "volume" : "closed"}) {
+                          "vertex_count", root_kind == RegionRootKind::Solid ? "volume" : "closed"}) {
     const Value* stored = shape_record.find(key);
     const Value* computed = actual_value.find(key);
     const bool same =
@@ -657,7 +702,11 @@ DecodedRegion decode_artifact(std::string_view bytes, std::optional<RegionRootKi
     if (!same)
       fail(std::string("BREP region snapshot shape descriptor drifted at ") + key);
   }
+  return actual;
+}
 
+// Face order and geometry of the decoded shape must match the stored fingerprints.
+void check_face_geometry(const TopoDS_Shape& shape, const Value& shape_record) {
   const Value actual_faces = face_fingerprints(shape);
   const auto& stored_faces = at(shape_record, "face_fingerprints").as_array();
   const auto& computed_faces = actual_faces.as_array();
@@ -674,6 +723,22 @@ DecodedRegion decode_artifact(std::string_view bytes, std::optional<RegionRootKi
   }
   if (!faces_match)
     fail("BREP region snapshot face order or geometry drifted");
+}
+
+}  // namespace
+
+DecodedRegion decode_artifact(std::string_view bytes, std::optional<RegionRootKind> expected) {
+  const auto [manifest_bytes, payload] = split_container(bytes);
+  Value manifest = parse_canonical_manifest(manifest_bytes);
+  const Validated validated = validate_manifest(manifest, payload);
+  if (expected && validated.root_kind != *expected)
+    fail(std::string("BREP region snapshot contains ") + std::string(to_string(validated.root_kind)) + ", expected " +
+         std::string(to_string(*expected)));
+  const Value& shape_record = at(manifest, "shape");
+
+  TopoDS_Shape shape = decode_payload_shape(payload, validated.root_kind);
+  const ShapeDescriptor actual = check_shape_descriptor(shape, shape_record, validated.root_kind);
+  check_face_geometry(shape, shape_record);
   if (static_cast<std::int64_t>(at(at(manifest, "region"), "source_face_ids").size()) != actual.face_count)
     fail("BREP region snapshot source face mapping is incomplete");
   return {shape, std::move(manifest), validated.root_kind};
