@@ -10,6 +10,8 @@
 #include <TopTools_IndexedMapOfShape.hxx>
 
 #include <map>
+#include <optional>
+#include <utility>
 
 #include "scad/core/error.hpp"
 #include "scad/kernel/properties.hpp"
@@ -128,6 +130,9 @@ std::optional<std::string> shape_geom_type(const Shape& shape) {
     if (shape.kind() == Kind::Face)
       return surface_type(BRepAdaptor_Surface(TopoDS::Face(shape.wrapped())).GetType());
   } catch (const std::exception&) {
+    // Kept broad on purpose: OCCT's Standard_Failure does not derive from std::exception, so this catch is
+    // not known to be narrowable (see the report).  A shape without a readable geometry type has none.
+    return std::nullopt;
   }
   return std::nullopt;
 }
@@ -215,12 +220,19 @@ void add_kind_measurements(Value& selector, const Shape& shape) {
       const Edge edge = shape.as<Edge>();
       selector.set("length", edge.length());
       selector.set("center", vec_list(edge.center()));
+      std::optional<std::pair<Vec3, Vec3>> end_points;
       try {
         const Vec3 start = edge.start_vertex().coordinates();
         const Vec3 end = edge.end_vertex().coordinates();
-        selector.set("start", vec_list(start));
-        selector.set("end", vec_list(end));
-      } catch (const std::exception&) {
+        end_points = std::pair<Vec3, Vec3>(start, end);
+      } catch (const Exception&) {
+        // start_vertex/end_vertex throw ValueError for an edge without vertices: the selector then keeps
+        // no end points (nothing reports it; the selector is still valid).
+        end_points = std::nullopt;
+      }
+      if (end_points) {
+        selector.set("start", vec_list(end_points->first));
+        selector.set("end", vec_list(end_points->second));
       }
       break;
     }
@@ -272,10 +284,16 @@ Value make_geo_exact_selector(const Shape& shape, const Shape* source) {
   }
   selector.set("metadata_geo", std::move(geo));
   add_brep_region_ref(selector, shape);
+  std::optional<Value> bbox;
   try {
-    selector.set("bbox", bbox_payload(shape));
-  } catch (const std::exception&) {
+    bbox = bbox_payload(shape);
+  } catch (const Exception&) {
+    // Shape::bounding_box runs under occt_guard (KernelError/ValueError): a shape with no box keeps a
+    // selector without one (nothing reports it).
+    bbox = std::nullopt;
   }
+  if (bbox)
+    selector.set("bbox", std::move(*bbox));
   if (const auto geom = shape_geom_type(shape))
     selector.set("geom_type", *geom);
 

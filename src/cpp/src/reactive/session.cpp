@@ -409,13 +409,10 @@ Session::Session(Options options)
       registry_(options.registry != nullptr ? options.registry : &ExecutorRegistry::global()) {}
 
 Session::~Session() {
-  if (scope_) {
-    // Destroyed while still installed: leave the thread as it was found.
-    try {
-      stop();
-    } catch (...) {
-    }
-  }
+  // Destroyed while still installed: leave the thread as it was found.  stop() is noexcept, so nothing
+  // can escape this destructor and no try/catch is needed around it.
+  if (scope_)
+    stop();
 }
 
 void Session::start() {

@@ -166,6 +166,9 @@ std::optional<Value> loop_role(const Shape& shape) {
   } catch (const SemanticCapabilityError&) {
     throw;
   } catch (const std::exception&) {
+    // Kept broad: has_tag's other failures are not enumerable here.  A shape whose tags cannot be read has
+    // no loop role; the property is then simply absent.
+    return std::nullopt;
   }
   return std::nullopt;
 }
@@ -242,7 +245,10 @@ std::optional<Vec3> EvalContext::normal(const Shape& shape) const {
     if (shape.kind() == Kind::Face) {
       try {
         slot.value = kernel::face_normal_at(TopoDS::Face(shape.wrapped()));
-      } catch (const std::exception&) {
+      } catch (const Exception&) {
+        // face_normal_at runs under occt_guard (KernelError/ValueError): a normal the kernel cannot
+        // compute is a missing property, not an error.
+        slot.value = std::nullopt;
       }
     }
   }
@@ -272,7 +278,10 @@ std::optional<double> EvalContext::measure(const Shape& shape, Measure what) con
           slot.value = Compound(shape).volume();
         break;
     }
-  } catch (const std::exception&) {  // a measurement the kernel cannot make is missing, not an error
+  } catch (const Exception&) {
+    // The kernel measures run under occt_guard (KernelError/ValueError): a measurement the kernel cannot
+    // make is missing, not an error.
+    slot.value = std::nullopt;
   }
   return slot.value;
 }
@@ -431,6 +440,9 @@ std::optional<Value> PropertyPath::lookup(const Shape& shape, const EvalContext&
         if (kind == Kind::Shell)
           return Value(kernel::shell_is_closed(shape.wrapped()));
       } catch (const std::exception&) {
+        // Kept broad: kernel::is_wire_closed/shell_is_closed are not under occt_guard, so this is not
+        // known to be narrowable.  A closedness the kernel cannot tell is a missing property.
+        return std::nullopt;
       }
       return std::nullopt;
   }
@@ -463,17 +475,23 @@ std::optional<Vec3> center_of(const Shape& shape) {
       } catch (const std::exception&) {
         return std::nullopt;
       }
-    case Kind::Edge:
+    case Kind::Edge: {
+      std::optional<Vec3> mass_centre;
       try {
-        return shape.center();
-      } catch (const std::exception&) {
+        mass_centre = shape.center();
+      } catch (const Exception&) {
+        // center_of_mass runs under occt_guard (KernelError/ValueError): fall back to the end points below.
+        mass_centre = std::nullopt;
       }
+      if (mass_centre)
+        return mass_centre;
       try {  // the centre of mass failed: fall back to the midpoint of the end points
         const Edge edge(shape);
         return (edge.start_vertex().coordinates() + edge.end_vertex().coordinates()) / 2.0;
       } catch (const std::exception&) {
         return std::nullopt;
       }
+    }
     default:
       return std::nullopt;
   }

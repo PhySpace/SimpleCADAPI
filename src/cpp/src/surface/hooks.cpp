@@ -35,9 +35,12 @@ void diagnose_loft_failure(const std::vector<LoftSection>& sections, std::string
   } catch (const Error&) {
     throw;
   } catch (const std::exception&) {
-    // A diagnoser that itself fails explains nothing; the caller applies the generic wrap.
+    // A diagnosis never replaces the error it explains: the caller applies the generic wrap.  Kept broad,
+    // the diagnoser is an arbitrary hook.
+    return;
   } catch (...) {
     // Same for non-std exceptions (OpenCASCADE's).
+    return;
   }
 }
 

@@ -8,6 +8,7 @@
 #include <cstdio>
 
 #include "probes.hpp"
+#include "scad/core/error.hpp"
 #include "scad/kernel/properties.hpp"
 #include "scad/kernel/topology.hpp"
 #include "scad/ops/features/diagnostics.hpp"
@@ -389,15 +390,19 @@ void assert_blend_volume_monotonic(const Solid& source, const Solid& result, std
   // A blend removes a visible share of the volume: when a quick estimate is clearly on the
   // legitimate side of both thresholds, the precise volumes cannot change the verdict (they are
   // only needed for the message when it throws).
+  bool estimate_settles_it = false;
   try {
     const double quick_source = kernel::volume_estimate(source.wrapped());
     const double quick_result = kernel::volume_estimate(result.wrapped());
     const double margin = 1e-3 * std::abs(quick_source);
-    if (quick_source > 0.0 && quick_result > margin && quick_result < quick_source - margin)
-      return;
-  } catch (const std::exception&) {
-    // fall through to the precise measurement
+    estimate_settles_it = quick_source > 0.0 && quick_result > margin && quick_result < quick_source - margin;
+  } catch (const KernelError&) {
+    // volume_estimate runs under occt_guard, so a failed estimate is a KernelError.  It settles nothing;
+    // the precise measurement below decides (and reports its own failure).
+    estimate_settles_it = false;
   }
+  if (estimate_settles_it)
+    return;
   double source_volume = 0.0, result_volume = 0.0;
   try {
     source_volume = kernel::volume(source.wrapped());

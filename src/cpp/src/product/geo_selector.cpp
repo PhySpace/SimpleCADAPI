@@ -8,6 +8,9 @@
 #include <GeomAbs_SurfaceType.hxx>
 #include <TopoDS.hxx>
 
+#include <optional>
+#include <utility>
+
 #include "scad/core/error.hpp"
 #include "scad/product/connector.hpp"
 #include "scad/product/validation.hpp"
@@ -123,13 +126,19 @@ Value make_geo_selector(const Shape& shape) {
       const Edge edge(shape);
       selector.set("length", edge.length());
       selector.set("center", to_array(shape.center()));
+      std::optional<std::pair<Vec3, Vec3>> end_points;
       try {
         const Vec3 start = edge.start_vertex().coordinates();
         const Vec3 end = edge.end_vertex().coordinates();
-        selector.set("start", to_array(start));
-        selector.set("end", to_array(end));
-      } catch (const std::exception&) {
-        // An edge without vertices keeps the selector without its end points.
+        end_points = std::pair<Vec3, Vec3>(start, end);
+      } catch (const Exception&) {
+        // start_vertex/end_vertex throw ValueError for an edge without vertices: the selector then
+        // keeps no end points (nothing reports it; the selector is still valid).
+        end_points = std::nullopt;
+      }
+      if (end_points) {
+        selector.set("start", to_array(end_points->first));
+        selector.set("end", to_array(end_points->second));
       }
       break;
     }

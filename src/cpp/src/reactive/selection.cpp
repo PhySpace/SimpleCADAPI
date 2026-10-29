@@ -95,15 +95,20 @@ double add_kind_terms(double score, const Shape& shape, const Value& selector) {
       if (const Value* length = selector.find("length"))
         score += std::abs(edge.length() - number_or(length, 0.0)) * 10.0;
       score += center_term(10.0);
+      double end_point_term = 0.0;
       try {
         const Vec3 start = edge.start_vertex().coordinates();
         const Vec3 end = edge.end_vertex().coordinates();
         if (has_vec(selector.find("start")) && has_vec(selector.find("end"))) {
           const Vec3 s = vec_of(selector.find("start")), e = vec_of(selector.find("end"));
-          score += std::min(start.distance(s) + end.distance(e), start.distance(e) + end.distance(s));
+          end_point_term = std::min(start.distance(s) + end.distance(e), start.distance(e) + end.distance(s));
         }
-      } catch (const std::exception&) {
+      } catch (const Exception&) {
+        // start_vertex/end_vertex throw ValueError for an edge without vertices, as_double a TypeError for
+        // a malformed stored point: the end points then add nothing to the score (nothing reports it).
+        end_point_term = 0.0;
       }
+      score += end_point_term;
       break;
     }
     case Kind::Wire: {

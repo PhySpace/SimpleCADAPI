@@ -115,8 +115,10 @@ ScopedSketchSolverBackend::ScopedSketchSolverBackend(std::shared_ptr<SketchSolve
 ScopedSketchSolverBackend::~ScopedSketchSolverBackend() {
   try {
     set_default_sketch_solver_backend(previous_);
-  } catch (const std::exception&) {
-    // The previous default was registered when we captured it; nothing to do if it vanished.
+  } catch (const ValueError&) {
+    // get_locked throws ValueError for a name that is no longer registered.  The previous default was
+    // registered when we captured it, and a destructor must not throw: the default stays as it is.
+    return;
   }
 }
 
