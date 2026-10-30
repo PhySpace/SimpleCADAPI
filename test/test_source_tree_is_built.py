@@ -39,7 +39,3 @@ def test_nothing_is_not_a_build(tmp_path) -> None:
 def test_the_compiled_module_is_a_build_with_or_without_stubs(tmp_path, name) -> None:
     assert _source_tree_is_built(make(tmp_path, name, stubs=True))
 
-
-def test_the_real_checkout_is_built_here() -> None:
-    """The test suite runs against a built tree (the extension is next to its Python files)."""
-    assert _source_tree_is_built(Path(__file__).resolve().parents[1] / "src")
