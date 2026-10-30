@@ -161,6 +161,15 @@ CHAMFER = True                                   # no comment: a toggle, inferre
 bool a toggle. A bad comment is reported (`sca params`) and the inferred
 control is used. A `scad.var`'s `unit` and `comment` show up in the editor.
 
+**A `scad.var` is used like a number.** Arithmetic on it (`2 * math.pi * R`, `R / 2`) builds a
+formula that keeps the link to the parameter, so operators take it as it is and the model rebuilds when the slider
+moves. Everything else Python asks of a number reads the value it has now: `R > 3`, `max(R, 3)`, `int(N)`,
+`round(R, 1)`, `range(N)`, `[0] * N`, `f"{R:.1f}"`, `R == 5.0` all work, and the same code runs on a plain
+float. `bool(R)` / `if R:` stays an error (as in 2.2.6; write the comparison, `if R > 0:`). Pass `float(R)` where a
+plain number is needed: numpy (`np.sqrt(R)` raises and `np.array([R])` is an object array, because a Var has no array
+protocol), `json.dumps`, and any notebook that also has to run on SimpleCADAPI 2.2.6, where the comparisons and
+conversions above raise or answer wrongly. A count must be a whole number (`range(N)` with `N = 2.5` says so).
+
 ```bash
 sca params bracket.py        # features (# ---- feature: ... ---- headers) and parameters, from the file
 sca ls [DIR]                 # the notebooks under DIR: id, part or assembly, the notebooks each uses

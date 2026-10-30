@@ -32,6 +32,13 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 - A refused preview post names what the editor server said (`HTTP 400: damaged preview: ...`) instead of only the status line.
 
 ### Changed
+- `Var` and `Expr` behave like numbers where Python asks for one: `int`, `round`, `floor`/`ceil`, comparisons
+  (`r > 3`), `max`/`min`/`sorted`, `range(n)`, `[0] * n`, `lst[n - 1]`, `//`, `%`, `f"{r:.2f}"`, `str`, and numpy
+  scalars as operands now work, and `r == 5.0` is `True` (it was `False`). Arithmetic still builds the formula; these
+  decisions read the value the expression has now. A ql predicate with a Var-derived value
+  (`ql.prop("geom.length", ">=", 2 * math.pi * radius)`) matches, where 2.2.6 matched nothing. `bool(var)` and
+  `json.dumps(var)` still raise. See `src/cpp/docs/DEVIATIONS.md`; the matrix test is
+  `src/cpp/tests/python/test_expr_numeric_protocol.py`.
 - A handled failure that used to leave no trace now prints a `[sca] ...` line on stderr: the preview warm-up, an
   unreadable lineage record, a cache entry that could not be deleted, a preview frame that could not be built, a
   notebook that could not be signed, and a kept model that is damaged and is built again.

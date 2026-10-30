@@ -2,6 +2,9 @@
 // expression graph; canonicalize_params.
 #include "bind_reactive_common.hpp"
 
+#include <cmath>
+#include <functional>
+#include <optional>
 #include <unordered_set>
 
 #include "scad/core/error.hpp"
@@ -24,7 +27,8 @@ ScalarPtr lift(const py::handle& value) {
     return py::cast<ScalarPtr>(value);
   if (PyBool_Check(value.ptr()))
     throw scad::TypeError("Boolean values are not valid scalar expression inputs");
-  if (PyLong_Check(value.ptr()) || PyFloat_Check(value.ptr()))
+  if (PyLong_Check(value.ptr()) || PyFloat_Check(value.ptr()) ||
+      PyObject_IsInstance(value.ptr(), numbers_real().ptr()) == 1)
     return sr::Const::make(real_number(value, "value"));
   throw scad::TypeError("Unsupported scalar expression value: " + py::cast<std::string>(py::repr(py::type::of(value))));
 }
@@ -41,6 +45,80 @@ ExprResult binary(const char* op, const ScalarPtr& self, const py::handle& other
 
 ExprResult unary(const char* op, const ScalarPtr& value) {
   return Expr::make(op, {value});
+}
+
+// ---- the numeric protocol -------------------------------------------------------------------------------------
+//
+// A Var or Expr is used where Python wants a number: comparisons, int(), round(), format(), indexing, numpy.  Those
+// are decisions, not formulas, so they read the value the expression has now -- the same value float(x) gives (a
+// saved parameter replaces a Var's default).  Arithmetic (+ - * / **, abs, neg) is the part that stays symbolic and
+// keeps the link to the parameters.  bool(x) stays an error (see __bool__): spell the comparison, `x > 0`.
+
+// There is deliberately no __array__: marimo takes an object that has one for a numpy array and keys the cell cache by
+// its value alone, which would drop the name, unit, tolerance and comment of a Var from the key (a changed comment
+// would no longer redo the cells that read it).  numpy takes float(x).
+double now(const ScalarPtr& s) {
+  return s->eval(nullptr);
+}
+
+// The other operand of a comparison or a rounding division: an expression or a real number (never a bool: the same
+// rule as arithmetic).  nullopt means "not mine": the operator returns NotImplemented and Python tries the other side.
+std::optional<double> other_value(const py::handle& other) {
+  if (py::isinstance<ScalarNode>(other))
+    return now(py::cast<ScalarPtr>(other));
+  if (PyBool_Check(other.ptr()))
+    return std::nullopt;
+  if (PyLong_Check(other.ptr()) || PyFloat_Check(other.ptr()) ||
+      PyObject_IsInstance(other.ptr(), numbers_real().ptr()) == 1) {
+    const double value = PyFloat_AsDouble(other.ptr());  // numpy scalars and ints go through __float__ / __index__
+    if (value == -1.0 && PyErr_Occurred())
+      throw py::error_already_set();
+    return value;
+  }
+  return std::nullopt;
+}
+
+py::object not_implemented() {
+  return py::reinterpret_borrow<py::object>(Py_NotImplemented);
+}
+
+template <class Compare>
+py::object compared(const ScalarPtr& s, const py::object& other, Compare compare) {
+  const std::optional<double> value = other_value(other);
+  if (!value)
+    return not_implemented();
+  return py::bool_(compare(now(s), *value));
+}
+
+// list * var, "ab" * var: Python's own repetition, which asks the Var for __index__.
+bool is_repeatable_sequence(const py::handle& o) {
+  return PyList_Check(o.ptr()) || PyTuple_Check(o.ptr()) || PyUnicode_Check(o.ptr()) || PyBytes_Check(o.ptr()) ||
+         PyByteArray_Check(o.ptr());
+}
+
+py::object multiplied(const ScalarPtr& s, const py::object& other, bool reflected) {
+  if (is_repeatable_sequence(other))
+    return not_implemented();
+  return py::cast(binary("mul", s, other, reflected));
+}
+
+py::object floor_divided(const ScalarPtr& s, const py::object& other, bool reflected) {
+  const std::optional<double> value = other_value(other);
+  if (!value)
+    return not_implemented();
+  const double self = now(s);
+  const double numerator = reflected ? *value : self, denominator = reflected ? self : *value;
+  return py::module_::import("builtins")
+      .attr("float")(py::module_::import("operator").attr("floordiv")(numerator, denominator));
+}
+
+py::object remainder_of(const ScalarPtr& s, const py::object& other, bool reflected) {
+  const std::optional<double> value = other_value(other);
+  if (!value)
+    return not_implemented();
+  const double self = now(s);
+  const double numerator = reflected ? *value : self, denominator = reflected ? self : *value;
+  return py::module_::import("operator").attr("mod")(numerator, denominator);
 }
 
 DimensionTolerance tolerance_from(const py::object& value) {
@@ -237,7 +315,58 @@ void bind_reactive_exprs(py::module_& m) {
       .def(
           "evaluate", [](const ScalarPtr& self, const py::object& bindings) { return evaluate_node(self, bindings); },
           py::arg("bindings") = py::none())
-      .def("__float__", [](const ScalarPtr& self) { return self->eval(nullptr); })
+      .def("__float__", [](const ScalarPtr& self) { return now(self); })
+      .def("__int__",
+           [](const ScalarPtr& self) { return py::reinterpret_steal<py::object>(PyLong_FromDouble(now(self))); })
+      .def("__index__",
+           [](const ScalarPtr& self) {
+             const double value = now(self);
+             if (!std::isfinite(value) || value != std::floor(value))
+               throw scad::TypeError(self->repr() + " has the value " +
+                                     py::cast<std::string>(py::str(py::float_(value))) +
+                                     ", which is not a whole number: it cannot be used as an index or a count");
+             return py::reinterpret_steal<py::object>(PyLong_FromDouble(value));
+           })
+      .def(
+          "__round__",
+          [](const ScalarPtr& self, const py::object& digits) {
+            return py::module_::import("builtins").attr("round")(py::float_(now(self)), digits);
+          },
+          py::arg("ndigits") = py::none())
+      .def("__floor__", [](const ScalarPtr& self) { return py::module_::import("math").attr("floor")(now(self)); })
+      .def("__ceil__", [](const ScalarPtr& self) { return py::module_::import("math").attr("ceil")(now(self)); })
+      .def("__trunc__", [](const ScalarPtr& self) { return py::module_::import("math").attr("trunc")(now(self)); })
+      .def("__format__",
+           [](const ScalarPtr& self, const py::object& spec) {
+             return py::module_::import("builtins").attr("format")(py::float_(now(self)), spec);
+           })
+      .def("__str__", [](const ScalarPtr& self) { return py::cast<std::string>(py::str(py::float_(now(self)))); })
+      .def(
+          "__lt__", [](const ScalarPtr& s, const py::object& o) { return compared(s, o, std::less<double>()); },
+          py::is_operator())
+      .def(
+          "__le__", [](const ScalarPtr& s, const py::object& o) { return compared(s, o, std::less_equal<double>()); },
+          py::is_operator())
+      .def(
+          "__gt__", [](const ScalarPtr& s, const py::object& o) { return compared(s, o, std::greater<double>()); },
+          py::is_operator())
+      .def(
+          "__ge__",
+          [](const ScalarPtr& s, const py::object& o) { return compared(s, o, std::greater_equal<double>()); },
+          py::is_operator())
+      .def(
+          "__floordiv__", [](const ScalarPtr& s, const py::object& o) { return floor_divided(s, o, false); },
+          py::is_operator())
+      .def(
+          "__rfloordiv__", [](const ScalarPtr& s, const py::object& o) { return floor_divided(s, o, true); },
+          py::is_operator())
+      .def(
+          "__mod__", [](const ScalarPtr& s, const py::object& o) { return remainder_of(s, o, false); },
+          py::is_operator())
+      .def(
+          "__rmod__", [](const ScalarPtr& s, const py::object& o) { return remainder_of(s, o, true); },
+          py::is_operator())
+      // 2.2.6 pins this with a test (the reason is not recorded there): the error stays; compare explicitly.
       .def("__bool__",
            [](const ScalarPtr&) -> bool {
              throw scad::TypeError("Expression objects do not define truthiness. Evaluate them explicitly first.");
@@ -255,11 +384,9 @@ void bind_reactive_exprs(py::module_& m) {
           "__rsub__", [](const ScalarPtr& s, const py::object& o) { return binary("sub", s, o, true); },
           py::is_operator())
       .def(
-          "__mul__", [](const ScalarPtr& s, const py::object& o) { return binary("mul", s, o, false); },
-          py::is_operator())
+          "__mul__", [](const ScalarPtr& s, const py::object& o) { return multiplied(s, o, false); }, py::is_operator())
       .def(
-          "__rmul__", [](const ScalarPtr& s, const py::object& o) { return binary("mul", s, o, true); },
-          py::is_operator())
+          "__rmul__", [](const ScalarPtr& s, const py::object& o) { return multiplied(s, o, true); }, py::is_operator())
       .def(
           "__truediv__", [](const ScalarPtr& s, const py::object& o) { return binary("div", s, o, false); },
           py::is_operator())
@@ -276,7 +403,10 @@ void bind_reactive_exprs(py::module_& m) {
       .def("__abs__", [](const ScalarPtr& s) { return unary("abs", s); })
       .def("__eq__",
            [](const ScalarPtr& s, const py::object& o) {
-             return py::isinstance<ScalarNode>(o) && sr::same_expression(*s, *py::cast<ScalarPtr>(o));
+             if (py::isinstance<ScalarNode>(o))
+               return sr::same_expression(*s, *py::cast<ScalarPtr>(o));  // two expressions: the same formula
+             const std::optional<double> value = other_value(o);         // an expression and a number: the same value
+             return value && now(s) == *value;
            })
       .def("__hash__", [](const ScalarPtr& s) { return std::hash<std::string>{}(s->expr_id()); })
       .def("__repr__", [](const ScalarPtr& s) { return s->repr(); });
