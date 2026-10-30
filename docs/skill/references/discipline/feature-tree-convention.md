@@ -113,7 +113,9 @@ design parameters) stay in the source; geometric verification never does
 
 ## Blocks are cells
 
-In a notebook every block is one `@app.cell`:
+In a notebook every block is one `@app.cell`. This section is the structure;
+`notebook-cell-design.md` gives the rules for where boundaries go, when a number
+is a `Var`, and the reason for each (read it too):
 
 - The block header is the first line of the cell body.
 - The cell returns the body under the block's slug in snake_case

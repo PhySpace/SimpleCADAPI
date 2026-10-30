@@ -161,7 +161,7 @@ CHAMFER = True                                   # no comment: a toggle, inferre
 bool a toggle. A bad comment is reported (`sca params`) and the inferred
 control is used. A `scad.var`'s `unit` and `comment` show up in the editor.
 
-**A `scad.var` is used like a number.** Arithmetic on it (`2 * math.pi * R`, `R / 2`) builds a
+**A `scad.var` is used like a number.** (When to make one, and where the cells go: `discipline/notebook-cell-design.md`.) Arithmetic on it (`2 * math.pi * R`, `R / 2`) builds a
 formula that keeps the link to the parameter, so operators take it as it is and the model rebuilds when the slider
 moves. Everything else Python asks of a number reads the value it has now: `R > 3`, `max(R, 3)`, `int(N)`,
 `round(R, 1)`, `range(N)`, `[0] * N`, `f"{R:.1f}"`, `R == 5.0` all work, and the same code runs on a plain

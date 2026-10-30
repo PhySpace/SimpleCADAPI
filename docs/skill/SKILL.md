@@ -108,6 +108,10 @@ it and stop that route; never invent an alternative route.
    boundary comment `# ---- feature: <slug> (<role>) ----`; 2D
    profiles and planar paths go through the sketch API, primitives
    only when the shape is completely contained in the basic form.
+   Where the cell boundaries go and which numbers are a `var()`
+   follow `references/discipline/notebook-cell-design.md`: read it
+   with the convention before writing any notebook; it states each rule
+   with its reason and the error you get when you break it.
 4. Booleans (`union_rsolid`, `cut_rsolid`, `cut_rsolid_list`, `intersect_rsolid`)
    accept mixed inputs and return exactly one `Solid`; union
    defaults to `glue=False` with a conservative scale-relative
