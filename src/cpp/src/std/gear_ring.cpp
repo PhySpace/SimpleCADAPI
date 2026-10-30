@@ -13,10 +13,14 @@ using namespace stdlib;
 Solid make_spur_ring_gear_rsolid(int n_teeth, double module, double pressure_angle, double gear_height,
                                  double rim_thickness, const ToothTuning& tuning) {
   const TrackingPolicyScope graph(TrackingPolicy::Graph);
-  if (n_teeth < 3) throw ValueError("n_teeth must be at least 3");
-  if (module <= 0) throw ValueError("module must be positive");
-  if (gear_height <= 0) throw ValueError("gear_height must be positive");
-  if (rim_thickness <= 0) throw ValueError("rim_thickness must be positive");
+  if (n_teeth < 3)
+    throw ValueError("n_teeth must be at least 3");
+  if (module <= 0)
+    throw ValueError("module must be positive");
+  if (gear_height <= 0)
+    throw ValueError("gear_height must be positive");
+  if (rim_thickness <= 0)
+    throw ValueError("rim_thickness must be positive");
 
   const double pa = pressure_angle_to_radians(pressure_angle);
   const Face face = build_ring_gear_face(n_teeth, module, pa, rim_thickness, tuning);

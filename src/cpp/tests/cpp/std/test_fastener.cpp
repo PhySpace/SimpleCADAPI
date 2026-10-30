@@ -33,8 +33,16 @@ TEST_CASE("catalog lookups: coarse pitch, hex head, minor diameter") {
 TEST_CASE("bolt with a modeled thread: default hex bolt") {
   const Solid bolt = make_bolt_rsolid(8.0, 24.0);
   CHECK(bolt.volume() == Approx(1758.7579781162303).epsilon(1e-6));
+  // The topology of a modeled thread depends on the platform's OCCT build: the 2.2.6.post2 SDK (OCP) gives 54 faces /
+  // 116 edges on macOS arm64 and 56 / 117 on Linux x86-64 (volume equal to 1e-8), and so does this engine on each.
+  // Each platform is held to the value 2.2.6 gives there; a platform not measured is held to the macOS one.
+#if defined(__linux__) && defined(__x86_64__)
+  CHECK(bolt.faces().size() == 56);
+  CHECK(bolt.edges().size() == 117);
+#else
   CHECK(bolt.faces().size() == 54);
   CHECK(bolt.edges().size() == 116);
+#endif
   CHECK(has_tag(bolt, "role.fastener.bolt"));
   CHECK(has_tag(bolt, "group.fasteners"));
   const Value meta = bolt.get_metadata("std.fastener.bolt");
@@ -87,7 +95,8 @@ TEST_CASE("bolt: every head and drive style builds") {
     options.drive_style = style.drive;
     options.thread_detail = "cosmetic";
     options.thread_style = std::string(style.head) == "countersunk" ? "none" : "auto";
-    if (std::string(style.head) == "square") options.thread_style = "partial";
+    if (std::string(style.head) == "square")
+      options.thread_style = "partial";
     const Solid bolt = make_bolt_rsolid(8.0, 24.0, options);
     CHECK_MESSAGE(bolt.volume() == Approx(style.volume).epsilon(1e-6), style.head);
   }

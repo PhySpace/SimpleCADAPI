@@ -34,7 +34,7 @@ std::vector<Shape> linear_pattern_rsolidlist(const Shape& shape, const Scalar3& 
 
 // `count` copies spread over `total_rotation_angle` degrees about the axis.
 // Error "radial_pattern_rsolidlist".
-std::vector<Shape> radial_pattern_rsolidlist(const Shape& shape, const Scalar3& center, const Scalar3& axis,
-                                             int count, const Scalar& total_rotation_angle);
+std::vector<Shape> radial_pattern_rsolidlist(const Shape& shape, const Scalar3& center, const Scalar3& axis, int count,
+                                             const Scalar& total_rotation_angle);
 
 }  // namespace scad

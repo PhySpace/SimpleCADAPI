@@ -77,17 +77,29 @@ Cache& cache() {
 
 }  // namespace
 
-std::shared_ptr<const TriMesh> cached_mesh(const Shape& solid, double linear_tolerance, double angular_tolerance) {
-  if (auto hit = cache().find(solid.wrapped(), linear_tolerance, angular_tolerance)) return hit;
+std::shared_ptr<const TriMesh> cached_mesh_detached(const Shape& solid, double linear_tolerance,
+                                                    double angular_tolerance, std::string* error) {
+  if (auto hit = cache().find(solid.wrapped(), linear_tolerance, angular_tolerance))
+    return hit;
   try {
     auto built = std::make_shared<const TriMesh>(build_solid_trimesh(solid, linear_tolerance, angular_tolerance));
     cache().insert(solid.wrapped(), linear_tolerance, angular_tolerance, built);
     return built;
-  } catch (const std::exception& error) {
-    Shape handle = solid;  // handles share their entity: this records on the caller's shape
-    handle.set_runtime(kErrorKey, std::string(error.what()));
+  } catch (const std::exception& failure) {
+    if (error != nullptr)
+      *error = failure.what();
     return nullptr;
   }
+}
+
+std::shared_ptr<const TriMesh> cached_mesh(const Shape& solid, double linear_tolerance, double angular_tolerance) {
+  std::string error;
+  auto mesh = cached_mesh_detached(solid, linear_tolerance, angular_tolerance, &error);
+  if (!mesh && !error.empty()) {
+    Shape handle = solid;  // handles share their entity: this records on the caller's shape
+    handle.set_runtime(kErrorKey, error);
+  }
+  return mesh;
 }
 
 std::string mesh_error(const Shape& solid) {
@@ -95,6 +107,8 @@ std::string mesh_error(const Shape& solid) {
   return value.is_string() ? value.as_string() : std::string();
 }
 
-void clear_mesh_cache() { cache().clear(); }
+void clear_mesh_cache() {
+  cache().clear();
+}
 
 }  // namespace scad::io

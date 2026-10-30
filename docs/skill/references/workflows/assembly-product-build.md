@@ -60,7 +60,8 @@ repair_routes:
    components by measurement (QL queries, not assumed dimensions).
 4. **Author each custom part** (shafts, housings, carriers, spacers,
    connectors) via `single-part-modeling.md` (which mandates
-   `discipline/feature-tree-convention.md` block structure); attach interface
+   `discipline/feature-tree-convention.md` block structure and the cell and
+   `Var` rules of `discipline/notebook-cell-design.md`); attach interface
    connectors on leaf parts (`add_connector_rpart`,
    `make_placement_connector_rconnector`, ...) at mating datums
    (`discipline/assembly-positioning.md`).

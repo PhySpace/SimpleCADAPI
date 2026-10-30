@@ -24,7 +24,8 @@ class Cow {
 
   // A mutable instance private to this handle.
   T& mut() {
-    if (node_.use_count() != 1) node_ = std::make_shared<T>(*node_);
+    if (node_.use_count() != 1)
+      node_ = std::make_shared<T>(*node_);
     return const_cast<T&>(*node_);  // sole owner of a node we created: writing is safe
   }
 

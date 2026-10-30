@@ -1,0 +1,8 @@
+# UBSan suppressions for the sanitizer CI job (UBSAN_OPTIONS=suppressions=...).
+#
+# OCCT's own mesher (BRepMesh_NodeInsertionMeshAlgo::initDataStructure -> TopoDS::Face, TopoDS_Shape::TShape) reads a
+# TopoDS_Shape at an address that is only 4-byte aligned.  Every frame of the reports is inside OCCT; the first frame of
+# ours is the call to BRepMesh_IncrementalMesh (src/io/mesh.cpp).  Only the alignment check, only for code that comes
+# from OCCT's headers: the same check stays on for this repository's own code.  (The first run named TopoDS.hxx, the
+# next TopoDS_Shape.hxx: the same read, so the whole header directory is covered.)
+alignment:*/opencascade/*

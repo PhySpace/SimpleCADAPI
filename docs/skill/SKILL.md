@@ -4,9 +4,9 @@ description: Build, assemble, inspect, reconstruct, and export parametric CAD mo
 license: Apache-2.0
 metadata:
   project: simplecadapi
-  version: 2.2.7b1
+  version: 2.2.7
   package-name: simplecadapi
-  package-version: 2.2.7b1
+  package-version: 2.2.7
 ---
 
 # SimpleCAD SDK Skill
@@ -108,6 +108,10 @@ it and stop that route; never invent an alternative route.
    boundary comment `# ---- feature: <slug> (<role>) ----`; 2D
    profiles and planar paths go through the sketch API, primitives
    only when the shape is completely contained in the basic form.
+   Where the cell boundaries go and which numbers are a `var()`
+   follow `references/discipline/notebook-cell-design.md`: read it
+   with the convention before writing any notebook; it states each rule
+   with its reason and the error you get when you break it.
 4. Booleans (`union_rsolid`, `cut_rsolid`, `cut_rsolid_list`, `intersect_rsolid`)
    accept mixed inputs and return exactly one `Solid`; union
    defaults to `glue=False` with a conservative scale-relative
@@ -208,6 +212,7 @@ print(len(rebuilt))
 - `references/workflows/` — goal-oriented workflows, including drawing reconstruction
 - `references/domains/` — capability domains, including drawing inspection
 - `references/discipline/` — modeling knowledge and invariants
+- `references/discipline/verifier-scripts.md` — writing a verifier script (OCP through `simplecadapi.verify`)
 - `references/SDK_OVERVIEW.md` — package-level map
 - `references/inspect/brep-reverse-engineering.md`
 - `references/domains/addon-development.md` — `sca` addon CLI and authoring guide

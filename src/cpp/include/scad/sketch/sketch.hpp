@@ -15,6 +15,7 @@
 #include <string_view>
 #include <vector>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/core/scalar.hpp"
 #include "scad/core/value.hpp"
 #include "scad/core/vec.hpp"
@@ -31,17 +32,17 @@ struct SketchControlPoint {
   std::array<double, 2> xy{0.0, 0.0};
 
   SketchControlPoint() = default;
-  SketchControlPoint(SketchTarget target) : point(std::move(target)) {}   // NOLINT(google-explicit-constructor)
+  SketchControlPoint(SketchTarget target) : point(std::move(target)) {}           // NOLINT(google-explicit-constructor)
   SketchControlPoint(std::string path) : point(SketchTarget(std::move(path))) {}  // NOLINT
-  SketchControlPoint(const char* path) : point(SketchTarget(path)) {}     // NOLINT
+  SketchControlPoint(const char* path) : point(SketchTarget(path)) {}             // NOLINT
   SketchControlPoint(double x, double y) : xy{x, y} {}
-  SketchControlPoint(std::array<double, 2> literal) : xy(literal) {}      // NOLINT
+  SketchControlPoint(std::array<double, 2> literal) : xy(literal) {}  // NOLINT
 };
 
 struct SketchSolveRequest {
   bool require_fully_constrained = false;
   bool strict = true;
-  double tolerance = 1e-7;
+  double tolerance = tol::kSketchSolveResidual;
   int max_iterations = 80;
   // Null: the process default backend.
   std::shared_ptr<SketchSolverBackend> backend;
@@ -109,8 +110,8 @@ class Sketch {
                    bool construction = false);
   Sketch& add_circle(const std::string& entity_id, const SketchRef& center, const Scalar& radius,
                      bool construction = false);
-  Sketch& add_arc(const std::string& entity_id, const SketchRef& start, const SketchRef& end,
-                  const SketchRef& center, bool construction = false);
+  Sketch& add_arc(const std::string& entity_id, const SketchRef& start, const SketchRef& end, const SketchRef& center,
+                  bool construction = false);
   Sketch& add_ellipse(const std::string& entity_id, const SketchRef& center, const SketchRef& major_point,
                       const SketchRef& minor_point, bool construction = false);
   Sketch& add_bspline(const std::string& entity_id, const SketchRef& start, const SketchRef& end,

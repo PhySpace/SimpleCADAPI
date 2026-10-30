@@ -43,6 +43,6 @@ TEST_CASE("traversal orderings: outer wire excluded from inner wires") {
   REQUIRE(faces.size() == 6);
   CHECK(kernel::wires_of(faces[0]).size() == 1);
   CHECK(kernel::inner_wires_of(faces[0]).empty());
-  CHECK(kernel::edges_of(box).size() == 24);   // 12 edges, each used by two faces
+  CHECK(kernel::edges_of(box).size() == 24);     // 12 edges, each used by two faces
   CHECK(kernel::vertices_of(box).size() == 48);  // 6 faces x 4 edges x 2 vertex uses
 }

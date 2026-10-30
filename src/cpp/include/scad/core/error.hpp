@@ -54,8 +54,7 @@ class RuntimeError : public Exception {
 };
 class NotImplementedError : public Exception {
  public:
-  explicit NotImplementedError(const std::string& message)
-      : Exception(PyKind::NotImplementedError, message) {}
+  explicit NotImplementedError(const std::string& message) : Exception(PyKind::NotImplementedError, message) {}
 };
 
 // An OpenCASCADE exception (Standard_Failure family) caught at a kernel boundary.
@@ -99,9 +98,9 @@ struct ErrorGuidance {
   std::string what_happened;
   std::vector<std::string> possible_causes;
   std::vector<std::string> how_to_fix;
-  std::string technical_details;     // empty = absent
-  std::string signature;             // empty = absent; filled lazily by the Python layer
-  std::string documentation_hint;    // empty = absent
+  std::string technical_details;   // empty = absent
+  std::string signature;           // empty = absent; filled lazily by the Python layer
+  std::string documentation_hint;  // empty = absent
   std::vector<ErrorMeasurement> measurements;
   std::vector<ErrorEvidence> evidence;
   std::vector<std::string> repair;
@@ -159,8 +158,8 @@ struct ErrorSpec {
   std::vector<std::string> possible_causes;
   std::vector<std::string> how_to_fix;
 
-  ErrorSpec(std::string operation_, std::string what_happened_,
-            std::initializer_list<std::string> causes, std::initializer_list<std::string> fixes)
+  ErrorSpec(std::string operation_, std::string what_happened_, std::initializer_list<std::string> causes,
+            std::initializer_list<std::string> fixes)
       : operation(std::move(operation_)),
         what_happened(std::move(what_happened_)),
         possible_causes(causes),
@@ -174,15 +173,13 @@ std::string technical_details_of(const std::exception& error);
 // existing scad::Error passes through unchanged (it already says what it needs to).
 [[noreturn]] void raise_harness_error(const ErrorSpec& spec, const std::exception& cause,
                                       std::vector<ErrorMeasurement> measurements = {},
-                                      std::vector<std::string> repair = {},
-                                      std::vector<InventoryEntry> inventory = {},
+                                      std::vector<std::string> repair = {}, std::vector<InventoryEntry> inventory = {},
                                       std::vector<ErrorEvidence> evidence = {});
 
 // Throw an Error with no underlying exception.
 [[noreturn]] void raise_harness_error(const ErrorSpec& spec, std::string technical_details = {},
                                       std::vector<ErrorMeasurement> measurements = {},
-                                      std::vector<std::string> repair = {},
-                                      std::vector<InventoryEntry> inventory = {},
+                                      std::vector<std::string> repair = {}, std::vector<InventoryEntry> inventory = {},
                                       std::vector<ErrorEvidence> evidence = {});
 
 // Run `body`; any exception leaves as a scad::Error described by `spec`.

@@ -11,12 +11,15 @@ namespace {
 
 std::vector<Connector> unique_connectors(std::vector<Connector> connectors) {
   std::map<std::string, int> counts;
-  for (const Connector& connector : connectors) ++counts[connector.connector_id()];
+  for (const Connector& connector : connectors)
+    ++counts[connector.connector_id()];
   std::string duplicates;
   for (const auto& [id, count] : counts) {
-    if (count > 1) duplicates += (duplicates.empty() ? "" : ", ") + id;
+    if (count > 1)
+      duplicates += (duplicates.empty() ? "" : ", ") + id;
   }
-  if (!duplicates.empty()) throw ValueError("duplicate connector_id: " + duplicates);
+  if (!duplicates.empty())
+    throw ValueError("duplicate connector_id: " + duplicates);
   return connectors;
 }
 
@@ -51,14 +54,16 @@ Part Part::with_connector(const Connector& connector) const {
 std::vector<std::string> Part::connector_ids() const {
   std::vector<std::string> ids;
   ids.reserve(connectors_.size());
-  for (const Connector& connector : connectors_) ids.push_back(connector.connector_id());
+  for (const Connector& connector : connectors_)
+    ids.push_back(connector.connector_id());
   return ids;
 }
 
 const Connector& Part::get_connector(std::string_view connector_id) const {
   const std::string target = validate_identifier(connector_id, "connector_id");
   for (const Connector& connector : connectors_) {
-    if (connector.connector_id() == target) return connector;
+    if (connector.connector_id() == target)
+      return connector;
   }
   throw LookupError("part has no connector_id '" + target + "'");
 }
@@ -69,7 +74,8 @@ Value Part::to_dict() const {
   out.set("name", name_ ? Value(*name_) : Value());
   out.set("material", material_ ? material_->to_dict() : Value());
   Value rows = Value::array();
-  for (const Connector& connector : connectors_) rows.push_back(connector.to_dict());
+  for (const Connector& connector : connectors_)
+    rows.push_back(connector.to_dict());
   out.set("connectors", std::move(rows));
   return out;
 }

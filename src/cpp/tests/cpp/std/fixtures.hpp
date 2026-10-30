@@ -12,7 +12,9 @@
 
 namespace scad::std_test {
 
-inline bool has_tag(const Shape& shape, std::string_view tag) { return shape.has_tag(tag, TagScope::Effective); }
+inline bool has_tag(const Shape& shape, std::string_view tag) {
+  return shape.has_tag(tag, TagScope::Effective);
+}
 
 inline double radial_extent(const Solid& solid) {
   const auto box = solid.bounding_box();
@@ -42,6 +44,8 @@ Error operator_failure(F&& call) {
   throw 0;
 }
 
-inline double number(const Value& dict, std::string_view key) { return dict.find(key)->as_double(); }
+inline double number(const Value& dict, std::string_view key) {
+  return dict.find(key)->as_double();
+}
 
 }  // namespace scad::std_test

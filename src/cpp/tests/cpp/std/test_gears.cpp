@@ -67,7 +67,8 @@ TEST_CASE("the external profile sketch fixes only the centre and uses B-spline r
   CHECK(sketch.entities().find("fillet_left_0")->kind == "bspline");
   CHECK(sketch.entities().find("fillet_right_0")->kind == "bspline");
   int fixes = 0;
-  for (const SketchConstraint& constraint : sketch.constraints()) fixes += constraint.kind == "fix" ? 1 : 0;
+  for (const SketchConstraint& constraint : sketch.constraints())
+    fixes += constraint.kind == "fix" ? 1 : 0;
   CHECK(fixes == 1);
 
   // The flank starts and ends on the analytic points of the tooth.

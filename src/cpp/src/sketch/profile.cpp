@@ -10,7 +10,9 @@ namespace scad {
 
 namespace {
 
-bool is_edge_kind(const std::string& kind) { return kind == kLineKind || kind == kArcKind || kind == kBSplineKind; }
+bool is_edge_kind(const std::string& kind) {
+  return kind == kLineKind || kind == kArcKind || kind == kBSplineKind;
+}
 
 std::pair<std::string, std::string> edge_endpoints(const SketchEntity& entity) {
   return {entity.point_id("start"), entity.point_id("end")};
@@ -20,7 +22,8 @@ std::pair<std::string, std::string> edge_endpoints(const SketchEntity& entity) {
 std::vector<std::string> edge_entity_ids(const Sketch& sketch) {
   std::vector<std::string> ids;
   for (const auto& [id, entity] : sketch.entities()) {
-    if (is_edge_kind(entity.kind) && !entity.construction) ids.push_back(id);
+    if (is_edge_kind(entity.kind) && !entity.construction)
+      ids.push_back(id);
   }
   return ids;
 }
@@ -28,7 +31,8 @@ std::vector<std::string> edge_entity_ids(const Sketch& sketch) {
 std::size_t entity_position(const Sketch& sketch, const std::string& id) {
   std::size_t position = 0;
   for (const auto& item : sketch.entities()) {
-    if (item.first == id) return position;
+    if (item.first == id)
+      return position;
     ++position;
   }
   return position;
@@ -43,13 +47,16 @@ std::vector<std::string> edge_component(const Sketch& sketch, const std::string&
   std::set<std::string> seen_points;
   for (std::size_t cursor = 0; cursor < queue.size(); ++cursor) {
     const std::string edge_id = queue[cursor];
-    if (!seen_edges.insert(edge_id).second) continue;
+    if (!seen_edges.insert(edge_id).second)
+      continue;
     const auto [start, end] = edge_endpoints(sketch.entities().at(edge_id));
     for (const std::string& point_id : {start, end}) {
-      if (!seen_points.insert(point_id).second) continue;
+      if (!seen_points.insert(point_id).second)
+        continue;
       for (const std::string& other_id : candidates) {
         const auto [other_start, other_end] = edge_endpoints(sketch.entities().at(other_id));
-        if (point_id == other_start || point_id == other_end) queue.push_back(other_id);
+        if (point_id == other_start || point_id == other_end)
+          queue.push_back(other_id);
       }
     }
   }
@@ -76,13 +83,16 @@ std::optional<OrderedPath> ordered_edge_path(const Sketch& sketch, const std::ve
     adjacency[start].push_back(edge_id);
     adjacency[end].push_back(edge_id);
   }
-  if (adjacency.empty()) return std::nullopt;
+  if (adjacency.empty())
+    return std::nullopt;
   for (const auto& item : adjacency) {
-    if (item.second.size() > 2) return std::nullopt;
+    if (item.second.size() > 2)
+      return std::nullopt;
   }
   std::vector<std::string> endpoints;
   for (const auto& item : adjacency) {
-    if (item.second.size() == 1) endpoints.push_back(item.first);
+    if (item.second.size() == 1)
+      endpoints.push_back(item.first);
   }
 
   OrderedPath path;
@@ -114,7 +124,8 @@ std::optional<OrderedPath> ordered_edge_path(const Sketch& sketch, const std::ve
   path.oriented_edges.emplace_back(start_edge, reversed_edge);
 
   while (true) {
-    if (path.closed && current_point == start_point) break;
+    if (path.closed && current_point == start_point)
+      break;
     std::string next_edge;
     for (const std::string& candidate : adjacency.at(current_point)) {
       if (used_edges.count(candidate) == 0) {
@@ -123,7 +134,8 @@ std::optional<OrderedPath> ordered_edge_path(const Sketch& sketch, const std::ve
       }
     }
     if (next_edge.empty()) {
-      if (path.closed || used_edges.size() != edge_ids.size()) return std::nullopt;
+      if (path.closed || used_edges.size() != edge_ids.size())
+        return std::nullopt;
       break;
     }
     used_edges.insert(next_edge);
@@ -131,17 +143,21 @@ std::optional<OrderedPath> ordered_edge_path(const Sketch& sketch, const std::ve
     reversed_edge = next_start != current_point;
     path.oriented_edges.emplace_back(next_edge, reversed_edge);
     current_point = reversed_edge ? next_start : next_end;
-    if (!(path.closed && current_point == start_point)) path.point_ids.push_back(current_point);
+    if (!(path.closed && current_point == start_point))
+      path.point_ids.push_back(current_point);
   }
-  if (used_edges.size() != edge_ids.size()) return std::nullopt;
-  if (path.closed && current_point != start_point) return std::nullopt;
+  if (used_edges.size() != edge_ids.size())
+    return std::nullopt;
+  if (path.closed && current_point != start_point)
+    return std::nullopt;
   return path;
 }
 
 std::string join(const std::vector<std::string>& parts, const char* separator) {
   std::string out;
   for (const std::string& part : parts) {
-    if (!out.empty()) out += separator;
+    if (!out.empty())
+      out += separator;
     out += part;
   }
   return out;
@@ -163,16 +179,19 @@ std::string describe_edge_component(const Sketch& sketch, const std::vector<std:
   }
   std::vector<std::string> endpoints;
   for (const auto& item : adjacency) {
-    if (item.second.size() == 1) endpoints.push_back(item.first);
+    if (item.second.size() == 1)
+      endpoints.push_back(item.first);
   }
   if (endpoints.size() == 2) {
     return "open chain (" + listed + ") from '" + endpoints[0] + "' to '" + endpoints[1] + "'";
   }
-  if (endpoints.empty()) return "closed loop (" + listed + ")";
+  if (endpoints.empty())
+    return "closed loop (" + listed + ")";
   return "irregular edge set (" + listed + ")";
 }
 
-std::vector<SketchProfile> edge_path_profiles(const Sketch& sketch, const std::shared_ptr<const SketchSolveResult>& result) {
+std::vector<SketchProfile> edge_path_profiles(const Sketch& sketch,
+                                              const std::shared_ptr<const SketchSolveResult>& result) {
   const std::vector<std::string> edge_ids = edge_entity_ids(sketch);
   std::set<std::string> unused(edge_ids.begin(), edge_ids.end());
   std::vector<SketchProfile> profiles;
@@ -181,9 +200,11 @@ std::vector<SketchProfile> edge_path_profiles(const Sketch& sketch, const std::s
     const std::string first_edge = *std::find_if(edge_ids.begin(), edge_ids.end(),
                                                  [&unused](const std::string& id) { return unused.count(id) != 0; });
     const std::vector<std::string> component = edge_component(sketch, first_edge, unused);
-    for (const std::string& id : component) unused.erase(id);
+    for (const std::string& id : component)
+      unused.erase(id);
     const std::optional<OrderedPath> ordered = ordered_edge_path(sketch, component);
-    if (!ordered) continue;
+    if (!ordered)
+      continue;
     SketchProfile profile;
     profile.id = component[0];
     profile.kind = ordered->closed ? "edge_loop" : "edge_chain";
@@ -193,7 +214,8 @@ std::vector<SketchProfile> edge_path_profiles(const Sketch& sketch, const std::s
       profile.reversed.push_back(reversed);
     }
     profile.point_ids = ordered->point_ids;
-    if (!ordered->closed) profile.endpoints = {ordered->point_ids.front(), ordered->point_ids.back()};
+    if (!ordered->closed)
+      profile.endpoints = {ordered->point_ids.front(), ordered->point_ids.back()};
     profile.solve = result;
     profiles.push_back(std::move(profile));
   }
@@ -210,7 +232,8 @@ std::vector<std::string> describe_edge_components(const Sketch& sketch) {
     const std::string first_edge = *std::find_if(edge_ids.begin(), edge_ids.end(),
                                                  [&unused](const std::string& id) { return unused.count(id) != 0; });
     const std::vector<std::string> component = edge_component(sketch, first_edge, unused);
-    for (const std::string& id : component) unused.erase(id);
+    for (const std::string& id : component)
+      unused.erase(id);
     descriptions.push_back(describe_edge_component(sketch, component));
   }
   return descriptions;
@@ -221,7 +244,8 @@ std::vector<SketchProfile> sketch_profiles(const Sketch& sketch, const SketchSol
   const Vec3 normal = sketch.plane_normal();
   const auto solved_point = [&result](const std::string& id) { return result.solved_points.at(id); };
   for (const auto& [entity_id, entity] : sketch.entities()) {
-    if (entity.construction) continue;
+    if (entity.construction)
+      continue;
     if (entity.kind == kCircleKind) {
       SketchProfile profile;
       profile.id = entity_id;
@@ -260,12 +284,12 @@ SketchProfile select_sketch_profile(const Sketch& sketch, const SketchProfileId&
   if (require_closed) {
     std::vector<SketchProfile> closed;
     for (SketchProfile& item : profiles) {
-      if (item.closed) closed.push_back(std::move(item));
+      if (item.closed)
+        closed.push_back(std::move(item));
     }
     if (closed.empty()) {
-      throw ValueError(
-          "Sketch contains no closed profile; face promotion requires a closed loop. Components: " +
-          join(describe_edge_components(sketch), "; "));
+      throw ValueError("Sketch contains no closed profile; face promotion requires a closed loop. Components: " +
+                       join(describe_edge_components(sketch), "; "));
     }
     profiles = std::move(closed);
   }
@@ -277,7 +301,8 @@ SketchProfile select_sketch_profile(const Sketch& sketch, const SketchProfileId&
   }
   if (!profile.is_index()) {
     for (SketchProfile& item : profiles) {
-      if (item.id == profile.id()) return std::move(item);
+      if (item.id == profile.id())
+        return std::move(item);
     }
     throw ValueError("Unknown sketch profile '" + profile.id() + "'");
   }

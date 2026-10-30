@@ -85,9 +85,9 @@ inline Mesh mesh(const Shape& shape, const MeshParameters& parameters = {}) {
 // Per face (kernel/ocp_mesh.py)
 // ---------------------------------------------------------------------------
 struct FaceTessellation {
-  std::vector<Vec3> vertices;                          // world coordinates
+  std::vector<Vec3> vertices;                           // world coordinates
   std::vector<std::array<std::uint32_t, 3>> triangles;  // already wound for the face's orientation
-  std::vector<Vec3> node_normals;                      // empty when OCCT computed none
+  std::vector<Vec3> node_normals;                       // empty when OCCT computed none
 
   // One normal triple per triangle: the node normals when there are any
   // (flipped for reversed faces), otherwise the flat triangle normal.
@@ -96,8 +96,7 @@ struct FaceTessellation {
 
 // Meshes `face` on its own (a copy, like mesh()) and returns its triangulation;
 // empty when the mesher produced none.  tolerance = linear deflection.
-FaceTessellation tessellate_face_with_normals(const TopoDS_Face& face,
-                                              double tolerance = kDefaultLinearDeflection,
+FaceTessellation tessellate_face_with_normals(const TopoDS_Face& face, double tolerance = kDefaultLinearDeflection,
                                               double angular_tolerance = kDefaultAngularDeflection);
 
 // vertices and triangles only: kernel/ocp_mesh.py tessellate_face.
@@ -119,9 +118,9 @@ struct FaceTriangleRange {
 };
 
 struct TriMesh {
-  std::vector<double> vertices;            // 3 per vertex
-  std::vector<std::int64_t> triangles;     // 3 per triangle
-  std::vector<double> corner_normals;      // 9 per triangle: three unit normals
+  std::vector<double> vertices;         // 3 per vertex
+  std::vector<std::int64_t> triangles;  // 3 per triangle
+  std::vector<double> corner_normals;   // 9 per triangle: three unit normals
   std::vector<FaceTriangleRange> face_triangle_ranges;
   double linear_tolerance = kDefaultLinearDeflection;
   double angular_tolerance = kDefaultAngularDeflection;
@@ -140,9 +139,12 @@ TriMesh build_solid_trimesh(const Shape& solid, double linear_tolerance = kDefau
 // per (shape identity, tolerances) in a small process-wide least-recently-used
 // cache (it is derived data: never serialized, never copied).  A failure is
 // recorded as the runtime value "mesh.error" on the shape and nullptr returned.
-std::shared_ptr<const TriMesh> cached_mesh(const Shape& solid,
-                                           double linear_tolerance = kDefaultLinearDeflection,
+std::shared_ptr<const TriMesh> cached_mesh(const Shape& solid, double linear_tolerance = kDefaultLinearDeflection,
                                            double angular_tolerance = kDefaultAngularDeflection);
+// The same without touching the shape: a failure's diagnostic is stored in `*error` instead of on the shape, so
+// the call is safe on a thread that holds no lock on the shape (the editor meshes parts in the background).
+std::shared_ptr<const TriMesh> cached_mesh_detached(const Shape& solid, double linear_tolerance,
+                                                    double angular_tolerance, std::string* error);
 // The diagnostic recorded by the last failed cached_mesh on this shape, or "".
 std::string mesh_error(const Shape& solid);
 // Drop every cached mesh (tests, memory pressure).
@@ -152,7 +154,7 @@ void clear_mesh_cache();
 // Welded surface mesh (exporter/_surface_mesh.py): what STL/OBJ/GLB write.
 // ---------------------------------------------------------------------------
 struct WeldedMesh {
-  std::vector<double> vertices;                          // 3 per vertex
+  std::vector<double> vertices;  // 3 per vertex
   std::vector<std::array<std::int32_t, 3>> triangles;
   std::size_t vertex_count() const noexcept { return vertices.size() / 3; }
 };

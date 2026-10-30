@@ -14,6 +14,7 @@
 
 #include "finalize.hpp"
 #include "internal.hpp"
+#include "scad/core/tolerance.hpp"
 #include "scad/core/coordinate_system.hpp"
 #include "scad/kernel/convert.hpp"
 #include "scad/surface/fitter.hpp"
@@ -36,7 +37,8 @@ TopoDS_Face bezier_face(const PointGrid& points, const std::optional<WeightGrid>
   for (int r = 0; r < rows; ++r)
     for (int c = 0; c < columns; ++c)
       poles.SetValue(r + 1, c + 1, kernel::to_pnt(points[static_cast<std::size_t>(r)][static_cast<std::size_t>(c)]));
-  if (!weights) return face_from_surface(new Geom_BezierSurface(poles));
+  if (!weights)
+    return face_from_surface(new Geom_BezierSurface(poles));
 
   TColStd_Array2OfReal grid(1, rows, 1, columns);
   for (int r = 0; r < rows; ++r)
@@ -51,30 +53,34 @@ void check_bezier_weights(const WeightGrid& weights, const PointGrid& points) {
     throw ValueError("Bezier weights must match the control-point grid");
   for (const auto& row : weights)
     for (double weight : row)
-      if (weight <= 0 || !std::isfinite(weight)) throw ValueError("Bezier weights must be positive finite values");
+      if (weight <= 0 || !std::isfinite(weight))
+        throw ValueError("Bezier weights must be positive finite values");
 }
 
 }  // namespace
 
 Face make_bezier_surface_rface(const PointGrid& control_points, const std::optional<WeightGrid>& weights,
                                const TagPrefix& tag_prefix) {
-  static const ErrorSpec kSpec{"make_bezier_surface_rface",
-                               "Failed to create the Bezier surface face.",
-                               {"The control-point grid is invalid or degenerate.", "The kernel rejected the Bezier surface."},
-                               {"Pass a rectangular finite grid with at least two rows and columns.",
-                                "Use positive finite weights with the same dimensions as the grid."}};
+  static const ErrorSpec kSpec{
+      "make_bezier_surface_rface",
+      "Failed to create the Bezier surface face.",
+      {"The control-point grid is invalid or degenerate.", "The kernel rejected the Bezier surface."},
+      {"Pass a rectangular finite grid with at least two rows and columns.",
+       "Use positive finite weights with the same dimensions as the grid."}};
   return operator_scope(kSpec, [&] {
     const PointGrid local = checked_point_grid(control_points);
     const PointGrid global = to_global(local);
-    if (weights) check_bezier_weights(*weights, local);
+    if (weights)
+      check_bezier_weights(*weights, local);
 
     Value params = Value::object();
     params.set("control_points", to_value(local));
     params.set("weights", to_value(weights));
     params.set("tag_prefix", to_value(tag_prefix));
-    return finalize_surface_output(Face(bezier_face(global, weights)),
-                                   FaceOutput{.record = {.op = "make_bezier_surface_rface", .params = std::move(params)},
-                                    .tag_prefix = tag_prefix});
+    return finalize_surface_output(
+        Face(bezier_face(global, weights)),
+        FaceOutput{.record = {.op = "make_bezier_surface_rface", .params = std::move(params)},
+                   .tag_prefix = tag_prefix});
   });
 }
 
@@ -85,12 +91,17 @@ namespace {
 
 void require_dimension(const Scalar& value, UnitDimension expected, const char* message) {
   const ScalarUnits units = scalar_units(value);
-  if (units.uses_units && units.dimension != expected) throw ValueError(message);
+  if (units.uses_units && units.dimension != expected)
+    throw ValueError(message);
 }
 
-Vec3 evaluated(const ScalarVec3& v) { return {v[0].value(), v[1].value(), v[2].value()}; }
+Vec3 evaluated(const ScalarVec3& v) {
+  return {v[0].value(), v[1].value(), v[2].value()};
+}
 
-Value vec_value(const Vec3& v) { return Value(Value::Array{v.x, v.y, v.z}); }
+Value vec_value(const Vec3& v) {
+  return Value(Value::Array{v.x, v.y, v.z});
+}
 
 // OCP's canonical in-plane X axis for a local normal.
 Vec3 default_plane_x_direction(const Vec3& normal) {
@@ -100,95 +111,139 @@ Vec3 default_plane_x_direction(const Vec3& normal) {
 
 TopoDS_Face cylindrical_face(double radius, const std::pair<double, double>& u, const std::pair<double, double>& v,
                              const Vec3& origin, const Vec3& axis, const Vec3& x_direction, double tolerance) {
-  const Handle(Geom_CylindricalSurface) surface = new Geom_CylindricalSurface(
-      gp_Ax3(kernel::to_pnt(origin), gp_Dir(axis.x, axis.y, axis.z), gp_Dir(x_direction.x, x_direction.y, x_direction.z)),
-      radius);
+  const Handle(Geom_CylindricalSurface) surface =
+      new Geom_CylindricalSurface(gp_Ax3(kernel::to_pnt(origin), gp_Dir(axis.x, axis.y, axis.z),
+                                         gp_Dir(x_direction.x, x_direction.y, x_direction.z)),
+                                  radius);
   BRepBuilderAPI_MakeFace builder(surface, u.first, u.second, v.first, v.second, tolerance);
   if (!builder.IsDone() || builder.Face().IsNull())
     throw ValueError("OCP could not create the bounded cylindrical surface face");
   const TopoDS_Face face = builder.Face();
-  if (!BRepCheck_Analyzer(face).IsValid()) throw ValueError("bounded cylindrical surface face is invalid");
+  if (!BRepCheck_Analyzer(face).IsValid())
+    throw ValueError("bounded cylindrical surface face is invalid");
   return face;
+}
+
+void check_cylinder_dimensions(const Scalar& radius, const ScalarRange& u_range, const ScalarRange& v_range,
+                               const CylindricalSurfaceOptions& options) {
+  require_dimension(radius, UnitDimension::Length, "radius must use model length units");
+  for (const Scalar* value : {&u_range.first, &u_range.second})
+    require_dimension(*value, UnitDimension::Dimensionless,
+                      "u_range must use unitless raw radians; unit-aware angle values evaluate in degrees");
+  for (const Scalar* value : {&v_range.first, &v_range.second})
+    require_dimension(*value, UnitDimension::Length, "v_range must use model length units");
+  require_dimension(options.tolerance, UnitDimension::Length, "tolerance must use model length units");
+}
+
+struct CylinderRanges {
+  double radius, tolerance;
+  std::pair<double, double> u, v;
+};
+
+// Finite, positive radius and tolerance; increasing U (at most one revolution) and V ranges.
+CylinderRanges checked_cylinder_ranges(const Scalar& radius, const ScalarRange& u_range, const ScalarRange& v_range,
+                                       const CylindricalSurfaceOptions& options) {
+  const double radius_value = radius.value();
+  const std::pair<double, double> u{u_range.first.value(), u_range.second.value()};
+  const std::pair<double, double> v{v_range.first.value(), v_range.second.value()};
+  const double tolerance_value = options.tolerance.value();
+  if (!std::isfinite(radius_value) || radius_value <= 0.0)
+    throw ValueError("radius must be a positive finite value");
+  if (!std::isfinite(u.first) || !std::isfinite(u.second))
+    throw ValueError("u_range must contain two finite values");
+  if (!std::isfinite(v.first) || !std::isfinite(v.second))
+    throw ValueError("v_range must contain two finite values");
+  const double u_span = u.second - u.first;
+  const double v_span = v.second - v.first;
+  // OCCT limits: a U span of at most 2*pi + Precision::Angular() (one revolution plus kernel angular slack).
+  if (u_span <= Precision::PConfusion() || u_span > 2.0 * kPi + Precision::Angular())
+    throw ValueError("u_range must be increasing and span at most one revolution");
+  if (v_span <= Precision::Confusion())
+    throw ValueError("v_range must be increasing beyond kernel confusion");
+  if (!std::isfinite(tolerance_value) || tolerance_value <= 0.0)
+    throw ValueError("tolerance must be a positive finite value");
+  return {radius_value, tolerance_value, u, v};
+}
+
+struct CylinderFrame {
+  Vec3 origin, axis, x_direction;
+};
+
+// The surface frame: finite, non-zero, non-parallel axis and x direction (default X from the axis).
+CylinderFrame checked_cylinder_frame(const CylindricalSurfaceOptions& options) {
+  const Vec3 origin = evaluated(options.origin);
+  const Vec3 axis = evaluated(options.axis);
+  // A non-finite axis has no default X; the finite check below reports it.
+  const Vec3 x_direction = options.x_direction ? evaluated(*options.x_direction)
+                           : axis.is_finite()  ? default_plane_x_direction(axis)
+                                               : axis;
+  if (!origin.is_finite() || !axis.is_finite() || !x_direction.is_finite())
+    throw ValueError("origin, axis, and x_direction must be finite 3D values");
+  const double axis_norm = axis.norm();
+  const double x_norm = x_direction.norm();
+  if (axis_norm <= tol::kDegenerateNorm || x_norm <= tol::kDegenerateNorm)
+    throw ValueError("axis and x_direction must be non-zero");
+  if (std::abs(axis.dot(x_direction)) / (axis_norm * x_norm) >= 1.0 - tol::kParallelCosineGap)
+    throw ValueError("axis and x_direction must not be parallel");
+  return {origin, axis, x_direction};
+}
+
+// The recorded params and symbolic scalars of the operation (values as given, before the workplane transform).
+void record_cylinder_args(const Scalar& radius, const ScalarRange& u_range, const ScalarRange& v_range,
+                          const CylindricalSurfaceOptions& options, const CylinderRanges& r, const CylinderFrame& f,
+                          Value& params, SymbolicArgs& symbolic) {
+  params = Value::object();
+  params.set("radius", r.radius);
+  params.set("u_range", Value(Value::Array{r.u.first, r.u.second}));
+  params.set("v_range", Value(Value::Array{r.v.first, r.v.second}));
+  params.set("origin", vec_value(f.origin));
+  params.set("axis", vec_value(f.axis));
+  params.set("x_direction", options.x_direction ? vec_value(f.x_direction) : Value());
+  params.set("tolerance", r.tolerance);
+  params.set("tag_prefix", to_value(options.tag_prefix));
+  note_symbolic(symbolic, "radius", radius);
+  note_symbolic(symbolic, "u_range[0]", u_range.first);
+  note_symbolic(symbolic, "u_range[1]", u_range.second);
+  note_symbolic(symbolic, "v_range[0]", v_range.first);
+  note_symbolic(symbolic, "v_range[1]", v_range.second);
+  for (std::size_t i = 0; i < 3; ++i) {
+    const std::string index = "[" + std::to_string(i) + "]";
+    note_symbolic(symbolic, "origin" + index, options.origin[i]);
+    note_symbolic(symbolic, "axis" + index, options.axis[i]);
+    if (options.x_direction)
+      note_symbolic(symbolic, "x_direction" + index, (*options.x_direction)[i]);
+  }
+  note_symbolic(symbolic, "tolerance", options.tolerance);
 }
 
 }  // namespace
 
 Face make_cylindrical_surface_rface(const Scalar& radius, const ScalarRange& u_range, const ScalarRange& v_range,
                                     const CylindricalSurfaceOptions& options) {
-  static const ErrorSpec kSpec{"make_cylindrical_surface_rface",
-                               "Failed to create the cylindrical surface face.",
-                               {"The radius, U/V ranges, or tolerance is invalid.", "The axis frame is degenerate or parallel.",
-                                "The kernel rejected the bounded cylindrical surface."},
-                               {"Use model length units for radius, V, and tolerance.",
-                                "Pass increasing finite U bounds as unitless raw radians.",
-                                "Keep the U span at or below one revolution and provide non-parallel axis directions."}};
+  static const ErrorSpec kSpec{
+      "make_cylindrical_surface_rface",
+      "Failed to create the cylindrical surface face.",
+      {"The radius, U/V ranges, or tolerance is invalid.", "The axis frame is degenerate or parallel.",
+       "The kernel rejected the bounded cylindrical surface."},
+      {"Use model length units for radius, V, and tolerance.",
+       "Pass increasing finite U bounds as unitless raw radians.",
+       "Keep the U span at or below one revolution and provide non-parallel axis directions."}};
   return operator_scope(kSpec, [&] {
-    require_dimension(radius, UnitDimension::Length, "radius must use model length units");
-    for (const Scalar* value : {&u_range.first, &u_range.second})
-      require_dimension(*value, UnitDimension::Dimensionless,
-                        "u_range must use unitless raw radians; unit-aware angle values evaluate in degrees");
-    for (const Scalar* value : {&v_range.first, &v_range.second})
-      require_dimension(*value, UnitDimension::Length, "v_range must use model length units");
-    require_dimension(options.tolerance, UnitDimension::Length, "tolerance must use model length units");
-
-    const double radius_value = radius.value();
-    const std::pair<double, double> u{u_range.first.value(), u_range.second.value()};
-    const std::pair<double, double> v{v_range.first.value(), v_range.second.value()};
-    const double tolerance_value = options.tolerance.value();
-    if (!std::isfinite(radius_value) || radius_value <= 0.0) throw ValueError("radius must be a positive finite value");
-    if (!std::isfinite(u.first) || !std::isfinite(u.second)) throw ValueError("u_range must contain two finite values");
-    if (!std::isfinite(v.first) || !std::isfinite(v.second)) throw ValueError("v_range must contain two finite values");
-    const double u_span = u.second - u.first;
-    const double v_span = v.second - v.first;
-    if (u_span <= Precision::PConfusion() || u_span > 2.0 * kPi + Precision::Angular())
-      throw ValueError("u_range must be increasing and span at most one revolution");
-    if (v_span <= Precision::Confusion()) throw ValueError("v_range must be increasing beyond kernel confusion");
-    if (!std::isfinite(tolerance_value) || tolerance_value <= 0.0)
-      throw ValueError("tolerance must be a positive finite value");
-
-    const Vec3 origin = evaluated(options.origin);
-    const Vec3 axis = evaluated(options.axis);
-    // A non-finite axis has no default X; the finite check below reports it.
-    const Vec3 x_direction = options.x_direction ? evaluated(*options.x_direction)
-                             : axis.is_finite()  ? default_plane_x_direction(axis)
-                                                 : axis;
-    if (!origin.is_finite() || !axis.is_finite() || !x_direction.is_finite())
-      throw ValueError("origin, axis, and x_direction must be finite 3D values");
-    const double axis_norm = axis.norm();
-    const double x_norm = x_direction.norm();
-    if (axis_norm <= 1e-12 || x_norm <= 1e-12) throw ValueError("axis and x_direction must be non-zero");
-    if (std::abs(axis.dot(x_direction)) / (axis_norm * x_norm) >= 1.0 - 1e-12)
-      throw ValueError("axis and x_direction must not be parallel");
+    check_cylinder_dimensions(radius, u_range, v_range, options);
+    const CylinderRanges r = checked_cylinder_ranges(radius, u_range, v_range, options);
+    const CylinderFrame f = checked_cylinder_frame(options);
 
     const CoordinateSystem& cs = current_cs();
-    const TopoDS_Face face = cylindrical_face(radius_value, u, v, cs.transform_point(origin), cs.transform_vector(axis),
-                                              cs.transform_vector(x_direction), tolerance_value);
+    const TopoDS_Face face =
+        cylindrical_face(r.radius, r.u, r.v, cs.transform_point(f.origin), cs.transform_vector(f.axis),
+                         cs.transform_vector(f.x_direction), r.tolerance);
 
-    Value params = Value::object();
-    params.set("radius", radius_value);
-    params.set("u_range", Value(Value::Array{u.first, u.second}));
-    params.set("v_range", Value(Value::Array{v.first, v.second}));
-    params.set("origin", vec_value(origin));
-    params.set("axis", vec_value(axis));
-    params.set("x_direction", options.x_direction ? vec_value(x_direction) : Value());
-    params.set("tolerance", tolerance_value);
-    params.set("tag_prefix", to_value(options.tag_prefix));
+    Value params;
     SymbolicArgs symbolic;
-    note_symbolic(symbolic, "radius", radius);
-    note_symbolic(symbolic, "u_range[0]", u_range.first);
-    note_symbolic(symbolic, "u_range[1]", u_range.second);
-    note_symbolic(symbolic, "v_range[0]", v_range.first);
-    note_symbolic(symbolic, "v_range[1]", v_range.second);
-    for (std::size_t i = 0; i < 3; ++i) {
-      const std::string index = "[" + std::to_string(i) + "]";
-      note_symbolic(symbolic, "origin" + index, options.origin[i]);
-      note_symbolic(symbolic, "axis" + index, options.axis[i]);
-      if (options.x_direction) note_symbolic(symbolic, "x_direction" + index, (*options.x_direction)[i]);
-    }
-    note_symbolic(symbolic, "tolerance", options.tolerance);
+    record_cylinder_args(radius, u_range, v_range, options, r, f, params, symbolic);
     return finalize_surface_output(Face(face), FaceOutput{.record = {.op = "make_cylindrical_surface_rface",
-                                                                    .params = std::move(params),
-                                                                    .symbolic = std::move(symbolic)},
+                                                                     .params = std::move(params),
+                                                                     .symbolic = std::move(symbolic)},
                                                           .tag_prefix = options.tag_prefix});
   });
 }
@@ -197,11 +252,12 @@ Face make_cylindrical_surface_rface(const Scalar& radius, const ScalarRange& u_r
 // fit_point_grid_rface
 // ---------------------------------------------------------------------------------------------
 Face fit_point_grid_rface(const PointGrid& points, const FitPointGridOptions& options) {
-  static const ErrorSpec kSpec{"fit_point_grid_rface",
-                               "Failed to fit a B-spline surface face.",
-                               {"The point grid or fitting controls are invalid.", "The kernel fitting algorithm did not converge."},
-                               {"Pass a rectangular finite point grid and positive tolerance.",
-                                "Keep degree_min <= degree_max and use non-negative smoothing weights."}};
+  static const ErrorSpec kSpec{
+      "fit_point_grid_rface",
+      "Failed to fit a B-spline surface face.",
+      {"The point grid or fitting controls are invalid.", "The kernel fitting algorithm did not converge."},
+      {"Pass a rectangular finite point grid and positive tolerance.",
+       "Keep degree_min <= degree_max and use non-negative smoothing weights."}};
   return operator_scope(kSpec, [&] {
     const double tolerance = require_positive_finite(options.tolerance, "tolerance");
     if (options.degree_min < 1 || options.degree_max < options.degree_min)
@@ -213,11 +269,11 @@ Face fit_point_grid_rface(const PointGrid& points, const FitPointGridOptions& op
     const PointGrid local = checked_point_grid(points);
     const PointGrid global = to_global(local);
 
-    const Handle(Geom_BSplineSurface) fitted = surface::surface_fitter()->fit_point_grid(
-        global, {.tolerance = tolerance,
-                 .degree_min = options.degree_min,
-                 .degree_max = options.degree_max,
-                 .smoothing = options.smoothing});
+    const Handle(Geom_BSplineSurface) fitted =
+        surface::surface_fitter()->fit_point_grid(global, {.tolerance = tolerance,
+                                                           .degree_min = options.degree_min,
+                                                           .degree_max = options.degree_max,
+                                                           .smoothing = options.smoothing});
 
     Value params = Value::object();
     params.set("points", to_value(local));
@@ -231,7 +287,7 @@ Face fit_point_grid_rface(const PointGrid& points, const FitPointGridOptions& op
     params.set("tag_prefix", to_value(options.tag_prefix));
     return finalize_surface_output(Face(face_from_surface(fitted)),
                                    FaceOutput{.record = {.op = "fit_point_grid_rface", .params = std::move(params)},
-                                    .tag_prefix = options.tag_prefix});
+                                              .tag_prefix = options.tag_prefix});
   });
 }
 

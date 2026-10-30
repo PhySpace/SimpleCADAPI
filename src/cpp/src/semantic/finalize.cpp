@@ -23,45 +23,137 @@ bool in(std::string_view op, std::initializer_list<std::string_view> names) {
 }
 
 // SemanticRef entity type of an operation's output (_semantic_delta_for_output).
+// A flat lookup table of operator names grouped by entity type; kept as one list on purpose.
 std::string entity_type_of(std::string_view op) {
-  if (in(op, {"make_point", "make_point_rvertex"})) return "Point";
+  if (in(op, {"make_point", "make_point_rvertex"}))
+    return "Point";
 
-  if (in(op, {"make_sketch_rsketch", "add_point_rsketch", "add_line_rsketch", "add_circle_rsketch",
-              "add_arc_rsketch", "add_bspline_rsketch", "make_wire_from_sketch_rwire", "make_face_from_sketch_rface",
-              "make_constrain_coincident_rsketch", "make_constrain_point_on_rsketch", "make_constrain_horizontal_rsketch",
-              "make_constrain_vertical_rsketch", "make_constrain_points_horizontal_rsketch",
-              "make_constrain_points_vertical_rsketch", "make_constrain_line_distance_rsketch",
-              "make_constrain_normal_rsketch", "make_constrain_mirror_rsketch", "make_constrain_midpoint_points_rsketch",
-              "make_constrain_parallel_rsketch", "make_constrain_perpendicular_rsketch",
-              "make_constrain_collinear_rsketch", "make_constrain_tangent_rsketch", "make_constrain_concentric_rsketch",
-              "make_constrain_midpoint_rsketch", "make_constrain_symmetric_rsketch",
-              "make_constrain_equal_length_rsketch", "make_constrain_equal_radius_rsketch",
-              "make_constrain_distance_rsketch", "make_constrain_distance_x_rsketch", "make_constrain_distance_y_rsketch",
-              "make_constrain_length_rsketch", "make_constrain_angle_rsketch", "make_constrain_radius_rsketch",
-              "make_constrain_major_radius_rsketch", "make_constrain_minor_radius_rsketch",
-              "make_constrain_diameter_rsketch", "make_constrain_fix_rsketch"}))
+  if (in(op, {"make_sketch_rsketch",
+              "add_point_rsketch",
+              "add_line_rsketch",
+              "add_circle_rsketch",
+              "add_arc_rsketch",
+              "add_bspline_rsketch",
+              "make_wire_from_sketch_rwire",
+              "make_face_from_sketch_rface",
+              "make_constrain_coincident_rsketch",
+              "make_constrain_point_on_rsketch",
+              "make_constrain_horizontal_rsketch",
+              "make_constrain_vertical_rsketch",
+              "make_constrain_points_horizontal_rsketch",
+              "make_constrain_points_vertical_rsketch",
+              "make_constrain_line_distance_rsketch",
+              "make_constrain_normal_rsketch",
+              "make_constrain_mirror_rsketch",
+              "make_constrain_midpoint_points_rsketch",
+              "make_constrain_parallel_rsketch",
+              "make_constrain_perpendicular_rsketch",
+              "make_constrain_collinear_rsketch",
+              "make_constrain_tangent_rsketch",
+              "make_constrain_concentric_rsketch",
+              "make_constrain_midpoint_rsketch",
+              "make_constrain_symmetric_rsketch",
+              "make_constrain_equal_length_rsketch",
+              "make_constrain_equal_radius_rsketch",
+              "make_constrain_distance_rsketch",
+              "make_constrain_distance_x_rsketch",
+              "make_constrain_distance_y_rsketch",
+              "make_constrain_length_rsketch",
+              "make_constrain_angle_rsketch",
+              "make_constrain_radius_rsketch",
+              "make_constrain_major_radius_rsketch",
+              "make_constrain_minor_radius_rsketch",
+              "make_constrain_diameter_rsketch",
+              "make_constrain_fix_rsketch"}))
     return "Sketch";
 
-  if (in(op, {"make_line", "make_circle_edge", "make_circle_wire", "make_circle_face", "make_rectangle_wire",
-              "make_rectangle_face", "make_segment_wire", "make_three_point_arc", "make_three_point_arc_wire",
-              "make_angle_arc", "make_angle_arc_wire", "make_spline", "make_spline_wire", "make_polyline_wire",
-              "make_helix", "make_helix_wire", "make_face_from_wire", "make_wire_from_edges", "make_line_redge",
-              "make_circle_redge", "make_three_point_arc_redge", "make_angle_arc_redge", "make_spline_redge",
-              "make_helix_redge", "make_face_from_wire_rface", "make_wire_from_edges_rwire"}))
+  if (in(op, {"make_line",
+              "make_circle_edge",
+              "make_circle_wire",
+              "make_circle_face",
+              "make_rectangle_wire",
+              "make_rectangle_face",
+              "make_segment_wire",
+              "make_three_point_arc",
+              "make_three_point_arc_wire",
+              "make_angle_arc",
+              "make_angle_arc_wire",
+              "make_spline",
+              "make_spline_wire",
+              "make_polyline_wire",
+              "make_helix",
+              "make_helix_wire",
+              "make_face_from_wire",
+              "make_wire_from_edges",
+              "make_line_redge",
+              "make_circle_redge",
+              "make_three_point_arc_redge",
+              "make_angle_arc_redge",
+              "make_spline_redge",
+              "make_helix_redge",
+              "make_face_from_wire_rface",
+              "make_wire_from_edges_rwire"}))
     return detail::ends_with(op, "_face") || in(op, {"make_face_from_wire", "make_face_from_wire_rface"}) ? "Sketch"
-                                                                                                        : "Profile";
+                                                                                                          : "Profile";
 
-  if (in(op, {"make_box", "make_cylinder", "make_cone", "make_sphere", "make_box_rsolid", "make_cylinder_rsolid",
-              "make_cone_rsolid", "make_sphere_rsolid", "extrude", "revolve", "loft", "sweep", "helical_sweep",
-              "fillet", "chamfer", "shell", "cut", "union", "intersect", "translate", "rotate", "mirror",
-              "make_extrude_rsolid", "make_revolve_rsolid", "make_loft_rsolid", "make_sweep_rsolid",
-              "make_twisted_sweep_rsolid", "make_fillet_rsolid", "make_chamfer_rsolid", "make_shell_rsolid",
-              "make_cut_rsolid", "make_union_rsolid", "make_intersect_rsolid", "make_translate_rshape",
-              "make_rotate_rshape", "make_mirror_rshape", "load_brep_region_rsolid"}))
-    return in(op, {"extrude", "revolve", "loft", "sweep", "fillet", "chamfer", "shell", "cut", "union", "intersect",
-                   "make_extrude_rsolid", "make_revolve_rsolid", "make_loft_rsolid", "make_sweep_rsolid",
-                   "make_twisted_sweep_rsolid", "make_fillet_rsolid", "make_chamfer_rsolid", "make_shell_rsolid",
-                   "make_cut_rsolid", "make_union_rsolid", "make_intersect_rsolid"})
+  if (in(op, {"make_box",
+              "make_cylinder",
+              "make_cone",
+              "make_sphere",
+              "make_box_rsolid",
+              "make_cylinder_rsolid",
+              "make_cone_rsolid",
+              "make_sphere_rsolid",
+              "extrude",
+              "revolve",
+              "loft",
+              "sweep",
+              "helical_sweep",
+              "fillet",
+              "chamfer",
+              "shell",
+              "cut",
+              "union",
+              "intersect",
+              "translate",
+              "rotate",
+              "mirror",
+              "make_extrude_rsolid",
+              "make_revolve_rsolid",
+              "make_loft_rsolid",
+              "make_sweep_rsolid",
+              "make_twisted_sweep_rsolid",
+              "make_fillet_rsolid",
+              "make_chamfer_rsolid",
+              "make_shell_rsolid",
+              "make_cut_rsolid",
+              "make_union_rsolid",
+              "make_intersect_rsolid",
+              "make_translate_rshape",
+              "make_rotate_rshape",
+              "make_mirror_rshape",
+              "load_brep_region_rsolid"}))
+    return in(op, {"extrude",
+                   "revolve",
+                   "loft",
+                   "sweep",
+                   "fillet",
+                   "chamfer",
+                   "shell",
+                   "cut",
+                   "union",
+                   "intersect",
+                   "make_extrude_rsolid",
+                   "make_revolve_rsolid",
+                   "make_loft_rsolid",
+                   "make_sweep_rsolid",
+                   "make_twisted_sweep_rsolid",
+                   "make_fillet_rsolid",
+                   "make_chamfer_rsolid",
+                   "make_shell_rsolid",
+                   "make_cut_rsolid",
+                   "make_union_rsolid",
+                   "make_intersect_rsolid"})
                ? "Feature"
                : "Body";
 
@@ -121,20 +213,25 @@ std::vector<std::string> node_labels_for_op(std::string_view op) {
       {"sew_faces_rshell", {"derived", "shell", "surface"}},
       {"trim_surface_rface", {"derived", "face", "surface", "trimmed"}},
   };
-  if (const auto found = table.find(op); found != table.end()) return found->second;
-  if (detail::starts_with(op, "make_constrain_") && detail::ends_with(op, "_rsketch")) return {"constraint", "sketch"};
+  if (const auto found = table.find(op); found != table.end())
+    return found->second;
+  if (detail::starts_with(op, "make_constrain_") && detail::ends_with(op, "_rsketch"))
+    return {"constraint", "sketch"};
   return {};
 }
 
 void apply_node_labels(OpRecord& record) {
-  if (record.labels.empty()) record.labels = node_labels_for_op(record.op);
+  if (record.labels.empty())
+    record.labels = node_labels_for_op(record.op);
 }
 
 std::vector<Shape> consumed_shapes(const FinalizeSpec& spec) {
   std::vector<Shape> sources;
   sources.reserve(spec.record.inputs.size() + spec.extra_sources.size());
-  for (const OpInput& input : spec.record.inputs) sources.push_back(input.shape);
-  for (const Shape& extra : spec.extra_sources) sources.push_back(extra);
+  for (const OpInput& input : spec.record.inputs)
+    sources.push_back(input.shape);
+  for (const Shape& extra : spec.extra_sources)
+    sources.push_back(extra);
   return sources;
 }
 
@@ -148,8 +245,8 @@ void record_now(OpRecord& record, const Shape& shape) {
 Shape apply_output_tags(Shape shape, const FinalizeSpec& spec, const OutputTagPlan& plan,
                         const std::map<std::string, Kind>& target_kinds, const TopoDelta& delta,
                         const std::vector<Shape>& sources) {
-  Shape tagged = apply_operation_role_tags(std::move(shape), spec.record.op, plan.assignments, target_kinds,
-                                           plan.result_tag);
+  Shape tagged =
+      apply_operation_role_tags(std::move(shape), spec.record.op, plan.assignments, target_kinds, plan.result_tag);
   return apply_feature_tag_prefix(std::move(tagged), plan.tag_prefix, spec.record.op, delta, spec.roles, sources);
 }
 
@@ -190,7 +287,8 @@ void attach_track_summary(Shape& shape, std::string_view op, const TopoDelta* de
     track.set("generated", static_cast<std::int64_t>(delta->generated.size()));
     track.set("deleted", static_cast<std::int64_t>(delta->deleted.size()));
   }
-  if (entries != nullptr && !entries->empty()) track.set("entry_count", static_cast<std::int64_t>(entries->size()));
+  if (entries != nullptr && !entries->empty())
+    track.set("entry_count", static_cast<std::int64_t>(entries->size()));
   shape.set_metadata_deferred("track", track);
 }
 
@@ -204,7 +302,8 @@ Shape finalize_tracked_shape(Shape shape, TopoDelta delta, DeltaEntries entries,
   const std::vector<Shape> sources = consumed_shapes(spec);
 
   const bool tracked = current_tracking_policy() != TrackingPolicy::Graph;
-  if (tracked) apply_tracking_tags(shape, delta, entries, TrackingContext{spec.record.op, sources});
+  if (tracked)
+    apply_tracking_tags(shape, delta, entries, TrackingContext{spec.record.op, sources});
   attach_track_summary(shape, spec.record.op, tracked ? &delta : nullptr, tracked ? &entries : nullptr);
 
   if (current_recorder() != nullptr) {
@@ -221,20 +320,23 @@ Shape finalize_derived_shape(Shape shape, FinalizeSpec spec) {
   const std::vector<Shape> sources = consumed_shapes(spec);
 
   attach_track_summary(shape, spec.record.op);
-  if (current_recorder() != nullptr) record_now(spec.record, shape);
+  if (current_recorder() != nullptr)
+    record_now(spec.record, shape);
   return apply_output_tags(std::move(shape), spec, plan, target_kinds, delta, sources);
 }
 
 Shape finalize_primitive_shape(Shape shape, OpRecord record) {
   attach_track_summary(shape, record.op);
-  if (current_recorder() != nullptr) record_now(record, shape);
+  if (current_recorder() != nullptr)
+    record_now(record, shape);
   return shape;
 }
 
 std::optional<ValueLineage> finalize_runtime_object(OpRecord record, std::string_view entity_type,
                                                     const std::vector<ValueLineage>& inputs) {
   Recorder* recorder = current_recorder();
-  if (recorder == nullptr) return std::nullopt;
+  if (recorder == nullptr)
+    return std::nullopt;
   record.semantic_delta = semantic_delta_for_output(record.op, 1, entity_type);
   apply_node_labels(record);
   return recorder->record_value_op(record, inputs);
@@ -246,9 +348,12 @@ std::optional<ValueLineage> finalize_runtime_object(OpRecord record, std::string
 namespace {
 
 int coverage_rank(std::string_view coverage) {
-  if (coverage == "complete") return 0;
-  if (coverage == "partial") return 1;
-  if (coverage == "none") return 2;
+  if (coverage == "complete")
+    return 0;
+  if (coverage == "partial")
+    return 1;
+  if (coverage == "none")
+    return 2;
   return -1;
 }
 
@@ -273,8 +378,8 @@ std::string runtime_coverage(const Shape& shape) {
 
 }  // namespace
 
-void attach_lineage_from_source(const Shape& source, Shape& target, LineageDerivation derivation,
-                                std::string_view op, std::string_view coverage) {
+void attach_lineage_from_source(const Shape& source, Shape& target, LineageDerivation derivation, std::string_view op,
+                                std::string_view coverage) {
   const std::string effective = weakest_coverage({coverage, runtime_coverage(source)});
 
   struct Carried {
@@ -286,39 +391,44 @@ void attach_lineage_from_source(const Shape& source, Shape& target, LineageDeriv
     return std::find_if(carried.begin(), carried.end(), [&](const Carried& c) { return c.binding.binding_id == id; });
   };
   for (TagBinding& binding : source.local_tag_bindings())
-    if (lineage_policy_allows(binding.propagation(), derivation)) carried.push_back({std::move(binding), effective});
+    if (lineage_policy_allows(binding.propagation(), derivation))
+      carried.push_back({std::move(binding), effective});
   for (const TagLineageWitness& witness : source.lineage_witnesses()) {
     if (!lineage_policy_allows(witness.binding.propagation(), witness.derivation) ||
         !lineage_policy_allows(witness.binding.propagation(), derivation))
       continue;
     const std::string witness_coverage = weakest_coverage({effective, witness.coverage});
     const auto existing = find(witness.binding.binding_id);
-    if (existing != carried.end()) existing->coverage = weakest_coverage({existing->coverage, witness_coverage});
-    else carried.push_back({witness.binding, witness_coverage});
+    if (existing != carried.end())
+      existing->coverage = weakest_coverage({existing->coverage, witness_coverage});
+    else
+      carried.push_back({witness.binding, witness_coverage});
   }
 
   for (const Carried& item : carried) {
     TagEvidence evidence;
     evidence.kind = TagEvidenceKind::TopologyChange;
-    evidence.data = object({{"op", std::string(op)},
-                            {"derivation", std::string(to_string(derivation))},
-                            {"coverage", item.coverage}});
+    evidence.data = object(
+        {{"op", std::string(op)}, {"derivation", std::string(to_string(derivation))}, {"coverage", item.coverage}});
     target.add_tag_lineage(item.binding, derivation, source.topo_id(), std::move(evidence), item.coverage);
   }
   target.set_runtime_deferred("semantic.lineage.coverage", weakest_coverage({runtime_coverage(target), effective}));
 }
 
 void copy_runtime_state(const Shape& source, Shape& target) {
-  if (!source.runtime().is_object()) return;
+  if (!source.runtime().is_object())
+    return;
   for (const auto& [key, value] : source.runtime().as_object()) {
     // A transformed BRep owns new geometry: its mesh is never the source's.
-    if (key == "mesh.error" || key == "mesh.default" || detail::starts_with(key, "mesh:")) continue;
+    if (key == "mesh.error" || key == "mesh.default" || detail::starts_with(key, "mesh:"))
+      continue;
     target.set_runtime(key, value);
   }
 }
 
 std::optional<TopoDelta> merge_topo_deltas(const std::vector<TopoDelta>& deltas) {
-  if (deltas.empty()) return std::nullopt;
+  if (deltas.empty())
+    return std::nullopt;
   TopoDelta merged;
   Value steps = Value::array();
   std::int64_t index = 0;
@@ -348,7 +458,8 @@ std::optional<TopoDelta> merge_topo_deltas(const std::vector<TopoDelta>& deltas)
 // ---------------------------------------------------------------------------
 void reserve_semantic_id(std::string_view kind, std::string_view value) {
   Recorder* recorder = current_recorder();
-  if (recorder == nullptr) return;
+  if (recorder == nullptr)
+    return;
   auto& registry = recorder->semantic_ids[std::string(kind)];
   if (!registry.insert(std::string(value)).second)
     throw ValueError("duplicate " + std::string(kind) + " id in active GraphSession: " + std::string(value));

@@ -23,7 +23,9 @@ constexpr std::array<std::uint32_t, 64> kRound = {
     0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
     0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
 
-constexpr std::uint32_t rotr(std::uint32_t x, int n) { return (x >> n) | (x << (32 - n)); }
+constexpr std::uint32_t rotr(std::uint32_t x, int n) {
+  return (x >> n) | (x << (32 - n));
+}
 
 class Sha256 {
  public:
@@ -42,18 +44,22 @@ class Sha256 {
     const std::uint64_t bits = static_cast<std::uint64_t>(length_) * 8;
     block_[used_++] = 0x80;
     if (used_ > 56) {
-      while (used_ < 64) block_[used_++] = 0;
+      while (used_ < 64)
+        block_[used_++] = 0;
       compress();
       used_ = 0;
     }
-    while (used_ < 56) block_[used_++] = 0;
-    for (int i = 7; i >= 0; --i) block_[used_++] = static_cast<std::uint8_t>(bits >> (8 * i));
+    while (used_ < 56)
+      block_[used_++] = 0;
+    for (int i = 7; i >= 0; --i)
+      block_[used_++] = static_cast<std::uint8_t>(bits >> (8 * i));
     compress();
     static constexpr char kHex[] = "0123456789abcdef";
     std::string out;
     out.reserve(64);
     for (const std::uint32_t word : state_) {
-      for (int i = 28; i >= 0; i -= 4) out += kHex[(word >> i) & 0xf];
+      for (int i = 28; i >= 0; i -= 4)
+        out += kHex[(word >> i) & 0xf];
     }
     return out;
   }
@@ -116,15 +122,19 @@ Shortest shortest_digits(double value) {
   char buf[48];
   for (int precision = 0; precision <= 16; ++precision) {
     std::snprintf(buf, sizeof buf, "%.*e", precision, value);
-    if (std::strtod(buf, nullptr) == value || precision == 16) break;
+    if (std::strtod(buf, nullptr) == value || precision == 16)
+      break;
   }
   Shortest out;
   const char* p = buf;
   for (; *p != 'e' && *p != '\0'; ++p) {
-    if (*p != '.') out.digits += *p;
+    if (*p != '.')
+      out.digits += *p;
   }
-  if (*p == 'e') out.exponent10 = std::atoi(p + 1);
-  while (out.digits.size() > 1 && out.digits.back() == '0') out.digits.pop_back();
+  if (*p == 'e')
+    out.exponent10 = std::atoi(p + 1);
+  while (out.digits.size() > 1 && out.digits.back() == '0')
+    out.digits.pop_back();
   return out;
 }
 
@@ -137,14 +147,17 @@ std::string sha256_hex(std::string_view data) {
 }
 
 std::string py_float_hex(double value) {
-  if (std::isnan(value)) return "nan";
-  if (std::isinf(value)) return value < 0 ? "-inf" : "inf";
+  if (std::isnan(value))
+    return "nan";
+  if (std::isinf(value))
+    return value < 0 ? "-inf" : "inf";
   const auto bits = std::bit_cast<std::uint64_t>(value);
   const bool negative = (bits >> 63) != 0;
   const int biased = static_cast<int>((bits >> 52) & 0x7ff);
   const std::uint64_t fraction = bits & ((std::uint64_t{1} << 52) - 1);
   std::string out = negative ? "-0x" : "0x";
-  if (biased == 0 && fraction == 0) return out + "0.0p+0";
+  if (biased == 0 && fraction == 0)
+    return out + "0.0p+0";
   char buf[32];
   std::snprintf(buf, sizeof buf, "%013llx", static_cast<unsigned long long>(fraction));
   const int exponent = biased == 0 ? -1022 : biased - 1023;
@@ -156,15 +169,19 @@ std::string py_float_hex(double value) {
 }
 
 std::string py_float_repr(double value) {
-  if (std::isnan(value)) return "nan";
-  if (std::isinf(value)) return value < 0 ? "-inf" : "inf";
+  if (std::isnan(value))
+    return "nan";
+  if (std::isinf(value))
+    return value < 0 ? "-inf" : "inf";
   std::string sign = std::signbit(value) ? "-" : "";
-  if (value == 0.0) return sign + "0.0";
+  if (value == 0.0)
+    return sign + "0.0";
   const Shortest s = shortest_digits(std::fabs(value));
   const int decpt = s.exponent10 + 1;  // position of the decimal point within the digits
   const int count = static_cast<int>(s.digits.size());
   if (decpt > -4 && decpt <= 16) {
-    if (decpt <= 0) return sign + "0." + std::string(static_cast<std::size_t>(-decpt), '0') + s.digits;
+    if (decpt <= 0)
+      return sign + "0." + std::string(static_cast<std::size_t>(-decpt), '0') + s.digits;
     if (decpt >= count) {
       return sign + s.digits + std::string(static_cast<std::size_t>(decpt - count), '0') + ".0";
     }
@@ -172,7 +189,8 @@ std::string py_float_repr(double value) {
            s.digits.substr(static_cast<std::size_t>(decpt));
   }
   std::string out = sign + s.digits.substr(0, 1);
-  if (count > 1) out += "." + s.digits.substr(1);
+  if (count > 1)
+    out += "." + s.digits.substr(1);
   const int exponent = decpt - 1;
   char buf[16];
   std::snprintf(buf, sizeof buf, "e%c%02d", exponent < 0 ? '-' : '+', exponent < 0 ? -exponent : exponent);

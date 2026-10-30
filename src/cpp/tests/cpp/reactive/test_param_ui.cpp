@@ -50,8 +50,10 @@ TEST_CASE("the control follows the value unless the description fits it") {
   CHECK(spec(ParamKind::Float, 1.5, "").control == "number");
   CHECK(spec(ParamKind::Bool, true, "").control == "toggle");
   CHECK(spec(ParamKind::Float, 1.5, "slider(1, 5)").control == "slider");
-  CHECK(spec(ParamKind::Bool, true, "slider(1, 5)").issues == std::vector<std::string>{"slider needs a number; A is a bool"});
-  CHECK(spec(ParamKind::Float, 1.5, "toggle()").issues == std::vector<std::string>{"toggle needs a bool; A is a number"});
+  CHECK(spec(ParamKind::Bool, true, "slider(1, 5)").issues ==
+        std::vector<std::string>{"slider needs a number; A is a bool"});
+  CHECK(spec(ParamKind::Float, 1.5, "toggle()").issues ==
+        std::vector<std::string>{"toggle needs a bool; A is a number"});
   CHECK(spec(ParamKind::Float, 1.5, "slider(1)").issues == std::vector<std::string>{"slider needs min and max"});
 
   const ParamSpec reversed = spec(ParamKind::Float, 1.5, "slider(5, 1)");

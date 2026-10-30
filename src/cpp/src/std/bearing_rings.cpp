@@ -14,16 +14,21 @@ namespace scad::stdlib {
 
 namespace {
 
-Scalar3 at(double radius, double z) { return scalar3(radius, 0.0, z); }
+Scalar3 at(double radius, double z) {
+  return scalar3(radius, 0.0, z);
+}
 
 Solid apply_edge_chamfer(const Solid& solid, double edge_chamfer, double bearing_width) {
-  if (edge_chamfer <= 0.0) return solid;
+  if (edge_chamfer <= 0.0)
+    return solid;
   const double circular_min_length = std::max(1e-6, bearing_width * 1.1);
   std::vector<Edge> edges;
   for (const Edge& edge : solid.edges()) {
-    if (edge.length() > circular_min_length) edges.push_back(edge);
+    if (edge.length() > circular_min_length)
+      edges.push_back(edge);
   }
-  if (edges.empty()) return solid;
+  if (edges.empty())
+    return solid;
   return chamfer_rsolid(solid, edges, edge_chamfer);
 }
 

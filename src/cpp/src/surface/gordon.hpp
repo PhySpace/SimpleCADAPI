@@ -23,7 +23,6 @@ Handle(Geom_Curve) network_curve_of(const TopoDS_Edge& edge);
 // possible (conics are approximated), then occ_gordon builds the surface.  Throws when this
 // build has no Gordon support (SCAD_WITH_GORDON=OFF).
 Handle(Geom_BSplineSurface) interpolate_curve_network(const std::vector<Handle(Geom_Curve)>& profiles,
-                                                      const std::vector<Handle(Geom_Curve)>& guides,
-                                                      double tolerance);
+                                                      const std::vector<Handle(Geom_Curve)>& guides, double tolerance);
 
 }  // namespace scad::surface::detail

@@ -24,7 +24,8 @@ std::vector<Scalar3> thread_profile_points(const ThreadCutterSpec& spec, double 
     const double flank_run = (spec.outer_radius - spec.inner_radius) / std::sqrt(3.0);
     const double crest_flat = spec.pitch / 8.0;
     const double root_flat = spec.pitch - crest_flat - 2.0 * flank_run;
-    if (root_flat <= 0.0) throw ValueError("thread_depth is too large for a truncated 60-degree V profile");
+    if (root_flat <= 0.0)
+      throw ValueError("thread_depth is too large for a truncated 60-degree V profile");
     return {scalar3(spec.outer_radius, 0.0, z + crest_flat / 2.0),
             scalar3(spec.inner_radius, 0.0, z + crest_flat / 2.0 + flank_run),
             scalar3(spec.inner_radius, 0.0, z + crest_flat / 2.0 + flank_run + root_flat),
@@ -70,7 +71,8 @@ Solid make_thread_cutter(const ThreadCutterSpec& spec) {
 }
 
 Solid rotate_thread_cutter(const Solid& cutter, double angle_degrees) {
-  if (angle_degrees == 0.0) return cutter;
+  if (angle_degrees == 0.0)
+    return cutter;
   return Solid(rotate_shape(cutter, angle_degrees, scalar3(0.0, 0.0, 1.0), scalar3(0.0, 0.0, 0.0)));
 }
 
@@ -89,7 +91,8 @@ double select_external_thread_phase(const Solid& shank, const Solid& cutter, dou
       continue;
     }
     const double volume = result->volume();
-    if (minimum_volume * 0.98 < volume && volume < maximum_volume - volume_tolerance) return angle;
+    if (minimum_volume * 0.98 < volume && volume < maximum_volume - volume_tolerance)
+      return angle;
   }
   throw ValueError("modeled external thread is unstable for these dimensions");
 }
@@ -110,7 +113,8 @@ double select_internal_thread_phase(const Solid& opened_nut, const Solid& body, 
       continue;
     }
     const double volume = result->volume();
-    if (minimum_volume + volume_tolerance < volume && volume < maximum_volume - volume_tolerance) return angle;
+    if (minimum_volume + volume_tolerance < volume && volume < maximum_volume - volume_tolerance)
+      return angle;
   }
   throw ValueError("modeled internal thread is unstable for these dimensions");
 }

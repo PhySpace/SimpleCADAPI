@@ -9,20 +9,24 @@ namespace scad::io::detail {
 namespace {
 
 const Value& member(const Value& object, std::string_view key, std::string_view where) {
-  if (!object.is_object()) throw ValueError("tag record: " + std::string(where) + " must be an object");
+  if (!object.is_object())
+    throw ValueError("tag record: " + std::string(where) + " must be an object");
   const Value* found = object.find(key);
-  if (found == nullptr) throw ValueError("tag record: " + std::string(where) + " has no '" + std::string(key) + "'");
+  if (found == nullptr)
+    throw ValueError("tag record: " + std::string(where) + " has no '" + std::string(key) + "'");
   return *found;
 }
 
 const std::string& text(const Value& value, std::string_view what) {
-  if (!value.is_string()) throw ValueError("tag record: " + std::string(what) + " must be a string");
+  if (!value.is_string())
+    throw ValueError("tag record: " + std::string(what) + " must be a string");
   return value.as_string();
 }
 
 std::optional<std::string> optional_text(const Value& object, std::string_view key, std::string_view where) {
   const Value* found = object.find(key);
-  if (found == nullptr || found->is_null()) return std::nullopt;
+  if (found == nullptr || found->is_null())
+    return std::nullopt;
   return text(*found, std::string(where) + "." + std::string(key));
 }
 
@@ -31,7 +35,8 @@ TagEvidence evidence_from(const Value& value) {
   evidence.kind = parse_tag_evidence_kind(text(member(value, "kind", "evidence"), "evidence.kind"));
   evidence.data = Value::object();
   for (const auto& [key, item] : value.as_object())
-    if (key != "kind") evidence.data.set(key, item);
+    if (key != "kind")
+      evidence.data.set(key, item);
   return evidence;
 }
 
@@ -57,19 +62,23 @@ TagBinding binding_from_value(const Value& value) {
   b.policy.mut().target.kind = parse_tag_target_kind(text(member(target, "kind", "target"), "target.kind"));
   b.policy.mut().target.query_hash = optional_text(target, "query_hash", "target");
   b.policy.mut().target.binding_hash = optional_text(target, "binding_hash", "target");
-  if (const Value* selector = target.find("selector")) b.policy.mut().target.selector = *selector;
+  if (const Value* selector = target.find("selector"))
+    b.policy.mut().target.selector = *selector;
   if (const Value* refs = target.find("refs"))
-    for (const Value& ref : refs->as_array()) b.policy.mut().target.refs.push_back(ref);
+    for (const Value& ref : refs->as_array())
+      b.policy.mut().target.refs.push_back(ref);
 
   b.attachment = parse_tag_attachment(text(member(value, "attachment", "binding"), "attachment"));
 
   const Value& propagation = member(value, "propagation", "binding");
   b.policy.mut().propagation.topology =
       parse_topology_propagation(text(member(propagation, "topology", "propagation"), "propagation.topology"));
-  b.policy.mut().propagation.lineage = parse_lineage_policy(text(member(propagation, "lineage", "propagation"), "propagation.lineage"));
+  b.policy.mut().propagation.lineage =
+      parse_lineage_policy(text(member(propagation, "lineage", "propagation"), "propagation.lineage"));
   if (const Value* derivations = propagation.find("derivations"))
     for (const Value& d : derivations->as_array())
-      b.policy.mut().propagation.explicit_derivations.push_back(parse_lineage_derivation(text(d, "propagation.derivations[]")));
+      b.policy.mut().propagation.explicit_derivations.push_back(
+          parse_lineage_derivation(text(d, "propagation.derivations[]")));
 
   b.evidence = evidence_from(member(value, "evidence", "binding"));
   b.certainty = parse_tag_certainty(text(member(value, "certainty", "binding"), "certainty"));

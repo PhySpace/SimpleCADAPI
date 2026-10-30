@@ -94,8 +94,18 @@ class PropertyPath {
   [[nodiscard]] std::optional<Value> lookup(const Shape& shape, const EvalContext& ctx) const;
 
   enum class Builtin : unsigned char {
-    None, TopoKind, TopoLoopRole, GeomType, GeomBBox, GeomFamily, GeomCenter, GeomNormal, GeomLength, GeomArea,
-    GeomVolume, GeomClosed
+    None,
+    TopoKind,
+    TopoLoopRole,
+    GeomType,
+    GeomBBox,
+    GeomFamily,
+    GeomCenter,
+    GeomNormal,
+    GeomLength,
+    GeomArea,
+    GeomVolume,
+    GeomClosed
   };
 
  private:

@@ -133,19 +133,20 @@ CalculiX 静力 FEM（边界面按保真的 `interface.*` 标签选取，仿真�
 
 ---
 
-## 更新日志（2.2.7b1）
+## 更新日志（2.2.7）
 
 > 投入生产前请验证生成的定义、装配约束和制造几何。
 
-- **几何引擎改为基于 OpenCASCADE 的 C++，随 wheel 发布。** `pip install simplecadapi` 不再需要 `cadquery-ocp`；
-  公开 API 和此前的整套测试不变。
-- **预编译 wheel**：Linux x86_64 与 aarch64、macOS arm64（14+）、Windows x86_64，Python 3.10-3.13，
-  全部使用同一份 OpenCASCADE 7.9.3。这是 beta，也是第一个带预编译 wheel 的版本。
-- **更快、更小。** 六轴机械臂：冷构建 43.8 s 到 29.1 s，无改动重建 12.8 s 到 6.0 s，
-  `import simplecadapi` 1.6 s / 360 MB 到 0.2 s / 68 MB。
-- **报错全部为英文**，标签与查询类报错和算子报错一样完整渲染。
+- **C++ 引擎的第一个正式版**，随预编译 wheel 发布（Linux x86_64 与 aarch64、macOS arm64 14+、Windows x86_64；
+  Python 3.10-3.13；统一使用 OpenCASCADE 7.9.3）。`pip install simplecadapi` 不再需要 `cadquery-ocp`。
+- **编辑器更快。** 六轴机械臂上一个没见过的关节角 2.7 s（beta 是 5.7 s），见过的 0.6 s（beta 是 5.5 s），
+  模型在最后一个 cell 之后 0.36-0.41 s 到达页面。内核空闲时比 beta 多用约 300 MB 内存。
+- **`Var` 和 `Expr` 像数字一样工作**：`r > 3`、`int(r)`、`round(r, 2)`、`range(n)`、`max(r, 3)`、f-string 可用，
+  用 `Var` 算出的值写 ql 谓词也能匹配。`bool(var)` 和 `json.dumps(var)` 仍然报错。
+- **装了 OCP 时 `shape.wrapped` 是 OCP 形状**（`simplecadapi[verify]`），是拷贝，OCCT 验证脚本可以原样运行。
+- fillet、chamfer 和 ql 选择失败重新附带图片。保存了参数值的笔记本会重建一次。
 
-本版本的完整说明：[`docs/updates/2.2.7b1.zh-CN.md`](docs/updates/2.2.7b1.zh-CN.md)。
+本版本的完整说明：[`docs/updates/2.2.7.zh-CN.md`](docs/updates/2.2.7.zh-CN.md)。
 更早的版本：见[更新日志](CHANGELOG.md)和 [`docs/updates/`](docs/updates/)。
 
 ---
@@ -163,7 +164,7 @@ CalculiX 静力 FEM（边界面按保真的 `interface.*` 标签选取，仿真�
 
 SimpleCADAPI 是一个基于 OCP 的 Python CAD SDK，提供清晰的函数式建模操作和可重放的模型图。它在 OpenCascade 几何内核之上提供精简的公共 API，可用于创建实体、应用特征、添加语义标签、查询拓扑、导出制造文件，以及将记录的模型转换为 FreeCAD 工作流。
 
-当前版本：`simplecadapi==2.2.7b1`。
+当前版本：`simplecadapi==2.2.7`。
 
 ## 核心能力
 
@@ -438,33 +439,6 @@ STL 与 OBJ 共用 OpenCASCADE 对求值后 BREP 的直接三角化。两种格�
 定向三角面，不再需要可选 remeshing 依赖。曲面精度由 `linear_deflection` 和
 `angular_deflection_degrees` 控制。
 
-### 可选 CalculiX FEM 流程
-
-AP242/Gmsh 示例还包含可选 CalculiX FEM 流程。Python 侧依赖通过
-`uv sync --extra fem` 安装；CalculiX 求解器需要单独安装（macOS：
-`brew install costerwi/homebrew-calculix/calculix-ccx`）：
-
-```bash
-uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py \
-  --ccx "$(brew --prefix calculix-ccx)/bin/ccx_2.23"
-uv run --extra fem python examples/ap242_gmsh_volume_mesh/visualize_calculix.py
-uv run --extra fem python examples/ap242_gmsh_volume_mesh/study_mesh_convergence.py \
-  --ccx "$(brew --prefix calculix-ccx)/bin/ccx_2.23" \
-  --linear-solver "ITERATIVE CHOLESKY" --solver-timeout 2400
-```
-
-分析统一使用 `mm`、`N`、`MPa`，输出 CalculiX `.inp`、`.dat`、`.frd`、求解日志、
-摘要 JSON、ParaView `.vtu` 和位移放大后的 von Mises 云图 PNG。图中用黄色轮廓
-标出载荷 physical group，并用红色 `-Z` 箭头表示载荷方向，不覆盖应力热力图。
-收敛研究支持 `--resume`；失败的求解级别单独记录，不会混入数值序列。
-
-仓库中的 `-1000 N` 研究从 `h=3.0 mm` 加密到 `h=0.25 mm`，共 11 级。平台要求
-连续三组细化同时满足最大位移变化低于 `5%`、积分点峰值 von Mises 应力变化低于
-`10%`。第 N 级验证网格为 `h=0.25 mm`（`0.0331843 mm`、`98.6392 MPa`），
-因此生产计算推荐第 N-1 级 `h=0.27 mm`。细网格使用迭代 Cholesky；在
-`h=0.375 mm` 同网格上与 SPOOLES 的位移和峰值应力差异均低于 `0.005%`，从而
-绕过直接求解器的内存容量限制。
-
 ## 可重放操作图
 
 notebook 之外的几何流程需要检查、序列化或重放时，使用显式 `GraphSession`：
@@ -572,10 +546,9 @@ uv run python examples/flange_plate/verify.py
 sca run examples/compact_two_stage_planetary_reducer/compact_two_stage_planetary_reducer.py
 uv run python examples/compact_two_stage_planetary_reducer/export_mjcf.py
 
-# FEM（AP242 STEP -> Gmsh 体网格 -> CalculiX 静力）
+# Gmsh 体网格（AP242 STEP -> 体网格）
 uv run python examples/ap242_gmsh_volume_mesh/export_step.py
 uv run --extra gmsh python examples/ap242_gmsh_volume_mesh/export_fem_mesh.py
-uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py
 ```
 
 想在真实模型上试用编辑器：`sca example u_link` 把一个电机座（两个零件 notebook 加
@@ -586,6 +559,7 @@ uv run --extra fem python examples/ap242_gmsh_volume_mesh/run_calculix.py
 
 ## 文档
 
+- 2.2.7 更新说明：[`docs/updates/2.2.7.zh-CN.md`](docs/updates/2.2.7.zh-CN.md)
 - 2.2.7b1 更新说明：[`docs/updates/2.2.7b1.zh-CN.md`](docs/updates/2.2.7b1.zh-CN.md)
 - 2.2.6.post2 更新说明：[`docs/updates/2.2.6.post2.zh-CN.md`](docs/updates/2.2.6.post2.zh-CN.md)
 - 2.2.6.post1 更新说明：[`docs/updates/2.2.6.post1.zh-CN.md`](docs/updates/2.2.6.post1.zh-CN.md)

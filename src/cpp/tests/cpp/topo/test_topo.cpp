@@ -37,7 +37,8 @@ TEST_CASE("a face's outer wire is tagged and inner wires are found") {
   const Face face = box.faces()[0];
   CHECK(face.outer_wire().has_tag("wire.outer", TagScope::Local));
   CHECK(face.inner_wires().empty());
-  for (const Edge& e : face.edges()) CHECK(e.has_tag("edge.boundary", TagScope::Local));
+  for (const Edge& e : face.edges())
+    CHECK(e.has_tag("edge.boundary", TagScope::Local));
 }
 
 TEST_CASE("downward tags are inherited by sub-shapes reached through the parent") {
@@ -54,13 +55,16 @@ TEST_CASE("asking an edge for its incident faces does not hand the face's downwa
   std::vector<Face> faces = box.faces();
   faces[0].apply_tag("group.first", /*propagate=*/true);
   for (const Edge& edge : faces[0].edges())
-    for (const Face& incident : edge.incident_faces()) (void)incident;  // the faces contain the edge; they are not its children
+    for (const Face& incident : edge.incident_faces())
+      (void)incident;  // the faces contain the edge; they are not its children
   int tagged = 0;
   for (const Face& face : box.faces())
-    if (face.has_tag("group.first")) ++tagged;
+    if (face.has_tag("group.first"))
+      ++tagged;
   CHECK(tagged == 1);
   for (const Vertex& vertex : box.edges()[0].vertices())
-    for (const Edge& edge : vertex.incident_edges()) CHECK_FALSE(edge.has_tag("group.first", TagScope::Local));
+    for (const Edge& edge : vertex.incident_edges())
+      CHECK_FALSE(edge.has_tag("group.first", TagScope::Local));
 }
 
 TEST_CASE("faces report orientation-correct outward normals") {
@@ -68,8 +72,10 @@ TEST_CASE("faces report orientation-correct outward normals") {
   int up = 0, down = 0;
   for (const Face& f : box.faces()) {
     const Vec3 n = f.normal_at();
-    if (n.z > 0.9) ++up;
-    if (n.z < -0.9) ++down;
+    if (n.z > 0.9)
+      ++up;
+    if (n.z < -0.9)
+      ++down;
   }
   CHECK(up == 1);
   CHECK(down == 1);
@@ -81,7 +87,8 @@ TEST_CASE("auto_tag_faces names the faces of a box") {
   int tagged = 0;
   for (const char* name : {"face.top", "face.bottom", "face.front", "face.back", "face.left", "face.right"}) {
     int hits = 0;
-    for (const Face& f : box.faces()) hits += f.has_tag(name, TagScope::Local) ? 1 : 0;
+    for (const Face& f : box.faces())
+      hits += f.has_tag(name, TagScope::Local) ? 1 : 0;
     CHECK(hits == 1);
     tagged += hits;
   }

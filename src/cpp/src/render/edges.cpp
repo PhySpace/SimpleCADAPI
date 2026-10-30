@@ -22,9 +22,12 @@ void push_point(std::vector<float>& out, const gp_Pnt& p) {
 }  // namespace
 
 Polylines edge_polylines(const TopoDS_Shape& shape, double deflection, int sample_count) {
-  if (shape.IsNull()) throw ValueError("edge_polylines: null shape");
-  if (sample_count == 0 && !(deflection > 0.0)) throw ValueError("edge deflection must be greater than zero");
-  if (sample_count == 1 || sample_count < 0) throw ValueError("edge sample count must be at least two");
+  if (shape.IsNull())
+    throw ValueError("edge_polylines: null shape");
+  if (sample_count == 0 && !(deflection > 0.0))
+    throw ValueError("edge deflection must be greater than zero");
+  if (sample_count == 1 || sample_count < 0)
+    throw ValueError("edge sample count must be at least two");
   Polylines out;
   out.starts.push_back(0);
   occt_guard([&] {
@@ -32,7 +35,8 @@ Polylines edge_polylines(const TopoDS_Shape& shape, double deflection, int sampl
     TopExp::MapShapes(shape, TopAbs_EDGE, edges);
     for (int i = 1; i <= edges.Extent(); ++i) {
       const TopoDS_Edge edge = TopoDS::Edge(edges.FindKey(i));
-      if (BRep_Tool::Degenerated(edge)) continue;
+      if (BRep_Tool::Degenerated(edge))
+        continue;
       BRepAdaptor_Curve curve(edge);
       const std::size_t before = out.points.size();
       const double first = curve.FirstParameter(), last = curve.LastParameter();
@@ -42,7 +46,8 @@ Polylines edge_polylines(const TopoDS_Shape& shape, double deflection, int sampl
       } else {
         GCPnts_QuasiUniformDeflection sampler(curve, deflection);
         if (sampler.IsDone() && sampler.NbPoints() >= 2) {
-          for (int k = 1; k <= sampler.NbPoints(); ++k) push_point(out.points, sampler.Value(k));
+          for (int k = 1; k <= sampler.NbPoints(); ++k)
+            push_point(out.points, sampler.Value(k));
         } else {
           push_point(out.points, curve.Value(first));
           push_point(out.points, curve.Value(last));

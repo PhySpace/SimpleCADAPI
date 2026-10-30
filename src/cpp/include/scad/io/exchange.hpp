@@ -20,6 +20,7 @@
 
 #include <TopoDS_Shape.hxx>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/io/brep.hpp"
 #include "scad/io/files.hpp"
 #include "scad/io/mesh.hpp"
@@ -100,8 +101,8 @@ Mesh read_stl(const std::filesystem::path& path);
 // Faceted BREP of an STL: one planar face per triangle, sewn at `sewing_tolerance`.
 // A closed result is returned as a Solid, otherwise as a Shell (or a Compound of
 // shells).  Degenerate triangles are skipped.
-TopoDS_Shape stl_to_shape(const Mesh& mesh, double sewing_tolerance = 1e-6);
-Shape import_stl_shape(const std::filesystem::path& path, double sewing_tolerance = 1e-6);
+TopoDS_Shape stl_to_shape(const Mesh& mesh, double sewing_tolerance = tol::kSewing);
+Shape import_stl_shape(const std::filesystem::path& path, double sewing_tolerance = tol::kSewing);
 
 // ---------------------------------------------------------------------------
 // OBJ and GLB

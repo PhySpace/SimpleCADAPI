@@ -4,6 +4,7 @@
  *
  * Layout: `SCAPREV1`, a u32 header length, 4 bytes of padding, the JSON header
  * (padded to 8 bytes), then the little-endian arrays the header points into.
+ * A frame carries only the parts the page does not have; every node names its part.
  */
 
 export type PreviewGroup = { entity_id: string; first_index: number; index_count: number };
@@ -38,7 +39,8 @@ export type PreviewNode = {
   transform: PreviewTransform;
 };
 
-export type PreviewData = { parts: Map<string, PreviewPart>; nodes: PreviewNode[] };
+/** `parts` holds exactly the parts the nodes draw; `missing` names the ones the frame left out that the cache lacks. */
+export type PreviewData = { parts: Map<string, PreviewPart>; nodes: PreviewNode[]; missing: string[] };
 
 type ArrayRef = { offset: number; count: number };
 type HeaderPart = {
@@ -63,7 +65,9 @@ type Header = {
 
 const MAGIC = "SCAPREV1";
 
-export function parsePreview(buffer: ArrayBuffer): PreviewData {
+/** Parse a preview.  A frame may leave out the parts the page already holds: they are taken from *cache* (the parts of
+ * the preview on screen, by key), and the result holds exactly the parts the nodes draw. */
+export function parsePreview(buffer: ArrayBuffer, cache: ReadonlyMap<string, PreviewPart> = new Map()): PreviewData {
   const bytes = new Uint8Array(buffer);
   if (new TextDecoder().decode(bytes.subarray(0, MAGIC.length)) !== MAGIC) throw new Error("not a preview");
   const view = new DataView(buffer);
@@ -72,11 +76,11 @@ export function parsePreview(buffer: ArrayBuffer): PreviewData {
   const header = JSON.parse(new TextDecoder().decode(bytes.subarray(headerStart, headerStart + headerLength))) as Header;
   if (header.schema !== "sca-preview-1") throw new Error(`unsupported preview schema: ${header.schema}`);
   const base = headerStart + headerLength;
-  const floats = (ref: ArrayRef) => new Float32Array(buffer, base + ref.offset, ref.count);
-  const uints = (ref: ArrayRef) => new Uint32Array(buffer, base + ref.offset, ref.count);
-  const parts = new Map<string, PreviewPart>();
+  const floats = (ref: ArrayRef) => new Float32Array(buffer, base + ref.offset, ref.count).slice(); // a copy: a kept part must not pin the whole frame it came in
+  const uints = (ref: ArrayRef) => new Uint32Array(buffer, base + ref.offset, ref.count).slice();
+  const carried = new Map<string, PreviewPart>();
   for (const part of header.parts) {
-    parts.set(part.key, {
+    carried.set(part.key, {
       key: part.key,
       definitionId: part.definition_id,
       positions: floats(part.positions),
@@ -98,5 +102,13 @@ export function parsePreview(buffer: ArrayBuffer): PreviewData {
     displayName: node.display_name,
     transform: node.transform,
   }));
-  return { parts, nodes };
+  const parts = new Map<string, PreviewPart>();
+  const missing: string[] = [];
+  for (const node of nodes) {
+    if (parts.has(node.partKey)) continue;
+    const part = carried.get(node.partKey) ?? cache.get(node.partKey);
+    if (part) parts.set(node.partKey, part);
+    else if (!missing.includes(node.partKey)) missing.push(node.partKey);
+  }
+  return { parts, nodes, missing };
 }

@@ -1,20 +1,35 @@
-# Native backend integration: running log
+# Native engine integration: status and log
 
-Owner goal: `sca editor` runs `sandbox-envs/desktop_arm_sources` (arm6) on the C++ backend with the
-Python SDK's behaviour (see NATIVE_INTEGRATION.md). Work tree of the SDK: `SimpleCADAPI-native`
-(branch `feat/native-backend`, nothing committed). This file is the running log; newest section last.
+## Current status
 
-## Setup facts
+* Old SDK suite (`test/` + `tests/`) on the native engine: **2202 passed, 49 skipped, 1 xfailed** (last recorded run; the
+  figure is the maintainer's, not re-run for this edit). Skips: 19 `internal` entries in `test/native_known_failures.json`
+  (checked: the file has 19 `internal` and 1 `open` entry) and the tests that need optional packages; the xfail is the
+  `open` entry (the soft renderer's shading of the ql evidence picture).
+* `src/cpp/tests/python` (golden parity tests): **468 passed**.
+* The C++ doctest suites (`ctest`, one executable per area): 575 `TEST_CASE` declarations in `src/cpp/tests/cpp` (counted with grep, not
+  run for this edit).
+* OCP is not a dependency and nothing imports it. The old backend switch (`SCA_BACKEND=ocp|native`, `_backend.py`, the
+  `_native/` meta-path finder) existed only in the integration work tree; it is replaced by the forwarding modules and
+  `src/simplecadapi/_glue`. The table below the log's first sections, the "Setup facts", and the arm6 timing sections are
+  **history** of that work, kept because the findings (what was slow, what was missing) still explain the code. Paths and
+  environment variables in them (`SimpleCADAPI-native`, `build/sdk-rel`, `SCA_BACKEND`, `/tmp/native/...`) no longer exist.
+  For current build and test commands see [../CONTRIBUTING.md](../CONTRIBUTING.md).
 
-- Build: `cmake -S . -B build/sdk-rel -G Ninja -DCMAKE_BUILD_TYPE=Release ...; ninja -C build/sdk-rel _native`.
-  Run the SDK with `SCA_BACKEND=native PYTHONPATH=<build>/python`. Never run python with cwd inside
-  `src/simplecadapi` (the `inspect` package shadows the stdlib).
-- OCP baseline of the old suite (`test/`, `tests/`, 2231 passed / 3 failed / 3 collection errors, 776 s):
-  `/tmp/native/baseline_ocp2.log`. The first baseline (`baseline_ocp.log`) stopped at collection errors.
-  The 3 failures and 3 errors are not native problems: `test_editor` (2, needs a free port), the scene-contract
-  generator, and three modules whose translators need packages absent from the venv.
+Open items, as far as this log knows: the replay-contract failures listed under "Failures by cause" are no longer in
+`test/native_known_failures.json` (one `open` entry remains); the arm6 editor UI end-to-end run in a browser was never done
+in this log; definition-hash determinism across cold runs was last marked "re-check" (see "Open / notes").
 
-## Step 1: backend switch (done)
+## Setup facts (history)
+
+- Build at the time: `cmake -S . -B build/sdk-rel -G Ninja -DCMAKE_BUILD_TYPE=Release ...; ninja -C build/sdk-rel _native`;
+  the SDK ran with `SCA_BACKEND=native PYTHONPATH=<build>/python`. Today: see CONTRIBUTING.md. Still true: never run Python
+  with the working directory inside `src/simplecadapi` (the `inspect` package shadows the stdlib).
+- OCP baseline of the old suite at the time (2231 passed / 3 failed / 3 collection errors, 776 s). The 3 failures and 3 errors
+  were not native problems: `test_editor` (2, needs a free port or `httpx2`), the scene-contract generator, and three modules
+  whose translators need packages absent from the venv.
+
+## Step 1: backend switch (done; history, replaced by `_glue`)
 
 - `simplecadapi/_backend.py`: `SCA_BACKEND=ocp|native` (default `ocp`, unchanged: verified, `import simplecadapi`
   gives `simplecadapi.core.Solid`). `simplecadapi/__init__.py` calls `_backend.activate()` first.
@@ -57,7 +72,7 @@ so assemblies had no data flow in the graph. Done, all additive:
   `runtime/lineage.py` + hooks in `runtime/{executor,cache,deps}.py`: the nodes of a cell are written beside its cache
   entry and put back in the registry on restore; the native backend keeps its cache under `simplecad-native/`.
 
-## Pass-rate table (old suite `test/` + `tests/`, SCA_BACKEND=native, build/sdk-rel)
+## Pass-rate table (old suite `test/` + `tests/`; every row but the last is history)
 
 | Run | passed | failed | collection errors | note |
 |---|---|---|---|---|
@@ -67,8 +82,9 @@ so assemblies had no data flow in the graph. Done, all additive:
 | native, ids/refs canonical | 1927 | 181 | 11 | `reserve_node`, resolved topology refs, dataclass protocol |
 | native, current (run 5) | 1942 | 170 | 11 | scene/apiindex fixes |
 | native, current with the classification of `test/native_known_failures.json` (run 6) | 1942 (+351 subtests) | 0 unexpected | 3 (same as ocp) | 46 skipped as internal, 122 xfailed as open, 8 modules ignored at collection (private helpers); 2231 -> 1942 passed, 289 of the baseline's passes are internal or open |
+| native, current (2026-10-29; the rows above are history) | 2202 | 0 | 0 | 49 skipped (19 internal in `test/native_known_failures.json`, the rest optional packages), 1 xfailed (`open`: the soft renderer's shading of the ql evidence picture); `src/cpp/tests/python` 468 passed. The previous version of this row said 2197 passed and "7 restored old test files not yet tracked"; the files are tracked now |
 
-Failures by cause (run 5, 170): 
+Failures by cause (run 5, 170 failures; history, nearly all since fixed: today 19 internal + 1 open): 
 1. the SDK's graph replay contract (`replay_model_json` / `replay_graph`; ~85): native-recorded nodes differ from
    what the Python replay reads: selection nodes carry `index/count/bbox` where the SDK writes a `geo_exact`
    selector (`mode, start, end, geom_type, metadata_geo`), detail features (fillet/chamfer/shell) lack
@@ -164,9 +180,9 @@ Findings: arm6 runs to completion with OCP blocked (core path needs no OCP: veri
 equal (18.8 vs 19.8 s): the per-operator speed-ups (14-77x on single operators) do not show up in arm6, so
 its time is not in modelling kernels; it is in the notebook runtime / cache / worker start / recording.
 The UPPER_LENGTH edit is SLOWER on native (+24% wall, +47% cpu): unexplained, needs a profile.
-"Green" suite on native = 1942 passed vs 2231 on ocp; 169 known failures are listed in
-`test/native_known_failures.json` of the SDK worktree (122 open parity gaps, ~46 internal-by-design,
-8 modules ignored at collection). Not verified by the lead: sandbox check outputs equal to ocp
+At the time of that run the "green" suite on native was 1942 passed vs 2231 on ocp, with 169 known failures listed in
+`test/native_known_failures.json` (122 open parity gaps, ~46 internal-by-design, 8 modules ignored at collection); that
+list has since shrunk to 19 internal + 1 open (current numbers: see "Current status"). Not verified by the lead: sandbox check outputs equal to ocp
 (agent-reported), definition-hash determinism across cold runs, the editor UI (no built editor-web).
 
 ## Exit-time crash (found by the lead, fixed, regression-tested)

@@ -14,7 +14,7 @@ TEST_CASE("value(): metadata first, then the geo.* measurements, else the defaul
   CHECK(value("geo.height")(box).as_double() == 9.5);
   CHECK(geo("height")(box).as_double() == 9.5);
   CHECK(value("geo.volume")(box).as_double() == doctest::Approx(24.0));
-  CHECK(value("geo.area")(box).is_null());           // a solid has no area
+  CHECK(value("geo.area")(box).is_null());  // a solid has no area
   CHECK(value("geo.area", Value(-1))(box).as_int() == -1);
   CHECK(value("geo.missing", Value("none"))(box).as_string() == "none");
   CHECK(value("other.thing")(box).is_null());
@@ -28,7 +28,8 @@ TEST_CASE("key(): the property language with a default for missing") {
   const Solid box = ql_test::box(2, 3, 4);
   Face top = box.faces().front();
   for (const Face& f : box.faces())
-    if (f.normal_at().z > 0.9) top = f;
+    if (f.normal_at().z > 0.9)
+      top = f;
   CHECK(key("geom.center.z")(top).as_double() == doctest::Approx(4.0));
   CHECK(key("geom.normal.z")(top).as_double() == doctest::Approx(1.0));
   CHECK(key("geom.center.z")(box).is_null());

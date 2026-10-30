@@ -34,19 +34,28 @@ ToothTuning tuning(double addendum_factor, double clearance_factor, double backl
 }
 
 // `isinstance(value, int) and not isinstance(value, bool)`, as the chain and nut factories test it.
-bool is_plain_int(const py::object& value) { return PyLong_Check(value.ptr()) != 0 && !PyBool_Check(value.ptr()); }
+bool is_plain_int(const py::object& value) {
+  return PyLong_Check(value.ptr()) != 0 && !PyBool_Check(value.ptr());
+}
 
 // `int(value)`, for the arguments Python converts that way.
-int python_int(const py::object& value) { return py::int_(value).cast<int>(); }
+int python_int(const py::object& value) {
+  return py::int_(value).cast<int>();
+}
 
 // `str(value)`, the way the fastener factories read their style arguments.
-std::string text_of(const py::object& value) { return py::str(value).cast<std::string>(); }
+std::string text_of(const py::object& value) {
+  return py::str(value).cast<std::string>();
+}
 
-py::object point_to_py(const stdlib::Point2& p) { return py::make_tuple(p.x, p.y); }
+py::object point_to_py(const stdlib::Point2& p) {
+  return py::make_tuple(p.x, p.y);
+}
 
 stdlib::Point2 point_from_py(const py::object& value) {
   const py::sequence items = py::reinterpret_borrow<py::sequence>(value);
-  if (items.size() != 2) throw ValueError("a 2D point needs two coordinates");
+  if (items.size() != 2)
+    throw ValueError("a 2D point needs two coordinates");
   return {items[0].cast<double>(), items[1].cast<double>()};
 }
 
@@ -62,8 +71,8 @@ void bind_gear_factories(py::module_& gear) {
                                        tuning(addendum_factor, clearance_factor, backlash));
         });
       },
-      py::arg("n_teeth"), py::arg("module"), py::arg("pressure_angle") = 20.0, py::arg("gear_height") = 6.0, py::kw_only(),
-      py::arg("addendum_factor") = 1.0, py::arg("clearance_factor") = 0.25, py::arg("backlash") = 0.0,
+      py::arg("n_teeth"), py::arg("module"), py::arg("pressure_angle") = 20.0, py::arg("gear_height") = 6.0,
+      py::kw_only(), py::arg("addendum_factor") = 1.0, py::arg("clearance_factor") = 0.25, py::arg("backlash") = 0.0,
       "Create an involute spur gear (straight teeth, helix angle = 0).\n\n"
       "n_teeth >= 3; module in mm (pitch diameter = module * n_teeth); pressure_angle in degrees;\n"
       "gear_height is the thickness along Z.  addendum_factor and clearance_factor are multiples of\n"
@@ -111,8 +120,8 @@ void bind_gear_factories(py::module_& gear) {
         });
       },
       py::arg("n_teeth"), py::arg("module"), py::arg("pressure_angle") = 20.0, py::arg("helix_angle") = 32.0,
-      py::arg("gear_height") = 10.0, py::kw_only(), py::arg("addendum_factor") = 1.0, py::arg("clearance_factor") = 0.25,
-      py::arg("backlash") = 0.0,
+      py::arg("gear_height") = 10.0, py::kw_only(), py::arg("addendum_factor") = 1.0,
+      py::arg("clearance_factor") = 0.25, py::arg("backlash") = 0.0,
       "Create an involute herringbone (double-helical) gear: two opposite twisted halves fused at the\n"
       "shared centre section.");
 
@@ -134,8 +143,8 @@ void bind_gear_factories(py::module_& gear) {
 
   gear.def(
       "make_helical_ring_gear_rsolid",
-      [](int n_teeth, double module, double pressure_angle, double helix_angle, double gear_height, double rim_thickness,
-         double backlash, double addendum_factor, double clearance_factor) {
+      [](int n_teeth, double module, double pressure_angle, double helix_angle, double gear_height,
+         double rim_thickness, double backlash, double addendum_factor, double clearance_factor) {
         return unlocked([&] {
           return make_helical_ring_gear_rsolid(n_teeth, module, pressure_angle, helix_angle, gear_height, rim_thickness,
                                                tuning(addendum_factor, clearance_factor, backlash));
@@ -148,8 +157,8 @@ void bind_gear_factories(py::module_& gear) {
 
   gear.def(
       "make_herringbone_ring_gear_rsolid",
-      [](int n_teeth, double module, double pressure_angle, double helix_angle, double gear_height, double rim_thickness,
-         double backlash, double addendum_factor, double clearance_factor) {
+      [](int n_teeth, double module, double pressure_angle, double helix_angle, double gear_height,
+         double rim_thickness, double backlash, double addendum_factor, double clearance_factor) {
         return unlocked([&] {
           return make_herringbone_ring_gear_rsolid(n_teeth, module, pressure_angle, helix_angle, gear_height,
                                                    rim_thickness, tuning(addendum_factor, clearance_factor, backlash));
@@ -175,7 +184,8 @@ void bind_gear_factories(py::module_& gear) {
         options.spline_tolerance = spline_tolerance;
         options.max_control_points = max_control_points;
         return unlocked([&] {
-          return make_cycloidal_disc_rsolid(n_lobes, ring_pin_pitch_radius, roller_radius, eccentricity, gear_height, options);
+          return make_cycloidal_disc_rsolid(n_lobes, ring_pin_pitch_radius, roller_radius, eccentricity, gear_height,
+                                            options);
         });
       },
       py::arg("n_lobes"), py::arg("ring_pin_pitch_radius"), py::arg("roller_radius"), py::arg("eccentricity"),
@@ -198,7 +208,8 @@ void bind_gear_factories(py::module_& gear) {
   gear.def(
       "make_helical_rack_rsolid",
       [](double module, int n_teeth, double pressure_angle, double helix_angle, double rack_height) {
-        return unlocked([&] { return make_helical_rack_rsolid(module, n_teeth, pressure_angle, helix_angle, rack_height); });
+        return unlocked(
+            [&] { return make_helical_rack_rsolid(module, n_teeth, pressure_angle, helix_angle, rack_height); });
       },
       py::arg("module"), py::arg("n_teeth") = 10, py::arg("pressure_angle") = 20.0, py::arg("helix_angle") = 25.0,
       py::arg("rack_height") = 8.0, "Create a helical rack: the rack profile lofted through twisted sections.");
@@ -206,31 +217,38 @@ void bind_gear_factories(py::module_& gear) {
   gear.def(
       "make_herringbone_rack_rsolid",
       [](double module, int n_teeth, double pressure_angle, double helix_angle, double rack_height) {
-        return unlocked([&] { return make_herringbone_rack_rsolid(module, n_teeth, pressure_angle, helix_angle, rack_height); });
+        return unlocked(
+            [&] { return make_herringbone_rack_rsolid(module, n_teeth, pressure_angle, helix_angle, rack_height); });
       },
       py::arg("module"), py::arg("n_teeth") = 10, py::arg("pressure_angle") = 20.0, py::arg("helix_angle") = 30.0,
       py::arg("rack_height") = 10.0, "Create a herringbone rack: two opposite twisted halves lofted as one.");
 
-  gear.attr("__all__") = py::make_tuple(
-      "make_spur_gear_rsolid", "make_straight_bevel_gear_rsolid", "make_helical_gear_rsolid", "make_herringbone_gear_rsolid",
-      "make_spur_ring_gear_rsolid", "make_helical_ring_gear_rsolid", "make_herringbone_ring_gear_rsolid",
-      "make_cycloidal_disc_rsolid", "make_spur_rack_rsolid", "make_helical_rack_rsolid", "make_herringbone_rack_rsolid");
+  gear.attr("__all__") =
+      py::make_tuple("make_spur_gear_rsolid", "make_straight_bevel_gear_rsolid", "make_helical_gear_rsolid",
+                     "make_herringbone_gear_rsolid", "make_spur_ring_gear_rsolid", "make_helical_ring_gear_rsolid",
+                     "make_herringbone_ring_gear_rsolid", "make_cycloidal_disc_rsolid", "make_spur_rack_rsolid",
+                     "make_helical_rack_rsolid", "make_herringbone_rack_rsolid");
 }
 
 // The private helpers the reference tests reach into (they read the profile sketch and the tooth numbers).
 void bind_gear_internals(py::module_& gear) {
-  gear.def("_involute_point", [](double base_radius, double t) { return point_to_py(stdlib::involute_point(base_radius, t)); },
-           py::arg("base_radius"), py::arg("t"));
+  gear.def(
+      "_involute_point",
+      [](double base_radius, double t) { return point_to_py(stdlib::involute_point(base_radius, t)); },
+      py::arg("base_radius"), py::arg("t"));
   gear.def("_involute_t_for_radius", &stdlib::involute_t_for_radius, py::arg("base_radius"), py::arg("target_radius"));
-  gear.def("_rotate_xy", [](const py::object& point, double angle) { return point_to_py(stdlib::rotate_xy(point_from_py(point), angle)); },
-           py::arg("point"), py::arg("angle"));
+  gear.def(
+      "_rotate_xy",
+      [](const py::object& point, double angle) { return point_to_py(stdlib::rotate_xy(point_from_py(point), angle)); },
+      py::arg("point"), py::arg("angle"));
   gear.def(
       "_root_fillet_control_points",
       [](const py::object& start, const py::object& end, double start_tangent_angle, double end_tangent_angle) {
         const stdlib::BSplineData data = stdlib::root_fillet_control_points(point_from_py(start), point_from_py(end),
                                                                             start_tangent_angle, end_tangent_angle);
         py::list poles;
-        for (const stdlib::Point2& pole : data.control_points) poles.append(point_to_py(pole));
+        for (const stdlib::Point2& pole : data.control_points)
+          poles.append(point_to_py(pole));
         return py::make_tuple(poles, data.degree, data.knots, data.multiplicities);
       },
       py::arg("start"), py::arg("end"), py::arg("start_tangent_angle"), py::arg("end_tangent_angle"));
@@ -315,7 +333,8 @@ void bind_gear_internals(py::module_& gear) {
         Sketch sketch = stdlib::build_gear_profile_sketch(n_teeth, module, pressure_angle, options);
         if (build_face || !return_sketch) {
           Face face = make_face_from_sketch_rface(sketch, 0);
-          return return_sketch ? py::make_tuple(py::cast(face), py::cast(std::move(sketch))).cast<py::object>() : py::cast(face);
+          return return_sketch ? py::make_tuple(py::cast(face), py::cast(std::move(sketch))).cast<py::object>()
+                               : py::cast(face);
         }
         return py::make_tuple(py::none(), py::cast(std::move(sketch)));
       },
@@ -330,7 +349,8 @@ void bind_gear_internals(py::module_& gear) {
         Sketch sketch = stdlib::build_internal_gear_profile_sketch(n_teeth, module, pressure_angle,
                                                                    tuning(addendum_factor, clearance_factor, backlash));
         Wire wire = make_wire_from_sketch_rwire(sketch, 0);
-        if (!return_sketch) return py::cast(wire);
+        if (!return_sketch)
+          return py::cast(wire);
         return py::make_tuple(py::cast(wire), py::cast(std::move(sketch)));
       },
       py::arg("n_teeth"), py::arg("module"), py::arg("pressure_angle"), py::arg("return_sketch") = false,
@@ -338,8 +358,8 @@ void bind_gear_internals(py::module_& gear) {
 
   gear.def(
       "_build_ring_gear_face",
-      [](int n_teeth, double module, double pressure_angle, double rim_thickness, double backlash, double addendum_factor,
-         double clearance_factor) {
+      [](int n_teeth, double module, double pressure_angle, double rim_thickness, double backlash,
+         double addendum_factor, double clearance_factor) {
         return stdlib::build_ring_gear_face(n_teeth, module, pressure_angle, rim_thickness,
                                             tuning(addendum_factor, clearance_factor, backlash));
       },
@@ -354,7 +374,8 @@ void bind_chain(py::module_& chain) {
       "make_roller_chain_sprocket_rsolid",
       [](const py::object& n_teeth, double chain_pitch, double roller_diameter, double sprocket_thickness,
          double bore_radius, double roller_clearance) {
-        if (!is_plain_int(n_teeth)) throw ValueError("n_teeth must be an integer of at least 6");
+        if (!is_plain_int(n_teeth))
+          throw ValueError("n_teeth must be an integer of at least 6");
         const int teeth = python_int(n_teeth);
         return unlocked([&] {
           return make_roller_chain_sprocket_rsolid(teeth, chain_pitch, roller_diameter, sprocket_thickness, bore_radius,
@@ -444,7 +465,8 @@ void bind_bearing(py::module_& bearing) {
          std::optional<double> drive_angle_degrees, bool fuse_rolling_elements, double rolling_element_fuse_overlap,
          const py::object& material) {
         BallBearingOptions options;
-        if (!ball_count.is_none()) options.ball_count = python_int(ball_count);
+        if (!ball_count.is_none())
+          options.ball_count = python_int(ball_count);
         options.raceway_clearance = raceway_clearance;
         options.edge_chamfer = edge_chamfer;
         options.assembly_id = std::move(assembly_id);
@@ -452,7 +474,8 @@ void bind_bearing(py::module_& bearing) {
         options.fuse_rolling_elements = fuse_rolling_elements;
         options.rolling_element_fuse_overlap = rolling_element_fuse_overlap;
         if (!material.is_none()) {
-          if (!py::isinstance<product::Material>(material)) throw TypeError("material must be a Material or None");
+          if (!py::isinstance<product::Material>(material))
+            throw TypeError("material must be a Material or None");
           options.material = material.cast<const product::Material&>();
         }
         return unlocked([&] {
@@ -474,7 +497,8 @@ void bind_bearing(py::module_& bearing) {
 }  // namespace
 
 void bind_std(py::module_& m) {
-  py::module_ std_module = m.def_submodule("std", "Standard parts: gears, bearings, roller-chain sprockets, fasteners.");
+  py::module_ std_module =
+      m.def_submodule("std", "Standard parts: gears, bearings, roller-chain sprockets, fasteners.");
   py::module_ gear = std_module.def_submodule("gear", "Involute gears, ring gears, racks and cycloidal discs.");
   py::module_ bearing = std_module.def_submodule("bearing", "Ball bearing standard assemblies.");
   py::module_ chain = std_module.def_submodule("chain", "Roller-chain sprockets.");

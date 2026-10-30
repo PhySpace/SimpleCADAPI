@@ -40,6 +40,140 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: python3 src/cpp/tools/build_occt.py --prefix "$HOME/occt"
 
+  format:
+    # No OpenCASCADE needed: runs in seconds, ahead of the heavy jobs.
+    name: clang-format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Install clang-format
+        run: python3 -m pip install clang-format==18.1.8
+
+      - name: Check formatting
+        run: CLANG_FORMAT=clang-format src/cpp/tools/check_format.sh
+
+  occt-guard:
+    # Every boolean / fillet / offset builder is constructed in a function that runs under occt_guard (or says, with
+    # `// occt_guard: the caller X ...`, that its one caller does).  See src/cpp/tools/check_occt_guard.py.
+    name: OCCT guard audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Audit
+        run: python3 src/cpp/tools/check_occt_guard.py --strict
+
+  cpp-tests:
+    # The engine's own doctest executables (one per area), Release, no sanitizer: what the Python jobs below never run.
+    name: C++ tests (Release)
+    needs: occt
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Restore the static OpenCASCADE build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/occt
+          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py') }}
+          fail-on-cache-miss: true
+
+      - name: Configure
+        run: >
+          cmake -S src/cpp -B build/release -G Ninja
+          -DCMAKE_BUILD_TYPE=Release -DSCAD_BUILD_PYTHON=OFF -DSCAD_BUILD_TESTS=ON
+          -DSCAD_OCCT_PREFIX="$HOME/occt"
+
+      - name: Build
+        run: cmake --build build/release -j"$(nproc)"
+
+      - name: Run the doctest executables
+        run: ctest --test-dir build/release --output-on-failure -j"$(nproc)"
+
+  sanitize:
+    # The OCCT it links is not instrumented, so OCCT's own reports are suppressed (tools/ubsan.supp, tools/lsan.supp);
+    # only the doctest executables are built (no Python layer).
+    name: C++ tests (ASan + UBSan)
+    needs: occt
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Restore the static OpenCASCADE build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/occt
+          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py') }}
+          fail-on-cache-miss: true
+
+      - name: Configure
+        # SCAD_SANITIZE adds -fsanitize=address,undefined (no thread sanitizer option exists).  The Python module is not
+        # built: loading an ASan module into an uninstrumented interpreter needs LD_PRELOAD games, and the doctest
+        # executables cover the engine.
+        run: >
+          cmake -S src/cpp -B build/asan -G Ninja
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DSCAD_SANITIZE=ON -DSCAD_BUILD_PYTHON=OFF -DSCAD_BUILD_TESTS=ON
+          -DSCAD_OCCT_PREFIX="$HOME/occt"
+
+      - name: Build
+        run: cmake --build build/asan -j"$(nproc)"
+
+      - name: Run the doctest executables
+        env:
+          ASAN_OPTIONS: halt_on_error=1:abort_on_error=1:detect_leaks=1:strict_string_checks=1:check_initialization_order=1
+          LSAN_OPTIONS: suppressions=${{ github.workspace }}/src/cpp/tools/lsan.supp:print_suppressions=0
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1:suppressions=${{ github.workspace }}/src/cpp/tools/ubsan.supp
+        run: ctest --test-dir build/asan --output-on-failure -j"$(nproc)"
+
+  clang-tidy:
+    # Advisory: .clang-tidy is small but the code base has never been run through it.  Changed files only.
+    name: clang-tidy (advisory)
+    needs: occt
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    continue-on-error: true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+      - name: Restore the static OpenCASCADE build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/occt
+          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py') }}
+          fail-on-cache-miss: true
+
+      - name: Install clang-tidy
+        run: python3 -m pip install clang-tidy==18.1.8
+
+      - name: Configure (compile_commands.json)
+        run: >
+          cmake -S src/cpp -B build/tidy -G Ninja
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DSCAD_BUILD_PYTHON=OFF
+          -DSCAD_OCCT_PREFIX="$HOME/occt"
+
+      - name: Run clang-tidy on the changed files
+        run: |
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then base="HEAD~1"; fi
+          # The engine only: the bindings need Python.h and pybind11, which a configure without the Python layer
+          # (SCAD_BUILD_PYTHON=OFF) does not put in the compile database.
+          files=$(git diff --name-only --diff-filter=d "$base" HEAD -- 'src/cpp/src/*.cpp' || true)
+          if [ -z "$files" ]; then echo "no C++ sources changed"; exit 0; fi
+          # shellcheck disable=SC2086
+          clang-tidy -p build/tidy --quiet $files
+
   test:
     name: Python ${{ matrix.python-version }}
     needs: occt
@@ -81,6 +215,24 @@ jobs:
 
       - name: Run tests
         run: uv run pytest test tests -q
+
+      - name: Run the C++ parity tests (goldens must exist)
+        # SCAD_GOLDEN_STRICT (read by tests/python/ref.py) makes a missing golden file a failure, not a silent recording;
+        # SCAD_REGOLDEN is refused under it.
+        env:
+          SCAD_GOLDEN_STRICT: "1"
+        run: uv run pytest src/cpp/tests/python -q
+
+      - name: Check the type stubs are current
+        # The checked-in stubs (generated on macOS arm64) are reproduced on Linux.
+        if: matrix.python-version == '3.12'
+        run: |
+          uv pip install pybind11-stubgen==2.5.5
+          PYTHON="uv run --no-sync python" src/cpp/tools/gen_stubs.sh --check
+
+      # The verifier bridge needs OCP, which the SDK and the suite above never do: it is overlaid for this one run.
+      - name: Verifier bridge (OCP)
+        run: uv run --with "cadquery-ocp-novtk>=7.9.3.1,<8" pytest src/cpp/tests/python/test_verify_bridge.py -q
 
   editor-e2e:
     needs: occt

@@ -155,7 +155,8 @@ class OperationGraph {
   // Restores nodes and edges; topology/semantic deltas are not restored.
   // `expressions` / `frames`, when given, are what the nodes' expression and frame records are
   // looked up in (a restored node carries the expressions its parameters refer to, and its frame).
-  static OperationGraph from_value(const Value& payload, bool strict = true, const class ExpressionGraph* expressions = nullptr,
+  static OperationGraph from_value(const Value& payload, bool strict = true,
+                                   const class ExpressionGraph* expressions = nullptr,
                                    const class FrameGraph* frames = nullptr);
 
  private:

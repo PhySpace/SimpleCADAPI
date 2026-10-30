@@ -20,8 +20,8 @@ namespace scad {
 
 class Symbol {
  public:
-  Symbol() noexcept;                           // the empty string
-  Symbol(std::string_view text);               // NOLINT(google-explicit-constructor)
+  Symbol() noexcept;                                                   // the empty string
+  Symbol(std::string_view text);                                       // NOLINT(google-explicit-constructor)
   Symbol(const std::string& text) : Symbol(std::string_view(text)) {}  // NOLINT
   Symbol(const char* text) : Symbol(std::string_view(text)) {}         // NOLINT
 

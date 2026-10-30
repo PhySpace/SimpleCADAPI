@@ -18,9 +18,12 @@ namespace {
 
 BOPAlgo_Operation bop_of(BooleanOp op) noexcept {
   switch (op) {
-    case BooleanOp::Cut: return BOPAlgo_CUT;
-    case BooleanOp::Common: return BOPAlgo_COMMON;
-    case BooleanOp::Fuse: return BOPAlgo_FUSE;
+    case BooleanOp::Cut:
+      return BOPAlgo_CUT;
+    case BooleanOp::Common:
+      return BOPAlgo_COMMON;
+    case BooleanOp::Fuse:
+      return BOPAlgo_FUSE;
   }
   return BOPAlgo_UNKNOWN;
 }
@@ -33,7 +36,8 @@ TopTools_ListOfShape list_of(const TopoDS_Shape& shape) {
 
 TopTools_ListOfShape list_of(const std::vector<TopoDS_Shape>& shapes) {
   TopTools_ListOfShape out;
-  for (const TopoDS_Shape& shape : shapes) out.Append(shape);
+  for (const TopoDS_Shape& shape : shapes)
+    out.Append(shape);
   return out;
 }
 
@@ -61,20 +65,23 @@ BooleanResult run_boolean(BooleanOp op, const TopoDS_Shape& argument, const std:
     builder.SetToFillHistory(options.fill_history);
     builder.SetArguments(list_of(argument));
     builder.SetTools(list_of(tools));
-    if (options.fuzzy) builder.SetFuzzyValue(*options.fuzzy);
+    if (options.fuzzy)
+      builder.SetFuzzyValue(*options.fuzzy);
     builder.SetGlue(options.glue ? BOPAlgo_GlueShift : BOPAlgo_GlueOff);
     builder.Build();
 
     BooleanResult out;
     out.done = builder.IsDone();
-    if (!out.done) return out;
+    if (!out.done)
+      return out;
     out.shape = builder.Shape();
     if (options.fill_history) {
       out.history = builder.History();
       // Section edges are evidence, not the result: a kernel that cannot list
       // them must not fail the boolean (the Python SDK treats it the same way).
       try {
-        for (const TopoDS_Shape& edge : builder.SectionEdges()) out.section_edges.push_back(edge);
+        for (const TopoDS_Shape& edge : builder.SectionEdges())
+          out.section_edges.push_back(edge);
       } catch (const Standard_Failure&) {
         out.section_edges.clear();
       }
@@ -94,7 +101,8 @@ TopoDS_Shape clean_shape(const TopoDS_Shape& shape) {
 
 FuseHistoryResult fuse_shapes_with_history(const std::vector<TopoDS_Shape>& shapes, bool glue,
                                            std::optional<double> tol, bool clean) {
-  if (shapes.empty()) throw ValueError("fuse_shapes requires at least one shape");
+  if (shapes.empty())
+    throw ValueError("fuse_shapes requires at least one shape");
   if (shapes.size() == 1) {
     FuseHistoryResult single;
     single.shape = shapes.front();
@@ -107,7 +115,8 @@ FuseHistoryResult fuse_shapes_with_history(const std::vector<TopoDS_Shape>& shap
   options.fuzzy = tol;
   options.glue = glue;
   BooleanResult fused = run_boolean(BooleanOp::Fuse, shapes.front(), tail_of(shapes), options);
-  if (!fused.done) throw ValueError("OCP fuse failed");
+  if (!fused.done)
+    throw ValueError("OCP fuse failed");
 
   if (glue && glue_result_is_inconclusive(shapes, fused.shape)) {
     return fuse_shapes_with_history(shapes, /*glue=*/false, tol, clean);
@@ -117,8 +126,10 @@ FuseHistoryResult fuse_shapes_with_history(const std::vector<TopoDS_Shape>& shap
   out.shape = fused.shape;
   out.history = fused.history;
   out.section_edges = std::move(fused.section_edges);
-  if (out.history.IsNull()) out.history = new BRepTools_History;
-  if (!clean) return out;
+  if (out.history.IsNull())
+    out.history = new BRepTools_History;
+  if (!clean)
+    return out;
 
   return occt_guard([&] {
     ShapeUpgrade_UnifySameDomain unifier(out.shape, true, true, true);
@@ -134,14 +145,19 @@ FuseHistoryResult fuse_shapes_with_history(const std::vector<TopoDS_Shape>& shap
     std::vector<TopoDS_Shape> survivors;
     for (const TopoDS_Shape& edge : out.section_edges) {
       std::vector<TopoDS_Shape> candidates;
-      for (const TopoDS_Shape& s : clean_history->Modified(edge)) candidates.push_back(s);
-      for (const TopoDS_Shape& s : clean_history->Generated(edge)) candidates.push_back(s);
-      if (candidates.empty() && !clean_history->IsRemoved(edge)) candidates.push_back(edge);
+      for (const TopoDS_Shape& s : clean_history->Modified(edge))
+        candidates.push_back(s);
+      for (const TopoDS_Shape& s : clean_history->Generated(edge))
+        candidates.push_back(s);
+      if (candidates.empty() && !clean_history->IsRemoved(edge))
+        candidates.push_back(edge);
       for (const TopoDS_Shape& candidate : candidates) {
-        if (!result.contains(candidate)) continue;
+        if (!result.contains(candidate))
+          continue;
         const int before = seen.Extent();
         seen.Add(candidate);
-        if (seen.Extent() > before) survivors.push_back(candidate);
+        if (seen.Extent() > before)
+          survivors.push_back(candidate);
       }
     }
     out.section_edges = std::move(survivors);
@@ -149,33 +165,40 @@ FuseHistoryResult fuse_shapes_with_history(const std::vector<TopoDS_Shape>& shap
   });
 }
 
-TopoDS_Shape fuse_shapes(const std::vector<TopoDS_Shape>& shapes, bool glue, std::optional<double> tol,
-                         bool clean) {
-  if (shapes.empty()) throw ValueError("fuse_shapes requires at least one shape");
-  if (shapes.size() == 1) return shapes.front();
+TopoDS_Shape fuse_shapes(const std::vector<TopoDS_Shape>& shapes, bool glue, std::optional<double> tol, bool clean) {
+  if (shapes.empty())
+    throw ValueError("fuse_shapes requires at least one shape");
+  if (shapes.size() == 1)
+    return shapes.front();
 
   BooleanOptions options;
   options.fuzzy = tol;
   options.glue = glue;
   const BooleanResult fused = run_boolean(BooleanOp::Fuse, shapes.front(), tail_of(shapes), options);
-  if (!fused.done) throw ValueError("OCP fuse failed");
-  if (glue && glue_result_is_inconclusive(shapes, fused.shape)) return fuse_shapes(shapes, false, tol, clean);
+  if (!fused.done)
+    throw ValueError("OCP fuse failed");
+  if (glue && glue_result_is_inconclusive(shapes, fused.shape))
+    return fuse_shapes(shapes, false, tol, clean);
   return clean ? clean_shape(fused.shape) : fused.shape;
 }
 
 TopoDS_Shape cut_shapes(const TopoDS_Shape& body, const std::vector<TopoDS_Shape>& tools) {
-  if (tools.empty()) return body;
+  if (tools.empty())
+    return body;
   const BooleanResult cut = run_boolean(BooleanOp::Cut, body, tools);
-  if (!cut.done) throw ValueError("OCP cut failed");
+  if (!cut.done)
+    throw ValueError("OCP cut failed");
   return cut.shape;
 }
 
 TopoDS_Shape common_shapes(const std::vector<TopoDS_Shape>& shapes) {
-  if (shapes.empty()) throw ValueError("common_shapes requires at least one shape");
+  if (shapes.empty())
+    throw ValueError("common_shapes requires at least one shape");
   TopoDS_Shape result = shapes.front();
   for (std::size_t i = 1; i < shapes.size(); ++i) {
     const BooleanResult common = run_boolean(BooleanOp::Common, result, {shapes[i]});
-    if (!common.done) throw ValueError("OCP common failed");
+    if (!common.done)
+      throw ValueError("OCP common failed");
     result = common.shape;
   }
   return result;

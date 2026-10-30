@@ -4,12 +4,15 @@
 #include <BRepAdaptor_Surface.hxx>
 #include <GeomAbs_CurveType.hxx>
 #include <GeomAbs_SurfaceType.hxx>
+#include <Standard_Failure.hxx>
 #include <TopoDS.hxx>
 
 #include <TopExp.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
 
 #include <map>
+#include <optional>
+#include <utility>
 
 #include "scad/core/error.hpp"
 #include "scad/kernel/properties.hpp"
@@ -21,7 +24,9 @@ namespace scad::reactive {
 
 namespace {
 
-Value vec_list(const Vec3& v) { return Value(Value::Array{Value(v.x), Value(v.y), Value(v.z)}); }
+Value vec_list(const Vec3& v) {
+  return Value(Value::Array{Value(v.x), Value(v.y), Value(v.z)});
+}
 
 Value bbox_payload(const Shape& shape) {
   const kernel::BoundingBox box = shape.bounding_box();
@@ -33,32 +38,52 @@ Value bbox_payload(const Shape& shape) {
 
 std::string curve_type(GeomAbs_CurveType type) {
   switch (type) {
-    case GeomAbs_Line: return "LINE";
-    case GeomAbs_Circle: return "CIRCLE";
-    case GeomAbs_BSplineCurve: return "BSPLINE";
-    case GeomAbs_BezierCurve: return "BEZIER";
-    case GeomAbs_Ellipse: return "ELLIPSE";
-    case GeomAbs_Hyperbola: return "HYPERBOLA";
-    case GeomAbs_Parabola: return "PARABOLA";
-    case GeomAbs_OffsetCurve: return "OFFSETCURVE";
-    case GeomAbs_OtherCurve: return "OTHERCURVE";
+    case GeomAbs_Line:
+      return "LINE";
+    case GeomAbs_Circle:
+      return "CIRCLE";
+    case GeomAbs_BSplineCurve:
+      return "BSPLINE";
+    case GeomAbs_BezierCurve:
+      return "BEZIER";
+    case GeomAbs_Ellipse:
+      return "ELLIPSE";
+    case GeomAbs_Hyperbola:
+      return "HYPERBOLA";
+    case GeomAbs_Parabola:
+      return "PARABOLA";
+    case GeomAbs_OffsetCurve:
+      return "OFFSETCURVE";
+    case GeomAbs_OtherCurve:
+      return "OTHERCURVE";
   }
   return "OTHERCURVE";
 }
 
 std::string surface_type(GeomAbs_SurfaceType type) {
   switch (type) {
-    case GeomAbs_Plane: return "PLANE";
-    case GeomAbs_Cylinder: return "CYLINDER";
-    case GeomAbs_Cone: return "CONE";
-    case GeomAbs_Sphere: return "SPHERE";
-    case GeomAbs_Torus: return "TORUS";
-    case GeomAbs_BSplineSurface: return "BSPLINE";
-    case GeomAbs_BezierSurface: return "BEZIER";
-    case GeomAbs_SurfaceOfRevolution: return "SURFACEOFREVOLUTION";
-    case GeomAbs_SurfaceOfExtrusion: return "SURFACEOFEXTRUSION";
-    case GeomAbs_OffsetSurface: return "OFFSETSURFACE";
-    case GeomAbs_OtherSurface: return "OTHERSURFACE";
+    case GeomAbs_Plane:
+      return "PLANE";
+    case GeomAbs_Cylinder:
+      return "CYLINDER";
+    case GeomAbs_Cone:
+      return "CONE";
+    case GeomAbs_Sphere:
+      return "SPHERE";
+    case GeomAbs_Torus:
+      return "TORUS";
+    case GeomAbs_BSplineSurface:
+      return "BSPLINE";
+    case GeomAbs_BezierSurface:
+      return "BEZIER";
+    case GeomAbs_SurfaceOfRevolution:
+      return "SURFACEOFREVOLUTION";
+    case GeomAbs_SurfaceOfExtrusion:
+      return "SURFACEOFEXTRUSION";
+    case GeomAbs_OffsetSurface:
+      return "OFFSETSURFACE";
+    case GeomAbs_OtherSurface:
+      return "OTHERSURFACE";
   }
   return "OTHERSURFACE";
 }
@@ -71,7 +96,8 @@ std::optional<std::int64_t> wrapper_edge_index(const Shape& source, const Shape&
   const auto scan_wire = [&](const TopoDS_Shape& wire) {
     std::int64_t i = 0;
     for (const TopoDS_Edge& candidate : kernel::edges_of(wire)) {
-      if (candidate.IsSame(edge.wrapped())) found = i;
+      if (candidate.IsSame(edge.wrapped()))
+        found = i;
       ++i;
     }
   };
@@ -84,21 +110,32 @@ std::optional<std::int64_t> wrapper_edge_index(const Shape& source, const Shape&
   for (int f = 1; f <= faces.Extent(); ++f) {
     const TopoDS_Face face = TopoDS::Face(faces(f));
     const TopoDS_Wire outer = kernel::outer_wire_of(face);
-    if (!outer.IsNull()) scan_wire(outer);
-    for (const TopoDS_Wire& wire : kernel::inner_wires_of(face)) scan_wire(wire);
+    if (!outer.IsNull())
+      scan_wire(outer);
+    for (const TopoDS_Wire& wire : kernel::inner_wires_of(face))
+      scan_wire(wire);
   }
   return found;
 }
 
 }  // namespace
 
-std::string shape_kind_token(const Shape& shape) { return std::string(kind_name(shape.kind())); }
+std::string shape_kind_token(const Shape& shape) {
+  return std::string(kind_name(shape.kind()));
+}
 
 std::optional<std::string> shape_geom_type(const Shape& shape) {
   try {
-    if (shape.kind() == Kind::Edge) return curve_type(BRepAdaptor_Curve(TopoDS::Edge(shape.wrapped())).GetType());
-    if (shape.kind() == Kind::Face) return surface_type(BRepAdaptor_Surface(TopoDS::Face(shape.wrapped())).GetType());
+    if (shape.kind() == Kind::Edge)
+      return curve_type(BRepAdaptor_Curve(TopoDS::Edge(shape.wrapped())).GetType());
+    if (shape.kind() == Kind::Face)
+      return surface_type(BRepAdaptor_Surface(TopoDS::Face(shape.wrapped())).GetType());
   } catch (const std::exception&) {
+    return std::nullopt;  // a shape without a readable geometry type has none
+  } catch (const Standard_Failure&) {
+    // OCCT's exceptions do not derive from std::exception.  2.2.6 wrote `except Exception` around the same OCP
+    // calls, and OCP's Standard_Failure is an Exception there: the type is absent, not an error.
+    return std::nullopt;
   }
   return std::nullopt;
 }
@@ -107,7 +144,8 @@ Value make_selector_hint(const Shape& shape) {
   Value hint = Value::object();
   hint.set("kind", shape_kind_token(shape));
   Value tags = Value::array();
-  for (const std::string& tag : shape.list_tags()) tags.push_back(tag);
+  for (const std::string& tag : shape.list_tags())
+    tags.push_back(tag);
   hint.set("tags", std::move(tags));
   switch (shape.kind()) {
     case Kind::Edge: {
@@ -136,7 +174,9 @@ Value make_selector_hint(const Shape& shape) {
       hint.set("closed", wire.is_closed());
       break;
     }
-    case Kind::Vertex: hint.set("coordinates", vec_list(shape.as<Vertex>().coordinates())); break;
+    case Kind::Vertex:
+      hint.set("coordinates", vec_list(shape.as<Vertex>().coordinates()));
+      break;
     case Kind::Shell:
       hint.set("face_count", static_cast<std::int64_t>(shape.as<Shell>().faces().size()));
       hint.set("bbox", bbox_payload(shape));
@@ -154,16 +194,10 @@ Value make_selector_hint(const Shape& shape) {
   return hint;
 }
 
-Value make_geo_exact_selector(const Shape& shape, const Shape* source) {
-  Value selector = Value::object();
-  selector.set("mode", "geo_exact");
-  selector.set("kind", shape_kind_token(shape));
-  Value geo = shape.get_metadata("geo", Value::object());
-  if (geo.is_null()) geo = Value::object();
-  if (shape.kind() == Kind::Edge && source != nullptr) {
-    if (const auto index = wrapper_edge_index(*source, shape)) geo.set("edge_index", *index);
-  }
-  selector.set("metadata_geo", std::move(geo));
+namespace {
+
+// A face loaded from a BREP region snapshot also names its snapshot and source face id.
+void add_brep_region_ref(Value& selector, const Shape& shape) {
   if (shape.kind() == Kind::Face) {
     const Value provenance = shape.get_metadata("provenance");
     if (provenance.is_object()) {
@@ -177,24 +211,31 @@ Value make_geo_exact_selector(const Shape& shape, const Shape* source) {
       }
     }
   }
-  try {
-    selector.set("bbox", bbox_payload(shape));
-  } catch (const std::exception&) {
-  }
-  if (const auto geom = shape_geom_type(shape)) selector.set("geom_type", *geom);
+}
 
+// The kind-specific measurements that make up the exact selector (compared by geo_selector_score).
+void add_kind_measurements(Value& selector, const Shape& shape) {
   switch (shape.kind()) {
-    case Kind::Vertex: selector.set("coordinates", vec_list(shape.as<Vertex>().coordinates())); break;
+    case Kind::Vertex:
+      selector.set("coordinates", vec_list(shape.as<Vertex>().coordinates()));
+      break;
     case Kind::Edge: {
       const Edge edge = shape.as<Edge>();
       selector.set("length", edge.length());
       selector.set("center", vec_list(edge.center()));
+      std::optional<std::pair<Vec3, Vec3>> end_points;
       try {
         const Vec3 start = edge.start_vertex().coordinates();
         const Vec3 end = edge.end_vertex().coordinates();
-        selector.set("start", vec_list(start));
-        selector.set("end", vec_list(end));
-      } catch (const std::exception&) {
+        end_points = std::pair<Vec3, Vec3>(start, end);
+      } catch (const Exception&) {
+        // start_vertex/end_vertex throw ValueError for an edge without vertices: the selector then keeps
+        // no end points (nothing reports it; the selector is still valid).
+        end_points = std::nullopt;
+      }
+      if (end_points) {
+        selector.set("start", vec_list(end_points->first));
+        selector.set("end", vec_list(end_points->second));
       }
       break;
     }
@@ -213,7 +254,9 @@ Value make_geo_exact_selector(const Shape& shape, const Shape* source) {
       selector.set("inner_wire_count", static_cast<std::int64_t>(face.inner_wires().size()));
       break;
     }
-    case Kind::Shell: selector.set("face_count", static_cast<std::int64_t>(shape.as<Shell>().faces().size())); break;
+    case Kind::Shell:
+      selector.set("face_count", static_cast<std::int64_t>(shape.as<Shell>().faces().size()));
+      break;
     case Kind::Solid: {
       const Solid solid = shape.as<Solid>();
       selector.set("volume", solid.volume());
@@ -227,17 +270,51 @@ Value make_geo_exact_selector(const Shape& shape, const Shape* source) {
       break;
     }
   }
+}
+
+}  // namespace
+
+Value make_geo_exact_selector(const Shape& shape, const Shape* source) {
+  Value selector = Value::object();
+  selector.set("mode", "geo_exact");
+  selector.set("kind", shape_kind_token(shape));
+  Value geo = shape.get_metadata("geo", Value::object());
+  if (geo.is_null())
+    geo = Value::object();
+  if (shape.kind() == Kind::Edge && source != nullptr) {
+    if (const auto index = wrapper_edge_index(*source, shape))
+      geo.set("edge_index", *index);
+  }
+  selector.set("metadata_geo", std::move(geo));
+  add_brep_region_ref(selector, shape);
+  std::optional<Value> bbox;
+  try {
+    bbox = bbox_payload(shape);
+  } catch (const Exception&) {
+    // Shape::bounding_box runs under occt_guard (KernelError/ValueError): a shape with no box keeps a
+    // selector without one (nothing reports it).
+    bbox = std::nullopt;
+  }
+  if (bbox)
+    selector.set("bbox", std::move(*bbox));
+  if (const auto geom = shape_geom_type(shape))
+    selector.set("geom_type", *geom);
+
+  add_kind_measurements(selector, shape);
   return selector;
 }
 
 std::optional<Value> serialize_shape_ref(const Shape& shape) {
   std::optional<Value> ref;
-  if (Session* session = Session::active_session()) ref = session->topo_ref_value(shape);
+  if (Session* session = Session::active_session())
+    ref = session->topo_ref_value(shape);
   if (!ref) {
     const Value stored = shape.get_metadata("topo_ref");
-    if (stored.is_object()) ref = stored;
+    if (stored.is_object())
+      ref = stored;
   }
-  if (!ref) return std::nullopt;
+  if (!ref)
+    return std::nullopt;
   ref->set("selector_hint", make_selector_hint(shape));
   return ref;
 }
@@ -245,29 +322,35 @@ std::optional<Value> serialize_shape_ref(const Shape& shape) {
 Value serialize_shape_refs(const std::vector<Shape>& shapes) {
   Value refs = Value::array();
   for (const Shape& shape : shapes) {
-    if (auto ref = serialize_shape_ref(shape)) refs.push_back(std::move(*ref));
+    if (auto ref = serialize_shape_ref(shape))
+      refs.push_back(std::move(*ref));
   }
   return refs;
 }
 
 std::optional<std::string> shape_ref_topo_id(const Shape& shape) {
   const auto ref = serialize_shape_ref(shape);
-  if (!ref) return std::nullopt;
+  if (!ref)
+    return std::nullopt;
   const Value* id = ref->find("topo_id");
-  if (id == nullptr || id->is_null()) return std::nullopt;
+  if (id == nullptr || id->is_null())
+    return std::nullopt;
   return id->is_string() ? id->as_string() : id->dump();
 }
 
 Value serialize_selection_indices(const std::vector<Shape>& selected, const std::vector<Shape>& candidates) {
   std::map<std::string, std::int64_t> index_by_topo_id;
   for (std::size_t i = 0; i < candidates.size(); ++i) {
-    if (const auto id = shape_ref_topo_id(candidates[i])) index_by_topo_id.emplace(*id, static_cast<std::int64_t>(i));
+    if (const auto id = shape_ref_topo_id(candidates[i]))
+      index_by_topo_id.emplace(*id, static_cast<std::int64_t>(i));
   }
   Value out = Value::array();
   for (const Shape& shape : selected) {
     const auto id = shape_ref_topo_id(shape);
-    if (!id) continue;
-    if (const auto found = index_by_topo_id.find(*id); found != index_by_topo_id.end()) out.push_back(found->second);
+    if (!id)
+      continue;
+    if (const auto found = index_by_topo_id.find(*id); found != index_by_topo_id.end())
+      out.push_back(found->second);
   }
   return out;
 }

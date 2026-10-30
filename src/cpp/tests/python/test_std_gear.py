@@ -170,7 +170,7 @@ def test_cycloidal_disc():
     """, rel=1e-4)
     # KNOWN GAP: the plain disc's face area differs from the reference by ~2e-5 (port 1577.9807,
     # reference 1577.9485). The cubic B-spline fit itself matches the reference to 6e-14 on an
-    # independent input (see docs/HANDOFF.md), so the cause is elsewhere and is not yet found.
+    # independent input, so the cause is elsewhere and is not yet found.
     # Volume, face/edge counts and metadata match; only the area is loosened, to 1e-4.
 
 

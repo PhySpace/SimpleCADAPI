@@ -21,8 +21,8 @@ struct DiagnosticImage {
   std::string operation;  // the failing operation ("union_rsolid")
   std::string view;       // what the picture shows ("default", "best-fit plane projection")
   std::string caption;
-  std::string dedup_key;  // the same failure is drawn once per process
-  std::vector<Shape> shapes;  // what to draw (3D kinds, and the wires of the plans)
+  std::string dedup_key;            // the same failure is drawn once per process
+  std::vector<Shape> shapes;        // what to draw (3D kinds, and the wires of the plans)
   Value payload = Value::object();  // kind-specific data: marks, labels, entities, what is implicated
 };
 

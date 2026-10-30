@@ -37,8 +37,10 @@ void query_input_faces(tracking::HistorySource& history, const Solid& input, std
 }
 
 std::string input_role(std::size_t index) {
-  if (index == 0) return "body";
-  if (index == 1) return "tool";
+  if (index == 0)
+    return "body";
+  if (index == 1)
+    return "tool";
   return "tool_" + std::to_string(index);
 }
 
@@ -50,7 +52,8 @@ TrackedBooleanResult track_boolean(kernel::BooleanOp op, const Solid& body, cons
     kernel::BooleanOptions options;
     options.fill_history = true;
     const kernel::BooleanResult run = kernel::run_boolean(op, body.wrapped(), {tool.wrapped()}, options);
-    if (!run.done) throw ValueError(failure);
+    if (!run.done)
+      throw ValueError(failure);
 
     tracking::DeltaBuilder delta;
     if (tracking::history_wanted()) {
@@ -61,13 +64,16 @@ TrackedBooleanResult track_boolean(kernel::BooleanOp op, const Solid& body, cons
     }
     // Section edges are reported even when face history is not wanted.
     delta.section_edge_ids.reserve(run.section_edges.size());
-    for (const TopoDS_Shape& edge : run.section_edges) delta.section_edge_ids.push_back(kernel_topo_id(edge));
+    for (const TopoDS_Shape& edge : run.section_edges)
+      delta.section_edge_ids.push_back(kernel_topo_id(edge));
 
     std::optional<Solid> solid;
     TopoDS_Solid first;
-    if (kernel::first_solid(run.shape, first)) solid.emplace(first);
+    if (kernel::first_solid(run.shape, first))
+      solid.emplace(first);
     std::vector<Solid> solids;
-    for (const TopoDS_Solid& piece : kernel::solids_of(run.shape)) solids.emplace_back(piece);
+    for (const TopoDS_Solid& piece : kernel::solids_of(run.shape))
+      solids.emplace_back(piece);
     return to_boolean_result(std::move(solid), std::move(solids), std::move(delta));
   });
 }
@@ -79,8 +85,7 @@ TrackedBooleanResult tracked_cut(const Solid& body, const Solid& tool) {
 }
 
 TrackedBooleanResult tracked_intersect(const Solid& body, const Solid& tool) {
-  return track_boolean(kernel::BooleanOp::Common, body, tool,
-                       "Boolean intersect failed: OCC build did not complete");
+  return track_boolean(kernel::BooleanOp::Common, body, tool, "Boolean intersect failed: OCC build did not complete");
 }
 
 TrackedBooleanResult tracked_union(const Solid& body, const Solid& tool, bool glue, double tol) {
@@ -88,7 +93,8 @@ TrackedBooleanResult tracked_union(const Solid& body, const Solid& tool, bool gl
     const kernel::FuseHistoryResult fused =
         kernel::fuse_shapes_with_history({body.wrapped(), tool.wrapped()}, glue, tol, /*clean=*/false);
     const std::vector<TopoDS_Solid> solids = kernel::solids_of(fused.shape);
-    if (solids.size() != 1) throw ValueError("Boolean union did not produce exactly one solid");
+    if (solids.size() != 1)
+      throw ValueError("Boolean union did not produce exactly one solid");
     return track_union_history({body, tool}, Solid(solids.front()), *fused.history, fused.section_edges);
   });
 }
@@ -96,7 +102,8 @@ TrackedBooleanResult tracked_union(const Solid& body, const Solid& tool, bool gl
 TrackedBooleanResult track_union_history(const std::vector<Solid>& solids, const Solid& result_solid,
                                          const BRepTools_History& history,
                                          const std::vector<TopoDS_Shape>& section_edges) {
-  if (solids.size() < 2) throw ValueError("Union history tracking requires at least two solids");
+  if (solids.size() < 2)
+    throw ValueError("Union history tracking requires at least two solids");
 
   return occt_guard([&] {
     tracking::DeltaBuilder delta;
@@ -112,10 +119,12 @@ TrackedBooleanResult track_union_history(const std::vector<Solid>& solids, const
     // The section edges that survive into the result, each once.
     TopTools_IndexedMapOfShape seen;
     for (const TopoDS_Shape& edge : section_edges) {
-      if (!in_result.contains(edge)) continue;
+      if (!in_result.contains(edge))
+        continue;
       const int before = seen.Extent();
       seen.Add(edge);
-      if (seen.Extent() > before) delta.section_edge_ids.push_back(kernel_topo_id(edge));
+      if (seen.Extent() > before)
+        delta.section_edge_ids.push_back(kernel_topo_id(edge));
     }
     return to_boolean_result(result_solid, std::vector<Solid>{result_solid}, std::move(delta));
   });

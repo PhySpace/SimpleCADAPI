@@ -26,9 +26,9 @@ namespace scad::surface::detail {
 
 // What the recorder is told about the operation.
 struct OperationRecord {
-  std::string op;                                           // the recorded name ("make_loft_rshell")
-  Value params = Value::object();                           // evaluated numbers, JSON-like
-  std::vector<std::pair<std::string, Scalar>> symbolic;     // only the Var/Expr arguments
+  std::string op;                                        // the recorded name ("make_loft_rshell")
+  Value params = Value::object();                        // evaluated numbers, JSON-like
+  std::vector<std::pair<std::string, Scalar>> symbolic;  // only the Var/Expr arguments
   std::vector<OpInput> inputs;
   // The node labels (`tags=` of record_operation_if_active); empty = {primitive|derived, surface, <kind>}.
   std::vector<std::string> labels;

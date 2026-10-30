@@ -19,13 +19,15 @@ namespace scad::detail {
 // {"a": 1, "b": "x"} in insertion order.
 inline Value object(std::initializer_list<std::pair<std::string, Value>> members) {
   Value out = Value::object();
-  for (const auto& [key, value] : members) out.set(key, value);
+  for (const auto& [key, value] : members)
+    out.set(key, value);
   return out;
 }
 
 inline Value string_array(const std::vector<std::string>& items) {
   Value out = Value::array();
-  for (const auto& item : items) out.push_back(item);
+  for (const auto& item : items)
+    out.push_back(item);
   return out;
 }
 
@@ -47,7 +49,8 @@ inline bool ends_with(std::string_view s, std::string_view suffix) noexcept {
 
 inline std::string strip(std::string_view s) {
   const auto b = s.find_first_not_of(" \t\r\n\f\v");
-  if (b == std::string_view::npos) return {};
+  if (b == std::string_view::npos)
+    return {};
   const auto e = s.find_last_not_of(" \t\r\n\f\v");
   return std::string(s.substr(b, e - b + 1));
 }
@@ -55,20 +58,23 @@ inline std::string strip(std::string_view s) {
 inline std::string lower(std::string_view s) {
   std::string out(s);
   for (char& c : out)
-    if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+    if (c >= 'A' && c <= 'Z')
+      c = static_cast<char>(c - 'A' + 'a');
   return out;
 }
 
 inline std::string upper(std::string_view s) {
   std::string out(s);
   for (char& c : out)
-    if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A');
+    if (c >= 'a' && c <= 'z')
+      c = static_cast<char>(c - 'a' + 'A');
   return out;
 }
 
 // str(value) for the scalar kinds evidence carries; JSON text for the rest.
 inline std::string text_of(const Value& v) {
-  if (v.is_string()) return v.as_string();
+  if (v.is_string())
+    return v.as_string();
   return v.dump();
 }
 
@@ -85,9 +91,11 @@ inline int output_slot_of(const Shape& shape) {
 }
 
 inline std::optional<SelectorSource> graph_source_of(const Shape& shape) {
-  if (current_recorder() == nullptr) return std::nullopt;
+  if (current_recorder() == nullptr)
+    return std::nullopt;
   const Value node = shape.get_runtime("graph.node_id");
-  if (!node.is_string() || node.as_string().empty()) return std::nullopt;
+  if (!node.is_string() || node.as_string().empty())
+    return std::nullopt;
   return SelectorSource{node.as_string(), output_slot_of(shape)};
 }
 

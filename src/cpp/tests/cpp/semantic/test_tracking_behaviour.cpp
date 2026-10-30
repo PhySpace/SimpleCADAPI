@@ -29,14 +29,16 @@ namespace {
 
 std::set<std::string> ids_of(const std::vector<TopoRef>& refs) {
   std::set<std::string> ids;
-  for (const TopoRef& r : refs) ids.insert(r.topo_id);
+  for (const TopoRef& r : refs)
+    ids.insert(r.topo_id);
   return ids;
 }
 
 template <class Handles>
 std::set<std::string> kernel_ids(const Handles& handles) {
   std::set<std::string> ids;
-  for (const auto& h : handles) ids.insert(kernel_topo_id(h.wrapped()));
+  for (const auto& h : handles)
+    ids.insert(kernel_topo_id(h.wrapped()));
   return ids;
 }
 
@@ -107,18 +109,17 @@ TEST_CASE("a translate entry and its delta_entries record have the Python layout
   CHECK(entry.origin_role == std::optional<std::string>("body"));
   CHECK(entry.ref.kind == Kind::Face);
   CHECK(entry.parent_refs.front().kind == Kind::Face);
-  CHECK(entry.metadata.dump() ==
-        R"({"derivation":"continuation","coverage":"complete","status":"proven",)"
-        R"("evidence_kind":"kernel_history","source_kind":"FACE"})");
+  CHECK(entry.metadata.dump() == R"({"derivation":"continuation","coverage":"complete","status":"proven",)"
+                                 R"("evidence_kind":"kernel_history","source_kind":"FACE"})");
 
   const std::string witness = R"({"topo_id":")" + out_id +
                               R"(","event":"modified","kind":"FACE","source_kind":"FACE","origin_role":"body",)"
-                              R"("input_topo_id":")" + in_id +
-                              R"(","derivation":"continuation","coverage":"complete","status":"proven"})";
+                              R"("input_topo_id":")" +
+                              in_id + R"(","derivation":"continuation","coverage":"complete","status":"proven"})";
   CHECK(tracked.delta_entries.at(out_id).dump() ==
         R"({"topo_id":")" + out_id + R"(","kind":"FACE","event":"modified","origin_role":"body","input_topo_id":")" +
-            in_id + R"(","derivation":"continuation","coverage":"complete","status":"proven","witnesses":[)" +
-            witness + R"(],"events":["modified"],"origin_roles":["body"]})");
+            in_id + R"(","derivation":"continuation","coverage":"complete","status":"proven","witnesses":[)" + witness +
+            R"(],"events":["modified"],"origin_roles":["body"]})");
 
   // The ids name the real sub-shapes: the source is a face of the box, the result a face of the shape returned.
   CHECK(kernel_ids(box.faces()).contains(in_id));
@@ -135,15 +136,15 @@ TEST_CASE("an extrusion's side face has a history witness and a role witness und
   const std::set<std::string> side_ids = ids_of(tracked.delta.generated);
   const std::set<std::string> edge_ids = kernel_ids(profile.edges());
   for (const TopoRoleEntry& role : tracked.delta.roles) {
-    if (role.role != "extrusion.side") continue;
+    if (role.role != "extrusion.side")
+      continue;
     CHECK(side_ids.contains(role.ref.topo_id));
     REQUIRE(role.parent_refs.size() == 1);
     CHECK(role.parent_refs.front().kind == Kind::Edge);
     CHECK(edge_ids.contains(role.parent_refs.front().topo_id));
     CHECK(role.origin_role == std::optional<std::string>("profile"));
-    CHECK(role.metadata.dump() ==
-          R"({"coverage":"complete","status":"proven","evidence_kind":"kernel_operation_role",)"
-          R"("evidence_method":"Generated","source_kind":"EDGE"})");
+    CHECK(role.metadata.dump() == R"({"coverage":"complete","status":"proven","evidence_kind":"kernel_operation_role",)"
+                                  R"("evidence_method":"Generated","source_kind":"EDGE"})");
   }
 
   const std::string id = tracked.delta.generated.front().topo_id;
@@ -160,7 +161,8 @@ TEST_CASE("an extrusion's side face has a history witness and a role witness und
   // The caps carry roles only, so their records have no history summary.
   const TopoRoleEntry* start = nullptr;
   for (const TopoRoleEntry& role : tracked.delta.roles) {
-    if (role.role == "extrusion.start") start = &role;
+    if (role.role == "extrusion.start")
+      start = &role;
   }
   REQUIRE(start != nullptr);
   CHECK(start->parent_refs.empty());
@@ -176,7 +178,8 @@ TEST_CASE("roles of the same fact are reported once") {
   const TrackedResult tracked = tracked_cylinder({0, 0, 0}, {0, 0, 1}, 2.0, 5.0);
   CHECK(tracked.delta.roles.size() == 6);
   std::set<std::pair<std::string, std::string>> distinct;
-  for (const TopoRoleEntry& r : tracked.delta.roles) distinct.insert({r.role, r.ref.topo_id});
+  for (const TopoRoleEntry& r : tracked.delta.roles)
+    distinct.insert({r.role, r.ref.topo_id});
   CHECK(distinct.size() == 6);
 }
 
@@ -263,7 +266,8 @@ TEST_CASE("a transform leaves its input untouched") {
   const std::set<std::string> before = kernel_ids(box.faces());
   const TrackedResult tracked = tracked_translate(box, {5, 0, 0});
   CHECK(kernel_ids(box.faces()) == before);
-  for (const std::string& id : kernel_ids(tracked.shape.as<Solid>().faces())) CHECK_FALSE(before.contains(id));
+  for (const std::string& id : kernel_ids(tracked.shape.as<Solid>().faces()))
+    CHECK_FALSE(before.contains(id));
 }
 
 // ---------------------------------------------------------------------------
@@ -365,7 +369,8 @@ TEST_CASE("an asymmetric chamfer puts the first distance on the given face") {
 
   const TrackedResult asymmetric = tracked_chamfer(box, {edge}, 0.5, 1.0, {{faces[0], faces[1]}});
   CHECK(1000.0 - asymmetric.shape.as<Solid>().volume() == doctest::Approx(2.5).epsilon(1e-6));  // d1*d2*L/2
-  CHECK_THROWS_WITH((void)tracked_chamfer(box, {edge}, 0.5, 1.0), "An asymmetric chamfer requires one (face1, face2) pair per edge");
+  CHECK_THROWS_WITH((void)tracked_chamfer(box, {edge}, 0.5, 1.0),
+                    "An asymmetric chamfer requires one (face1, face2) pair per edge");
 }
 
 TEST_CASE("shell roles: body, offset, closing descendants and walls") {
@@ -406,9 +411,10 @@ TEST_CASE("the same boolean twice gives the same delta") {
   for (int run = 0; run < 3; ++run) {
     const TrackedBooleanResult tracked = tracked_cut(plate, tool);
     REQUIRE(tracked.solid.has_value());
-    const auto summary = summarise(tracked.delta, tracked.delta_entries, {plate.wrapped(), tool.wrapped()},
-                                   tracked.solid->wrapped());
-    if (run == 0) first = summary;
+    const auto summary =
+        summarise(tracked.delta, tracked.delta_entries, {plate.wrapped(), tool.wrapped()}, tracked.solid->wrapped());
+    if (run == 0)
+      first = summary;
     CHECK(summary == first);
   }
 }
@@ -448,7 +454,8 @@ TEST_CASE("an N-ary union labels its inputs body, tool, tool_2, ...") {
   const TrackedBooleanResult tracked = track_union_history(row, result, *fused.history, fused.section_edges);
 
   std::set<std::string> roles;
-  for (const TopoEntry& e : tracked.delta.entries) roles.insert(*e.origin_role);
+  for (const TopoEntry& e : tracked.delta.entries)
+    roles.insert(*e.origin_role);
   CHECK(roles == std::set<std::string>{"body", "tool", "tool_2", "tool_3"});
   CHECK(result.faces().size() == 6);
 }

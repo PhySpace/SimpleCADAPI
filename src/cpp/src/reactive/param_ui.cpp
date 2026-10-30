@@ -11,7 +11,8 @@
 namespace scad::reactive {
 
 std::string UiNumber::text() const {
-  if (integral) return std::to_string(static_cast<long long>(value));
+  if (integral)
+    return std::to_string(static_cast<long long>(value));
   return py_float_repr(value);
 }
 
@@ -21,9 +22,12 @@ Value UiNumber::to_value() const {
 
 std::string_view to_string(ParamKind kind) noexcept {
   switch (kind) {
-    case ParamKind::Float: return "float";
-    case ParamKind::Int: return "int";
-    case ParamKind::Bool: return "bool";
+    case ParamKind::Float:
+      return "float";
+    case ParamKind::Int:
+      return "int";
+    case ParamKind::Bool:
+      return "bool";
   }
   return "float";
 }
@@ -58,12 +62,15 @@ class Reader {
   Outcome read(Call& out) {
     skip_blanks();
     std::string name;
-    if (!identifier(name)) return fail_kind();
+    if (!identifier(name))
+      return fail_kind();
     skip_blanks();
-    if (!consume('(')) return at_end() ? Outcome::NotACall : Outcome::SyntaxError;
+    if (!consume('('))
+      return at_end() ? Outcome::NotACall : Outcome::SyntaxError;
     out.callee = name;
     skip_blanks();
-    if (consume(')')) return finish();
+    if (consume(')'))
+      return finish();
     while (true) {
       Argument arg;
       skip_blanks();
@@ -77,15 +84,18 @@ class Reader {
           pos_ = mark;
         }
       }
-      if (!argument_value(arg)) return Outcome::SyntaxError;
+      if (!argument_value(arg))
+        return Outcome::SyntaxError;
       out.args.push_back(std::move(arg));
       skip_blanks();
       if (consume(',')) {
         skip_blanks();
-        if (consume(')')) return finish();
+        if (consume(')'))
+          return finish();
         continue;
       }
-      if (consume(')')) return finish();
+      if (consume(')'))
+        return finish();
       return Outcome::SyntaxError;
     }
   }
@@ -102,7 +112,8 @@ class Reader {
     skip_blanks();
     if (argument_value(probe)) {
       skip_blanks();
-      if (at_end()) return Outcome::NotACall;
+      if (at_end())
+        return Outcome::NotACall;
     }
     return Outcome::SyntaxError;
   }
@@ -110,18 +121,21 @@ class Reader {
   bool at_end() const { return pos_ >= text_.size(); }
   bool peek_is(char c) const { return pos_ < text_.size() && text_[pos_] == c; }
   bool consume(char c) {
-    if (!peek_is(c)) return false;
+    if (!peek_is(c))
+      return false;
     ++pos_;
     return true;
   }
   void skip_blanks() {
-    while (pos_ < text_.size() && std::isspace(static_cast<unsigned char>(text_[pos_]))) ++pos_;
+    while (pos_ < text_.size() && std::isspace(static_cast<unsigned char>(text_[pos_])))
+      ++pos_;
   }
   bool identifier(std::string& out) {
     const std::size_t start = pos_;
     if (pos_ < text_.size() && (std::isalpha(static_cast<unsigned char>(text_[pos_])) || text_[pos_] == '_')) {
       ++pos_;
-      while (pos_ < text_.size() && (std::isalnum(static_cast<unsigned char>(text_[pos_])) || text_[pos_] == '_')) ++pos_;
+      while (pos_ < text_.size() && (std::isalnum(static_cast<unsigned char>(text_[pos_])) || text_[pos_] == '_'))
+        ++pos_;
       out.assign(text_.substr(start, pos_ - start));
       return true;
     }
@@ -130,10 +144,13 @@ class Reader {
 
   bool argument_value(Argument& arg) {
     skip_blanks();
-    if (pos_ >= text_.size()) return false;
+    if (pos_ >= text_.size())
+      return false;
     const char c = text_[pos_];
-    if (c == '"' || c == '\'') return string_literal(arg.value);
-    if (c == '-' || c == '+' || c == '.' || std::isdigit(static_cast<unsigned char>(c))) return number_literal(arg.value);
+    if (c == '"' || c == '\'')
+      return string_literal(arg.value);
+    if (c == '-' || c == '+' || c == '.' || std::isdigit(static_cast<unsigned char>(c)))
+      return number_literal(arg.value);
     std::string word;
     const std::size_t mark = pos_;
     if (identifier(word)) {
@@ -161,25 +178,31 @@ class Reader {
 
   bool number_literal(Literal& out) {
     const std::size_t start = pos_;
-    if (text_[pos_] == '-' || text_[pos_] == '+') ++pos_;
+    if (text_[pos_] == '-' || text_[pos_] == '+')
+      ++pos_;
     bool integral = true;
     const std::size_t digits_from = pos_;
-    while (pos_ < text_.size() && (std::isdigit(static_cast<unsigned char>(text_[pos_])) || text_[pos_] == '_')) ++pos_;
+    while (pos_ < text_.size() && (std::isdigit(static_cast<unsigned char>(text_[pos_])) || text_[pos_] == '_'))
+      ++pos_;
     if (peek_is('.')) {
       integral = false;
       ++pos_;
-      while (pos_ < text_.size() && std::isdigit(static_cast<unsigned char>(text_[pos_]))) ++pos_;
+      while (pos_ < text_.size() && std::isdigit(static_cast<unsigned char>(text_[pos_])))
+        ++pos_;
     }
     if (pos_ < text_.size() && (text_[pos_] == 'e' || text_[pos_] == 'E')) {
       std::size_t probe = pos_ + 1;
-      if (probe < text_.size() && (text_[probe] == '+' || text_[probe] == '-')) ++probe;
+      if (probe < text_.size() && (text_[probe] == '+' || text_[probe] == '-'))
+        ++probe;
       if (probe < text_.size() && std::isdigit(static_cast<unsigned char>(text_[probe]))) {
         integral = false;
         pos_ = probe;
-        while (pos_ < text_.size() && std::isdigit(static_cast<unsigned char>(text_[pos_]))) ++pos_;
+        while (pos_ < text_.size() && std::isdigit(static_cast<unsigned char>(text_[pos_])))
+          ++pos_;
       }
     }
-    if (pos_ == digits_from || (pos_ == digits_from + 1 && text_[digits_from] == '.')) return false;
+    if (pos_ == digits_from || (pos_ == digits_from + 1 && text_[digits_from] == '.'))
+      return false;
     std::string number(text_.substr(start, pos_ - start));
     number.erase(std::remove(number.begin(), number.end(), '_'), number.end());
     out.type = Literal::Type::Number;
@@ -195,14 +218,21 @@ class Reader {
       if (c == '\\' && pos_ < text_.size()) {
         const char escaped = text_[pos_++];
         switch (escaped) {
-          case 'n': c = '\n'; break;
-          case 't': c = '\t'; break;
-          default: c = escaped; break;
+          case 'n':
+            c = '\n';
+            break;
+          case 't':
+            c = '\t';
+            break;
+          default:
+            c = escaped;
+            break;
         }
       }
       value += c;
     }
-    if (!consume(quote)) return false;
+    if (!consume(quote))
+      return false;
     out.type = Literal::Type::String;
     out.text = std::move(value);
     return true;
@@ -214,7 +244,9 @@ class Reader {
 
 constexpr std::string_view kControlList = "['number', 'slider', 'toggle']";
 
-bool is_control(std::string_view name) { return name == "slider" || name == "number" || name == "toggle"; }
+bool is_control(std::string_view name) {
+  return name == "slider" || name == "number" || name == "toggle";
+}
 
 }  // namespace
 
@@ -228,7 +260,8 @@ ParamUi parse_ui_comment(std::string_view text) {
     case Reader::Outcome::NotACall:
       ui.issues.push_back("ui comment must be one of " + std::string(kControlList) + ": " + py_str_repr(text));
       return ui;
-    case Reader::Outcome::Call: break;
+    case Reader::Outcome::Call:
+      break;
   }
   if (!is_control(call.callee)) {
     ui.issues.push_back("ui comment must be one of " + std::string(kControlList) + ": " + py_str_repr(text));
@@ -237,7 +270,8 @@ ParamUi parse_ui_comment(std::string_view text) {
   const bool toggle = call.callee == "toggle";
   const std::size_t positional_limit = toggle ? 0 : 2;
   std::size_t positional = 0;
-  for (const Argument& arg : call.args) positional += arg.key.empty() ? 1 : 0;
+  for (const Argument& arg : call.args)
+    positional += arg.key.empty() ? 1 : 0;
   if (positional > positional_limit) {
     ui.issues.push_back("too many positional arguments for " + call.callee);
     return ui;
@@ -248,7 +282,8 @@ ParamUi parse_ui_comment(std::string_view text) {
   std::size_t next_positional = 0;
   for (const Argument& arg : call.args) {
     std::string key = arg.key;
-    if (key.empty()) key = next_positional++ == 0 ? "min" : "max";
+    if (key.empty())
+      key = next_positional++ == 0 ? "min" : "max";
     if (key != "min" && key != "max" && key != "step" && key != "unit" && key != "label") {
       ui.issues.push_back("unknown ui option " + py_str_repr(key));
       return ui;
@@ -271,7 +306,7 @@ ParamUi parse_ui_comment(std::string_view text) {
       (key == "unit" ? parsed.unit : parsed.label) = arg.value.text;
     }
   }
-  if (parsed.step && parsed.step->value <= 0) {
+  if (const auto step = parsed.step; step && step->value <= 0) {
     ui.issues.push_back("step must be positive");
     return ui;
   }
@@ -296,7 +331,8 @@ Value ParamSpec::to_value() const {
   out.set("label", label && !label->empty() ? *label : (dot == std::string::npos ? name : name.substr(dot + 1)));
   out.set("comment", comment ? Value(*comment) : Value());
   Value list = Value::array();
-  for (const std::string& issue : issues) list.push_back(issue);
+  for (const std::string& issue : issues)
+    list.push_back(issue);
   out.set("issues", list);
   return out;
 }
@@ -332,7 +368,8 @@ ParamSpec make_param_spec(std::string name, ParamKind kind, Value default_value,
     spec.issues.push_back("min " + lower->text() + " is above max " + upper->text());
     lower.reset();
     upper.reset();
-    if (kind != ParamKind::Bool) spec.control = "number";
+    if (kind != ParamKind::Bool)
+      spec.control = "number";
   }
   spec.min = lower;
   spec.max = upper;

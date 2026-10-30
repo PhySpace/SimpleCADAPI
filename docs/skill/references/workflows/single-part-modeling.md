@@ -40,7 +40,8 @@ Standing discipline, binding for every role:
   block-structured features per `discipline/feature-tree-convention.md`
   (sketch → basic body op → bool → modifier, one feature per block and one
   block per cell, each with its boundary comment); read both before Role 4
-  writes any model source.
+  writes any model source, together with `discipline/notebook-cell-design.md`
+  (where the cell boundaries go, when a number is a `Var`, and why).
 - **Repair the owning artifact.** A failed verification reopens the current
   stage's verifier contract or model, whichever owns the failure. Never patch
   downstream symptoms or weaken a check to pass it.
@@ -52,7 +53,7 @@ Standing discipline, binding for every role:
 | 1 | Requirement Confirmer | `domains/requirement-refinement.md`, `discipline/requirement-and-cad-brief.md` | `<part-dir>/REQUIREMENTS.md` | ⛔ user consent received |
 | 2 | Master Planner | `REQUIREMENTS.md`, `discipline/mechanical-modeling.md`, `discipline/datums-and-coordinate-systems.md` | `<part-dir>/BUILD_PLAN.md` + base TODOs | plan presented |
 | 3 | Verifier Planner | `REQUIREMENTS.md`, `BUILD_PLAN.md`, `discipline/geometric-validation.md`, exact API/diagnostic pages used by the check | current-stage verification contract, hypothesis snippets, executable verification script, `plan verifier` and `run verifier` TODO items | verification artifact is ready before modeling |
-| 4 | Detail Modeling Planner & Builder | current stage's verifier contract, `domains/part-modeling.md`, `discipline/feature-ordering.md`, `discipline/feature-tree-convention.md`, exact modeling API pages | current-stage model, operation hypotheses, rendered evidence inputs | model runs and the prepared verifier passes |
+| 4 | Detail Modeling Planner & Builder | current stage's verifier contract, `domains/part-modeling.md`, `discipline/feature-ordering.md`, `discipline/feature-tree-convention.md`, `discipline/notebook-cell-design.md`, exact modeling API pages | current-stage model, operation hypotheses, rendered evidence inputs | model runs and the prepared verifier passes |
 | 5 | Exporter | `REQUIREMENTS.md` export rows, `domains/export-and-translation.md`, `domains/assembly-and-product.md` | `.scadpkg` + requested exports, readability check | artifacts re-open cleanly |
 
 ## Role-switch protocol

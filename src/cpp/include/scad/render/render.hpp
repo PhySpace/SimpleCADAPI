@@ -50,13 +50,15 @@ struct Bounds {
 // ---------------------------------------------------------------------------
 struct Camera {
   Vec3 target;
-  Vec3 right, up, forward;  // orthonormal; forward points from the eye into the scene
+  Vec3 right, up, forward;   // orthonormal; forward points from the eye into the scene
   double half_height = 1.0;  // world units from the image centre to its top edge
   double aspect = 1.0;       // width / height
 
   Vec3 eye(double distance) const { return target - forward * distance; }
   // Image position in [0,1]^2 (x right, y DOWN, like pixels) and the distance along `forward`.
-  struct Projected { double x, y, depth; };
+  struct Projected {
+    double x, y, depth;
+  };
   Projected project(const Vec3& p) const;
 };
 
@@ -101,8 +103,8 @@ struct PointStyle {
 };
 
 struct Polylines {
-  std::vector<float> points;           // xyz
-  std::vector<std::uint32_t> starts;   // polyline i = points[starts[i], starts[i+1]); size = count + 1
+  std::vector<float> points;          // xyz
+  std::vector<std::uint32_t> starts;  // polyline i = points[starts[i], starts[i+1]); size = count + 1
   std::size_t count() const { return starts.empty() ? 0 : starts.size() - 1; }
 };
 
@@ -125,9 +127,18 @@ class Scene {
   std::size_t mesh_count() const { return meshes_.size(); }
   std::size_t triangle_count() const;
 
-  struct MeshEntry { std::shared_ptr<const io::Mesh> mesh; MeshStyle style; };
-  struct LineEntry { Polylines lines; LineStyle style; };
-  struct PointEntry { std::vector<float> xyz; PointStyle style; };
+  struct MeshEntry {
+    std::shared_ptr<const io::Mesh> mesh;
+    MeshStyle style;
+  };
+  struct LineEntry {
+    Polylines lines;
+    LineStyle style;
+  };
+  struct PointEntry {
+    std::vector<float> xyz;
+    PointStyle style;
+  };
   const std::vector<MeshEntry>& meshes() const { return meshes_; }
   const std::vector<LineEntry>& lines() const { return lines_; }
   const std::vector<PointEntry>& points() const { return points_; }
@@ -173,7 +184,7 @@ struct RenderOptions {
 };
 
 struct AnchorResult {
-  double x = 0, y = 0;   // output pixels (full image, y down)
+  double x = 0, y = 0;  // output pixels (full image, y down)
   double depth = 0;
   bool in_view = false;
   bool visible = false;  // in view and not behind the nearest surface at its pixel
@@ -196,7 +207,7 @@ struct Frame {
   std::vector<std::int32_t> mesh_id;  // -1 = background
   std::vector<std::int32_t> face_id;  // face id inside that mesh, -1 = none
   std::vector<Panel> panels;
-  double ink_diameter = 0;            // world
+  double ink_diameter = 0;  // world
   double render_ms = 0, resolve_ms = 0;
 };
 

@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "metadata.hpp"
+#include "scad/core/tolerance.hpp"
 #include "scad/core/error.hpp"
 #include "scad/ops/features/features.hpp"
 #include "scad/ops/geometry/geometry.hpp"
@@ -22,9 +23,12 @@ namespace {
 
 Solid make_nut_body(const std::string& style, double width, double height, int knurl_count) {
   const Scalar3 origin = scalar3(0.0, 0.0, 0.0);
-  if (style == "hex") return make_across_flats_prism(6, width, 0.0, height);
-  if (style == "square") return make_box_rsolid(width, width, height, origin);
-  if (style == "round") return make_cylinder_rsolid(width / 2.0, height, origin, scalar3(0.0, 0.0, 1.0));
+  if (style == "hex")
+    return make_across_flats_prism(6, width, 0.0, height);
+  if (style == "square")
+    return make_box_rsolid(width, width, height, origin);
+  if (style == "round")
+    return make_cylinder_rsolid(width / 2.0, height, origin, scalar3(0.0, 0.0, 1.0));
 
   const double outer_radius = width / 2.0;
   std::vector<Scalar3> points;
@@ -54,19 +58,23 @@ Solid make_nut_rsolid(double diameter, double width, double height, const NutOpt
   const double default_depth = thread_form == "v" ? (resolved_diameter - basic_minor_diameter) / 2.0 : pitch * 0.5;
   const double depth = options.thread_depth ? positive_finite("thread_depth", *options.thread_depth) : default_depth;
   const double major_radius = resolved_diameter / 2.0;
-  if (depth >= major_radius) throw ValueError("thread_depth must be smaller than the nut hole radius");
+  if (depth >= major_radius)
+    throw ValueError("thread_depth must be smaller than the nut hole radius");
   if (resolved_width / 2.0 <= major_radius + resolved_diameter * 0.05) {
     throw ValueError("width leaves insufficient wall around the nut hole");
   }
-  if (options.knurl_count < 8) throw ValueError("knurl_count must be an integer of at least 8");
+  if (options.knurl_count < 8)
+    throw ValueError("knurl_count must be an integer of at least 8");
 
   double hole_depth = resolved_height;
   double hole_start = 0.0;
   if (hole_style == "through") {
-    if (options.hole_depth) throw ValueError("hole_depth is only valid when hole_style='blind'");
+    if (options.hole_depth)
+      throw ValueError("hole_depth is only valid when hole_style='blind'");
   } else {
     hole_depth = positive_finite("hole_depth", options.hole_depth ? *options.hole_depth : resolved_height * 0.75);
-    if (hole_depth >= resolved_height) throw ValueError("blind hole_depth must be smaller than height");
+    if (hole_depth >= resolved_height)
+      throw ValueError("blind hole_depth must be smaller than height");
     hole_start = resolved_height - hole_depth;
   }
   if (thread_detail == "modeled" && hole_depth <= pitch) {
@@ -74,11 +82,12 @@ Solid make_nut_rsolid(double diameter, double width, double height, const NutOpt
   }
 
   const Solid body = make_nut_body(nut_style, resolved_width, resolved_height, options.knurl_count);
-  const double epsilon = std::max(1e-5, resolved_diameter * 1e-4);
+  const double epsilon = std::max(tol::kCutterOverrunFloor, resolved_diameter * tol::kCutterOverrunRelative);
   const bool through = hole_style == "through";
   const double cut_start = through ? -epsilon : hole_start;
   const double cut_height = through ? hole_depth + 2.0 * epsilon : hole_depth + epsilon;
-  const Solid hole = make_cylinder_rsolid(major_radius, cut_height, scalar3(0.0, 0.0, cut_start), scalar3(0.0, 0.0, 1.0));
+  const Solid hole =
+      make_cylinder_rsolid(major_radius, cut_height, scalar3(0.0, 0.0, cut_start), scalar3(0.0, 0.0, 1.0));
   CutOptions cut;
   cut.skip_non_intersecting = false;
   Solid nut = cut_rsolid({body, hole}, cut);
@@ -101,15 +110,15 @@ Solid make_nut_rsolid(double diameter, double width, double height, const NutOpt
   }
   nut = Solid(apply_tag(nut, "role.fastener.nut"));
   nut = Solid(apply_tag(nut, "group.fasteners"));
-  nut.set_metadata("std.fastener.nut",
-                   Dict("diameter", resolved_diameter)("width", resolved_width)("height", resolved_height)(
-                       "nut_style", nut_style)("hole_style", hole_style)("hole_depth", hole_depth)(
-                       "hole_start", hole_start)("thread_detail", thread_detail)("thread_form", thread_form)(
-                       "thread_pitch", pitch)("thread_pitch_source", resolved_pitch.source)("thread_depth", depth)(
-                       "pitch_diameter", pitch_diameter)("basic_minor_diameter", basic_minor_diameter)(
-                       "modeled_minor_diameter", resolved_diameter - 2.0 * depth)(
-                       "thread_phase_degrees", thread_phase_degrees)("knurl_count", options.knurl_count)
-                       .take());
+  nut.set_metadata(
+      "std.fastener.nut",
+      Dict("diameter", resolved_diameter)("width", resolved_width)("height", resolved_height)("nut_style", nut_style)(
+          "hole_style", hole_style)("hole_depth", hole_depth)("hole_start", hole_start)("thread_detail", thread_detail)(
+          "thread_form", thread_form)("thread_pitch", pitch)("thread_pitch_source", resolved_pitch.source)(
+          "thread_depth", depth)("pitch_diameter", pitch_diameter)("basic_minor_diameter", basic_minor_diameter)(
+          "modeled_minor_diameter", resolved_diameter - 2.0 * depth)("thread_phase_degrees", thread_phase_degrees)(
+          "knurl_count", options.knurl_count)
+          .take());
   return nut;
 }
 

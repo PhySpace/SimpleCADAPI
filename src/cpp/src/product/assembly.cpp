@@ -9,10 +9,13 @@
 
 namespace scad::product {
 
-std::string_view item_kind(const Item& item) { return std::holds_alternative<AssemblyPtr>(item) ? "assembly" : "part"; }
+std::string_view item_kind(const Item& item) {
+  return std::holds_alternative<AssemblyPtr>(item) ? "assembly" : "part";
+}
 
 const std::string& item_id(const Item& item) {
-  if (const auto* assembly = std::get_if<AssemblyPtr>(&item)) return (*assembly)->assembly_id();
+  if (const auto* assembly = std::get_if<AssemblyPtr>(&item))
+    return (*assembly)->assembly_id();
   return std::get<PartPtr>(item)->part_id();
 }
 
@@ -20,8 +23,8 @@ const std::string& item_id(const Item& item) {
 // PublicConnectorRef, Component
 // ---------------------------------------------------------------------------
 
-PublicConnectorRef::PublicConnectorRef(std::string public_id, std::string source_component, std::string source_connector,
-                                       const OptionalString& label)
+PublicConnectorRef::PublicConnectorRef(std::string public_id, std::string source_component,
+                                       std::string source_connector, const OptionalString& label)
     : public_connector_id(validate_identifier(public_id, "public_connector_id")),
       component_id(validate_identifier(source_component, "component_id")),
       connector_id(validate_identifier(source_connector, "connector_id")),
@@ -61,10 +64,12 @@ namespace {
 template <class Rows, class Key>
 std::string duplicates_of(const Rows& rows, Key key) {
   std::map<std::string, int> counts;
-  for (const auto& row : rows) ++counts[key(row)];
+  for (const auto& row : rows)
+    ++counts[key(row)];
   std::string out;
   for (const auto& [id, count] : counts) {
-    if (count > 1) out += (out.empty() ? "" : ", ") + id;
+    if (count > 1)
+      out += (out.empty() ? "" : ", ") + id;
   }
   return out;
 }
@@ -74,7 +79,8 @@ void assert_no_assembly_cycle(const Assembly& parent, const Assembly& child) {
     throw ValueError("assembly cycle detected for '" + parent.assembly_id() + "'");
   }
   for (const Component& component : child.components()) {
-    if (const auto* nested = std::get_if<AssemblyPtr>(&component.item)) assert_no_assembly_cycle(parent, **nested);
+    if (const auto* nested = std::get_if<AssemblyPtr>(&component.item))
+      assert_no_assembly_cycle(parent, **nested);
   }
 }
 
@@ -112,16 +118,19 @@ Assembly::Assembly(std::string assembly_id, OptionalString name, std::vector<Com
   std::vector<std::string> grounded;
   for (const std::string& raw : grounded_component_ids) {
     const std::string id = validate_identifier(raw, "component_id");
-    if (std::find(grounded.begin(), grounded.end(), id) == grounded.end()) grounded.push_back(id);
+    if (std::find(grounded.begin(), grounded.end(), id) == grounded.end())
+      grounded.push_back(id);
   }
   const std::vector<std::string> known = component_ids();
   std::set<std::string> unknown;
   for (const std::string& id : grounded) {
-    if (std::find(known.begin(), known.end(), id) == known.end()) unknown.insert(id);
+    if (std::find(known.begin(), known.end(), id) == known.end())
+      unknown.insert(id);
   }
   if (!unknown.empty()) {
     std::string joined;
-    for (const std::string& id : unknown) joined += (joined.empty() ? "" : ", ") + id;
+    for (const std::string& id : unknown)
+      joined += (joined.empty() ? "" : ", ") + id;
     throw ValueError("grounded component_id not found in assembly: " + joined);
   }
   grounded_ = std::move(grounded);
@@ -130,14 +139,16 @@ Assembly::Assembly(std::string assembly_id, OptionalString name, std::vector<Com
 std::vector<std::string> Assembly::component_ids() const {
   std::vector<std::string> ids;
   ids.reserve(components_.size());
-  for (const Component& component : components_) ids.push_back(component.component_id);
+  for (const Component& component : components_)
+    ids.push_back(component.component_id);
   return ids;
 }
 
 const Component& Assembly::get_component(std::string_view component_id) const {
   const std::string target = validate_identifier(component_id, "component_id");
   for (const Component& component : components_) {
-    if (component.component_id == target) return component;
+    if (component.component_id == target)
+      return component;
   }
   throw LookupError("assembly has no component_id '" + target + "'");
 }
@@ -145,7 +156,8 @@ const Component& Assembly::get_component(std::string_view component_id) const {
 Value Assembly::authored_runtime() const {
   Value out = Value::object();
   const Value authored = get_runtime(kAuthoredPlacementsKey);
-  if (!authored.is_null()) out.set(std::string(kAuthoredPlacementsKey), authored);
+  if (!authored.is_null())
+    out.set(std::string(kAuthoredPlacementsKey), authored);
   return out;
 }
 
@@ -163,7 +175,8 @@ Assembly Assembly::with_component(const Component& component) const {
   if (std::find(ids.begin(), ids.end(), component.component_id) != ids.end()) {
     throw ValueError("duplicate component_id in assembly: " + component.component_id);
   }
-  if (const auto* nested = std::get_if<AssemblyPtr>(&component.item)) assert_no_assembly_cycle(*this, **nested);
+  if (const auto* nested = std::get_if<AssemblyPtr>(&component.item))
+    assert_no_assembly_cycle(*this, **nested);
   std::vector<Component> components = components_;
   components.push_back(component);
   return derive(std::move(components), public_connectors_, constraints_, grounded_, Value::object());
@@ -182,20 +195,23 @@ Assembly Assembly::with_component_placement(std::string_view component_id, const
       components.push_back(component);
     }
   }
-  if (!found) throw LookupError("assembly has no component_id '" + target + "'");
+  if (!found)
+    throw LookupError("assembly has no component_id '" + target + "'");
   return derive(std::move(components), public_connectors_, constraints_, grounded_, Value::object());
 }
 
 std::vector<std::string> Assembly::public_connector_ids() const {
   std::vector<std::string> ids;
-  for (const PublicConnectorRef& pub : public_connectors_) ids.push_back(pub.public_connector_id);
+  for (const PublicConnectorRef& pub : public_connectors_)
+    ids.push_back(pub.public_connector_id);
   return ids;
 }
 
 const PublicConnectorRef& Assembly::get_public_connector(std::string_view public_connector_id) const {
   const std::string target = validate_identifier(public_connector_id, "public_connector_id");
   for (const PublicConnectorRef& pub : public_connectors_) {
-    if (pub.public_connector_id == target) return pub;
+    if (pub.public_connector_id == target)
+      return pub;
   }
   throw LookupError("assembly has no public_connector_id '" + target + "'");
 }
@@ -213,14 +229,16 @@ Assembly Assembly::with_public_connector(const PublicConnectorRef& public_connec
 
 std::vector<std::string> Assembly::constraint_ids() const {
   std::vector<std::string> ids;
-  for (const Constraint& constraint : constraints_) ids.push_back(constraint.constraint_id());
+  for (const Constraint& constraint : constraints_)
+    ids.push_back(constraint.constraint_id());
   return ids;
 }
 
 const Constraint& Assembly::get_constraint(std::string_view constraint_id) const {
   const std::string target = validate_identifier(constraint_id, "constraint_id");
   for (const Constraint& constraint : constraints_) {
-    if (constraint.constraint_id() == target) return constraint;
+    if (constraint.constraint_id() == target)
+      return constraint;
   }
   throw LookupError("assembly has no constraint_id '" + target + "'");
 }
@@ -240,7 +258,8 @@ Assembly Assembly::with_constraint(const Constraint& constraint) const {
 Assembly Assembly::with_grounded_component(std::string_view component_id) const {
   const std::string target = validate_identifier(component_id, "component_id");
   get_component(target);
-  if (std::find(grounded_.begin(), grounded_.end(), target) != grounded_.end()) return *this;
+  if (std::find(grounded_.begin(), grounded_.end(), target) != grounded_.end())
+    return *this;
   std::vector<std::string> grounded = grounded_;
   grounded.push_back(target);
   return derive(components_, public_connectors_, constraints_, std::move(grounded), authored_runtime());
@@ -251,7 +270,8 @@ Assembly Assembly::without_grounded_component(std::string_view component_id) con
   get_component(target);
   std::vector<std::string> grounded;
   for (const std::string& existing : grounded_) {
-    if (existing != target) grounded.push_back(existing);
+    if (existing != target)
+      grounded.push_back(existing);
   }
   return derive(components_, public_connectors_, constraints_, std::move(grounded), authored_runtime());
 }
@@ -261,28 +281,35 @@ Value Assembly::to_dict() const {
   out.set("assembly_id", id_);
   out.set("name", name_ ? Value(*name_) : Value());
   Value components = Value::array();
-  for (const Component& component : components_) components.push_back(component.to_dict());
+  for (const Component& component : components_)
+    components.push_back(component.to_dict());
   out.set("components", std::move(components));
   Value publics = Value::array();
-  for (const PublicConnectorRef& pub : public_connectors_) publics.push_back(pub.to_dict());
+  for (const PublicConnectorRef& pub : public_connectors_)
+    publics.push_back(pub.to_dict());
   out.set("public_connectors", std::move(publics));
   Value constraints = Value::array();
-  for (const Constraint& constraint : constraints_) constraints.push_back(constraint.to_dict());
+  for (const Constraint& constraint : constraints_)
+    constraints.push_back(constraint.to_dict());
   out.set("constraints", std::move(constraints));
   Value grounded = Value::array();
-  for (const std::string& id : grounded_) grounded.push_back(id);
+  for (const std::string& id : grounded_)
+    grounded.push_back(id);
   out.set("grounded_component_ids", std::move(grounded));
   return out;
 }
 
 Assembly Assembly::with_component_path_placement(const std::vector<std::string>& component_path,
                                                  const Placement& placement) const {
-  if (component_path.empty()) throw ValueError("component path must not be empty");
+  if (component_path.empty())
+    throw ValueError("component path must not be empty");
   const Component& component = get_component(component_path.front());
   const Component replacement = [&]() -> Component {
-    if (component_path.size() == 1) return Component(component.component_id, component.item, placement, component.name);
+    if (component_path.size() == 1)
+      return Component(component.component_id, component.item, placement, component.name);
     const auto* nested = std::get_if<AssemblyPtr>(&component.item);
-    if (nested == nullptr) throw ValueError("component path crosses a non-assembly component");
+    if (nested == nullptr)
+      throw ValueError("component path crosses a non-assembly component");
     const std::vector<std::string> rest(component_path.begin() + 1, component_path.end());
     return Component(component.component_id,
                      std::make_shared<const Assembly>((*nested)->with_component_path_placement(rest, placement)),

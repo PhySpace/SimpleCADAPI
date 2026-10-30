@@ -24,7 +24,9 @@ namespace scad::geometry_detail {
 // Python's `get_active_session() is not None`: the profile makers then build their
 // result out of recorded edge / wire operations instead of one primitive.  Any
 // recorder counts, so everything that is recorded can be replayed.
-inline bool graph_recording() { return reactive::Session::active_session() != nullptr || current_recorder() != nullptr; }
+inline bool graph_recording() {
+  return reactive::Session::active_session() != nullptr || current_recorder() != nullptr;
+}
 
 // An argument point, evaluated and placed in world coordinates through the current system.
 inline Vec3 place_point(const Scalar3& point, std::string_view label) {
@@ -38,7 +40,8 @@ inline Vec3 place_vector(const Scalar3& vector, std::string_view label) {
 // op name alone is enough for the track summary.
 template <class Build>
 OpRecord record_for(std::string_view op, Build&& build) {
-  if (current_recorder() != nullptr) return std::forward<Build>(build)();
+  if (current_recorder() != nullptr)
+    return std::forward<Build>(build)();
   OpRecord stub;
   stub.op = std::string(op);
   return stub;
@@ -83,8 +86,10 @@ T with_profile_prefix(T shape, const OptionalString& tag_prefix, const OptionalS
 // `face._metadata = wire._metadata.copy()`
 inline void copy_metadata(const Shape& from, Shape& to) {
   const Value& metadata = from.metadata();
-  if (!metadata.is_object()) return;
-  for (const auto& [key, value] : metadata.as_object()) to.set_metadata(key, value);
+  if (!metadata.is_object())
+    return;
+  for (const auto& [key, value] : metadata.as_object())
+    to.set_metadata(key, value);
 }
 
 // The non-session tail of the planar profile makers: the face of a finished wire, recorded

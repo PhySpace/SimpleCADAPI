@@ -48,7 +48,8 @@ TopoDS_Shape apply_transform(const TopoDS_Shape& shape, const gp_Trsf& trsf, boo
   return occt_guard([&] {
     BRepBuilderAPI_Transform xform(shape, trsf, copy);
     xform.Build();
-    if (!xform.IsDone()) throw ValueError("OCP transform build failed");
+    if (!xform.IsDone())
+      throw ValueError("OCP transform build failed");
     return xform.Shape();
   });
 }
@@ -65,8 +66,8 @@ TopoDS_Shape mirror_shape(const TopoDS_Shape& shape, const Vec3& plane_origin, c
   return apply_transform(shape, mirror_trsf(plane_origin, plane_normal));
 }
 
-TopoDS_Shape place_shape(const TopoDS_Shape& shape, const Vec3& origin, const Vec3& x_axis,
-                         const Vec3& y_axis, const Vec3& z_axis) {
+TopoDS_Shape place_shape(const TopoDS_Shape& shape, const Vec3& origin, const Vec3& x_axis, const Vec3& y_axis,
+                         const Vec3& z_axis) {
   return apply_transform(shape, placement_trsf(origin, x_axis, y_axis, z_axis));
 }
 

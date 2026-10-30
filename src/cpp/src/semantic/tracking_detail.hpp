@@ -58,8 +58,8 @@ struct Witness {
   Kind source_kind = Kind::Face;  // of input_topo_id
   std::string origin_role;        // "body" / "tool" / "profile" ... (never empty)
   std::string input_topo_id;
-  std::string_view derivation;    // continuation | fragment | boundary | replacement
-  std::string_view result_role;   // "" = none
+  std::string_view derivation;   // continuation | fragment | boundary | replacement
+  std::string_view result_role;  // "" = none
   bool project_source_tags = false;
 };
 
@@ -116,8 +116,8 @@ class RetainedHistory final : public HistorySource {
 // Everything `_query_exact_history` takes besides the builder and the shapes.
 struct QuerySpec {
   std::string_view origin_role;
-  Kind kind = Kind::Face;                  // of the inputs
-  kernel::SubShapeIndex* result = nullptr; // only facts that land in the result; null = no filter
+  Kind kind = Kind::Face;                   // of the inputs
+  kernel::SubShapeIndex* result = nullptr;  // only facts that land in the result; null = no filter
   std::string_view modified_derivation = "fragment";
   std::string_view generated_derivation = "boundary";
   // result_role applies to every event; the specific ones override it.
@@ -149,8 +149,8 @@ std::optional<RoleWitness> operation_role(kernel::SubShapeIndex& result, const T
                                           std::string_view role, std::string_view evidence_method,
                                           std::optional<std::string_view> origin_role = std::nullopt);
 // Append operation_role(...) when it exists.
-void add_operation_role(std::vector<RoleWitness>& roles, kernel::SubShapeIndex& result,
-                        const TopoDS_Shape& candidate, std::string_view role, std::string_view evidence_method,
+void add_operation_role(std::vector<RoleWitness>& roles, kernel::SubShapeIndex& result, const TopoDS_Shape& candidate,
+                        std::string_view role, std::string_view evidence_method,
                         std::optional<std::string_view> origin_role = std::nullopt);
 // `_roles_from_history`: one role per witness that has a result_role, from
 // witnesses[begin..].

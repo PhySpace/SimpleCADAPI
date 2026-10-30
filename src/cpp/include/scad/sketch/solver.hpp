@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/sketch/types.hpp"
 
 namespace scad {
@@ -18,7 +19,7 @@ namespace scad {
 class Sketch;
 
 struct SketchSolverOptions {
-  double tolerance = 1e-7;
+  double tolerance = tol::kSketchSolveResidual;
   int max_iterations = 80;
 };
 

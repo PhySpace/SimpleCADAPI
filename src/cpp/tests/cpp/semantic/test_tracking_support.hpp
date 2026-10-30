@@ -37,9 +37,9 @@ inline Solid cylinder_solid(double radius, double height, const Vec3& bottom_cen
 // make_rectangle_rwire(w, h, center=...): in the plane z = centre.z, counter-clockwise.
 inline Wire rectangle_wire(double w, double h, const Vec3& centre = {0, 0, 0}) {
   const double x = w / 2, y = h / 2;
-  return Wire(kernel::make_polyline_wire({centre + Vec3{-x, -y, 0}, centre + Vec3{x, -y, 0},
-                                          centre + Vec3{x, y, 0}, centre + Vec3{-x, y, 0}},
-                                         /*closed=*/true));
+  return Wire(kernel::make_polyline_wire(
+      {centre + Vec3{-x, -y, 0}, centre + Vec3{x, -y, 0}, centre + Vec3{x, y, 0}, centre + Vec3{-x, y, 0}},
+      /*closed=*/true));
 }
 
 inline Face rectangle_face(double w, double h, const Vec3& centre = {0, 0, 0}) {
@@ -61,7 +61,8 @@ inline ShapeIndex index_shapes(const std::vector<TopoDS_Shape>& roots) {
   ShapeIndex found;
   for (const TopoDS_Shape& root : roots) {
     for (TopAbs_ShapeEnum type : {TopAbs_VERTEX, TopAbs_EDGE, TopAbs_FACE, TopAbs_WIRE, TopAbs_SOLID}) {
-      for (const TopoDS_Shape& shape : kernel::explore(root, type)) found.emplace(kernel_topo_id(shape), shape);
+      for (const TopoDS_Shape& shape : kernel::explore(root, type))
+        found.emplace(kernel_topo_id(shape), shape);
     }
     found.emplace(kernel_topo_id(root), root);
   }
@@ -70,26 +71,31 @@ inline ShapeIndex index_shapes(const std::vector<TopoDS_Shape>& roots) {
 
 inline std::string centre_text(const ShapeIndex& index, const std::string& id) {
   const auto it = index.find(id);
-  if (it == index.end()) return "?";
+  if (it == index.end())
+    return "?";
   const Vec3 c = kernel::center_of_mass(it->second);
   char buffer[96];
   std::snprintf(buffer, sizeof buffer, "(%.4f,%.4f,%.4f)", c.x + 0.0, c.y + 0.0, c.z + 0.0);
   std::string text = buffer;
   // -0.0000 is what a tiny negative prints as; the recorder rounds first.
-  for (std::size_t at; (at = text.find("-0.0000")) != std::string::npos;) text.erase(at, 1);
+  for (std::size_t at; (at = text.find("-0.0000")) != std::string::npos;)
+    text.erase(at, 1);
   return text;
 }
 
 inline std::string upper(std::string_view kind) {
   std::string out(kind);
-  std::transform(out.begin(), out.end(), out.begin(), [](unsigned char ch) { return static_cast<char>(std::toupper(ch)); });
+  std::transform(out.begin(), out.end(), out.begin(),
+                 [](unsigned char ch) { return static_cast<char>(std::toupper(ch)); });
   return out;
 }
 
 inline std::string join(const Value* list) {
   std::string out;
-  if (list == nullptr) return out;
-  for (const Value& item : list->as_array()) out += (out.empty() ? "" : ",") + item.as_string();
+  if (list == nullptr)
+    return out;
+  for (const Value& item : list->as_array())
+    out += (out.empty() ? "" : ",") + item.as_string();
   return out;
 }
 
@@ -102,14 +108,11 @@ inline std::vector<std::string> summarise(const TopoDelta& delta, const DeltaEnt
 
   std::vector<std::string> lines;
   std::vector<std::string> body;
-  lines.push_back("counts preserved=" + std::to_string(delta.preserved.size()) +
-                  " modified=" + std::to_string(delta.modified.size()) +
-                  " generated=" + std::to_string(delta.generated.size()) +
-                  " deleted=" + std::to_string(delta.deleted.size()) +
-                  " section_edges=" + std::to_string(delta.section_edges.size()) +
-                  " entries=" + std::to_string(delta.entries.size()) +
-                  " roles=" + std::to_string(delta.roles.size()) +
-                  " delta_entries=" + std::to_string(entries.size()));
+  lines.push_back("counts preserved=" + std::to_string(delta.preserved.size()) + " modified=" +
+                  std::to_string(delta.modified.size()) + " generated=" + std::to_string(delta.generated.size()) +
+                  " deleted=" + std::to_string(delta.deleted.size()) + " section_edges=" +
+                  std::to_string(delta.section_edges.size()) + " entries=" + std::to_string(delta.entries.size()) +
+                  " roles=" + std::to_string(delta.roles.size()) + " delta_entries=" + std::to_string(entries.size()));
 
   for (const TopoEntry& e : delta.entries) {
     const TopoRef& source = e.parent_refs.at(0);
@@ -131,12 +134,12 @@ inline std::vector<std::string> summarise(const TopoDelta& delta, const DeltaEnt
                    r.metadata.find("evidence_method")->as_string() + "|" + upper(kind_name(r.ref.kind)) + "@" +
                    centre_text(index, r.ref.topo_id) + "|" + parent);
   }
-  for (const TopoRef& ref : delta.section_edges) body.push_back("S EDGE@" + centre_text(index, ref.topo_id));
+  for (const TopoRef& ref : delta.section_edges)
+    body.push_back("S EDGE@" + centre_text(index, ref.topo_id));
   for (const auto& [id, value] : entries) {
-    body.push_back("D " + centre_text(index, id) + "|" + value.find("kind")->as_string() + "|ev=" +
-                   join(value.find("events")) + "|or=" + join(value.find("origin_roles")) +
-                   "|rr=" + join(value.find("result_roles")) + "|w=" +
-                   std::to_string(value.find("witnesses")->size()));
+    body.push_back("D " + centre_text(index, id) + "|" + value.find("kind")->as_string() +
+                   "|ev=" + join(value.find("events")) + "|or=" + join(value.find("origin_roles")) +
+                   "|rr=" + join(value.find("result_roles")) + "|w=" + std::to_string(value.find("witnesses")->size()));
   }
   std::sort(body.begin(), body.end());
   lines.insert(lines.end(), body.begin(), body.end());

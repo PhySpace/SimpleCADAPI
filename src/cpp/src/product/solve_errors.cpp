@@ -21,14 +21,16 @@ std::string constraint_description(const Constraint& constraint) {
 
 std::string join(const std::vector<std::string>& items, std::string_view separator) {
   std::string out;
-  for (const std::string& item : items) out += (out.empty() ? "" : std::string(separator)) + item;
+  for (const std::string& item : items)
+    out += (out.empty() ? "" : std::string(separator)) + item;
   return out;
 }
 
 // Python's repr(list_of_str).
 std::string list_repr(const std::vector<std::string>& items) {
   std::string out = "[";
-  for (std::size_t i = 0; i < items.size(); ++i) out += (i == 0 ? "" : ", ") + python_repr(items[i]);
+  for (std::size_t i = 0; i < items.size(); ++i)
+    out += (i == 0 ? "" : ", ") + python_repr(items[i]);
   return out + "]";
 }
 
@@ -46,7 +48,8 @@ void raise_residual_failure(const Assembly& assembly, const std::vector<Constrai
                                                 {"angular tolerance", kAngleToleranceDegrees, "deg"}};
   std::vector<std::string> failed_ids;
   for (const ConstraintResidual& residual : residuals) {
-    if (residual.within_tolerance) continue;
+    if (residual.within_tolerance)
+      continue;
     failed_ids.push_back(residual.constraint_id);
     measurements.push_back({residual.constraint_id + " translation error", residual.translation_error, "mm"});
     measurements.push_back({residual.constraint_id + " angular error", residual.angular_error_degrees, "deg"});
@@ -64,7 +67,8 @@ void raise_residual_failure(const Assembly& assembly, const std::vector<Constrai
   const ConstraintResidual* worst = nullptr;
   double worst_score = 0.0;
   for (const ConstraintResidual& residual : residuals) {
-    if (residual.within_tolerance) continue;
+    if (residual.within_tolerance)
+      continue;
     const double score = std::max(residual.translation_error / std::max(kPlacementTolerance, 1e-30),
                                   residual.angular_error_degrees / std::max(kAngleToleranceDegrees, 1e-30));
     if (worst == nullptr || score > worst_score) {
@@ -96,10 +100,9 @@ void raise_residual_failure(const Assembly& assembly, const std::vector<Constrai
        "A nested subassembly still owns internal degrees of freedom that the parent cannot close."},
       {"Fix the connector frame definitions named in the repair lines, not the placements.",
        "For closed loops, remove one redundant constraint or solve the loop internally in a subassembly."});
-  raise_harness_error(spec,
-                      "assembly_id=" + assembly.assembly_id() +
-                          ", grounded=" + list_repr(assembly.grounded_component_ids()),
-                      std::move(measurements), std::move(repair), std::move(inventory));
+  raise_harness_error(
+      spec, "assembly_id=" + assembly.assembly_id() + ", grounded=" + list_repr(assembly.grounded_component_ids()),
+      std::move(measurements), std::move(repair), std::move(inventory));
 }
 
 void raise_structural_failure(const Assembly& assembly, StructuralFailure kind, const Constraint* constraint,
@@ -119,34 +122,38 @@ void raise_structural_failure(const Assembly& assembly, StructuralFailure kind, 
     } else if (std::find(unsolved_ids.begin(), unsolved_ids.end(), id) != unsolved_ids.end()) {
       status = "unsolved";
     }
-    const auto references = std::count_if(assembly.constraints().begin(), assembly.constraints().end(),
-                                          [&id](const Constraint& existing) {
-                                            return existing.connector_a().component_id() == id ||
-                                                   existing.connector_b().component_id() == id;
-                                          });
+    const auto references =
+        std::count_if(assembly.constraints().begin(), assembly.constraints().end(), [&id](const Constraint& existing) {
+          return existing.connector_a().component_id() == id || existing.connector_b().component_id() == id;
+        });
     inventory.push_back({id, status, std::to_string(references) + " connecting constraint(s)"});
   }
 
-  const char* kind_name = kind == StructuralFailure::UnresolvableLoop
-                              ? "unresolvable_loop"
-                              : (kind == StructuralFailure::NoGroundedPath ? "no_grounded_path" : "unsolved_components");
+  const char* kind_name =
+      kind == StructuralFailure::UnresolvableLoop
+          ? "unresolvable_loop"
+          : (kind == StructuralFailure::NoGroundedPath ? "no_grounded_path" : "unsolved_components");
   std::string what;
   std::vector<std::string> repair;
   if (constraint != nullptr && kind == StructuralFailure::UnresolvableLoop) {
     what = "constraint '" + constraint->constraint_id() + "' (" + constraint_description(*constraint) +
            ") forms a closed loop with no feasible scalar inside its limits";
-    repair = {"Add or widen a ScalarLimit on that constraint (angle_limit / distance_limit), or delete one constraint "
-              "on the loop to break it open",
-              "Let a nested subassembly solve the loop internally and have the parent consume its public interface"};
+    repair = {
+        "Add or widen a ScalarLimit on that constraint (angle_limit / distance_limit), or delete one constraint "
+        "on the loop to break it open",
+        "Let a nested subassembly solve the loop internally and have the parent consume its public interface"};
   } else if (constraint != nullptr && kind == StructuralFailure::NoGroundedPath) {
     what = "constraint '" + constraint->constraint_id() + "' (" + constraint_description(*constraint) +
            ") connects two components that are both unreachable from any grounded component";
-    repair = {"Ground one end of the chain with ground_component_rassembly, or add a connecting constraint so the "
-              "component is reachable from a grounded one"};
+    repair = {
+        "Ground one end of the chain with ground_component_rassembly, or add a connecting constraint so the "
+        "component is reachable from a grounded one"};
   } else {
-    what = "components unreachable from any grounded component through the constraint graph: " + join(unsolved_ids, ", ");
-    repair = {"Add a ground or a connecting constraint for the [unsolved] components so they are reachable from a "
-              "grounded one"};
+    what =
+        "components unreachable from any grounded component through the constraint graph: " + join(unsolved_ids, ", ");
+    repair = {
+        "Add a ground or a connecting constraint for the [unsolved] components so they are reachable from a "
+        "grounded one"};
   }
 
   const ErrorSpec spec(

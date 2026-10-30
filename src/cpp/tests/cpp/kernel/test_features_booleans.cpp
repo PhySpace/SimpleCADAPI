@@ -26,7 +26,9 @@ TopoDS_Wire rectangle(double w, double h, double z = 0.0) {
   return make_polyline_wire({{-w / 2, -h / 2, z}, {w / 2, -h / 2, z}, {w / 2, h / 2, z}, {-w / 2, h / 2, z}}, true);
 }
 
-TopoDS_Solid cube(double x, double size = 2.0) { return make_box_solid({x, 0, 0}, size, size, size); }
+TopoDS_Solid cube(double x, double size = 2.0) {
+  return make_box_solid({x, 0, 0}, size, size, size);
+}
 
 }  // namespace
 
@@ -69,8 +71,8 @@ TEST_CASE("sweep a square along a segment") {
 
 TEST_CASE("helical sweep: a small square wound around the axis") {
   // The profile is built about the axis and the builder moves it out to the helix radius.
-  const TopoDS_Wire profile = make_polyline_wire(
-      {{-0.1, 0, -0.1}, {0.1, 0, -0.1}, {0.1, 0, 0.1}, {-0.1, 0, 0.1}}, true);
+  const TopoDS_Wire profile =
+      make_polyline_wire({{-0.1, 0, -0.1}, {0.1, 0, -0.1}, {0.1, 0, 0.1}, {-0.1, 0, 0.1}}, true);
   const TopoDS_Shape thread = make_helical_sweep_solid(profile, 1.0, 3.0, 1.0, {0, 0, 0}, {0, 0, 1});
   const double centreline = 3.0 * std::sqrt(4.0 * kPi * kPi + 1.0);
   CHECK(volume(thread) == doctest::Approx(0.04 * centreline).epsilon(0.02));  // Pappus, approximately
@@ -125,8 +127,10 @@ TEST_CASE("run_boolean keeps history on request") {
   SubShapeIndex in_result(kept.shape);
   int survived = 0, modified = 0;
   for (const TopoDS_Face& face : faces_of(a)) {
-    if (!kept.history->Modified(face).IsEmpty()) ++modified;
-    if (in_result.contains(face) && kept.history->Modified(face).IsEmpty()) ++survived;
+    if (!kept.history->Modified(face).IsEmpty())
+      ++modified;
+    if (in_result.contains(face) && kept.history->Modified(face).IsEmpty())
+      ++survived;
   }
   CHECK(modified >= 1);
   CHECK(survived >= 1);
@@ -134,7 +138,8 @@ TEST_CASE("run_boolean keeps history on request") {
 
 TEST_CASE("fuse with history: clean-up merges faces and the history follows it") {
   std::vector<TopoDS_Shape> row;
-  for (int i = 0; i < 3; ++i) row.push_back(make_box_solid({static_cast<double>(i), 0, 0}, 1, 1, 1));
+  for (int i = 0; i < 3; ++i)
+    row.push_back(make_box_solid({static_cast<double>(i), 0, 0}, 1, 1, 1));
 
   const FuseHistoryResult raw = fuse_shapes_with_history(row, false, 1e-7, /*clean=*/false);
   CHECK(faces_of(raw.shape).size() == 14);
@@ -147,15 +152,18 @@ TEST_CASE("fuse with history: clean-up merges faces and the history follows it")
   int descendants = 0;
   for (const TopoDS_Shape& input : row) {
     for (const TopoDS_Face& face : faces_of(input)) {
-      if (clean.history->IsRemoved(face)) continue;
-      if (!clean.history->Modified(face).IsEmpty()) ++descendants;
+      if (clean.history->IsRemoved(face))
+        continue;
+      if (!clean.history->Modified(face).IsEmpty())
+        ++descendants;
     }
   }
   CHECK(descendants > 0);
 
   // Section edges are kept only if they survive into the result.
   SubShapeIndex in_result(clean.shape);
-  for (const TopoDS_Shape& edge : clean.section_edges) CHECK(in_result.contains(edge));
+  for (const TopoDS_Shape& edge : clean.section_edges)
+    CHECK(in_result.contains(edge));
 }
 
 TEST_CASE("fuse_shapes_with_history edge cases") {

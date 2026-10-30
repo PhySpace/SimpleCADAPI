@@ -34,7 +34,8 @@ Face build_face(const PromotionLoops& promotion, const Sketch& sketch) {
         "Sketch hole profiles must lie strictly inside the outer profile and must not touch or intersect another loop");
   }
   Face face(raw_face);
-  if (expected_normal.dot(face.normal_at()) < 0.0) face = Face(TopoDS::Face(raw_face.Reversed()));
+  if (expected_normal.dot(face.normal_at()) < 0.0)
+    face = Face(TopoDS::Face(raw_face.Reversed()));
   return face;
 }
 
@@ -64,10 +65,12 @@ Promotion promote_sketch_profile(const Sketch& sketch, const SketchProfileId& pr
       {profile, promotion.profile_payload, "outer", wire_from_profile(sketch, promotion.profile_payload)});
   Shape shape = promotion.source_wires.front().built.wire;
   if (target == PromotionTarget::Wire) {
-    if (!promotion.inner_profiles.empty()) throw ValueError("A Wire promotion accepts exactly one sketch profile");
+    if (!promotion.inner_profiles.empty())
+      throw ValueError("A Wire promotion accepts exactly one sketch profile");
   } else {
     for (const auto& [inner_profile, inner_payload] : promotion.inner_profiles) {
-      promotion.source_wires.push_back({inner_profile, inner_payload, "inner", wire_from_profile(sketch, inner_payload)});
+      promotion.source_wires.push_back(
+          {inner_profile, inner_payload, "inner", wire_from_profile(sketch, inner_payload)});
     }
     shape = build_face(promotion, sketch);
   }

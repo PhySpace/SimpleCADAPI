@@ -34,14 +34,16 @@ TEST_CASE("a recorded circle wire is an edge and a wire, a rectangle four lines 
 
   Recording rectangle;
   make_rectangle_rface(2.0, 1.0);
-  CHECK(rectangle.ops() == std::vector<std::string>{"make_line_redge", "make_line_redge", "make_line_redge", "make_line_redge",
-                                                    "make_wire_from_edges_rwire", "make_face_from_wire_rface"});
+  CHECK(rectangle.ops() == std::vector<std::string>{"make_line_redge", "make_line_redge", "make_line_redge",
+                                                    "make_line_redge", "make_wire_from_edges_rwire",
+                                                    "make_face_from_wire_rface"});
 }
 
 TEST_CASE("without a recorder the same makers build one primitive and record nothing") {
   CHECK(make_circle_rwire(scalar3(0, 0, 0), 2.0).get_metadata("track").find("op")->as_string() == "make_circle_wire");
   CHECK(make_rectangle_rface(2.0, 1.0).get_metadata("track").find("op")->as_string() == "make_rectangle_face");
-  CHECK(make_polyline_rwire({scalar3(0, 0, 0), scalar3(1, 0, 0)}).get_metadata("track").find("op")->as_string() == "make_polyline_wire");
+  CHECK(make_polyline_rwire({scalar3(0, 0, 0), scalar3(1, 0, 0)}).get_metadata("track").find("op")->as_string() ==
+        "make_polyline_wire");
   CHECK(make_helix_rwire(1.0, 2.0, 0.5).get_metadata("track").find("op")->as_string() == "make_helix_wire");
 }
 

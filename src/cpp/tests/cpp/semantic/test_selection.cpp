@@ -27,7 +27,8 @@ class FixedSelector final : public ShapeSelector {
   std::vector<Shape> resolve(const Shape& scope) const override {
     const auto faces = Solid(scope).faces();
     std::vector<Shape> out;
-    for (const std::size_t i : picks_) out.push_back(faces.at(i));
+    for (const std::size_t i : picks_)
+      out.push_back(faces.at(i));
     return out;
   }
   Value to_value() const override {
@@ -47,9 +48,12 @@ class AnchoringRecorder final : public Recorder {
   std::vector<OpRecord> records;
   void record(const OpRecord& record, const std::vector<Shape>& outputs) override {
     records.push_back(record);
-    for (Shape output : outputs) output.set_runtime("graph.node_id", "n_out");
+    for (Shape output : outputs)
+      output.set_runtime("graph.node_id", "n_out");
   }
-  std::optional<NodeReservation> reserve_node(std::string_view) override { return NodeReservation{"g_x", "n_reserved"}; }
+  std::optional<NodeReservation> reserve_node(std::string_view) override {
+    return NodeReservation{"g_x", "n_reserved"};
+  }
 };
 
 }  // namespace
@@ -107,7 +111,8 @@ TEST_CASE("targets must belong to the scope and be distinct") {
   } catch (const Error& e) {
     CHECK(e.operation() == "apply_tag_rselection");
     CHECK(e.guidance().what_happened == "Failed to attach the tag to the selected shapes.");
-    CHECK(e.guidance().technical_details.find("tag target does not belong to the assignment scope") != std::string::npos);
+    CHECK(e.guidance().technical_details.find("tag target does not belong to the assignment scope") !=
+          std::string::npos);
   }
   const Face face = box.faces()[0];
   CHECK_THROWS_AS((void)assign_tag(box, TagTargets(std::vector<Face>{face, face}), "role.x", TopologyPropagation::Local,
@@ -116,15 +121,16 @@ TEST_CASE("targets must belong to the scope and be distinct") {
   CHECK_THROWS_AS((void)assign_tag(box, TagTargets(std::vector<Face>{}), "role.x", TopologyPropagation::Local,
                                    LineagePolicy::ContinuationFragment),
                   ValueError);
-  CHECK_THROWS_AS((void)assign_tag(box, TagTargets(std::make_shared<FixedSelector>(std::vector<std::size_t>{})), "role.x",
-                                   TopologyPropagation::Local, LineagePolicy::ContinuationFragment),
+  CHECK_THROWS_AS((void)assign_tag(box, TagTargets(std::make_shared<FixedSelector>(std::vector<std::size_t>{})),
+                                   "role.x", TopologyPropagation::Local, LineagePolicy::ContinuationFragment),
                   ValueError);
 }
 
 TEST_CASE("a selector picks the targets and is recorded in the binding") {
   Solid box = box_solid(1, 1, 1);
-  const Shape tagged = apply_tag_rselection(box, TagTargets(std::make_shared<FixedSelector>(std::vector<std::size_t>{1, 2})),
-                                            "role.pair", TopologyPropagation::Downward);
+  const Shape tagged =
+      apply_tag_rselection(box, TagTargets(std::make_shared<FixedSelector>(std::vector<std::size_t>{1, 2})),
+                           "role.pair", TopologyPropagation::Downward);
   const Solid view(tagged);
   CHECK(view.faces()[1].has_tag("role.pair", TagScope::Local));
   CHECK(view.faces()[2].has_tag("role.pair", TagScope::Local));
@@ -172,8 +178,9 @@ TEST_CASE("the native selectors serialise like QL's and check their cardinality"
         R"("predicate":{"kind":"output_role","data":{"role":"extrusion.start"},"children":[]}})");
   const auto anchored = NativeSelector::exactly_one(Kind::Solid)->from_source({"n_4", 2});
   REQUIRE(anchored);
-  CHECK(anchored->to_value().dump() ==
-        R"({"target_kind":"solid","order_desc":false,"cardinality":{"exactly":1},"source_node_id":"n_4","source_output_slot":2})");
+  CHECK(
+      anchored->to_value().dump() ==
+      R"({"target_kind":"solid","order_desc":false,"cardinality":{"exactly":1},"source_node_id":"n_4","source_output_slot":2})");
   CHECK(anchored->source()->node_id == "n_4");
 
   const Solid box = box_solid(1, 1, 1);
@@ -212,9 +219,11 @@ TEST_CASE("under a recorder an assignment is a node anchored to its scope") {
   CHECK(box.get_runtime("graph.node_id").as_string() == "n_box");  // the scope keeps its own node
 
   // A selector anchored somewhere else cannot be used on this scope.
-  CHECK_THROWS_AS((void)assign_tag(box, TagTargets(std::make_shared<FixedSelector>(std::vector<std::size_t>{0}, SelectorSource{"n_other", 0})),
-                                   "role.b", TopologyPropagation::Local, LineagePolicy::ContinuationFragment),
-                  ValueError);
+  CHECK_THROWS_AS(
+      (void)assign_tag(
+          box, TagTargets(std::make_shared<FixedSelector>(std::vector<std::size_t>{0}, SelectorSource{"n_other", 0})),
+          "role.b", TopologyPropagation::Local, LineagePolicy::ContinuationFragment),
+      ValueError);
 }
 
 TEST_CASE("apply_tag marks the shape itself, apply_tag_rselection works on a clone") {

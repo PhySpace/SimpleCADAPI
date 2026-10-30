@@ -20,13 +20,14 @@
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/core/vec.hpp"
 #include "scad/surface/types.hpp"
 
 namespace scad::surface {
 
 struct GridFit {
-  double tolerance = 1e-3;
+  double tolerance = tol::kFitError;
   int degree_min = 3;
   int degree_max = 8;
   // Weights of the three smoothing terms; nullopt = plain tolerance-driven fit.
@@ -60,8 +61,7 @@ class SurfaceFitter {
   // The Gordon interpolation of a curve network: `profiles` run in u, `guides` in v, and
   // every profile must meet every guide within `tolerance`.
   virtual Handle(Geom_BSplineSurface) gordon(const std::vector<Handle(Geom_Curve)>& profiles,
-                                             const std::vector<Handle(Geom_Curve)>& guides,
-                                             double tolerance) const = 0;
+                                             const std::vector<Handle(Geom_Curve)>& guides, double tolerance) const = 0;
 };
 
 // The provider in use; the OpenCASCADE one unless replaced.

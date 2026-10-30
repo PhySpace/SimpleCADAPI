@@ -54,16 +54,24 @@ TEST_CASE("every registered unit converts to canonical units") {
     double scale;
   };
   const Row rows[] = {
-      {&units::mm(), 1.0},           {&units::cm(), 10.0},
-      {&units::m(), 1000.0},         {&units::inch(), 25.4},
-      {&units::foot(), 304.8},       {&units::degree(), 1.0},
+      {&units::mm(), 1.0},
+      {&units::cm(), 10.0},
+      {&units::m(), 1000.0},
+      {&units::inch(), 25.4},
+      {&units::foot(), 304.8},
+      {&units::degree(), 1.0},
       {&units::radian(), 180.0 / std::numbers::pi},
-      {&units::one(), 1.0},          {&units::percent(), 0.01},
-      {&units::square_mm(), 1.0},    {&units::square_cm(), 100.0},
-      {&units::square_m(), 1e6},     {&units::square_inch(), 25.4 * 25.4},
+      {&units::one(), 1.0},
+      {&units::percent(), 0.01},
+      {&units::square_mm(), 1.0},
+      {&units::square_cm(), 100.0},
+      {&units::square_m(), 1e6},
+      {&units::square_inch(), 25.4 * 25.4},
       {&units::square_foot(), 304.8 * 304.8},
-      {&units::cubic_mm(), 1.0},     {&units::cubic_cm(), 1000.0},
-      {&units::cubic_m(), 1e9},      {&units::cubic_inch(), 25.4 * 25.4 * 25.4},
+      {&units::cubic_mm(), 1.0},
+      {&units::cubic_cm(), 1000.0},
+      {&units::cubic_m(), 1e9},
+      {&units::cubic_inch(), 25.4 * 25.4 * 25.4},
       {&units::cubic_foot(), 304.8 * 304.8 * 304.8},
   };
   for (const Row& row : rows) {
@@ -190,7 +198,8 @@ TEST_CASE("invalid variable unit combinations are rejected") {
   CHECK_THROWS_AS(make_var("x", 1.0, std::nullopt, std::nullopt, units::mm(), units::mm()), ValueError);
   CHECK_THROWS_AS(make_var("x", 1.0, std::nullopt, tol, units::mm(), units::degree()), ValueError);
   CHECK_THROWS_AS(make_var("x", 1e308, std::nullopt, std::nullopt, units::m()), ValueError);
-  CHECK_THROWS_AS(make_var("x", 1.0, std::nullopt, DimensionTolerance::symmetric(1e308), units::mm(), units::m()), ValueError);
+  CHECK_THROWS_AS(make_var("x", 1.0, std::nullopt, DimensionTolerance::symmetric(1e308), units::mm(), units::m()),
+                  ValueError);
   CHECK_THROWS_AS(make_var("", 1.0), ValueError);
   CHECK_THROWS_AS(make_var("x", HUGE_VAL), ValueError);
 }
@@ -220,7 +229,9 @@ struct Quantities {
   Sym angle = make_var("angle", 90.0, std::nullopt, std::nullopt, units::degree());
   Sym scalar = make_var("scalar", 50.0, std::nullopt, std::nullopt, units::percent());
 };
-std::optional<Dimension> dim(const Sym& s) { return infer_dimension(s.node()); }
+std::optional<Dimension> dim(const Sym& s) {
+  return infer_dimension(s.node());
+}
 }  // namespace
 
 TEST_CASE("addition, subtraction and contextual constants") {
@@ -269,10 +280,9 @@ TEST_CASE("unary and trigonometric dimensions") {
 TEST_CASE("invalid physical expressions are rejected") {
   Quantities q;
   const Sym legacy = make_var("legacy", 1.0);
-  const Sym invalid[] = {q.length + q.angle,        q.length + q.scalar,        q.length + legacy,
-                         q.length * legacy,         pow(q.length, q.scalar),    pow(q.length, q.angle),
-                         pow(q.length, legacy),     pow(q.length, 0.25),        sin(q.length),
-                         asin(q.length),            atan2(q.length, q.angle)};
+  const Sym invalid[] = {q.length + q.angle,      q.length + q.scalar,    q.length + legacy,       q.length * legacy,
+                         pow(q.length, q.scalar), pow(q.length, q.angle), pow(q.length, legacy),   pow(q.length, 0.25),
+                         sin(q.length),           asin(q.length),         atan2(q.length, q.angle)};
   for (const Sym& expression : invalid) {
     CAPTURE(expression.node()->repr());
     CHECK_THROWS_AS(infer_dimension(expression.node()), UnitValidationError);

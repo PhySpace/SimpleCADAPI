@@ -13,6 +13,7 @@
 #include <optional>
 #include <vector>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/core/error.hpp"
 #include "scad/io/brep.hpp"
 #include "scad/io/brep_region.hpp"
@@ -32,29 +33,40 @@ namespace io = scad::io;
 // ---------------------------------------------------------------------------
 py::object cast_shape(const Shape& shape) {
   switch (shape.kind()) {
-    case Kind::Vertex: return py::cast(Vertex(shape));
-    case Kind::Edge: return py::cast(Edge(shape));
-    case Kind::Wire: return py::cast(Wire(shape));
-    case Kind::Face: return py::cast(Face(shape));
-    case Kind::Shell: return py::cast(Shell(shape));
-    case Kind::Solid: return py::cast(Solid(shape));
-    case Kind::Compound: return py::cast(Compound(shape));
+    case Kind::Vertex:
+      return py::cast(Vertex(shape));
+    case Kind::Edge:
+      return py::cast(Edge(shape));
+    case Kind::Wire:
+      return py::cast(Wire(shape));
+    case Kind::Face:
+      return py::cast(Face(shape));
+    case Kind::Shell:
+      return py::cast(Shell(shape));
+    case Kind::Solid:
+      return py::cast(Solid(shape));
+    case Kind::Compound:
+      return py::cast(Compound(shape));
   }
   throw RuntimeError("unknown shape kind");
 }
 
-py::bytes to_py_bytes(const io::Bytes& bytes) { return py::bytes(bytes.data(), bytes.size()); }
+py::bytes to_py_bytes(const io::Bytes& bytes) {
+  return py::bytes(bytes.data(), bytes.size());
+}
 
 io::Bytes from_py_bytes(const py::bytes& bytes) {
   char* data = nullptr;
   Py_ssize_t size = 0;
-  if (PYBIND11_BYTES_AS_STRING_AND_SIZE(bytes.ptr(), &data, &size) != 0) throw py::error_already_set();
+  if (PYBIND11_BYTES_AS_STRING_AND_SIZE(bytes.ptr(), &data, &size) != 0)
+    throw py::error_already_set();
   return io::Bytes(data, static_cast<std::size_t>(size));
 }
 
 // A Shape or a sequence of Shapes -> TopoDS_Shapes.
 std::vector<TopoDS_Shape> shapes_from(const py::object& arg) {
-  if (py::isinstance<Shape>(arg)) return {arg.cast<const Shape&>().wrapped()};
+  if (py::isinstance<Shape>(arg))
+    return {arg.cast<const Shape&>().wrapped()};
   std::vector<TopoDS_Shape> out;
   for (const py::handle item : arg) {
     if (!py::isinstance<Shape>(item))
@@ -111,8 +123,10 @@ io::SurfaceMeshParameters surface_parameters(double linear, double angular_degre
 }
 
 io::RegionRootKind root_kind(const std::string& name) {
-  if (name == "solid") return io::RegionRootKind::Solid;
-  if (name == "shell") return io::RegionRootKind::Shell;
+  if (name == "solid")
+    return io::RegionRootKind::Solid;
+  if (name == "shell")
+    return io::RegionRootKind::Shell;
   throw ValueError("root_kind must be 'solid' or 'shell'");
 }
 
@@ -125,22 +139,26 @@ void bind_mesh(py::module_& m) {
       "A triangle mesh: float32 vertices (n, 3), per-vertex normals (n, 3), uint32 triangles (m, 3) and the face\n"
       "index of each triangle (m,).  The arrays are read-only views of the mesh's own memory (no copy); they keep\n"
       "the mesh alive.")
-      .def_property_readonly("vertices", [](const py::object& self) {
-        const auto& mesh = self.cast<const io::Mesh&>();
-        return view<float>(self, mesh.vertices.data(), mesh.vertex_count(), 3);
-      })
-      .def_property_readonly("normals", [](const py::object& self) {
-        const auto& mesh = self.cast<const io::Mesh&>();
-        return view<float>(self, mesh.normals.data(), mesh.vertex_count(), 3);
-      })
-      .def_property_readonly("triangles", [](const py::object& self) {
-        const auto& mesh = self.cast<const io::Mesh&>();
-        return view<std::uint32_t>(self, mesh.triangles.data(), mesh.triangle_count(), 3);
-      })
-      .def_property_readonly("face_ids", [](const py::object& self) {
-        const auto& mesh = self.cast<const io::Mesh&>();
-        return view<std::uint32_t>(self, mesh.face_ids.data(), mesh.face_ids.size(), 1);
-      })
+      .def_property_readonly("vertices",
+                             [](const py::object& self) {
+                               const auto& mesh = self.cast<const io::Mesh&>();
+                               return view<float>(self, mesh.vertices.data(), mesh.vertex_count(), 3);
+                             })
+      .def_property_readonly("normals",
+                             [](const py::object& self) {
+                               const auto& mesh = self.cast<const io::Mesh&>();
+                               return view<float>(self, mesh.normals.data(), mesh.vertex_count(), 3);
+                             })
+      .def_property_readonly("triangles",
+                             [](const py::object& self) {
+                               const auto& mesh = self.cast<const io::Mesh&>();
+                               return view<std::uint32_t>(self, mesh.triangles.data(), mesh.triangle_count(), 3);
+                             })
+      .def_property_readonly("face_ids",
+                             [](const py::object& self) {
+                               const auto& mesh = self.cast<const io::Mesh&>();
+                               return view<std::uint32_t>(self, mesh.face_ids.data(), mesh.face_ids.size(), 1);
+                             })
       .def_property_readonly(
           "face_ranges",
           [](const py::object& self) {
@@ -167,7 +185,8 @@ void bind_mesh(py::module_& m) {
       "mesh",
       [](const Shape& shape, double linear_deflection, double angular_deflection, bool relative, bool parallel) {
         const TopoDS_Shape wrapped = shape.wrapped();
-        const io::MeshParameters parameters = mesh_parameters(linear_deflection, angular_deflection, relative, parallel);
+        const io::MeshParameters parameters =
+            mesh_parameters(linear_deflection, angular_deflection, relative, parallel);
         io::Mesh result;
         {
           py::gil_scoped_release release;
@@ -195,18 +214,21 @@ void bind_mesh(py::module_& m) {
       .def_readonly("source_topo_id", &io::FaceTriangleRange::source_topo_id);
 
   py::class_<io::TriMesh, std::shared_ptr<io::TriMesh>>(internal, "TriMesh")
-      .def_property_readonly("vertices", [](const py::object& self) {
-        const auto& mesh = self.cast<const io::TriMesh&>();
-        return view<double>(self, mesh.vertices.data(), mesh.vertex_count(), 3);
-      })
-      .def_property_readonly("triangles", [](const py::object& self) {
-        const auto& mesh = self.cast<const io::TriMesh&>();
-        return view<std::int64_t>(self, mesh.triangles.data(), mesh.triangle_count(), 3);
-      })
+      .def_property_readonly("vertices",
+                             [](const py::object& self) {
+                               const auto& mesh = self.cast<const io::TriMesh&>();
+                               return view<double>(self, mesh.vertices.data(), mesh.vertex_count(), 3);
+                             })
+      .def_property_readonly("triangles",
+                             [](const py::object& self) {
+                               const auto& mesh = self.cast<const io::TriMesh&>();
+                               return view<std::int64_t>(self, mesh.triangles.data(), mesh.triangle_count(), 3);
+                             })
       .def_property_readonly("corner_normals",
                              [](const py::object& self) {
                                const auto& mesh = self.cast<const io::TriMesh&>();
-                               py::array flat = view<double>(self, mesh.corner_normals.data(), mesh.triangle_count() * 3, 3);
+                               py::array flat =
+                                   view<double>(self, mesh.corner_normals.data(), mesh.triangle_count() * 3, 3);
                                return flat.attr("reshape")(py::make_tuple(mesh.triangle_count(), 3, 3));
                              })
       .def_readonly("face_triangle_ranges", &io::TriMesh::face_triangle_ranges)
@@ -222,8 +244,21 @@ void bind_mesh(py::module_& m) {
   internal.def(
       "cached_mesh",
       [](const Shape& solid, double linear_tolerance, double angular_tolerance) {
+        // Meshing works on a topology copy (see meshed_copy) and touches no Python object, so it runs without the GIL:
+        // the editor tessellates parts on a background thread while the next cell computes.  A failure is recorded on
+        // the shape here, with the GIL back.
+        std::shared_ptr<const io::TriMesh> mesh;
+        std::string error;
+        {
+          py::gil_scoped_release release;
+          mesh = io::cached_mesh_detached(solid, linear_tolerance, angular_tolerance, &error);
+        }
+        if (!mesh && !error.empty()) {
+          Shape handle = solid;
+          handle.set_runtime("mesh.error", Value(error));
+        }
         // The mesh is shared with the cache and exposed read-only, so handing it out un-const is safe.
-        return std::const_pointer_cast<io::TriMesh>(io::cached_mesh(solid, linear_tolerance, angular_tolerance));
+        return std::const_pointer_cast<io::TriMesh>(mesh);
       },
       py::arg("solid"), py::kw_only(), py::arg("linear_tolerance") = io::kDefaultLinearDeflection,
       py::arg("angular_tolerance") = io::kDefaultAngularDeflection);
@@ -277,7 +312,8 @@ void bind_bytes(py::module_& m) {
         return cast_shape(Shape::from_occt(shape));
       },
       py::name("from_brep"), py::arg("data"), py::arg("require_valid") = false,
-      py::doc("from_brep(data: bytes) -> Shape\nThe shape (Solid, Face, ...) stored in BinTools or ASCII BRep bytes.")));
+      py::doc(
+          "from_brep(data: bytes) -> Shape\nThe shape (Solid, Face, ...) stored in BinTools or ASCII BRep bytes.")));
   m.attr("from_brep") = any_shape.attr("from_brep");
   m.def(
       "canonical_brep_bytes",
@@ -317,13 +353,13 @@ void bind_bytes(py::module_& m) {
       py::name("__reduce__"), py::is_method(any_shape));
 }
 
-
 // ---------------------------------------------------------------------------
 // STEP assemblies: definitions arrive as plain dicts (see exporter/step.py).
 // ---------------------------------------------------------------------------
 Vec3 vec3_from(const py::handle& obj) {
   const auto values = py::cast<std::vector<double>>(obj);
-  if (values.size() != 3) throw ValueError("expected three numbers");
+  if (values.size() != 3)
+    throw ValueError("expected three numbers");
   return Vec3{values[0], values[1], values[2]};
 }
 
@@ -342,10 +378,13 @@ std::vector<io::StepDefinition> definitions_from(const py::sequence& items) {
     const py::dict d = py::reinterpret_borrow<py::dict>(handle);
     io::StepDefinition def;
     def.id = d["id"].cast<std::string>();
-    if (d.contains("kind")) def.kind = d["kind"].cast<std::string>();
+    if (d.contains("kind"))
+      def.kind = d["kind"].cast<std::string>();
     def.name = d["name"].cast<std::string>();
-    if (d.contains("shape") && !d["shape"].is_none()) def.shape = d["shape"].cast<const Shape&>().wrapped();
-    if (d.contains("metadata")) def.metadata = pybind::value_from_python(d["metadata"]);
+    if (d.contains("shape") && !d["shape"].is_none())
+      def.shape = d["shape"].cast<const Shape&>().wrapped();
+    if (d.contains("metadata"))
+      def.metadata = pybind::value_from_python(d["metadata"]);
     if (d.contains("color") && !d["color"].is_none()) {
       const Vec3 c = vec3_from(d["color"]);
       def.color = std::array<double, 3>{c.x, c.y, c.z};
@@ -356,8 +395,10 @@ std::vector<io::StepDefinition> definitions_from(const py::sequence& items) {
       material.id = m["id"].cast<std::string>();
       material.name = m["name"].cast<std::string>();
       material.description = pybind::value_from_python(m["description"]);
-      if (m.contains("density") && !m["density"].is_none()) material.density = m["density"].cast<double>();
-      if (m.contains("density_unit")) material.density_unit = m["density_unit"].cast<std::string>();
+      if (m.contains("density") && !m["density"].is_none())
+        material.density = m["density"].cast<double>();
+      if (m.contains("density_unit"))
+        material.density_unit = m["density_unit"].cast<std::string>();
       def.material = std::move(material);
     }
     if (d.contains("components")) {
@@ -440,8 +481,8 @@ void bind_files(py::module_& m) {
         }
         return py::make_tuple(vertices, triangles);
       },
-      py::arg("shape"), py::kw_only(), py::arg("linear_deflection") = 0.1,
-      py::arg("angular_deflection_degrees") = 20.0, py::arg("relative") = false,
+      py::arg("shape"), py::kw_only(), py::arg("linear_deflection") = 0.1, py::arg("angular_deflection_degrees") = 20.0,
+      py::arg("relative") = false,
       "(vertices Nx3 float64, triangles Mx3 int32): the shape's surface tessellated, vertices welded.");
   m.def(
       "export_step_assembly",
@@ -484,7 +525,8 @@ void bind_files(py::module_& m) {
         io::SurfaceExportReport report;
         {
           py::gil_scoped_release release;
-          report = io::export_stl(list, path, surface_parameters(linear_deflection, angular_deflection_degrees, relative));
+          report =
+              io::export_stl(list, path, surface_parameters(linear_deflection, angular_deflection_degrees, relative));
         }
         return surface_report(report);
       },
@@ -508,7 +550,7 @@ void bind_files(py::module_& m) {
       [](const std::filesystem::path& path, double sewing_tolerance) {
         return cast_shape(io::import_stl_shape(path, sewing_tolerance));
       },
-      py::arg("path"), py::arg("sewing_tolerance") = 1e-6,
+      py::arg("path"), py::arg("sewing_tolerance") = tol::kSewing,
       "Read an STL as a faceted BREP (a Solid when the triangles close up).");
   m.def(
       "export_obj",
@@ -518,7 +560,8 @@ void bind_files(py::module_& m) {
         io::SurfaceExportReport report;
         {
           py::gil_scoped_release release;
-          report = io::export_obj(list, path, surface_parameters(linear_deflection, angular_deflection_degrees, relative));
+          report =
+              io::export_obj(list, path, surface_parameters(linear_deflection, angular_deflection_degrees, relative));
         }
         return surface_report(report);
       },
@@ -568,8 +611,7 @@ void bind_region(py::module_& m) {
         return py::make_tuple(cast_shape(Shape::from_occt(file.shape)), py::cast(file.manifest), file.sha256);
       },
       py::arg("path"), py::arg("sha256"), py::kw_only(), py::arg("expected_root_kind"),
-      py::arg("replay_root") = py::none(),
-      "(shape, manifest, sha256) of a hash-pinned .scadbrep file.");
+      py::arg("replay_root") = py::none(), "(shape, manifest, sha256) of a hash-pinned .scadbrep file.");
   region.def(
       "decode_artifact",
       [](const py::bytes& data, const std::optional<std::string>& expected_root_kind) {

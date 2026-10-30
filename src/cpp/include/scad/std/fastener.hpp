@@ -15,12 +15,12 @@ struct BoltOptions {
   std::string thread_style = "auto";
   // cosmetic: smooth major-diameter shank, thread intent in metadata.  modeled: a helical groove is cut.
   std::string thread_detail = "modeled";
-  std::string thread_form = "v";  // v | trapezoidal
-  std::optional<double> thread_pitch;   // required outside the metric coarse series
+  std::string thread_form = "v";       // v | trapezoidal
+  std::optional<double> thread_pitch;  // required outside the metric coarse series
   std::optional<double> thread_depth;
-  std::optional<double> thread_length;  // only with thread_style "partial"
+  std::optional<double> thread_length;            // only with thread_style "partial"
   std::optional<double> head_width, head_height;  // default: ISO 4014 for hex, proportions of d otherwise
-  std::string drive_style = "none";  // none | slot | cross | hex_socket
+  std::string drive_style = "none";               // none | slot | cross | hex_socket
   std::optional<double> drive_size, drive_depth;
   std::optional<double> underhead_fillet_radius;  // default 0.06 d (none under a countersunk head)
 };

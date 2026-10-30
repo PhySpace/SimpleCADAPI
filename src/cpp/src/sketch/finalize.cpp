@@ -15,8 +15,10 @@ void finalize_sketch_object(const std::string& op, Value params, SymbolicArgs sy
   record.symbolic = std::move(symbolic);
   std::vector<ValueLineage> inputs;
   if (input != nullptr)
-    if (auto lineage = value_lineage_of(*input)) inputs.push_back(std::move(*lineage));
-  if (const auto lineage = finalize_runtime_object(std::move(record), "Sketch", inputs)) attach_value_lineage(output, *lineage, op);
+    if (auto lineage = value_lineage_of(*input))
+      inputs.push_back(std::move(*lineage));
+  if (const auto lineage = finalize_runtime_object(std::move(record), "Sketch", inputs))
+    attach_value_lineage(output, *lineage, op);
 }
 
 // The symbolic scalars a sketch holds, by their path in params["sketch"] (the structure of Sketch.to_dict()): a
@@ -26,7 +28,8 @@ static SymbolicArgs sketch_symbolic(const Sketch& sketch) {
   std::size_t index = 0;
   for (const auto& [id, entity] : sketch.entities()) {
     for (const auto& [key, scalar] : entity.scalars)
-      if (scalar.symbolic()) out.emplace_back("sketch.entities[" + std::to_string(index) + "]." + key, scalar);
+      if (scalar.symbolic())
+        out.emplace_back("sketch.entities[" + std::to_string(index) + "]." + key, scalar);
     ++index;
   }
   index = 0;
@@ -43,7 +46,8 @@ Shape finalize_sketch_promotion(Shape shape, const std::string& op, Value params
   spec.record.op = op;
   spec.record.params = std::move(params);
   spec.record.symbolic = sketch_symbolic(sketch);
-  if (auto lineage = value_lineage_of(sketch)) spec.record.value_inputs.push_back(std::move(*lineage));
+  if (auto lineage = value_lineage_of(sketch))
+    spec.record.value_inputs.push_back(std::move(*lineage));
   return finalize_derived_shape(std::move(shape), std::move(spec));
 }
 

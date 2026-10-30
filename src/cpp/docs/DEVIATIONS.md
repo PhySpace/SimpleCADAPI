@@ -131,3 +131,45 @@ id, a 36-char rule id, an evidence Value: about 700 B per binding, 36 bindings p
 * The geometry-interface bounds of solids, shells and wires are the union of their faces' / edges' boxes
   (bitwise equal to `AddOptimal` on the whole shape on every arm6 shape); the fingerprint is memoised per OCCT
   shape identity. Neither changes a hash.
+
+## Old tests that do not run on the native build (and why)
+
+Each is a test of something 2.2.7b1 removed on purpose, not of behaviour a user can see. Listed here so that a missing
+test is a decision on record, not a gap.
+
+| Old test | Why it does not apply |
+|---|---|
+| `tests/test_render_supersample.py` (2 tests) | patches `inspect.brep.render._write_window`, a VTK window writer; VTK is gone (the soft renderer supersamples in `render_scene(supersample=)`, covered by `tests/python/test_render_*`) |
+| `test_inspect_brep_queries.py::test_render_worker_retries_crash_and_requires_clean_exit` | tests the crash-isolated VTK render worker subprocess and its retry policy; the soft renderer runs in-process |
+| `test_render_screenshot_multiview.py` (3 tests: `..._grid_engine`, `..._multiview_engine_with_annotations`) | tests the routing between the VTK single-view engine and the grid engine; there is one engine |
+| `test_sketch_api.py::...default_solver_backend_is_py_slvs...` (in `test/native_known_failures.json`) | the default sketch solver backend is `scad-native`; py-slvs (GPL) is not linked. A user-visible difference: the backend name in a sketch snapshot. See `sketch-solver.md` |
+
+## Var and Expr behave like numbers (native does more than 2.2.6)
+
+2.2.6.post2 gave `Var` / `Expr` the symbolic arithmetic only. Everything else Python asks of a number failed, or worse,
+answered wrongly: `int(r)`, `round(e, 2)`, `r > 3`, `max(r, 3)`, `sorted`, `range(n)`, `[0] * n`, `r // 2`, `r % 3`,
+`f"{r:.2f}"` raised `TypeError`; `r == 5.0` and `r in [5.0]` were `False` for a Var whose value is 5.0;
+`f"{r}"` / `str(r)` printed `Var(name='r', ...)`. In a `ql` predicate,
+`ql.prop("geom.length", ">=", 2 * math.pi * radius * 0.999)` with a Var `radius` matched nothing (an agent spent ten
+minutes on this in a scan-to-CAD run; the fix was `float(radius)`).
+
+This engine gives them the numeric protocol, evaluated where Python asks (`simplecadapi.reactive`, `bind_reactive_exprs.cpp`):
+
+* **Arithmetic stays symbolic** (`+ - * / **`, `abs`, unary `-`): the result is an Expr that keeps the link to the parameters.
+* **Decisions read the value the expression has now** (the same value `float(x)` gives; a saved parameter replaces a
+  Var's default): `int`, `round`, `floor`, `ceil`, `trunc`, `<  <=  >  >=`, `//`, `%`, `__index__` (so `range(n)`,
+  `[0] * n`, `lst[n - 1]` work; a value that is not whole raises `TypeError` saying so), `format` / f-strings, `str`.
+  An operand that is a numpy scalar is accepted wherever an int or float is.
+* **Equality:** two expressions are equal when they are the same formula (unchanged); an expression and a number are
+  equal when the value is. So `r == 5.0` is `True` here (it was `False`). `hash` stays structural, so `{5.0: x}[r]`
+  does not find the entry (the one place where `==` and `hash` disagree; a bool is not a number here, as in arithmetic).
+* **Unchanged:** `bool(x)` still raises ("Expression objects do not define truthiness"; an old test of 2.2.6 pins it,
+  and the reason it was designed so is not recorded): write the comparison, `x > 0`. `json.dumps(var)` still raises (it
+  takes real numbers only); `float(var)` is the portable spelling, and it is also what 2.2.6 needs. There is no `__array__` on purpose:
+  marimo takes an object that has one for a numpy array and keys the cell cache by its value alone, so a changed name,
+  unit, tolerance or comment of a Var would no longer redo the cells that read it. numpy takes `float(var)`
+  (`np.sqrt(var)` raises, `np.array([var])` is an object array, as before).
+
+A model written against this engine that relies on these is therefore not guaranteed to run on 2.2.6; `float(...)`
+around the Var makes it portable. Pinned by `tests/python/test_expr_numeric_protocol.py` (a matrix: each usage with a
+number, a Var and an Expr gives the same answer) and `tests/python/test_ql_symbolic_predicate.py`.

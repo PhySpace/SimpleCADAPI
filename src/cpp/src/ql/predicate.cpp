@@ -87,38 +87,47 @@ const std::vector<KindSchema>& schemas() {
   return table;
 }
 
-bool is_logic(std::string_view kind) noexcept { return kind == "and" || kind == "or" || kind == "not"; }
+bool is_logic(std::string_view kind) noexcept {
+  return kind == "and" || kind == "or" || kind == "not";
+}
 
 // The sorted names of `a` that are not in `b` (Python prints sorted sets).
 std::string names_missing_from(const std::set<std::string_view>& a, const std::set<std::string_view>& b,
                                const std::set<std::string_view>* also = nullptr) {
   std::vector<std::string> out;
   for (const auto name : a)
-    if (b.count(name) == 0 && (also == nullptr || also->count(name) == 0)) out.emplace_back(name);
+    if (b.count(name) == 0 && (also == nullptr || also->count(name) == 0))
+      out.emplace_back(name);
   return text::join(out, ", ");
 }
 
 void check_schema(const std::string& kind, const Value& data) {
-  const auto found = std::find_if(schemas().begin(), schemas().end(),
-                                  [&](const KindSchema& s) { return s.kind == kind; });
-  if (found == schemas().end()) throw ValueError("unsupported predicate kind: " + kind);
+  const auto found =
+      std::find_if(schemas().begin(), schemas().end(), [&](const KindSchema& s) { return s.kind == kind; });
+  if (found == schemas().end())
+    throw ValueError("unsupported predicate kind: " + kind);
   std::set<std::string_view> present;
-  for (const auto& [name, item] : data.as_object()) present.insert(name);
+  for (const auto& [name, item] : data.as_object())
+    present.insert(name);
   const std::string missing = names_missing_from(found->required, present);
   const std::string unknown = names_missing_from(present, found->required, &found->optional);
   if (!missing.empty())
     throw ValueError("predicate '" + kind + "' is missing required data: " + missing);
-  if (!unknown.empty()) throw ValueError("predicate '" + kind + "' contains unknown data: " + unknown);
+  if (!unknown.empty())
+    throw ValueError("predicate '" + kind + "' contains unknown data: " + unknown);
 }
 
 void check_children(const std::string& kind, std::size_t count) {
-  if (kind == "not" && count != 1) throw ValueError("predicate 'not' requires exactly one child");
-  if (!is_logic(kind) && count != 0) throw ValueError("predicate '" + kind + "' cannot contain children");
+  if (kind == "not" && count != 1)
+    throw ValueError("predicate 'not' requires exactly one child");
+  if (!is_logic(kind) && count != 0)
+    throw ValueError("predicate '" + kind + "' cannot contain children");
 }
 
 // ---- compilation --------------------------------------------------------------------------------------
 std::string str_of(const Value* v, std::string_view fallback = {}) {
-  if (v == nullptr) return std::string(fallback);
+  if (v == nullptr)
+    return std::string(fallback);
   return v->is_string() ? v->as_string() : py_str(*v);
 }
 
@@ -130,9 +139,11 @@ struct OperationSpellings {
 
 OperationSpellings spellings(std::string_view raw) noexcept {
   std::string_view token = text::strip(raw);
-  if (token.starts_with("op.")) token.remove_prefix(3);
+  if (token.starts_with("op."))
+    token.remove_prefix(3);
   std::string_view alias = token;
-  if (alias.starts_with("make_")) alias.remove_prefix(5);
+  if (alias.starts_with("make_"))
+    alias.remove_prefix(5);
   for (const std::string_view suffix : {"_rsolid", "_rshape", "_rface", "_rwire", "_redge"}) {
     if (alias.ends_with(suffix)) {
       alias.remove_suffix(suffix.size());
@@ -168,7 +179,8 @@ Node compile_leaf(const std::string& kind, const Value& data) {
     const std::string operation = str_of(get("op"));  // the spellings are views into it
     const OperationSpellings s = spellings(operation);
     op_node.names.emplace_back(s.token);
-    if (s.alias != s.token) op_node.names.emplace_back(s.alias);
+    if (s.alias != s.token)
+      op_node.names.emplace_back(s.alias);
     op_node.event = str_of(get("event"), "*");
     op_node.any_event = op_node.event == "*";
     node.payload = std::move(op_node);
@@ -199,7 +211,8 @@ const Value& null_value() {
 template <class Accept>
 bool any_track_value(const Value& track, std::string_view plural, std::string_view singular, Accept&& accept) {
   const auto check = [&](const Value& v) {
-    if (v.is_string()) return accept(std::string_view(v.as_string()));
+    if (v.is_string())
+      return accept(std::string_view(v.as_string()));
     const std::string rendered = py_str(v);
     return accept(std::string_view(rendered));
   };
@@ -228,14 +241,17 @@ struct Evaluator {
 
   bool operator()(const OperationNode& n) const {
     const Value* track = shape.metadata().find("track");
-    if (track == nullptr || !track->is_object()) return false;
+    if (track == nullptr || !track->is_object())
+      return false;
     bool named = false;
     for (const std::string_view field : {"op", "operation"}) {
       const Value* actual = track->find(field);
-      if (actual == nullptr || actual->is_null()) continue;
+      if (actual == nullptr || actual->is_null())
+        continue;
       named = named || shares_a_spelling(actual->is_string() ? actual->as_string() : py_str(*actual), n.names);
     }
-    if (!named) return false;
+    if (!named)
+      return false;
     if (n.any_event) {
       return any_track_value(*track, "events", "event", [](std::string_view) { return true; });
     }
@@ -244,7 +260,8 @@ struct Evaluator {
 
   bool operator()(const RoleNode& n) const {
     const Value* track = shape.metadata().find("track");
-    if (track == nullptr || !track->is_object()) return false;
+    if (track == nullptr || !track->is_object())
+      return false;
     const std::string_view plural = n.output ? "result_roles" : "origin_roles";
     const std::string_view singular = n.output ? "result_role" : "origin_role";
     return any_track_value(*track, plural, singular, [&](std::string_view r) { return r == n.role; });
@@ -255,10 +272,12 @@ struct Evaluator {
     for (const TagBinding& binding : shape.local_bindings()) {
       const Value* found = binding.evidence->data.find(field);
       if (found == nullptr) {
-        if (n.expected.empty()) return true;
+        if (n.expected.empty())
+          return true;
         continue;
       }
-      if (found->is_string() ? found->as_string() == n.expected : py_str(*found) == n.expected) return true;
+      if (found->is_string() ? found->as_string() == n.expected : py_str(*found) == n.expected)
+        return true;
     }
     return false;
   }
@@ -284,13 +303,16 @@ struct Evaluator {
     switch (n.logic) {
       case Logic::And:
         for (; child < end; child += program[child].span)
-          if (!run(program, child, shape, ctx)) return false;
+          if (!run(program, child, shape, ctx))
+            return false;
         return true;
       case Logic::Or:
         for (; child < end; child += program[child].span)
-          if (run(program, child, shape, ctx)) return true;
+          if (run(program, child, shape, ctx))
+            return true;
         return false;
-      case Logic::Not: return !run(program, child, shape, ctx);
+      case Logic::Not:
+        return !run(program, child, shape, ctx);
     }
     return false;
   }
@@ -310,8 +332,10 @@ struct Predicate::Impl {
 };
 
 Predicate::Predicate(std::string kind, Value data, std::vector<Predicate> children) {
-  if (data.is_null()) data = Value::object();
-  if (!data.is_object()) throw ValueError("predicate data must be an object");
+  if (data.is_null())
+    data = Value::object();
+  if (!data.is_object())
+    throw ValueError("predicate data must be an object");
   pred::check_schema(kind, data);
   pred::check_children(kind, children.size());
 
@@ -333,9 +357,15 @@ Predicate::Predicate(std::string kind, Value data, std::vector<Predicate> childr
   impl_ = std::move(impl);
 }
 
-const std::string& Predicate::kind() const noexcept { return impl_->kind; }
-const Value& Predicate::data() const noexcept { return impl_->data; }
-const std::vector<Predicate>& Predicate::children() const noexcept { return impl_->children; }
+const std::string& Predicate::kind() const noexcept {
+  return impl_->kind;
+}
+const Value& Predicate::data() const noexcept {
+  return impl_->data;
+}
+const std::vector<Predicate>& Predicate::children() const noexcept {
+  return impl_->children;
+}
 
 bool Predicate::matches(const Shape& shape, const EvalContext& ctx) const {
   return pred::Evaluator::run(impl_->program, 0, shape, ctx);
@@ -351,13 +381,15 @@ Value Predicate::to_value() const {
   out.set("kind", impl_->kind);
   out.set("data", impl_->data);
   Value children = Value::array();
-  for (const Predicate& child : impl_->children) children.push_back(child.to_value());
+  for (const Predicate& child : impl_->children)
+    children.push_back(child.to_value());
   out.set("children", std::move(children));
   return out;
 }
 
 Predicate Predicate::from_value(const Value& payload) {
-  if (!payload.is_object()) throw ValueError("predicate payload must be an object");
+  if (!payload.is_object())
+    throw ValueError("predicate payload must be an object");
   for (const auto& [name, item] : payload.as_object())
     if (name != "kind" && name != "data" && name != "children")
       throw ValueError("predicate payload contains unknown fields");
@@ -367,8 +399,10 @@ Predicate Predicate::from_value(const Value& payload) {
   const Value* children = payload.find("children");
   if (kind == nullptr || !kind->is_string() || kind->as_string().empty())
     throw ValueError("predicate kind must be a non-empty string");
-  if (data != nullptr && !data->is_object()) throw ValueError("predicate data must be an object");
-  if (children != nullptr && !children->is_array()) throw ValueError("predicate children must be an array");
+  if (data != nullptr && !data->is_object())
+    throw ValueError("predicate data must be an object");
+  if (children != nullptr && !children->is_array())
+    throw ValueError("predicate children must be an array");
 
   const std::string& name = kind->as_string();
   const Value empty_data = Value::object();
@@ -380,12 +414,14 @@ Predicate Predicate::from_value(const Value& payload) {
 
   std::vector<Predicate> parsed;
   if (children != nullptr)
-    for (const Value& child : children->as_array()) parsed.push_back(from_value(child));
+    for (const Value& child : children->as_array())
+      parsed.push_back(from_value(child));
   return Predicate(name, data != nullptr ? *data : empty_data, std::move(parsed));
 }
 
 bool Predicate::operator==(const Predicate& other) const {
-  if (impl_ == other.impl_) return true;
+  if (impl_ == other.impl_)
+    return true;
   return impl_->kind == other.impl_->kind && values_equal(impl_->data, other.impl_->data) &&
          impl_->children == other.impl_->children;
 }
@@ -395,33 +431,38 @@ namespace {
 
 Value object_of(std::initializer_list<Value::Member> members) {
   Value out = Value::object();
-  for (const auto& [name, item] : members) out.set(name, item);
+  for (const auto& [name, item] : members)
+    out.set(name, item);
   return out;
 }
 
 std::string non_empty(std::string_view raw, const char* name) {
   const std::string stripped(text::strip(raw));
-  if (stripped.empty()) throw ValueError(std::string(name) + " must be a non-empty string");
+  if (stripped.empty())
+    throw ValueError(std::string(name) + " must be a non-empty string");
   return stripped;
 }
 
 Predicate compare_predicate(const char* kind, std::string_view path, std::string_view op, Value expected) {
-  return Predicate(kind, object_of({{"path", std::string(path)},
-                                    {"op", std::string(text::strip(op))},
-                                    {"value", std::move(expected)}}));
+  return Predicate(
+      kind,
+      object_of({{"path", std::string(path)}, {"op", std::string(text::strip(op))}, {"value", std::move(expected)}}));
 }
 
 }  // namespace
 
 Predicate tag(std::string_view pattern, TagScope scope) {
   const std::string stripped(text::strip(pattern));
-  if (stripped.empty()) throw ValueError("pattern must be non-empty");
+  if (stripped.empty())
+    throw ValueError("pattern must be non-empty");
   if (stripped.find('*') != std::string::npos && !stripped.ends_with('*'))
     throw ValueError("only trailing '*' wildcard is supported");
   return Predicate("tag", object_of({{"pattern", stripped}, {"scope", std::string(to_string(scope))}}));
 }
 
-Predicate tag(std::string_view pattern, std::string_view scope) { return tag(pattern, normalize_tag_scope(scope)); }
+Predicate tag(std::string_view pattern, std::string_view scope) {
+  return tag(pattern, normalize_tag_scope(scope));
+}
 
 Predicate meta(std::string_view path, std::string_view op_text, Value expected) {
   return compare_predicate("meta", path, op_text, std::move(expected));
@@ -431,11 +472,19 @@ Predicate prop(std::string_view path, std::string_view op_text, Value expected) 
   return compare_predicate("property_compare", path, op_text, std::move(expected));
 }
 
-Predicate curve_type(std::string_view kind) { return prop("geom.type", "==", Value(text::upper(kind))); }
-Predicate surface_type(std::string_view kind) { return prop("geom.type", "==", Value(text::upper(kind))); }
+Predicate curve_type(std::string_view kind) {
+  return prop("geom.type", "==", Value(text::upper(kind)));
+}
+Predicate surface_type(std::string_view kind) {
+  return prop("geom.type", "==", Value(text::upper(kind)));
+}
 
-Predicate and_(std::vector<Predicate> predicates) { return Predicate("and", Value::object(), std::move(predicates)); }
-Predicate or_(std::vector<Predicate> predicates) { return Predicate("or", Value::object(), std::move(predicates)); }
+Predicate and_(std::vector<Predicate> predicates) {
+  return Predicate("and", Value::object(), std::move(predicates));
+}
+Predicate or_(std::vector<Predicate> predicates) {
+  return Predicate("or", Value::object(), std::move(predicates));
+}
 
 Predicate not_(Predicate predicate) {
   std::vector<Predicate> children;
@@ -444,8 +493,8 @@ Predicate not_(Predicate predicate) {
 }
 
 Predicate operation_event(std::string_view op_name, std::string_view event) {
-  return Predicate("operation_event", object_of({{"op", non_empty(op_name, "op_name")},
-                                                  {"event", non_empty(event, "event")}}));
+  return Predicate("operation_event",
+                   object_of({{"op", non_empty(op_name, "op_name")}, {"event", non_empty(event, "event")}}));
 }
 
 Predicate origin_role(std::string_view role_name) {
@@ -464,6 +513,8 @@ Predicate source_topology(std::string_view topo_id) {
   return Predicate("source_topology", object_of({{"source_topo_id", non_empty(topo_id, "topo_id")}}));
 }
 
-Predicate role(std::string_view role_name) { return tag("role." + std::string(role_name) + ".*"); }
+Predicate role(std::string_view role_name) {
+  return tag("role." + std::string(role_name) + ".*");
+}
 
 }  // namespace scad::ql

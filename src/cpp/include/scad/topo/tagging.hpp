@@ -34,7 +34,12 @@ enum class TagAttachment : std::uint8_t { Local, Inherited, EffectiveLegacy };
 enum class TagProducerKind { UserOperation, AutoRule, ImportedSidecar, LegacyImport };
 enum class TagTargetKind { SelectionQuery, ScopeRoot, ExplicitRefs, LegacyEffective };
 enum class TagEvidenceKind {
-  UserAssertion, QueryExecution, TopologyChange, GeometryClassification, ImportedSidecar, LegacySnapshot
+  UserAssertion,
+  QueryExecution,
+  TopologyChange,
+  GeometryClassification,
+  ImportedSidecar,
+  LegacySnapshot
 };
 enum class TagCertainty : std::uint8_t { Asserted, Proven };
 enum class TagLifecycle : std::uint8_t { Assertion, Recompute, Snapshot };
@@ -74,7 +79,7 @@ struct TagBindingScope {
 struct TagProducer {
   TagProducerKind kind = TagProducerKind::UserOperation;
   std::optional<std::string> node_id;
-  std::optional<std::string> rule_id;       // required (with rule_version) for AutoRule only
+  std::optional<std::string> rule_id;  // required (with rule_version) for AutoRule only
   std::optional<std::string> rule_version;
   Value to_value() const;
 };

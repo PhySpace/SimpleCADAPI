@@ -44,8 +44,12 @@ def save(directory: Path, cell_id: str, session: Any) -> None:
     partial.replace(target)
 
 
-def load(directory: Path, cell_id: str) -> bool:
-    """Register the nodes saved for the cell; ``False`` when there is no entry."""
+def load(directory: Path, cell_id: str, graph_id: str | None = None) -> bool:
+    """Register the nodes saved for the cell; ``False`` when there is no entry.
+
+    With *graph_id*, a record of another graph is no entry either: its nodes would be registered under that graph,
+    and the values restored beside it (which name their nodes by this run's graph) would find none.
+    """
 
     import simplecadapi._cpp as native
 
@@ -53,6 +57,8 @@ def load(directory: Path, cell_id: str) -> bool:
     try:
         document = pickle.loads(zlib.decompress(target.read_bytes()))
     except OSError:
+        return False
+    if graph_id is not None and document.get("graph_id") != graph_id:
         return False
     graph = native.OperationGraph.from_dict(
         {

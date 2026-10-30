@@ -24,13 +24,12 @@ TopoDS_Face make_face_from_wires(const TopoDS_Wire& outer_wire, const std::vecto
 TopoDS_Shape make_loft_solid(const std::vector<TopoDS_Shape>& sections, bool ruled = false);
 
 // Sweep `profile_wire` along `path_wire`; `is_frenet` selects the Frenet trihedron.
-TopoDS_Shape make_sweep_solid(const TopoDS_Wire& profile_wire, const TopoDS_Wire& path_wire,
-                              bool is_frenet = false);
+TopoDS_Shape make_sweep_solid(const TopoDS_Wire& profile_wire, const TopoDS_Wire& path_wire, bool is_frenet = false);
 
 // Sweep a profile along a helix (Frenet mode).  The profile is placed at
 // `radius` along `x_direction` (default +X) first; it is expected to be centred on the axis.
-TopoDS_Shape make_helical_sweep_solid(const TopoDS_Wire& profile_wire, double pitch, double height,
-                                      double radius, const Vec3& center, const Vec3& direction,
+TopoDS_Shape make_helical_sweep_solid(const TopoDS_Wire& profile_wire, double pitch, double height, double radius,
+                                      const Vec3& center, const Vec3& direction,
                                       const std::optional<Vec3>& x_direction = std::nullopt);
 
 }  // namespace scad::kernel

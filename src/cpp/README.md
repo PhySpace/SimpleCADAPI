@@ -1,59 +1,52 @@
-# SimpleCADAPI-cpp
+# simplecadapi native engine
 
-The [SimpleCADAPI](../SimpleCADAPI) Python SDK, re-implemented below the Python boundary:
-everything from the OpenCASCADE calls up to the operator layer is C++20, shipped as a single
-pybind11 extension (`simplecadapi._cpp`) that mirrors the Python SDK's names and behaviour.
+The geometry engine of the `simplecadapi` Python SDK, written in C++20 on OpenCASCADE (OCCT). Everything from the OCCT
+calls up to the operator layer (shapes, tags and lineage, operators, constrained sketches, parts and assemblies, the
+selector language, the reactive parameter graph, import/export, a software renderer) lives here and is shipped inside the
+`simplecadapi` wheel as one pybind11 extension, `simplecadapi._cpp._native`, with a thin Python package
+(`src/simplecadapi/_cpp`, `src/simplecadapi/_glue`) around it. It keeps the names, arguments, results and error text of
+SDK 2.2.6; it removes the cost of the old Python wrapper tree and of OCP.
 
-Why: the Python SDK is a heavy wrapper over OCCT (an eager wrapper tree on every shape, tag and
-lineage bookkeeping in interpreted code). See [ARCHITECTURE.md](ARCHITECTURE.md).
+The layers that are still Python (notebook runtime, editor, inspection, translators, scene, artifacts) run on top of it
+unchanged.
 
-Status of every operator: [PORTING_STATUS.md](PORTING_STATUS.md) (generated).
-Working rules for contributors: [AGENTS.md](AGENTS.md).
+## Where to start
 
-## Targets
+| You want to | Read |
+|---|---|
+| understand the design and the layer rules | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| build it, run the tests, follow the rules for a change | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| review the code in a sensible order, find the Python module and tests of each area | [docs/READING_ORDER.md](docs/READING_ORDER.md) |
+| see how the initial commit is meant to be landed as small pull requests | [docs/LANDING_PLAN.md](docs/LANDING_PLAN.md) |
+| know where the native engine differs from 2.2.6 on purpose | [docs/DEVIATIONS.md](docs/DEVIATIONS.md) |
+| see the latest test results and the open items | [docs/NATIVE_PROGRESS.md](docs/NATIVE_PROGRESS.md) |
 
-| Platform | Built and tested here | CI |
-|---|---|---|
-| macOS arm64 | yes | `ci.yml` |
-| Linux x86_64 | yes (OrbStack Ubuntu 26.04 VM; it is x86_64) | `ci.yml` |
-| Linux aarch64 | no | `ci.yml` (`ubuntu-24.04-arm`) |
-| Windows x64 | no | `ci.yml` |
+Other documents in `docs/`: `io.md` (serialization format and exchange), `render.md` (software renderer),
+`sketch-solver.md` (the in-house sketch solver), `memory.md` and `PERF.md` (measurements), `OCCT_BINDINGS.md` (the raw
+OCCT classes exposed as `simplecadapi._cpp.occt`), `NATIVE_INTEGRATION.md` (the historical plan for running the SDK on this engine), `briefs.md` (historical per-area work orders),
+`research/smlib-usd-brep.md` (evaluation of an optional curve/surface kernel).
 
-Only standard C++20 is used and compiler-specific switches live in `cmake/ScadCompile.cmake`,
-but a platform that has not been built is unverified: treat Windows and Linux aarch64 as
-"expected to work, first CI run decides".
+## Layout
 
-## Build (development)
-
-```bash
-# macOS: brew install opencascade pybind11 cmake ninja
-uv venv .venv --python 3.12 && uv pip install --python .venv/bin/python pybind11 pytest numpy
-cmake -S . -B build/mac -G Ninja -DCMAKE_BUILD_TYPE=Debug \
-  -DPython_EXECUTABLE=$PWD/.venv/bin/python \
-  -Dpybind11_DIR=$(.venv/bin/python -m pybind11 --cmakedir) -DCMAKE_PREFIX_PATH=/opt/homebrew
-ninja -C build/mac
-ctest --test-dir build/mac --output-on-failure           # C++ (doctest)
-SCAD_BUILD_DIR=$PWD/build/mac .venv/bin/python -m pytest  # Python
+```
+include/scad/<area>/   public C++ headers
+src/<area>/            implementation, one static library scad_<area> per area
+tests/cpp/<area>/      doctest executable test_<area>
+bindings/python/       pybind11 module, one bind_<area>.cpp per area; occt/ is the raw OCCT class binding
+tests/python/          parity tests against goldens recorded from the 2.2.6 SDK (tests/golden/)
+cmake/  tools/  scripts/  third_party/ (doctest, occ_gordon)
 ```
 
-Linux: `apt install libocct-*-dev pybind11-dev ninja-build` (Ubuntu 26.04 ships OCCT 7.9.2),
-same cmake line without `CMAKE_PREFIX_PATH`.
+Areas: `core`, `kernel`, `topo`, `semantic`, `reactive`, `io`, `ql`, `render`, `sketch`, `surface`, `ops_geometry`,
+`ops_features`, `product`, `std` (dependencies: ARCHITECTURE.md).
 
-OCCT 7.8 or newer is required; the reference Python SDK runs on 7.9.3.
+## Build in one line
 
-## Build (release wheels)
+From the repository root: `uv sync --locked --group dev` builds the module and the Python environment. Direct CMake
+builds, the static OCCT used by releases, the test layers and the formatting rule are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-`tools/build_occt.py` builds OCCT 7.9.3 as static libraries the same way on every platform;
-`pip wheel .` (scikit-build-core) links them into the extension, which then depends on nothing
-but the Python it was built for. `cibuildwheel` drives this from `.github/workflows/wheels.yml`.
+## Platforms
 
-## Verifying behaviour
-
-`tests/python/ref.py::golden(name, snippet)` runs `snippet` in the reference Python SDK
-(`SCAD_REF_PYTHON`, default: the SimpleCADAPI checkout's venv), stores the answer in
-`tests/golden/` and compares the C++ result to it on every platform.
-
-## Research
-
-[docs/research/smlib-usd-brep.md](docs/research/smlib-usd-brep.md): can NVIDIA's open-sourced
-SMLib strengthen OCCT's curve/surface capability? (Measured on macOS arm64; recommendation inside.)
+Release wheels are built for Linux x86_64 and aarch64, macOS arm64 and Windows x86_64, for Python 3.10 to 3.13, against
+one static OCCT 7.9.3 (`.github/workflows/release.yml`). The regular CI (`.github/workflows/ci.yml`) runs on Linux x86_64.
+Development is done on macOS arm64 and Linux x86_64; the other targets are built only by the release workflow.

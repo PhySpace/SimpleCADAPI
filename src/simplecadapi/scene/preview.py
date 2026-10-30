@@ -30,7 +30,7 @@ import struct
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Collection
 
 import numpy as np
 
@@ -307,12 +307,15 @@ def compile_preview(
 # -- the wire format -----------------------------------------------------------------
 
 
-def encode_preview(scene: PreviewScene) -> bytes:
+def encode_preview(scene: PreviewScene, omit: Collection[str] = ()) -> bytes:
     """Serialize *scene*: ``SCAPREV1``, a header length, a JSON header, then the arrays.
 
     The header lists the parts (each array as an ``offset`` and ``count`` into the
     data that follows), the face and edge groups, and the nodes.  Arrays are
     little-endian ``float32`` (positions, normals) and ``uint32`` (indices).
+
+    The parts whose key is in *omit* are left out: a reader that already holds them (a page, the editor's part store)
+    looks them up by key.  Every node still names its part, so the header alone says which parts the scene needs.
     """
     chunks: list[bytes] = []
     cursor = 0
@@ -327,6 +330,8 @@ def encode_preview(scene: PreviewScene) -> bytes:
 
     parts: list[dict[str, Any]] = []
     for key, part in scene.parts.items():
+        if key in omit:
+            continue
         definition = scene.definitions[key]
         prefix = f"entity/{definition}/"
         parts.append(

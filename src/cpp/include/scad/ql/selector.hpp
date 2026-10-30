@@ -123,6 +123,8 @@ class ShapeSelector final : public scad::ShapeSelector {
 [[nodiscard]] ShapeSelector vertices();
 [[nodiscard]] ShapeSelector solids();
 [[nodiscard]] ShapeSelector shells();
-[[nodiscard]] inline ShapeSelector selector_from_value(const Value& payload) { return ShapeSelector::from_value(payload); }
+[[nodiscard]] inline ShapeSelector selector_from_value(const Value& payload) {
+  return ShapeSelector::from_value(payload);
+}
 
 }  // namespace scad::ql

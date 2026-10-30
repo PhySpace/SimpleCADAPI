@@ -35,11 +35,12 @@ OpRecord to_op_record(OperationRecord record, std::optional<TopoDelta> delta = s
   out.delta = std::move(delta);
   // The ordered inputs these builders replay from (_finalize_derived_shape).
   static const std::set<std::string, std::less<>> kOrderedInputOps = {
-      "make_ruled_surface_rface", "make_gordon_surface_rface", "make_surface_patch_rface", "trim_surface_rface",
+      "make_ruled_surface_rface", "make_gordon_surface_rface", "make_surface_patch_rface",     "trim_surface_rface",
       "make_loft_rshell",         "sew_faces_rshell",          "make_solid_from_shell_rsolid", "fill_holes_rshell"};
   if (Recorder* recorder = current_recorder(); recorder != nullptr && kOrderedInputOps.count(out.op) != 0) {
     std::vector<Shape> shapes;
-    for (const OpInput& input : out.inputs) shapes.push_back(input.shape);
+    for (const OpInput& input : out.inputs)
+      shapes.push_back(input.shape);
     // A recorder that keeps no references (the test double) answers nothing: the record stays as it is.
     if (std::optional<Value> refs = recorder->input_refs(shapes)) {
       if (!refs->is_array() || refs->as_array().size() != shapes.size())
@@ -57,7 +58,8 @@ std::vector<std::string> default_labels(const OperationRecord& record, Kind kind
 
 // _surface_tag_output: "<prefix>.<kind>" on the result.
 void apply_prefix_tag(Shape& result, const TagPrefix& prefix) {
-  if (!prefix) return;
+  if (!prefix)
+    return;
   result.apply_tag(normalize_tag(*prefix, true) + "." + std::string(kind_name(result.kind())), false);
 }
 
@@ -70,8 +72,10 @@ void carry_face_provenance(const std::vector<Face>& result_faces, const std::vec
     for (const Face& source : source_faces) {
       std::vector<int> matches;
       for (std::size_t i = 0; i < result_faces.size(); ++i)
-        if (result_faces[i].wrapped().IsSame(source.wrapped())) matches.push_back(static_cast<int>(i));
-      if (matches.size() != 1) throw ValueError("face continuation mapping is incomplete or ambiguous");
+        if (result_faces[i].wrapped().IsSame(source.wrapped()))
+          matches.push_back(static_cast<int>(i));
+      if (matches.size() != 1)
+        throw ValueError("face continuation mapping is incomplete or ambiguous");
       mapped->push_back(matches.front());
     }
   }
@@ -96,11 +100,13 @@ void carry_face_provenance(const std::vector<Face>& result_faces, const std::vec
     if (replace_local_bindings) {
       std::vector<TagBinding> projected;
       for (const TagBinding& binding : source.local_tag_bindings())
-        if (lineage_policy_allows(binding.propagation(), LineageDerivation::Continuation)) projected.push_back(binding);
+        if (lineage_policy_allows(binding.propagation(), LineageDerivation::Continuation))
+          projected.push_back(binding);
       face.replace_local_tag_bindings(std::move(projected));
     }
     attach_lineage_from_source(source, face, LineageDerivation::Continuation, "face_continuation", "complete");
-    if (provenance.is_object()) face.set_metadata("provenance", provenance);
+    if (provenance.is_object())
+      face.set_metadata("provenance", provenance);
     face.set_runtime(kCoverageKey, "complete");
   }
 }
@@ -119,9 +125,11 @@ void move_state_to_identical_entities(const Shell& source, const Solid& target) 
     for (int i = 1; i <= source_map.Extent(); ++i) {
       const TopoDS_Shape& from = source_map(i);
       const int j = target_map.FindIndex(from);
-      if (j == 0) continue;
+      if (j == 0)
+        continue;
       const Shape source_entity = source.sub(from);
-      if (!has_semantic_state(source_entity)) continue;
+      if (!has_semantic_state(source_entity))
+        continue;
       Shape target_entity = target.sub(target_map(j));
       target_entity.copy_semantic_state_from(source_entity);
     }
@@ -133,15 +141,18 @@ using Members = std::map<std::pair<Kind, std::string>, Shape>;
 
 std::string upper_kind_name(Kind kind) {
   std::string name(kind_name(kind));
-  std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+  std::transform(name.begin(), name.end(), name.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
   return name;
 }
 
 // The faces and boundary wires of `shell` by the kernel id the delta's roles name.
 Members role_candidates(const Shell& shell) {
   Members out;
-  for (const Face& face : shell.faces()) out.emplace(std::pair{Kind::Face, kernel_topo_id(face.wrapped())}, face);
-  for (const Wire& wire : shell.wires()) out.emplace(std::pair{Kind::Wire, kernel_topo_id(wire.wrapped())}, wire);
+  for (const Face& face : shell.faces())
+    out.emplace(std::pair{Kind::Face, kernel_topo_id(face.wrapped())}, face);
+  for (const Wire& wire : shell.wires())
+    out.emplace(std::pair{Kind::Wire, kernel_topo_id(wire.wrapped())}, wire);
   return out;
 }
 
@@ -150,16 +161,20 @@ Members role_candidates(const Shell& shell) {
 void apply_loft_role_metadata(const Members& members, const TopoDelta& delta, const std::string& op) {
   for (const TopoRoleEntry& entry : delta.roles) {
     const auto found = members.find({entry.ref.kind, entry.ref.topo_id});
-    if (found == members.end()) continue;
+    if (found == members.end())
+      continue;
     Shape member = found->second;
     Value track = member.get_metadata("track", Value::object());
-    if (!track.is_object()) track = Value::object();
+    if (!track.is_object())
+      track = Value::object();
     std::set<std::string> roles{entry.role};
     if (const Value* existing = track.find("result_roles"); existing != nullptr && existing->is_array())
       for (const Value& role : existing->as_array())
-        if (role.is_string()) roles.insert(role.as_string());
+        if (role.is_string())
+          roles.insert(role.as_string());
     Value role_list = Value::array();
-    for (const std::string& role : roles) role_list.push_back(role);
+    for (const std::string& role : roles)
+      role_list.push_back(role);
     track.set("op", op);
     track.set("topo_id", entry.ref.topo_id);
     track.set("kind", upper_kind_name(entry.ref.kind));
@@ -172,7 +187,8 @@ void apply_loft_role_metadata(const Members& members, const TopoDelta& delta, co
 
 // _apply_shell_loft_tag_prefix
 Shell apply_shell_loft_tag_prefix(Shell shell, const LoftOutput& output) {
-  if (!output.tags.tag_prefix) return shell;
+  if (!output.tags.tag_prefix)
+    return shell;
   const std::string prefix = normalize_tag(*output.tags.tag_prefix, true);
   const std::string source = "simplecadapi.loft_rshell.tag_prefix";
   Shape result = apply_topology_identity_tag(shell, NativeSelector::exactly_one(Kind::Shell), prefix + ".shell",
@@ -180,7 +196,8 @@ Shell apply_shell_loft_tag_prefix(Shell shell, const LoftOutput& output) {
   const std::pair<bool, std::pair<const char*, const char*>> ends[] = {{output.has_start, {"loft.start_wire", "start"}},
                                                                        {output.has_end, {"loft.end_wire", "end"}}};
   for (const auto& [present, names] : ends) {
-    if (!present) continue;
+    if (!present)
+      continue;
     result = apply_topology_identity_tag(result, NativeSelector::with_output_role(Kind::Wire, names.first, true),
                                          prefix + ".wire." + names.second, Kind::Wire, names.second, source);
   }
@@ -198,7 +215,8 @@ Face finalize_surface_output(Face result, FaceOutput output) {
   const bool primitive = output.record.inputs.empty();
   if (output.record.labels.empty()) {
     output.record.labels = default_labels(output.record, Kind::Face);
-    if (output.record.op == "trim_surface_rface") output.record.labels.push_back("trimmed");
+    if (output.record.op == "trim_surface_rface")
+      output.record.labels.push_back("trimmed");
   }
   OpRecord record = to_op_record(std::move(output.record));
   Face finalized = primitive ? finalize_primitive<Face>(std::move(result), std::move(record))
@@ -215,39 +233,48 @@ Shell finalize_surface_output(Shell result, LoftOutput output) {
   spec.tags.roles = {{"loft.start_wire", output.tags.start_wire_tag},
                      {"loft.end_wire", output.tags.end_wire_tag},
                      {"loft.side", output.tags.side_faces_tag}};
-  if (output.record.labels.empty()) output.record.labels = default_labels(output.record, Kind::Shell);
+  if (output.record.labels.empty())
+    output.record.labels = default_labels(output.record, Kind::Shell);
   spec.record = to_op_record(std::move(output.record), output.delta);
   const Shell finalized = finalize_derived<Shell>(std::move(result), std::move(spec));
   return apply_shell_loft_tag_prefix(finalized, output);
 }
 
 Shell finalize_surface_output(Shell result, SewnOutput output) {
-  if (output.record.labels.empty()) output.record.labels = default_labels(output.record, Kind::Shell);
-  Shell finalized = finalize_derived<Shell>(std::move(result), FinalizeSpec{.record = to_op_record(std::move(output.record))});
+  if (output.record.labels.empty())
+    output.record.labels = default_labels(output.record, Kind::Shell);
+  Shell finalized =
+      finalize_derived<Shell>(std::move(result), FinalizeSpec{.record = to_op_record(std::move(output.record))});
   carry_face_provenance(finalized.faces(), output.sources, std::move(output.result_face_indices), false, true);
   apply_prefix_tag(finalized, output.tag_prefix);
   return finalized;
 }
 
 Shell finalize_surface_output(Shell result, FilledOutput output) {
-  if (output.record.labels.empty()) output.record.labels = default_labels(output.record, Kind::Shell);
-  Shell finalized = finalize_derived<Shell>(std::move(result), FinalizeSpec{.record = to_op_record(std::move(output.record))});
+  if (output.record.labels.empty())
+    output.record.labels = default_labels(output.record, Kind::Shell);
+  Shell finalized =
+      finalize_derived<Shell>(std::move(result), FinalizeSpec{.record = to_op_record(std::move(output.record))});
   apply_prefix_tag(finalized, output.tag_prefix);
   return finalized;
 }
 
 Solid finalize_surface_output(Solid result, SolidifiedOutput output) {
-  if (output.record.labels.empty()) output.record.labels = default_labels(output.record, Kind::Solid);
+  if (output.record.labels.empty())
+    output.record.labels = default_labels(output.record, Kind::Solid);
   move_state_to_identical_entities(output.source, result);
-  attach_lineage_from_source(output.source, result, LineageDerivation::Continuation, "make_solid_from_shell_rsolid", "partial");
-  Solid finalized = finalize_derived<Solid>(std::move(result), FinalizeSpec{.record = to_op_record(std::move(output.record))});
+  attach_lineage_from_source(output.source, result, LineageDerivation::Continuation, "make_solid_from_shell_rsolid",
+                             "partial");
+  Solid finalized =
+      finalize_derived<Solid>(std::move(result), FinalizeSpec{.record = to_op_record(std::move(output.record))});
   carry_face_provenance(finalized.faces(), output.source.faces(), std::nullopt, true, false);
   apply_prefix_tag(finalized, output.tag_prefix);
   return finalized;
 }
 
 std::vector<Wire> finalize_surface_output(std::vector<Wire> result, BoundariesOutput output) {
-  if (current_recorder() == nullptr) return result;
+  if (current_recorder() == nullptr)
+    return result;
   OpRecord record = to_op_record(std::move(output.record));
   record.semantic_delta = semantic_delta_for_output(record.op, static_cast<int>(result.size()), "Profile");
   record.empty_list_result = result.empty();

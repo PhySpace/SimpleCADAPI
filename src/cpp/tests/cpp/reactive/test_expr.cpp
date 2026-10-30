@@ -57,8 +57,9 @@ TEST_CASE("default expression ids derive from the content, exactly as in Python"
   CHECK((r * 2 + 1).expr_id() == "expr_d44ad8ebee707556");
   CHECK(make_var("r", 5.0)->expr_id() == "var_c8fbc9d12f568139");
   CHECK(make_var("r", 6.0)->expr_id() == "var_e7d1064daca3321c");
-  CHECK(make_var("r", 5.0, "a 'quoted' comment \xC3\xA9", DimensionTolerance::symmetric(0.1), units::inch(), units::mm())
-            ->expr_id() == "var_c771e1954f6b9230");
+  CHECK(
+      make_var("r", 5.0, "a 'quoted' comment \xC3\xA9", DimensionTolerance::symmetric(0.1), units::inch(), units::mm())
+          ->expr_id() == "var_c771e1954f6b9230");
   CHECK(make_var("w", 1.5, "c", DimensionTolerance(-0.1, 0.2))->expr_id() == "var_b548982a6a604e86");
   CHECK(sin(make_var("a", 30.0, std::nullopt, std::nullopt, units::degree())).expr_id() == "expr_465b7e98c446938a");
   CHECK(make_var("q\\n\"x'", 1.0)->expr_id() == "var_26fc11039389b6b8");
@@ -80,7 +81,8 @@ TEST_CASE("repr is the Python dataclass text") {
         "tolerance_unit=Unit(symbol='mm', dimension=Dimension(length=1, angle=0), scale_to_canonical=1.0))");
   CHECK(make_const(2)->repr() == "Const(value=2.0, expr_id='const_c51de2f6cbbc2a1e')");
   const Sym e = Sym(make_var("r", 5.0, std::nullopt, std::nullopt, units::mm())) * 2 + 1;
-  CHECK(e.node()->repr().rfind("Expr(op='add', args=(Expr(op='mul', args=(Var(name='r', default=5.0, comment=None", 0) == 0);
+  CHECK(e.node()->repr().rfind("Expr(op='add', args=(Expr(op='mul', args=(Var(name='r', default=5.0, comment=None",
+                               0) == 0);
   CHECK(e.node()->repr().find("expr_id='expr_2ece69357ab4b237'), Const(value=1.0, expr_id='const_abdce65477d1247f')), "
                               "expr_id='expr_d44ad8ebee707556')") != std::string::npos);
 }
@@ -99,10 +101,12 @@ TEST_CASE("var and expr roundtrip through the expression graph") {
   // Operands come before the nodes that use them.
   std::unordered_map<std::string, std::size_t> position;
   const auto& nodes = payload.find("nodes")->as_array();
-  for (std::size_t i = 0; i < nodes.size(); ++i) position[nodes[i].find("expr_id")->as_string()] = i;
+  for (std::size_t i = 0; i < nodes.size(); ++i)
+    position[nodes[i].find("expr_id")->as_string()] = i;
   for (std::size_t i = 0; i < nodes.size(); ++i) {
     if (const Value* args = nodes[i].find("args")) {
-      for (const Value& arg : args->as_array()) CHECK(position[arg.as_string()] < i);
+      for (const Value& arg : args->as_array())
+        CHECK(position[arg.as_string()] < i);
     }
   }
 }
@@ -185,7 +189,8 @@ TEST_CASE("canonicalization does not promote discrete index lists") {
   ExpressionGraph graph;
   Value params = Value::object();
   Value indices = Value::array();
-  for (int i = 0; i < 3; ++i) indices.push_back(i);
+  for (int i = 0; i < 3; ++i)
+    indices.push_back(i);
   params.set("selected_edge_indices", indices);
   params.set("distance", 2.0);
   params.set("count", 4);
@@ -215,7 +220,8 @@ TEST_CASE("referenced expressions walk nested params in order") {
   Value again = Value::object();
   again.set("x", 4.0);
   params.set("again", again);
-  const SymbolicParams symbolic{{"size[0]", doubled.scalar()}, {"depth", depth.scalar()}, {"again.x", doubled.scalar()}};
+  const SymbolicParams symbolic{
+      {"size[0]", doubled.scalar()}, {"depth", depth.scalar()}, {"again.x", doubled.scalar()}};
 
   const CanonicalParams out = canonicalize_params(params, symbolic, graph);
   const auto found = referenced_expressions(out.exprs, graph);
@@ -234,7 +240,8 @@ TEST_CASE("referenced expressions walk nested params in order") {
 
 TEST_CASE("a symbolic position missing from the params is written with its value") {
   ExpressionGraph graph;
-  const CanonicalParams out = canonicalize_params(Value::object(), {{"radius", Sym(make_var("r", 4.0)).scalar()}}, graph);
+  const CanonicalParams out =
+      canonicalize_params(Value::object(), {{"radius", Sym(make_var("r", 4.0)).scalar()}}, graph);
   CHECK(out.numeric.find("radius")->as_double() == 4.0);
 }
 
