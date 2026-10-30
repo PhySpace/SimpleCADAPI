@@ -4,6 +4,7 @@
 #include <BRepAdaptor_Surface.hxx>
 #include <GeomAbs_CurveType.hxx>
 #include <GeomAbs_SurfaceType.hxx>
+#include <Standard_Failure.hxx>
 #include <TopoDS.hxx>
 
 #include <TopExp.hxx>
@@ -130,8 +131,10 @@ std::optional<std::string> shape_geom_type(const Shape& shape) {
     if (shape.kind() == Kind::Face)
       return surface_type(BRepAdaptor_Surface(TopoDS::Face(shape.wrapped())).GetType());
   } catch (const std::exception&) {
-    // Kept broad on purpose: OCCT's Standard_Failure does not derive from std::exception, so this catch is
-    // not known to be narrowable (see the report).  A shape without a readable geometry type has none.
+    return std::nullopt;  // a shape without a readable geometry type has none
+  } catch (const Standard_Failure&) {
+    // OCCT's exceptions do not derive from std::exception.  2.2.6 wrote `except Exception` around the same OCP
+    // calls, and OCP's Standard_Failure is an Exception there: the type is absent, not an error.
     return std::nullopt;
   }
   return std::nullopt;

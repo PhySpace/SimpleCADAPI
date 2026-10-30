@@ -143,3 +143,13 @@ test is a decision on record, not a gap.
 | `test_inspect_brep_queries.py::test_render_worker_retries_crash_and_requires_clean_exit` | tests the crash-isolated VTK render worker subprocess and its retry policy; the soft renderer runs in-process |
 | `test_render_screenshot_multiview.py` (3 tests: `..._grid_engine`, `..._multiview_engine_with_annotations`) | tests the routing between the VTK single-view engine and the grid engine; there is one engine |
 | `test_sketch_api.py::...default_solver_backend_is_py_slvs...` (in `test/native_known_failures.json`) | the default sketch solver backend is `scad-native`; py-slvs (GPL) is not linked. A user-visible difference: the backend name in a sketch snapshot. See `sketch-solver.md` |
+
+## A symbolic value in a ql predicate (native is more permissive than 2.2.6)
+
+`ql.prop("geom.length", ">=", 2 * math.pi * plate_radius * 0.999)` where `plate_radius` is a `scad.var(...)`: the value
+is an `Expr`. 2.2.6.post2 compares the measured number with the unevaluated expression, matches nothing and fails with
+"expected exactly 2 edge(s), got 0" while its own inventory lists the arcs of the right length (an agent spent ten
+minutes on this in a scan-to-CAD run: the fix was `float(plate_radius)`). This engine evaluates the expression, so the
+query matches. The 2.2.6 behaviour is a defect rather than a contract, and no old test depends on it; it is recorded so
+that a model written against this engine is known not to run unchanged on 2.2.6 (`float(...)` makes it portable).
+Pinned by `tests/python/test_ql_symbolic_predicate.py`.

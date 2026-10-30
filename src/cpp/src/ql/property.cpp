@@ -4,6 +4,7 @@
 #include <BRepAdaptor_Surface.hxx>
 #include <GeomAbs_CurveType.hxx>
 #include <GeomAbs_SurfaceType.hxx>
+#include <Standard_Failure.hxx>
 #include <TopoDS.hxx>
 
 #include <algorithm>
@@ -441,8 +442,11 @@ std::optional<Value> PropertyPath::lookup(const Shape& shape, const EvalContext&
         if (kind == Kind::Shell)
           return Value(kernel::shell_is_closed(shape.wrapped()));
       } catch (const std::exception&) {
-        // Kept broad: kernel::is_wire_closed/shell_is_closed are not under occt_guard, so this is not
-        // known to be narrowable.  A closedness the kernel cannot tell is a missing property.
+        return std::nullopt;  // a closedness the kernel cannot tell is a missing property
+      } catch (const Standard_Failure&) {
+        // kernel::is_wire_closed / shell_is_closed are not under occt_guard, and OCCT's exceptions do not derive
+        // from std::exception.  2.2.6 wrote `except Exception: return MISSING` around the same OCP calls
+        // (ql._geometry_property), where OCP's Standard_Failure is an Exception: the property is missing.
         return std::nullopt;
       }
       return std::nullopt;
