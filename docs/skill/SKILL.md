@@ -4,9 +4,9 @@ description: Build, assemble, inspect, reconstruct, and export parametric CAD mo
 license: Apache-2.0
 metadata:
   project: simplecadapi
-  version: 2.2.7b1
+  version: 2.2.7
   package-name: simplecadapi
-  package-version: 2.2.7b1
+  package-version: 2.2.7
 ---
 
 # SimpleCAD SDK Skill

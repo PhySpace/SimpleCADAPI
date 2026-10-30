@@ -6,6 +6,8 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+## 2.2.7 — 2026-10-30
+
 ### Fixed
 - The editor starts with whatever model file is on disk: a model kept by an older build that leaves parts out, or a damaged
   one, is not restored (and no longer stops the kernel from starting, which showed as "starting the kernel" for ever), and

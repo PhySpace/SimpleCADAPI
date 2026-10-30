@@ -133,19 +133,20 @@ CalculiX 静力 FEM（边界面按保真的 `interface.*` 标签选取，仿真�
 
 ---
 
-## 更新日志（2.2.7b1）
+## 更新日志（2.2.7）
 
 > 投入生产前请验证生成的定义、装配约束和制造几何。
 
-- **几何引擎改为基于 OpenCASCADE 的 C++，随 wheel 发布。** `pip install simplecadapi` 不再需要 `cadquery-ocp`；
-  公开 API 和此前的整套测试不变。
-- **预编译 wheel**：Linux x86_64 与 aarch64、macOS arm64（14+）、Windows x86_64，Python 3.10-3.13，
-  全部使用同一份 OpenCASCADE 7.9.3。这是 beta，也是第一个带预编译 wheel 的版本。
-- **更快、更小。** 六轴机械臂：冷构建 43.8 s 到 29.1 s，无改动重建 12.8 s 到 6.0 s，
-  `import simplecadapi` 1.6 s / 360 MB 到 0.2 s / 68 MB。
-- **报错全部为英文**，标签与查询类报错和算子报错一样完整渲染。
+- **C++ 引擎的第一个正式版**，随预编译 wheel 发布（Linux x86_64 与 aarch64、macOS arm64 14+、Windows x86_64；
+  Python 3.10-3.13；统一使用 OpenCASCADE 7.9.3）。`pip install simplecadapi` 不再需要 `cadquery-ocp`。
+- **编辑器更快。** 六轴机械臂上一个没见过的关节角 2.7 s（beta 是 5.7 s），见过的 0.6 s（beta 是 5.5 s），
+  模型在最后一个 cell 之后 0.36-0.41 s 到达页面。内核空闲时比 beta 多用约 300 MB 内存。
+- **`Var` 和 `Expr` 像数字一样工作**：`r > 3`、`int(r)`、`round(r, 2)`、`range(n)`、`max(r, 3)`、f-string 可用，
+  用 `Var` 算出的值写 ql 谓词也能匹配。`bool(var)` 和 `json.dumps(var)` 仍然报错。
+- **装了 OCP 时 `shape.wrapped` 是 OCP 形状**（`simplecadapi[verify]`），是拷贝，OCCT 验证脚本可以原样运行。
+- fillet、chamfer 和 ql 选择失败重新附带图片。保存了参数值的笔记本会重建一次。
 
-本版本的完整说明：[`docs/updates/2.2.7b1.zh-CN.md`](docs/updates/2.2.7b1.zh-CN.md)。
+本版本的完整说明：[`docs/updates/2.2.7.zh-CN.md`](docs/updates/2.2.7.zh-CN.md)。
 更早的版本：见[更新日志](CHANGELOG.md)和 [`docs/updates/`](docs/updates/)。
 
 ---
@@ -163,7 +164,7 @@ CalculiX 静力 FEM（边界面按保真的 `interface.*` 标签选取，仿真�
 
 SimpleCADAPI 是一个基于 OCP 的 Python CAD SDK，提供清晰的函数式建模操作和可重放的模型图。它在 OpenCascade 几何内核之上提供精简的公共 API，可用于创建实体、应用特征、添加语义标签、查询拓扑、导出制造文件，以及将记录的模型转换为 FreeCAD 工作流。
 
-当前版本：`simplecadapi==2.2.7b1`。
+当前版本：`simplecadapi==2.2.7`。
 
 ## 核心能力
 
@@ -558,6 +559,7 @@ uv run --extra gmsh python examples/ap242_gmsh_volume_mesh/export_fem_mesh.py
 
 ## 文档
 
+- 2.2.7 更新说明：[`docs/updates/2.2.7.zh-CN.md`](docs/updates/2.2.7.zh-CN.md)
 - 2.2.7b1 更新说明：[`docs/updates/2.2.7b1.zh-CN.md`](docs/updates/2.2.7b1.zh-CN.md)
 - 2.2.6.post2 更新说明：[`docs/updates/2.2.6.post2.zh-CN.md`](docs/updates/2.2.6.post2.zh-CN.md)
 - 2.2.6.post1 更新说明：[`docs/updates/2.2.6.post1.zh-CN.md`](docs/updates/2.2.6.post1.zh-CN.md)
