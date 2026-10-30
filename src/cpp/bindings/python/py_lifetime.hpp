@@ -15,7 +15,8 @@
 namespace scad::pybind {
 
 inline bool python_alive() noexcept {
-  if (Py_IsInitialized() == 0) return false;
+  if (Py_IsInitialized() == 0)
+    return false;
 #if PY_VERSION_HEX >= 0x030D0000
   return Py_IsFinalizing() == 0;
 #else

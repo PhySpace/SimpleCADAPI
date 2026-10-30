@@ -9,7 +9,7 @@ PYBIND11_MODULE(_native, m, py::mod_gil_not_used()) {
 
   bind_core(m);
   bind_topo(m);
-  bind_reactive(m);   // before the operator areas: they accept Scalar expressions
+  bind_reactive(m);  // before the operator areas: they accept Scalar expressions
   bind_semantic(m);
   bind_io(m);
   bind_ql(m);
@@ -21,6 +21,6 @@ PYBIND11_MODULE(_native, m, py::mod_gil_not_used()) {
   bind_std(m);
   bind_product(m);
   bind_canonical(m);
-  bind_sdk_compat(m);  // names the Python layers above import from the lower modules
+  bind_sdk_compat(m);                // names the Python layers above import from the lower modules
   scad::pybind::occt::bind_occt(m);  // the OCCT classes the kept Python layers use (OCP's names)
 }

@@ -21,7 +21,8 @@ Visited entered(const Visited& seen, const Assembly& assembly, const std::string
 }
 
 Connector resolve_through(const Item& item, std::string_view connector_id, const Visited& seen) {
-  if (const auto* part = std::get_if<PartPtr>(&item)) return (*part)->get_connector(connector_id);
+  if (const auto* part = std::get_if<PartPtr>(&item))
+    return (*part)->get_connector(connector_id);
   const Assembly& assembly = *std::get<AssemblyPtr>(item);
   const Visited next = entered(seen, assembly, std::string(connector_id));
   const PublicConnectorRef& pub = assembly.get_public_connector(connector_id);
@@ -29,7 +30,8 @@ Connector resolve_through(const Item& item, std::string_view connector_id, const
 }
 
 Placement placement_through(const Item& item, std::string_view connector_id, const Visited& seen) {
-  if (const auto* part = std::get_if<PartPtr>(&item)) return resolve_connector_placement((*part)->get_connector(connector_id));
+  if (const auto* part = std::get_if<PartPtr>(&item))
+    return resolve_connector_placement((*part)->get_connector(connector_id));
   const Assembly& assembly = *std::get<AssemblyPtr>(item);
   const Visited next = entered(seen, assembly, std::string(connector_id));
   const PublicConnectorRef& pub = assembly.get_public_connector(connector_id);

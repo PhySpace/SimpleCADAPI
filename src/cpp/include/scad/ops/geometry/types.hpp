@@ -29,7 +29,11 @@ using OptionalString = std::optional<std::string>;
 Vec3 evaluate_point(const Scalar3& point, std::string_view label = "point");
 
 // A point of literal coordinates as a Scalar3, for defaults and C++ callers.
-inline Scalar3 scalar3(double x, double y, double z) { return {Scalar(x), Scalar(y), Scalar(z)}; }
-inline Scalar3 scalar3(const Vec3& v) { return scalar3(v.x, v.y, v.z); }
+inline Scalar3 scalar3(double x, double y, double z) {
+  return {Scalar(x), Scalar(y), Scalar(z)};
+}
+inline Scalar3 scalar3(const Vec3& v) {
+  return scalar3(v.x, v.y, v.z);
+}
 
 }  // namespace scad

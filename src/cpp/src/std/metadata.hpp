@@ -22,7 +22,8 @@ class Dict {
   }
   // Every member of `other`, after the ones already here (Python: {**other, ...}).
   Dict& merge(const Value& other) {
-    for (const auto& [key, value] : other.as_object()) v_.set(key, value);
+    for (const auto& [key, value] : other.as_object())
+      v_.set(key, value);
     return *this;
   }
   Value take() { return std::move(v_); }
@@ -31,12 +32,15 @@ class Dict {
   Value v_ = Value::object();
 };
 
-inline Value number_or_null(const std::optional<double>& value) { return value ? Value(*value) : Value(); }
+inline Value number_or_null(const std::optional<double>& value) {
+  return value ? Value(*value) : Value();
+}
 
 template <class T>
 Value list_of(const std::vector<T>& items) {
   Value out = Value::array();
-  for (const T& item : items) out.push_back(Value(item));
+  for (const T& item : items)
+    out.push_back(Value(item));
   return out;
 }
 

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "scad/core/engaged.hpp"
 #include "scad/core/error.hpp"
 #include "solver_detail.hpp"
 
@@ -18,6 +19,12 @@ struct Endpoint {
   std::optional<Constraint> support;  // empty: grounded
 };
 
+// The radius of a gear, belt or rack_pinion constraint: Constraint's validation rejects a coupling that
+// lacks the radii of its kind, and the callers pick the radii by that same kind.
+double coupling_radius(const OptionalDouble& radius) {
+  return require_engaged(radius, "a gear, belt or rack_pinion constraint carries the radii of its kind");
+}
+
 bool is_grounded(const Assembly& assembly, const std::string& component_id) {
   const auto& grounded = assembly.grounded_component_ids();
   return std::find(grounded.begin(), grounded.end(), component_id) != grounded.end();
@@ -26,15 +33,19 @@ bool is_grounded(const Assembly& assembly, const std::string& component_id) {
 std::optional<Constraint> support_constraint_for(const Assembly& assembly, const ConnectorRef& ref,
                                                  std::string_view support_kind) {
   for (const Constraint& constraint : assembly.constraints()) {
-    if (constraint.constraint_kind() != support_kind) continue;
-    if (constraint.connector_a() == ref || constraint.connector_b() == ref) return constraint;
+    if (constraint.constraint_kind() != support_kind)
+      continue;
+    if (constraint.connector_a() == ref || constraint.connector_b() == ref)
+      return constraint;
   }
   return std::nullopt;
 }
 
 std::optional<Endpoint> endpoint_for(const Assembly& assembly, const ConnectorRef& ref, std::string_view support_kind) {
-  if (auto support = support_constraint_for(assembly, ref, support_kind)) return Endpoint{std::move(support)};
-  if (is_grounded(assembly, ref.component_id())) return Endpoint{};
+  if (auto support = support_constraint_for(assembly, ref, support_kind))
+    return Endpoint{std::move(support)};
+  if (is_grounded(assembly, ref.component_id()))
+    return Endpoint{};
   return std::nullopt;
 }
 
@@ -47,10 +58,13 @@ double endpoint_scalar(const Assembly& assembly, const Endpoint& endpoint) {
 }
 
 bool can_accept_coupled_scalar(const Endpoint& endpoint) {
-  if (!endpoint.support) return false;
+  if (!endpoint.support)
+    return false;
   const Constraint& support = *endpoint.support;
-  if (support.constraint_kind() == "revolute") return !support.drive_angle_degrees();
-  if (support.constraint_kind() == "prismatic") return !support.drive_distance();
+  if (support.constraint_kind() == "revolute")
+    return !support.drive_angle_degrees();
+  if (support.constraint_kind() == "prismatic")
+    return !support.drive_distance();
   return false;
 }
 
@@ -66,12 +80,12 @@ Placement component_placement_for_support_scalar(const Assembly& assembly, const
 }
 
 Assembly set_endpoint_scalar(const Assembly& assembly, const Endpoint& endpoint, double scalar) {
-  if (!endpoint.support) return assembly;
+  if (!endpoint.support)
+    return assembly;
   const Constraint& support = *endpoint.support;
   scalar = project_scalar(scalar, constraint_scalar_bounds(support));
-  const ConnectorRef& moving_ref = is_grounded(assembly, support.connector_b().component_id())
-                                       ? support.connector_a()
-                                       : support.connector_b();
+  const ConnectorRef& moving_ref =
+      is_grounded(assembly, support.connector_b().component_id()) ? support.connector_a() : support.connector_b();
   const Placement placement = component_placement_for_support_scalar(assembly, support, scalar);
   return assembly.with_component_placement(moving_ref.component_id(), placement);
 }
@@ -80,7 +94,8 @@ std::optional<std::pair<Endpoint, Endpoint>> coupling_supports(const Assembly& a
   const bool rack = coupling.constraint_kind() == "rack_pinion";
   auto first = endpoint_for(assembly, coupling.connector_a(), rack ? "prismatic" : "revolute");
   auto second = endpoint_for(assembly, coupling.connector_b(), "revolute");
-  if (!first || !second) return std::nullopt;
+  if (!first || !second)
+    return std::nullopt;
   return std::pair{std::move(*first), std::move(*second)};
 }
 
@@ -88,12 +103,14 @@ double phase_from_supports(const Assembly& assembly, const Constraint& coupling,
   const double scalar_a = endpoint_scalar(assembly, a);
   const double scalar_b = endpoint_scalar(assembly, b);
   if (coupling.constraint_kind() == "gear") {
-    return *coupling.pitch_radius_a() * radians(scalar_a) + *coupling.pitch_radius_b() * radians(scalar_b);
+    return coupling_radius(coupling.pitch_radius_a()) * radians(scalar_a) +
+           coupling_radius(coupling.pitch_radius_b()) * radians(scalar_b);
   }
   if (coupling.constraint_kind() == "belt") {
-    return *coupling.pulley_radius_a() * radians(scalar_a) - *coupling.pulley_radius_b() * radians(scalar_b);
+    return coupling_radius(coupling.pulley_radius_a()) * radians(scalar_a) -
+           coupling_radius(coupling.pulley_radius_b()) * radians(scalar_b);
   }
-  return scalar_a + *coupling.pitch_radius() * radians(scalar_b);
+  return scalar_a + coupling_radius(coupling.pitch_radius()) * radians(scalar_b);
 }
 
 // The coordinates that satisfy the coupling when one side is free: {target_a, target_b}.
@@ -103,15 +120,20 @@ struct Targets {
 
 Targets coupled_targets(const Constraint& coupling, double phase, double scalar_a, double scalar_b) {
   if (coupling.constraint_kind() == "gear") {
-    return {degrees((phase - *coupling.pitch_radius_b() * radians(scalar_b)) / *coupling.pitch_radius_a()),
-            degrees((phase - *coupling.pitch_radius_a() * radians(scalar_a)) / *coupling.pitch_radius_b())};
+    return {degrees((phase - coupling_radius(coupling.pitch_radius_b()) * radians(scalar_b)) /
+                    coupling_radius(coupling.pitch_radius_a())),
+            degrees((phase - coupling_radius(coupling.pitch_radius_a()) * radians(scalar_a)) /
+                    coupling_radius(coupling.pitch_radius_b()))};
   }
   if (coupling.constraint_kind() == "belt") {
-    return {degrees((phase + *coupling.pulley_radius_b() * radians(scalar_b)) / *coupling.pulley_radius_a()),
-            degrees((*coupling.pulley_radius_a() * radians(scalar_a) - phase) / *coupling.pulley_radius_b())};
+    return {degrees((phase + coupling_radius(coupling.pulley_radius_b()) * radians(scalar_b)) /
+                    coupling_radius(coupling.pulley_radius_a())),
+            degrees((coupling_radius(coupling.pulley_radius_a()) * radians(scalar_a) - phase) /
+                    coupling_radius(coupling.pulley_radius_b()))};
   }
   // rack and pinion: the rack coordinate is a length, the pinion's an angle.
-  return {phase - *coupling.pitch_radius() * radians(scalar_b), degrees((phase - scalar_a) / *coupling.pitch_radius())};
+  return {phase - coupling_radius(coupling.pitch_radius()) * radians(scalar_b),
+          degrees((phase - scalar_a) / coupling_radius(coupling.pitch_radius()))};
 }
 
 }  // namespace
@@ -119,9 +141,11 @@ Targets coupled_targets(const Constraint& coupling, double phase, double scalar_
 Assembly solve_coupling_constraints(const Assembly& assembly) {
   Assembly result = assembly;
   for (const Constraint& coupling : assembly.constraints()) {
-    if (!coupling.is_coupling()) continue;
+    if (!coupling.is_coupling())
+      continue;
     const auto supports = coupling_supports(result, coupling);
-    if (!supports) continue;
+    if (!supports)
+      continue;
     const auto& [support_a, support_b] = *supports;
     const double phase = coupling.phase_offset().value_or(0.0);
     const double scalar_a = endpoint_scalar(result, support_a);
@@ -140,30 +164,33 @@ Assembly solve_coupling_constraints(const Assembly& assembly) {
 
 ConstraintResidual measure_coupling_residual(const Assembly& assembly, const Constraint& constraint) {
   const auto supports = coupling_supports(assembly, constraint);
-  if (!supports) return {constraint.constraint_id(), 1.0e30, 0.0, false};
+  if (!supports)
+    return {constraint.constraint_id(), 1.0e30, 0.0, false};
   const double residual = std::abs(phase_from_supports(assembly, constraint, supports->first, supports->second) -
                                    constraint.phase_offset().value_or(0.0));
   double angular_error = 0.0;
   if (constraint.constraint_kind() == "gear") {
-    angular_error = degrees(residual / *constraint.pitch_radius_b());
+    angular_error = degrees(residual / coupling_radius(constraint.pitch_radius_b()));
   } else if (constraint.constraint_kind() == "belt") {
-    angular_error = degrees(residual / *constraint.pulley_radius_b());
+    angular_error = degrees(residual / coupling_radius(constraint.pulley_radius_b()));
   } else if (constraint.constraint_kind() == "rack_pinion") {
-    angular_error = degrees(residual / *constraint.pitch_radius());
+    angular_error = degrees(residual / coupling_radius(constraint.pitch_radius()));
   }
   return {constraint.constraint_id(), residual, std::abs(angular_error), residual <= kPlacementTolerance};
 }
 
 std::optional<double> current_coupling_phase(const Assembly& assembly, const Constraint& coupling) {
   const auto supports = coupling_supports(assembly, coupling);
-  if (!supports) return std::nullopt;
+  if (!supports)
+    return std::nullopt;
   return phase_from_supports(assembly, coupling, supports->first, supports->second);
 }
 
 }  // namespace detail
 
 double coupling_phase_offset(const Assembly& assembly, const Constraint& constraint) {
-  if (!constraint.is_coupling()) throw ValueError("constraint must be a gear, belt, or rack_pinion constraint");
+  if (!constraint.is_coupling())
+    throw ValueError("constraint must be a gear, belt, or rack_pinion constraint");
   return detail::current_coupling_phase(assembly, constraint).value_or(0.0);
 }
 

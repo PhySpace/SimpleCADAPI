@@ -24,7 +24,8 @@ PointGrid checked_point_grid(const PointGrid& points) {
     throw ValueError("surface point grids must be rectangular");
   for (const auto& row : points)
     for (const Vec3& point : row)
-      if (!point.is_finite()) throw ValueError("surface points must be finite");
+      if (!point.is_finite())
+        throw ValueError("surface points must be finite");
   return points;
 }
 
@@ -35,7 +36,8 @@ PointGrid to_global(const PointGrid& points) {
   for (const auto& row : points) {
     std::vector<Vec3> converted;
     converted.reserve(row.size());
-    for (const Vec3& point : row) converted.push_back(cs.transform_point(point));
+    for (const Vec3& point : row)
+      converted.push_back(cs.transform_point(point));
     out.push_back(std::move(converted));
   }
   return out;
@@ -46,55 +48,67 @@ std::vector<Vec3> constraint_points_to_global(const std::vector<Vec3>& points) {
   std::vector<Vec3> out;
   out.reserve(points.size());
   for (const Vec3& point : points) {
-    if (!point.is_finite()) throw ValueError("surface constraint points must be finite 3D points");
+    if (!point.is_finite())
+      throw ValueError("surface constraint points must be finite 3D points");
     out.push_back(cs.transform_point(point));
   }
   return out;
 }
 
 namespace {
-Value point_value(const Vec3& p) { return Value(Value::Array{p.x, p.y, p.z}); }
+Value point_value(const Vec3& p) {
+  return Value(Value::Array{p.x, p.y, p.z});
+}
 }  // namespace
 
 Value to_value(const std::vector<Vec3>& points) {
   Value::Array out;
   out.reserve(points.size());
-  for (const Vec3& p : points) out.push_back(point_value(p));
+  for (const Vec3& p : points)
+    out.push_back(point_value(p));
   return Value(std::move(out));
 }
 
 Value to_value(const PointGrid& grid) {
   Value::Array rows;
   rows.reserve(grid.size());
-  for (const auto& row : grid) rows.push_back(to_value(row));
+  for (const auto& row : grid)
+    rows.push_back(to_value(row));
   return Value(std::move(rows));
 }
 
 Value to_value(const std::optional<WeightGrid>& weights) {
-  if (!weights) return {};
+  if (!weights)
+    return {};
   Value::Array rows;
   for (const auto& row : *weights) {
     Value::Array cells;
-    for (double w : row) cells.emplace_back(w);
+    for (double w : row)
+      cells.emplace_back(w);
     rows.emplace_back(std::move(cells));
   }
   return Value(std::move(rows));
 }
 
 void note_symbolic(SymbolicArgs& out, std::string name, const Scalar& value) {
-  if (value.symbolic()) out.emplace_back(std::move(name), value);
+  if (value.symbolic())
+    out.emplace_back(std::move(name), value);
 }
 
-Value to_value(const TagPrefix& tag_prefix) { return tag_prefix ? Value(*tag_prefix) : Value(); }
+Value to_value(const TagPrefix& tag_prefix) {
+  return tag_prefix ? Value(*tag_prefix) : Value();
+}
 
-TopoDS_Face face_from_surface(const Handle(Geom_Surface)& surface) {
+TopoDS_Face face_from_surface(const Handle(Geom_Surface) & surface) {
   BRepBuilderAPI_MakeFace builder(surface, Precision::Confusion());
-  if (!builder.IsDone()) throw ValueError("OCP could not create a face from the generated surface");
+  if (!builder.IsDone())
+    throw ValueError("OCP could not create a face from the generated surface");
   return builder.Face();
 }
 
 TopoDS_Face single_face(const TopoDS_Shape& shape, std::string_view what) {
-  if (shape.ShapeType() == TopAbs_FACE) return TopoDS::Face(shape);
+  if (shape.ShapeType() == TopAbs_FACE)
+    return TopoDS::Face(shape);
   const auto faces = kernel::faces_of(shape);
   if (faces.size() != 1)
     throw ValueError("surface " + std::string(what) + " must create exactly one face, got " +

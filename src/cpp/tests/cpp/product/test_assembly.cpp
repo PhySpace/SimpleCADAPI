@@ -34,7 +34,8 @@ TEST_CASE("duplicate components and assembly cycles are rejected") {
 
   AssemblyPtr child = make_assembly_rassembly("child");
   child = add_component_rassembly(*child, Item{assembly}, "parent_instance", identity_placement());
-  const auto cycle = failure_of([&] { add_component_rassembly(*assembly, Item{child}, "child_instance", identity_placement()); });
+  const auto cycle =
+      failure_of([&] { add_component_rassembly(*assembly, Item{child}, "child_instance", identity_placement()); });
   REQUIRE(cycle);
   CHECK(cycle->guidance().technical_details == "ValueError: assembly cycle detected for 'root'");
 }
@@ -69,11 +70,13 @@ TEST_CASE("public connectors expose a child's connector") {
 
   const auto missing = failure_of([&] { set_public_connector_rassembly(*child, "other", "ghost", "axis"); });
   REQUIRE(missing);
-  CHECK(missing->guidance().technical_details.find("missing component or connector for public connector") != std::string::npos);
+  CHECK(missing->guidance().technical_details.find("missing component or connector for public connector") !=
+        std::string::npos);
 
   const auto duplicate = failure_of([&] { set_public_connector_rassembly(*child, "public_axis", "inner", "axis"); });
   REQUIRE(duplicate);
-  CHECK(duplicate->guidance().technical_details == "ValueError: duplicate public_connector_id in assembly: public_axis");
+  CHECK(duplicate->guidance().technical_details ==
+        "ValueError: duplicate public_connector_id in assembly: public_axis");
 
   check_vec(resolve_item_connector_placement(Item{child}, "public_axis").origin(), {7, 0, 0});
 }

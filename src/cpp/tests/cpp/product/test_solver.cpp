@@ -89,7 +89,8 @@ TEST_CASE("gear and belt couplings set the free joint from the driven one") {
   const PartPtr part = part_with_axis("rotor");
   const auto build = [&](bool belt) {
     AssemblyPtr assembly = make_assembly_rassembly(belt ? "belt_asm" : "gear_asm");
-    for (const char* id : {"base", "gear_a", "gear_b"}) assembly = with_component(assembly, part, id);
+    for (const char* id : {"base", "gear_a", "gear_b"})
+      assembly = with_component(assembly, part, id);
     assembly = ground_component_rassembly(*assembly, "base");
     assembly = add_revolute_constraint_rassembly(*assembly, "drive_a", ref("base"), ref("gear_a"), 90.0);
     assembly = add_revolute_constraint_rassembly(*assembly, "free_b", ref("base"), ref("gear_b"));
@@ -108,7 +109,8 @@ TEST_CASE("gear and belt couplings set the free joint from the driven one") {
 TEST_CASE("a rack-pinion coupling turns the pinion angle into rack travel") {
   const PartPtr part = part_with_axis("rp");
   AssemblyPtr assembly = make_assembly_rassembly("rack_pinion_asm");
-  for (const char* id : {"base", "rack", "pinion"}) assembly = with_component(assembly, part, id);
+  for (const char* id : {"base", "rack", "pinion"})
+    assembly = with_component(assembly, part, id);
   assembly = ground_component_rassembly(*assembly, "base");
   assembly = add_prismatic_constraint_rassembly(*assembly, "rack_slide", ref("base"), ref("rack"));
   assembly = add_revolute_constraint_rassembly(*assembly, "pinion_axis", ref("base"), ref("pinion"), 90.0);
@@ -121,13 +123,15 @@ TEST_CASE("a rack-pinion coupling turns the pinion angle into rack travel") {
 TEST_CASE("a coupling's omitted phase offset is the current relative phase") {
   const PartPtr part = part_with_axis("rotor");
   AssemblyPtr assembly = make_assembly_rassembly("phase");
-  for (const char* id : {"base", "a", "b"}) assembly = with_component(assembly, part, id);
+  for (const char* id : {"base", "a", "b"})
+    assembly = with_component(assembly, part, id);
   assembly = ground_component_rassembly(*assembly, "base");
   assembly = add_revolute_constraint_rassembly(*assembly, "ja", ref("base"), ref("a"), 30.0);
   assembly = add_revolute_constraint_rassembly(*assembly, "jb", ref("base"), ref("b"));
   const AssemblyPtr solved = solve_assembly_constraints_rassembly(assembly);
   const AssemblyPtr coupled = add_gear_constraint_rassembly(*solved, "mesh", ref("a"), ref("b"), 1.0, 1.0);
-  const double expected = 1.0 * 30.0 * kPi / 180.0 + 1.0 * z_angle_degrees(solved->get_component("b").placement) * kPi / 180.0;
+  const double expected =
+      1.0 * 30.0 * kPi / 180.0 + 1.0 * z_angle_degrees(solved->get_component("b").placement) * kPi / 180.0;
   CHECK(*coupled->get_constraint("mesh").phase_offset() == doctest::Approx(expected).epsilon(1e-9));
   CHECK(coupling_phase_offset(*solved, coupled->get_constraint("mesh")) == doctest::Approx(expected).epsilon(1e-9));
   CHECK_THROWS_AS(coupling_phase_offset(*solved, solved->get_constraint("ja")), ValueError);
@@ -136,15 +140,19 @@ TEST_CASE("a coupling's omitted phase offset is the current relative phase") {
 TEST_CASE("coupling constructor errors are not wrapped, like Python") {
   const PartPtr part = part_with_axis("p");
   AssemblyPtr assembly = with_component(with_component(make_assembly_rassembly("a"), part, "a"), part, "b");
-  CHECK_THROWS_WITH_AS(add_gear_constraint_rassembly(*assembly, "g", ref("a"), ref("b"), 0.0, 1.0), "pitch_radius_a must be positive", ValueError);
-  CHECK_THROWS_WITH_AS(add_belt_constraint_rassembly(*assembly, "b", ref("a"), ref("b"), 1.0, -1.0), "pulley_radius_b must be positive", ValueError);
-  CHECK_THROWS_WITH_AS(add_rack_pinion_constraint_rassembly(*assembly, "r", ref("a"), ref("b"), 0.0), "pitch_radius must be positive", ValueError);
+  CHECK_THROWS_WITH_AS(add_gear_constraint_rassembly(*assembly, "g", ref("a"), ref("b"), 0.0, 1.0),
+                       "pitch_radius_a must be positive", ValueError);
+  CHECK_THROWS_WITH_AS(add_belt_constraint_rassembly(*assembly, "b", ref("a"), ref("b"), 1.0, -1.0),
+                       "pulley_radius_b must be positive", ValueError);
+  CHECK_THROWS_WITH_AS(add_rack_pinion_constraint_rassembly(*assembly, "r", ref("a"), ref("b"), 0.0),
+                       "pitch_radius must be positive", ValueError);
 }
 
 TEST_CASE("a constraint on a missing connector is rejected with the operator's guidance") {
   const PartPtr part = part_with_axis("p");
   AssemblyPtr assembly = with_component(with_component(make_assembly_rassembly("a"), part, "base"), part, "slider");
-  const auto error = failure_of([&] { add_fixed_constraint_rassembly(*assembly, "m", ref("base"), ref("slider", "missing_axis")); });
+  const auto error =
+      failure_of([&] { add_fixed_constraint_rassembly(*assembly, "m", ref("base"), ref("slider", "missing_axis")); });
   REQUIRE(error);
   CHECK(error->operation() == "add_fixed_constraint_rassembly");
   CHECK(error->guidance().technical_details == "KeyError: \"part has no connector_id 'missing_axis'\"");
@@ -157,7 +165,8 @@ TEST_CASE("solving without a grounded component fails") {
   const auto error = failure_of([&] { solve_assembly_constraints_rassembly(assembly); });
   REQUIRE(error);
   CHECK(error->operation() == "solve_assembly_constraints_rassembly");
-  CHECK(error->guidance().technical_details == "ValueError: assembly constraints require at least one grounded component");
+  CHECK(error->guidance().technical_details ==
+        "ValueError: assembly constraints require at least one grounded component");
 }
 
 TEST_CASE("an assembly without constraints is returned as it is") {
@@ -191,7 +200,8 @@ TEST_CASE("a residual failure carries the measured error and a worst-first repai
   }
   CHECK(found);
   bool exceeded = false;
-  for (const InventoryEntry& entry : guidance.inventory) exceeded = exceeded || (entry.symbol == "hold2" && entry.status == "exceeded");
+  for (const InventoryEntry& entry : guidance.inventory)
+    exceeded = exceeded || (entry.symbol == "hold2" && entry.status == "exceeded");
   CHECK(exceeded);
   CHECK(guidance.repair.front().find("hold2") != std::string::npos);
   CHECK(std::string(error->what()).find("hold2 translation error: 15") != std::string::npos);
@@ -203,7 +213,8 @@ TEST_CASE("a residual failure carries the measured error and a worst-first repai
 TEST_CASE("a structural failure lists the connectivity verdict") {
   const PartPtr part = part_with_axis("p");
   AssemblyPtr assembly = make_assembly_rassembly("structural");
-  for (const char* id : {"base", "floating", "island"}) assembly = with_component(assembly, part, id);
+  for (const char* id : {"base", "floating", "island"})
+    assembly = with_component(assembly, part, id);
   assembly = ground_component_rassembly(*assembly, "base");
   assembly = add_revolute_constraint_rassembly(*assembly, "link", ref("base"), ref("floating"));
 
@@ -212,7 +223,8 @@ TEST_CASE("a structural failure lists the connectivity verdict") {
   CHECK(error->operation() == "solve_assembly_constraints");
   CHECK(error->guidance().what_happened.find("island") != std::string::npos);
   std::map<std::string, std::string> statuses;
-  for (const InventoryEntry& entry : error->guidance().inventory) statuses[entry.symbol] = entry.status;
+  for (const InventoryEntry& entry : error->guidance().inventory)
+    statuses[entry.symbol] = entry.status;
   CHECK(statuses["base"] == "grounded");
   CHECK(statuses["floating"] == "reachable");
   CHECK(statuses["island"] == "unsolved");

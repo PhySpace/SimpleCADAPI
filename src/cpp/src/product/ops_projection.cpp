@@ -30,18 +30,21 @@ void collect_placed_solids(const Item& item, const Placement& placement, std::ve
 
 Compound make_compound_from_assembly_rcompound(const Assembly& assembly) {
   return guard_operation("make_compound_from_assembly_rcompound", [&] {
-    if (assembly.components().empty()) throw ValueError("assembly must contain at least one component to project");
+    if (assembly.components().empty())
+      throw ValueError("assembly must contain at least one component to project");
     std::vector<Solid> solids;
     const Placement identity = identity_placement();
     for (const Component& component : assembly.components()) {
       collect_placed_solids(component.item, identity.compose(component.placement), solids);
     }
-    if (solids.empty()) throw ValueError("assembly projection produced no solids");
+    if (solids.empty())
+      throw ValueError("assembly projection produced no solids");
 
     BRep_Builder builder;
     TopoDS_Compound shape;
     builder.MakeCompound(shape);
-    for (const Solid& solid : solids) builder.Add(shape, solid.wrapped());
+    for (const Solid& solid : solids)
+      builder.Add(shape, solid.wrapped());
     Compound compound(shape);
 
     Value projection = Value::object();

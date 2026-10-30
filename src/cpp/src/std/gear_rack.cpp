@@ -19,7 +19,8 @@ namespace {
 // `_rotate_profile_wire_3d`: `wire` turned about Z, then lifted to height `z`.
 Shape rotated_section(const Wire& wire, double angle_degrees, double z) {
   Shape section = rotate_shape(wire, angle_degrees, scalar3(0.0, 0.0, 1.0), scalar3(0.0, 0.0, 0.0));
-  if (z != 0.0) section = translate_shape(section, scalar3(0.0, 0.0, z));
+  if (z != 0.0)
+    section = translate_shape(section, scalar3(0.0, 0.0, z));
   return section;
 }
 
@@ -27,9 +28,12 @@ Shape rotated_section(const Wire& wire, double angle_degrees, double z) {
 
 Solid make_spur_rack_rsolid(double module, int n_teeth, double pressure_angle, double rack_height) {
   const TrackingPolicyScope graph(TrackingPolicy::Graph);
-  if (module <= 0) throw ValueError("module must be positive");
-  if (n_teeth < 1) throw ValueError("n_teeth must be at least 1");
-  if (rack_height <= 0) throw ValueError("rack_height must be positive");
+  if (module <= 0)
+    throw ValueError("module must be positive");
+  if (n_teeth < 1)
+    throw ValueError("n_teeth must be at least 1");
+  if (rack_height <= 0)
+    throw ValueError("rack_height must be positive");
 
   const Face face = build_rack_profile_face(module, n_teeth, radians(pressure_angle));
   return extrude_rsolid(face, scalar3(0.0, 0.0, 1.0), rack_height);
@@ -38,7 +42,8 @@ Solid make_spur_rack_rsolid(double module, int n_teeth, double pressure_angle, d
 Solid make_helical_rack_rsolid(double module, int n_teeth, double pressure_angle, double helix_angle,
                                double rack_height) {
   const TrackingPolicyScope graph(TrackingPolicy::Graph);
-  if (helix_angle == 0) return make_spur_rack_rsolid(module, n_teeth, pressure_angle, rack_height);
+  if (helix_angle == 0)
+    return make_spur_rack_rsolid(module, n_teeth, pressure_angle, rack_height);
 
   const double pitch = kPi * module;
   const double twist_total = helix_twist_degrees(rack_height, helix_angle, pitch);
@@ -57,7 +62,8 @@ Solid make_helical_rack_rsolid(double module, int n_teeth, double pressure_angle
 Solid make_herringbone_rack_rsolid(double module, int n_teeth, double pressure_angle, double helix_angle,
                                    double rack_height) {
   const TrackingPolicyScope graph(TrackingPolicy::Graph);
-  if (helix_angle == 0) return make_spur_rack_rsolid(module, n_teeth, pressure_angle, rack_height);
+  if (helix_angle == 0)
+    return make_spur_rack_rsolid(module, n_teeth, pressure_angle, rack_height);
 
   const double pitch = kPi * module;
   const double half_height = rack_height / 2.0;

@@ -19,7 +19,7 @@ struct WireGapDiagnosis {
   double gap_distance = 0.0;  // the smallest dangling end-to-end gap
   Vec3 point_a, point_b;      // its two ends
   int edge_count = 0;
-  int chain_count = 0;        // > 1: the wire is not even connected
+  int chain_count = 0;  // > 1: the wire is not even connected
   int dangling_count = 0;
 };
 

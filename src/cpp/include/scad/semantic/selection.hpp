@@ -105,8 +105,8 @@ struct TagAssignOptions {
 // semantic state) unless options.clone_scope is false, and the view is returned.
 // With a recorder installed the assignment is recorded as an
 // `apply_tag_rselection` operation whose input is `scope`.
-Shape assign_tag(const Shape& scope, const TagTargets& targets, std::string_view tag,
-                 TopologyPropagation topology, LineagePolicy lineage, const TagAssignOptions& options = {});
+Shape assign_tag(const Shape& scope, const TagTargets& targets, std::string_view tag, TopologyPropagation topology,
+                 LineagePolicy lineage, const TagAssignOptions& options = {});
 
 // A detached view of `shape` over the same geometry with all semantic state of
 // its topology copied (clone_semantic_shape_view); topo ids are preserved.

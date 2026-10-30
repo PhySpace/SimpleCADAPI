@@ -111,7 +111,8 @@ TEST_CASE("ball bearing: invalid arguments are ValueErrors with the Python text"
   CHECK(message(8.0, 22.0, 7.0, 8.0) == "ball_diameter plus raceway_clearance leaves no radial wall thickness");
   BallBearingOptions crowded;
   crowded.ball_count = 100;
-  CHECK(message(8.0, 22.0, 7.0, 3.5, crowded) == "ball_count is too high for ball_diameter on the bearing pitch circle");
+  CHECK(message(8.0, 22.0, 7.0, 3.5, crowded) ==
+        "ball_count is too high for ball_diameter on the bearing pitch circle");
   BallBearingOptions few;
   few.ball_count = 2;
   CHECK(message(8.0, 22.0, 7.0, 3.5, few) == "ball_count must be at least 3");

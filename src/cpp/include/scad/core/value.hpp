@@ -29,19 +29,19 @@ class Value {
     explicit Tuple(Array items) : Array(std::move(items)) {}
   };
 
-  Value() = default;                                                     // null
-  Value(std::nullptr_t) {}                                               // NOLINT
-  Value(bool v) : data_(v) {}                                            // NOLINT
-  Value(int v) : data_(static_cast<std::int64_t>(v)) {}                  // NOLINT
-  Value(std::int64_t v) : data_(v) {}                                    // NOLINT
-  Value(double v) : data_(v) {}                                          // NOLINT
-  Value(const char* v) : data_(std::string(v)) {}                        // NOLINT
-  Value(std::string v) : data_(std::move(v)) {}                          // NOLINT
-  Value(std::string_view v) : data_(std::string(v)) {}                   // NOLINT
-  Value(Array v) : data_(std::move(v)) {}                                // NOLINT
-  Value(Object v) : data_(std::move(v)) {}                               // NOLINT
+  Value() = default;                                     // null
+  Value(std::nullptr_t) {}                               // NOLINT
+  Value(bool v) : data_(v) {}                            // NOLINT
+  Value(int v) : data_(static_cast<std::int64_t>(v)) {}  // NOLINT
+  Value(std::int64_t v) : data_(v) {}                    // NOLINT
+  Value(double v) : data_(v) {}                          // NOLINT
+  Value(const char* v) : data_(std::string(v)) {}        // NOLINT
+  Value(std::string v) : data_(std::move(v)) {}          // NOLINT
+  Value(std::string_view v) : data_(std::string(v)) {}   // NOLINT
+  Value(Array v) : data_(std::move(v)) {}                // NOLINT
+  Value(Object v) : data_(std::move(v)) {}               // NOLINT
 
-  Value(Tuple v) : data_(std::move(v)) {}                                // NOLINT
+  Value(Tuple v) : data_(std::move(v)) {}  // NOLINT
 
   static Value array() { return Value(Array{}); }
   static Value tuple(Array items = {}) { return Value(Tuple(std::move(items))); }

@@ -13,6 +13,7 @@
 #include <unordered_set>
 
 #include "detail.hpp"
+#include "scad/core/engaged.hpp"
 #include "scad/core/error.hpp"
 #include "scad/topo/recorder.hpp"
 #include "scad/topo/tag_factories.hpp"
@@ -33,55 +34,79 @@ std::vector<Shape> unique_vertices(const std::vector<Edge>& edges) {
   std::unordered_set<std::string> seen;
   for (const Edge& edge : edges)
     for (const Vertex& vertex : edge.vertices())
-      if (seen.insert(vertex.topo_id()).second) out.push_back(vertex);
+      if (seen.insert(vertex.topo_id()).second)
+        out.push_back(vertex);
   return out;
 }
 
 std::vector<Shape> scope_items(const Shape& scope, Kind target) {
   using detail::as_shapes;
-  if (scope.kind() == target) return {scope};
+  if (scope.kind() == target)
+    return {scope};
   switch (target) {
     case Kind::Edge:
       switch (scope.kind()) {
-        case Kind::Wire: return as_shapes(Wire(scope).edges());
-        case Kind::Face: return as_shapes(Face(scope).edges());
-        case Kind::Shell: return as_shapes(Shell(scope).edges());
-        case Kind::Solid: return as_shapes(Solid(scope).edges());
-        case Kind::Compound: return as_shapes(Compound(scope).edges());
-        default: break;
+        case Kind::Wire:
+          return as_shapes(Wire(scope).edges());
+        case Kind::Face:
+          return as_shapes(Face(scope).edges());
+        case Kind::Shell:
+          return as_shapes(Shell(scope).edges());
+        case Kind::Solid:
+          return as_shapes(Solid(scope).edges());
+        case Kind::Compound:
+          return as_shapes(Compound(scope).edges());
+        default:
+          break;
       }
       break;
     case Kind::Face:
       switch (scope.kind()) {
-        case Kind::Shell: return as_shapes(Shell(scope).faces());
-        case Kind::Solid: return as_shapes(Solid(scope).faces());
-        case Kind::Compound: return as_shapes(Compound(scope).faces());
-        default: break;
+        case Kind::Shell:
+          return as_shapes(Shell(scope).faces());
+        case Kind::Solid:
+          return as_shapes(Solid(scope).faces());
+        case Kind::Compound:
+          return as_shapes(Compound(scope).faces());
+        default:
+          break;
       }
       break;
     case Kind::Wire:
       switch (scope.kind()) {
-        case Kind::Face: return as_shapes(Face(scope).wires());
-        case Kind::Shell: return as_shapes(Shell(scope).wires());
-        default: break;
+        case Kind::Face:
+          return as_shapes(Face(scope).wires());
+        case Kind::Shell:
+          return as_shapes(Shell(scope).wires());
+        default:
+          break;
       }
       break;
     case Kind::Solid:
-      if (scope.kind() == Kind::Compound) return as_shapes(Compound(scope).solids());
+      if (scope.kind() == Kind::Compound)
+        return as_shapes(Compound(scope).solids());
       break;
     case Kind::Vertex:
       switch (scope.kind()) {
-        case Kind::Edge: return as_shapes(Edge(scope).vertices());
-        case Kind::Wire: return unique_vertices(Wire(scope).edges());
-        case Kind::Face: return unique_vertices(Face(scope).edges());
-        case Kind::Shell: return unique_vertices(Shell(scope).edges());
-        case Kind::Solid: return unique_vertices(Solid(scope).edges());
-        case Kind::Compound: return unique_vertices(Compound(scope).edges());
-        default: break;
+        case Kind::Edge:
+          return as_shapes(Edge(scope).vertices());
+        case Kind::Wire:
+          return unique_vertices(Wire(scope).edges());
+        case Kind::Face:
+          return unique_vertices(Face(scope).edges());
+        case Kind::Shell:
+          return unique_vertices(Shell(scope).edges());
+        case Kind::Solid:
+          return unique_vertices(Solid(scope).edges());
+        case Kind::Compound:
+          return unique_vertices(Compound(scope).edges());
+        default:
+          break;
       }
       break;
     case Kind::Shell:
-    case Kind::Compound: break;
+    case Kind::Compound:
+      break;
   }
   throw TypeError("cannot resolve QL selector scope for target_kind=" + std::string(kind_name(target)));
 }
@@ -89,10 +114,12 @@ std::vector<Shape> scope_items(const Shape& scope, Kind target) {
 // _track_values(track, "result_roles", "result_role"): the output roles the tracker proved.
 bool has_output_role(const Shape& shape, std::string_view role) {
   const Value track = shape.get_metadata("track");
-  if (!track.is_object()) return false;
+  if (!track.is_object())
+    return false;
   if (const Value* plural = track.find("result_roles"); plural != nullptr && plural->is_array()) {
     for (const Value& item : plural->as_array())
-      if (detail::text_of(item) == role) return true;
+      if (detail::text_of(item) == role)
+        return true;
     return false;
   }
   const Value* single = track.find("result_role");
@@ -121,8 +148,8 @@ Value bbox_value(const Shape& shape) {
 }
 
 Value selector_hint(const Shape& shape) {
-  Value hint = object({{"kind", std::string(kind_name(shape.kind()))},
-                       {"tags", detail::string_array(shape.list_tags())}});
+  Value hint =
+      object({{"kind", std::string(kind_name(shape.kind()))}, {"tags", detail::string_array(shape.list_tags())}});
   switch (shape.kind()) {
     case Kind::Edge: {
       const Edge edge(shape);
@@ -146,7 +173,9 @@ Value selector_hint(const Shape& shape) {
       hint.set("edge_count", static_cast<std::int64_t>(Wire(shape).edges().size()));
       hint.set("closed", Wire(shape).is_closed());
       break;
-    case Kind::Vertex: hint.set("coordinates", detail::vec3_array(Vertex(shape).coordinates())); break;
+    case Kind::Vertex:
+      hint.set("coordinates", detail::vec3_array(Vertex(shape).coordinates()));
+      break;
     case Kind::Shell:
       hint.set("face_count", static_cast<std::int64_t>(Shell(shape).faces().size()));
       hint.set("bbox", bbox_value(shape));
@@ -167,13 +196,16 @@ Value selector_hint(const Shape& shape) {
 // The recorded reference of a shape, if the recorder attached one.
 std::optional<Value> shape_ref(const Shape& shape) {
   Value ref = shape.get_runtime("topo.ref");
-  if (!ref.is_object()) ref = shape.get_metadata("topo_ref");
+  if (!ref.is_object())
+    ref = shape.get_metadata("topo_ref");
   if (!ref.is_object()) {
     if (Recorder* recorder = current_recorder()) {
-      if (auto derived = recorder->topo_ref_value(shape)) ref = std::move(*derived);
+      if (auto derived = recorder->topo_ref_value(shape))
+        ref = std::move(*derived);
     }
   }
-  if (!ref.is_object()) return std::nullopt;
+  if (!ref.is_object())
+    return std::nullopt;
   ref.set("selector_hint", selector_hint(shape));
   return ref;
 }
@@ -186,10 +218,13 @@ Value plain_ref(const Shape& shape) {
 std::vector<Value> shape_refs(const std::vector<Shape>& shapes) {
   std::vector<Value> refs;
   for (const Shape& shape : shapes)
-    if (auto ref = shape_ref(shape)) refs.push_back(std::move(*ref));
-  if (refs.size() == shapes.size()) return refs;
+    if (auto ref = shape_ref(shape))
+      refs.push_back(std::move(*ref));
+  if (refs.size() == shapes.size())
+    return refs;
   refs.clear();
-  for (const Shape& shape : shapes) refs.push_back(plain_ref(shape));
+  for (const Shape& shape : shapes)
+    refs.push_back(plain_ref(shape));
   return refs;
 }
 
@@ -202,14 +237,18 @@ class ViewTargets {
 
   Shape resolve(const Shape& target) {
     const TopTools_IndexedMapOfShape& members = members_of(target.kind());
-    if (members.Contains(target.wrapped())) return view_.sub(target.wrapped());
+    if (members.Contains(target.wrapped()))
+      return view_.sub(target.wrapped());
     if (target.kind() == Kind::Wire) {
       // A wire rebuilt from the same edges is the same topology.
       std::vector<TopoDS_Shape> matches;
       for (int i = 1; i <= members.Extent(); ++i)
-        if (same_edges(members(i), target.wrapped())) matches.push_back(members(i));
-      if (matches.size() == 1) return view_.sub(matches.front());
-      if (matches.size() > 1) throw ValueError("tag target resolves ambiguously inside the assignment scope");
+        if (same_edges(members(i), target.wrapped()))
+          matches.push_back(members(i));
+      if (matches.size() == 1)
+        return view_.sub(matches.front());
+      if (matches.size() > 1)
+        throw ValueError("tag target resolves ambiguously inside the assignment scope");
     }
     throw ValueError("tag target does not belong to the assignment scope");
   }
@@ -227,13 +266,20 @@ class ViewTargets {
 
   static TopAbs_ShapeEnum to_topabs_kind(Kind kind) {
     switch (kind) {
-      case Kind::Vertex: return TopAbs_VERTEX;
-      case Kind::Edge: return TopAbs_EDGE;
-      case Kind::Wire: return TopAbs_WIRE;
-      case Kind::Face: return TopAbs_FACE;
-      case Kind::Shell: return TopAbs_SHELL;
-      case Kind::Solid: return TopAbs_SOLID;
-      case Kind::Compound: return TopAbs_COMPOUND;
+      case Kind::Vertex:
+        return TopAbs_VERTEX;
+      case Kind::Edge:
+        return TopAbs_EDGE;
+      case Kind::Wire:
+        return TopAbs_WIRE;
+      case Kind::Face:
+        return TopAbs_FACE;
+      case Kind::Shell:
+        return TopAbs_SHELL;
+      case Kind::Solid:
+        return TopAbs_SOLID;
+      case Kind::Compound:
+        return TopAbs_COMPOUND;
     }
     return TopAbs_SHAPE;
   }
@@ -242,9 +288,11 @@ class ViewTargets {
     TopTools_IndexedMapOfShape left, right;
     TopExp::MapShapes(a, TopAbs_EDGE, left);
     TopExp::MapShapes(b, TopAbs_EDGE, right);
-    if (left.Extent() != right.Extent()) return false;
+    if (left.Extent() != right.Extent())
+      return false;
     for (int i = 1; i <= left.Extent(); ++i)
-      if (!right.Contains(left(i))) return false;
+      if (!right.Contains(left(i)))
+        return false;
     return true;
   }
 
@@ -260,7 +308,8 @@ class ViewTargets {
 NativeSelector::NativeSelector(Kind target, std::optional<std::string> output_role, Count mode, int count,
                                std::optional<SelectorSource> source)
     : target_(target), output_role_(std::move(output_role)), mode_(mode), count_(count), source_(std::move(source)) {
-  if (count_ < 0) throw ValueError("count must be >= 0");
+  if (count_ < 0)
+    throw ValueError("count must be >= 0");
 }
 
 SelectorPtr NativeSelector::exactly_one(Kind target) {
@@ -269,9 +318,10 @@ SelectorPtr NativeSelector::exactly_one(Kind target) {
 
 SelectorPtr NativeSelector::with_output_role(Kind target, std::string_view role, bool exactly_one) {
   const std::string trimmed = detail::strip(role);
-  if (trimmed.empty()) throw ValueError("role_name must be a non-empty string");
-  return std::make_shared<NativeSelector>(target, detail::lower(trimmed),
-                                          exactly_one ? Count::Exactly : Count::AtLeast, 1);
+  if (trimmed.empty())
+    throw ValueError("role_name must be a non-empty string");
+  return std::make_shared<NativeSelector>(target, detail::lower(trimmed), exactly_one ? Count::Exactly : Count::AtLeast,
+                                          1);
 }
 
 std::vector<Shape> NativeSelector::resolve(const Shape& scope) const {
@@ -295,9 +345,9 @@ Value NativeSelector::to_value() const {
                           {"order_desc", false},
                           {"cardinality", std::move(cardinality)}});
   if (output_role_) {
-    payload.set("predicate", object({{"kind", "output_role"},
-                                     {"data", object({{"role", *output_role_}})},
-                                     {"children", Value::array()}}));
+    payload.set(
+        "predicate",
+        object({{"kind", "output_role"}, {"data", object({{"role", *output_role_}})}, {"children", Value::array()}}));
   }
   if (source_) {
     payload.set("source_node_id", source_->node_id);
@@ -313,19 +363,17 @@ std::shared_ptr<const ShapeSelector> NativeSelector::from_source(const SelectorS
 // ---------------------------------------------------------------------------
 // Assignment
 // ---------------------------------------------------------------------------
-Shape clone_semantic_view(const Shape& shape) { return shape.clone_view(); }
+Shape clone_semantic_view(const Shape& shape) {
+  return shape.clone_view();
+}
 
-Shape assign_tag(const Shape& scope, const TagTargets& targets, std::string_view tag, TopologyPropagation topology,
-                 LineagePolicy lineage, const TagAssignOptions& options) {
-  const std::string normalized = normalize_tag(tag, true);
-  Recorder* const recorder = current_recorder();
-  const std::optional<SelectorSource> source_node = graph_source_of(scope);
-  const int source_slot = source_node ? source_node->output_slot : output_slot_of(scope);
+namespace {
 
-  Shape view = options.clone_scope ? clone_semantic_view(scope) : scope;
-
+// Resolves the tag targets against the scope's view: through a selector (anchored to the scope's graph
+// node when it declares none) or from explicit shapes. Fills `target` with the recorded description.
+std::vector<Shape> resolve_tag_targets(const TagTargets& targets, const Shape& view,
+                                       const std::optional<SelectorSource>& source_node, TagTarget& target) {
   std::vector<Shape> selected;
-  TagTarget target;
   if (const SelectorPtr& given = targets.selector()) {
     SelectorPtr selector = given;
     if (source_node) {
@@ -341,29 +389,30 @@ Shape assign_tag(const Shape& scope, const TagTargets& targets, std::string_view
     target.selector = selector->to_value();
   } else {
     const std::vector<Shape>& explicit_shapes = targets.shapes();
-    if (explicit_shapes.empty()) throw ValueError("tag assignment targets cannot be empty");
+    if (explicit_shapes.empty())
+      throw ValueError("tag assignment targets cannot be empty");
     ViewTargets in_view(view);
-    for (const Shape& item : explicit_shapes) selected.push_back(in_view.resolve(item));
+    for (const Shape& item : explicit_shapes)
+      selected.push_back(in_view.resolve(item));
     target.kind = TagTargetKind::ExplicitRefs;
     target.refs = shape_refs(explicit_shapes);
   }
+  return selected;
+}
 
-  std::unordered_set<std::string> seen;
-  for (const Shape& item : selected)
-    if (!seen.insert(item.topo_id()).second)
-      throw ValueError("tag assignment targets contain ambiguous duplicate entities");
-  if (selected.empty()) throw ValueError("tag assignment resolved no targets");
-
-  std::optional<NodeReservation> reservation;
-  if (recorder != nullptr && source_node) reservation = recorder->reserve_node("n");
-
-  // The picks are handles of the scope's own view: they carry no container link, so a recorded
-  // reference is named from the scope's node (the SDK stamps every entity of a recorded output).
+// References of the selected shapes for the binding's evidence. The picks are handles of the scope's
+// own view: they carry no container link, so a recorded reference is named from the scope's node
+// (the SDK stamps every entity of a recorded output).
+Value selected_ref_values(const std::vector<Shape>& selected, const std::optional<NodeReservation>& reservation,
+                          const std::optional<SelectorSource>& source_node, int source_slot) {
   const auto scoped_ref = [&](const Shape& item) -> std::optional<Value> {
-    if (auto ref = shape_ref(item)) return ref;
-    if (!reservation || !source_node) return std::nullopt;
+    if (auto ref = shape_ref(item))
+      return ref;
+    if (!reservation || !source_node)
+      return std::nullopt;
     std::string kind(kind_name(item.kind()));
-    for (char& c : kind) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    for (char& c : kind)
+      c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
     Value ref = object({{"graph_id", reservation->graph_id},
                         {"kind", kind},
                         {"node_id", source_node->node_id},
@@ -373,33 +422,46 @@ Shape assign_tag(const Shape& scope, const TagTargets& targets, std::string_view
     return ref;
   };
   Value selected_refs = Value::array();
-  {
-    std::vector<Value> refs;
-    for (const Shape& item : selected) {
-      if (auto ref = scoped_ref(item)) refs.push_back(std::move(*ref));
-    }
-    if (refs.size() == selected.size()) {
-      for (Value& ref : refs) selected_refs.push_back(std::move(ref));
-    } else {
-      for (const Value& ref : shape_refs(selected)) selected_refs.push_back(ref);
-    }
+  std::vector<Value> refs;
+  for (const Shape& item : selected) {
+    if (auto ref = scoped_ref(item))
+      refs.push_back(std::move(*ref));
   }
+  // All-or-nothing: if any pick cannot be named from the scope, fall back to plain shape references.
+  if (refs.size() == selected.size()) {
+    for (Value& ref : refs)
+      selected_refs.push_back(std::move(ref));
+  } else {
+    for (const Value& ref : shape_refs(selected))
+      selected_refs.push_back(ref);
+  }
+  return selected_refs;
+}
 
+// The user-operation tag binding; with a reserved node its id is derived from the node (deterministic),
+// otherwise a fresh id is minted.
+TagBinding make_tag_binding(const std::string& normalized, TopologyPropagation topology, LineagePolicy lineage,
+                            const TagAssignOptions& options, std::size_t selected_count, Value selected_refs,
+                            TagTarget target, const std::optional<NodeReservation>& reservation,
+                            const std::optional<SelectorSource>& source_node, int source_slot) {
   TagBinding binding;
   binding.tag = normalized;
   binding.policy.mut().producer.kind = TagProducerKind::UserOperation;
-  if (reservation) binding.policy.mut().producer.node_id = reservation->node_id;
-  if (source_node) binding.policy.mut().scope.node_id = source_node->node_id;
+  if (reservation)
+    binding.policy.mut().producer.node_id = reservation->node_id;
+  if (source_node)
+    binding.policy.mut().scope.node_id = source_node->node_id;
   binding.policy.mut().scope.output_slot = source_slot;
   binding.policy.mut().target = std::move(target);
   binding.policy.mut().propagation.topology = topology;
   binding.policy.mut().propagation.lineage = lineage;
   binding.evidence.mut().kind = TagEvidenceKind::QueryExecution;
   binding.evidence.mut().data.set("authoring_source", options.authoring_source);
-  binding.evidence.mut().data.set("selected_count", static_cast<std::int64_t>(selected.size()));
+  binding.evidence.mut().data.set("selected_count", static_cast<std::int64_t>(selected_count));
   binding.evidence.mut().data.set("selected_refs", std::move(selected_refs));
   if (options.extra_evidence.is_object())
-    for (const auto& [key, value] : options.extra_evidence.as_object()) binding.evidence.mut().data.set(key, value);
+    for (const auto& [key, value] : options.extra_evidence.as_object())
+      binding.evidence.mut().data.set(key, value);
   binding.certainty = TagCertainty::Asserted;
   binding.lifecycle = TagLifecycle::Assertion;
   if (reservation)
@@ -408,15 +470,47 @@ Shape assign_tag(const Shape& scope, const TagTargets& targets, std::string_view
   else
     binding.binding_id = new_binding_id();
   binding.validate();
+  return binding;
+}
 
-  for (Shape& item : selected) item.add_binding(binding);
+}  // namespace
+
+Shape assign_tag(const Shape& scope, const TagTargets& targets, std::string_view tag, TopologyPropagation topology,
+                 LineagePolicy lineage, const TagAssignOptions& options) {
+  const std::string normalized = normalize_tag(tag, true);
+  Recorder* const recorder = current_recorder();
+  const std::optional<SelectorSource> source_node = graph_source_of(scope);
+  const int source_slot = source_node ? source_node->output_slot : output_slot_of(scope);
+
+  Shape view = options.clone_scope ? clone_semantic_view(scope) : scope;
+
+  TagTarget target;
+  std::vector<Shape> selected = resolve_tag_targets(targets, view, source_node, target);
+  std::unordered_set<std::string> seen;
+  for (const Shape& item : selected)
+    if (!seen.insert(item.topo_id()).second)
+      throw ValueError("tag assignment targets contain ambiguous duplicate entities");
+  if (selected.empty())
+    throw ValueError("tag assignment resolved no targets");
+
+  std::optional<NodeReservation> reservation;
+  if (recorder != nullptr && source_node)
+    reservation = recorder->reserve_node("n");
+
+  Value selected_refs = selected_ref_values(selected, reservation, source_node, source_slot);
+  const TagBinding binding =
+      make_tag_binding(normalized, topology, lineage, options, selected.size(), std::move(selected_refs),
+                       std::move(target), reservation, source_node, source_slot);
+  for (Shape& item : selected)
+    item.add_binding(binding);
 
   if (recorder != nullptr && source_node) {
     OpRecord record;
     record.op = "apply_tag_rselection";
     record.params = object({{"tag_binding", binding.to_value()}});
     record.inputs.push_back({scope, "scope"});
-    if (reservation) record.node_id = reservation->node_id;
+    if (reservation)
+      record.node_id = require_engaged(reservation, "a reserved node is tested on the line above").node_id;
     recorder->record(record, {view});
   }
   return view;
@@ -462,11 +556,12 @@ std::vector<std::string> list_tags(const Shape& shape, TagScope scope) {
 }
 
 std::vector<Value> explain_tag(const Shape& shape, std::string_view tag, TagScope scope) {
-  static const ErrorSpec kSpec{"explain_tag",
-                               "Failed to explain the tag on the shape.",
-                               {"The shape or tag is invalid.", "The requested scope requires unavailable semantic evidence."},
-                               {"Pass a valid shape and normalized tag token.",
-                                "Request a supported scope or provide complete topology history."}};
+  static const ErrorSpec kSpec{
+      "explain_tag",
+      "Failed to explain the tag on the shape.",
+      {"The shape or tag is invalid.", "The requested scope requires unavailable semantic evidence."},
+      {"Pass a valid shape and normalized tag token.",
+       "Request a supported scope or provide complete topology history."}};
   return guarded(kSpec, [&] { return shape.explain_tag(normalize_tag(tag, true), scope); });
 }
 
@@ -479,7 +574,8 @@ std::vector<Face> select_faces_by_tag(const Solid& solid, std::string_view tag, 
     const std::string normalized = normalize_tag(tag, true);
     std::vector<Face> out;
     for (const Face& face : solid.faces())
-      if (face.has_tag(normalized, scope)) out.push_back(face);
+      if (face.has_tag(normalized, scope))
+        out.push_back(face);
     return out;
   });
 }
@@ -494,12 +590,16 @@ std::vector<Edge> select_edges_by_tag(const Shape& shape, std::string_view tag, 
   return guarded(kSpec, [&] {
     const std::string normalized = normalize_tag(tag, true);
     std::vector<Edge> edges;
-    if (shape.kind() == Kind::Face) edges = Face(shape).edges();
-    else if (shape.kind() == Kind::Solid) edges = Solid(shape).edges();
-    else throw ValueError("Edges can only be selected from a face or a solid");
+    if (shape.kind() == Kind::Face)
+      edges = Face(shape).edges();
+    else if (shape.kind() == Kind::Solid)
+      edges = Solid(shape).edges();
+    else
+      throw ValueError("Edges can only be selected from a face or a solid");
     std::vector<Edge> out;
     for (const Edge& edge : edges)
-      if (edge.has_tag(normalized, scope)) out.push_back(edge);
+      if (edge.has_tag(normalized, scope))
+        out.push_back(edge);
     return out;
   });
 }

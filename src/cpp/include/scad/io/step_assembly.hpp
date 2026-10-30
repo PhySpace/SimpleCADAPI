@@ -39,15 +39,15 @@ struct StepPlacement {
 };
 
 struct StepMaterial {
-  std::string id;                       // materials with the same id share one XCAF material
+  std::string id;  // materials with the same id share one XCAF material
   std::string name;
   Value description = Value::object();  // written as sorted-key JSON in the material's description
   std::optional<double> density;
-  std::string density_unit;             // e.g. "kg/m^3"; only used with a density
+  std::string density_unit;  // e.g. "kg/m^3"; only used with a density
 };
 
 struct StepComponent {
-  std::string id;             // identity within the parent (names the metadata record)
+  std::string id;  // identity within the parent (names the metadata record)
   std::string name;
   std::string definition_id;  // the StepDefinition it places
   StepPlacement placement;
@@ -58,7 +58,7 @@ struct StepDefinition {
   std::string id;
   std::string kind = "single_solid";  // "single_solid" or "assembly": part of the metadata record's name
   std::string name;
-  TopoDS_Shape shape;                 // a part's body; null for an assembly
+  TopoDS_Shape shape;  // a part's body; null for an assembly
   std::vector<StepComponent> components;
   std::optional<std::array<double, 3>> color;  // linear RGB in [0, 1], applied as the surface colour
   std::optional<StepMaterial> material;
@@ -66,15 +66,15 @@ struct StepDefinition {
 };
 
 struct StepAssemblyOptions {
-  std::string schema = "AP242DIS";   // value of OCCT's write.step.schema
-  bool metadata_properties = true;   // inject the "SimpleCAD metadata" property definition
+  std::string schema = "AP242DIS";  // value of OCCT's write.step.schema
+  bool metadata_properties = true;  // inject the "SimpleCAD metadata" property definition
 };
 
 struct StepAssemblyReport {
   std::string schema;
   std::vector<std::string> definition_ids;  // in first-visit order
   std::size_t occurrence_count = 0;
-  std::vector<std::string> material_ids;    // sorted
+  std::vector<std::string> material_ids;  // sorted
   std::size_t metadata_item_count = 0;
 };
 
@@ -90,8 +90,8 @@ StepAssemblyReport export_step_assembly(const std::vector<StepDefinition>& defin
 // ---------------------------------------------------------------------------
 struct StepNode {
   std::string name;
-  TopoDS_Shape shape;  // the part's own body (null for an assembly node)
-  StepPlacement placement;  // relative to the parent (identity for roots)
+  TopoDS_Shape shape;                          // the part's own body (null for an assembly node)
+  StepPlacement placement;                     // relative to the parent (identity for roots)
   std::optional<std::array<double, 3>> color;  // surface colour set on this label
   std::vector<StepNode> children;
 };

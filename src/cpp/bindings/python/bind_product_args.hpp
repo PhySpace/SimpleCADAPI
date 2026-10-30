@@ -20,7 +20,8 @@ namespace sp = scad::product;
 // `value` as a T, or a TypeError(message).
 template <class T>
 const T& typed(const py::object& value, const char* message) {
-  if (!py::isinstance<T>(value)) throw scad::TypeError(message);
+  if (!py::isinstance<T>(value))
+    throw scad::TypeError(message);
   return value.cast<const T&>();
 }
 
@@ -33,17 +34,21 @@ T converted(const py::object& value, const char* message) {
   }
 }
 
-inline bool is_none(const py::object& value) { return value.is_none(); }
+inline bool is_none(const py::object& value) {
+  return value.is_none();
+}
 
 // str arguments: Python raises TypeError("<field> must be a string") for anything else.
 inline std::string text(const py::object& value, const char* field) {
-  if (!py::isinstance<py::str>(value)) throw scad::TypeError(std::string(field) + " must be a string");
+  if (!py::isinstance<py::str>(value))
+    throw scad::TypeError(std::string(field) + " must be a string");
   return value.cast<std::string>();
 }
 
 // A display name: None, or anything str() accepts.
 inline sp::OptionalString optional_name(const py::object& value) {
-  if (value.is_none()) return std::nullopt;
+  if (value.is_none())
+    return std::nullopt;
   return py::str(value).cast<std::string>();
 }
 
@@ -56,7 +61,8 @@ inline scad::Scalar scalar(const py::object& value, const char* field) {
 }
 
 inline std::optional<scad::Scalar> optional_scalar(const py::object& value, const char* field) {
-  if (value.is_none()) return std::nullopt;
+  if (value.is_none())
+    return std::nullopt;
   return scalar(value, field);
 }
 
@@ -70,7 +76,8 @@ inline Vec3 vec3(const py::object& value, const char* field) {
     throw scad::ValueError(std::string(field) + " must be a 3-element tuple or list");
   }
   const py::sequence seq = py::reinterpret_borrow<py::sequence>(value);
-  if (seq.size() != 3) throw scad::ValueError(std::string(field) + " must be a 3-element tuple or list");
+  if (seq.size() != 3)
+    throw scad::ValueError(std::string(field) + " must be a 3-element tuple or list");
   double v[3];
   for (std::size_t i = 0; i < 3; ++i) {
     try {
@@ -83,28 +90,35 @@ inline Vec3 vec3(const py::object& value, const char* field) {
 }
 
 inline std::optional<Vec3> optional_vec3(const py::object& value, const char* field) {
-  if (value.is_none()) return std::nullopt;
+  if (value.is_none())
+    return std::nullopt;
   return vec3(value, field);
 }
 
-inline bool truthy(const py::object& value) { return PyObject_IsTrue(value.ptr()) == 1; }
+inline bool truthy(const py::object& value) {
+  return PyObject_IsTrue(value.ptr()) == 1;
+}
 
 // `item` of add_component_rassembly.
 inline sp::Item item_of(const py::object& value) {
-  if (py::isinstance<sp::Part>(value)) return sp::Item{value.cast<sp::PartPtr>()};
-  if (py::isinstance<sp::Assembly>(value)) return sp::Item{value.cast<sp::AssemblyPtr>()};
+  if (py::isinstance<sp::Part>(value))
+    return sp::Item{value.cast<sp::PartPtr>()};
+  if (py::isinstance<sp::Assembly>(value))
+    return sp::Item{value.cast<sp::AssemblyPtr>()};
   throw scad::TypeError("item must be a Part or Assembly");
 }
 
 inline py::object py_item(const sp::Item& item) {
-  if (const auto* part = std::get_if<sp::PartPtr>(&item)) return py::cast(*part);
+  if (const auto* part = std::get_if<sp::PartPtr>(&item))
+    return py::cast(*part);
   return py::cast(std::get<sp::AssemblyPtr>(item));
 }
 
 template <class T>
 py::tuple to_tuple(const std::vector<T>& items) {
   py::tuple out(items.size());
-  for (std::size_t i = 0; i < items.size(); ++i) out[i] = py::cast(items[i]);
+  for (std::size_t i = 0; i < items.size(); ++i)
+    out[i] = py::cast(items[i]);
   return out;
 }
 

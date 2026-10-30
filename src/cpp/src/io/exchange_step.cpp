@@ -21,24 +21,28 @@ namespace {
 
 const char* status_name(IFSelect_ReturnStatus status) {
   switch (status) {
-    case IFSelect_RetVoid: return "RetVoid (nothing to do)";
-    case IFSelect_RetDone: return "RetDone";
-    case IFSelect_RetError: return "RetError";
-    case IFSelect_RetFail: return "RetFail";
-    case IFSelect_RetStop: return "RetStop";
+    case IFSelect_RetVoid:
+      return "RetVoid (nothing to do)";
+    case IFSelect_RetDone:
+      return "RetDone";
+    case IFSelect_RetError:
+      return "RetError";
+    case IFSelect_RetFail:
+      return "RetFail";
+    case IFSelect_RetStop:
+      return "RetStop";
   }
   return "unknown";
 }
 
 const ErrorSpec& export_step_spec() {
-  static const ErrorSpec spec{"export_step_shapes",
-                              "Failed to export the shapes as STEP.",
-                              {"The shape list is empty or contains a null shape.",
-                               "OpenCASCADE could not translate the geometry to STEP entities.",
-                               "The destination is not writable."},
-                              {"Pass at least one valid shape.",
-                               "Check the shape with a validity query before exporting.",
-                               "Write to a directory that exists and is writable."}};
+  static const ErrorSpec spec{
+      "export_step_shapes",
+      "Failed to export the shapes as STEP.",
+      {"The shape list is empty or contains a null shape.",
+       "OpenCASCADE could not translate the geometry to STEP entities.", "The destination is not writable."},
+      {"Pass at least one valid shape.", "Check the shape with a validity query before exporting.",
+       "Write to a directory that exists and is writable."}};
   return spec;
 }
 
@@ -67,8 +71,7 @@ const ErrorSpec& import_brep_spec() {
                               "Failed to read the BREP file.",
                               {"The file does not exist or is not an OpenCASCADE BREP (binary or ASCII).",
                                "The BREP is truncated, or its topology is invalid."},
-                              {"Check the path and the file's origin.",
-                               "Re-export the shape from its source."}};
+                              {"Check the path and the file's origin.", "Re-export the shape from its source."}};
   return spec;
 }
 
@@ -79,7 +82,8 @@ std::string with_messages(const std::string& what, const detail::MessageCapture&
 
 std::string transfer_into(STEPControl_Writer& writer, const TopoDS_Shape& compound) {
   const IFSelect_ReturnStatus status = writer.Transfer(compound, STEPControl_AsIs);
-  if (status != IFSelect_RetDone) return std::string("STEP transfer failed: ") + status_name(status);
+  if (status != IFSelect_RetDone)
+    return std::string("STEP transfer failed: ") + status_name(status);
   return {};
 }
 
@@ -116,7 +120,8 @@ StepReadResult read_step_stream(std::istream& in, const std::string& name, const
       throw ValueError("expected one STEP root in " + name + ", got transferred=" +
                        std::to_string(result.transferred_roots) + ", shapes=" + std::to_string(result.shape_count));
     result.shape = options.require_single_root ? reader.Shape(1) : reader.OneShape();
-    if (result.shape.IsNull()) throw ValueError("STEP file " + name + " produced a null shape");
+    if (result.shape.IsNull())
+      throw ValueError("STEP file " + name + " produced a null shape");
     if (options.require_valid && !BRepCheck_Analyzer(result.shape).IsValid())
       throw ValueError("STEP BREP is invalid: " + name);
     return result;
@@ -126,13 +131,15 @@ StepReadResult read_step_stream(std::istream& in, const std::string& name, const
 }  // namespace
 
 TopoDS_Shape make_compound_always(const std::vector<TopoDS_Shape>& shapes) {
-  if (shapes.empty()) throw ValueError("No shapes to export");
+  if (shapes.empty())
+    throw ValueError("No shapes to export");
   return occt_guard([&] {
     BRep_Builder builder;
     TopoDS_Compound compound;
     builder.MakeCompound(compound);
     for (const TopoDS_Shape& shape : shapes) {
-      if (shape.IsNull()) throw ValueError("cannot export a null shape");
+      if (shape.IsNull())
+        throw ValueError("cannot export a null shape");
       builder.Add(compound, shape);
     }
     return TopoDS_Shape(compound);
@@ -140,9 +147,11 @@ TopoDS_Shape make_compound_always(const std::vector<TopoDS_Shape>& shapes) {
 }
 
 TopoDS_Shape make_compound(const std::vector<TopoDS_Shape>& shapes) {
-  if (shapes.empty()) throw ValueError("No shapes to export");
+  if (shapes.empty())
+    throw ValueError("No shapes to export");
   if (shapes.size() == 1) {
-    if (shapes.front().IsNull()) throw ValueError("cannot export a null shape");
+    if (shapes.front().IsNull())
+      throw ValueError("cannot export a null shape");
     return shapes.front();
   }
   return make_compound_always(shapes);

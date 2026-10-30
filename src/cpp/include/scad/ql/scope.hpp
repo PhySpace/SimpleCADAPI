@@ -15,7 +15,7 @@ namespace scad::ql {
 
 class Scope {
  public:
-  Scope(const Shape& shape) : data_(shape) {}                 // NOLINT(google-explicit-constructor)
+  Scope(const Shape& shape) : data_(shape) {}                   // NOLINT(google-explicit-constructor)
   Scope(std::vector<Shape> items) : data_(std::move(items)) {}  // NOLINT(google-explicit-constructor)
   template <class T>
     requires(std::derived_from<T, Shape> && !std::is_same_v<T, Shape>)

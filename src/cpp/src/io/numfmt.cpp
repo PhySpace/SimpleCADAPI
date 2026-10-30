@@ -29,9 +29,11 @@ Decimal shortest_decimal(double value) {
   const std::size_t e = text.find('e');
   const std::string mantissa = text.substr(0, e);
   for (const char c : mantissa)
-    if (c != '.') d.digits.push_back(c);
+    if (c != '.')
+      d.digits.push_back(c);
   d.exponent = std::stoi(text.substr(e + 1));
-  while (d.digits.size() > 1 && d.digits.back() == '0') d.digits.pop_back();
+  while (d.digits.size() > 1 && d.digits.back() == '0')
+    d.digits.pop_back();
   return d;
 }
 
@@ -39,14 +41,16 @@ std::string exponent_suffix(int exponent, bool pad_two_digits) {
   std::string out = "e";
   out += exponent < 0 ? '-' : '+';
   std::string digits = std::to_string(std::abs(exponent));
-  if (pad_two_digits && digits.size() < 2) digits.insert(digits.begin(), '0');
+  if (pad_two_digits && digits.size() < 2)
+    digits.insert(digits.begin(), '0');
   return out + digits;
 }
 
 }  // namespace
 
 std::string format_es6(double value) {
-  if (value == 0.0) return "0";
+  if (value == 0.0)
+    return "0";
   const Decimal d = shortest_decimal(value);
   const int k = static_cast<int>(d.digits.size());
   const int n = d.exponent + 1;  // ES6 "n": the decimal point sits after n digits
@@ -59,7 +63,8 @@ std::string format_es6(double value) {
     out += "0." + std::string(static_cast<std::size_t>(-n), '0') + d.digits;
   } else {
     out += d.digits.substr(0, 1);
-    if (k > 1) out += "." + d.digits.substr(1);
+    if (k > 1)
+      out += "." + d.digits.substr(1);
     out += exponent_suffix(n - 1, false);
   }
   return out;
@@ -69,16 +74,19 @@ std::string format_python_repr(double value) {
   const Decimal d = shortest_decimal(value);
   const int k = static_cast<int>(d.digits.size());
   std::string out = d.negative ? "-" : "";
-  if (value == 0.0) return out + "0.0";
+  if (value == 0.0)
+    return out + "0.0";
   // float_repr_style 'short' uses exponent form outside -4 <= exp < 16.
   if (d.exponent < -4 || d.exponent >= 16) {
     out += d.digits.substr(0, 1);
-    if (k > 1) out += "." + d.digits.substr(1);
+    if (k > 1)
+      out += "." + d.digits.substr(1);
     return out + exponent_suffix(d.exponent, true);
   }
   if (d.exponent >= 0) {
     const int integer_digits = d.exponent + 1;
-    if (k <= integer_digits) return out + d.digits + std::string(static_cast<std::size_t>(integer_digits - k), '0') + ".0";
+    if (k <= integer_digits)
+      return out + d.digits + std::string(static_cast<std::size_t>(integer_digits - k), '0') + ".0";
     return out + d.digits.substr(0, static_cast<std::size_t>(integer_digits)) + "." +
            d.digits.substr(static_cast<std::size_t>(integer_digits));
   }
@@ -92,7 +100,8 @@ std::string format_general(double value, int precision) {
 }
 
 bool parse_double(std::string_view text, double& out) {
-  if (text.empty()) return false;
+  if (text.empty())
+    return false;
 #if defined(__cpp_lib_to_chars) && __cpp_lib_to_chars >= 201611L
   const char* first = text.data();
   const char* last = text.data() + text.size();

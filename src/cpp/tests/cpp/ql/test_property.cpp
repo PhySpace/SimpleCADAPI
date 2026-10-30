@@ -13,13 +13,16 @@ Face face_facing(const Solid& solid, int axis, bool positive) {
   for (const Face& f : solid.faces()) {
     const Vec3 n = f.normal_at();
     const double component = axis == 0 ? n.x : (axis == 1 ? n.y : n.z);
-    if (component * (positive ? 1.0 : -1.0) > 0.9) return f;
+    if (component * (positive ? 1.0 : -1.0) > 0.9)
+      return f;
   }
   FAIL("no such face");
   return solid.faces().front();
 }
 
-double number(const std::optional<Value>& v) { return v.value().as_double(); }
+double number(const std::optional<Value>& v) {
+  return v.value().as_double();
+}
 
 }  // namespace
 
@@ -117,11 +120,13 @@ TEST_CASE("resolvers answer for their prefix, longest prefix first") {
   const Solid box = ql_test::box(1, 1, 1);
   const Face face = box.faces().front();
   register_property_resolver("custom.", [](const Shape&, std::string_view path) -> std::optional<Value> {
-    if (path == "custom.answer") return Value(42);
+    if (path == "custom.answer")
+      return Value(42);
     return std::nullopt;
   });
   register_property_resolver("custom.deep.", [](const Shape&, std::string_view path) -> std::optional<Value> {
-    if (path == "custom.deep.answer") return Value("deep");
+    if (path == "custom.deep.answer")
+      return Value("deep");
     return std::nullopt;
   });
   CHECK(lookup_property(face, "custom.answer")->as_int() == 42);
@@ -129,15 +134,13 @@ TEST_CASE("resolvers answer for their prefix, longest prefix first") {
   CHECK_FALSE(lookup_property(face, "custom.other").has_value());
 
   // a resolver may decline; the next one (and finally the built-ins) is asked
-  register_property_resolver("geom.", [](const Shape&, std::string_view) -> std::optional<Value> {
-    return std::nullopt;
-  });
+  register_property_resolver("geom.",
+                             [](const Shape&, std::string_view) -> std::optional<Value> { return std::nullopt; });
   CHECK(lookup_property(face, "geom.type")->as_string() == "PLANE");
 
   // registering a prefix again replaces its resolver
-  register_property_resolver("custom.", [](const Shape&, std::string_view) -> std::optional<Value> {
-    return Value(7);
-  });
+  register_property_resolver("custom.",
+                             [](const Shape&, std::string_view) -> std::optional<Value> { return Value(7); });
   CHECK(lookup_property(face, "custom.answer")->as_int() == 7);
 
   unregister_property_resolver("custom.");

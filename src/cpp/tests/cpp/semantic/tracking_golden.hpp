@@ -9,7 +9,8 @@ struct Case {
 };
 
 inline constexpr Case kCases[] = {
-    {"box", R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=0 entries=0 roles=6 delta_entries=6
+    {"box",
+     R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=0 entries=0 roles=6 delta_entries=6
 D (0.0000,1.5000,2.0000)|FACE|ev=|or=|rr=box.back|w=1
 D (1.0000,0.0000,2.0000)|FACE|ev=|or=|rr=box.left|w=1
 D (1.0000,1.5000,0.0000)|FACE|ev=|or=|rr=box.bottom|w=1
@@ -23,7 +24,8 @@ R box.left|-|Box.LeftFace|FACE@(1.0000,0.0000,2.0000)|-
 R box.right|-|Box.RightFace|FACE@(1.0000,3.0000,2.0000)|-
 R box.top|-|Box.TopFace|FACE@(1.0000,1.5000,4.0000)|-
 )GOLDEN"},
-    {"cylinder", R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=0 entries=0 roles=6 delta_entries=6
+    {"cylinder",
+     R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=0 entries=0 roles=6 delta_entries=6
 D (0.0000,0.0000,0.0000)|EDGE|ev=|or=|rr=cylinder.start_boundary|w=1
 D (0.0000,0.0000,0.0000)|FACE|ev=|or=|rr=cylinder.start|w=1
 D (0.0000,0.0000,2.5000)|FACE|ev=|or=|rr=cylinder.side|w=1
@@ -37,7 +39,8 @@ R cylinder.side|-|Cylinder.LateralFace|FACE@(0.0000,0.0000,2.5000)|-
 R cylinder.start_boundary|-|Cylinder.BottomEdge|EDGE@(0.0000,0.0000,0.0000)|-
 R cylinder.start|-|Cylinder.BottomFace|FACE@(0.0000,0.0000,0.0000)|-
 )GOLDEN"},
-    {"cone", R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=0 entries=0 roles=6 delta_entries=6
+    {"cone",
+     R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=0 entries=0 roles=6 delta_entries=6
 D (0.0000,0.0000,0.0000)|EDGE|ev=|or=|rr=cone.start_boundary|w=1
 D (0.0000,0.0000,0.0000)|FACE|ev=|or=|rr=cone.start|w=1
 D (0.0000,0.0000,1.6667)|FACE|ev=|or=|rr=cone.side|w=1
@@ -51,7 +54,8 @@ R cone.side|-|Cone.LateralFace|FACE@(0.0000,0.0000,1.6667)|-
 R cone.start_boundary|-|Cone.BottomEdge|EDGE@(0.0000,0.0000,0.0000)|-
 R cone.start|-|Cone.BottomFace|FACE@(0.0000,0.0000,0.0000)|-
 )GOLDEN"},
-    {"cone_point", R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=0 entries=0 roles=5 delta_entries=5
+    {"cone_point",
+     R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=0 entries=0 roles=5 delta_entries=5
 D (0.0000,0.0000,0.0000)|EDGE|ev=|or=|rr=cone.start_boundary|w=1
 D (0.0000,0.0000,0.0000)|FACE|ev=|or=|rr=cone.start|w=1
 D (0.0000,0.0000,1.3333)|FACE|ev=|or=|rr=cone.side|w=1
@@ -63,7 +67,8 @@ R cone.side|-|Cone.LateralFace|FACE@(0.0000,0.0000,1.3333)|-
 R cone.start_boundary|-|Cone.BottomEdge|EDGE@(0.0000,0.0000,0.0000)|-
 R cone.start|-|Cone.BottomFace|FACE@(0.0000,0.0000,0.0000)|-
 )GOLDEN"},
-    {"translate", R"GOLDEN(counts preserved=0 modified=6 generated=0 deleted=0 section_edges=0 entries=6 roles=0 delta_entries=6
+    {"translate",
+     R"GOLDEN(counts preserved=0 modified=6 generated=0 deleted=0 section_edges=0 entries=6 roles=0 delta_entries=6
 D (0.0000,0.0000,5.0000)|FACE|ev=modified|or=body|rr=|w=1
 D (10.0000,0.0000,5.0000)|FACE|ev=modified|or=body|rr=|w=1
 D (5.0000,-5.0000,5.0000)|FACE|ev=modified|or=body|rr=|w=1
@@ -77,7 +82,8 @@ E modified|body|continuation|-|False|FACE@(0.0000,0.0000,10.0000)->FACE@(5.0000,
 E modified|body|continuation|-|False|FACE@(0.0000,5.0000,5.0000)->FACE@(5.0000,5.0000,5.0000)
 E modified|body|continuation|-|False|FACE@(5.0000,0.0000,5.0000)->FACE@(10.0000,0.0000,5.0000)
 )GOLDEN"},
-    {"rotate", R"GOLDEN(counts preserved=0 modified=6 generated=0 deleted=0 section_edges=0 entries=6 roles=0 delta_entries=6
+    {"rotate",
+     R"GOLDEN(counts preserved=0 modified=6 generated=0 deleted=0 section_edges=0 entries=6 roles=0 delta_entries=6
 D (-3.5355,-3.5355,5.0000)|FACE|ev=modified|or=body|rr=|w=1
 D (-3.5355,3.5355,5.0000)|FACE|ev=modified|or=body|rr=|w=1
 D (0.0000,0.0000,0.0000)|FACE|ev=modified|or=body|rr=|w=1
@@ -91,7 +97,8 @@ E modified|body|continuation|-|False|FACE@(0.0000,0.0000,10.0000)->FACE@(0.0000,
 E modified|body|continuation|-|False|FACE@(0.0000,5.0000,5.0000)->FACE@(-3.5355,3.5355,5.0000)
 E modified|body|continuation|-|False|FACE@(5.0000,0.0000,5.0000)->FACE@(3.5355,3.5355,5.0000)
 )GOLDEN"},
-    {"mirror", R"GOLDEN(counts preserved=0 modified=6 generated=0 deleted=0 section_edges=0 entries=6 roles=0 delta_entries=6
+    {"mirror",
+     R"GOLDEN(counts preserved=0 modified=6 generated=0 deleted=0 section_edges=0 entries=6 roles=0 delta_entries=6
 D (-5.0000,0.0000,5.0000)|FACE|ev=modified|or=body|rr=|w=1
 D (0.0000,-5.0000,5.0000)|FACE|ev=modified|or=body|rr=|w=1
 D (0.0000,0.0000,0.0000)|FACE|ev=modified|or=body|rr=|w=1
@@ -105,7 +112,8 @@ E modified|body|continuation|-|False|FACE@(0.0000,0.0000,10.0000)->FACE@(0.0000,
 E modified|body|continuation|-|False|FACE@(0.0000,5.0000,5.0000)->FACE@(0.0000,5.0000,5.0000)
 E modified|body|continuation|-|False|FACE@(5.0000,0.0000,5.0000)->FACE@(-5.0000,0.0000,5.0000)
 )GOLDEN"},
-    {"extrude_rect", R"GOLDEN(counts preserved=0 modified=0 generated=4 deleted=0 section_edges=0 entries=4 roles=6 delta_entries=6
+    {"extrude_rect",
+     R"GOLDEN(counts preserved=0 modified=0 generated=4 deleted=0 section_edges=0 entries=4 roles=6 delta_entries=6
 D (-2.5000,0.0000,5.0000)|FACE|ev=generated|or=profile|rr=extrusion.side|w=2
 D (0.0000,-1.5000,5.0000)|FACE|ev=generated|or=profile|rr=extrusion.side|w=2
 D (0.0000,0.0000,0.0000)|FACE|ev=|or=|rr=extrusion.start|w=1
@@ -123,7 +131,8 @@ R extrusion.side|profile|Generated|FACE@(0.0000,1.5000,5.0000)|EDGE@(0.0000,1.50
 R extrusion.side|profile|Generated|FACE@(2.5000,0.0000,5.0000)|EDGE@(2.5000,0.0000,0.0000)
 R extrusion.start|profile|FirstShape|FACE@(0.0000,0.0000,0.0000)|-
 )GOLDEN"},
-    {"extrude_circle", R"GOLDEN(counts preserved=0 modified=0 generated=1 deleted=0 section_edges=0 entries=1 roles=3 delta_entries=3
+    {"extrude_circle",
+     R"GOLDEN(counts preserved=0 modified=0 generated=1 deleted=0 section_edges=0 entries=1 roles=3 delta_entries=3
 D (0.0000,0.0000,0.0000)|FACE|ev=|or=|rr=extrusion.start|w=1
 D (0.0000,0.0000,1.5000)|FACE|ev=generated|or=profile|rr=extrusion.side|w=2
 D (0.0000,0.0000,3.0000)|FACE|ev=|or=|rr=extrusion.end|w=1
@@ -132,7 +141,8 @@ R extrusion.end|profile|LastShape|FACE@(0.0000,0.0000,3.0000)|-
 R extrusion.side|profile|Generated|FACE@(0.0000,0.0000,1.5000)|EDGE@(0.0000,0.0000,0.0000)
 R extrusion.start|profile|FirstShape|FACE@(0.0000,0.0000,0.0000)|-
 )GOLDEN"},
-    {"revolve", R"GOLDEN(counts preserved=0 modified=0 generated=4 deleted=0 section_edges=0 entries=4 roles=6 delta_entries=6
+    {"revolve",
+     R"GOLDEN(counts preserved=0 modified=0 generated=4 deleted=0 section_edges=0 entries=4 roles=6 delta_entries=6
 D (-3.0000,0.0000,0.0000)|FACE|ev=|or=|rr=revolution.end|w=1
 D (0.0000,-0.5000,-1.9806)|FACE|ev=generated|or=profile|rr=revolution.side|w=2
 D (0.0000,0.0000,-1.2732)|FACE|ev=generated|or=profile|rr=revolution.side|w=2
@@ -150,7 +160,8 @@ R revolution.side|profile|Generated|FACE@(0.0000,0.0000,-2.5465)|EDGE@(4.0000,0.
 R revolution.side|profile|Generated|FACE@(0.0000,0.5000,-1.9806)|EDGE@(3.0000,0.5000,0.0000)
 R revolution.start|profile|FirstShape|FACE@(3.0000,0.0000,0.0000)|-
 )GOLDEN"},
-    {"revolve_full", R"GOLDEN(counts preserved=0 modified=0 generated=4 deleted=0 section_edges=0 entries=4 roles=4 delta_entries=4
+    {"revolve_full",
+     R"GOLDEN(counts preserved=0 modified=0 generated=4 deleted=0 section_edges=0 entries=4 roles=4 delta_entries=4
 D (0.0000,-0.5000,0.0000)|FACE|ev=generated|or=profile|rr=revolution.side|w=2
 D (0.0000,0.0000,0.0000)|FACE|ev=generated|or=profile|rr=revolution.side|w=2
 D (0.0000,0.0000,0.0000)|FACE|ev=generated|or=profile|rr=revolution.side|w=2
@@ -164,7 +175,8 @@ R revolution.side|profile|Generated|FACE@(0.0000,0.0000,0.0000)|EDGE@(2.0000,0.0
 R revolution.side|profile|Generated|FACE@(0.0000,0.0000,0.0000)|EDGE@(4.0000,0.0000,0.0000)
 R revolution.side|profile|Generated|FACE@(0.0000,0.5000,0.0000)|EDGE@(3.0000,0.5000,0.0000)
 )GOLDEN"},
-    {"fillet4", R"GOLDEN(counts preserved=1 modified=5 generated=4 deleted=4 section_edges=0 entries=14 roles=4 delta_entries=14
+    {"fillet4",
+     R"GOLDEN(counts preserved=1 modified=5 generated=4 deleted=4 section_edges=0 entries=14 roles=4 delta_entries=14
 D (-4.8138,-4.8232,5.0000)|FACE|ev=generated|or=contour_edge|rr=fillet.patch|w=2
 D (-4.8138,0.0000,0.1768)|FACE|ev=generated|or=contour_edge|rr=fillet.patch|w=2
 D (-4.8138,0.0000,9.8232)|FACE|ev=generated|or=contour_edge|rr=fillet.patch|w=2
@@ -198,7 +210,8 @@ R fillet.patch|contour_edge|Generated|FACE@(-4.8138,0.0000,0.1768)|EDGE@(-5.0000
 R fillet.patch|contour_edge|Generated|FACE@(-4.8138,0.0000,9.8232)|EDGE@(-5.0000,0.0000,10.0000)
 R fillet.patch|contour_edge|Generated|FACE@(-4.8138,4.8232,5.0000)|EDGE@(-5.0000,5.0000,5.0000)
 )GOLDEN"},
-    {"chamfer4", R"GOLDEN(counts preserved=1 modified=5 generated=4 deleted=4 section_edges=0 entries=14 roles=4 delta_entries=14
+    {"chamfer4",
+     R"GOLDEN(counts preserved=1 modified=5 generated=4 deleted=4 section_edges=0 entries=14 roles=4 delta_entries=14
 D (-4.7456,-4.7544,5.0000)|FACE|ev=generated|or=contour_edge|rr=chamfer.patch|w=2
 D (-4.7456,0.0000,0.2456)|FACE|ev=generated|or=contour_edge|rr=chamfer.patch|w=2
 D (-4.7456,0.0000,9.7544)|FACE|ev=generated|or=contour_edge|rr=chamfer.patch|w=2
@@ -232,7 +245,8 @@ R chamfer.patch|contour_edge|Generated|FACE@(-4.7456,0.0000,0.2456)|EDGE@(-5.000
 R chamfer.patch|contour_edge|Generated|FACE@(-4.7456,0.0000,9.7544)|EDGE@(-5.0000,0.0000,10.0000)
 R chamfer.patch|contour_edge|Generated|FACE@(-4.7456,4.7544,5.0000)|EDGE@(-5.0000,5.0000,5.0000)
 )GOLDEN"},
-    {"fillet_all", R"GOLDEN(counts preserved=0 modified=6 generated=12 deleted=12 section_edges=0 entries=30 roles=12 delta_entries=30
+    {"fillet_all",
+     R"GOLDEN(counts preserved=0 modified=6 generated=12 deleted=12 section_edges=0 entries=30 roles=12 delta_entries=30
 D (-4.6366,-4.6366,5.0000)|FACE|ev=generated|or=contour_edge|rr=fillet.patch|w=2
 D (-4.6366,0.0000,0.3634)|FACE|ev=generated|or=contour_edge|rr=fillet.patch|w=2
 D (-4.6366,0.0000,9.6366)|FACE|ev=generated|or=contour_edge|rr=fillet.patch|w=2
@@ -306,7 +320,8 @@ R fillet.patch|contour_edge|Generated|FACE@(4.6366,0.0000,0.3634)|EDGE@(5.0000,0
 R fillet.patch|contour_edge|Generated|FACE@(4.6366,0.0000,9.6366)|EDGE@(5.0000,0.0000,10.0000)
 R fillet.patch|contour_edge|Generated|FACE@(4.6366,4.6366,5.0000)|EDGE@(5.0000,5.0000,5.0000)
 )GOLDEN"},
-    {"shell", R"GOLDEN(counts preserved=0 modified=1 generated=9 deleted=0 section_edges=0 entries=10 roles=10 delta_entries=10
+    {"shell",
+     R"GOLDEN(counts preserved=0 modified=1 generated=9 deleted=0 section_edges=0 entries=10 roles=10 delta_entries=10
 D (-4.0000,0.0000,10.0000)|EDGE|ev=generated|or=closing_boundary|rr=shell.wall|w=2
 D (-4.0000,0.0000,5.5000)|FACE|ev=generated|or=body|rr=shell.offset_face|w=2
 D (0.0000,-4.0000,10.0000)|EDGE|ev=generated|or=closing_boundary|rr=shell.wall|w=2
@@ -338,7 +353,8 @@ R shell.wall|closing_boundary|GeneratedOrModified|EDGE@(0.0000,-4.0000,10.0000)|
 R shell.wall|closing_boundary|GeneratedOrModified|EDGE@(0.0000,4.0000,10.0000)|EDGE@(0.0000,5.0000,10.0000)
 R shell.wall|closing_boundary|GeneratedOrModified|EDGE@(4.0000,0.0000,10.0000)|EDGE@(5.0000,0.0000,10.0000)
 )GOLDEN"},
-    {"loft", R"GOLDEN(counts preserved=0 modified=0 generated=8 deleted=0 section_edges=0 entries=8 roles=10 delta_entries=6
+    {"loft",
+     R"GOLDEN(counts preserved=0 modified=0 generated=8 deleted=0 section_edges=0 entries=8 roles=10 delta_entries=6
 D (-0.7778,0.0000,0.8889)|FACE|ev=generated|or=profile_0,profile_1|rr=loft.side|w=4
 D (0.0000,-0.7778,0.8889)|FACE|ev=generated|or=profile_0,profile_1|rr=loft.side|w=4
 D (0.0000,0.0000,0.0000)|FACE|ev=|or=|rr=loft.start|w=1
@@ -364,7 +380,8 @@ R loft.side|profile_1|Generated|FACE@(0.0000,0.7778,0.8889)|EDGE@(0.0000,0.5000,
 R loft.side|profile_1|Generated|FACE@(0.7778,0.0000,0.8889)|EDGE@(0.5000,0.0000,2.0000)
 R loft.start|-|FirstShape|FACE@(0.0000,0.0000,0.0000)|-
 )GOLDEN"},
-    {"loft_ruled", R"GOLDEN(counts preserved=0 modified=0 generated=8 deleted=0 section_edges=0 entries=8 roles=10 delta_entries=6
+    {"loft_ruled",
+     R"GOLDEN(counts preserved=0 modified=0 generated=8 deleted=0 section_edges=0 entries=8 roles=10 delta_entries=6
 D (-0.7778,0.0000,0.8889)|FACE|ev=generated|or=profile_0,profile_1|rr=loft.side|w=4
 D (0.0000,-0.7778,0.8889)|FACE|ev=generated|or=profile_0,profile_1|rr=loft.side|w=4
 D (0.0000,0.0000,0.0000)|FACE|ev=|or=|rr=loft.start|w=1
@@ -390,7 +407,8 @@ R loft.side|profile_1|Generated|FACE@(0.0000,0.7778,0.8889)|EDGE@(0.0000,0.5000,
 R loft.side|profile_1|Generated|FACE@(0.7778,0.0000,0.8889)|EDGE@(0.5000,0.0000,2.0000)
 R loft.start|-|FirstShape|FACE@(0.0000,0.0000,0.0000)|-
 )GOLDEN"},
-    {"sweep", R"GOLDEN(counts preserved=0 modified=0 generated=4 deleted=0 section_edges=0 entries=4 roles=6 delta_entries=6
+    {"sweep",
+     R"GOLDEN(counts preserved=0 modified=0 generated=4 deleted=0 section_edges=0 entries=4 roles=6 delta_entries=6
 D (-0.5000,0.0000,1.5000)|FACE|ev=generated|or=profile|rr=sweep.side|w=2
 D (0.0000,-0.5000,1.5000)|FACE|ev=generated|or=profile|rr=sweep.side|w=2
 D (0.0000,0.0000,0.0000)|FACE|ev=|or=|rr=sweep.start|w=1
@@ -408,7 +426,8 @@ R sweep.side|profile|Generated|FACE@(0.0000,0.5000,1.5000)|EDGE@(0.0000,0.5000,0
 R sweep.side|profile|Generated|FACE@(0.5000,0.0000,1.5000)|EDGE@(0.5000,0.0000,0.0000)
 R sweep.start|-|FirstShape|FACE@(0.0000,0.0000,0.0000)|-
 )GOLDEN"},
-    {"twisted_sweep", R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=0 entries=0 roles=6 delta_entries=6
+    {"twisted_sweep",
+     R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=0 entries=0 roles=6 delta_entries=6
 D (-0.1865,0.4502,1.5000)|FACE|ev=|or=|rr=twisted_sweep.side|w=1
 D (-0.4502,-0.1865,1.5000)|FACE|ev=|or=|rr=twisted_sweep.side|w=1
 D (0.0000,0.0000,0.0000)|FACE|ev=|or=|rr=twisted_sweep.start|w=1
@@ -422,7 +441,8 @@ R twisted_sweep.side|-|SewnSide|FACE@(0.1865,-0.4502,1.5000)|-
 R twisted_sweep.side|-|SewnSide|FACE@(0.4502,0.1865,1.5000)|-
 R twisted_sweep.start|-|sewn_cap|FACE@(0.0000,0.0000,0.0000)|-
 )GOLDEN"},
-    {"cut_tangent", R"GOLDEN(counts preserved=2 modified=10 generated=12 deleted=2 section_edges=5 entries=26 roles=0 delta_entries=21
+    {"cut_tangent",
+     R"GOLDEN(counts preserved=2 modified=10 generated=12 deleted=2 section_edges=5 entries=26 roles=0 delta_entries=21
 D (-0.4806,-0.4806,0.0000)|FACE|ev=modified|or=body|rr=|w=1
 D (-0.4806,-0.4806,10.0000)|FACE|ev=modified|or=body|rr=|w=1
 D (-1.0000,5.0000,5.0000)|FACE|ev=modified|or=body|rr=|w=1
@@ -476,7 +496,8 @@ S EDGE@(3.0000,5.0000,5.0000)
 S EDGE@?
 S EDGE@?
 )GOLDEN"},
-    {"cut_blind_hole", R"GOLDEN(counts preserved=9 modified=0 generated=0 deleted=0 section_edges=0 entries=9 roles=0 delta_entries=9
+    {"cut_blind_hole",
+     R"GOLDEN(counts preserved=9 modified=0 generated=0 deleted=0 section_edges=0 entries=9 roles=0 delta_entries=9
 D (-5.0000,0.0000,5.0000)|FACE|ev=preserved|or=body|rr=|w=1
 D (0.0000,-5.0000,5.0000)|FACE|ev=preserved|or=body|rr=|w=1
 D (0.0000,0.0000,0.0000)|FACE|ev=preserved|or=body|rr=|w=1
@@ -496,7 +517,8 @@ E preserved|tool|continuation|-|True|FACE@(0.0000,0.0000,2.0000)->FACE@(0.0000,0
 E preserved|tool|continuation|-|True|FACE@(0.0000,0.0000,5.0000)->FACE@(0.0000,0.0000,5.0000)
 E preserved|tool|continuation|-|True|FACE@(0.0000,0.0000,8.0000)->FACE@(0.0000,0.0000,8.0000)
 )GOLDEN"},
-    {"union", R"GOLDEN(counts preserved=2 modified=12 generated=4 deleted=0 section_edges=2 entries=18 roles=0 delta_entries=14
+    {"union",
+     R"GOLDEN(counts preserved=2 modified=12 generated=4 deleted=0 section_edges=2 entries=18 roles=0 delta_entries=14
 D (-0.4641,5.0000,5.0000)|EDGE|ev=generated|or=body,tool|rr=|w=2
 D (-1.0435,-1.0435,0.0000)|FACE|ev=modified|or=body|rr=|w=1
 D (-1.0435,-1.0435,10.0000)|FACE|ev=modified|or=body|rr=|w=1
@@ -532,7 +554,8 @@ E preserved|body|continuation|-|True|FACE@(0.0000,-5.0000,5.0000)->FACE@(0.0000,
 S EDGE@(-0.4641,5.0000,5.0000)
 S EDGE@(5.0000,-0.4641,5.0000)
 )GOLDEN"},
-    {"intersect", R"GOLDEN(counts preserved=0 modified=7 generated=4 deleted=2 section_edges=2 entries=13 roles=0 delta_entries=9
+    {"intersect",
+     R"GOLDEN(counts preserved=0 modified=7 generated=4 deleted=2 section_edges=2 entries=13 roles=0 delta_entries=9
 D (-0.4023,-0.4023,5.0000)|FACE|ev=modified|or=tool|rr=|w=1
 D (-2.6569,5.0000,5.0000)|EDGE|ev=generated|or=body,tool|rr=|w=2
 D (-5.0000,0.0000,5.0000)|FACE|ev=deleted|or=body|rr=|w=1
@@ -558,7 +581,8 @@ E modified|tool|fragment|-|True|FACE@(3.0000,3.0000,5.0000)->FACE@(-0.4023,-0.40
 S EDGE@(-2.6569,5.0000,5.0000)
 S EDGE@(5.0000,-2.6569,5.0000)
 )GOLDEN"},
-    {"union3_clean", R"GOLDEN(counts preserved=0 modified=14 generated=0 deleted=4 section_edges=0 entries=18 roles=0 delta_entries=10
+    {"union3_clean",
+     R"GOLDEN(counts preserved=0 modified=14 generated=0 deleted=4 section_edges=0 entries=18 roles=0 delta_entries=10
 D (-0.5000,0.0000,0.5000)|FACE|ev=modified|or=body|rr=|w=1
 D (0.5000,0.0000,0.5000)|FACE|ev=deleted|or=body|rr=|w=1
 D (0.5000,0.0000,0.5000)|FACE|ev=deleted|or=tool|rr=|w=1
@@ -588,7 +612,8 @@ E modified|tool|fragment|-|True|FACE@(1.0000,0.0000,0.0000)->FACE@(1.0000,0.0000
 E modified|tool|fragment|-|True|FACE@(1.0000,0.0000,1.0000)->FACE@(1.0000,0.0000,1.0000)
 E modified|tool|fragment|-|True|FACE@(1.0000,0.5000,0.5000)->FACE@(1.0000,0.5000,0.5000)
 )GOLDEN"},
-    {"union3_raw", R"GOLDEN(counts preserved=2 modified=12 generated=0 deleted=4 section_edges=0 entries=18 roles=0 delta_entries=18
+    {"union3_raw",
+     R"GOLDEN(counts preserved=2 modified=12 generated=0 deleted=4 section_edges=0 entries=18 roles=0 delta_entries=18
 D (-0.5000,0.0000,0.5000)|FACE|ev=preserved|or=body|rr=|w=1
 D (0.0000,-0.5000,0.5000)|FACE|ev=modified|or=body|rr=|w=1
 D (0.0000,0.0000,0.0000)|FACE|ev=modified|or=body|rr=|w=1
@@ -626,17 +651,21 @@ E modified|tool|fragment|-|True|FACE@(1.0000,0.5000,0.5000)->FACE@(1.0000,0.5000
 E preserved|body|continuation|-|True|FACE@(-0.5000,0.0000,0.5000)->FACE@(-0.5000,0.0000,0.5000)
 E preserved|tool_2|continuation|-|True|FACE@(2.5000,0.0000,0.5000)->FACE@(2.5000,0.0000,0.5000)
 )GOLDEN"},
-    {"graph_extrude", R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=0 entries=0 roles=2 delta_entries=2
+    {"graph_extrude",
+     R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=0 entries=0 roles=2 delta_entries=2
 D (0.0000,0.0000,0.0000)|FACE|ev=|or=|rr=extrusion.start|w=1
 D (0.0000,0.0000,10.0000)|FACE|ev=|or=|rr=extrusion.end|w=1
 R extrusion.end|profile|LastShape|FACE@(0.0000,0.0000,10.0000)|-
 R extrusion.start|profile|FirstShape|FACE@(0.0000,0.0000,0.0000)|-
 )GOLDEN"},
-    {"graph_translate", R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=0 entries=0 roles=0 delta_entries=0
+    {"graph_translate",
+     R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=0 entries=0 roles=0 delta_entries=0
 )GOLDEN"},
-    {"graph_fillet", R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=0 entries=0 roles=0 delta_entries=0
+    {"graph_fillet",
+     R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=0 entries=0 roles=0 delta_entries=0
 )GOLDEN"},
-    {"graph_cut", R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=5 entries=0 roles=0 delta_entries=0
+    {"graph_cut",
+     R"GOLDEN(counts preserved=0 modified=0 generated=0 deleted=0 section_edges=5 entries=0 roles=0 delta_entries=0
 S EDGE@(2.5756,2.5756,0.0000)
 S EDGE@(2.5756,2.5756,10.0000)
 S EDGE@(3.0000,5.0000,5.0000)

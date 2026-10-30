@@ -18,7 +18,9 @@ Value member(const Value& object, std::string_view key) {
   return found != nullptr ? *found : Value();
 }
 
-std::string python_str(const Value& value) { return value.is_string() ? value.as_string() : value.is_null() ? "None" : value.dump(); }
+std::string python_str(const Value& value) {
+  return value.is_string() ? value.as_string() : value.is_null() ? "None" : value.dump();
+}
 
 TagBinding provenance_binding(const Value& evidence, TopologyPropagation topology, const std::string& scope,
                               const std::string& artifact_sha256, const std::string& subject) {
@@ -26,11 +28,13 @@ TagBinding provenance_binding(const Value& evidence, TopologyPropagation topolog
   binding.tag = "provenance.exact_transcription";
   binding.policy.mut().producer = TagProducer{.kind = TagProducerKind::ImportedSidecar};
   binding.policy.mut().target = TagTarget{.kind = TagTargetKind::ScopeRoot};
-  binding.policy.mut().propagation = TagPropagation{.topology = topology, .lineage = LineagePolicy::ContinuationFragment};
+  binding.policy.mut().propagation =
+      TagPropagation{.topology = topology, .lineage = LineagePolicy::ContinuationFragment};
   binding.evidence = TagEvidence{.kind = TagEvidenceKind::ImportedSidecar, .data = evidence};
   binding.certainty = TagCertainty::Asserted;
   binding.lifecycle = TagLifecycle::Snapshot;
-  binding.binding_id = "tag_binding_" + uuid5_url_hex("simplecad.brep_region." + scope + "|" + artifact_sha256 + "|" + subject);
+  binding.binding_id =
+      "tag_binding_" + uuid5_url_hex("simplecad.brep_region." + scope + "|" + artifact_sha256 + "|" + subject);
   return binding;
 }
 
@@ -86,10 +90,12 @@ T load_region(std::string_view path, std::string_view sha256, const OptionalStri
     prefix = normalize_tag(*tag_prefix, true);
     shape.apply_tag(*prefix + "." + root_kind, false);
   }
-  shape.set_metadata("brep_region", Value(Value::Object{{"artifact_sha256", Value(file.sha256)},
-                                                        {"profile", member(file.manifest, "profile")},
-                                                        {"provenance", member(file.manifest, "provenance")},
-                                                        {"source_face_ids", member(member(file.manifest, "region"), "source_face_ids")}}));
+  shape.set_metadata(
+      "brep_region",
+      Value(Value::Object{{"artifact_sha256", Value(file.sha256)},
+                          {"profile", member(file.manifest, "profile")},
+                          {"provenance", member(file.manifest, "provenance")},
+                          {"source_face_ids", member(member(file.manifest, "region"), "source_face_ids")}}));
   attach_provenance(shape, file.manifest, file.sha256);
 
   return finalize_primitive_with(std::move(shape), op, [&] {
@@ -105,14 +111,14 @@ T load_region(std::string_view path, std::string_view sha256, const OptionalStri
 
 Solid load_brep_region_rsolid(std::string_view path, std::string_view sha256, const OptionalString& tag_prefix) {
   static constexpr const char* kOp = "load_brep_region_rsolid";
-  static const ErrorSpec kSpec{kOp,
-                               "Failed to load the BREP region snapshot.",
-                               {"The snapshot path does not exist or is not readable.",
-                                "The supplied SHA-256 does not match the snapshot bytes.",
-                                "The snapshot is corrupt, unsupported, invalid, or not one solid."},
-                               {"Create the snapshot with copy_step_region_rpath(...).",
-                                "Pass the SHA-256 of the complete .scadbrep file.",
-                                "Keep the sidecar at the same path when replaying model JSON."}};
+  static const ErrorSpec kSpec{
+      kOp,
+      "Failed to load the BREP region snapshot.",
+      {"The snapshot path does not exist or is not readable.",
+       "The supplied SHA-256 does not match the snapshot bytes.",
+       "The snapshot is corrupt, unsupported, invalid, or not one solid."},
+      {"Create the snapshot with copy_step_region_rpath(...).", "Pass the SHA-256 of the complete .scadbrep file.",
+       "Keep the sidecar at the same path when replaying model JSON."}};
   return guarded(kSpec, [&] { return load_region<Solid>(path, sha256, tag_prefix, kOp, io::RegionRootKind::Solid); });
 }
 

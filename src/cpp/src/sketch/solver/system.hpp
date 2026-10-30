@@ -31,12 +31,24 @@ struct V2 {
   Dual x;
   Dual y;
 };
-inline V2 operator+(const V2& a, const V2& b) { return {a.x + b.x, a.y + b.y}; }
-inline V2 operator-(const V2& a, const V2& b) { return {a.x - b.x, a.y - b.y}; }
-inline V2 operator*(const V2& a, double s) { return {a.x * s, a.y * s}; }
-inline Dual dot(const V2& a, const V2& b) { return a.x * b.x + a.y * b.y; }
-inline Dual cross(const V2& a, const V2& b) { return a.x * b.y - a.y * b.x; }
-inline Dual length(const V2& a) { return sqrt(dot(a, a)); }
+inline V2 operator+(const V2& a, const V2& b) {
+  return {a.x + b.x, a.y + b.y};
+}
+inline V2 operator-(const V2& a, const V2& b) {
+  return {a.x - b.x, a.y - b.y};
+}
+inline V2 operator*(const V2& a, double s) {
+  return {a.x * s, a.y * s};
+}
+inline Dual dot(const V2& a, const V2& b) {
+  return a.x * b.x + a.y * b.y;
+}
+inline Dual cross(const V2& a, const V2& b) {
+  return a.x * b.y - a.y * b.x;
+}
+inline Dual length(const V2& a) {
+  return sqrt(dot(a, a));
+}
 
 class ParamTable;
 
@@ -48,8 +60,7 @@ class Env {
   Env(const ParamTable& table, const double* x, std::vector<int>& slots)
       : table_(table), x_(x), slots_(&slots), writable_(&slots) {}
   // Evaluation: `slots` was filled by discovery.
-  Env(const ParamTable& table, const double* x, const std::vector<int>& slots)
-      : table_(table), x_(x), slots_(&slots) {}
+  Env(const ParamTable& table, const double* x, const std::vector<int>& slots) : table_(table), x_(x), slots_(&slots) {}
   Dual operator()(int param) const;
   V2 operator()(const Pt& p) const { return {(*this)(p.x), (*this)(p.y)}; }
 
@@ -106,8 +117,8 @@ class System {
   void finalize();
 
   // Residuals of the listed equations at x, and optionally the Jacobian.
-  void evaluate(const std::vector<std::size_t>& active, const std::vector<double>& x,
-                std::vector<double>& residual, Matrix* jacobian) const;
+  void evaluate(const std::vector<std::size_t>& active, const std::vector<double>& x, std::vector<double>& residual,
+                Matrix* jacobian) const;
 
   // Equation indices of the implicit blocks plus the listed explicit ones.
   std::vector<std::size_t> active_equations(const std::vector<bool>& block_enabled) const;

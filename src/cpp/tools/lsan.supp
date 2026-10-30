@@ -1,0 +1,11 @@
+# LeakSanitizer suppressions.  The diagnostic-image slot (src/topo/diagnostic_image.cpp) is intentionally leaked: it
+# stays reachable through a static pointer, so LSan normally does not report it; this is the safety net.
+leak:scad::*::slot
+
+# OCCT's own process-lifetime singletons (the first run of the sanitizer job reported exactly these, 112 bytes in 4
+# allocations, with every doctest case passing): the TPrsStd driver table is created on first use and never freed, and
+# OCCT's registries build their names with TCollection_AsciiString in static initialisation.  Only these OCCT entry
+# points; a leak that goes through this repository's code is still reported.
+leak:TPrsStd_DriverTable::Get
+leak:TCollection_AsciiString::allocate
+leak:TCollection_AsciiString::reallocate

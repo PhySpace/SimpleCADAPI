@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/std/gear_profiles.hpp"
 
 #include <algorithm>
@@ -6,6 +7,7 @@
 #include <optional>
 #include <string>
 
+#include "scad/core/engaged.hpp"
 #include "scad/core/vec.hpp"
 #include "scad/ops/features/support.hpp"
 #include "scad/ops/geometry/geometry.hpp"
@@ -18,15 +20,21 @@ namespace scad::stdlib {
 
 namespace {
 
-std::string tooth_point(int tooth, const char* key) { return "t" + std::to_string(tooth) + "_" + key; }
+std::string tooth_point(int tooth, const char* key) {
+  return "t" + std::to_string(tooth) + "_" + key;
+}
 
-std::string numbered(const char* stem, int index) { return std::string(stem) + std::to_string(index); }
+std::string numbered(const char* stem, int index) {
+  return std::string(stem) + std::to_string(index);
+}
 
 void add_point(SketchBuilder& sketch, int tooth, const char* key, Point2 p) {
   sketch.point(tooth_point(tooth, key), p.x, p.y);
 }
 
-Point2 polar(double radius, double angle) { return {radius * std::cos(angle), radius * std::sin(angle)}; }
+Point2 polar(double radius, double angle) {
+  return {radius * std::cos(angle), radius * std::sin(angle)};
+}
 
 // The three construction circles of a gear sketch, in the order the factories add them.
 void add_construction_circles(SketchBuilder& sketch, const char* first, double first_radius, const char* second,
@@ -49,6 +57,87 @@ void add_construction_circles(SketchBuilder& sketch, const char* first, double f
 // External gear
 // ---------------------------------------------------------------------------
 
+namespace {
+
+// The six points of one external tooth: root start/end, flank base start/end, tip start/end.
+struct ToothPoints {
+  Point2 rs, re, bs, be, ts, te;
+};
+
+// The outline of an external gear as one point set and one edge ring, ready for the sketch.
+struct ExternalGearPlan {
+  const ToothGeometry& geo;
+  int n_teeth;
+  double tooth_angle;
+  bool needs_root_connectors;  // the root circle lies inside the base circle: flanks start with a root fillet
+  const BSplineData& canonical;
+  const std::vector<double>& reversed_knots;
+  const std::vector<int>& reversed_multiplicities;
+  const std::optional<BSplineData>& left_fillet;
+  const std::optional<BSplineData>& right_fillet;
+};
+
+// Edges share the tooth points instead of carrying hundreds of coincidence constraints.
+void add_tooth_points(SketchBuilder& sketch, const std::vector<ToothPoints>& teeth) {
+  for (std::size_t i = 0; i < teeth.size(); ++i) {
+    const int tooth = static_cast<int>(i);
+    add_point(sketch, tooth, "rs", teeth[i].rs);
+    add_point(sketch, tooth, "re", teeth[i].re);
+    add_point(sketch, tooth, "bs", teeth[i].bs);
+    add_point(sketch, tooth, "be", teeth[i].be);
+    add_point(sketch, tooth, "ts", teeth[i].ts);
+    add_point(sketch, tooth, "te", teeth[i].te);
+  }
+}
+
+// Per tooth: root arc, [left root fillet], left flank, tip arc, right flank (mirrored + reversed
+// from the canonical one), [right root fillet]; each is the canonical curve rotated by the tooth turn.
+void add_tooth_edges(SketchBuilder& sketch, const ExternalGearPlan& plan) {
+  const ToothGeometry& geo = plan.geo;
+  const int n_teeth = plan.n_teeth;
+  const bool needs_root_connectors = plan.needs_root_connectors;
+  const BSplineData& canonical = plan.canonical;
+  for (int i = 0; i < n_teeth; ++i) {
+    const std::string rs = tooth_point(i, "rs");
+    const std::string re = tooth_point(i, "re");
+    const std::string bs = needs_root_connectors ? tooth_point(i, "bs") : re;
+    const std::string be = tooth_point(i, "be");
+    const std::string ts = tooth_point(i, "ts");
+    const std::string te = tooth_point(i, "te");
+    const std::string next_rs = tooth_point((i + 1) % n_teeth, "rs");
+    const std::string right_flank_end = needs_root_connectors ? be : next_rs;
+    const double turn = plan.tooth_angle * i;
+
+    sketch.arc(numbered("arc_root_", i), rs, re, "center");
+    if (needs_root_connectors) {
+      BSplineData fillet = require_engaged(plan.left_fillet, "root connectors exist only with their left fillet");
+      fillet.control_points = transform_bspline_control_points(fillet.control_points, turn);
+      sketch.bspline(numbered("fillet_left_", i), re, tooth_point(i, "bs"), fillet);
+    }
+
+    BSplineData left = canonical;
+    left.control_points = transform_bspline_control_points(canonical.control_points, geo.left_start + turn);
+    sketch.bspline(numbered("bspline_left_", i), bs, ts, left);
+
+    sketch.arc(numbered("arc_tip_", i), ts, te, "center");
+
+    BSplineData right = canonical;
+    right.control_points = transform_bspline_control_points(canonical.control_points, geo.right_start + turn,
+                                                            /*mirror=*/true, /*reverse=*/true);
+    right.knots = plan.reversed_knots;
+    right.multiplicities = plan.reversed_multiplicities;
+    sketch.bspline(numbered("bspline_right_", i), te, right_flank_end, right);
+
+    if (needs_root_connectors) {
+      BSplineData fillet = require_engaged(plan.right_fillet, "root connectors exist only with their right fillet");
+      fillet.control_points = transform_bspline_control_points(fillet.control_points, turn);
+      sketch.bspline(numbered("fillet_right_", i), be, next_rs, fillet);
+    }
+  }
+}
+
+}  // namespace
+
 Sketch build_gear_profile_sketch(int n_teeth, double module, double pressure_angle, const ToothOptions& options) {
   const ToothGeometry geo = compute_tooth_geometry(n_teeth, module, pressure_angle, options);
   const double root_radius = geo.root_radius;
@@ -56,7 +145,7 @@ Sketch build_gear_profile_sketch(int n_teeth, double module, double pressure_ang
   const double tip_radius = geo.tip_radius;
   const double tooth_angle = geo.tooth_angle;
   const double flank_start_radius = std::max(base_radius, root_radius);
-  const bool needs_root_connectors = root_radius < base_radius - 1e-8;
+  const bool needs_root_connectors = root_radius < base_radius - tol::kBaseCircleClearance;
   const double t_flank_start = involute_t_for_radius(base_radius, flank_start_radius);
   const double flank_start_span = t_flank_start - std::atan(t_flank_start);
   const double left_flank_start_angle = geo.left_start + flank_start_span;
@@ -65,16 +154,15 @@ Sketch build_gear_profile_sketch(int n_teeth, double module, double pressure_ang
   const double root_right_angle = needs_root_connectors ? geo.right_start : right_flank_start_angle;
   const double prev_right_start = root_right_angle - tooth_angle;
 
-  const BSplineData canonical = involute_bspline_control_points(base_radius, tip_radius, flank_start_radius, 0.0, false);
-  const auto [reversed_knots, reversed_multiplicities] = reverse_bspline_parameters(canonical.knots, canonical.multiplicities);
+  const BSplineData canonical =
+      involute_bspline_control_points(base_radius, tip_radius, flank_start_radius, 0.0, false);
+  const auto [reversed_knots, reversed_multiplicities] =
+      reverse_bspline_parameters(canonical.knots, canonical.multiplicities);
 
   SketchBuilder sketch("gear_" + std::to_string(n_teeth) + "t_m" + python_float_repr(module));
   add_construction_circles(sketch, "root_circle", root_radius, "pitch_circle", geo.pitch_radius, "tip_circle",
                            tip_radius);
 
-  struct ToothPoints {
-    Point2 rs, re, bs, be, ts, te;
-  };
   std::vector<ToothPoints> teeth;
   teeth.reserve(static_cast<std::size_t>(n_teeth));
   for (int i = 0; i < n_teeth; ++i) {
@@ -92,54 +180,12 @@ Sketch build_gear_profile_sketch(int n_teeth, double module, double pressure_ang
                                               geo.right_start + kPi, root_right_angle + kPi / 2.0);
   }
 
-  // Edges share these points instead of carrying hundreds of coincidence constraints.
-  for (int i = 0; i < n_teeth; ++i) {
-    const ToothPoints& t = teeth[static_cast<std::size_t>(i)];
-    add_point(sketch, i, "rs", t.rs);
-    add_point(sketch, i, "re", t.re);
-    add_point(sketch, i, "bs", t.bs);
-    add_point(sketch, i, "be", t.be);
-    add_point(sketch, i, "ts", t.ts);
-    add_point(sketch, i, "te", t.te);
-  }
+  add_tooth_points(sketch, teeth);
 
-  for (int i = 0; i < n_teeth; ++i) {
-    const std::string rs = tooth_point(i, "rs");
-    const std::string re = tooth_point(i, "re");
-    const std::string bs = needs_root_connectors ? tooth_point(i, "bs") : re;
-    const std::string be = tooth_point(i, "be");
-    const std::string ts = tooth_point(i, "ts");
-    const std::string te = tooth_point(i, "te");
-    const std::string next_rs = tooth_point((i + 1) % n_teeth, "rs");
-    const std::string right_flank_end = needs_root_connectors ? be : next_rs;
-    const double turn = tooth_angle * i;
-
-    sketch.arc(numbered("arc_root_", i), rs, re, "center");
-    if (needs_root_connectors) {
-      BSplineData fillet = *left_fillet;
-      fillet.control_points = transform_bspline_control_points(fillet.control_points, turn);
-      sketch.bspline(numbered("fillet_left_", i), re, tooth_point(i, "bs"), fillet);
-    }
-
-    BSplineData left = canonical;
-    left.control_points = transform_bspline_control_points(canonical.control_points, geo.left_start + turn);
-    sketch.bspline(numbered("bspline_left_", i), bs, ts, left);
-
-    sketch.arc(numbered("arc_tip_", i), ts, te, "center");
-
-    BSplineData right = canonical;
-    right.control_points =
-        transform_bspline_control_points(canonical.control_points, geo.right_start + turn, /*mirror=*/true, /*reverse=*/true);
-    right.knots = reversed_knots;
-    right.multiplicities = reversed_multiplicities;
-    sketch.bspline(numbered("bspline_right_", i), te, right_flank_end, right);
-
-    if (needs_root_connectors) {
-      BSplineData fillet = *right_fillet;
-      fillet.control_points = transform_bspline_control_points(fillet.control_points, turn);
-      sketch.bspline(numbered("fillet_right_", i), be, next_rs, fillet);
-    }
-  }
+  const ExternalGearPlan plan{
+      geo,         n_teeth,     tooth_angle, needs_root_connectors, canonical, reversed_knots, reversed_multiplicities,
+      left_fillet, right_fillet};
+  add_tooth_edges(sketch, plan);
   return sketch.take();
 }
 
@@ -248,7 +294,8 @@ Face build_ring_gear_face(int n_teeth, double module, double pressure_angle, dou
 Face build_rack_profile_face(double module, int n_teeth, double pressure_angle) {
   const std::vector<Point2> points = rack_profile_points(module, n_teeth, pressure_angle);
   SketchBuilder sketch("rack_m" + python_float_repr(module) + "_n" + std::to_string(n_teeth));
-  for (std::size_t i = 0; i < points.size(); ++i) sketch.point("p" + std::to_string(i), points[i].x, points[i].y);
+  for (std::size_t i = 0; i < points.size(); ++i)
+    sketch.point("p" + std::to_string(i), points[i].x, points[i].y);
   for (std::size_t i = 0; i < points.size(); ++i) {
     sketch.line("l" + std::to_string(i), "p" + std::to_string(i), "p" + std::to_string((i + 1) % points.size()));
   }
@@ -287,7 +334,8 @@ Wire build_cycloidal_disc_profile_wire(const CycloidalProfile& profile, Cycloida
     const reactive::BSplineFit fit = reactive::fit_cubic_bspline_control_points(samples, options);
 
     SplineSpec spec;
-    for (const auto& pole : fit.control_points) spec.control_points.push_back({Scalar(pole[0]), Scalar(pole[1]), Scalar(pole[2])});
+    for (const auto& pole : fit.control_points)
+      spec.control_points.push_back({Scalar(pole[0]), Scalar(pole[1]), Scalar(pole[2])});
     spec.degree = fit.degree;
     const std::vector<double> knots = fit.unique_knots();
     spec.knots = ScalarList(knots.begin(), knots.end());
@@ -298,7 +346,8 @@ Wire build_cycloidal_disc_profile_wire(const CycloidalProfile& profile, Cycloida
   }
 
   Wire wire = make_wire_from_edges_rwire(edges);
-  if (fit_data != nullptr) *fit_data = std::move(data);
+  if (fit_data != nullptr)
+    *fit_data = std::move(data);
   return wire;
 }
 

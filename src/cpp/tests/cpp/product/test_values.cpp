@@ -9,9 +9,11 @@ TEST_CASE("a placement is a canonical right-handed frame") {
   check_vec(placement.z_axis(), {0, 0, 1});
   check_vec(placement.transform_point({1, 2, 3}), {8, 21, 33});
 
-  CHECK_THROWS_WITH_AS(Placement(Vec3{0, 0, 0}, Vec3{1, 0, 0}, Vec3{1, 0, 0}), "x_axis and y_axis must be orthogonal", ValueError);
+  CHECK_THROWS_WITH_AS(Placement(Vec3{0, 0, 0}, Vec3{1, 0, 0}, Vec3{1, 0, 0}), "x_axis and y_axis must be orthogonal",
+                       ValueError);
   CHECK_THROWS_WITH_AS(Placement(Vec3{0, 0, 0}, Vec3{0, 0, 0}), "x_axis must be a non-zero vector", ValueError);
-  CHECK_THROWS_WITH_AS(Placement(Vec3{0, 0, 0}, Vec3{1, 0, 0}, Vec3{0, std::nan(""), 0}), "y_axis[1] must be finite", ValueError);
+  CHECK_THROWS_WITH_AS(Placement(Vec3{0, 0, 0}, Vec3{1, 0, 0}, Vec3{0, std::nan(""), 0}), "y_axis[1] must be finite",
+                       ValueError);
 }
 
 TEST_CASE("placements compose, invert and measure relative to each other") {
@@ -63,7 +65,8 @@ TEST_CASE("a material validates density, unit and colour") {
   CHECK_THROWS_WITH_AS(Material("m", {}, 1.0), "density_unit must be explicit when density is provided", ValueError);
   CHECK_THROWS_WITH_AS(Material("m", {}, {}, "kg"), "density_unit requires density", ValueError);
   CHECK_THROWS_WITH_AS(Material("m", {}, -1.0, "kg"), "density must be positive when provided", ValueError);
-  CHECK_THROWS_WITH_AS(Material("m", {}, {}, {}, Vec3{1.2, 0, 0}), "color components must be in [0.0, 1.0]", ValueError);
+  CHECK_THROWS_WITH_AS(Material("m", {}, {}, {}, Vec3{1.2, 0, 0}), "color components must be in [0.0, 1.0]",
+                       ValueError);
   CHECK(Material("a") == Material("a"));
   CHECK_FALSE(Material("a") == Material("b"));
 }
@@ -80,16 +83,27 @@ TEST_CASE("a constraint accepts only what its kind allows") {
   const ConnectorRef a("a", "axis");
   const ConnectorRef b("b", "axis");
   CHECK_NOTHROW(Constraint("c", "revolute", a, b, {.drive_angle_degrees = 30.0, .angle_limit = ScalarLimit(0, 90)}));
-  CHECK_THROWS_WITH_AS(Constraint("c", "fixed", a, b, {.drive_distance = 1.0}), "fixed constraints do not accept drive scalars", ValueError);
-  CHECK_THROWS_WITH_AS(Constraint("c", "revolute", a, b, {.drive_distance = 1.0}), "revolute constraints only accept angle scalars", ValueError);
-  CHECK_THROWS_WITH_AS(Constraint("c", "prismatic", a, b, {.drive_angle_degrees = 1.0}), "prismatic constraints only accept distance scalars", ValueError);
-  CHECK_THROWS_WITH_AS(Constraint("c", "prismatic", a, b, {.pitch_radius = 1.0}), "prismatic constraints do not accept coupling radii or phase_offset", ValueError);
-  CHECK_THROWS_WITH_AS(Constraint("c", "gear", a, b, {.pitch_radius_a = 0.0, .pitch_radius_b = 1.0}), "pitch_radius_a must be positive", ValueError);
-  CHECK_THROWS_WITH_AS(Constraint("c", "gear", a, b, {.pitch_radius_a = 1.0}), "gear constraints require pitch_radius_a and pitch_radius_b", ValueError);
-  CHECK_THROWS_WITH_AS(Constraint("c", "belt", a, b, {.pulley_radius_a = 1.0, .pulley_radius_b = 1.0, .pitch_radius = 1.0}), "belt constraints only accept pulley_radius_a and pulley_radius_b", ValueError);
-  CHECK_THROWS_WITH_AS(Constraint("c", "rack_pinion", a, b), "rack_pinion constraints require pitch_radius", ValueError);
-  CHECK_THROWS_WITH_AS(Constraint("c", "weld", a, b), "constraint_kind must be fixed, revolute, prismatic, gear, belt, or rack_pinion", ValueError);
-  CHECK_THROWS_WITH_AS(Constraint("c", "fixed", a, a), "constraint cannot connect the same connector ref twice", ValueError);
+  CHECK_THROWS_WITH_AS(Constraint("c", "fixed", a, b, {.drive_distance = 1.0}),
+                       "fixed constraints do not accept drive scalars", ValueError);
+  CHECK_THROWS_WITH_AS(Constraint("c", "revolute", a, b, {.drive_distance = 1.0}),
+                       "revolute constraints only accept angle scalars", ValueError);
+  CHECK_THROWS_WITH_AS(Constraint("c", "prismatic", a, b, {.drive_angle_degrees = 1.0}),
+                       "prismatic constraints only accept distance scalars", ValueError);
+  CHECK_THROWS_WITH_AS(Constraint("c", "prismatic", a, b, {.pitch_radius = 1.0}),
+                       "prismatic constraints do not accept coupling radii or phase_offset", ValueError);
+  CHECK_THROWS_WITH_AS(Constraint("c", "gear", a, b, {.pitch_radius_a = 0.0, .pitch_radius_b = 1.0}),
+                       "pitch_radius_a must be positive", ValueError);
+  CHECK_THROWS_WITH_AS(Constraint("c", "gear", a, b, {.pitch_radius_a = 1.0}),
+                       "gear constraints require pitch_radius_a and pitch_radius_b", ValueError);
+  CHECK_THROWS_WITH_AS(
+      Constraint("c", "belt", a, b, {.pulley_radius_a = 1.0, .pulley_radius_b = 1.0, .pitch_radius = 1.0}),
+      "belt constraints only accept pulley_radius_a and pulley_radius_b", ValueError);
+  CHECK_THROWS_WITH_AS(Constraint("c", "rack_pinion", a, b), "rack_pinion constraints require pitch_radius",
+                       ValueError);
+  CHECK_THROWS_WITH_AS(Constraint("c", "weld", a, b),
+                       "constraint_kind must be fixed, revolute, prismatic, gear, belt, or rack_pinion", ValueError);
+  CHECK_THROWS_WITH_AS(Constraint("c", "fixed", a, a), "constraint cannot connect the same connector ref twice",
+                       ValueError);
 
   const Constraint gear("g", " GEAR ", a, b, {.pitch_radius_a = 1.0, .pitch_radius_b = 2.0});
   CHECK(gear.constraint_kind() == "gear");
@@ -122,7 +136,10 @@ TEST_CASE("a connector needs an anchor and keeps geometry and placement apart") 
   const GeometryRef ref("face", std::nullopt, Value::object());
   CHECK_THROWS_WITH_AS(Connector("c", ref, std::nullopt, ConnectorAnchor(at(0, 0, 0))),
                        "geometry_ref is only valid for geometry connectors", ValueError);
-  CHECK_THROWS_WITH_AS(GeometryRef("shell", std::nullopt, Value::object()), "kind must be one of: vertex, edge, wire, face, solid", ValueError);
-  CHECK_THROWS_WITH_AS(ConnectorAnchor("placement", ref, std::nullopt), "placement anchors require placement", TypeError);
-  CHECK_THROWS_WITH_AS(ConnectorAnchor("geometry", std::nullopt, at(0, 0, 0)), "geometry anchors require geometry_ref", TypeError);
+  CHECK_THROWS_WITH_AS(GeometryRef("shell", std::nullopt, Value::object()),
+                       "kind must be one of: vertex, edge, wire, face, solid", ValueError);
+  CHECK_THROWS_WITH_AS(ConnectorAnchor("placement", ref, std::nullopt), "placement anchors require placement",
+                       TypeError);
+  CHECK_THROWS_WITH_AS(ConnectorAnchor("geometry", std::nullopt, at(0, 0, 0)), "geometry anchors require geometry_ref",
+                       TypeError);
 }

@@ -24,18 +24,24 @@ using reactive::ScalarValues;
 
 const Value& param(const Value& params, std::string_view key) {
   const Value* found = params.find(key);
-  if (found == nullptr) throw ValueError("recorded parameter '" + std::string(key) + "' is missing");
+  if (found == nullptr)
+    throw ValueError("recorded parameter '" + std::string(key) + "' is missing");
   return *found;
 }
 
-Scalar number(const Value& params, std::string_view key) { return Scalar(param(params, key).as_double()); }
+Scalar number(const Value& params, std::string_view key) {
+  return Scalar(param(params, key).as_double());
+}
 
 Scalar3 point_of(const Value& value) {
   const Value::Array& items = value.as_array();
-  if (items.size() != 3) throw ValueError("a recorded point must have three coordinates");
+  if (items.size() != 3)
+    throw ValueError("a recorded point must have three coordinates");
   return scalar3(items[0].as_double(), items[1].as_double(), items[2].as_double());
 }
-Scalar3 point(const Value& params, std::string_view key) { return point_of(param(params, key)); }
+Scalar3 point(const Value& params, std::string_view key) {
+  return point_of(param(params, key));
+}
 
 std::optional<Scalar3> optional_point(const Value& params, std::string_view key) {
   const Value& value = param(params, key);
@@ -44,25 +50,29 @@ std::optional<Scalar3> optional_point(const Value& params, std::string_view key)
 
 ScalarPoint coordinates_of(const Value& value) {
   ScalarPoint out;
-  for (const Value& item : value.as_array()) out.emplace_back(item.as_double());
+  for (const Value& item : value.as_array())
+    out.emplace_back(item.as_double());
   return out;
 }
 
 std::vector<ScalarPoint> point_list(const Value& params, std::string_view key) {
   std::vector<ScalarPoint> out;
-  for (const Value& item : param(params, key).as_array()) out.push_back(coordinates_of(item));
+  for (const Value& item : param(params, key).as_array())
+    out.push_back(coordinates_of(item));
   return out;
 }
 
 std::optional<ScalarList> optional_scalars(const Value& params, std::string_view key) {
   const Value& value = param(params, key);
-  if (value.is_null()) return std::nullopt;
+  if (value.is_null())
+    return std::nullopt;
   return coordinates_of(value);
 }
 
 OptionalString optional_text(const Value& params, std::string_view key) {
   const Value* value = params.find(key);
-  if (value == nullptr || value->is_null()) return std::nullopt;
+  if (value == nullptr || value->is_null())
+    return std::nullopt;
   return value->as_string();
 }
 
@@ -74,12 +84,14 @@ std::vector<Shape> one(const T& shape) {
 std::vector<Edge> edges_of(const std::vector<OpInput>& inputs) {
   std::vector<Edge> edges;
   edges.reserve(inputs.size());
-  for (const OpInput& input : inputs) edges.emplace_back(input.shape);
+  for (const OpInput& input : inputs)
+    edges.emplace_back(input.shape);
   return edges;
 }
 
 const Shape& input_at(const std::vector<OpInput>& inputs, std::size_t index) {
-  if (index >= inputs.size()) throw ValueError("a recorded operation lost an input shape");
+  if (index >= inputs.size())
+    throw ValueError("a recorded operation lost an input shape");
   return inputs[index].shape;
 }
 
@@ -122,7 +134,8 @@ void register_splines(reactive::ExecutorRegistry& registry) {
     spec.degree = static_cast<double>(param(p, "degree").as_int());
     spec.knots = optional_scalars(p, "knots");
     std::vector<int> multiplicities;
-    for (const Value& m : param(p, "multiplicities").as_array()) multiplicities.push_back(static_cast<int>(m.as_int()));
+    for (const Value& m : param(p, "multiplicities").as_array())
+      multiplicities.push_back(static_cast<int>(m.as_int()));
     spec.multiplicities = std::move(multiplicities);
     spec.weights = optional_scalars(p, "weights");
     spec.periodic = param(p, "periodic").as_bool();
@@ -144,15 +157,16 @@ void register_assemblies(reactive::ExecutorRegistry& registry) {
   });
   registry.add("make_face_from_wires_rface", [](Params p, Inputs inputs, const ScalarValues&) {
     std::vector<Shape> inner;
-    for (std::size_t i = 1; i < inputs.size(); ++i) inner.push_back(inputs[i].shape);
+    for (std::size_t i = 1; i < inputs.size(); ++i)
+      inner.push_back(inputs[i].shape);
     return one(make_face_from_wires_rface(input_at(inputs, 0), inner, point(p, "normal")));
   });
 }
 
 void register_primitives(reactive::ExecutorRegistry& registry) {
   registry.add("make_box_rsolid", [](Params p, Inputs, const ScalarValues&) {
-    return one(make_box_rsolid(number(p, "width"), number(p, "height"), number(p, "depth"),
-                               point(p, "bottom_face_center")));
+    return one(
+        make_box_rsolid(number(p, "width"), number(p, "height"), number(p, "depth"), point(p, "bottom_face_center")));
   });
   registry.add("make_cylinder_rsolid", [](Params p, Inputs, const ScalarValues&) {
     return one(make_cylinder_rsolid(number(p, "radius"), number(p, "height"), point(p, "bottom_face_center"),

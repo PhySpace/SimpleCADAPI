@@ -34,8 +34,7 @@ Sketch add_line_rsketch(const Sketch& sketch, const std::string& entity_id, cons
 Sketch add_circle_rsketch(const Sketch& sketch, const std::string& entity_id, const SketchTarget& center,
                           const Scalar& radius, bool construction = false);
 Sketch add_ellipse_rsketch(const Sketch& sketch, const std::string& entity_id, const SketchTarget& center,
-                           const SketchTarget& major_point, const SketchTarget& minor_point,
-                           bool construction = false);
+                           const SketchTarget& major_point, const SketchTarget& minor_point, bool construction = false);
 Sketch add_bspline_rsketch(const Sketch& sketch, const std::string& entity_id, const SketchTarget& start,
                            const SketchTarget& end, const std::vector<SketchControlPoint>& control_points,
                            int degree = 3, const std::optional<std::vector<Scalar>>& knots = std::nullopt,
@@ -78,8 +77,7 @@ Sketch constrain_normal_rsketch(const Sketch& sketch, const SketchTarget& a, con
 Sketch constrain_mirror_rsketch(const Sketch& sketch, const SketchTarget& a, const SketchTarget& axis,
                                 const SketchTarget& b, const SketchConstraintId& constraint_id = std::nullopt);
 Sketch constrain_midpoint_points_rsketch(const Sketch& sketch, const SketchTarget& mid, const SketchTarget& a,
-                                         const SketchTarget& b,
-                                         const SketchConstraintId& constraint_id = std::nullopt);
+                                         const SketchTarget& b, const SketchConstraintId& constraint_id = std::nullopt);
 Sketch constrain_parallel_rsketch(const Sketch& sketch, const SketchTarget& a, const SketchTarget& b,
                                   const SketchConstraintId& constraint_id = std::nullopt);
 Sketch constrain_perpendicular_rsketch(const Sketch& sketch, const SketchTarget& a, const SketchTarget& b,
@@ -114,9 +112,8 @@ Sketch constrain_distance_y_rsketch(const Sketch& sketch, const SketchTarget& a,
                                     bool driving = true);
 Sketch constrain_length_rsketch(const Sketch& sketch, const SketchTarget& line, const Scalar& value,
                                 const SketchConstraintId& constraint_id = std::nullopt, bool driving = true);
-Sketch constrain_angle_rsketch(const Sketch& sketch, const SketchTarget& a, const SketchTarget& b,
-                               const Scalar& value, const SketchConstraintId& constraint_id = std::nullopt,
-                               bool driving = true);
+Sketch constrain_angle_rsketch(const Sketch& sketch, const SketchTarget& a, const SketchTarget& b, const Scalar& value,
+                               const SketchConstraintId& constraint_id = std::nullopt, bool driving = true);
 Sketch constrain_radius_rsketch(const Sketch& sketch, const SketchTarget& circle, const Scalar& value,
                                 const SketchConstraintId& constraint_id = std::nullopt, bool driving = true);
 Sketch constrain_diameter_rsketch(const Sketch& sketch, const SketchTarget& circle, const Scalar& value,

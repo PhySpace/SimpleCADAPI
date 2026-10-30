@@ -54,7 +54,7 @@ from ._marimo import (
     safe_get_context,
     suppress_warnings_logs,
 )
-from . import prefetch
+from . import prefetch, usememo
 from .cache import CellCache, CellDigests, cache_root, prune
 from .cells import NotebookCells
 from .config import NotebookConfig, NotebookConfigError, read_notebook_config
@@ -191,12 +191,22 @@ def use(path: str | Path, /, *, id: str | None = None, **overrides: Any) -> Prod
     target = Path(path)
     if not target.is_absolute():
         target = _calling_directory() / target
+    kept = usememo.recall(target, id, overrides)
+    if kept is not None:  # this process ran it already and nothing it depends on changed
+        record_dependencies({kept.path, *kept.dependencies})
+        return kept.product
     prefetch.wait(target, id, overrides)  # a worker may be building it
     child = run_notebook(target, id=id, overrides=overrides)
     # use() never asks for a partial run, so the product is always there.
     if child.product is None:
         raise RuntimeError(f"{child.config.path}: the child run produced no product")
     record_dependencies({child.config.path, *child.dependencies})
+    usememo.keep(
+        target,
+        id,
+        overrides,
+        usememo.Kept(child.product, child.config.path, frozenset(child.dependencies), child.config.id),
+    )
     return child.product
 
 
@@ -267,11 +277,30 @@ def _run(
                 cell_cache.flush()
         restored = cell_cache.restored if cell_cache is not None else set()
         if glbls is None or _holds_stub(glbls, ordered):
-            # marimo restores a value it could not pickle as a stub (and has
-            # logged why).  Run every cell again, without the cache.
-            progress = _Progress()
-            glbls = _execute(internal, scope, overrides, progress)
-            restored = set()
+            # marimo restores a value it could not unpickle as a stub (and has
+            # logged why): an entry written by an older build names classes
+            # that are no longer there.  Drop the entries that could not be
+            # restored and run again with the cache, which writes them anew.
+            # (Running without it, as this used to, left the entries as they
+            # were: every later run found the same stubs and ran every cell.)
+            if cell_cache is not None and glbls is not None and _stubs_are_gone_classes(glbls, ordered):
+                for cell in ordered:
+                    if any(is_unhashable_stub(glbls.get(name)) for name in cell.defs):
+                        cell_cache.discard(cell)
+                cell_cache = CellCache(internal.graph, root, lambda cell: digests.digest(cell.cell_id))
+                progress = _Progress()
+                try:
+                    glbls = _execute(internal, scope, overrides, progress, cell_cache)
+                except MarimoRescheduleError:
+                    glbls = None
+                finally:
+                    cell_cache.flush()
+                restored = cell_cache.restored
+            if glbls is None or _holds_stub(glbls, ordered):
+                # Still unusable: run every cell again, without the cache.
+                progress = _Progress()
+                glbls = _execute(internal, scope, overrides, progress)
+                restored = set()
 
     values = {
         name: glbls[name] for cell in ordered for name in cell.defs if name in glbls
@@ -432,6 +461,22 @@ def _check_overrides(
                 f"also defines {', '.join(missing)}; override them together, or "
                 "define them in cells of their own"
             )
+
+
+def _stubs_are_gone_classes(glbls: MutableGlobals, cells: list[CellImpl]) -> bool:
+    """Whether every stub the run restored is an entry whose classes no longer exist (``No module named ...``).
+
+    That entry is stale: it is deleted and written again.  A stub for any other reason (a value that cannot be
+    pickled at all, a lock) stays what it was: the notebook runs again without the cache.
+    """
+
+    reasons = [
+        str(getattr(glbls.get(name), "error_msg", ""))
+        for cell in cells
+        for name in cell.defs
+        if is_unhashable_stub(glbls.get(name))
+    ]
+    return bool(reasons) and all(reason.startswith("No module named") for reason in reasons)
 
 
 def _holds_stub(glbls: MutableGlobals, cells: list[CellImpl]) -> bool:

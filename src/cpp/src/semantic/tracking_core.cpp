@@ -30,10 +30,14 @@ namespace scad::tracking {
 
 namespace {
 std::atomic<std::size_t> g_history_queries{0};
-void count_history_query() noexcept { g_history_queries.fetch_add(1, std::memory_order_relaxed); }
+void count_history_query() noexcept {
+  g_history_queries.fetch_add(1, std::memory_order_relaxed);
+}
 }  // namespace
 
-std::size_t history_query_count() noexcept { return g_history_queries.load(std::memory_order_relaxed); }
+std::size_t history_query_count() noexcept {
+  return g_history_queries.load(std::memory_order_relaxed);
+}
 
 // ===========================================================================
 // identities
@@ -46,38 +50,57 @@ std::string make_id(char prefix) {
   static constexpr char kDigits[] = "0123456789abcdef";
   const auto bits = static_cast<std::uint32_t>(engine());
   std::string id{prefix, '_'};
-  for (int shift = 28; shift >= 0; shift -= 4) id.push_back(kDigits[(bits >> shift) & 0xFU]);
+  for (int shift = 28; shift >= 0; shift -= 4)
+    id.push_back(kDigits[(bits >> shift) & 0xFU]);
   return id;
 }
 
 }  // namespace
 
-OperationIds new_operation_ids() { return {make_id('g'), make_id('n')}; }
+OperationIds new_operation_ids() {
+  return {make_id('g'), make_id('n')};
+}
 
 std::string_view kind_token(Kind kind) noexcept {
   switch (kind) {
-    case Kind::Vertex: return "VERTEX";
-    case Kind::Edge: return "EDGE";
-    case Kind::Wire: return "WIRE";
-    case Kind::Face: return "FACE";
-    case Kind::Shell: return "SHELL";
-    case Kind::Solid: return "SOLID";
-    case Kind::Compound: return "COMPOUND";
+    case Kind::Vertex:
+      return "VERTEX";
+    case Kind::Edge:
+      return "EDGE";
+    case Kind::Wire:
+      return "WIRE";
+    case Kind::Face:
+      return "FACE";
+    case Kind::Shell:
+      return "SHELL";
+    case Kind::Solid:
+      return "SOLID";
+    case Kind::Compound:
+      return "COMPOUND";
   }
   return "";
 }
 
 Kind kind_of_shape(const TopoDS_Shape& shape, Kind fallback) noexcept {
-  if (shape.IsNull()) return fallback;
+  if (shape.IsNull())
+    return fallback;
   switch (shape.ShapeType()) {
-    case TopAbs_VERTEX: return Kind::Vertex;
-    case TopAbs_EDGE: return Kind::Edge;
-    case TopAbs_WIRE: return Kind::Wire;
-    case TopAbs_FACE: return Kind::Face;
-    case TopAbs_SHELL: return Kind::Shell;
-    case TopAbs_SOLID: return Kind::Solid;
-    case TopAbs_COMPOUND: return Kind::Compound;
-    default: return fallback;
+    case TopAbs_VERTEX:
+      return Kind::Vertex;
+    case TopAbs_EDGE:
+      return Kind::Edge;
+    case TopAbs_WIRE:
+      return Kind::Wire;
+    case TopAbs_FACE:
+      return Kind::Face;
+    case TopAbs_SHELL:
+      return Kind::Shell;
+    case TopAbs_SOLID:
+      return Kind::Solid;
+    case TopAbs_COMPOUND:
+      return Kind::Compound;
+    default:
+      return fallback;
   }
 }
 
@@ -85,13 +108,16 @@ Kind kind_of_shape(const TopoDS_Shape& shape, Kind fallback) noexcept {
 // history queries
 // ===========================================================================
 
-bool history_wanted() noexcept { return current_tracking_policy() != TrackingPolicy::Graph; }
+bool history_wanted() noexcept {
+  return current_tracking_policy() != TrackingPolicy::Graph;
+}
 
 namespace {
 
 void copy_into(std::vector<TopoDS_Shape>& to, const TopTools_ListOfShape& from) {
   to.clear();
-  for (const TopoDS_Shape& shape : from) to.push_back(shape);
+  for (const TopoDS_Shape& shape : from)
+    to.push_back(shape);
 }
 
 std::string_view pick_role(std::string_view specific, std::string_view general) {
@@ -102,7 +128,8 @@ std::string_view pick_role(std::string_view specific, std::string_view general) 
 
 void query_history(HistorySource& history, const TopTools_IndexedMapOfShape& inputs, const QuerySpec& spec,
                    std::vector<Witness>& out) {
-  if (!history_wanted()) return;
+  if (!history_wanted())
+    return;
 
   const std::string origin(spec.origin_role);
   std::vector<TopoDS_Shape> modified, generated;  // reused: Modified/Generated share one buffer
@@ -131,32 +158,33 @@ void query_history(HistorySource& history, const TopTools_IndexedMapOfShape& inp
       out.push_back(std::move(w));
     };
 
-    if (deleted) emit(input_id, TopoEvent::Deleted, spec.kind, "replacement", {});
+    if (deleted)
+      emit(input_id, TopoEvent::Deleted, spec.kind, "replacement", {});
 
     // A modification that returns the input itself is no modification.
     const bool modified_is_self = modified.size() == 1 && modified.front().IsSame(sub);
 
     // Untouched and still in the result: preserved.
     if (!deleted && modified.empty() && generated.empty() && (!spec.result || spec.result->contains(sub))) {
-      emit(input_id, TopoEvent::Preserved, spec.kind, "continuation",
-           pick_role(spec.preserved_role, spec.result_role));
+      emit(input_id, TopoEvent::Preserved, spec.kind, "continuation", pick_role(spec.preserved_role, spec.result_role));
       continue;
     }
     if (!deleted && modified_is_self && generated.empty()) {
-      emit(input_id, TopoEvent::Preserved, spec.kind, "continuation",
-           pick_role(spec.preserved_role, spec.result_role));
+      emit(input_id, TopoEvent::Preserved, spec.kind, "continuation", pick_role(spec.preserved_role, spec.result_role));
       continue;
     }
 
     if (!modified.empty() && !modified_is_self) {
       for (const TopoDS_Shape& shape : modified) {
-        if (spec.result && !spec.result->contains(shape)) continue;
+        if (spec.result && !spec.result->contains(shape))
+          continue;
         emit(kernel_topo_id(shape), TopoEvent::Modified, kind_of_shape(shape, spec.kind), spec.modified_derivation,
              pick_role(spec.modified_role, spec.result_role));
       }
     }
     for (const TopoDS_Shape& shape : generated) {
-      if (spec.result && !spec.result->contains(shape)) continue;
+      if (spec.result && !spec.result->contains(shape))
+        continue;
       emit(kernel_topo_id(shape), TopoEvent::Generated, kind_of_shape(shape, spec.kind), spec.generated_derivation,
            pick_role(spec.generated_role, spec.result_role));
     }
@@ -165,7 +193,8 @@ void query_history(HistorySource& history, const TopTools_IndexedMapOfShape& inp
 
 void query_sub_shape_history(HistorySource& history, const TopoDS_Shape& input, TopAbs_ShapeEnum type,
                              const QuerySpec& spec, std::vector<Witness>& out) {
-  if (!history_wanted()) return;
+  if (!history_wanted())
+    return;
   count_history_query();
   TopTools_IndexedMapOfShape inputs;
   TopExp::MapShapes(input, type, inputs);
@@ -174,10 +203,12 @@ void query_sub_shape_history(HistorySource& history, const TopoDS_Shape& input, 
 
 void query_list_history(HistorySource& history, const std::vector<TopoDS_Shape>& inputs, const QuerySpec& spec,
                         std::vector<Witness>& out) {
-  if (!history_wanted()) return;
+  if (!history_wanted())
+    return;
   count_history_query();
   TopTools_IndexedMapOfShape distinct;
-  for (const TopoDS_Shape& shape : inputs) distinct.Add(shape);
+  for (const TopoDS_Shape& shape : inputs)
+    distinct.Add(shape);
   query_history(history, distinct, spec, out);
 }
 
@@ -188,18 +219,20 @@ void query_list_history(HistorySource& history, const std::vector<TopoDS_Shape>&
 std::optional<RoleWitness> operation_role(kernel::SubShapeIndex& result, const TopoDS_Shape& candidate,
                                           std::string_view role, std::string_view evidence_method,
                                           std::optional<std::string_view> origin_role) {
-  if (!result.contains(candidate)) return std::nullopt;
+  if (!result.contains(candidate))
+    return std::nullopt;
   RoleWitness witness;
   witness.topo_id = kernel_topo_id(candidate);
   witness.kind = kind_of_shape(candidate, Kind::Face);
   witness.role = std::string(role);
-  if (origin_role) witness.origin_role = std::string(*origin_role);
+  if (origin_role)
+    witness.origin_role = std::string(*origin_role);
   witness.evidence_method = evidence_method;
   return witness;
 }
 
-void add_operation_role(std::vector<RoleWitness>& roles, kernel::SubShapeIndex& result,
-                        const TopoDS_Shape& candidate, std::string_view role, std::string_view evidence_method,
+void add_operation_role(std::vector<RoleWitness>& roles, kernel::SubShapeIndex& result, const TopoDS_Shape& candidate,
+                        std::string_view role, std::string_view evidence_method,
                         std::optional<std::string_view> origin_role) {
   if (auto witness = operation_role(result, candidate, role, evidence_method, origin_role)) {
     roles.push_back(std::move(*witness));
@@ -210,7 +243,8 @@ void add_roles_from_history(std::vector<RoleWitness>& roles, const std::vector<W
                             std::string_view evidence_method, std::size_t begin) {
   for (std::size_t i = begin; i < witnesses.size(); ++i) {
     const Witness& w = witnesses[i];
-    if (w.result_role.empty()) continue;
+    if (w.result_role.empty())
+      continue;
     RoleWitness role;
     role.topo_id = w.topo_id;
     role.kind = w.kind;
@@ -240,7 +274,9 @@ void put(Members& members, std::string_view key, Value value) {
   members.emplace_back(std::string(key), std::move(value));
 }
 
-Value string_or_null(const std::optional<std::string>& text) { return text ? Value(*text) : Value(); }
+Value string_or_null(const std::optional<std::string>& text) {
+  return text ? Value(*text) : Value();
+}
 
 // The dict a history fact has in Python's `entries` lists.
 Value witness_value(const Witness& w) {
@@ -255,8 +291,10 @@ Value witness_value(const Witness& w) {
   put(m, "derivation", w.derivation);
   put(m, "coverage", kComplete);
   put(m, "status", kProven);
-  if (!w.result_role.empty()) put(m, "result_role", w.result_role);
-  if (w.project_source_tags) put(m, "project_source_tags", true);
+  if (!w.result_role.empty())
+    put(m, "result_role", w.result_role);
+  if (w.project_source_tags)
+    put(m, "project_source_tags", true);
   return Value(std::move(m));
 }
 
@@ -284,8 +322,10 @@ Value entry_metadata(const Witness& w) {
   put(m, "status", kProven);
   put(m, "evidence_kind", kKernelHistory);
   put(m, "source_kind", kind_token(w.source_kind));
-  if (!w.result_role.empty()) put(m, "result_role", w.result_role);
-  if (w.project_source_tags) put(m, "project_source_tags", true);
+  if (!w.result_role.empty())
+    put(m, "result_role", w.result_role);
+  if (w.project_source_tags)
+    put(m, "project_source_tags", true);
   return Value(std::move(m));
 }
 
@@ -296,7 +336,8 @@ Value role_metadata(const RoleWitness& r) {
   put(m, "status", kProven);
   put(m, "evidence_kind", kKernelOperationRole);
   put(m, "evidence_method", r.evidence_method);
-  if (r.source_kind) put(m, "source_kind", kind_token(*r.source_kind));
+  if (r.source_kind)
+    put(m, "source_kind", kind_token(*r.source_kind));
   return Value(std::move(m));
 }
 
@@ -304,7 +345,7 @@ Value role_metadata(const RoleWitness& r) {
 // compatibility lookup keeps every witness: a face can descend from several
 // sources, so the first witness' fields are only a summary.
 struct Aggregate {
-  Members head;          // topo_id .. status
+  Members head;  // topo_id .. status
   Value::Array witnesses;
   std::set<std::string, std::less<>> events, origin_roles, result_roles;
   bool from_history = false;
@@ -315,14 +356,16 @@ struct Aggregate {
     const auto strings = [](const std::set<std::string, std::less<>>& set) {
       Value::Array items;
       items.reserve(set.size());
-      for (const std::string& s : set) items.emplace_back(s);
+      for (const std::string& s : set)
+        items.emplace_back(s);
       return Value(std::move(items));
     };
     if (from_history) {
       put(head, "events", strings(events));
       put(head, "origin_roles", strings(origin_roles));
     }
-    if (has_roles) put(head, "result_roles", strings(result_roles));
+    if (has_roles)
+      put(head, "result_roles", strings(result_roles));
     return Value(std::move(head));
   }
 };
@@ -348,7 +391,8 @@ DeltaEntries aggregate_entries(const Witness* first, const Witness* last, const 
     agg.witnesses.push_back(witness_value(*w));
     agg.events.emplace(to_string(w->event));
     agg.origin_roles.insert(w->origin_role);
-    if (!w->result_role.empty()) agg.result_roles.emplace(w->result_role);
+    if (!w->result_role.empty())
+      agg.result_roles.emplace(w->result_role);
   }
 
   for (const RoleWitness& r : roles) {
@@ -371,7 +415,8 @@ DeltaEntries aggregate_entries(const Witness* first, const Witness* last, const 
   }
 
   DeltaEntries out;
-  for (auto& [id, agg] : by_id) out.emplace_hint(out.end(), id, std::move(agg).finish());
+  for (auto& [id, agg] : by_id)
+    out.emplace_hint(out.end(), id, std::move(agg).finish());
   return out;
 }
 
@@ -409,10 +454,18 @@ Finished DeltaBuilder::finish() && {
   for (const Witness& w : witnesses) {
     TopoRef ref = make_ref(w.kind, w.topo_id);
     switch (w.event) {
-      case TopoEvent::Preserved: delta.preserved.push_back(ref); break;
-      case TopoEvent::Modified: delta.modified.push_back(ref); break;
-      case TopoEvent::Generated: delta.generated.push_back(ref); break;
-      case TopoEvent::Deleted: delta.deleted.push_back(ref); break;
+      case TopoEvent::Preserved:
+        delta.preserved.push_back(ref);
+        break;
+      case TopoEvent::Modified:
+        delta.modified.push_back(ref);
+        break;
+      case TopoEvent::Generated:
+        delta.generated.push_back(ref);
+        break;
+      case TopoEvent::Deleted:
+        delta.deleted.push_back(ref);
+        break;
     }
     TopoEntry entry;
     entry.ref = std::move(ref);
@@ -423,17 +476,20 @@ Finished DeltaBuilder::finish() && {
     delta.entries.push_back(std::move(entry));
   }
 
-  for (const std::string& id : section_edge_ids) delta.section_edges.push_back(make_ref(Kind::Edge, id));
+  for (const std::string& id : section_edge_ids)
+    delta.section_edges.push_back(make_ref(Kind::Edge, id));
 
   std::unordered_set<std::string> seen_roles;
   delta.roles.reserve(roles.size());
   for (const RoleWitness& r : roles) {
-    if (!seen_roles.insert(role_key(r)).second) continue;
+    if (!seen_roles.insert(role_key(r)).second)
+      continue;
     TopoRoleEntry entry;
     entry.ref = make_ref(r.kind, r.topo_id);
     entry.role = r.role;
     entry.origin_role = r.origin_role;
-    if (r.input_topo_id && r.source_kind) entry.parent_refs.push_back(make_ref(*r.source_kind, *r.input_topo_id));
+    if (r.input_topo_id && r.source_kind)
+      entry.parent_refs.push_back(make_ref(*r.source_kind, *r.input_topo_id));
     entry.metadata = role_metadata(r);
     delta.roles.push_back(std::move(entry));
   }
@@ -443,7 +499,8 @@ Finished DeltaBuilder::finish() && {
   const Witness* split = begin + std::min(yielding_prefix, witnesses.size());
   out.delta_entries = aggregate_entries(split, end, roles);
   if (split != begin) {
-    for (auto& [id, value] : aggregate_entries(begin, split, {})) out.delta_entries.try_emplace(id, std::move(value));
+    for (auto& [id, value] : aggregate_entries(begin, split, {}))
+      out.delta_entries.try_emplace(id, std::move(value));
   }
   return out;
 }

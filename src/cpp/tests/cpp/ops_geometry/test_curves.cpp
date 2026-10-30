@@ -56,7 +56,8 @@ TEST_CASE("three-point and angle arcs") {
   const Edge half = make_three_point_arc_redge(scalar3(0, 0, 0), scalar3(1, 1, 0), scalar3(2, 0, 0));
   CHECK(half.length() == doctest::Approx(kPi));
   CHECK(make_three_point_arc_rwire(scalar3(0, 0, 0), scalar3(1, 1, 0), scalar3(2, 0, 0)).edges().size() == 1);
-  const auto collinear = failure_of([] { make_three_point_arc_redge(scalar3(0, 0, 0), scalar3(1, 0, 0), scalar3(2, 0, 0)); });
+  const auto collinear =
+      failure_of([] { make_three_point_arc_redge(scalar3(0, 0, 0), scalar3(1, 0, 0), scalar3(2, 0, 0)); });
   REQUIRE(collinear);
   CHECK(collinear->operation() == "make_three_point_arc_redge");
 
@@ -67,7 +68,8 @@ TEST_CASE("three-point and angle arcs") {
   CHECK(failure_of([] { make_angle_arc_redge(scalar3(0, 0, 0), -1.0, 0.0, 1.0); }));
   CHECK(failure_of([] { make_angle_arc_redge(scalar3(0, 0, 0), 1.0, 0.5, 0.5); }));
   // The failing edge names its own operation inside a wire maker, as Python does.
-  CHECK(failure_of([] { make_angle_arc_rwire(scalar3(0, 0, 0), -1.0, 0.0, 1.0); })->operation() == "make_angle_arc_redge");
+  CHECK(failure_of([] { make_angle_arc_rwire(scalar3(0, 0, 0), -1.0, 0.0, 1.0); })->operation() ==
+        "make_angle_arc_redge");
 }
 
 namespace {
@@ -81,8 +83,10 @@ double turns_of(const Edge& edge) {
     const double angle = std::atan2(p.Y(), p.X());
     if (i > 0) {
       double delta = angle - previous;
-      while (delta > kPi) delta -= 2 * kPi;
-      while (delta < -kPi) delta += 2 * kPi;
+      while (delta > kPi)
+        delta -= 2 * kPi;
+      while (delta < -kPi)
+        delta += 2 * kPi;
       total += delta;
     }
     previous = angle;
@@ -103,7 +107,8 @@ TEST_CASE("helices wind with their handedness") {
   CHECK(turns_of(make_helix_rwire(2.0, 10.0, 3.0, scalar3(0, 0, 0), scalar3(0, 0, 1), "Left").edges().front()) ==
         doctest::Approx(-5.0).epsilon(1e-3));
 
-  CHECK(failure_of([] { make_helix_redge(-1.0, 3.0, 0.5); })->guidance().technical_details == "ValueError: The pitch must be greater than zero");
+  CHECK(failure_of([] { make_helix_redge(-1.0, 3.0, 0.5); })->guidance().technical_details ==
+        "ValueError: The pitch must be greater than zero");
   CHECK(failure_of([] { make_helix_redge(1.0, 3.0, 0.5, scalar3(0, 0, 0), scalar3(0, 0, 1), "wrong"); }));
 }
 

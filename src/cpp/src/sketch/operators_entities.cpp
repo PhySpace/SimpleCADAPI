@@ -15,7 +15,8 @@ using sketch_detail::finalize_sketch_object;
 using sketch_detail::SymbolicArgs;
 
 std::string target_path(const SketchRef& ref) {
-  if (ref.kind == kPointKind && ref.subentity != "geometry") return ref.entity_id + "." + ref.subentity;
+  if (ref.kind == kPointKind && ref.subentity != "geometry")
+    return ref.entity_id + "." + ref.subentity;
   return ref.entity_id;
 }
 
@@ -28,11 +29,13 @@ Value base_params(const Sketch& updated, const std::string& entity_id) {
 }
 
 void append_symbolic(SymbolicArgs& symbolic, const char* name, const Scalar& scalar) {
-  if (scalar.symbolic()) symbolic.emplace_back(name, scalar);
+  if (scalar.symbolic())
+    symbolic.emplace_back(name, scalar);
 }
 
 Vec3 vec_from_value(const Value* value, const Vec3& fallback) {
-  if (value == nullptr) return fallback;
+  if (value == nullptr)
+    return fallback;
   if (!value->is_array() || value->as_array().size() != 3) {
     throw ValueError("Sketch plane origin and axes must be 3-D vectors");
   }
@@ -40,7 +43,9 @@ Vec3 vec_from_value(const Value* value, const Vec3& fallback) {
   return {items[0].as_double(), items[1].as_double(), items[2].as_double()};
 }
 
-Value vec_value(const Vec3& v) { return Value(Value::Array{Value(v.x), Value(v.y), Value(v.z)}); }
+Value vec_value(const Vec3& v) {
+  return Value(Value::Array{Value(v.x), Value(v.y), Value(v.z)});
+}
 
 // _sketch_plane_in_current_coordinates
 Value plane_in_current_coordinates(const Value& plane) {
@@ -49,7 +54,8 @@ Value plane_in_current_coordinates(const Value& plane) {
   Vec3 y_axis{0, 1, 0};
   if (plane.is_string()) {
     std::string token = plane.as_string();
-    std::transform(token.begin(), token.end(), token.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+    std::transform(token.begin(), token.end(), token.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
     if (token == "XY") {
     } else if (token == "XZ") {
       y_axis = {0, 0, 1};
@@ -94,12 +100,12 @@ Sketch make_sketch_rsketch(const std::optional<std::string>& name, const Value& 
 }
 
 Sketch add_point_rsketch(const Sketch& sketch, const std::string& point_id, const Scalar& x, const Scalar& y) {
-  static const ErrorSpec kSpec{"add_point_rsketch",
-                               "Failed to add a point to the sketch.",
-                               {"The sketch is invalid.", "The point id is duplicated.",
-                                "The x or y value is not a valid scalar or expression."},
-                               {"Use a unique point id within the sketch.",
-                                "Pass numeric x/y values or valid scalar expressions."}};
+  static const ErrorSpec kSpec{
+      "add_point_rsketch",
+      "Failed to add a point to the sketch.",
+      {"The sketch is invalid.", "The point id is duplicated.",
+       "The x or y value is not a valid scalar or expression."},
+      {"Use a unique point id within the sketch.", "Pass numeric x/y values or valid scalar expressions."}};
   return guarded(kSpec, [&] {
     Sketch updated = sketch.clone(/*include_solve=*/false);
     updated.add_point(point_id, x, y);
@@ -126,12 +132,12 @@ SketchRef get_sketch_point_rsketchref(const Sketch& sketch, const std::string& p
 
 Sketch add_line_rsketch(const Sketch& sketch, const std::string& entity_id, const SketchTarget& start,
                         const SketchTarget& end, bool construction) {
-  static const ErrorSpec kSpec{"add_line_rsketch",
-                               "Failed to add a line to the sketch.",
-                               {"The line id is duplicated.", "One of the endpoint refs does not belong to this sketch.",
-                                "Both endpoints resolve to the same point."},
-                               {"Use a unique line id.",
-                                "Create endpoints with add_point_rsketch(...) and refer to them by id."}};
+  static const ErrorSpec kSpec{
+      "add_line_rsketch",
+      "Failed to add a line to the sketch.",
+      {"The line id is duplicated.", "One of the endpoint refs does not belong to this sketch.",
+       "Both endpoints resolve to the same point."},
+      {"Use a unique line id.", "Create endpoints with add_point_rsketch(...) and refer to them by id."}};
   return guarded(kSpec, [&] {
     const SketchRef start_ref = sketch.resolve_target(start, {"point"});
     const SketchRef end_ref = sketch.resolve_target(end, {"point"});
@@ -148,12 +154,12 @@ Sketch add_line_rsketch(const Sketch& sketch, const std::string& entity_id, cons
 
 Sketch add_circle_rsketch(const Sketch& sketch, const std::string& entity_id, const SketchTarget& center,
                           const Scalar& radius, bool construction) {
-  static const ErrorSpec kSpec{"add_circle_rsketch",
-                               "Failed to add a circle to the sketch.",
-                               {"The circle id is duplicated.", "The center ref does not belong to this sketch.",
-                                "The radius is not positive."},
-                               {"Use a unique circle id and a positive radius.",
-                                "Create the center with add_point_rsketch(...) and refer to it by id."}};
+  static const ErrorSpec kSpec{
+      "add_circle_rsketch",
+      "Failed to add a circle to the sketch.",
+      {"The circle id is duplicated.", "The center ref does not belong to this sketch.", "The radius is not positive."},
+      {"Use a unique circle id and a positive radius.",
+       "Create the center with add_point_rsketch(...) and refer to it by id."}};
   return guarded(kSpec, [&] {
     const SketchRef center_ref = sketch.resolve_target(center, {"point"});
     Sketch updated = sketch.clone(false);
@@ -196,23 +202,23 @@ Sketch add_ellipse_rsketch(const Sketch& sketch, const std::string& entity_id, c
 }
 
 Sketch add_bspline_rsketch(const Sketch& sketch, const std::string& entity_id, const SketchTarget& start,
-                           const SketchTarget& end, const std::vector<SketchControlPoint>& control_points,
-                           int degree, const std::optional<std::vector<Scalar>>& knots,
+                           const SketchTarget& end, const std::vector<SketchControlPoint>& control_points, int degree,
+                           const std::optional<std::vector<Scalar>>& knots,
                            const std::optional<std::vector<int>>& multiplicities,
                            const std::optional<std::vector<Scalar>>& weights, bool periodic, bool construction) {
-  static const ErrorSpec kSpec{"add_bspline_rsketch",
-                               "Failed to add a B-spline to the sketch.",
-                               {"The entity id is duplicated.", "The start or end ref does not belong to this sketch.",
-                                "Too few control points for the requested degree."},
-                               {"Use a unique entity id.",
-                                "Create start and end points with add_point_rsketch(...) first.",
-                                "Pass at least degree+1 control points."}};
+  static const ErrorSpec kSpec{
+      "add_bspline_rsketch",
+      "Failed to add a B-spline to the sketch.",
+      {"The entity id is duplicated.", "The start or end ref does not belong to this sketch.",
+       "Too few control points for the requested degree."},
+      {"Use a unique entity id.", "Create start and end points with add_point_rsketch(...) first.",
+       "Pass at least degree+1 control points."}};
   return guarded(kSpec, [&] {
     const SketchRef start_ref = sketch.resolve_target(start, {"point"});
     const SketchRef end_ref = sketch.resolve_target(end, {"point"});
     Sketch updated = sketch.clone(false);
-    updated.add_bspline(entity_id, start_ref, end_ref, control_points, degree, knots, multiplicities, weights,
-                        periodic, construction);
+    updated.add_bspline(entity_id, start_ref, end_ref, control_points, degree, knots, multiplicities, weights, periodic,
+                        construction);
     const Value& data = updated.entities().at(entity_id).data;
     Value params = base_params(updated, entity_id);
     params.set("start", target_path(start_ref));

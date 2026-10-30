@@ -75,7 +75,9 @@ class Predicate {
 [[nodiscard]] inline Predicate op(std::string_view op_name, std::string_view event = "*") {
   return operation_event(op_name, event);
 }
-[[nodiscard]] inline Predicate origin(std::string_view role_name) { return origin_role(role_name); }
+[[nodiscard]] inline Predicate origin(std::string_view role_name) {
+  return origin_role(role_name);
+}
 [[nodiscard]] Predicate role(std::string_view role_name);  // tag("role.<name>.*")
 
 }  // namespace scad::ql

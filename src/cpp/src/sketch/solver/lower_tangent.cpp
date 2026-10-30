@@ -13,11 +13,14 @@ namespace {
 
 std::optional<std::string> selector(const SketchConstraint& c, const char* key) {
   const Value* value = c.metadata.find(key);
-  if (value == nullptr || value->is_null()) return std::nullopt;
+  if (value == nullptr || value->is_null())
+    return std::nullopt;
   return value->as_string();
 }
 
-bool is_curve_kind(const std::string& kind) { return kind == kArcKind || kind == kBSplineKind; }
+bool is_curve_kind(const std::string& kind) {
+  return kind == kArcKind || kind == kBSplineKind;
+}
 
 // radius ⟂ line at the contact point T, with T on both the circle and the line.
 void line_circle_tangent(Model& m, const SketchRef& line_ref, const SketchRef& circle_ref) {
@@ -31,7 +34,8 @@ void line_circle_tangent(Model& m, const SketchRef& line_ref, const SketchRef& c
   const double dx = e0.first - s0.first;
   const double dy = e0.second - s0.second;
   const double denominator = dx * dx + dy * dy;
-  if (denominator <= 1e-18) throw ValueError("A tangent constraint requires a non-degenerate line");
+  if (denominator <= 1e-18)
+    throw ValueError("A tangent constraint requires a non-degenerate line");
   const double parameter = ((c0.first - s0.first) * dx + (c0.second - s0.second) * dy) / denominator;
   const Pt contact = m.helper_point(s0.first + parameter * dx, s0.second + parameter * dy);
 
@@ -68,8 +72,8 @@ void circle_circle_tangent(Model& m, const SketchRef& a_ref, const SketchRef& b_
 // The endpoint tangent direction of a curve entity (not normalised).
 struct Tangent {
   enum class Kind { ArcRadius, Cubic } kind = Kind::ArcRadius;
-  Pt center, endpoint;     // arc: the radius vector, rotated a quarter turn
-  Pt from, to;             // cubic: to - from
+  Pt center, endpoint;  // arc: the radius vector, rotated a quarter turn
+  Pt from, to;          // cubic: to - from
   V2 operator()(const Env& e) const {
     if (kind == Kind::ArcRadius) {
       const V2 radius = e(endpoint) - e(center);
@@ -129,27 +133,33 @@ void lower_tangent(Model& m, const SketchConstraint& c) {
   const auto unsupported = [&] {
     return ValueError("Unsupported tangent target kinds '" + kind_a + "' and '" + kind_b + "'");
   };
-  if (!is_curve_kind(kind_a) && !is_curve_kind(kind_b)) throw unsupported();
+  if (!is_curve_kind(kind_a) && !is_curve_kind(kind_b))
+    throw unsupported();
+  // The validated end of each curve target ("start" or "end"); empty for a target that is not a curve.
+  std::string curve_end[2];
   for (int i = 0; i < 2; ++i) {
-    if (!is_curve_kind(kinds[i])) continue;
-    if (!at[i] || (*at[i] != "start" && *at[i] != "end")) {
-      throw ValueError("Tangent constraint '" + c.id + "' requires at_" + (i == 0 ? "a" : "b") +
-                       "='start' or 'end'");
+    if (!is_curve_kind(kinds[i]))
+      continue;
+    const std::optional<std::string>& requested = at[i];
+    if (!requested || (*requested != "start" && *requested != "end")) {
+      throw ValueError("Tangent constraint '" + c.id + "' requires at_" + (i == 0 ? "a" : "b") + "='start' or 'end'");
     }
+    curve_end[i] = *requested;
   }
 
   const bool has_line = kind_a == kLineKind || kind_b == kLineKind;
   if (has_line) {
     const int curve = is_curve_kind(kind_a) ? 0 : 1;
     const int line_index = 1 - curve;
-    if (kinds[line_index] != kLineKind) throw unsupported();
+    if (kinds[line_index] != kLineKind)
+      throw unsupported();
     const LineRef line = m.line(*refs[line_index]);
-    const Tangent tangent = curve_tangent(m, *refs[curve], *at[curve]);
+    const Tangent tangent = curve_tangent(m, *refs[curve], curve_end[curve]);
     if (kinds[curve] == kArcKind) {
       // The line direction is perpendicular to the radius at the selected endpoint.
       const SketchEntity& arc = m.entity(*refs[curve]);
       const Pt center = m.point_by_id(arc.point_id("center"));
-      const Pt endpoint = m.point_by_id(arc.point_id(*at[curve] == "end" ? "end" : "start"));
+      const Pt endpoint = m.point_by_id(arc.point_id(curve_end[curve] == "end" ? "end" : "start"));
       m.equation([=](const Env& e) { return dot(line.direction(e), e(endpoint) - e(center)); });
     } else {
       m.equation([=](const Env& e) { return cross(tangent(e), line.direction(e)); });
@@ -157,8 +167,8 @@ void lower_tangent(Model& m, const SketchConstraint& c) {
     return;
   }
   if (is_curve_kind(kind_a) && is_curve_kind(kind_b)) {
-    const Tangent ta = curve_tangent(m, ref_a, *at[0]);
-    const Tangent tb = curve_tangent(m, ref_b, *at[1]);
+    const Tangent ta = curve_tangent(m, ref_a, curve_end[0]);
+    const Tangent tb = curve_tangent(m, ref_b, curve_end[1]);
     m.equation([=](const Env& e) { return cross(ta(e), tb(e)); });
     return;
   }

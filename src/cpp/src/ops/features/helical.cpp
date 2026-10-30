@@ -27,9 +27,12 @@ Solid helical_sweep_rsolid(const Wire& profile, const Scalar& pitch, const Scala
     const double pitch_value = evaluate_finite(pitch);
     const double height_value = evaluate_finite(height);
     const double radius_value = evaluate_finite(radius);
-    if (pitch_value <= 0) throw ValueError("The pitch must be greater than zero");
-    if (height_value <= 0) throw ValueError("The height must be greater than zero");
-    if (radius_value <= 0) throw ValueError("The radius must be greater than zero");
+    if (pitch_value <= 0)
+      throw ValueError("The pitch must be greater than zero");
+    if (height_value <= 0)
+      throw ValueError("The height must be greater than zero");
+    if (radius_value <= 0)
+      throw ValueError("The radius must be greater than zero");
 
     const Vec3 local_dir = evaluate_point(dir, "dir");
     const Vec3 global_center = features_detail::place_point(evaluate_point(center, "center"));
@@ -37,8 +40,8 @@ Solid helical_sweep_rsolid(const Wire& profile, const Scalar& pitch, const Scala
     const Vec3 global_x = features_detail::place_vector(default_plane_x_direction(local_dir));
 
     // The kernel call has no handedness; the Python SDK ignores it on this path too.
-    Solid result(kernel::make_helical_sweep_solid(TopoDS::Wire(profile.wrapped()), pitch_value, height_value, radius_value,
-                                                  global_center, global_dir, global_x));
+    Solid result(kernel::make_helical_sweep_solid(TopoDS::Wire(profile.wrapped()), pitch_value, height_value,
+                                                  radius_value, global_center, global_dir, global_x));
     inherit_metadata(result, {&profile});
     result.apply_tag("solid.feature.helical_sweep", false);
     return result;

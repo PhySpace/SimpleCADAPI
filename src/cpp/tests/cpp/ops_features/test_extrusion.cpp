@@ -28,10 +28,9 @@ TEST_CASE("extrude a face: volume, role tags and prefix") {
 TEST_CASE("extrude a wire, and a wire that is not closed") {
   CHECK(extrude_rsolid(make_rectangle_rwire(4, 2), scalar3(0, 0, 1), 5.0).volume() == Approx(40.0));
 
-  const Wire open = make_wire_from_edges_rwire({make_line_redge(scalar3(0, 0, 0), scalar3(10, 0, 0)),
-                                                make_line_redge(scalar3(10, 0, 0), scalar3(10, 6, 0)),
-                                                make_line_redge(scalar3(10, 6, 0), scalar3(0, 6, 0)),
-                                                make_line_redge(scalar3(0, 6, 0), scalar3(0, 0.8, 0))});
+  const Wire open = make_wire_from_edges_rwire(
+      {make_line_redge(scalar3(0, 0, 0), scalar3(10, 0, 0)), make_line_redge(scalar3(10, 0, 0), scalar3(10, 6, 0)),
+       make_line_redge(scalar3(10, 6, 0), scalar3(0, 6, 0)), make_line_redge(scalar3(0, 6, 0), scalar3(0, 0.8, 0))});
   const Error error = failure_of([&] { (void)extrude_rsolid(open, scalar3(0, 0, 1), 2.0); });
   CHECK(error.operation() == "extrude_rsolid");
   CHECK(measurement(error, "gap") == Approx(0.8));

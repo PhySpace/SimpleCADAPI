@@ -16,13 +16,14 @@ void add(Specs& specs, ErrorSpec spec) {
 }
 
 void add_structure(Specs& s) {
-  add(s, {"make_material_rmaterial",
-          "Failed to create the material definition.",
-          {"The material_id is empty or uses unsupported characters.",
-           "The density is non-finite, non-positive, or missing a density_unit.",
-           "The color is not a 3-tuple in the [0.0, 1.0] range."},
-          {"Use a stable identifier such as 'aluminum_6061'.", "Provide density and density_unit together, or omit both.",
-           "Pass RGB color components as floats between 0.0 and 1.0."}});
+  add(s,
+      {"make_material_rmaterial",
+       "Failed to create the material definition.",
+       {"The material_id is empty or uses unsupported characters.",
+        "The density is non-finite, non-positive, or missing a density_unit.",
+        "The color is not a 3-tuple in the [0.0, 1.0] range."},
+       {"Use a stable identifier such as 'aluminum_6061'.", "Provide density and density_unit together, or omit both.",
+        "Pass RGB color components as floats between 0.0 and 1.0."}});
   add(s, {"make_placement_rplacement",
           "Failed to create the placement.",
           {"The origin is not a finite 3D point.", "One of the axes is zero-length or non-finite.",
@@ -38,7 +39,8 @@ void add_structure(Specs& s) {
           "Failed to create the single-body Part.",
           {"The part_id is empty or uses unsupported characters.", "The body is not a Solid.",
            "A Part with the same part_id already exists in the active GraphSession."},
-          {"Pass a stable part_id such as 'base_plate'.", "Union intended multiple bodies into one Solid before creating the Part.",
+          {"Pass a stable part_id such as 'base_plate'.",
+           "Union intended multiple bodies into one Solid before creating the Part.",
            "Do not pass material to make_part_rpart; use assign_material_rpart instead."}});
   add(s, {"assign_material_rpart",
           "Failed to assign the material to the Part.",
@@ -52,8 +54,8 @@ void add_structure(Specs& s) {
   add(s, {"add_component_rassembly",
           "Failed to add the component to the assembly.",
           {"The assembly input is not an Assembly.", "The item input is not a Part or Assembly.",
-           "The component_id is empty, malformed, or duplicated in the assembly.", "The placement is invalid or missing.",
-           "Adding this subassembly would create an assembly cycle."},
+           "The component_id is empty, malformed, or duplicated in the assembly.",
+           "The placement is invalid or missing.", "Adding this subassembly would create an assembly cycle."},
           {"Wrap solids explicitly with make_part_rpart before adding them to assemblies.",
            "Use a unique component_id within the parent assembly.",
            "Create placements with make_placement_rplacement or identity_placement_rplacement."}});
@@ -62,7 +64,8 @@ void add_structure(Specs& s) {
           {"The assembly input is not an Assembly.", "The component_id does not exist in the assembly.",
            "The placement is invalid or missing."},
           {"Use add_component_rassembly before placing a component.",
-           "Use a component_id returned in assembly.component_ids().", "Create placements with make_placement_rplacement."}});
+           "Use a component_id returned in assembly.component_ids().",
+           "Create placements with make_placement_rplacement."}});
 }
 
 void add_connectors(Specs& s) {
@@ -76,11 +79,12 @@ void add_connectors(Specs& s) {
           {"The connector_id is empty or malformed.", "The edge is not a valid Edge object."},
           {"Use a stable connector_id such as 'hinge_axis'.",
            "Select an edge via ql.edges().where(...).resolve(solid), or an indexed pick solid.get_edges(index)."}});
-  add(s, {"make_vertex_connector_rconnector",
-          "Failed to create the vertex connector.",
-          {"The connector_id is empty or malformed.", "The vertex is not a valid Vertex object."},
-          {"Use a stable connector_id such as 'pivot_point'.",
-           "Select a vertex via ql.vertices().where(...).resolve(solid), or an indexed pick solid.get_vertices(index)."}});
+  add(s,
+      {"make_vertex_connector_rconnector",
+       "Failed to create the vertex connector.",
+       {"The connector_id is empty or malformed.", "The vertex is not a valid Vertex object."},
+       {"Use a stable connector_id such as 'pivot_point'.",
+        "Select a vertex via ql.vertices().where(...).resolve(solid), or an indexed pick solid.get_vertices(index)."}});
   add(s, {"make_placement_connector_rconnector",
           "Failed to create the placement connector.",
           {"The connector_id is empty or malformed.", "The placement input is not a Placement."},
@@ -95,7 +99,8 @@ void add_connectors(Specs& s) {
   add(s, {"set_public_connector_rassembly",
           "Failed to expose the component connector publicly.",
           {"The assembly input is not an Assembly.", "The component is not a direct child of the Assembly.",
-           "The connector does not exist on the child component.", "The public connector ID is already used in the Assembly."},
+           "The connector does not exist on the child component.",
+           "The public connector ID is already used in the Assembly."},
           {"Add the direct child component before exposing its connector.",
            "Create the connector on the child Part or expose it on the child Assembly first.",
            "Expose each public connector ID at most once per Assembly."}});
@@ -132,16 +137,18 @@ void add_constraints(Specs& s) {
   add(s, {"solve_assembly_constraints_rassembly",
           "Failed to solve the assembly constraints.",
           {"No component is grounded.", "A constraint graph references missing connectors.",
-           "A connected component cannot be reached from a grounded component.", "A closed-loop residual exceeds tolerance."},
+           "A connected component cannot be reached from a grounded component.",
+           "A closed-loop residual exceeds tolerance."},
           {"Ground at least one component with ground_component_rassembly.",
            "Ensure every constrained component has the required connectors.",
            "Inspect constraint residuals before strict solving."}});
-  add(s, {"make_compound_from_assembly_rcompound",
-          "Failed to project the assembly into a Compound.",
-          {"The input is not an Assembly.", "The assembly has no components.", "A component placement is invalid.",
-           "The kernel could not transform or combine the component bodies."},
-          {"Create an assembly with make_assembly_rassembly and add at least one component.",
-           "Ensure every component references a valid Part or subassembly.", "Validate placements before projection."}});
+  add(s,
+      {"make_compound_from_assembly_rcompound",
+       "Failed to project the assembly into a Compound.",
+       {"The input is not an Assembly.", "The assembly has no components.", "A component placement is invalid.",
+        "The kernel could not transform or combine the component bodies."},
+       {"Create an assembly with make_assembly_rassembly and add at least one component.",
+        "Ensure every component references a valid Part or subassembly.", "Validate placements before projection."}});
 }
 
 const Specs& specs() {
@@ -159,7 +166,8 @@ const Specs& specs() {
 
 const ErrorSpec& operator_spec(std::string_view operation) {
   const auto found = specs().find(operation);
-  if (found == specs().end()) throw LookupError("no error guidance for operation '" + std::string(operation) + "'");
+  if (found == specs().end())
+    throw LookupError("no error guidance for operation '" + std::string(operation) + "'");
   return found->second;
 }
 

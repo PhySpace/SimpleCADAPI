@@ -313,6 +313,9 @@ jobs:
         run: |
           .venv/bin/python -m pytest test tests -q
           .venv/bin/python -m pytest src/cpp/tests/python -q
+          # Last: the verifier bridge needs OCP, which nothing above may find installed.
+          uv pip install --python .venv/bin/python "cadquery-ocp-novtk>=7.9.3.1,<8"
+          .venv/bin/python -m pytest src/cpp/tests/python/test_verify_bridge.py -q
 
   release:
     name: Build the skill and publish the release
@@ -432,10 +435,22 @@ jobs:
           if [[ "$RELEASE_TAG" =~ (a|b|rc)[0-9]+$ ]]; then
             release_flags+=(--prerelease --latest=false)
           fi
+          # The page shows the version's update notes (docs/updates/<version>.md), as every release page has; only a
+          # version without notes falls back to the generated list of merged pull requests.
+          version="${RELEASE_TAG#v}"
+          notes=(--generate-notes)
+          if [[ -f "docs/updates/${version}.md" ]]; then
+            cp "docs/updates/${version}.md" "$RUNNER_TEMP/release-notes.md"
+            if [[ -f "docs/updates/${version}.zh-CN.md" ]]; then
+              printf '\n---\n中文说明：[docs/updates/%s.zh-CN.md](%s/%s/blob/%s/docs/updates/%s.zh-CN.md)\n' \
+                "$version" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$RELEASE_TAG" "$version" >> "$RUNNER_TEMP/release-notes.md"
+            fi
+            notes=(--notes-file "$RUNNER_TEMP/release-notes.md")
+          fi
           gh release create "$RELEASE_TAG" dist/* skills/simplecadapi.tar.gz \
             --verify-tag \
-            --generate-notes \
-            --title "$RELEASE_TAG" \
+            "${notes[@]}" \
+            --title "simplecadapi ${version}" \
             "${release_flags[@]}"
 
   publish-pypi:

@@ -13,16 +13,20 @@ namespace {
 // *is* the Bezier polygon: cubic, non-periodic, unit weights, clamped ends
 // (multiplicity 4) and C0 interior knots (multiplicity 3).
 bool is_bezier_chain(const SketchBSpline& spline) {
-  if (spline.periodic || spline.degree != 3) return false;
+  if (spline.periodic || spline.degree != 3)
+    return false;
   if (spline.weights) {
     for (const double w : *spline.weights) {
-      if (std::abs(w - 1.0) > 1e-12) return false;
+      if (std::abs(w - 1.0) > 1e-12)
+        return false;
     }
   }
   const auto& mult = spline.multiplicities;
-  if (mult.size() < 2 || mult.front() != 4 || mult.back() != 4) return false;
+  if (mult.size() < 2 || mult.front() != 4 || mult.back() != 4)
+    return false;
   for (std::size_t i = 1; i + 1 < mult.size(); ++i) {
-    if (mult[i] != 3) return false;
+    if (mult[i] != 3)
+      return false;
   }
   return (spline.poles.size() - 1) % 3 == 0;
 }
@@ -32,7 +36,8 @@ bool is_bezier_chain(const SketchBSpline& spline) {
 Model::Model(const Sketch& s) : sketch(s) {
   create_parameters();
   for (const SketchConstraint& constraint : sketch.constraints()) {
-    if (constraint.driving && constraint.kind == "fix") apply_fix(target(constraint, 0));
+    if (constraint.driving && constraint.kind == "fix")
+      apply_fix(target(constraint, 0));
   }
   add_arc_rules();
   for (const SketchConstraint& constraint : sketch.constraints()) {
@@ -74,8 +79,10 @@ void Model::create_spline(const SketchEntity& entity) {
   const bool open_ends = !model.definition.periodic;
   for (std::size_t i = 0; i < poles.size(); ++i) {
     std::string bound = poles[i].point_id;
-    if (bound.empty() && open_ends && i == 0) bound = entity.point_id("start");
-    if (bound.empty() && open_ends && i + 1 == poles.size()) bound = entity.point_id("end");
+    if (bound.empty() && open_ends && i == 0)
+      bound = entity.point_id("start");
+    if (bound.empty() && open_ends && i + 1 == poles.size())
+      bound = entity.point_id("end");
     if (!bound.empty()) {
       model.poles.push_back(point_by_id(bound));  // shares the sketch point's parameters
     } else {
@@ -103,11 +110,14 @@ void Model::apply_fix(const SketchRef& ref) {
   } else if (e.kind == kLineKind || e.kind == kArcKind) {
     freeze(point_by_id(e.point_id("start")));
     freeze(point_by_id(e.point_id("end")));
-    if (e.kind == kArcKind) freeze(point_by_id(e.point_id("center")));
+    if (e.kind == kArcKind)
+      freeze(point_by_id(e.point_id("center")));
   } else if (e.kind == kBSplineKind) {
-    for (const Pt& pole : splines.at(e.id).poles) freeze(pole);
+    for (const Pt& pole : splines.at(e.id).poles)
+      freeze(pole);
   } else if (e.kind == kEllipseKind) {
-    for (const char* role : {"center", "major", "minor"}) freeze(point_by_id(e.point_id(role)));
+    for (const char* role : {"center", "major", "minor"})
+      freeze(point_by_id(e.point_id(role)));
   } else if (e.kind == kCircleKind) {
     freeze(point_by_id(e.point_id("center")));
     system.params[radius_params.at(e.id)].fixed = true;
@@ -120,7 +130,8 @@ void Model::apply_fix(const SketchRef& ref) {
 // into the arc entity itself).
 void Model::add_arc_rules() {
   for (const auto& [id, entity] : sketch.entities()) {
-    if (entity.kind != kArcKind) continue;
+    if (entity.kind != kArcKind)
+      continue;
     const Pt center = point_by_id(entity.point_id("center"));
     const Pt start = point_by_id(entity.point_id("start"));
     const Pt end = point_by_id(entity.point_id("end"));
@@ -143,22 +154,32 @@ void Model::lower(const SketchConstraint& constraint) {
 }
 
 // ---- lookups ----------------------------------------------------------------
-const SketchEntity& Model::entity(const SketchRef& ref) const { return sketch.entities().at(ref.entity_id); }
-const SketchEntity& Model::entity_by_id(const std::string& id) const { return sketch.entities().at(id); }
+const SketchEntity& Model::entity(const SketchRef& ref) const {
+  return sketch.entities().at(ref.entity_id);
+}
+const SketchEntity& Model::entity_by_id(const std::string& id) const {
+  return sketch.entities().at(id);
+}
 
 Pt Model::point_by_id(const std::string& id) const {
   const auto found = points.find(id);
-  if (found == points.end()) throw ValueError("Unknown sketch point '" + id + "'");
+  if (found == points.end())
+    throw ValueError("Unknown sketch point '" + id + "'");
   return found->second;
 }
 
-Pt Model::point(const SketchRef& ref) const { return point_by_id(sketch.resolve_point_id(ref)); }
+Pt Model::point(const SketchRef& ref) const {
+  return point_by_id(sketch.resolve_point_id(ref));
+}
 
 LineRef Model::line(const SketchEntity& e) const {
-  if (e.kind != kLineKind) throw ValueError("Sketch entity '" + e.id + "' is kind '" + e.kind + "', expected a line");
+  if (e.kind != kLineKind)
+    throw ValueError("Sketch entity '" + e.id + "' is kind '" + e.kind + "', expected a line");
   return {point_by_id(e.point_id("start")), point_by_id(e.point_id("end"))};
 }
-LineRef Model::line(const SketchRef& ref) const { return line(entity(ref)); }
+LineRef Model::line(const SketchRef& ref) const {
+  return line(entity(ref));
+}
 
 RadiusRef Model::radius_ref(const SketchRef& ref) const {
   const SketchEntity& e = entity(ref);
@@ -184,7 +205,8 @@ Pt Model::circle_center(const SketchRef& ref) const {
 
 double Model::initial_radius(const SketchRef& ref) const {
   const SketchEntity& e = entity(ref);
-  if (e.kind == kCircleKind) return initial(radius_params.at(e.id));
+  if (e.kind == kCircleKind)
+    return initial(radius_params.at(e.id));
   const SketchPoint2 center = initial(point_by_id(e.point_id("center")));
   const SketchPoint2 start = initial(point_by_id(e.point_id("start")));
   return std::hypot(center.first - start.first, center.second - start.second);

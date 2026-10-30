@@ -34,17 +34,20 @@ std::vector<std::string> blame_by_incremental_consistency(const System& system, 
                                                           const SketchSolverOptions& options) {
   std::vector<bool> enabled(system.blocks.size(), false);
   std::size_t explicit_blocks = 0;
-  for (const Block& block : system.blocks) explicit_blocks += block.constraint_id.empty() ? 0 : 1;
-  if (explicit_blocks > kMaxNamedConstraints) return {};
+  for (const Block& block : system.blocks)
+    explicit_blocks += block.constraint_id.empty() ? 0 : 1;
+  if (explicit_blocks > kMaxNamedConstraints)
+    return {};
 
   std::vector<std::string> failed;
   std::vector<double> accepted = x0;
   for (std::size_t b = 0; b < system.blocks.size(); ++b) {
     const Block& block = system.blocks[b];
-    if (block.constraint_id.empty() || block.count == 0) continue;
+    if (block.constraint_id.empty() || block.count == 0)
+      continue;
     enabled[b] = true;
-    const SolveOutcome outcome = solve_equations(system, system.active_equations(enabled), accepted,
-                                                 options.tolerance, options.max_iterations);
+    const SolveOutcome outcome =
+        solve_equations(system, system.active_equations(enabled), accepted, options.tolerance, options.max_iterations);
     if (outcome.converged) {
       accepted = outcome.x;
     } else {
@@ -59,12 +62,15 @@ std::vector<std::string> blame_by_incremental_consistency(const System& system, 
 std::vector<std::string> blame_by_residual(const System& system, const std::vector<double>& x, double tolerance) {
   std::vector<std::string> failed;
   for (const Block& block : system.blocks) {
-    if (block.constraint_id.empty() || block.count == 0) continue;
+    if (block.constraint_id.empty() || block.count == 0)
+      continue;
     std::vector<std::size_t> rows;
-    for (std::size_t i = 0; i < block.count; ++i) rows.push_back(block.first + i);
+    for (std::size_t i = 0; i < block.count; ++i)
+      rows.push_back(block.first + i);
     std::vector<double> residual;
     system.evaluate(rows, x, residual, nullptr);
-    if (max_abs(residual) > tolerance || !std::all_of(residual.begin(), residual.end(), [](double v) { return std::isfinite(v); })) {
+    if (max_abs(residual) > tolerance ||
+        !std::all_of(residual.begin(), residual.end(), [](double v) { return std::isfinite(v); })) {
       failed.push_back(block.constraint_id);
     }
   }
@@ -100,8 +106,8 @@ SketchSolveResult NativeSketchSolverBackend::solve(const Sketch& sketch, const S
     result.status = result.dof > 0 ? "underconstrained" : "solved";
     result.residual_norm = outcome.residual_l2;
     if (rank_deficient) {
-      result.diagnostics.push_back(
-          {std::nullopt, "warning", "redundant_constraints", "Sketch has redundant but consistent constraints.", std::nullopt});
+      result.diagnostics.push_back({std::nullopt, "warning", "redundant_constraints",
+                                    "Sketch has redundant but consistent constraints.", std::nullopt});
     }
     if (result.dof > 0) {
       result.diagnostics.push_back({std::nullopt, "warning", "underconstrained",

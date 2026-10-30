@@ -76,7 +76,9 @@ class Recorder {
   }
   // Selections (indexed picks) are recorded as graph nodes too.
   virtual void record_selection(const Shape& source, const std::vector<Shape>& picked, const std::string& kind) {
-    (void)source; (void)picked; (void)kind;
+    (void)source;
+    (void)picked;
+    (void)kind;
   }
   // A session-local object id ("<graph>_sketch_00000001"): what an object made without an id of its own is
   // named, so that rebuilding a session names it the same.  nullopt: this recorder names nothing.
@@ -138,7 +140,8 @@ class RecorderSuspend {
 };
 
 inline void record_operation(const OpRecord& record, const std::vector<Shape>& outputs) {
-  if (Recorder* r = current_recorder()) r->record(record, outputs);
+  if (Recorder* r = current_recorder())
+    r->record(record, outputs);
 }
 
 }  // namespace scad

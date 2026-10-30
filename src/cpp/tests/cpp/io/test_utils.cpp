@@ -33,10 +33,11 @@ TEST_CASE("canonical JSON is RFC 8785 byte for byte (output of the Python rfc878
   Value v = Value::object();
   v.set("b", 1);
   Value a = Value::array();
-  for (const double d : {1.5, 1e21, 1e-7}) a.push_back(d);
+  for (const double d : {1.5, 1e21, 1e-7})
+    a.push_back(d);
   a.push_back(std::string("\xC3\xA9\n\x01\""));
-  for (const double d : {0.1, 100.0, 1e16, 123456789012345678.0, -0.0, 5e-324, 1.7976931348623157e308, 0.000001, 1e22,
-                         12345.6789})
+  for (const double d :
+       {0.1, 100.0, 1e16, 123456789012345678.0, -0.0, 5e-324, 1.7976931348623157e308, 0.000001, 1e22, 12345.6789})
     a.push_back(d);
   v.set("a", a);
   Value c = Value::object();
@@ -54,7 +55,8 @@ TEST_CASE("canonical JSON is RFC 8785 byte for byte (output of the Python rfc878
 TEST_CASE("python_json_dumps matches json.dumps") {
   Value v = Value::object();
   Value a = Value::array();
-  for (const double d : {1.0, 1e16, 1e-5, 0.1, -0.0, 1e15, 123456789.123456789, 2.5e-7, 1e100}) a.push_back(d);
+  for (const double d : {1.0, 1e16, 1e-5, 0.1, -0.0, 1e15, 123456789.123456789, 2.5e-7, 1e100})
+    a.push_back(d);
   v.set("a", a);
   v.set("\xC3\xA9", std::string("\xC3\xBC\x7f"));
   CHECK(python_json_dumps(v, /*sort_keys=*/true, /*ensure_ascii=*/true) ==
@@ -102,7 +104,10 @@ TEST_CASE("files: UTF-8 paths, atomic writes, binary fidelity") {
   write_file(file, "second");
   CHECK(read_file(file) == "second");
   std::size_t entries = 0;
-  for (const auto& e : fs::directory_iterator(dir)) { (void)e; ++entries; }
+  for (const auto& e : fs::directory_iterator(dir)) {
+    (void)e;
+    ++entries;
+  }
   CHECK(entries == 1);
 
   {

@@ -25,14 +25,17 @@ std::string mutate(std::string text, std::size_t begin, std::size_t end, std::mt
   std::uniform_int_distribution<std::size_t> position(begin, end - 1);
   std::uniform_int_distribution<int> value(0, 255);
   const int edits = 1 + static_cast<int>(rng() % 4);
-  for (int i = 0; i < edits; ++i) text[position(rng)] = static_cast<char>(value(rng));
-  if (rng() % 5 == 0) text.erase(position(rng) % (text.size() - begin) + begin, 1 + rng() % 3);
+  for (int i = 0; i < edits; ++i)
+    text[position(rng)] = static_cast<char>(value(rng));
+  if (rng() % 5 == 0)
+    text.erase(position(rng) % (text.size() - begin) + begin, 1 + rng() % 3);
   return text;
 }
 
 std::string with_checksum(std::string frame) {
   const std::uint32_t crc = crc32(std::string_view(frame).substr(40));
-  for (int i = 0; i < 4; ++i) frame[32 + static_cast<std::size_t>(i)] = static_cast<char>((crc >> (24 - 8 * i)) & 0xFF);
+  for (int i = 0; i < 4; ++i)
+    frame[32 + static_cast<std::size_t>(i)] = static_cast<char>((crc >> (24 - 8 * i)) & 0xFF);
   return frame;
 }
 
@@ -60,7 +63,8 @@ TEST_CASE("fuzz: a damaged state section never crashes deserialize") {
   solid.set_metadata("m", Value::object());
   const Bytes good = serialize(solid);
   std::uint64_t state_size = 0;
-  for (int i = 0; i < 8; ++i) state_size = (state_size << 8) | static_cast<unsigned char>(good[16 + static_cast<std::size_t>(i)]);
+  for (int i = 0; i < 8; ++i)
+    state_size = (state_size << 8) | static_cast<unsigned char>(good[16 + static_cast<std::size_t>(i)]);
   std::mt19937 rng(11);
   int accepted = 0;
   for (int i = 0; i < 1500; ++i) {
@@ -82,7 +86,8 @@ TEST_CASE("fuzz: a damaged .scadbrep manifest or header is rejected cleanly") {
   source.content_hash = sha256_tagged("x");
   const Bytes good = make_region_artifact(box, RegionRootKind::Solid, source);
   std::uint64_t manifest_size = 0;
-  for (int i = 0; i < 8; ++i) manifest_size = (manifest_size << 8) | static_cast<unsigned char>(good[16 + static_cast<std::size_t>(i)]);
+  for (int i = 0; i < 8; ++i)
+    manifest_size = (manifest_size << 8) | static_cast<unsigned char>(good[16 + static_cast<std::size_t>(i)]);
   std::mt19937 rng(13);
   for (int i = 0; i < 1500; ++i) {
     // The payload stays intact (its digest is in the manifest), so OCCT only ever sees valid bytes.
@@ -113,7 +118,8 @@ TEST_CASE("fuzz: STL readers survive garbage") {
   std::uniform_int_distribution<int> byte(0, 255);
   for (int i = 0; i < 300; ++i) {
     std::string noise(static_cast<std::size_t>(rng() % 400), '\0');
-    for (char& c : noise) c = static_cast<char>(byte(rng));
+    for (char& c : noise)
+      c = static_cast<char>(byte(rng));
     try {
       (void)read_stl_bytes(noise);
     } catch (const Error&) {

@@ -31,7 +31,9 @@ bool message_has(const std::function<void()>& body, const std::string& needle) {
   return false;
 }
 
-GeomAbs_SurfaceType surface_type(const Face& face) { return BRepAdaptor_Surface(TopoDS::Face(face.wrapped())).GetType(); }
+GeomAbs_SurfaceType surface_type(const Face& face) {
+  return BRepAdaptor_Surface(TopoDS::Face(face.wrapped())).GetType();
+}
 
 }  // namespace
 
@@ -70,10 +72,15 @@ TEST_CASE("make_cylindrical_surface_rface: area, validity limits and unit-aware 
 
   CHECK(message_has([] { (void)make_cylindrical_surface_rface(2.0, {0.0, 1.0001e-12}, {0.0, 2.0}); }, "u_range"));
   CHECK(message_has([] { (void)make_cylindrical_surface_rface(2.0, {0.0, 1.0}, {0.0, 1.0e-8}); }, "v_range"));
-  CHECK(message_has([] { (void)make_cylindrical_surface_rface(-1.0, {0.0, 1.0}, {0.0, 1.0}); }, "radius must be a positive finite value"));
-  CHECK(message_has([] { (void)make_cylindrical_surface_rface(1.0, {0.0, 7.0}, {0.0, 1.0}); }, "at most one revolution"));
+  CHECK(message_has([] { (void)make_cylindrical_surface_rface(-1.0, {0.0, 1.0}, {0.0, 1.0}); },
+                    "radius must be a positive finite value"));
+  CHECK(
+      message_has([] { (void)make_cylindrical_surface_rface(1.0, {0.0, 7.0}, {0.0, 1.0}); }, "at most one revolution"));
   CHECK(message_has(
-      [] { (void)make_cylindrical_surface_rface(1.0, {0.0, 1.0}, {0.0, 1.0}, {.axis = {1, 0, 0}, .x_direction = ScalarVec3{2, 0, 0}}); },
+      [] {
+        (void)make_cylindrical_surface_rface(1.0, {0.0, 1.0}, {0.0, 1.0},
+                                             {.axis = {1, 0, 0}, .x_direction = ScalarVec3{2, 0, 0}});
+      },
       "must not be parallel"));
 }
 
@@ -84,12 +91,15 @@ TEST_CASE("the units probe makes make_cylindrical_surface_rface reject mis-dimen
   };
   const Scalar symbolic{ExprPtr(std::make_shared<ExprStub>())};
   set_scalar_units_probe(+[](const Scalar&) { return ScalarUnits{true, UnitDimension::Other}; });
-  CHECK(message_has([&] { (void)make_cylindrical_surface_rface(symbolic, {0.0, 1.0}, {0.0, 1.0}); }, "radius must use model length units"));
-  CHECK(message_has([&] { (void)make_cylindrical_surface_rface(1.0, {0.0, symbolic}, {0.0, 1.0}); }, "unitless raw radians"));
+  CHECK(message_has([&] { (void)make_cylindrical_surface_rface(symbolic, {0.0, 1.0}, {0.0, 1.0}); },
+                    "radius must use model length units"));
+  CHECK(message_has([&] { (void)make_cylindrical_surface_rface(1.0, {0.0, symbolic}, {0.0, 1.0}); },
+                    "unitless raw radians"));
   CHECK(message_has([&] { (void)make_cylindrical_surface_rface(1.0, {0.0, 1.0}, {0.0, 1.0}, {.tolerance = symbolic}); },
                     "tolerance must use model length units"));
   set_scalar_units_probe(+[](const Scalar&) { return ScalarUnits{true, UnitDimension::Length}; });
-  CHECK(make_cylindrical_surface_rface(symbolic, {0.0, kPi}, {0.0, 2.0}).area() == doctest::Approx(2 * kPi).epsilon(1e-9));
+  CHECK(make_cylindrical_surface_rface(symbolic, {0.0, kPi}, {0.0, 2.0}).area() ==
+        doctest::Approx(2 * kPi).epsilon(1e-9));
   set_scalar_units_probe(nullptr);
 }
 
@@ -99,8 +109,9 @@ TEST_CASE("fit_point_grid_rface fits a planar grid and validates its controls") 
   CHECK(message_has([] { (void)fit_point_grid_rface(unit_square_grid(), {.tolerance = 0.0}); }, "positive tolerance"));
   CHECK(message_has([] { (void)fit_point_grid_rface(unit_square_grid(), {.degree_min = 4, .degree_max = 3}); },
                     "degree_max must be greater than or equal to degree_min"));
-  CHECK(message_has([] { (void)fit_point_grid_rface(unit_square_grid(), {.smoothing = std::array<double, 3>{1, -1, 1}}); },
-                    "three finite non-negative weights"));
+  CHECK(message_has(
+      [] { (void)fit_point_grid_rface(unit_square_grid(), {.smoothing = std::array<double, 3>{1, -1, 1}}); },
+      "three finite non-negative weights"));
 }
 
 TEST_CASE("make_ruled_surface_rface spans two edges") {
@@ -110,7 +121,8 @@ TEST_CASE("make_ruled_surface_rface spans two edges") {
 }
 
 TEST_CASE("make_gordon_surface_rface interpolates a planar network exactly") {
-  if (!surface::gordon_available()) return;
+  if (!surface::gordon_available())
+    return;
   const Face gordon = make_gordon_surface_rface({line({0, 0, 0}, {1, 0, 0}), line({0, 1, 0}, {1, 1, 0})},
                                                 {line({0, 0, 0}, {0, 1, 0}), line({1, 0, 0}, {1, 1, 0})});
   CHECK(gordon.area() == doctest::Approx(1.0).epsilon(1e-9));
@@ -124,7 +136,8 @@ TEST_CASE("make_gordon_surface_rface interpolates a planar network exactly") {
 }
 
 TEST_CASE("make_gordon_surface_rface rejects small or disjoint networks") {
-  if (!surface::gordon_available()) return;
+  if (!surface::gordon_available())
+    return;
   CHECK(message_has([] { (void)make_gordon_surface_rface({line({0, 0, 0}, {1, 0, 0})}, {line({0, 0, 0}, {0, 1, 0})}); },
                     "at least two profiles and two guides"));
   CHECK(message_has(
@@ -139,7 +152,8 @@ TEST_CASE("make_gordon_surface_rface rejects small or disjoint networks") {
 TEST_CASE("make_surface_patch_rface fills a square boundary, with and without a hole") {
   std::vector<Vec3> corners{{0, 0, 1}, {2, 0, 1}, {2, 2, 1}, {0, 2, 1}};
   std::vector<SurfaceBoundary> boundaries;
-  for (std::size_t i = 0; i < 4; ++i) boundaries.emplace_back(line(corners[i], corners[(i + 1) % 4]));
+  for (std::size_t i = 0; i < 4; ++i)
+    boundaries.emplace_back(line(corners[i], corners[(i + 1) % 4]));
   const Face patch = make_surface_patch_rface(boundaries, {.tag_prefix = "patch"});
   CHECK(patch.area() == doctest::Approx(4.0).epsilon(1e-6));
   CHECK(patch.has_tag("patch.face", TagScope::Local));
@@ -170,9 +184,11 @@ TEST_CASE("a replaced SurfaceFitter is the one the operators use") {
       ++grid_fits;
       return surface::occt_surface_fitter()->fit_point_grid(g, o);
     }
-    TopoDS_Face fill(const surface::FillingProblem& p) const override { return surface::occt_surface_fitter()->fill(p); }
-    Handle(Geom_BSplineSurface) gordon(const std::vector<Handle(Geom_Curve)>& a, const std::vector<Handle(Geom_Curve)>& b,
-                                       double t) const override {
+    TopoDS_Face fill(const surface::FillingProblem& p) const override {
+      return surface::occt_surface_fitter()->fill(p);
+    }
+    Handle(Geom_BSplineSurface) gordon(const std::vector<Handle(Geom_Curve)>& a,
+                                       const std::vector<Handle(Geom_Curve)>& b, double t) const override {
       return surface::occt_surface_fitter()->gordon(a, b, t);
     }
   };

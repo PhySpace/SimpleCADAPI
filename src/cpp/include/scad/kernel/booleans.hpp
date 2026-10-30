@@ -19,14 +19,14 @@ namespace scad::kernel {
 enum class BooleanOp { Cut, Common, Fuse };
 
 struct BooleanOptions {
-  bool fill_history = false;       // keep BRepTools_History + section edges
-  std::optional<double> fuzzy;     // fuzzy tolerance (SetFuzzyValue)
-  bool glue = false;               // BOPAlgo_GlueShift instead of GlueOff
+  bool fill_history = false;    // keep BRepTools_History + section edges
+  std::optional<double> fuzzy;  // fuzzy tolerance (SetFuzzyValue)
+  bool glue = false;            // BOPAlgo_GlueShift instead of GlueOff
 };
 
 struct BooleanResult {
-  bool done = false;               // BRepAlgoAPI::IsDone(); the other fields are empty when false
-  TopoDS_Shape shape;              // usually a compound holding the result solid(s)
+  bool done = false;                               // BRepAlgoAPI::IsDone(); the other fields are empty when false
+  TopoDS_Shape shape;                              // usually a compound holding the result solid(s)
   opencascade::handle<BRepTools_History> history;  // null unless fill_history
   std::vector<TopoDS_Shape> section_edges;         // empty unless fill_history
 };

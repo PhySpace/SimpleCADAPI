@@ -28,11 +28,14 @@ std::vector<Face> incident_faces_of(const Shape& item) {
 // (a small bipartite matching; the sets are few)
 bool distinct_witnesses(const std::vector<Face>& incident, const std::vector<IdentitySet>& sets, std::size_t index,
                         std::vector<char>& used) {
-  if (index == sets.size()) return true;
+  if (index == sets.size())
+    return true;
   for (std::size_t i = 0; i < incident.size(); ++i) {
-    if (used[i] != 0 || !sets[index].contains(incident[i])) continue;
+    if (used[i] != 0 || !sets[index].contains(incident[i]))
+      continue;
     used[i] = 1;
-    if (distinct_witnesses(incident, sets, index + 1, used)) return true;
+    if (distinct_witnesses(incident, sets, index + 1, used))
+      return true;
     used[i] = 0;
   }
   return false;
@@ -53,13 +56,17 @@ bool has_incident_witnesses(const Shape& item, const std::vector<IdentitySet>& s
 bool key_before(const Value& a, const Value& b) {
   const bool a_missing = a.is_null();
   const bool b_missing = b.is_null();
-  if (a_missing || b_missing) return !a_missing && b_missing;
+  if (a_missing || b_missing)
+    return !a_missing && b_missing;
   switch (compare_values(a, b)) {
-    case Ordering::Less: return true;
+    case Ordering::Less:
+      return true;
     case Ordering::Equal:
     case Ordering::Greater:
-    case Ordering::Unordered: return false;
-    case Ordering::Incomparable: break;
+    case Ordering::Unordered:
+      return false;
+    case Ordering::Incomparable:
+      break;
   }
   throw TypeError("'<' not supported between instances of '" + std::string(py_type_name(a)) + "' and '" +
                   std::string(py_type_name(b)) + "'");
@@ -69,7 +76,8 @@ bool key_before(const Value& a, const Value& b) {
 void sort_by(std::vector<Shape>& items, const Key& sort_key, bool desc, const EvalContext& ctx) {
   std::vector<Value> keys;
   keys.reserve(items.size());
-  for (const Shape& item : items) keys.push_back(sort_key.evaluate(item, ctx));
+  for (const Shape& item : items)
+    keys.push_back(sort_key.evaluate(item, ctx));
 
   std::vector<std::size_t> order(items.size());
   std::iota(order.begin(), order.end(), std::size_t{0});
@@ -79,14 +87,16 @@ void sort_by(std::vector<Shape>& items, const Key& sort_key, bool desc, const Ev
 
   std::vector<Shape> sorted;
   sorted.reserve(items.size());
-  for (const std::size_t index : order) sorted.push_back(std::move(items[index]));
+  for (const std::size_t index : order)
+    sorted.push_back(std::move(items[index]));
   items = std::move(sorted);
 }
 
 std::optional<std::int64_t> asserted(const std::vector<std::pair<std::string, std::int64_t>>& cardinality,
                                      std::string_view mode) {
   for (const auto& [name, count] : cardinality)
-    if (name == mode) return count;
+    if (name == mode)
+      return count;
   return std::nullopt;
 }
 
@@ -111,7 +121,8 @@ std::vector<Shape> ShapeSelector::resolve_with(const Scope& scope, const EvalCon
   } else if (!m.source_selector) {
     items = detail::scope_items(scope, m.target_kind);
   } else {
-    if (!m.traversal) throw ValueError("traversal selector is missing traversal metadata");
+    if (!m.traversal)
+      throw ValueError("traversal selector is missing traversal metadata");
     const std::vector<Shape> sources = m.source_selector->resolve_with(scope, ctx);
     if (m.traversal->relation != "boundary")
       throw ValueError("unsupported traversal relation: " + m.traversal->relation);
@@ -129,9 +140,8 @@ std::vector<Shape> ShapeSelector::resolve_with(const Scope& scope, const EvalCon
       const std::vector<Shape> faces = selector.resolve_with(scope, ctx);
       face_sets.emplace_back(faces.begin(), faces.end());
     }
-    std::erase_if(items, [&](const Shape& item) {
-      return !has_incident_witnesses(item, face_sets, m.incident_faces_distinct);
-    });
+    std::erase_if(
+        items, [&](const Shape& item) { return !has_incident_witnesses(item, face_sets, m.incident_faces_distinct); });
   }
 
   if (m.incident_face_cardinality) {
@@ -144,7 +154,8 @@ std::vector<Shape> ShapeSelector::resolve_with(const Scope& scope, const EvalCon
 
   // Sort by the last key first: stable passes leave the first key most significant.
   if (!m.order_keys.empty()) {
-    for (auto it = m.order_keys.rbegin(); it != m.order_keys.rend(); ++it) sort_by(items, it->first, it->second, ctx);
+    for (auto it = m.order_keys.rbegin(); it != m.order_keys.rend(); ++it)
+      sort_by(items, it->first, it->second, ctx);
   } else if (m.order_key) {
     sort_by(items, *m.order_key, m.order_desc, ctx);
   }
@@ -152,7 +163,8 @@ std::vector<Shape> ShapeSelector::resolve_with(const Scope& scope, const EvalCon
   if (m.limit_count) {  // items[:limit]: a negative limit (possible only from a payload) drops from the end
     const auto size = static_cast<std::int64_t>(items.size());
     const std::int64_t keep = *m.limit_count < 0 ? std::max<std::int64_t>(size + *m.limit_count, 0) : *m.limit_count;
-    if (keep < size) items.erase(items.begin() + static_cast<std::ptrdiff_t>(keep), items.end());
+    if (keep < size)
+      items.erase(items.begin() + static_cast<std::ptrdiff_t>(keep), items.end());
   }
 
   const auto count = static_cast<std::int64_t>(items.size());
@@ -170,7 +182,9 @@ std::vector<Shape> ShapeSelector::resolve(const Scope& scope) const {
   return resolve_with(scope, ctx);
 }
 
-std::vector<Shape> ShapeSelector::resolve(const Shape& scope) const { return resolve(Scope(scope)); }
+std::vector<Shape> ShapeSelector::resolve(const Shape& scope) const {
+  return resolve(Scope(scope));
+}
 
 std::vector<Shape> ShapeSelector::resolve_recorded(const Shape& scope) const {
   std::vector<Shape> picked = resolve(scope);

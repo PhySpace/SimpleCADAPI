@@ -31,10 +31,11 @@ struct holder_helper<opencascade::handle<T>> {
 namespace scad::pybind::occt {
 
 // Each area registers its classes on the flat submodule, in this order (a class may name one registered before it).
-void bind_core(py::module_& m);    // gp_*, enums, TopLoc, TopoDS_*, TopExp, TopTools_*, Precision, BRep_Tool/Builder
-void bind_query(py::module_& m);   // BRepAdaptor_*, BRepGProp/GProp, Bnd/BRepBndLib, classifiers, extrema, Geom_* curves/surfaces
-void bind_algo(py::module_& m);    // booleans, builders, primitives, fillet, transform/copy, mesh, HLR, shape upgrade
-void bind_step(py::module_& m);    // STEP/XCAF/TDF/TCollection/Quantity/Step*, BinTools, IO of BREP
+void bind_core(py::module_& m);  // gp_*, enums, TopLoc, TopoDS_*, TopExp, TopTools_*, Precision, BRep_Tool/Builder
+void bind_query(
+    py::module_& m);  // BRepAdaptor_*, BRepGProp/GProp, Bnd/BRepBndLib, classifiers, extrema, Geom_* curves/surfaces
+void bind_algo(py::module_& m);  // booleans, builders, primitives, fillet, transform/copy, mesh, HLR, shape upgrade
+void bind_step(py::module_& m);  // STEP/XCAF/TDF/TCollection/Quantity/Step*, BinTools, IO of BREP
 
 void bind_occt(py::module_& m);
 
@@ -57,17 +58,27 @@ namespace scad::pybind::occt {
 // A shape as the Python class of its type (TopoDS_Solid, ...): `.wrapped` of a native shape, and what an explorer
 // hands back once the caller has asked for a type.
 inline py::object shape_to_python(const TopoDS_Shape& shape) {
-  if (shape.IsNull()) return py::cast(shape);
+  if (shape.IsNull())
+    return py::cast(shape);
   switch (shape.ShapeType()) {
-    case TopAbs_VERTEX: return py::cast(TopoDS::Vertex(shape));
-    case TopAbs_EDGE: return py::cast(TopoDS::Edge(shape));
-    case TopAbs_WIRE: return py::cast(TopoDS::Wire(shape));
-    case TopAbs_FACE: return py::cast(TopoDS::Face(shape));
-    case TopAbs_SHELL: return py::cast(TopoDS::Shell(shape));
-    case TopAbs_SOLID: return py::cast(TopoDS::Solid(shape));
-    case TopAbs_COMPSOLID: return py::cast(TopoDS::CompSolid(shape));
-    case TopAbs_COMPOUND: return py::cast(TopoDS::Compound(shape));
-    default: return py::cast(shape);
+    case TopAbs_VERTEX:
+      return py::cast(TopoDS::Vertex(shape));
+    case TopAbs_EDGE:
+      return py::cast(TopoDS::Edge(shape));
+    case TopAbs_WIRE:
+      return py::cast(TopoDS::Wire(shape));
+    case TopAbs_FACE:
+      return py::cast(TopoDS::Face(shape));
+    case TopAbs_SHELL:
+      return py::cast(TopoDS::Shell(shape));
+    case TopAbs_SOLID:
+      return py::cast(TopoDS::Solid(shape));
+    case TopAbs_COMPSOLID:
+      return py::cast(TopoDS::CompSolid(shape));
+    case TopAbs_COMPOUND:
+      return py::cast(TopoDS::Compound(shape));
+    default:
+      return py::cast(shape);
   }
 }
 

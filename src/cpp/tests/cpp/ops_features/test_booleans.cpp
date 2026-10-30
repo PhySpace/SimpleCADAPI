@@ -84,7 +84,7 @@ TEST_CASE("the set boolean keeps every piece") {
 TEST_CASE("2D booleans") {
   const Face a = make_rectangle_rface(4, 4), b = make_rectangle_rface(2, 2, scalar3(1, 1, 0));
   CHECK(make_2d_cut_rface(a, b).area() == Approx(12.0));
-  CHECK(make_2d_union_rface(a, b).area() == Approx(16.0 + 4.0 - 1.0 - 0.0 - 3.0).epsilon(1e-6) );
+  CHECK(make_2d_union_rface(a, b).area() == Approx(16.0 + 4.0 - 1.0 - 0.0 - 3.0).epsilon(1e-6));
   CHECK(make_2d_intersect_rface(a, b).area() == Approx(4.0));
   CHECK(make_2d_cut_rface(a, make_rectangle_rface(1, 1)).inner_wires().size() == 1);
   CHECK(failure_of([&] { (void)make_2d_cut_rface(a, box(1, 1, 1)); }).operation() == "make_2d_cut_rface");

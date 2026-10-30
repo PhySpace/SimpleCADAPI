@@ -27,8 +27,8 @@ inline constexpr double kRankTolerance = 1e-6;
 // Minimise |residual| over the unknowns from x0.  `converged` means every
 // listed residual is within `tolerance`.  The unknowns the active equations do
 // not touch never move (minimum-norm steps).
-SolveOutcome solve_equations(const System& system, const std::vector<std::size_t>& active,
-                             std::vector<double> x0, double tolerance, int max_iterations);
+SolveOutcome solve_equations(const System& system, const std::vector<std::size_t>& active, std::vector<double> x0,
+                             double tolerance, int max_iterations);
 
 // Rank of the row-normalised Jacobian of the active equations at x.
 int jacobian_rank(const System& system, const std::vector<std::size_t>& active, const std::vector<double>& x);

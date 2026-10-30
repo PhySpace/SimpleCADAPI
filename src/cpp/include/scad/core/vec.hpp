@@ -26,17 +26,30 @@ struct Vec3 {
   constexpr Vec3 operator-() const { return {-x, -y, -z}; }
   constexpr Vec3 operator*(double s) const { return {x * s, y * s, z * s}; }
   constexpr Vec3 operator/(double s) const { return {x / s, y / s, z / s}; }
-  Vec3& operator+=(const Vec3& o) { x += o.x; y += o.y; z += o.z; return *this; }
-  Vec3& operator-=(const Vec3& o) { x -= o.x; y -= o.y; z -= o.z; return *this; }
-  Vec3& operator*=(double s) { x *= s; y *= s; z *= s; return *this; }
+  Vec3& operator+=(const Vec3& o) {
+    x += o.x;
+    y += o.y;
+    z += o.z;
+    return *this;
+  }
+  Vec3& operator-=(const Vec3& o) {
+    x -= o.x;
+    y -= o.y;
+    z -= o.z;
+    return *this;
+  }
+  Vec3& operator*=(double s) {
+    x *= s;
+    y *= s;
+    z *= s;
+    return *this;
+  }
 
   constexpr bool operator==(const Vec3& o) const { return x == o.x && y == o.y && z == o.z; }
   constexpr bool operator!=(const Vec3& o) const { return !(*this == o); }
 
   constexpr double dot(const Vec3& o) const { return x * o.x + y * o.y + z * o.z; }
-  constexpr Vec3 cross(const Vec3& o) const {
-    return {y * o.z - z * o.y, z * o.x - x * o.z, x * o.y - y * o.x};
-  }
+  constexpr Vec3 cross(const Vec3& o) const { return {y * o.z - z * o.y, z * o.x - x * o.z, x * o.y - y * o.x}; }
   double norm() const { return std::sqrt(dot(*this)); }
   double distance(const Vec3& o) const { return (*this - o).norm(); }
   bool is_finite() const { return std::isfinite(x) && std::isfinite(y) && std::isfinite(z); }
@@ -48,7 +61,9 @@ struct Vec3 {
   }
 };
 
-constexpr Vec3 operator*(double s, const Vec3& v) { return v * s; }
+constexpr Vec3 operator*(double s, const Vec3& v) {
+  return v * s;
+}
 
 // "(x, y, z)" with Python's repr-style shortest float form is not needed
 // anywhere that matters; %.17g keeps the value exact.

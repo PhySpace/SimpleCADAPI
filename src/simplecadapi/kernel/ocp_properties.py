@@ -266,3 +266,10 @@ def face_normal_at(face: TopoDS_Face, u: float = 0.5, v: float = 0.5) -> Vec3:
 
 def edge_center(edge: TopoDS_Edge) -> Vec3:
     return center_of_mass(edge)
+
+
+# `shape.wrapped` is an OCP shape when OCP is installed: these helpers work on the SDK's own OCCT
+from simplecadapi._glue.bridge import accepting_ocp as _accepting_ocp  # noqa: E402
+
+_accepting_ocp(globals())
+del _accepting_ocp

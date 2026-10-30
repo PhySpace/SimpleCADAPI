@@ -71,13 +71,15 @@ class ScalarNode : public ExprNode {
   // Dimension inference result; throws the UnitValidationError (or the
   // ValueError of a constant exponent) the expression is inconsistent with.
   const Inference& inference() const {
-    if (error_) std::rethrow_exception(error_);
+    if (error_)
+      std::rethrow_exception(error_);
     return inference_;
   }
 
   // evaluate(): validates the expression's dimensions, then computes.
   double eval(const Bindings* bindings) const final {
-    if (error_) std::rethrow_exception(error_);
+    if (error_)
+      std::rethrow_exception(error_);
     return eval_unchecked(bindings);
   }
   virtual double eval_unchecked(const Bindings* bindings) const = 0;
@@ -105,7 +107,8 @@ class Const final : public ScalarNode {
   // ValueError when `value` is not finite.  An empty id is derived from the content.
   static std::shared_ptr<const Const> make(double value, std::string expr_id = {});
 
-  Const(Private, std::string id, double value) : ScalarNode(std::move(id), constant_inference(), nullptr), value_(value) {}
+  Const(Private, std::string id, double value)
+      : ScalarNode(std::move(id), constant_inference(), nullptr), value_(value) {}
 
   NodeType type() const noexcept override { return NodeType::Const; }
   double value() const noexcept { return value_; }
@@ -151,7 +154,9 @@ class Var final : public ScalarNode {
   const ParamUi& ui() const noexcept { return spec_.ui; }
   const VarSpec& spec() const noexcept { return spec_; }
 
-  std::optional<Dimension> dimension() const { return spec_.unit ? std::optional(spec_.unit->dimension()) : std::nullopt; }
+  std::optional<Dimension> dimension() const {
+    return spec_.unit ? std::optional(spec_.unit->dimension()) : std::nullopt;
+  }
   double canonical_default() const;
   std::optional<DimensionTolerance> canonical_tolerance() const;
 
@@ -177,7 +182,8 @@ class Expr final : public ScalarNode {
   // ValueError for an unsupported op or a wrong number of operands.
   static std::shared_ptr<const Expr> make(std::string op, std::vector<ScalarPtr> args, std::string expr_id = {});
 
-  Expr(Private, std::string id, Inference inference, std::exception_ptr error, std::string op, std::vector<ScalarPtr> args);
+  Expr(Private, std::string id, Inference inference, std::exception_ptr error, std::string op,
+       std::vector<ScalarPtr> args);
 
   NodeType type() const noexcept override { return NodeType::Expr; }
   const std::string& op() const noexcept { return op_; }
@@ -198,7 +204,8 @@ std::size_t expr_op_arity(std::string_view op) noexcept;
 // ---------------------------------------------------------------------------
 
 // Variable.  ValueError for an empty name or a non-finite default.
-std::shared_ptr<const Var> make_var(std::string name, double default_value, std::optional<std::string> comment = std::nullopt,
+std::shared_ptr<const Var> make_var(std::string name, double default_value,
+                                    std::optional<std::string> comment = std::nullopt,
                                     std::optional<DimensionTolerance> tolerance = std::nullopt,
                                     std::optional<Unit> unit = std::nullopt,
                                     std::optional<Unit> tolerance_unit = std::nullopt, ParamUi ui = {});
@@ -252,14 +259,14 @@ std::vector<std::shared_ptr<const Var>> referenced_vars(const Scalar& scalar);
 // A bare number is a constant; operators lift both sides.
 class Sym {
  public:
-  Sym(double value);                  // NOLINT(google-explicit-constructor)
-  Sym(int value);                     // NOLINT(google-explicit-constructor)
-  Sym(ScalarPtr node);                // NOLINT(google-explicit-constructor)
+  Sym(double value);    // NOLINT(google-explicit-constructor)
+  Sym(int value);       // NOLINT(google-explicit-constructor)
+  Sym(ScalarPtr node);  // NOLINT(google-explicit-constructor)
   // A Var, Const or Expr straight from its factory.
   template <class Node>
     requires std::is_base_of_v<ScalarNode, Node>
   Sym(std::shared_ptr<const Node> node) : Sym(ScalarPtr(std::move(node))) {}  // NOLINT(google-explicit-constructor)
-  Sym(const Scalar& scalar);          // NOLINT(google-explicit-constructor)
+  Sym(const Scalar& scalar);                                                  // NOLINT(google-explicit-constructor)
 
   const ScalarPtr& node() const noexcept { return node_; }
   Scalar scalar() const { return Scalar(ExprPtr(node_)); }

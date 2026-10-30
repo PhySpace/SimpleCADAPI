@@ -146,7 +146,7 @@ def build_edge_mesh(
         raise ValueError("edge entity count does not match the solid topology")
     blocks = tuple(
         _edge_block(
-            edge if hasattr(edge, "_polyline") else edge.wrapped,
+            edge if hasattr(edge, "_polyline") else edge._native_wrapped,
             entity_id=entity_id,
             linear_tolerance=linear_tolerance,
             angular_tolerance=angular_tolerance,
@@ -191,7 +191,7 @@ def solid_asset_bounds(solid: Solid) -> tuple[tuple[float, float, float], tuple[
         return ((float(xmin), float(ymin), float(zmin)), (float(xmax), float(ymax), float(zmax)))
     from ..kernel.ocp_properties import bounding_box
 
-    box = bounding_box(solid.wrapped)
+    box = bounding_box(solid._native_wrapped)
     return (
         (float(box.xmin), float(box.ymin), float(box.zmin)),
         (float(box.xmax), float(box.ymax), float(box.zmax)),
@@ -353,7 +353,6 @@ def _edge_block(
             points = edge._polyline(float(linear_tolerance), float(angular_tolerance))
         except Exception as exc:
             raise ValueError(f"edge {entity_id} discretization failed") from exc
-        positions = tuple(cad_to_gltf(point) for point in points)
     else:
         from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Curve
         from simplecadapi._cpp.occt.GCPnts import GCPnts_TangentialDeflection
@@ -374,15 +373,12 @@ def _edge_block(
             )
         except Exception as exc:
             raise ValueError(f"edge {entity_id} discretization failed") from exc
-        positions = tuple(
-            cad_to_gltf(sampler.Value(index))
+        points = [
+            (float(sampler.Value(index).X()), float(sampler.Value(index).Y()), float(sampler.Value(index).Z()))
             for index in range(1, sampler.NbPoints() + 1)
-        )
-    segments = [
-        (_position_key(positions[index]), _position_key(positions[index + 1]))
-        for index in range(len(positions) - 1)
-        if _position_key(positions[index]) != _position_key(positions[index + 1])
-    ]
+        ]
+    keys = _position_keys(points)
+    segments = [(keys[index], keys[index + 1]) for index in range(len(keys) - 1) if keys[index] != keys[index + 1]]
     position_keys = sorted(set(key for segment in segments for key in segment))
     key_to_index = {key: index for index, key in enumerate(position_keys)}
     canonical_segments = tuple(sorted(set((min(key_to_index[a], key_to_index[b]), max(key_to_index[a], key_to_index[b])) for a, b in segments)))
@@ -400,6 +396,29 @@ def _edge_block(
     )
 
 
+def _position_keys(points: Sequence[Sequence[float]]) -> list[bytes]:
+    """The position keys of CAD points (mm, +Z up), as ``_position_key(cad_to_gltf(point))`` for each, in one pass.
+
+    The same arithmetic as the scalar path -- divide in binary64, round to binary32, the profile's zero-sign and
+    finiteness rules -- so the bytes are identical; numpy does it for the whole polyline at once.
+    """
+
+    if len(points) == 0:
+        return []
+    cad = np.asarray(points, dtype=np.float64).reshape(-1, 3)
+    glt = np.stack([cad[:, 0] / 1000.0, cad[:, 2] / 1000.0, -cad[:, 1] / 1000.0], axis=1)
+    if not np.isfinite(glt).all():
+        raise ValueError("f32 input must be a finite number")
+    with np.errstate(over="ignore"):
+        single = glt.astype("<f4")
+    if not np.isfinite(single).all():
+        raise ValueError("f32 conversion overflowed")
+    bits = np.ascontiguousarray(single).view("<u4")
+    bits = np.where(bits == 0x80000000, np.uint32(0), bits).astype("<u4")
+    raw = bits.tobytes()
+    return [raw[offset : offset + 12] for offset in range(0, len(raw), 12)]
+
+
 def _position_key(position: Sequence[float]) -> bytes:
     return struct.pack("<III", *(profile_f32_bits(float(value)) for value in position))
 
@@ -409,7 +428,7 @@ def _vertex_key(position: Sequence[float], normal: Sequence[float]) -> bytes:
 
 
 def _decode_position(key: bytes) -> tuple[float, float, float]:
-    return tuple(struct.unpack("<f", struct.pack("<I", bits))[0] for bits in struct.unpack("<III", key))  # type: ignore[return-value]
+    return struct.unpack("<fff", key)  # type: ignore[return-value]
 
 
 def _decode_vertex(key: bytes) -> tuple[tuple[float, float, float], tuple[float, float, float]]:

@@ -12,15 +12,19 @@ using namespace detail;
 
 namespace {
 
-Value optional_name(const OptionalString& name) { return name ? Value(*name) : Value(); }
+Value optional_name(const OptionalString& name) {
+  return name ? Value(*name) : Value();
+}
 
 // The graph node a connector's geometry was picked from, when a session is recording: a face or
 // edge of a recorded output gets its selection node here (the operator that follows would create it
 // anyway), so the connector can name it.
 OptionalString source_node_id(const Shape& shape) {
   reactive::Session* session = reactive::Session::active_session();
-  if (session == nullptr || current_recorder() != session) return std::nullopt;
-  if (const auto lineage = reactive::lineage_of(shape)) return lineage->node_id;
+  if (session == nullptr || current_recorder() != session)
+    return std::nullopt;
+  if (const auto lineage = reactive::lineage_of(shape))
+    return lineage->node_id;
   if (const auto ref = reactive::topo_ref_of(shape)) {
     // Recording the pick is best effort: the shape's producer may belong to another session (a cell's value restored
     // from the cache), which this one does not hold outputs for.
@@ -29,7 +33,8 @@ OptionalString source_node_id(const Shape& shape) {
     } catch (const reactive::KeyError&) {
       return std::nullopt;
     }
-    if (const auto picked = reactive::lineage_of(shape)) return picked->node_id;
+    if (const auto picked = reactive::lineage_of(shape))
+      return picked->node_id;
   }
   return std::nullopt;
 }
@@ -39,11 +44,13 @@ Connector geometry_connector(const char* op, const std::string& connector_id, co
   const OptionalString source = source_node_id(shape);
   GeometryRef ref(shape_kind_token(shape), source, make_geo_selector(shape), flip);
   Connector connector(connector_id, std::move(ref), name);
-  record_value([&] {
-    OpRecord record = op_record(op, connector.to_dict());
-    record.inputs.push_back(OpInput{shape, "shape"});
-    return record;
-  }, connector);
+  record_value(
+      [&] {
+        OpRecord record = op_record(op, connector.to_dict());
+        record.inputs.push_back(OpInput{shape, "shape"});
+        return record;
+      },
+      connector);
   return connector;
 }
 
@@ -74,13 +81,15 @@ Connector make_placement_connector_rconnector(const std::string& connector_id, c
                                               const OptionalString& name) {
   return guard_operation("make_placement_connector_rconnector", [&] {
     Connector connector(connector_id, std::nullopt, name, ConnectorAnchor(placement));
-    record_value([&] {
-      Value params = Value::object();
-      params.set("connector_id", connector.connector_id());
-      params.set("placement", placement.to_dict());
-      params.set("name", optional_name(connector.name()));
-      return op_record("make_placement_connector_rconnector", std::move(params));
-    }, connector, placement);
+    record_value(
+        [&] {
+          Value params = Value::object();
+          params.set("connector_id", connector.connector_id());
+          params.set("placement", placement.to_dict());
+          params.set("name", optional_name(connector.name()));
+          return op_record("make_placement_connector_rconnector", std::move(params));
+        },
+        connector, placement);
     return connector;
   });
 }
@@ -88,16 +97,18 @@ Connector make_placement_connector_rconnector(const std::string& connector_id, c
 PartPtr add_connector_rpart(const Part& part, const Connector& connector) {
   return guard_operation("add_connector_rpart", [&] {
     auto result = std::make_shared<const Part>(part.with_connector(connector));
-    record_value([&] {
-      Value params = Value::object();
-      params.set("part_id", part.part_id());
-      params.set("connector_id", connector.connector_id());
-      OpRecord record = op_record("make_add_connector_rpart", std::move(params));
-      Value metadata = Value::object();
-      metadata.set("connector", connector.to_dict());
-      record.semantic_delta = semantic_modified("Part", part.part_id(), std::move(metadata));
-      return record;
-    }, result, part, connector);
+    record_value(
+        [&] {
+          Value params = Value::object();
+          params.set("part_id", part.part_id());
+          params.set("connector_id", connector.connector_id());
+          OpRecord record = op_record("make_add_connector_rpart", std::move(params));
+          Value metadata = Value::object();
+          metadata.set("connector", connector.to_dict());
+          record.semantic_delta = semantic_modified("Part", part.part_id(), std::move(metadata));
+          return record;
+        },
+        result, part, connector);
     return result;
   });
 }
@@ -113,19 +124,21 @@ AssemblyPtr set_public_connector_rassembly(const Assembly& assembly, const std::
     } catch (const reactive::KeyError& error) {
       throw ValueError("missing component or connector for public connector: " + python_repr(error.what()));
     }
-    record_value([&] {
-      Value params = Value::object();
-      params.set("assembly_id", assembly.assembly_id());
-      params.set("public_connector_id", pub.public_connector_id);
-      params.set("source_component_id", pub.component_id);
-      params.set("source_connector_id", pub.connector_id);
-      params.set("name", optional_name(pub.name));
-      OpRecord record = op_record("make_set_public_connector_rassembly", std::move(params));
-      Value metadata = Value::object();
-      metadata.set("public_connector", pub.to_dict());
-      record.semantic_delta = semantic_modified("Assembly", assembly.assembly_id(), std::move(metadata));
-      return record;
-    }, result, assembly);
+    record_value(
+        [&] {
+          Value params = Value::object();
+          params.set("assembly_id", assembly.assembly_id());
+          params.set("public_connector_id", pub.public_connector_id);
+          params.set("source_component_id", pub.component_id);
+          params.set("source_connector_id", pub.connector_id);
+          params.set("name", optional_name(pub.name));
+          OpRecord record = op_record("make_set_public_connector_rassembly", std::move(params));
+          Value metadata = Value::object();
+          metadata.set("public_connector", pub.to_dict());
+          record.semantic_delta = semantic_modified("Assembly", assembly.assembly_id(), std::move(metadata));
+          return record;
+        },
+        result, assembly);
     return result;
   });
 }

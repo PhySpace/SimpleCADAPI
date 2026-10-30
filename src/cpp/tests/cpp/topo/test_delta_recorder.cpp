@@ -18,7 +18,9 @@ struct Capture : Recorder {
   }
 };
 
-Solid unit_box() { return Solid(BRepPrimAPI_MakeBox(1.0, 1.0, 1.0).Solid()); }
+Solid unit_box() {
+  return Solid(BRepPrimAPI_MakeBox(1.0, 1.0, 1.0).Solid());
+}
 
 }  // namespace
 

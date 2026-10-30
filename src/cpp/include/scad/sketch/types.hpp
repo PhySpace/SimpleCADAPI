@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "scad/core/engaged.hpp"
 #include "scad/core/scalar.hpp"
 #include "scad/core/value.hpp"
 #include "scad/sketch/ordered_map.hpp"
@@ -45,12 +46,12 @@ struct SketchRef {
 class SketchTarget {
  public:
   SketchTarget() = default;  // empty path: only so binding layers can default-construct a slot
-  SketchTarget(SketchRef ref) : ref_(std::move(ref)) {}                 // NOLINT(google-explicit-constructor)
-  SketchTarget(std::string path) : path_(std::move(path)) {}            // NOLINT(google-explicit-constructor)
-  SketchTarget(const char* path) : path_(path) {}                       // NOLINT(google-explicit-constructor)
+  SketchTarget(SketchRef ref) : ref_(std::move(ref)) {}       // NOLINT(google-explicit-constructor)
+  SketchTarget(std::string path) : path_(std::move(path)) {}  // NOLINT(google-explicit-constructor)
+  SketchTarget(const char* path) : path_(path) {}             // NOLINT(google-explicit-constructor)
 
   bool is_ref() const noexcept { return ref_.has_value(); }
-  const SketchRef& ref() const { return *ref_; }
+  const SketchRef& ref() const { return require_engaged(ref_, "ref() is only valid when is_ref() is true"); }
   const std::string& path() const noexcept { return path_; }
 
  private:

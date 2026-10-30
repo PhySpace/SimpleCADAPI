@@ -98,9 +98,11 @@ Symbol::Symbol(std::string_view text) {
 }
 
 std::optional<Symbol> Symbol::find(std::string_view text) {
-  if (text.empty()) return Symbol();
+  if (text.empty())
+    return Symbol();
   const Entry* entry = SymbolTable::instance().find(text);
-  if (entry == nullptr) return std::nullopt;
+  if (entry == nullptr)
+    return std::nullopt;
   Symbol s;
   s.entry_ = entry;
   return s;
@@ -112,6 +114,8 @@ Symbol Symbol::from_index(std::uint32_t index) {
   return s;
 }
 
-std::size_t Symbol::count() { return SymbolTable::instance().count(); }
+std::size_t Symbol::count() {
+  return SymbolTable::instance().count();
+}
 
 }  // namespace scad

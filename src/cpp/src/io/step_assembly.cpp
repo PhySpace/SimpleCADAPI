@@ -57,28 +57,32 @@ namespace {
 constexpr const char* kSchemaKey = "write.step.schema";
 
 const ErrorSpec& export_spec() {
-  static const ErrorSpec spec{"export_step_assembly",
-                              "Failed to export the assembly as STEP.",
-                              {"A component refers to a definition that was not provided, or the assembly is cyclic.",
-                               "A placement is not a rigid transform (its axes are not orthonormal).",
-                               "OpenCASCADE rejected the schema or could not translate the document."},
-                              {"Provide every referenced definition and avoid cycles.",
-                               "Use orthonormal, right-handed placement axes.",
-                               "Use schema AP242DIS, AP214IS or AP203."}};
+  static const ErrorSpec spec{
+      "export_step_assembly",
+      "Failed to export the assembly as STEP.",
+      {"A component refers to a definition that was not provided, or the assembly is cyclic.",
+       "A placement is not a rigid transform (its axes are not orthonormal).",
+       "OpenCASCADE rejected the schema or could not translate the document."},
+      {"Provide every referenced definition and avoid cycles.", "Use orthonormal, right-handed placement axes.",
+       "Use schema AP242DIS, AP214IS or AP203."}};
   return spec;
 }
 
 const ErrorSpec& import_spec() {
-  static const ErrorSpec spec{"import_step_assembly",
-                              "Failed to read the STEP assembly.",
-                              {"The file does not exist or is not ISO 10303-21 text.",
-                               "The file holds no transferable shapes."},
-                              {"Check the path.", "Open the file in a CAD viewer to confirm it holds geometry."}};
+  static const ErrorSpec spec{
+      "import_step_assembly",
+      "Failed to read the STEP assembly.",
+      {"The file does not exist or is not ISO 10303-21 text.", "The file holds no transferable shapes."},
+      {"Check the path.", "Open the file in a CAD viewer to confirm it holds geometry."}};
   return spec;
 }
 
-TCollection_ExtendedString extended(const std::string& utf8) { return TCollection_ExtendedString(utf8.c_str(), true); }
-Handle(TCollection_HAsciiString) ascii(const std::string& text) { return new TCollection_HAsciiString(text.c_str()); }
+TCollection_ExtendedString extended(const std::string& utf8) {
+  return TCollection_ExtendedString(utf8.c_str(), true);
+}
+Handle(TCollection_HAsciiString) ascii(const std::string& text) {
+  return new TCollection_HAsciiString(text.c_str());
+}
 
 std::string utf8_of(const TCollection_ExtendedString& text) {
   const NCollection_Utf16String utf16(text.ToExtString());
@@ -91,11 +95,13 @@ void require_rigid(const StepPlacement& p, const std::string& where) {
   constexpr double kTolerance = 1e-9;
   const bool unit = std::fabs(p.x_axis.norm() - 1.0) < kTolerance && std::fabs(p.y_axis.norm() - 1.0) < kTolerance &&
                     std::fabs(p.z_axis.norm() - 1.0) < kTolerance;
-  const bool orthogonal = std::fabs(p.x_axis.dot(p.y_axis)) < kTolerance && std::fabs(p.y_axis.dot(p.z_axis)) < kTolerance &&
+  const bool orthogonal = std::fabs(p.x_axis.dot(p.y_axis)) < kTolerance &&
+                          std::fabs(p.y_axis.dot(p.z_axis)) < kTolerance &&
                           std::fabs(p.z_axis.dot(p.x_axis)) < kTolerance;
   const bool right_handed = p.x_axis.cross(p.y_axis).dot(p.z_axis) > 0.0;
   if (!(unit && orthogonal && right_handed && p.origin.is_finite()))
-    throw ValueError("the placement of " + where + " is not a rigid transform: its axes must be unit length, mutually "
+    throw ValueError("the placement of " + where +
+                     " is not a rigid transform: its axes must be unit length, mutually "
                      "orthogonal and right-handed, and its origin finite");
 }
 
@@ -116,7 +122,9 @@ StepPlacement from_trsf(const gp_Trsf& t) {
   return p;
 }
 
-std::string metadata_text(const Value& value) { return python_json_dumps(value, /*sort_keys=*/true, /*ensure_ascii=*/true); }
+std::string metadata_text(const Value& value) {
+  return python_json_dumps(value, /*sort_keys=*/true, /*ensure_ascii=*/true);
+}
 
 // ---------------------------------------------------------------------------
 // Writing
@@ -125,7 +133,8 @@ class AssemblyBuilder {
  public:
   AssemblyBuilder(const std::vector<StepDefinition>& definitions) {
     for (const StepDefinition& d : definitions) {
-      if (!by_id_.emplace(d.id, &d).second) throw ValueError("duplicate definition id '" + d.id + "'");
+      if (!by_id_.emplace(d.id, &d).second)
+        throw ValueError("duplicate definition id '" + d.id + "'");
     }
     XCAFApp_Application::GetApplication();
     document_ = new TDocStd_Document(TCollection_ExtendedString("BinXCAF"));
@@ -146,7 +155,8 @@ class AssemblyBuilder {
   const std::vector<std::string>& visited() const { return visited_; }
   std::vector<std::string> material_ids() const {
     std::vector<std::string> ids;
-    for (const auto& [id, label] : material_labels_) ids.push_back(id);
+    for (const auto& [id, label] : material_labels_)
+      ids.push_back(id);
     return ids;  // std::map keeps them sorted
   }
 
@@ -158,7 +168,8 @@ class AssemblyBuilder {
 
   TDF_Label material_label(const StepMaterial& material) {
     const auto found = material_labels_.find(material.id);
-    if (found != material_labels_.end()) return found->second;
+    if (found != material_labels_.end())
+      return found->second;
     const double density = material.density.value_or(0.0);
     const std::string density_name = material.density ? material.density_unit : std::string();
     const std::string density_type = material.density ? "mass density" : std::string();
@@ -173,10 +184,13 @@ class AssemblyBuilder {
     // A definition is registered as soon as its label exists, so the cycle check must come first:
     // an assembly that contains itself would otherwise find its own half-built label and recurse
     // without end inside OpenCASCADE.
-    if (in_progress_.count(id) != 0) throw ValueError("definition '" + id + "' contains itself");
-    if (const auto found = labels_.find(id); found != labels_.end()) return found->second;
+    if (in_progress_.count(id) != 0)
+      throw ValueError("definition '" + id + "' contains itself");
+    if (const auto found = labels_.find(id); found != labels_.end())
+      return found->second;
     const auto def = by_id_.find(id);
-    if (def == by_id_.end()) throw ValueError("definition '" + id + "' is not among the provided definitions");
+    if (def == by_id_.end())
+      throw ValueError("definition '" + id + "' is not among the provided definitions");
     in_progress_.insert(id);
     const StepDefinition& d = *def->second;
     visited_.push_back(id);
@@ -241,20 +255,24 @@ class AssemblyBuilder {
 // product definition whose items are the named JSON records.
 void inject_metadata_properties(STEPCAFControl_Writer& writer,
                                 const std::vector<std::pair<std::string, Value>>& records) {
-  if (records.empty()) return;
+  if (records.empty())
+    return;
   const Handle(Interface_InterfaceModel) model = writer.ChangeWriter().WS()->Model();
   Handle(StepBasic_ProductDefinition) root_definition;
   Handle(StepRepr_RepresentationContext) context;
   for (int index = 1; index <= model->NbEntities(); ++index) {
     const Handle(StepShape_ShapeDefinitionRepresentation) entity =
         Handle(StepShape_ShapeDefinitionRepresentation)::DownCast(model->Value(index));
-    if (entity.IsNull()) continue;
+    if (entity.IsNull())
+      continue;
     const Handle(StepRepr_ProductDefinitionShape) represented =
         Handle(StepRepr_ProductDefinitionShape)::DownCast(entity->Definition().Value());
-    if (represented.IsNull()) continue;
+    if (represented.IsNull())
+      continue;
     const Handle(StepBasic_ProductDefinition) characterized =
         Handle(StepBasic_ProductDefinition)::DownCast(represented->Definition().Value());
-    if (characterized.IsNull()) continue;
+    if (characterized.IsNull())
+      continue;
     root_definition = characterized;
     context = entity->UsedRepresentation()->ContextOfItems();
     break;
@@ -317,13 +335,17 @@ Bytes step_assembly_bytes(const std::vector<StepDefinition>& definitions, std::s
       writer.SetMaterialMode(Standard_True);
       writer.SetPropsMode(Standard_True);
       const SchemaScope schema(options.schema);
-      if (!writer.Transfer(root)) throw RuntimeError("STEPCAF transfer failed: " + messages.text());
-      if (options.metadata_properties) inject_metadata_properties(writer, builder.metadata_records());
+      if (!writer.Transfer(root))
+        throw RuntimeError("STEPCAF transfer failed: " + messages.text());
+      if (options.metadata_properties)
+        inject_metadata_properties(writer, builder.metadata_records());
       std::ostringstream out(std::ios::binary);
       const IFSelect_ReturnStatus status = writer.WriteStream(out);
-      if (status != IFSelect_RetDone) throw RuntimeError("STEPCAF write failed: " + messages.text());
+      if (status != IFSelect_RetDone)
+        throw RuntimeError("STEPCAF write failed: " + messages.text());
       Bytes bytes = std::move(out).str();
-      if (bytes.empty()) throw RuntimeError("STEPCAF export produced an empty STEP file");
+      if (bytes.empty())
+        throw RuntimeError("STEPCAF export produced an empty STEP file");
 
       if (report != nullptr) {
         report->schema = options.schema;
@@ -353,31 +375,36 @@ namespace {
 
 std::string label_name(const TDF_Label& label) {
   Handle(TDataStd_Name) name;
-  if (label.FindAttribute(TDataStd_Name::GetID(), name)) return utf8_of(name->Get());
+  if (label.FindAttribute(TDataStd_Name::GetID(), name))
+    return utf8_of(name->Get());
   return {};
 }
 
-std::optional<std::array<double, 3>> label_color(const Handle(XCAFDoc_ColorTool)& tool, const TDF_Label& label) {
+std::optional<std::array<double, 3>> label_color(const Handle(XCAFDoc_ColorTool) & tool, const TDF_Label& label) {
   Quantity_Color color;
   if (!tool->GetColor(label, XCAFDoc_ColorSurf, color) && !tool->GetColor(label, XCAFDoc_ColorGen, color))
     return std::nullopt;
   return std::array<double, 3>{color.Red(), color.Green(), color.Blue()};
 }
 
-StepNode build_node(const Handle(XCAFDoc_ShapeTool)& shapes, const Handle(XCAFDoc_ColorTool)& colors,
+StepNode build_node(const Handle(XCAFDoc_ShapeTool) & shapes, const Handle(XCAFDoc_ColorTool) & colors,
                     const TDF_Label& label, const TDF_Label& instance, int depth) {
-  if (depth > 64) throw ValueError("the STEP assembly is nested too deeply");
+  if (depth > 64)
+    throw ValueError("the STEP assembly is nested too deeply");
   StepNode node;
   node.name = label_name(instance.IsNull() ? label : instance);
-  if (node.name.empty()) node.name = label_name(label);
-  if (!instance.IsNull()) node.placement = from_trsf(XCAFDoc_ShapeTool::GetLocation(instance).Transformation());
+  if (node.name.empty())
+    node.name = label_name(label);
+  if (!instance.IsNull())
+    node.placement = from_trsf(XCAFDoc_ShapeTool::GetLocation(instance).Transformation());
   node.color = label_color(colors, label);
   if (XCAFDoc_ShapeTool::IsAssembly(label)) {
     TDF_LabelSequence components;
     XCAFDoc_ShapeTool::GetComponents(label, components);
     for (int i = 1; i <= components.Length(); ++i) {
       TDF_Label referred;
-      if (!XCAFDoc_ShapeTool::GetReferredShape(components.Value(i), referred)) continue;
+      if (!XCAFDoc_ShapeTool::GetReferredShape(components.Value(i), referred))
+        continue;
       node.children.push_back(build_node(shapes, colors, referred, components.Value(i), depth + 1));
     }
   } else {
@@ -396,15 +423,19 @@ std::vector<StepNode> read_tree(std::istream& in, const std::string& name) {
     reader.SetColorMode(Standard_True);
     reader.SetNameMode(Standard_True);
     const IFSelect_ReturnStatus status = reader.ReadStream(name.c_str(), in);
-    if (status != IFSelect_RetDone) throw ValueError("could not read STEP file " + name + ": " + messages.text());
-    if (!reader.Transfer(document)) throw ValueError("STEP file " + name + " transferred no shapes: " + messages.text());
+    if (status != IFSelect_RetDone)
+      throw ValueError("could not read STEP file " + name + ": " + messages.text());
+    if (!reader.Transfer(document))
+      throw ValueError("STEP file " + name + " transferred no shapes: " + messages.text());
     const Handle(XCAFDoc_ShapeTool) shapes = XCAFDoc_DocumentTool::ShapeTool(document->Main());
     const Handle(XCAFDoc_ColorTool) colors = XCAFDoc_DocumentTool::ColorTool(document->Main());
     TDF_LabelSequence roots;
     shapes->GetFreeShapes(roots);
-    if (roots.Length() < 1) throw ValueError("STEP file " + name + " contains no free shapes");
+    if (roots.Length() < 1)
+      throw ValueError("STEP file " + name + " contains no free shapes");
     std::vector<StepNode> tree;
-    for (int i = 1; i <= roots.Length(); ++i) tree.push_back(build_node(shapes, colors, roots.Value(i), TDF_Label(), 0));
+    for (int i = 1; i <= roots.Length(); ++i)
+      tree.push_back(build_node(shapes, colors, roots.Value(i), TDF_Label(), 0));
     return tree;
   });
 }

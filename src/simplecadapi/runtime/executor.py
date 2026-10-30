@@ -26,6 +26,7 @@ header's id, or the one a caller passed to ``run_notebook``/``use``.
 from __future__ import annotations
 
 import os
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -121,11 +122,15 @@ class SimpleCadExecutor:
         if scope is None or cell.cell_id not in scope.cells:
             return self._delegate.execute_cell(cell, glbls)
         cache = self._cache_for(scope, cell)
+        began = time.perf_counter()
         restored = _restore(cache, cell, glbls)
         if restored is not _MISS:
+            self._warm_preview(cell, glbls)
+            _trace(cell, _restored_label(cache, cell), began)
             return restored
         cache = cache if restored is _MISS else None
         _prefetch(scope, cell, glbls)
+        ran = time.perf_counter()
         try:
             with _cell_recording(scope, cell, glbls):
                 result = self._delegate.execute_cell(cell, glbls)
@@ -133,7 +138,10 @@ class SimpleCadExecutor:
         except BaseException as error:
             _store(cache, cell, glbls, None, error)
             raise
+        stored = time.perf_counter()
         _store(cache, cell, glbls, result, None)
+        self._warm_preview(cell, glbls)
+        _trace(cell, f"ran (cache lookup {(ran - began) * 1000:.0f} ms, body {(stored - ran) * 1000:.0f} ms, store {(time.perf_counter() - stored) * 1000:.0f} ms)", began)
         return result
 
     async def execute_cell_async(self, cell: CellImpl, glbls: MutableGlobals) -> Any:
@@ -141,10 +149,14 @@ class SimpleCadExecutor:
         if scope is None or cell.cell_id not in scope.cells:
             return await self._delegate.execute_cell_async(cell, glbls)
         cache = self._cache_for(scope, cell)
+        began = time.perf_counter()
         restored = _restore(cache, cell, glbls)
         if restored is not _MISS:
+            self._warm_preview(cell, glbls)
+            _trace(cell, _restored_label(cache, cell), began)
             return restored
         _prefetch(scope, cell, glbls)
+        ran = time.perf_counter()
         try:
             with _cell_recording(scope, cell, glbls):
                 result = await self._delegate.execute_cell_async(cell, glbls)
@@ -152,8 +164,20 @@ class SimpleCadExecutor:
         except BaseException as error:
             _store(cache, cell, glbls, None, error)
             raise
+        stored = time.perf_counter()
         _store(cache, cell, glbls, result, None)
+        self._warm_preview(cell, glbls)
+        _trace(cell, f"ran (cache lookup {(ran - began) * 1000:.0f} ms, body {(stored - ran) * 1000:.0f} ms, store {(time.perf_counter() - stored) * 1000:.0f} ms)", began)
         return result
+
+    def _warm_preview(self, cell: CellImpl, glbls: MutableGlobals) -> None:
+        """The editor kernel tessellates what the cell made in the background (see :mod:`..scene.prewarm`)."""
+
+        if self._scope is not None or os.environ.get("SCA_NO_PREVIEW_WARM"):
+            return
+        from ..scene import prewarm
+
+        prewarm.submit(glbls[name] for name in cell.defs if name in glbls)
 
     def _apply_saved(
         self, scope: NotebookScope, cell: CellImpl, glbls: MutableGlobals
@@ -178,6 +202,29 @@ def _prefetch(scope: NotebookScope, cell: CellImpl, glbls: MutableGlobals) -> No
         prefetch.start(scope.config.directory, cell.code, glbls, scope.config.id)
     except Exception:  # noqa: BLE001 - an optimisation, never a reason for a cell to fail
         pass
+
+
+def _restored_label(cache: CellCache | None, cell: CellImpl) -> str:
+    if cache is None:
+        return "restored"
+    key, values, lineage = cache.last_timing.get(cell.cell_id, (0.0, 0.0, 0.0))
+    where = "memory" if cell.cell_id in cache.from_memory else "disk"
+    return f"restored ({where}; key {key:.0f} ms, values {values:.0f} ms, lineage {lineage:.0f} ms)"
+
+
+def _trace(cell: CellImpl, what: str, began: float) -> None:
+    """``SCA_EDITOR_TRACE=1``: what the cache did with a cell of the editor's kernel, and how long it took."""
+
+    if os.environ.get("SCA_EDITOR_TRACE"):
+        import sys
+
+        line = f"[sca cell] {str(cell.cell_id)[-4:]} {what}: {(time.perf_counter() - began) * 1000:.0f} ms"
+        print(line, file=sys.stderr, flush=True)
+        # (a marimo kernel's own streams belong to the cells' console: a file is where a trace can be read)
+        target = os.environ.get("SCA_EDITOR_TRACE_FILE")
+        if target:
+            with open(target, "a", encoding="utf-8") as handle:
+                handle.write(f"{time.strftime('%H:%M:%S')} {line}\n")
 
 
 _MISS = object()
@@ -246,7 +293,7 @@ def _kernel_cache(scope: NotebookScope, cell: CellImpl) -> CellCache | None:
         return entry.lifecycle
     entry = _KernelCache(graph=graph, signature=signature, digests=digests, lifecycle=None)  # type: ignore[arg-type]
     entry.lifecycle = CellCache(
-        graph, cache_root(config), lambda item: entry.digests.digest(item.cell_id)
+        graph, cache_root(config), lambda item: entry.digests.digest(item.cell_id), memory=True
     )
     _kernel_caches[config.path] = entry
     return entry.lifecycle

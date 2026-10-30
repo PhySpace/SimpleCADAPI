@@ -16,8 +16,8 @@ using Sha256Digest = std::array<std::uint8_t, 32>;
 using Sha1Digest = std::array<std::uint8_t, 20>;
 
 Sha256Digest sha256(std::string_view data) noexcept;
-std::string sha256_hex(std::string_view data);       // 64 lower-case hex characters
-std::string sha256_tagged(std::string_view data);    // "sha256:<hex>", the artifact digest spelling
+std::string sha256_hex(std::string_view data);     // 64 lower-case hex characters
+std::string sha256_tagged(std::string_view data);  // "sha256:<hex>", the artifact digest spelling
 Sha1Digest sha1(std::string_view data) noexcept;
 
 std::string to_hex(const std::uint8_t* bytes, std::size_t count);

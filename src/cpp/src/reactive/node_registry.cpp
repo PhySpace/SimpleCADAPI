@@ -29,7 +29,8 @@ NodePtr find_registered_node(std::string_view graph_id, std::string_view node_id
   Registry& r = registry();
   const std::lock_guard lock(r.mutex);
   const auto graph = r.graphs.find(std::string(graph_id));
-  if (graph == r.graphs.end()) return nullptr;
+  if (graph == r.graphs.end())
+    return nullptr;
   const auto found = graph->second.find(std::string(node_id));
   return found == graph->second.end() ? nullptr : found->second;
 }

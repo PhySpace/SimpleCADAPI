@@ -1,0 +1,26 @@
+# clang-tidy configuration for the C++ engine.  Deliberately small: only checks with a high signal-to-noise ratio on
+# this code base.  No readability-* (naming/style is clang-format's and the code review's job).  Not a blocking CI gate
+# yet; the "clang-tidy (advisory)" job in .github/workflows/ci.yml runs it on changed files only.
+# Needs a compile_commands.json (cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON).
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-exception-escape,
+  -bugprone-narrowing-conversions,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-branch-clone,
+  -bugprone-macro-parentheses,
+  -bugprone-reserved-identifier,
+  performance-for-range-copy,
+  performance-implicit-conversion-in-loop,
+  performance-inefficient-vector-operation,
+  performance-move-const-arg,
+  performance-unnecessary-copy-initialization,
+  performance-unnecessary-value-param,
+  misc-unused-alias-decls,
+  misc-unused-parameters,
+  misc-unused-using-decls
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*/src/cpp/(src|include|bindings)/.*'
+FormatStyle: none

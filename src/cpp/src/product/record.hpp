@@ -28,15 +28,22 @@ inline OpRecord op_record(std::string op, Value params) {
 namespace lineage {
 // A product value by reference, however it is held.
 template <class V>
-const V& deref(const V& value) { return value; }
+const V& deref(const V& value) {
+  return value;
+}
 template <class V>
-const V& deref(const std::shared_ptr<const V>& value) { return *value; }
+const V& deref(const std::shared_ptr<const V>& value) {
+  return *value;
+}
 
 template <class V>
-void add(std::vector<ValueLineage>& out, const V& value) { scad::detail::collect_lineage(out, deref(value)); }
+void add(std::vector<ValueLineage>& out, const V& value) {
+  scad::detail::collect_lineage(out, deref(value));
+}
 template <class V>
 void add(std::vector<ValueLineage>& out, const std::optional<V>& value) {
-  if (value) scad::detail::collect_lineage(out, *value);
+  if (value)
+    scad::detail::collect_lineage(out, *value);
 }
 inline void add(std::vector<ValueLineage>& out, const Item& item) {
   std::visit([&out](const auto& held) { scad::detail::collect_lineage(out, *held); }, item);
@@ -50,7 +57,8 @@ inline void add(std::vector<ValueLineage>& out, const Item& item) {
 template <class Build, class Out, class... In>
 void record_value(Build&& build, const Out& output, const In&... inputs) {
   Recorder* recorder = current_recorder();
-  if (recorder == nullptr) return;
+  if (recorder == nullptr)
+    return;
   std::vector<ValueLineage> lineages;
   (lineage::add(lineages, inputs), ...);
   const OpRecord record = std::forward<Build>(build)();
@@ -61,7 +69,8 @@ void record_value(Build&& build, const Out& output, const In&... inputs) {
 // As record_value, for an operation whose result is a shape.
 template <class Build>
 void record_shape(const Shape& output, Build&& build) {
-  if (current_recorder() != nullptr) record_operation(std::forward<Build>(build)(), {output});
+  if (current_recorder() != nullptr)
+    record_operation(std::forward<Build>(build)(), {output});
 }
 
 }  // namespace scad::product::detail

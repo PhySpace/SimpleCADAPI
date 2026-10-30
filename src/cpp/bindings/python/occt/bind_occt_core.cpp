@@ -66,12 +66,15 @@ void shape_members(Cls& cls) {
       .def("Orientation", [](const TopoDS_Shape& s) { return s.Orientation(); })
       .def("Orientation", [](TopoDS_Shape& s, TopAbs_Orientation o) { s.Orientation(o); })
       .def("Location", [](const TopoDS_Shape& s) { return s.Location(); })
-      .def("Location", [](TopoDS_Shape& s, const TopLoc_Location& l, bool raise) { s.Location(l, raise); }, py::arg("Loc"),
-           py::arg("theRaiseExc") = true)
-      .def("Located", [](const TopoDS_Shape& s, const TopLoc_Location& l, bool raise) { return s.Located(l, raise); },
-           py::arg("theLoc"), py::arg("theRaiseExc") = true)
-      .def("Moved", [](const TopoDS_Shape& s, const TopLoc_Location& l, bool raise) { return s.Moved(l, raise); },
-           py::arg("thePosition"), py::arg("theRaiseExc") = true)
+      .def(
+          "Location", [](TopoDS_Shape& s, const TopLoc_Location& l, bool raise) { s.Location(l, raise); },
+          py::arg("Loc"), py::arg("theRaiseExc") = true)
+      .def(
+          "Located", [](const TopoDS_Shape& s, const TopLoc_Location& l, bool raise) { return s.Located(l, raise); },
+          py::arg("theLoc"), py::arg("theRaiseExc") = true)
+      .def(
+          "Moved", [](const TopoDS_Shape& s, const TopLoc_Location& l, bool raise) { return s.Moved(l, raise); },
+          py::arg("thePosition"), py::arg("theRaiseExc") = true)
       .def("Oriented", &TopoDS_Shape::Oriented)
       .def("Reversed", &TopoDS_Shape::Reversed)
       .def("Reverse", &TopoDS_Shape::Reverse)
@@ -89,9 +92,14 @@ void shape_members(Cls& cls) {
       .def("Infinite", [](const TopoDS_Shape& s) { return s.Infinite(); })
       .def("Modified", [](const TopoDS_Shape& s) { return s.Modified(); })
       .def("Orientable", [](const TopoDS_Shape& s) { return s.Orientable(); })
-      .def("HashCode", [](const TopoDS_Shape& s, int upper) { return static_cast<long>(std::hash<TopoDS_Shape>{}(s) % static_cast<std::size_t>(upper)); },
-           py::arg("theUpperBound") = 2147483647)
-      .def("__eq__", [](const TopoDS_Shape& a, const TopoDS_Shape& b) { return a.IsEqual(b); }, py::is_operator())
+      .def(
+          "HashCode",
+          [](const TopoDS_Shape& s, int upper) {
+            return static_cast<long>(std::hash<TopoDS_Shape>{}(s) % static_cast<std::size_t>(upper));
+          },
+          py::arg("theUpperBound") = 2147483647)
+      .def(
+          "__eq__", [](const TopoDS_Shape& a, const TopoDS_Shape& b) { return a.IsEqual(b); }, py::is_operator())
       .def("__hash__", [](const TopoDS_Shape& s) { return std::hash<TopoDS_Shape>{}(s); });
 }
 
@@ -103,7 +111,8 @@ void sub_shape(py::module_& m, const char* name) {
 }  // namespace
 
 void bind_core(py::module_& m) {
-  m.attr("OCC_VERSION_COMPLETE") = OCC_VERSION_COMPLETE;  // "7.9.3": what OCP calls its version, minus its own build number
+  m.attr("OCC_VERSION_COMPLETE") =
+      OCC_VERSION_COMPLETE;  // "7.9.3": what OCP calls its version, minus its own build number
   // ---- enums -------------------------------------------------------------------------------------------------
   py::enum_<TopAbs_ShapeEnum>(m, "TopAbs_ShapeEnum")
       .value("TopAbs_COMPOUND", TopAbs_COMPOUND)
@@ -260,10 +269,9 @@ void bind_core(py::module_& m) {
       .def("SetTranslation", [](gp_Trsf& t, const gp_Vec& v) { t.SetTranslation(v); })
       .def("SetScale", [](gp_Trsf& t, const gp_Pnt& p, double s) { t.SetScale(p, s); })
       .def("SetMirror", [](gp_Trsf& t, const gp_Ax1& a) { t.SetMirror(a); })
-      .def("SetValues", [](gp_Trsf& t, double a11, double a12, double a13, double a14, double a21, double a22, double a23,
-                           double a24, double a31, double a32, double a33, double a34) {
-        t.SetValues(a11, a12, a13, a14, a21, a22, a23, a24, a31, a32, a33, a34);
-      })
+      .def("SetValues", [](gp_Trsf& t, double a11, double a12, double a13, double a14, double a21, double a22,
+                           double a23, double a24, double a31, double a32, double a33,
+                           double a34) { t.SetValues(a11, a12, a13, a14, a21, a22, a23, a24, a31, a32, a33, a34); })
       .def("TranslationPart", [](const gp_Trsf& t) { return t.TranslationPart(); })
       .def("Value", [](const gp_Trsf& t, int r, int c) { return t.Value(r, c); })
       .def("ScaleFactor", &gp_Trsf::ScaleFactor)
@@ -357,7 +365,8 @@ void bind_core(py::module_& m) {
       .def("MakeShell", [](const TopoDS_Builder& b, TopoDS_Shell& s) { b.MakeShell(s); })
       .def("MakeWire", [](const TopoDS_Builder& b, TopoDS_Wire& w) { b.MakeWire(w); })
       .def("Add", [](const TopoDS_Builder& b, TopoDS_Shape& whole, const TopoDS_Shape& part) { b.Add(whole, part); })
-      .def("Remove", [](const TopoDS_Builder& b, TopoDS_Shape& whole, const TopoDS_Shape& part) { b.Remove(whole, part); });
+      .def("Remove",
+           [](const TopoDS_Builder& b, TopoDS_Shape& whole, const TopoDS_Shape& part) { b.Remove(whole, part); });
 
   // ---- TopExp / TopTools -------------------------------------------------------------------------------------
   py::class_<TopTools_ListOfShape>(m, "TopTools_ListOfShape")
@@ -373,7 +382,8 @@ void bind_core(py::module_& m) {
       .def("__len__", [](const TopTools_ListOfShape& l) { return l.Extent(); })
       .def("__iter__", [](const TopTools_ListOfShape& l) {
         py::list items;
-        for (TopTools_ListIteratorOfListOfShape it(l); it.More(); it.Next()) items.append(it.Value());
+        for (TopTools_ListIteratorOfListOfShape it(l); it.More(); it.Next())
+          items.append(it.Value());
         return py::iter(items);
       });
 
@@ -389,19 +399,33 @@ void bind_core(py::module_& m) {
       .def("__len__", [](const TopTools_IndexedMapOfShape& map) { return map.Extent(); });
 
   py::class_<TopExp>(m, "TopExp")
-      .def_static("MapShapes_s", [](const TopoDS_Shape& s, TopAbs_ShapeEnum t, TopTools_IndexedMapOfShape& map) { TopExp::MapShapes(s, t, map); })
-      .def_static("MapShapes_s", [](const TopoDS_Shape& s, TopTools_IndexedMapOfShape& map) { TopExp::MapShapes(s, map); })
-      .def_static("FirstVertex_s", [](const TopoDS_Edge& e, bool cumOri) { return TopExp::FirstVertex(e, cumOri); }, py::arg("E"), py::arg("CumOri") = false)
-      .def_static("LastVertex_s", [](const TopoDS_Edge& e, bool cumOri) { return TopExp::LastVertex(e, cumOri); }, py::arg("E"), py::arg("CumOri") = false)
-      .def_static("Vertices_s", [](const TopoDS_Edge& e, TopoDS_Vertex& v1, TopoDS_Vertex& v2, bool cumOri) { TopExp::Vertices(e, v1, v2, cumOri); },
-                  py::arg("E"), py::arg("Vfirst"), py::arg("Vlast"), py::arg("CumOri") = false);
+      .def_static("MapShapes_s", [](const TopoDS_Shape& s, TopAbs_ShapeEnum t,
+                                    TopTools_IndexedMapOfShape& map) { TopExp::MapShapes(s, t, map); })
+      .def_static("MapShapes_s",
+                  [](const TopoDS_Shape& s, TopTools_IndexedMapOfShape& map) { TopExp::MapShapes(s, map); })
+      .def_static(
+          "FirstVertex_s", [](const TopoDS_Edge& e, bool cumOri) { return TopExp::FirstVertex(e, cumOri); },
+          py::arg("E"), py::arg("CumOri") = false)
+      .def_static(
+          "LastVertex_s", [](const TopoDS_Edge& e, bool cumOri) { return TopExp::LastVertex(e, cumOri); }, py::arg("E"),
+          py::arg("CumOri") = false)
+      .def_static(
+          "Vertices_s",
+          [](const TopoDS_Edge& e, TopoDS_Vertex& v1, TopoDS_Vertex& v2, bool cumOri) {
+            TopExp::Vertices(e, v1, v2, cumOri);
+          },
+          py::arg("E"), py::arg("Vfirst"), py::arg("Vlast"), py::arg("CumOri") = false);
 
   py::class_<TopExp_Explorer>(m, "TopExp_Explorer")
       .def(py::init<>())
       .def(py::init<const TopoDS_Shape&, TopAbs_ShapeEnum, TopAbs_ShapeEnum>(), py::arg("S"), py::arg("ToFind"),
            py::arg("ToAvoid") = TopAbs_SHAPE)
-      .def("Init", [](TopExp_Explorer& e, const TopoDS_Shape& s, TopAbs_ShapeEnum find, TopAbs_ShapeEnum avoid) { e.Init(s, find, avoid); },
-           py::arg("S"), py::arg("ToFind"), py::arg("ToAvoid") = TopAbs_SHAPE)
+      .def(
+          "Init",
+          [](TopExp_Explorer& e, const TopoDS_Shape& s, TopAbs_ShapeEnum find, TopAbs_ShapeEnum avoid) {
+            e.Init(s, find, avoid);
+          },
+          py::arg("S"), py::arg("ToFind"), py::arg("ToAvoid") = TopAbs_SHAPE)
       .def("More", &TopExp_Explorer::More)
       .def("Next", &TopExp_Explorer::Next)
       .def("Current", [](const TopExp_Explorer& e) { return e.Current(); })
@@ -425,9 +449,11 @@ void bind_core(py::module_& m) {
       .def("MakeEdge", [](const BRep_Builder& b, TopoDS_Edge& e) { b.MakeEdge(e); })
       .def("MakeFace", [](const BRep_Builder& b, TopoDS_Face& f) { b.MakeFace(f); })
       .def("MakeVertex", [](const BRep_Builder& b, TopoDS_Vertex& v) { b.MakeVertex(v); })
-      .def("MakeVertex", [](const BRep_Builder& b, TopoDS_Vertex& v, const gp_Pnt& p, double tol) { b.MakeVertex(v, p, tol); })
+      .def("MakeVertex",
+           [](const BRep_Builder& b, TopoDS_Vertex& v, const gp_Pnt& p, double tol) { b.MakeVertex(v, p, tol); })
       .def("Degenerated", [](const BRep_Builder& b, const TopoDS_Edge& e, bool d) { b.Degenerated(e, d); })
-      .def("UpdateVertex", [](const BRep_Builder& b, const TopoDS_Vertex& v, const gp_Pnt& p, double tol) { b.UpdateVertex(v, p, tol); })
+      .def("UpdateVertex", [](const BRep_Builder& b, const TopoDS_Vertex& v, const gp_Pnt& p,
+                              double tol) { b.UpdateVertex(v, p, tol); })
       .def("UpdateEdge", [](const BRep_Builder& b, const TopoDS_Edge& e, double tol) { b.UpdateEdge(e, tol); })
       .def("UpdateFace", [](const BRep_Builder& b, const TopoDS_Face& f, double tol) { b.UpdateFace(f, tol); });
 
@@ -439,28 +465,38 @@ void bind_core(py::module_& m) {
       .def_static("Degenerated_s", [](const TopoDS_Edge& e) { return BRep_Tool::Degenerated(e); })
       .def_static("IsClosed_s", [](const TopoDS_Shape& s) { return BRep_Tool::IsClosed(s); })
       .def_static("IsClosed_s", [](const TopoDS_Edge& e, const TopoDS_Face& f) { return BRep_Tool::IsClosed(e, f); })
-      .def_static("Range_s", [](const TopoDS_Edge& e, const TopoDS_Face& f) {
-        double a = 0.0, b = 0.0;
-        BRep_Tool::Range(e, f, a, b);
-        return py::make_tuple(a, b);
-      })
-      .def_static("Range_s", [](const TopoDS_Edge& e) {
-        double a = 0.0, b = 0.0;
-        BRep_Tool::Range(e, a, b);
-        return py::make_tuple(a, b);
-      })
+      .def_static("Range_s",
+                  [](const TopoDS_Edge& e, const TopoDS_Face& f) {
+                    double a = 0.0, b = 0.0;
+                    BRep_Tool::Range(e, f, a, b);
+                    return py::make_tuple(a, b);
+                  })
+      .def_static("Range_s",
+                  [](const TopoDS_Edge& e) {
+                    double a = 0.0, b = 0.0;
+                    BRep_Tool::Range(e, a, b);
+                    return py::make_tuple(a, b);
+                  })
       .def_static("Surface_s", [](const TopoDS_Face& f) { return BRep_Tool::Surface(f); })
       // OCP returns the curve alone: the parameter range is read with Range_s
-      .def_static("Curve_s", [](const TopoDS_Edge& e, double, double) {
-        double a = 0.0, b = 0.0;
-        return BRep_Tool::Curve(e, a, b);
-      }, py::arg("E"), py::arg("First") = 0.0, py::arg("Last") = 0.0)
-      .def_static("CurveOnSurface_s", [](const TopoDS_Edge& e, const TopoDS_Face& f, double, double) {
-        double a = 0.0, b = 0.0;
-        return BRep_Tool::CurveOnSurface(e, f, a, b);
-      }, py::arg("E"), py::arg("F"), py::arg("First") = 0.0, py::arg("Last") = 0.0)
-      .def_static("Continuity_s", [](const TopoDS_Edge& e, const TopoDS_Face& f1, const TopoDS_Face& f2) { return BRep_Tool::Continuity(e, f1, f2); })
-      .def_static("Triangulation_s", [](const TopoDS_Face& f, TopLoc_Location& loc) { return BRep_Tool::Triangulation(f, loc); })
+      .def_static(
+          "Curve_s",
+          [](const TopoDS_Edge& e, double, double) {
+            double a = 0.0, b = 0.0;
+            return BRep_Tool::Curve(e, a, b);
+          },
+          py::arg("E"), py::arg("First") = 0.0, py::arg("Last") = 0.0)
+      .def_static(
+          "CurveOnSurface_s",
+          [](const TopoDS_Edge& e, const TopoDS_Face& f, double, double) {
+            double a = 0.0, b = 0.0;
+            return BRep_Tool::CurveOnSurface(e, f, a, b);
+          },
+          py::arg("E"), py::arg("F"), py::arg("First") = 0.0, py::arg("Last") = 0.0)
+      .def_static("Continuity_s", [](const TopoDS_Edge& e, const TopoDS_Face& f1,
+                                     const TopoDS_Face& f2) { return BRep_Tool::Continuity(e, f1, f2); })
+      .def_static("Triangulation_s",
+                  [](const TopoDS_Face& f, TopLoc_Location& loc) { return BRep_Tool::Triangulation(f, loc); })
       .def_static("Triangulation_s", [](const TopoDS_Face& f, TopLoc_Location& loc, int purpose) {
         return BRep_Tool::Triangulation(f, loc, static_cast<Poly_MeshPurpose>(purpose));
       });

@@ -15,15 +15,17 @@ namespace {
 
 const std::set<std::string>& basic_kinds() {
   static const std::set<std::string> kinds{
-      "coincident",   "horizontal",   "vertical",    "points_horizontal", "points_vertical", "parallel",
-      "perpendicular", "collinear",   "equal_length", "equal_radius",     "distance",        "distance_x",
-      "distance_y",    "length",      "major_radius", "minor_radius",     "radius",          "diameter",
-      "point_on",      "angle",       "concentric",   "midpoint"};
+      "coincident",    "horizontal", "vertical",     "points_horizontal", "points_vertical", "parallel",
+      "perpendicular", "collinear",  "equal_length", "equal_radius",      "distance",        "distance_x",
+      "distance_y",    "length",     "major_radius", "minor_radius",      "radius",          "diameter",
+      "point_on",      "angle",      "concentric",   "midpoint"};
   return kinds;
 }
 
 // Python's `value % 360.0` (result in [0, 360)).
-double positive_mod(double value, double modulus) { return value - modulus * std::floor(value / modulus); }
+double positive_mod(double value, double modulus) {
+  return value - modulus * std::floor(value / modulus);
+}
 
 void lower_point_on(Model& m, const SketchConstraint& c) {
   const Pt p = m.point(m.target(c, 0));
@@ -86,7 +88,9 @@ void lower_ellipse_radius(Model& m, const SketchConstraint& c) {
 
 }  // namespace
 
-bool is_basic_kind(const std::string& kind) { return basic_kinds().count(kind) != 0; }
+bool is_basic_kind(const std::string& kind) {
+  return basic_kinds().count(kind) != 0;
+}
 
 void lower_basic(Model& m, const SketchConstraint& c) {
   const std::string& kind = c.kind;

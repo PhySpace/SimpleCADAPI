@@ -31,7 +31,8 @@ struct RadiusRef {
   Pt center;
   Pt start;
   Dual operator()(const Env& env) const {
-    if (param >= 0) return env(param);
+    if (param >= 0)
+      return env(param);
     return length(env(start) - env(center));
   }
 };
@@ -49,10 +50,10 @@ class Model {
 
   const Sketch& sketch;
   System system;
-  std::unordered_map<std::string, Pt> points;           // point entity -> parameters
-  std::unordered_map<std::string, int> radius_params;   // circle entity -> radius parameter
-  std::unordered_map<std::string, SplineModel> splines; // bspline entity -> representation
-  std::vector<const SketchConstraint*> measurements;    // driving == false, in order
+  std::unordered_map<std::string, Pt> points;            // point entity -> parameters
+  std::unordered_map<std::string, int> radius_params;    // circle entity -> radius parameter
+  std::unordered_map<std::string, SplineModel> splines;  // bspline entity -> representation
+  std::vector<const SketchConstraint*> measurements;     // driving == false, in order
 
   // ---- lookups used by lowering and assembly -----------------------------
   const SketchEntity& entity(const SketchRef& ref) const;

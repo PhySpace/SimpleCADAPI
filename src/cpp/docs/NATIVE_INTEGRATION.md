@@ -1,3 +1,8 @@
+> **Historical.** This is the plan the native-backend work started from (2026-10-21). The `SCA_BACKEND` switch, the
+> `_native/` finder and the `SimpleCADAPI-native` worktree it describes no longer exist: the engine is the only backend and
+> the Python adapter is `src/simplecadapi/_glue`. Current rules: [../CONTRIBUTING.md](../CONTRIBUTING.md); results:
+> [NATIVE_PROGRESS.md](NATIVE_PROGRESS.md).
+
 # Running the SDK on the native backend
 
 Goal (owner, 2026-10-21): `sca editor` runs `sandbox-envs/desktop_arm_sources` (the 6-DOF arm,
@@ -15,7 +20,7 @@ ids, ...) are optimised in C++.
   `<repo>/cpp/build/<yours>/python` on `PYTHONPATH`.
 - The sandbox is copied into `SimpleCADAPI-native/sandbox-envs/desktop_arm_sources` and is
   git-ignored (keep it untracked). `tools/profile_arm6.py` finds it there.
-- The C++ project lives in this repo under `cpp/` (see src/cpp/ARCHITECTURE.md, src/cpp/AGENTS.md). One folder, one branch.
+- The C++ project lives in this repo under `cpp/` (see src/cpp/ARCHITECTURE.md and src/cpp/CONTRIBUTING.md). One folder, one branch.
 
 ## Design
 

@@ -6,7 +6,9 @@ namespace scad {
 
 namespace {
 
-std::string indexed(const std::string& path, std::size_t index) { return path + "[" + std::to_string(index) + "]"; }
+std::string indexed(const std::string& path, std::size_t index) {
+  return path + "[" + std::to_string(index) + "]";
+}
 
 }  // namespace
 
@@ -19,7 +21,8 @@ OpParams::OpParams(std::string op, std::vector<std::string> labels) {
 OpParams& OpParams::scalar(std::string_view name, const Scalar& value) {
   const std::string path(name);
   record_.params.set(path, Value(evaluate_scalar(value, path)));
-  if (value.symbolic()) record_.symbolic.emplace_back(path, value);
+  if (value.symbolic())
+    record_.symbolic.emplace_back(path, value);
   return *this;
 }
 
@@ -32,7 +35,8 @@ Value coordinate_array(const Coordinates& coordinates, const std::string& path, 
   for (std::size_t i = 0; i < coordinates.size(); ++i) {
     const std::string item = indexed(path, i);
     items.push_back(Value(evaluate_scalar(coordinates[i], item)));
-    if (coordinates[i].symbolic()) record.symbolic.emplace_back(item, coordinates[i]);
+    if (coordinates[i].symbolic())
+      record.symbolic.emplace_back(item, coordinates[i]);
   }
   return tuple ? Value::tuple(std::move(items)) : Value(std::move(items));
 }
@@ -50,14 +54,16 @@ OpParams& OpParams::optional_point(std::string_view name, const std::optional<Sc
 
 OpParams& OpParams::points(std::string_view name, const std::vector<Scalar3>& value) {
   Value out = Value::array();
-  for (std::size_t i = 0; i < value.size(); ++i) out.push_back(coordinate_array(value[i], indexed(std::string(name), i), record_));
+  for (std::size_t i = 0; i < value.size(); ++i)
+    out.push_back(coordinate_array(value[i], indexed(std::string(name), i), record_));
   record_.params.set(std::string(name), std::move(out));
   return *this;
 }
 
 OpParams& OpParams::coordinates(std::string_view name, const std::vector<ScalarPoint>& value) {
   Value out = Value::array();
-  for (std::size_t i = 0; i < value.size(); ++i) out.push_back(coordinate_array(value[i], indexed(std::string(name), i), record_));
+  for (std::size_t i = 0; i < value.size(); ++i)
+    out.push_back(coordinate_array(value[i], indexed(std::string(name), i), record_));
   record_.params.set(std::string(name), std::move(out));
   return *this;
 }
@@ -78,14 +84,16 @@ OpParams& OpParams::vec(std::string_view name, const Vec3& value) {
 
 OpParams& OpParams::numbers(std::string_view name, const std::vector<double>& value) {
   Value out = Value::array();
-  for (const double number : value) out.push_back(Value(number));
+  for (const double number : value)
+    out.push_back(Value(number));
   record_.params.set(std::string(name), std::move(out));
   return *this;
 }
 
 OpParams& OpParams::integers(std::string_view name, const std::vector<int>& value) {
   Value out = Value::array();
-  for (const int number : value) out.push_back(Value(number));
+  for (const int number : value)
+    out.push_back(Value(number));
   record_.params.set(std::string(name), std::move(out));
   return *this;
 }
@@ -119,7 +127,9 @@ OpParams& OpParams::input(Shape shape, std::string role) {
   return *this;
 }
 
-OpRecord OpParams::take() { return std::move(record_); }
+OpRecord OpParams::take() {
+  return std::move(record_);
+}
 
 namespace {
 
@@ -132,7 +142,11 @@ std::vector<std::string> sorted_labels(std::string_view role, std::string_view k
 
 }  // namespace
 
-std::vector<std::string> primitive_labels(std::string_view kind) { return sorted_labels("primitive", kind); }
-std::vector<std::string> derived_labels(std::string_view kind) { return sorted_labels("derived", kind); }
+std::vector<std::string> primitive_labels(std::string_view kind) {
+  return sorted_labels("primitive", kind);
+}
+std::vector<std::string> derived_labels(std::string_view kind) {
+  return sorted_labels("derived", kind);
+}
 
 }  // namespace scad

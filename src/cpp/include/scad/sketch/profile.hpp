@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "scad/core/engaged.hpp"
 #include "scad/core/value.hpp"
 #include "scad/core/vec.hpp"
 #include "scad/sketch/sketch.hpp"
@@ -20,13 +21,13 @@ namespace scad {
 // `profile: int | str` -- an index into the profile list or a profile id.
 class SketchProfileId {
  public:
-  SketchProfileId(int index = 0) : index_(index) {}                       // NOLINT(google-explicit-constructor)
-  SketchProfileId(std::string id) : id_(std::move(id)) {}                 // NOLINT(google-explicit-constructor)
-  SketchProfileId(const char* id) : id_(id) {}                            // NOLINT(google-explicit-constructor)
+  SketchProfileId(int index = 0) : index_(index) {}        // NOLINT(google-explicit-constructor)
+  SketchProfileId(std::string id) : id_(std::move(id)) {}  // NOLINT(google-explicit-constructor)
+  SketchProfileId(const char* id) : id_(id) {}             // NOLINT(google-explicit-constructor)
 
   bool is_index() const noexcept { return !id_.has_value(); }
   int index() const noexcept { return index_; }
-  const std::string& id() const { return *id_; }
+  const std::string& id() const { return require_engaged(id_, "id() is only valid when is_index() is false"); }
   // The JSON form recorded in metadata: a number or a string.
   Value to_value() const { return id_ ? Value(*id_) : Value(index_); }
 

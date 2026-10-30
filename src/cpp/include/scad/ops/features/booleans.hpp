@@ -11,9 +11,9 @@
 namespace scad {
 
 struct UnionOptions {
-  bool clean = true;  // unify same-domain faces afterwards
-  bool glue = false;  // try OCC's glue optimisation first; a non-conclusive result is retried plain
-  std::optional<double> tol;  // fuzzy tolerance; default scales with the operands' extent
+  bool clean = true;                     // unify same-domain faces afterwards
+  bool glue = false;                     // try OCC's glue optimisation first; a non-conclusive result is retried plain
+  std::optional<double> tol;             // fuzzy tolerance; default scales with the operands' extent
   std::string tracking_policy = "full";  // "graph": record the node, compute no topology delta
 };
 

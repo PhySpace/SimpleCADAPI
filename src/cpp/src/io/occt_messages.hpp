@@ -20,13 +20,15 @@ namespace scad::io::detail {
 class MessageCapture {
  public:
   MessageCapture() : messenger_(Message::DefaultMessenger()), printer_(new Printer) {
-    for (const Handle(Message_Printer)& existing : messenger_->Printers()) saved_.push_back(existing);
+    for (const Handle(Message_Printer) & existing : messenger_->Printers())
+      saved_.push_back(existing);
     messenger_->ChangePrinters().Clear();
     messenger_->AddPrinter(printer_);
   }
   ~MessageCapture() {
     messenger_->ChangePrinters().Clear();
-    for (const Handle(Message_Printer)& existing : saved_) messenger_->AddPrinter(existing);
+    for (const Handle(Message_Printer) & existing : saved_)
+      messenger_->AddPrinter(existing);
   }
   MessageCapture(const MessageCapture&) = delete;
   MessageCapture& operator=(const MessageCapture&) = delete;
@@ -34,8 +36,10 @@ class MessageCapture {
   // The captured lines, trimmed and capped (the head is the most informative part).
   std::string text(std::size_t max_chars = 1500) const {
     std::string out = printer_->buffer;
-    while (!out.empty() && (out.back() == '\n' || out.back() == ' ')) out.pop_back();
-    if (out.size() > max_chars) out = out.substr(0, max_chars) + "...";
+    while (!out.empty() && (out.back() == '\n' || out.back() == ' '))
+      out.pop_back();
+    if (out.size() > max_chars)
+      out = out.substr(0, max_chars) + "...";
     return out;
   }
 

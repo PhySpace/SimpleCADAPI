@@ -1,13 +1,14 @@
 # Area briefs
 
-Condensed work orders for each area. Every one assumes the reader has first read
-`ARCHITECTURE.md` and `AGENTS.md`. They are what the first wave of parallel engineers was given;
-reuse them verbatim to resume an area, adding "continue from the code already in your area:
-read it first, then finish what is missing". Reference Python: `../SimpleCADAPI/src/simplecadapi`
-(read-only), tests in `../SimpleCADAPI/test`.
+> **Historical.** Condensed work orders the first wave of area owners was given while the port was written. They are kept
+> because each says which Python modules and tests an area ports; the rules they mention are now in
+> [../CONTRIBUTING.md](../CONTRIBUTING.md), and the Python sources they name are the 2.2.6 modules
+> (`operators/`, `topology/`, ...), which are forwarding modules in this tree.
 
-Rules for every area: own only your directories; build only your own targets in your own build
-dir (`build/<area>`, `ninja -j4`); no git; no questions (decide, document); end with a report.
+Reference Python: the 2.2.6 SDK; tests: `test/` and `tests/`.
+
+Rules at the time: own only your directories; build only your own targets in your own build
+dir; end with a report.
 
 ## semantic (tags)
 Own `include/scad/semantic/` (except `tracking.hpp`), `src/semantic/` (except `tracking_*`),

@@ -89,6 +89,36 @@ function isHiddenEdge(entity: Entity | undefined): boolean {
  */
 const EDGE_DEPTH_BIAS = 0.0004;
 
+type BuiltPart = {
+  faces: THREE.BufferGeometry;
+  pick: THREE.BufferGeometry;
+  edges: LineSegmentsGeometry;
+  vertices: THREE.BufferGeometry | null;
+  sidecar: EntitySidecar;
+};
+
+function disposeBuilt(built: BuiltPart): void {
+  built.faces.dispose();
+  built.pick.dispose();
+  built.edges.dispose();
+  built.vertices?.dispose();
+}
+
+/** Free the materials under *root* and leave its geometries alone (a preview's parts outlive its nodes). */
+function disposeMaterials(root: THREE.Object3D): void {
+  const done = new Set<THREE.Material>();
+  root.traverse((object) => {
+    const material = (object as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+    if (!material) return;
+    for (const item of Array.isArray(material) ? material : [material]) {
+      if (!done.has(item)) {
+        item.dispose();
+        done.add(item);
+      }
+    }
+  });
+}
+
 function createEdgeMaterial(color: string): LineMaterial {
   const material = new LineMaterial({ color, linewidth: CAD_EDGE_LINE_WIDTH, worldUnits: false, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   material.onBeforeCompile = (shader) => {
@@ -139,7 +169,8 @@ export class BRepRenderer {
   private grid: THREE.LineSegments | null = null;
   /** Entity sidecars of the preview's parts, by node id (a preview has no package). */
   private previewSidecars = new Map<string, EntitySidecar>();
-  private previewGeometries: THREE.BufferGeometry[] = [];
+  /** The geometry built for each part of the preview on screen, by part key: the next preview reuses what it shares. */
+  private previewBuilt = new Map<string, BuiltPart>();
   private readonly gizmoScene = new THREE.Scene();
   private readonly gizmoCamera = new THREE.OrthographicCamera(-1.5, 1.5, 1.5, -1.5, 0.1, 20);
 
@@ -626,10 +657,13 @@ export class BRepRenderer {
   loadPreview(preview: PreviewData): void {
     this.needsRender = true;
     const hadScene = this.modelRoot.children.length > 0;
-    this.clearScene();
+    // What is on screen is a preview: its nodes go and its parts stay, so the parts this one shares are not built
+    // again (building a part's edge lines is most of the time a preview takes to show).  Anything else goes whole.
+    if (this.previewSidecars.size > 0) this.clearPreviewNodes();
+    else this.clearScene();
     this.files = {};
     const nodes: SceneNode[] = [];
-    const built = new Map<string, { faces: THREE.BufferGeometry; pick: THREE.BufferGeometry; edges: LineSegmentsGeometry; vertices: THREE.BufferGeometry | null; sidecar: EntitySidecar }>();
+    const built = this.previewBuilt;
     const material = (part: PreviewPart) => part && materialFor({ material_id: null } as SceneNode);
     const buildPart = (part: PreviewPart) => {
       const faces = new THREE.BufferGeometry();
@@ -672,7 +706,6 @@ export class BRepRenderer {
         face_groups: part.faceGroups,
         edge_groups: part.edgeGroups,
       };
-      this.previewGeometries.push(faces, pick, edges, ...(vertices ? [vertices] : []));
       return { faces, pick, edges, vertices, sidecar };
     };
     const edgeMaterial = createEdgeMaterial(this.palette.edge);
@@ -729,6 +762,12 @@ export class BRepRenderer {
       object.add(group);
       this.nodeObjects.set(item.nodeId, object);
       this.modelRoot.add(object);
+    }
+    for (const [key, part] of built) {
+      if (!preview.parts.has(key)) {
+        disposeBuilt(part);
+        built.delete(key);
+      }
     }
     this.manifest = { schema_version: '2.0', nodes } as unknown as SceneManifest;
     this.setVertexCloudsVisible(false);
@@ -846,6 +885,21 @@ export class BRepRenderer {
     return visual;
   }
 
+  /** Drop a preview's nodes and keep its parts' geometry (see :meth:`loadPreview`). */
+  private clearPreviewNodes(): void {
+    while (this.modelRoot.children.length) {
+      const child = this.modelRoot.children[0];
+      disposeMaterials(child);
+      this.modelRoot.remove(child);
+    }
+    this.previewSidecars.clear();
+    this.nodeObjects.clear();
+    this.nodeVisibility.clear();
+    this.entityCache.clear();
+    this.manifest = null;
+    this.files = null;
+  }
+
   clearScene(): void {
     for (const object of this.geometryCache.values()) disposeObject(object);
     for (const object of this.edgeCache.values()) disposeObject(object);
@@ -854,8 +908,8 @@ export class BRepRenderer {
       disposeObject(child);
       this.modelRoot.remove(child);
     }
-    for (const geometry of this.previewGeometries) geometry.dispose();
-    this.previewGeometries = [];
+    for (const part of this.previewBuilt.values()) disposeBuilt(part);
+    this.previewBuilt.clear();
     this.previewSidecars.clear();
     this.nodeObjects.clear();
     this.nodeVisibility.clear();

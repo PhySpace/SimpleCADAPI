@@ -51,8 +51,8 @@ class AmbientBindingsScope {
 class Scalar {
  public:
   Scalar() = default;
-  Scalar(double value) noexcept : value_(value) {}                       // NOLINT(google-explicit-constructor)
-  Scalar(int value) noexcept : value_(static_cast<double>(value)) {}     // NOLINT(google-explicit-constructor)
+  Scalar(double value) noexcept : value_(value) {}                    // NOLINT(google-explicit-constructor)
+  Scalar(int value) noexcept : value_(static_cast<double>(value)) {}  // NOLINT(google-explicit-constructor)
   explicit Scalar(ExprPtr expr) : expr_(std::move(expr)) {}
 
   bool symbolic() const noexcept { return static_cast<bool>(expr_); }
@@ -71,7 +71,6 @@ class Scalar {
 };
 
 // Evaluate with a label for the error message ("width" -> "width must be finite").
-double evaluate_scalar(const Scalar& s, std::string_view label = "value",
-                       const Bindings* bindings = nullptr);
+double evaluate_scalar(const Scalar& s, std::string_view label = "value", const Bindings* bindings = nullptr);
 
 }  // namespace scad

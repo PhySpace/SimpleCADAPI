@@ -32,8 +32,10 @@ std::vector<TopoDS_Shape> actual_contour_edges(BRepFilletAPI_LocalOperation& op,
   std::unordered_set<int> seen_contours;
   for (const Edge& seed : seeds) {
     const int contour = op.Contour(TopoDS::Edge(seed.wrapped()));
-    if (contour <= 0 || !seen_contours.insert(contour).second) continue;
-    for (int i = 1, n = op.NbEdges(contour); i <= n; ++i) out.push_back(op.Edge(contour, i));
+    if (contour <= 0 || !seen_contours.insert(contour).second)
+      continue;
+    for (int i = 1, n = op.NbEdges(contour); i <= n; ++i)
+      out.push_back(op.Edge(contour, i));
   }
   return out;
 }
@@ -77,9 +79,11 @@ TrackedResult track_blend(BRepFilletAPI_LocalOperation& op, const Solid& solid, 
 TrackedResult tracked_fillet(const Solid& solid, const std::vector<Edge>& edges, double radius) {
   return occt_guard([&] {
     BRepFilletAPI_MakeFillet fillet(solid.wrapped());
-    for (const Edge& edge : edges) fillet.Add(radius, TopoDS::Edge(edge.wrapped()));
+    for (const Edge& edge : edges)
+      fillet.Add(radius, TopoDS::Edge(edge.wrapped()));
     fillet.Build();
-    if (!fillet.IsDone()) throw ValueError("Fillet failed: OCC build did not complete");
+    if (!fillet.IsDone())
+      throw ValueError("Fillet failed: OCC build did not complete");
     return track_blend(fillet, solid, edges, "fillet.patch");
   });
 }
@@ -98,14 +102,15 @@ TrackedResult tracked_chamfer(const Solid& solid, const std::vector<Edge>& edges
         chamfer.Add(edge);
         // OCCT puts the first distance on the face it is given; the second
         // lands on the adjacent one.
-        chamfer.SetDists(distance, *distance2, chamfer.Contour(edge),
-                         TopoDS::Face(edge_face_pairs[i].first.wrapped()));
+        chamfer.SetDists(distance, *distance2, chamfer.Contour(edge), TopoDS::Face(edge_face_pairs[i].first.wrapped()));
       }
     } else {
-      for (const Edge& edge : edges) chamfer.Add(distance, TopoDS::Edge(edge.wrapped()));
+      for (const Edge& edge : edges)
+        chamfer.Add(distance, TopoDS::Edge(edge.wrapped()));
     }
     chamfer.Build();
-    if (!chamfer.IsDone()) throw ValueError("Chamfer failed: OCC build did not complete");
+    if (!chamfer.IsDone())
+      throw ValueError("Chamfer failed: OCC build did not complete");
     return track_blend(chamfer, solid, edges, "chamfer.patch");
   });
 }
@@ -126,7 +131,8 @@ TrackedResult tracked_shell(const Solid& solid, const std::vector<Face>& faces_t
                                /*Intersection=*/false, /*SelfInter=*/false, GeomAbs_Arc,
                                /*RemoveIntEdges=*/false);
     shell.Build();
-    if (!shell.IsDone()) throw ValueError("Shell failed: OCC build did not complete");
+    if (!shell.IsDone())
+      throw ValueError("Shell failed: OCC build did not complete");
 
     const Solid result(kernel::as_solid(shell.Shape()));
     tracking::DeltaBuilder delta;
@@ -136,12 +142,14 @@ TrackedResult tracked_shell(const Solid& solid, const std::vector<Face>& faces_t
 
       // Faces that stay: every face of the solid except those removed.
       TopTools_IndexedMapOfShape removed;
-      for (const TopoDS_Shape& face : selected) removed.Add(face);
+      for (const TopoDS_Shape& face : selected)
+        removed.Add(face);
       TopTools_IndexedMapOfShape all_faces;
       TopExp::MapShapes(solid.wrapped(), TopAbs_FACE, all_faces);
       std::vector<TopoDS_Shape> remaining;
       for (int i = 1; i <= all_faces.Extent(); ++i) {
-        if (!removed.Contains(all_faces.FindKey(i))) remaining.push_back(all_faces.FindKey(i));
+        if (!removed.Contains(all_faces.FindKey(i)))
+          remaining.push_back(all_faces.FindKey(i));
       }
 
       tracking::QuerySpec body;
@@ -166,7 +174,8 @@ TrackedResult tracked_shell(const Solid& solid, const std::vector<Face>& faces_t
       for (const TopoDS_Shape& face : selected) {
         TopTools_IndexedMapOfShape edges;
         TopExp::MapShapes(face, TopAbs_EDGE, edges);
-        for (int i = 1; i <= edges.Extent(); ++i) boundary.push_back(edges.FindKey(i));
+        for (int i = 1; i <= edges.Extent(); ++i)
+          boundary.push_back(edges.FindKey(i));
       }
       tracking::QuerySpec walls;
       walls.origin_role = "closing_boundary";

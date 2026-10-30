@@ -1,3 +1,4 @@
+#include "scad/core/tolerance.hpp"
 #include "scad/ops/geometry/rectangles.hpp"
 
 #include <array>
@@ -47,7 +48,8 @@ Wire recorded_rectangle(const Scalar& width, const Scalar& height, const Scalar3
                                        offset_point(center, axes.x_axis, axes.y_axis, -half_width, half_height)};
   std::vector<Edge> edges;
   edges.reserve(corners.size());
-  for (std::size_t i = 0; i < corners.size(); ++i) edges.push_back(make_line_redge(corners[i], corners[(i + 1) % corners.size()]));
+  for (std::size_t i = 0; i < corners.size(); ++i)
+    edges.push_back(make_line_redge(corners[i], corners[(i + 1) % corners.size()]));
   return make_wire_from_edges_rwire(edges);
 }
 
@@ -56,17 +58,19 @@ std::vector<Vec3> placed_corners(double width, double height, const Scalar3& cen
   const Vec3 center_global = cs.transform_point(evaluate_point(center, "center"));
   const Vec3 normal_value = evaluate_point(normal, "normal");
   const double normal_norm = cs.transform_vector(normal_value).norm();
-  if (normal_norm <= 1e-15 || !std::isfinite(normal_norm)) throw ValueError("The normal vector cannot be a zero vector");
+  if (normal_norm <= tol::kZeroDirectionNorm || !std::isfinite(normal_norm))
+    throw ValueError("The normal vector cannot be a zero vector");
 
   const PlaneAxes axes = orthonormal_plane_axes(normal_value);
   const Vec3 plane_x = cs.transform_vector(axes.x_axis);
   const Vec3 plane_y = cs.transform_vector(axes.y_axis);
   const double half_width = width / 2, half_height = height / 2;
-  const std::array<std::array<double, 2>, 4> local{{{-half_width, -half_height}, {half_width, -half_height},
-                                                    {half_width, half_height}, {-half_width, half_height}}};
+  const std::array<std::array<double, 2>, 4> local{
+      {{-half_width, -half_height}, {half_width, -half_height}, {half_width, half_height}, {-half_width, half_height}}};
   std::vector<Vec3> corners;
   corners.reserve(local.size());
-  for (const auto& [u, v] : local) corners.push_back(center_global + plane_x * u + plane_y * v);
+  for (const auto& [u, v] : local)
+    corners.push_back(center_global + plane_x * u + plane_y * v);
   return corners;
 }
 
@@ -78,39 +82,43 @@ Wire with_edge_prefix(Wire wire, const RectangleTags& tags) {
 
 Wire make_rectangle_rwire(const Scalar& width, const Scalar& height, const Scalar3& center, const Scalar3& normal,
                           const RectangleTags& tags) {
-  static const ErrorSpec kSpec{kWireOp,
-                               "Failed to create a rectangular wire.",
-                               {"Width or height is not a positive finite scalar.",
-                                "The center or normal is not a valid finite 3D vector.",
-                                "The local rectangle basis became degenerate."},
-                               {"Use width and height values greater than zero.",
-                                "Pass a valid center and a non-zero normal vector.",
-                                "If the normal is near zero, normalize or replace it before retrying."}};
+  static const ErrorSpec kSpec{
+      kWireOp,
+      "Failed to create a rectangular wire.",
+      {"Width or height is not a positive finite scalar.", "The center or normal is not a valid finite 3D vector.",
+       "The local rectangle basis became degenerate."},
+      {"Use width and height values greater than zero.", "Pass a valid center and a non-zero normal vector.",
+       "If the normal is near zero, normalize or replace it before retrying."}};
   return guarded(kSpec, [&] {
     const double w = evaluate_scalar(width, "width");
     const double h = evaluate_scalar(height, "height");
-    if (w <= 0 || h <= 0) throw ValueError("The width and height must be greater than zero");
+    if (w <= 0 || h <= 0)
+      throw ValueError("The width and height must be greater than zero");
 
-    if (graph_recording()) return with_edge_prefix(recorded_rectangle(width, height, center, normal), tags);
+    if (graph_recording())
+      return with_edge_prefix(recorded_rectangle(width, height, center, normal), tags);
 
     const TopoDS_Wire wire = kernel::make_polyline_wire(placed_corners(w, h, center, normal), true);
-    return with_edge_prefix(finalize_primitive_with(Wire(wire), "make_rectangle_wire",
-                                                    [&] { return rectangle_record("make_rectangle_wire", "wire", width, height, center, normal); }),
-                            tags);
+    return with_edge_prefix(
+        finalize_primitive_with(
+            Wire(wire), "make_rectangle_wire",
+            [&] { return rectangle_record("make_rectangle_wire", "wire", width, height, center, normal); }),
+        tags);
   });
 }
 
 Face make_rectangle_rface(const Scalar& width, const Scalar& height, const Scalar3& center, const Scalar3& normal,
                           const RectangleTags& tags) {
-  static const ErrorSpec kSpec{kFaceOp,
-                               "Failed to create a rectangular face.",
-                               {"The rectangular wire could not be created.",
-                                "The face construction step rejected the generated wire."},
-                               {"Verify width, height, center, and normal.",
-                                "Retry with positive dimensions and a valid non-zero normal vector."}};
+  static const ErrorSpec kSpec{
+      kFaceOp,
+      "Failed to create a rectangular face.",
+      {"The rectangular wire could not be created.", "The face construction step rejected the generated wire."},
+      {"Verify width, height, center, and normal.",
+       "Retry with positive dimensions and a valid non-zero normal vector."}};
   return guarded(kSpec, [&] {
     const Wire wire = make_rectangle_rwire(width, height, center, normal, tags);
-    if (graph_recording()) return make_face_from_wire_rface(wire, normal, tags.tag_prefix);
+    if (graph_recording())
+      return make_face_from_wire_rface(wire, normal, tags.tag_prefix);
     return profile_face(wire, "make_rectangle_face", kFaceOp, tags.tag_prefix,
                         [&] { return rectangle_record("make_rectangle_face", "face", width, height, center, normal); });
   });

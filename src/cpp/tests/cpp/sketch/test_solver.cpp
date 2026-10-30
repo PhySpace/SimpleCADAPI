@@ -14,7 +14,8 @@ using namespace scad;
 namespace {
 
 Sketch with_points(Sketch s, std::initializer_list<std::pair<const char*, std::pair<double, double>>> points) {
-  for (const auto& [id, xy] : points) s = add_point_rsketch(s, id, xy.first, xy.second);
+  for (const auto& [id, xy] : points)
+    s = add_point_rsketch(s, id, xy.first, xy.second);
   return s;
 }
 
@@ -22,7 +23,9 @@ SketchSolveResult inspect(const Sketch& s, bool strict = true, bool fully = fals
   return inspect_sketch_rsketchresult(s, {.require_fully_constrained = fully, .strict = strict});
 }
 
-SketchPoint2 at(const SketchSolveResult& r, const char* id) { return r.solved_points.at(id); }
+SketchPoint2 at(const SketchSolveResult& r, const char* id) {
+  return r.solved_points.at(id);
+}
 
 Sketch constrained_rectangle() {
   Sketch s = make_sketch_rsketch("rect");
@@ -95,8 +98,10 @@ TEST_CASE("conflicting distances name the later constraint and revert the geomet
     CHECK(e.operation() == "sketch_solve");
     bool near_miss = false;
     for (const auto& entry : e.guidance().inventory) {
-      if (entry.symbol == "c_far" && entry.status == "near miss") near_miss = true;
-      if (entry.symbol == "c_near") CHECK(entry.status == "failed");
+      if (entry.symbol == "c_far" && entry.status == "near miss")
+        near_miss = true;
+      if (entry.symbol == "c_near")
+        CHECK(entry.status == "failed");
     }
     CHECK(near_miss);
     const std::string text = e.what();
@@ -172,7 +177,8 @@ TEST_CASE("an arc with a radius and point-on constraint is not conflicting") {
 }
 
 TEST_CASE("a driving arc length is rejected with the Python guidance") {
-  Sketch s = with_points(make_sketch_rsketch("arc_driving_length"), {{"center", {0, 0}}, {"start", {1, 0}}, {"end", {0, 1}}});
+  Sketch s =
+      with_points(make_sketch_rsketch("arc_driving_length"), {{"center", {0, 0}}, {"start", {1, 0}}, {"end", {0, 1}}});
   s = add_arc_rsketch(s, "arc", "start", "end", "center");
   s = constrain_length_rsketch(s, "arc", 2.0);
   try {
@@ -187,22 +193,29 @@ TEST_CASE("the driving angle holds each directed branch") {
   for (const double directed : {30.0, 150.0, 200.0, 330.0}) {
     const double radians = directed * kPi / 180.0;
     Sketch s = make_sketch_rsketch("angle");
-    s = with_points(s, {{"p0", {0, 0}}, {"p1", {4, 0}}, {"p2", {1, 1}}, {"p3", {1 + 3 * std::cos(radians), 1 + 3 * std::sin(radians)}}});
+    s = with_points(s, {{"p0", {0, 0}},
+                        {"p1", {4, 0}},
+                        {"p2", {1, 1}},
+                        {"p3", {1 + 3 * std::cos(radians), 1 + 3 * std::sin(radians)}}});
     s = add_line_rsketch(s, "a", "p0", "p1");
     s = add_line_rsketch(s, "b", "p2", "p3");
-    for (const char* p : {"p0", "p1", "p2"}) s = constrain_fix_rsketch(s, p);
+    for (const char* p : {"p0", "p1", "p2"})
+      s = constrain_fix_rsketch(s, p);
     s = constrain_length_rsketch(s, "b", 3.0);
     s = constrain_angle_rsketch(s, "a", "b", directed);
     const SketchSolveResult r = inspect(s, true, true);
     CHECK(r.status == "solved");
-    const double measured =
-        std::fmod(std::atan2(at(r, "p3").second - at(r, "p2").second, at(r, "p3").first - at(r, "p2").first) * 180.0 / kPi + 360.0, 360.0);
+    const double measured = std::fmod(
+        std::atan2(at(r, "p3").second - at(r, "p2").second, at(r, "p3").first - at(r, "p2").first) * 180.0 / kPi +
+            360.0,
+        360.0);
     CHECK(measured == doctest::Approx(directed).epsilon(1e-7));
   }
 }
 
 TEST_CASE("a zero driving angle redirects to the parallel constraint") {
-  Sketch s = with_points(make_sketch_rsketch("angle"), {{"p0", {0, 0}}, {"p1", {4, 0}}, {"p2", {1, 1}}, {"p3", {4, 1.1}}});
+  Sketch s =
+      with_points(make_sketch_rsketch("angle"), {{"p0", {0, 0}}, {"p1", {4, 0}}, {"p2", {1, 1}}, {"p3", {4, 1.1}}});
   s = add_line_rsketch(s, "a", "p0", "p1");
   s = add_line_rsketch(s, "b", "p2", "p3");
   s = constrain_angle_rsketch(s, "a", "b", 0.0);
@@ -235,13 +248,17 @@ TEST_CASE("line distance keeps the initial side") {
 TEST_CASE("mirror snaps the image line about the axis, also with flipped endpoints") {
   for (const bool flipped : {false, true}) {
     Sketch s = with_points(make_sketch_rsketch("mirror"),
-                           {{"a0", {0, 0}}, {"a1", {0, 4}}, {"m0", {1, 1}}, {"m1", {1, 3}},
+                           {{"a0", {0, 0}},
+                            {"a1", {0, 4}},
+                            {"m0", {1, 1}},
+                            {"m1", {1, 3}},
                             {"n0", flipped ? std::make_pair(-1.1, 2.9) : std::make_pair(-1.25, 1.1)},
                             {"n1", flipped ? std::make_pair(-1.2, 1.15) : std::make_pair(-1.1, 2.85)}});
     s = add_line_rsketch(s, "axis", "a0", "a1");
     s = add_line_rsketch(s, "source", "m0", "m1");
     s = add_line_rsketch(s, "image", "n0", "n1");
-    for (const char* p : {"a0", "a1", "m0", "m1"}) s = constrain_fix_rsketch(s, p);
+    for (const char* p : {"a0", "a1", "m0", "m1"})
+      s = constrain_fix_rsketch(s, p);
     s = constrain_mirror_rsketch(s, "image", "axis", "source");
     const SketchSolveResult r = inspect(s, false);
     CHECK(at(r, "n0").first == doctest::Approx(-1.0));
@@ -252,9 +269,11 @@ TEST_CASE("mirror snaps the image line about the axis, also with flipped endpoin
 }
 
 TEST_CASE("symmetric about a diagonal axis") {
-  Sketch s = with_points(make_sketch_rsketch("sym"), {{"a0", {0, 0}}, {"a1", {3, 3}}, {"p", {1, 3}}, {"q", {2.6, 1.2}}});
+  Sketch s =
+      with_points(make_sketch_rsketch("sym"), {{"a0", {0, 0}}, {"a1", {3, 3}}, {"p", {1, 3}}, {"q", {2.6, 1.2}}});
   s = add_line_rsketch(s, "axis", "a0", "a1");
-  for (const char* p : {"a0", "a1", "p"}) s = constrain_fix_rsketch(s, p);
+  for (const char* p : {"a0", "a1", "p"})
+    s = constrain_fix_rsketch(s, p);
   s = constrain_symmetric_rsketch(s, "q", "p", "axis");
   const SketchSolveResult r = inspect(s, false);
   CHECK(at(r, "q").first == doctest::Approx(3.0).epsilon(1e-6));
@@ -306,8 +325,14 @@ TEST_CASE("a tangent U path with arcs solves to zero DOF") {
   const double length = 80, height = 20, radius = 17;
   const double xl = -length / 2, xr = length / 2;
   Sketch s = make_sketch_rsketch("u_path");
-  s = with_points(s, {{"lt", {xl, height}}, {"l1", {xl, radius}}, {"cl", {xl + radius, radius}}, {"b1", {xl + radius, 0}},
-                      {"b2", {xr - radius, 0}}, {"cr", {xr - radius, radius}}, {"r1", {xr, radius}}, {"rt", {xr, height}}});
+  s = with_points(s, {{"lt", {xl, height}},
+                      {"l1", {xl, radius}},
+                      {"cl", {xl + radius, radius}},
+                      {"b1", {xl + radius, 0}},
+                      {"b2", {xr - radius, 0}},
+                      {"cr", {xr - radius, radius}},
+                      {"r1", {xr, radius}},
+                      {"rt", {xr, height}}});
   s = add_line_rsketch(s, "arm_l", "lt", "l1");
   s = add_arc_rsketch(s, "corner_l", "l1", "b1", "cl");
   s = add_line_rsketch(s, "bottom", "b1", "b2");
@@ -334,7 +359,9 @@ TEST_CASE("a tangent U path with arcs solves to zero DOF") {
 TEST_CASE("ellipse radii drive the axis points; orientation stays free") {
   const double theta = 30.0 * kPi / 180.0;
   Sketch s = make_sketch_rsketch("oval");
-  s = with_points(s, {{"c", {0, 0}}, {"M", {4 * std::cos(theta), 4 * std::sin(theta)}}, {"m", {-2 * std::sin(theta), 2 * std::cos(theta)}}});
+  s = with_points(s, {{"c", {0, 0}},
+                      {"M", {4 * std::cos(theta), 4 * std::sin(theta)}},
+                      {"m", {-2 * std::sin(theta), 2 * std::cos(theta)}}});
   s = add_ellipse_rsketch(s, "oval", "c", "M", "m");
   const SketchSolveResult plain = inspect(s, false);
   CHECK(plain.solved_entities.at("oval").find("angle")->as_double() == doctest::Approx(30.0));
@@ -348,7 +375,8 @@ TEST_CASE("ellipse radii drive the axis points; orientation stays free") {
 }
 
 TEST_CASE("tangent with an ellipse reports the unsupported kind") {
-  Sketch s = with_points(make_sketch_rsketch("t"), {{"c", {0, 0}}, {"M", {4, 0}}, {"m", {0, 2}}, {"p0", {5, 0}}, {"p1", {8, 0}}});
+  Sketch s = with_points(make_sketch_rsketch("t"),
+                         {{"c", {0, 0}}, {"M", {4, 0}}, {"m", {0, 2}}, {"p0", {5, 0}}, {"p1", {8, 0}}});
   s = add_ellipse_rsketch(s, "oval", "c", "M", "m");
   s = add_line_rsketch(s, "tan_line", "p0", "p1");
   s = constrain_tangent_rsketch(s, "tan_line", "oval");
@@ -362,7 +390,9 @@ TEST_CASE("tangent with an ellipse reports the unsupported kind") {
 
 TEST_CASE("B-spline solved entities and reference lengths") {
   Sketch s = with_points(make_sketch_rsketch("spline_measure"), {{"a", {0, 0}}, {"b", {3, 0}}});
-  s = add_bspline_rsketch(s, "curve", "a", "b", {SketchControlPoint(0.0, 0.0), SketchControlPoint(1.0, 1.0), SketchControlPoint(2.0, 1.0), SketchControlPoint(3.0, 0.0)},
+  s = add_bspline_rsketch(s, "curve", "a", "b",
+                          {SketchControlPoint(0.0, 0.0), SketchControlPoint(1.0, 1.0), SketchControlPoint(2.0, 1.0),
+                           SketchControlPoint(3.0, 0.0)},
                           3, std::vector<Scalar>{0.0, 1.0}, std::vector<int>{4, 4});
   s = constrain_fix_rsketch(s, "curve");
   s = constrain_length_rsketch(s, "curve", 0.0, "curve_length", /*driving=*/false);
@@ -398,14 +428,18 @@ TEST_CASE("an empty sketch and a constraint-free sketch solve trivially") {
 TEST_CASE("a perturbed start stays in the basin of the initial geometry") {
   const double radians = 207.0 * kPi / 180.0;
   Sketch s = make_sketch_rsketch("angle");
-  s = with_points(s, {{"p0", {0, 0}}, {"p1", {4, 0}}, {"p2", {1, 1}}, {"p3", {1 + 3 * std::cos(radians), 1 + 3 * std::sin(radians)}}});
+  s = with_points(
+      s,
+      {{"p0", {0, 0}}, {"p1", {4, 0}}, {"p2", {1, 1}}, {"p3", {1 + 3 * std::cos(radians), 1 + 3 * std::sin(radians)}}});
   s = add_line_rsketch(s, "a", "p0", "p1");
   s = add_line_rsketch(s, "b", "p2", "p3");
-  for (const char* p : {"p0", "p1", "p2"}) s = constrain_fix_rsketch(s, p);
+  for (const char* p : {"p0", "p1", "p2"})
+    s = constrain_fix_rsketch(s, p);
   s = constrain_length_rsketch(s, "b", 3.0);
   s = constrain_angle_rsketch(s, "a", "b", 200.0);
   const SketchSolveResult r = inspect(s);
-  const double measured = std::fmod(std::atan2(at(r, "p3").second - 1.0, at(r, "p3").first - 1.0) * 180.0 / kPi + 360.0, 360.0);
+  const double measured =
+      std::fmod(std::atan2(at(r, "p3").second - 1.0, at(r, "p3").first - 1.0) * 180.0 / kPi + 360.0, 360.0);
   CHECK(measured == doctest::Approx(200.0).epsilon(1e-7));
 }
 

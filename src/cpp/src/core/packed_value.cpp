@@ -9,17 +9,32 @@ namespace scad {
 
 namespace {
 
-enum Tag : unsigned char { kNull, kFalse, kTrue, kInt, kDouble, kSymbol, kText, kArray, kObject, kDigits, kRecipe = 0xFE };
+enum Tag : unsigned char {
+  kNull,
+  kFalse,
+  kTrue,
+  kInt,
+  kDouble,
+  kSymbol,
+  kText,
+  kArray,
+  kObject,
+  kDigits,
+  kRecipe = 0xFE
+};
 
 ValueRecipe g_recipes[8] = {};
 
 // Vocabulary (repeats across shapes and operations) is interned; per-shape or per-operation ids
 // (kernel topo ids are decimal hashes, graph/node ids are g_/n_ + hex) would only grow the table.
 bool interned_text(const std::string& s) {
-  if (s.empty() || s.size() > 48) return false;
+  if (s.empty() || s.size() > 48)
+    return false;
   const char c = s.front();
-  if (c >= '0' && c <= '9') return false;
-  if (s.size() > 1 && s[1] == '_' && (c == 'g' || c == 'n')) return false;
+  if (c >= '0' && c <= '9')
+    return false;
+  if (s.size() > 1 && s[1] == '_' && (c == 'g' || c == 'n'))
+    return false;
   return Symbol::count() < (1u << 20);
 }
 
@@ -35,10 +50,12 @@ std::uint64_t get_varint(std::string_view in, std::size_t& at) {
   std::uint64_t v = 0;
   int shift = 0;
   while (true) {
-    if (at >= in.size()) throw ValueError("corrupt packed value");
+    if (at >= in.size())
+      throw ValueError("corrupt packed value");
     const auto byte = static_cast<unsigned char>(in[at++]);
     v |= static_cast<std::uint64_t>(byte & 0x7F) << shift;
-    if ((byte & 0x80) == 0) return v;
+    if ((byte & 0x80) == 0)
+      return v;
     shift += 7;
   }
 }
@@ -46,16 +63,20 @@ std::uint64_t get_varint(std::string_view in, std::size_t& at) {
 // A decimal numeral without sign or leading zero that fits an int64 (kernel topo ids are such
 // hashes): stored as a number, rendered back to the same text.
 bool is_canonical_numeral(const std::string& s, std::uint64_t& value) {
-  if (s.empty() || s.size() > 18 || s.front() == '0') return false;
+  if (s.empty() || s.size() > 18 || s.front() == '0')
+    return false;
   value = 0;
   for (const char c : s) {
-    if (c < '0' || c > '9') return false;
+    if (c < '0' || c > '9')
+      return false;
     value = value * 10 + static_cast<std::uint64_t>(c - '0');
   }
   return true;
 }
 
-void put_symbol(std::string& out, const std::string& text) { put_varint(out, Symbol(text).index()); }
+void put_symbol(std::string& out, const std::string& text) {
+  put_varint(out, Symbol(text).index());
+}
 
 void pack(std::string& out, const Value& v) {
   if (v.is_null()) {
@@ -89,7 +110,8 @@ void pack(std::string& out, const Value& v) {
   } else if (v.is_array()) {
     out.push_back(kArray);
     put_varint(out, v.as_array().size());
-    for (const Value& item : v.as_array()) pack(out, item);
+    for (const Value& item : v.as_array())
+      pack(out, item);
   } else {
     out.push_back(kObject);
     put_varint(out, v.as_object().size());
@@ -101,34 +123,44 @@ void pack(std::string& out, const Value& v) {
 }
 
 Value unpack(std::string_view in, std::size_t& at) {
-  if (at >= in.size()) throw ValueError("corrupt packed value");
+  if (at >= in.size())
+    throw ValueError("corrupt packed value");
   switch (static_cast<unsigned char>(in[at++])) {
-    case kNull: return Value();
-    case kFalse: return Value(false);
-    case kTrue: return Value(true);
+    case kNull:
+      return Value();
+    case kFalse:
+      return Value(false);
+    case kTrue:
+      return Value(true);
     case kInt: {
       const std::uint64_t z = get_varint(in, at);
       return Value(static_cast<std::int64_t>((z >> 1) ^ (~(z & 1) + 1)));
     }
     case kDouble: {
       double d;
-      if (at + sizeof d > in.size()) throw ValueError("corrupt packed value");
+      if (at + sizeof d > in.size())
+        throw ValueError("corrupt packed value");
       std::memcpy(&d, in.data() + at, sizeof d);
       at += sizeof d;
       return Value(d);
     }
     case kRecipe: {
-      if (at >= in.size()) throw ValueError("corrupt packed value");
+      if (at >= in.size())
+        throw ValueError("corrupt packed value");
       const unsigned char id = static_cast<unsigned char>(in[at++]);
       Value args = unpack(in, at);
-      if (id >= 8 || g_recipes[id] == nullptr) throw ValueError("packed value names an unregistered recipe");
+      if (id >= 8 || g_recipes[id] == nullptr)
+        throw ValueError("packed value names an unregistered recipe");
       return g_recipes[id](args);
     }
-    case kDigits: return Value(std::to_string(get_varint(in, at)));
-    case kSymbol: return Value(Symbol::from_index(static_cast<std::uint32_t>(get_varint(in, at))).str());
+    case kDigits:
+      return Value(std::to_string(get_varint(in, at)));
+    case kSymbol:
+      return Value(Symbol::from_index(static_cast<std::uint32_t>(get_varint(in, at))).str());
     case kText: {
       const std::uint64_t n = get_varint(in, at);
-      if (at + n > in.size()) throw ValueError("corrupt packed value");
+      if (at + n > in.size())
+        throw ValueError("corrupt packed value");
       Value text(std::string(in.substr(at, static_cast<std::size_t>(n))));
       at += static_cast<std::size_t>(n);
       return text;
@@ -137,7 +169,8 @@ Value unpack(std::string_view in, std::size_t& at) {
       const std::uint64_t n = get_varint(in, at);
       Value::Array items;
       items.reserve(static_cast<std::size_t>(n));
-      for (std::uint64_t i = 0; i < n; ++i) items.push_back(unpack(in, at));
+      for (std::uint64_t i = 0; i < n; ++i)
+        items.push_back(unpack(in, at));
       return Value(std::move(items));
     }
     case kObject: {
@@ -150,7 +183,8 @@ Value unpack(std::string_view in, std::size_t& at) {
       }
       return Value(std::move(members));
     }
-    default: break;
+    default:
+      break;
   }
   throw ValueError("corrupt packed value");
 }
@@ -158,7 +192,8 @@ Value unpack(std::string_view in, std::size_t& at) {
 }  // namespace
 
 void PackedValue::register_recipe(unsigned char id, ValueRecipe expand) {
-  if (id < 8) g_recipes[id] = expand;
+  if (id < 8)
+    g_recipes[id] = expand;
 }
 
 PackedValue PackedValue::from_recipe(unsigned char id, const Value& args) {
@@ -174,7 +209,9 @@ PackedValue::PackedValue(const Value& value) {
   bytes_.shrink_to_fit();
 }
 
-Value PackedValue::unpack() const { return unpack_bytes(bytes_); }
+Value PackedValue::unpack() const {
+  return unpack_bytes(bytes_);
+}
 
 Value PackedValue::unpack_bytes(std::string_view bytes) {
   std::size_t at = 0;

@@ -11,7 +11,9 @@ using namespace scad::geometry_test;
 
 namespace {
 
-bool close_to(const Vec3& a, const Vec3& b, double tol = 1e-12) { return (a - b).norm() <= tol; }
+bool close_to(const Vec3& a, const Vec3& b, double tol = 1e-12) {
+  return (a - b).norm() <= tol;
+}
 
 }  // namespace
 
@@ -23,7 +25,8 @@ TEST_CASE("a +Z normal gives exactly the global frame (test_plane_axes_conventio
 }
 
 TEST_CASE("plane frames are unit, right-handed and transverse") {
-  for (const Vec3& normal : {Vec3{0.3, -0.4, 0.86}, Vec3{1, 0, 0}, Vec3{0, 1, 0}, Vec3{0, 0, -1}, Vec3{0.2, 0.98, 0.05}}) {
+  for (const Vec3& normal :
+       {Vec3{0.3, -0.4, 0.86}, Vec3{1, 0, 0}, Vec3{0, 1, 0}, Vec3{0, 0, -1}, Vec3{0.2, 0.98, 0.05}}) {
     const PlaneAxes a = orthonormal_plane_axes(normal);
     CHECK(a.z_axis.norm() == doctest::Approx(1.0));
     CHECK(a.x_axis.norm() == doctest::Approx(1.0));
@@ -83,9 +86,11 @@ TEST_CASE("OpParams stores evaluated numbers and notes the symbolic ones by path
                         .take();
   CHECK(record.op == "demo");
   CHECK(record.labels == std::vector<std::string>{"edge", "primitive"});
-  CHECK(record.params.dump() == R"({"radius":10,"center":[1,10,3],"poles":[[0,1],[2,10]],"weights":null,"periodic":false})");
+  CHECK(record.params.dump() ==
+        R"({"radius":10,"center":[1,10,3],"poles":[[0,1],[2,10]],"weights":null,"periodic":false})");
   std::vector<std::string> paths;
-  for (const auto& [path, scalar] : record.symbolic) paths.push_back(path);
+  for (const auto& [path, scalar] : record.symbolic)
+    paths.push_back(path);
   CHECK(paths == std::vector<std::string>{"radius", "center[1]", "poles[1][1]"});
   CHECK(derived_labels("face") == std::vector<std::string>{"derived", "face"});
 }

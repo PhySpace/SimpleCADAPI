@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 
+#include "scad/core/tolerance.hpp"
 #include "scad/ops/features/support.hpp"
 #include "scad/ops/features/tags.hpp"
 #include "scad/ops/geometry/types.hpp"
@@ -37,7 +38,7 @@ Solid shell_rsolid(const Solid& solid, const FaceSelection& faces_to_remove, con
                    const ShellTags& tags = {});
 
 struct OffsetOptions {
-  double tolerance = 1e-4;
+  double tolerance = tol::kOffsetTolerance;
   std::string kind = "ARC";  // join type: "ARC" or "INTERSECTION"
 };
 

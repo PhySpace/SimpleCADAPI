@@ -23,7 +23,8 @@ const Kinds kLineArcSpline{"line", "arc", "bspline"};
 const Kinds kAny{};
 
 std::string target_path(const SketchRef& ref) {
-  if (ref.kind == kPointKind && ref.subentity != "geometry") return ref.entity_id + "." + ref.subentity;
+  if (ref.kind == kPointKind && ref.subentity != "geometry")
+    return ref.entity_id + "." + ref.subentity;
   return ref.entity_id;
 }
 
@@ -45,14 +46,16 @@ struct ConstraintCall {
 Sketch constrain(const Sketch& sketch, const ConstraintCall& call) {
   std::vector<SketchRef> refs;
   refs.reserve(call.targets.size());
-  for (const Target& item : call.targets) refs.push_back(sketch.resolve_target(item.target, item.expected));
+  for (const Target& item : call.targets)
+    refs.push_back(sketch.resolve_target(item.target, item.expected));
 
   Sketch updated = sketch.clone(/*include_solve=*/false);
   updated.add_constraint(call.kind, refs, call.value, call.constraint_id, call.driving,
                          call.metadata.is_null() ? Value::object() : call.metadata);
 
   Value::Array paths;
-  for (const SketchRef& ref : refs) paths.emplace_back(target_path(ref));
+  for (const SketchRef& ref : refs)
+    paths.emplace_back(target_path(ref));
   Value params = Value::object();
   params.set("sketch_id", updated.sketch_id());
   params.set("kind", call.kind);
@@ -62,8 +65,10 @@ Sketch constrain(const Sketch& sketch, const ConstraintCall& call) {
   params.set("driving", call.driving);
   params.set("metadata", call.metadata.is_null() ? Value::object() : call.metadata);
   SymbolicArgs symbolic;
-  if (call.value && call.value->symbolic()) symbolic.emplace_back("value", *call.value);
-  finalize_sketch_object("make_constrain_" + call.kind + "_rsketch", std::move(params), std::move(symbolic), updated, &sketch);
+  if (call.value && call.value->symbolic())
+    symbolic.emplace_back("value", *call.value);
+  finalize_sketch_object("make_constrain_" + call.kind + "_rsketch", std::move(params), std::move(symbolic), updated,
+                         &sketch);
   return updated;
 }
 
@@ -94,7 +99,8 @@ Sketch constrain_rsketch(const Sketch& sketch, const std::string& kind, const st
                          Value metadata) {
   static const Kinds kAny;  // no kind is required of a target
   ConstraintCall call{kind, {}, value, constraint_id, driving, std::move(metadata)};
-  for (const SketchTarget& target : targets) call.targets.push_back({target, kAny});
+  for (const SketchTarget& target : targets)
+    call.targets.push_back({target, kAny});
   return constrain(sketch, call);
 }
 
@@ -143,8 +149,8 @@ Sketch constrain_normal_rsketch(const Sketch& sketch, const SketchTarget& a, con
 
 Sketch constrain_mirror_rsketch(const Sketch& sketch, const SketchTarget& a, const SketchTarget& axis,
                                 const SketchTarget& b, const SketchConstraintId& id) {
-  return constrain(sketch, {"mirror", {{a, kLineCircleArc}, {axis, kLine}, {b, kLineCircleArc}}, std::nullopt, id, true,
-                            Value()});
+  return constrain(
+      sketch, {"mirror", {{a, kLineCircleArc}, {axis, kLine}, {b, kLineCircleArc}}, std::nullopt, id, true, Value()});
 }
 
 Sketch constrain_midpoint_points_rsketch(const Sketch& sketch, const SketchTarget& mid, const SketchTarget& a,
@@ -177,7 +183,8 @@ Sketch constrain_tangent_rsketch(const Sketch& sketch, const SketchTarget& a, co
   if (!valid_selector(at_a) || !valid_selector(at_b)) {
     throw ValueError("Tangent endpoint selectors must be 'start' or 'end'");
   }
-  if (mode != "external" && mode != "internal") throw ValueError("Tangent mode must be 'external' or 'internal'");
+  if (mode != "external" && mode != "internal")
+    throw ValueError("Tangent mode must be 'external' or 'internal'");
   Value metadata = Value::object();
   metadata.set("at_a", at_a ? Value(*at_a) : Value());
   metadata.set("at_b", at_b ? Value(*at_b) : Value());
@@ -235,8 +242,8 @@ Sketch constrain_length_rsketch(const Sketch& sketch, const SketchTarget& line, 
   return dimension(sketch, "length", {{line, kLineArcSpline}}, value, id, driving);
 }
 
-Sketch constrain_angle_rsketch(const Sketch& sketch, const SketchTarget& a, const SketchTarget& b,
-                               const Scalar& value, const SketchConstraintId& id, bool driving) {
+Sketch constrain_angle_rsketch(const Sketch& sketch, const SketchTarget& a, const SketchTarget& b, const Scalar& value,
+                               const SketchConstraintId& id, bool driving) {
   return dimension(sketch, "angle", {{a, kLine}, {b, kLine}}, value, id, driving);
 }
 

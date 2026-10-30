@@ -1,4 +1,5 @@
 // translate_shape, rotate_shape, mirror_shape (operators/transform.py).
+#include "scad/core/tolerance.hpp"
 #include "scad/ops/features/transforms.hpp"
 
 #include "internal.hpp"
@@ -50,7 +51,8 @@ Shape translate_shape(const Shape& shape, const Scalar3& vector) {
     if (shape.kind() == Kind::Solid) {
       return finish_tracked_transform(tracked_translate(Solid(shape), global_vector), shape, rec, kTranslateOp);
     }
-    Shape moved = finish_raw_transform(Shape::from_occt(kernel::translate_shape(shape.wrapped(), global_vector)), shape, kTranslateOp);
+    Shape moved = finish_raw_transform(Shape::from_occt(kernel::translate_shape(shape.wrapped(), global_vector)), shape,
+                                       kTranslateOp);
     record_operation(std::move(rec.input(shape, "shape")).take(), {moved});
     return moved;
   });
@@ -64,7 +66,8 @@ Shape rotate_shape(const Shape& shape, const Scalar& angle, const Scalar3& axis,
        "The axis or origin is not a valid finite 3D vector."},
       {"Pass a valid shape and a finite rotation angle.", "Use a non-zero axis vector and a valid origin point.",
        "Log the evaluated angle, axis, and origin before retrying."}};
-  if (evaluate_finite(angle) == 0) return shape;
+  if (evaluate_finite(angle) == 0)
+    return shape;
   return guarded(spec, [&]() -> Shape {
     FeatureRecord rec(kRotateOp);
     const double angle_value = rec.scalar("angle", angle);
@@ -75,7 +78,8 @@ Shape rotate_shape(const Shape& shape, const Scalar& angle, const Scalar3& axis,
                                       kRotateOp);
     }
     Shape turned = finish_raw_transform(
-        Shape::from_occt(kernel::rotate_shape(shape.wrapped(), angle_value, global_axis, global_origin)), shape, kRotateOp);
+        Shape::from_occt(kernel::rotate_shape(shape.wrapped(), angle_value, global_axis, global_origin)), shape,
+        kRotateOp);
     record_operation(std::move(rec.input(shape, "shape")).take(), {turned});
     return turned;
   });
@@ -93,7 +97,8 @@ Shape mirror_shape(const Shape& shape, const Scalar3& plane_origin, const Scalar
     FeatureRecord rec(kMirrorOp);
     const Vec3 global_origin = features_detail::place_point(rec.point("plane_origin", plane_origin));
     const Vec3 global_normal = features_detail::place_vector(rec.point("plane_normal", plane_normal));
-    if (global_normal.norm() < 1e-10) throw ValueError("The mirror plane normal cannot be a zero vector");
+    if (global_normal.norm() < tol::kMirrorNormalNorm)
+      throw ValueError("The mirror plane normal cannot be a zero vector");
 
     if (shape.kind() == Kind::Solid) {
       TrackedResult tracked = tracked_mirror(Solid(shape), global_origin, global_normal);

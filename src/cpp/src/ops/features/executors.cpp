@@ -20,24 +20,37 @@ using reactive::ScalarValues;
 // ---- reading what was recorded ---------------------------------------------------------------
 const Value& param(Params params, std::string_view key) {
   const Value* found = params.find(key);
-  if (found == nullptr) throw ValueError("recorded parameter '" + std::string(key) + "' is missing");
+  if (found == nullptr)
+    throw ValueError("recorded parameter '" + std::string(key) + "' is missing");
   return *found;
 }
 
-Scalar number(Params p, std::string_view key) { return Scalar(param(p, key).as_double()); }
-double real(Params p, std::string_view key) { return param(p, key).as_double(); }
-bool flag(Params p, std::string_view key) { return param(p, key).as_bool(); }
-std::string text(Params p, std::string_view key) { return param(p, key).as_string(); }
+Scalar number(Params p, std::string_view key) {
+  return Scalar(param(p, key).as_double());
+}
+double real(Params p, std::string_view key) {
+  return param(p, key).as_double();
+}
+bool flag(Params p, std::string_view key) {
+  return param(p, key).as_bool();
+}
+std::string text(Params p, std::string_view key) {
+  return param(p, key).as_string();
+}
 
 Vec3 vec_of(const Value& value) {
   const Value::Array& items = value.as_array();
-  if (items.size() != 3) throw ValueError("a recorded vector must have three coordinates");
+  if (items.size() != 3)
+    throw ValueError("a recorded vector must have three coordinates");
   return {items[0].as_double(), items[1].as_double(), items[2].as_double()};
 }
-Scalar3 point(Params p, std::string_view key) { return scalar3(vec_of(param(p, key))); }
+Scalar3 point(Params p, std::string_view key) {
+  return scalar3(vec_of(param(p, key)));
+}
 
 const Shape& input(Inputs inputs, std::size_t index) {
-  if (index >= inputs.size()) throw ValueError("the operation lost an input");
+  if (index >= inputs.size())
+    throw ValueError("the operation lost an input");
   return inputs[index].shape;
 }
 
@@ -45,12 +58,17 @@ const Shape& input(Inputs inputs, std::size_t index) {
 template <class T>
 std::vector<T> rest(Inputs inputs, std::size_t first, std::size_t last) {
   std::vector<T> out;
-  for (std::size_t i = first; i < last && i < inputs.size(); ++i) out.emplace_back(inputs[i].shape);
+  for (std::size_t i = first; i < last && i < inputs.size(); ++i)
+    out.emplace_back(inputs[i].shape);
   return out;
 }
 
-std::vector<Shape> one(const Shape& shape) { return {shape}; }
-std::vector<Shape> many(const std::vector<Solid>& solids) { return std::vector<Shape>(solids.begin(), solids.end()); }
+std::vector<Shape> one(const Shape& shape) {
+  return {shape};
+}
+std::vector<Shape> many(const std::vector<Solid>& solids) {
+  return std::vector<Shape>(solids.begin(), solids.end());
+}
 
 // ---- sweeps and local features --------------------------------------------------------------
 void register_sweeps(reactive::ExecutorRegistry& registry) {
@@ -62,7 +80,8 @@ void register_sweeps(reactive::ExecutorRegistry& registry) {
   });
   registry.add("make_loft_rsolid", [](Params p, Inputs in, const ScalarValues&) {
     std::vector<Shape> profiles;
-    for (const OpInput& i : in) profiles.push_back(i.shape);
+    for (const OpInput& i : in)
+      profiles.push_back(i.shape);
     return one(loft_rsolid(profiles, flag(p, "ruled"), {text(p, "tracking_policy"), {}}));
   });
   registry.add("make_sweep_rsolid", [](Params p, Inputs in, const ScalarValues&) {
@@ -78,12 +97,14 @@ void register_sweeps(reactive::ExecutorRegistry& registry) {
     return one(extrude_taper_rsolid(Face(input(in, 0)), point(p, "vector"), number(p, "taper"), flag(p, "flip_inner")));
   });
   registry.add("make_extrude_until_rsolid", [](Params p, Inputs in, const ScalarValues&) {
-    return one(extrude_until_rsolid(Face(input(in, 0)), rest<Solid>(in, 1, in.size()), point(p, "direction"), text(p, "until")));
+    return one(extrude_until_rsolid(Face(input(in, 0)), rest<Solid>(in, 1, in.size()), point(p, "direction"),
+                                    text(p, "until")));
   });
   registry.add("make_sweep_multisection_rsolid", [](Params p, Inputs in, const ScalarValues&) {
     const auto count = static_cast<std::size_t>(param(p, "profile_count").as_int());
     std::vector<Shape> profiles;
-    for (std::size_t i = 0; i < count; ++i) profiles.push_back(input(in, i));
+    for (std::size_t i = 0; i < count; ++i)
+      profiles.push_back(input(in, i));
     std::optional<Binormal> binormal;
     if (const Value* wire = p.find("binormal_is_wire"); wire != nullptr && wire->is_bool() && wire->as_bool()) {
       binormal = Binormal(Wire(input(in, count + 1)));
@@ -100,8 +121,10 @@ void register_blends(reactive::ExecutorRegistry& registry) {
   });
   registry.add("make_chamfer_rsolid", [](Params p, Inputs in, const ScalarValues&) {
     ChamferOptions options;
-    if (!param(p, "angle").is_null()) options.angle = real(p, "angle");
-    if (!param(p, "reference_direction").is_null()) options.reference_direction = vec_of(param(p, "reference_direction"));
+    if (!param(p, "angle").is_null())
+      options.angle = real(p, "angle");
+    if (!param(p, "reference_direction").is_null())
+      options.reference_direction = vec_of(param(p, "reference_direction"));
     return one(chamfer_rsolid(Solid(input(in, 0)), rest<Edge>(in, 1, in.size()), number(p, "distance"), options));
   });
   registry.add("make_shell_rsolid", [](Params p, Inputs in, const ScalarValues&) {
@@ -112,8 +135,8 @@ void register_blends(reactive::ExecutorRegistry& registry) {
                              {real(p, "tolerance"), text(p, "kind")}));
   });
   registry.add("make_draft_rsolid", [](Params p, Inputs in, const ScalarValues&) {
-    return one(draft_rsolid(Solid(input(in, 0)), rest<Face>(in, 1, in.size()), number(p, "angle"), point(p, "plane_origin"),
-                            point(p, "plane_normal")));
+    return one(draft_rsolid(Solid(input(in, 0)), rest<Face>(in, 1, in.size()), number(p, "angle"),
+                            point(p, "plane_origin"), point(p, "plane_normal")));
   });
 }
 
@@ -128,10 +151,12 @@ void register_booleans(reactive::ExecutorRegistry& registry) {
     return one(union_rsolid(rest<Solid>(in, 0, in.size()), options));
   });
   registry.add("make_cut_rsolid", [](Params p, Inputs in, const ScalarValues&) {
-    return one(cut_rsolid(rest<Solid>(in, 0, in.size()), {flag(p, "skip_non_intersecting"), text(p, "tracking_policy")}));
+    return one(
+        cut_rsolid(rest<Solid>(in, 0, in.size()), {flag(p, "skip_non_intersecting"), text(p, "tracking_policy")}));
   });
   registry.add("make_cut_rsolid_list", [](Params p, Inputs in, const ScalarValues&) {
-    return many(cut_rsolid_list(rest<Solid>(in, 0, in.size()), {flag(p, "skip_non_intersecting"), text(p, "tracking_policy")}));
+    return many(
+        cut_rsolid_list(rest<Solid>(in, 0, in.size()), {flag(p, "skip_non_intersecting"), text(p, "tracking_policy")}));
   });
   registry.add("make_intersect_rsolid", [](Params, Inputs in, const ScalarValues&) {
     return one(intersect_rsolid(rest<Solid>(in, 0, in.size())));
@@ -169,7 +194,8 @@ void register_transforms(reactive::ExecutorRegistry& registry) {
     std::vector<std::vector<Scalar>> matrix;
     for (const Value& row : param(p, "matrix").as_array()) {
       std::vector<Scalar>& cells = matrix.emplace_back();
-      for (const Value& cell : row.as_array()) cells.emplace_back(cell.as_double());
+      for (const Value& cell : row.as_array())
+        cells.emplace_back(cell.as_double());
     }
     return one(transform_rsolid(Solid(input(in, 0)), matrix));
   });

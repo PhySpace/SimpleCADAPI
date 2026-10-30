@@ -37,11 +37,14 @@ RenderOptions options(int w, int h, double el, double az, int ss = 1) {
 }
 
 std::array<std::uint8_t, 3> pixel(const Frame& f, int x, int y) {
-  const std::size_t o = (static_cast<std::size_t>(y) * static_cast<std::size_t>(f.width) + static_cast<std::size_t>(x)) * 4;
+  const std::size_t o =
+      (static_cast<std::size_t>(y) * static_cast<std::size_t>(f.width) + static_cast<std::size_t>(x)) * 4;
   return {f.rgba[o], f.rgba[o + 1], f.rgba[o + 2]};
 }
 
-std::int32_t face_at(const Frame& f, int x, int y) { return f.face_id[static_cast<std::size_t>(y) * static_cast<std::size_t>(f.width) + static_cast<std::size_t>(x)]; }
+std::int32_t face_at(const Frame& f, int x, int y) {
+  return f.face_id[static_cast<std::size_t>(y) * static_cast<std::size_t>(f.width) + static_cast<std::size_t>(x)];
+}
 
 }  // namespace
 
@@ -53,7 +56,8 @@ TEST_CASE("a box seen from +Z fills the projected rectangle and nothing else") {
   const Frame f = render_scene(scene, o);
   const Panel& p = f.panels.at(0);
   const AnchorResult lo = p.project({0, 0, 4}), hi = p.project({10, 8, 4});
-  const double x0 = std::min(lo.x, hi.x), x1 = std::max(lo.x, hi.x), y0 = std::min(lo.y, hi.y), y1 = std::max(lo.y, hi.y);
+  const double x0 = std::min(lo.x, hi.x), x1 = std::max(lo.x, hi.x), y0 = std::min(lo.y, hi.y),
+               y1 = std::max(lo.y, hi.y);
   const std::int32_t top = face_at(f, 200, 150);
   REQUIRE(top >= 0);
   int inside = 0, wrong = 0;
@@ -61,8 +65,12 @@ TEST_CASE("a box seen from +Z fills the projected rectangle and nothing else") {
     for (int x = 0; x < f.width; ++x) {
       const bool in = x + 0.5 > x0 + 1 && x + 0.5 < x1 - 1 && y + 0.5 > y0 + 1 && y + 0.5 < y1 - 1;
       const bool out = x + 0.5 < x0 - 1 || x + 0.5 > x1 + 1 || y + 0.5 < y0 - 1 || y + 0.5 > y1 + 1;
-      if (in) { ++inside; wrong += face_at(f, x, y) != top; }
-      if (out) wrong += face_at(f, x, y) != -1;
+      if (in) {
+        ++inside;
+        wrong += face_at(f, x, y) != top;
+      }
+      if (out)
+        wrong += face_at(f, x, y) != -1;
     }
   CHECK(inside > 20000);
   CHECK(wrong == 0);
@@ -93,21 +101,23 @@ TEST_CASE("an isometric view shows three faces, each with its own id") {
   const Frame f = render_scene(scene, o);
   std::set<std::int32_t> ids;
   for (std::int32_t v : f.face_id)
-    if (v >= 0) ids.insert(v);
+    if (v >= 0)
+      ids.insert(v);
   CHECK(ids.size() == 3);
-  for (std::int32_t m : f.mesh_id) CHECK(m <= 0);
+  for (std::int32_t m : f.mesh_id)
+    CHECK(m <= 0);
 }
 
 TEST_CASE("the nearer box occludes anchors on the farther one") {
   Scene scene;
-  scene.add_shape(box(4, 10, 10, 0, 0, 0));    // front (x = 0..4), seen from +X
-  scene.add_shape(box(4, 2, 2, -8, 4, 4));     // behind it, hidden
-  scene.add_shape(box(4, 2, 2, -8, 20, 4));    // behind but off to the side: visible
+  scene.add_shape(box(4, 10, 10, 0, 0, 0));  // front (x = 0..4), seen from +X
+  scene.add_shape(box(4, 2, 2, -8, 4, 4));   // behind it, hidden
+  scene.add_shape(box(4, 2, 2, -8, 20, 4));  // behind but off to the side: visible
   RenderOptions o = options(400, 400, 0.0, 0.0);
   o.anchors = {{4, 5, 5}, {-4, 5, 5}, {-4, 21, 5}};
   const Frame f = render_scene(scene, o);
   const auto& a = f.panels.at(0).anchors;
-  CHECK(a[0].visible);    // on the front face of the near box
+  CHECK(a[0].visible);        // on the front face of the near box
   CHECK_FALSE(a[1].visible);  // the far box's +X face is behind the near box
   CHECK(a[2].visible);
   CHECK(a[1].in_view);
@@ -143,14 +153,18 @@ TEST_CASE("per-face highlight colours and opacity") {
   clear.opacity = 0.3f;
   glass.add_shape(shape, clear, {}, false);
   const auto m = pixel(render_scene(glass, o), 100, 100);
-  CHECK(m[0] > 200);          // red + light background
+  CHECK(m[0] > 200);  // red + light background
   CHECK(m[1] > 100);
   CHECK(m[1] < 230);
 }
 
 TEST_CASE("edges are ink on visible edges and absent behind the solid") {
   Scene scene;
-  scene.add_shape(box(10, 8, 4), {}, {}, true, [] { LineStyle s; s.width_world = -1; return s; }());
+  scene.add_shape(box(10, 8, 4), {}, {}, true, [] {
+    LineStyle s;
+    s.width_world = -1;
+    return s;
+  }());
   RenderOptions o = options(500, 500, 30.0, 30.0, 2);
   o.edge_width_scale = 0.01;
   const Frame f = render_scene(scene, o);
@@ -161,20 +175,30 @@ TEST_CASE("edges are ink on visible edges and absent behind the solid") {
     return std::abs(int(c[0]) - 41) < 20 && std::abs(int(c[1]) - 54) < 20 && std::abs(int(c[2]) - 69) < 20;
   };
   // the eye sits at +x +y +z: the +X, +Y and +Z faces are seen
-  CHECK(ink({0, 8, 4}, {10, 8, 4}));          // top edge of the +Y face
-  CHECK(ink({10, 8, 0}, {0, 8, 0}));          // bottom edge of the +Y face
-  CHECK_FALSE(ink({0, 0, 0}, {10, 0, 0}));    // bottom edge of the hidden -Y face
+  CHECK(ink({0, 8, 4}, {10, 8, 4}));        // top edge of the +Y face
+  CHECK(ink({10, 8, 0}, {0, 8, 0}));        // bottom edge of the +Y face
+  CHECK_FALSE(ink({0, 0, 0}, {10, 0, 0}));  // bottom edge of the hidden -Y face
 }
 
 TEST_CASE("the image does not depend on the thread count") {
   Scene scene;
   BRepFilletAPI_MakeFillet fillet(box(10, 8, 4));
-  for (TopExp_Explorer ex(box(1, 1, 1), TopAbs_EDGE); false && ex.More(); ex.Next()) {}
+  for (TopExp_Explorer ex(box(1, 1, 1), TopAbs_EDGE); false && ex.More(); ex.Next()) {
+  }
   TopoDS_Shape b = box(10, 8, 4);
   BRepFilletAPI_MakeFillet mk(b);
-  for (TopExp_Explorer ex(b, TopAbs_EDGE); ex.More(); ex.Next()) mk.Add(1.0, TopoDS::Edge(ex.Current()));
-  scene.add_shape(mk.Shape(), {}, {}, true, [] { LineStyle s; s.width_world = -1; return s; }());
-  scene.add_shape(BRepPrimAPI_MakeCylinder(2.0, 9.0).Shape(), [] { MeshStyle s; s.color = {0.9f, 0.2f, 0.2f}; return s; }());
+  for (TopExp_Explorer ex(b, TopAbs_EDGE); ex.More(); ex.Next())
+    mk.Add(1.0, TopoDS::Edge(ex.Current()));
+  scene.add_shape(mk.Shape(), {}, {}, true, [] {
+    LineStyle s;
+    s.width_world = -1;
+    return s;
+  }());
+  scene.add_shape(BRepPrimAPI_MakeCylinder(2.0, 9.0).Shape(), [] {
+    MeshStyle s;
+    s.color = {0.9f, 0.2f, 0.2f};
+    return s;
+  }());
   RenderOptions o = options(321, 243, 28.0, -45.0, 3);
   o.style = Style::Studio;
   o.show_axes = true;

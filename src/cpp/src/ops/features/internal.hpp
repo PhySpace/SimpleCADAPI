@@ -22,17 +22,24 @@ inline OutputTags sweep_output_tags(const SweepTags& tags, std::string start, st
   OutputTags out;
   out.tag_prefix = tags.tag_prefix;
   out.result_tag = tags.result_tag;
-  out.roles = {{std::move(start), tags.start_face_tag}, {std::move(end), tags.end_face_tag},
+  out.roles = {{std::move(start), tags.start_face_tag},
+               {std::move(end), tags.end_face_tag},
                {std::move(side), tags.side_faces_tag}};
   return out;
 }
 
 // The face of a closed wire (BRepBuilderAPI_MakeFace, planar only).
-inline Face face_of_wire(const Wire& wire) { return Face(kernel::make_face_from_wire(TopoDS::Wire(wire.wrapped()))); }
+inline Face face_of_wire(const Wire& wire) {
+  return Face(kernel::make_face_from_wire(TopoDS::Wire(wire.wrapped())));
+}
 
 // A direction given in current coordinates, placed in the world.
-inline Vec3 place_vector(const Vec3& local) { return current_cs().transform_vector(local); }
-inline Vec3 place_point(const Vec3& local) { return current_cs().transform_point(local); }
+inline Vec3 place_vector(const Vec3& local) {
+  return current_cs().transform_vector(local);
+}
+inline Vec3 place_point(const Vec3& local) {
+  return current_cs().transform_point(local);
+}
 
 // The step of an operator that never reaches the recorder's shapes with tags: stamp the
 // "track" summary and hand the operation to the recorder.

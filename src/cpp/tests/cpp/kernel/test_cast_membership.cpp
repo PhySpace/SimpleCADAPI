@@ -13,7 +13,9 @@ using namespace scad;
 using namespace scad::kernel;
 
 namespace {
-TopoDS_Solid unit_box(double x = 0) { return make_box_solid({x, 0, 0}, 1, 1, 1); }
+TopoDS_Solid unit_box(double x = 0) {
+  return make_box_solid({x, 0, 0}, 1, 1, 1);
+}
 }  // namespace
 
 TEST_CASE("shape_type_name names every kind") {
@@ -72,8 +74,10 @@ TEST_CASE("SubShapeIndex answers membership by identity") {
     CHECK(index.contains(face));
     CHECK(index.contains(face.Reversed()));
   }
-  for (const TopoDS_Edge& edge : edges_of(box)) CHECK(index.contains(edge));
-  for (const TopoDS_Face& face : faces_of(other)) CHECK_FALSE(index.contains(face));
+  for (const TopoDS_Edge& edge : edges_of(box))
+    CHECK(index.contains(edge));
+  for (const TopoDS_Face& face : faces_of(other))
+    CHECK_FALSE(index.contains(face));
   CHECK_FALSE(index.contains(other));
   CHECK_FALSE(index.contains(TopoDS_Shape()));
 

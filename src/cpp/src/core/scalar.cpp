@@ -10,10 +10,16 @@ namespace {
 thread_local const Bindings* g_ambient = nullptr;
 }
 
-const Bindings* ambient_bindings() noexcept { return g_ambient; }
+const Bindings* ambient_bindings() noexcept {
+  return g_ambient;
+}
 
-AmbientBindingsScope::AmbientBindingsScope(const Bindings* bindings) noexcept : previous_(g_ambient) { g_ambient = bindings; }
-AmbientBindingsScope::~AmbientBindingsScope() { g_ambient = previous_; }
+AmbientBindingsScope::AmbientBindingsScope(const Bindings* bindings) noexcept : previous_(g_ambient) {
+  g_ambient = bindings;
+}
+AmbientBindingsScope::~AmbientBindingsScope() {
+  g_ambient = previous_;
+}
 
 double Scalar::value(const Bindings* bindings) const {
   return expr_ ? expr_->eval(bindings != nullptr ? bindings : g_ambient) : value_;

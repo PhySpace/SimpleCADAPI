@@ -1,0 +1,11 @@
+# The style of the C++ tree. One pass of `clang-format -i` over src include bindings tests/cpp is the whole
+# formatting commit; CI checks it (`tools/check_format.sh`).
+BasedOnStyle: Google
+ColumnLimit: 120
+PointerAlignment: Left
+DerivePointerAlignment: false
+SortIncludes: false          # include order carries meaning here (the local header first, then ours, then OCCT)
+IncludeBlocks: Preserve
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false

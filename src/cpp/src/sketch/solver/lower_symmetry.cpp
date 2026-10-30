@@ -24,21 +24,28 @@ void symmetric_about_line(Model& m, const Pt& p, const Pt& q, const LineRef& axi
   m.equation([=](const Env& e) { return dot(e(q) - e(p), axis.direction(e)); });
 }
 
-double distance(const SketchPoint2& a, const SketchPoint2& b) { return std::hypot(a.first - b.first, a.second - b.second); }
+double distance(const SketchPoint2& a, const SketchPoint2& b) {
+  return std::hypot(a.first - b.first, a.second - b.second);
+}
 
 // Which points of two same-kind entities mirror each other: lines and arcs match
 // endpoints by nearest initial position, circles match centers.
 std::vector<std::pair<std::string, std::string>> mirror_point_pairs(const Model& m, const SketchEntity& a,
                                                                     const SketchEntity& b) {
-  if (a.kind == kCircleKind) return {{a.point_id("center"), b.point_id("center")}};
+  if (a.kind == kCircleKind)
+    return {{a.point_id("center"), b.point_id("center")}};
   std::vector<std::string> a_points{a.point_id("start"), a.point_id("end")};
   std::vector<std::string> b_points{b.point_id("start"), b.point_id("end")};
   const auto initial = [&m](const std::string& id) { return m.initial(m.point_by_id(id)); };
-  const double direct = distance(initial(a_points[0]), initial(b_points[0])) + distance(initial(a_points[1]), initial(b_points[1]));
-  const double flipped = distance(initial(a_points[0]), initial(b_points[1])) + distance(initial(a_points[1]), initial(b_points[0]));
-  if (flipped < direct) std::reverse(b_points.begin(), b_points.end());
+  const double direct =
+      distance(initial(a_points[0]), initial(b_points[0])) + distance(initial(a_points[1]), initial(b_points[1]));
+  const double flipped =
+      distance(initial(a_points[0]), initial(b_points[1])) + distance(initial(a_points[1]), initial(b_points[0]));
+  if (flipped < direct)
+    std::reverse(b_points.begin(), b_points.end());
   std::vector<std::pair<std::string, std::string>> pairs{{a_points[0], b_points[0]}, {a_points[1], b_points[1]}};
-  if (a.kind == kArcKind) pairs.emplace_back(a.point_id("center"), b.point_id("center"));
+  if (a.kind == kArcKind)
+    pairs.emplace_back(a.point_id("center"), b.point_id("center"));
   return pairs;
 }
 
@@ -46,10 +53,12 @@ void lower_mirror(Model& m, const SketchConstraint& c) {
   const SketchEntity& a = m.entity(m.target(c, 0));
   const SketchEntity& b = m.entity(m.target(c, 2));
   if (a.kind != b.kind) {
-    throw ValueError("Mirror constraint requires two entities of the same kind, got '" + a.kind + "' and '" + b.kind + "'");
+    throw ValueError("Mirror constraint requires two entities of the same kind, got '" + a.kind + "' and '" + b.kind +
+                     "'");
   }
   const SketchEntity& axis_entity = m.entity(m.target(c, 1));
-  if (axis_entity.kind != kLineKind) throw ValueError("Mirror constraint requires a line as its axis");
+  if (axis_entity.kind != kLineKind)
+    throw ValueError("Mirror constraint requires a line as its axis");
   const LineRef axis = m.line(axis_entity);
   for (const auto& [id_a, id_b] : mirror_point_pairs(m, a, b)) {
     symmetric_about_line(m, m.point_by_id(id_a), m.point_by_id(id_b), axis);
@@ -73,10 +82,12 @@ void lower_midpoint_points(Model& m, const SketchConstraint& c) {
 
 void lower_line_distance(Model& m, const SketchConstraint& c) {
   const double value = c.numeric_value();
-  if (value <= 0.0) throw ValueError("A line-to-line distance must be positive");
+  if (value <= 0.0)
+    throw ValueError("A line-to-line distance must be positive");
   const SketchEntity& a = m.entity(m.target(c, 0));
   const SketchEntity& b = m.entity(m.target(c, 1));
-  if (a.kind != kLineKind || b.kind != kLineKind) throw ValueError("A line-to-line distance requires two line entities");
+  if (a.kind != kLineKind || b.kind != kLineKind)
+    throw ValueError("A line-to-line distance requires two line entities");
   // Drive line a's start point against line b, keeping the side it starts on.
   const Pt probe = m.point_by_id(a.point_id("start"));
   const LineRef line = m.line(b);
@@ -100,8 +111,10 @@ void lower_normal(Model& m, const SketchConstraint& c) {
   std::size_t curve_index = 2;
   for (std::size_t i = 0; i < 2; ++i) {
     const SketchEntity& e = i == 0 ? first : second;
-    if (line_index == 2 && e.kind == kLineKind) line_index = i;
-    if (curve_index == 2 && is_curve(e)) curve_index = i;
+    if (line_index == 2 && e.kind == kLineKind)
+      line_index = i;
+    if (curve_index == 2 && is_curve(e))
+      curve_index = i;
   }
   if (line_index == 2 || curve_index == 2) {
     throw ValueError("A normal constraint requires one line and one circle or arc");

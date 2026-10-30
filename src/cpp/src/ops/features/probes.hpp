@@ -63,8 +63,8 @@ std::optional<bool> edge_is_concave(const TopoDS_Solid& solid, const TopoDS_Face
 
 // Convexity by probing along n_a - n_b: unlike the bisector probe it tells a 90 degree convex
 // edge from its 270 degree concave supplement.
-std::optional<bool> edge_is_concave_side_probe(const TopoDS_Solid& solid, const TopoDS_Face& a,
-                                               const TopoDS_Face& b, const TopoDS_Edge& edge);
+std::optional<bool> edge_is_concave_side_probe(const TopoDS_Solid& solid, const TopoDS_Face& a, const TopoDS_Face& b,
+                                               const TopoDS_Edge& edge);
 
 // True when two edges meet at a vertex with aligned (or anti-aligned) tangents: one smooth curve
 // that the kernel split in two.

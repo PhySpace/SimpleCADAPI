@@ -20,16 +20,66 @@ namespace scad::pybind {
 // The Python class standing for each enum, and the facts needed to parse one.
 template <class E>
 struct EnumInfo;
-template <> struct EnumInfo<TagScope> { static constexpr const char* name = "TagScope"; static constexpr const char* field = "tag scope"; static constexpr int count = 4; };
-template <> struct EnumInfo<TopologyPropagation> { static constexpr const char* name = "TopologyPropagation"; static constexpr const char* field = "topology propagation"; static constexpr int count = 2; };
-template <> struct EnumInfo<LineagePolicy> { static constexpr const char* name = "LineagePolicy"; static constexpr const char* field = "lineage policy"; static constexpr int count = 4; };
-template <> struct EnumInfo<LineageDerivation> { static constexpr const char* name = "LineageDerivation"; static constexpr const char* field = "lineage derivation"; static constexpr int count = 6; };
-template <> struct EnumInfo<TagAttachment> { static constexpr const char* name = "TagAttachment"; static constexpr const char* field = "attachment"; static constexpr int count = 3; };
-template <> struct EnumInfo<TagProducerKind> { static constexpr const char* name = "TagProducerKind"; static constexpr const char* field = "producer kind"; static constexpr int count = 4; };
-template <> struct EnumInfo<TagTargetKind> { static constexpr const char* name = "TagTargetKind"; static constexpr const char* field = "target kind"; static constexpr int count = 4; };
-template <> struct EnumInfo<TagEvidenceKind> { static constexpr const char* name = "TagEvidenceKind"; static constexpr const char* field = "evidence kind"; static constexpr int count = 6; };
-template <> struct EnumInfo<TagCertainty> { static constexpr const char* name = "TagCertainty"; static constexpr const char* field = "certainty"; static constexpr int count = 2; };
-template <> struct EnumInfo<TagLifecycle> { static constexpr const char* name = "TagLifecycle"; static constexpr const char* field = "lifecycle"; static constexpr int count = 3; };
+template <>
+struct EnumInfo<TagScope> {
+  static constexpr const char* name = "TagScope";
+  static constexpr const char* field = "tag scope";
+  static constexpr int count = 4;
+};
+template <>
+struct EnumInfo<TopologyPropagation> {
+  static constexpr const char* name = "TopologyPropagation";
+  static constexpr const char* field = "topology propagation";
+  static constexpr int count = 2;
+};
+template <>
+struct EnumInfo<LineagePolicy> {
+  static constexpr const char* name = "LineagePolicy";
+  static constexpr const char* field = "lineage policy";
+  static constexpr int count = 4;
+};
+template <>
+struct EnumInfo<LineageDerivation> {
+  static constexpr const char* name = "LineageDerivation";
+  static constexpr const char* field = "lineage derivation";
+  static constexpr int count = 6;
+};
+template <>
+struct EnumInfo<TagAttachment> {
+  static constexpr const char* name = "TagAttachment";
+  static constexpr const char* field = "attachment";
+  static constexpr int count = 3;
+};
+template <>
+struct EnumInfo<TagProducerKind> {
+  static constexpr const char* name = "TagProducerKind";
+  static constexpr const char* field = "producer kind";
+  static constexpr int count = 4;
+};
+template <>
+struct EnumInfo<TagTargetKind> {
+  static constexpr const char* name = "TagTargetKind";
+  static constexpr const char* field = "target kind";
+  static constexpr int count = 4;
+};
+template <>
+struct EnumInfo<TagEvidenceKind> {
+  static constexpr const char* name = "TagEvidenceKind";
+  static constexpr const char* field = "evidence kind";
+  static constexpr int count = 6;
+};
+template <>
+struct EnumInfo<TagCertainty> {
+  static constexpr const char* name = "TagCertainty";
+  static constexpr const char* field = "certainty";
+  static constexpr int count = 2;
+};
+template <>
+struct EnumInfo<TagLifecycle> {
+  static constexpr const char* name = "TagLifecycle";
+  static constexpr const char* field = "lifecycle";
+  static constexpr int count = 3;
+};
 
 template <class E>
 py::object& enum_class() {
@@ -45,13 +95,16 @@ E parse_enum_text(const std::string& text) {
     std::vector<std::string> allowed;
     for (int i = 0; i < EnumInfo<E>::count; ++i) {
       const E candidate = static_cast<E>(i);
-      if (to_string(candidate) == text) return candidate;
+      if (to_string(candidate) == text)
+        return candidate;
       allowed.emplace_back(to_string(candidate));
     }
     std::sort(allowed.begin(), allowed.end());
     std::string joined;
-    for (const auto& item : allowed) joined += (joined.empty() ? "" : ", ") + item;
-    throw TagValidationError(std::string("unsupported ") + EnumInfo<E>::field + " '" + text + "'; expected one of: " + joined);
+    for (const auto& item : allowed)
+      joined += (joined.empty() ? "" : ", ") + item;
+    throw TagValidationError(std::string("unsupported ") + EnumInfo<E>::field + " '" + text +
+                             "'; expected one of: " + joined);
   }
 }
 
@@ -66,7 +119,8 @@ struct TagEnumCaster {
   PYBIND11_TYPE_CASTER(E, ::pybind11::detail::const_name("str"));
 
   bool load(py::handle src, bool) {
-    if (!src) return false;
+    if (!src)
+      return false;
     if (py::isinstance<py::str>(src)) {
       value = parse_enum_text<E>(src.cast<std::string>());
       return true;
@@ -87,16 +141,26 @@ struct TagEnumCaster {
 
 namespace pybind11::detail {
 
-template <> struct type_caster<scad::TagScope> : scad::pybind::TagEnumCaster<scad::TagScope> {};
-template <> struct type_caster<scad::TopologyPropagation> : scad::pybind::TagEnumCaster<scad::TopologyPropagation> {};
-template <> struct type_caster<scad::LineagePolicy> : scad::pybind::TagEnumCaster<scad::LineagePolicy> {};
-template <> struct type_caster<scad::LineageDerivation> : scad::pybind::TagEnumCaster<scad::LineageDerivation> {};
-template <> struct type_caster<scad::TagAttachment> : scad::pybind::TagEnumCaster<scad::TagAttachment> {};
-template <> struct type_caster<scad::TagProducerKind> : scad::pybind::TagEnumCaster<scad::TagProducerKind> {};
-template <> struct type_caster<scad::TagTargetKind> : scad::pybind::TagEnumCaster<scad::TagTargetKind> {};
-template <> struct type_caster<scad::TagEvidenceKind> : scad::pybind::TagEnumCaster<scad::TagEvidenceKind> {};
-template <> struct type_caster<scad::TagCertainty> : scad::pybind::TagEnumCaster<scad::TagCertainty> {};
-template <> struct type_caster<scad::TagLifecycle> : scad::pybind::TagEnumCaster<scad::TagLifecycle> {};
+template <>
+struct type_caster<scad::TagScope> : scad::pybind::TagEnumCaster<scad::TagScope> {};
+template <>
+struct type_caster<scad::TopologyPropagation> : scad::pybind::TagEnumCaster<scad::TopologyPropagation> {};
+template <>
+struct type_caster<scad::LineagePolicy> : scad::pybind::TagEnumCaster<scad::LineagePolicy> {};
+template <>
+struct type_caster<scad::LineageDerivation> : scad::pybind::TagEnumCaster<scad::LineageDerivation> {};
+template <>
+struct type_caster<scad::TagAttachment> : scad::pybind::TagEnumCaster<scad::TagAttachment> {};
+template <>
+struct type_caster<scad::TagProducerKind> : scad::pybind::TagEnumCaster<scad::TagProducerKind> {};
+template <>
+struct type_caster<scad::TagTargetKind> : scad::pybind::TagEnumCaster<scad::TagTargetKind> {};
+template <>
+struct type_caster<scad::TagEvidenceKind> : scad::pybind::TagEnumCaster<scad::TagEvidenceKind> {};
+template <>
+struct type_caster<scad::TagCertainty> : scad::pybind::TagEnumCaster<scad::TagCertainty> {};
+template <>
+struct type_caster<scad::TagLifecycle> : scad::pybind::TagEnumCaster<scad::TagLifecycle> {};
 
 }  // namespace pybind11::detail
 
@@ -108,13 +172,20 @@ using scad::pybind::value_to_python;
 
 py::object shape_to_py(const Shape& s) {
   switch (s.kind()) {
-    case Kind::Vertex: return py::cast(Vertex(s));
-    case Kind::Edge: return py::cast(Edge(s));
-    case Kind::Wire: return py::cast(Wire(s));
-    case Kind::Face: return py::cast(Face(s));
-    case Kind::Shell: return py::cast(Shell(s));
-    case Kind::Solid: return py::cast(Solid(s));
-    case Kind::Compound: return py::cast(Compound(s));
+    case Kind::Vertex:
+      return py::cast(Vertex(s));
+    case Kind::Edge:
+      return py::cast(Edge(s));
+    case Kind::Wire:
+      return py::cast(Wire(s));
+    case Kind::Face:
+      return py::cast(Face(s));
+    case Kind::Shell:
+      return py::cast(Shell(s));
+    case Kind::Solid:
+      return py::cast(Solid(s));
+    case Kind::Compound:
+      return py::cast(Compound(s));
   }
   return py::none();
 }
@@ -124,7 +195,8 @@ void make_enum(py::module_& m, std::initializer_list<const char*> values) {
   py::list members;
   for (const char* value : values) {
     std::string name = value;
-    for (char& c : name) c = static_cast<char>(c >= 'a' && c <= 'z' ? c - 'a' + 'A' : c);
+    for (char& c : name)
+      c = static_cast<char>(c >= 'a' && c <= 'z' ? c - 'a' + 'A' : c);
     members.append(py::make_tuple(name, value));
   }
   py::dict kwargs;
@@ -152,22 +224,31 @@ void bind_enums(py::module_& m) {
 // ---- the data classes ------------------------------------------------------------------------------------
 
 // The data classes validate when they are built, like the Python dataclasses; the wire parsers hold the rules.
-TagTarget checked(const TagTarget& target) { return tag_target_from_value(target.to_value()); }
-TagPropagation checked(const TagPropagation& p) { return tag_propagation_from_value(p.to_value()); }
-TagProducer checked(const TagProducer& p) { return tag_producer_from_value(p.to_value()); }
+TagTarget checked(const TagTarget& target) {
+  return tag_target_from_value(target.to_value());
+}
+TagPropagation checked(const TagPropagation& p) {
+  return tag_propagation_from_value(p.to_value());
+}
+TagProducer checked(const TagProducer& p) {
+  return tag_producer_from_value(p.to_value());
+}
 
 void bind_records(py::module_& m) {
   py::class_<TagBindingScope>(m, "TagBindingScope", "Snapshot boundary in which an assignment target is evaluated.")
       .def(py::init([](std::optional<std::string> node_id, int output_slot) {
-             if (node_id && node_id->empty()) throw TagValidationError("scope.node_id must be null or a non-empty string");
-             if (output_slot < 0) throw TagValidationError("scope.output_slot must be >= 0");
+             if (node_id && node_id->empty())
+               throw TagValidationError("scope.node_id must be null or a non-empty string");
+             if (output_slot < 0)
+               throw TagValidationError("scope.output_slot must be >= 0");
              return TagBindingScope{std::move(node_id), output_slot};
            }),
            py::arg("node_id") = py::none(), py::arg("output_slot") = 0)
       .def_property_readonly("node_id", [](const TagBindingScope& s) { return s.node_id; })
       .def_property_readonly("output_slot", [](const TagBindingScope& s) { return s.output_slot; })
       .def("to_dict", [](const TagBindingScope& s) { return value_to_python(s.to_value()); })
-      .def_static("from_dict", [](const py::object& data) { return tag_binding_scope_from_value(value_from_python(data)); })
+      .def_static("from_dict",
+                  [](const py::object& data) { return tag_binding_scope_from_value(value_from_python(data)); })
       .def("__eq__", [](const TagBindingScope& a, const TagBindingScope& b) { return a.to_value() == b.to_value(); })
       .def("__hash__", [](const TagBindingScope& s) { return py::hash(py::make_tuple(s.node_id, s.output_slot)); })
       .def("__repr__", [](const TagBindingScope& s) {
@@ -197,56 +278,67 @@ void bind_records(py::module_& m) {
       .def("__repr__", [](const TagProducer& p) { return "TagProducer(" + p.to_value().dump() + ")"; });
 
   py::class_<TagTarget>(m, "TagTarget", "Serializable assignment intent, separate from execution evidence.")
-      .def(py::init([](TagTargetKind kind, std::optional<std::string> query_hash, std::optional<std::string> binding_hash,
-                       std::optional<Value> selector, std::vector<Value> refs) {
-             TagTarget t;
-             t.kind = kind;
-             t.query_hash = std::move(query_hash);
-             t.binding_hash = std::move(binding_hash);
-             if (selector && !selector->is_null()) {
-               if (!selector->is_object()) throw TagValidationError("target.selector must be an object");
-               t.selector = std::move(selector);
-             }
-             for (const Value& ref : refs)
-               if (!ref.is_object()) throw TagValidationError("target.refs must be a tuple of objects");
-             t.refs = std::move(refs);
-             return checked(t);
-           }),
-           py::arg("kind") = TagTargetKind::ScopeRoot, py::arg("query_hash") = py::none(),
-           py::arg("binding_hash") = py::none(), py::arg("selector") = py::none(), py::arg("refs") = py::tuple())
+      .def(
+          py::init([](TagTargetKind kind, std::optional<std::string> query_hash,
+                      std::optional<std::string> binding_hash, std::optional<Value> selector, std::vector<Value> refs) {
+            TagTarget t;
+            t.kind = kind;
+            t.query_hash = std::move(query_hash);
+            t.binding_hash = std::move(binding_hash);
+            if (selector && !selector->is_null()) {
+              if (!selector->is_object())
+                throw TagValidationError("target.selector must be an object");
+              t.selector = std::move(selector);
+            }
+            for (const Value& ref : refs)
+              if (!ref.is_object())
+                throw TagValidationError("target.refs must be a tuple of objects");
+            t.refs = std::move(refs);
+            return checked(t);
+          }),
+          py::arg("kind") = TagTargetKind::ScopeRoot, py::arg("query_hash") = py::none(),
+          py::arg("binding_hash") = py::none(), py::arg("selector") = py::none(), py::arg("refs") = py::tuple())
       .def_property_readonly("kind", [](const TagTarget& t) { return t.kind; })
       .def_property_readonly("query_hash", [](const TagTarget& t) { return t.query_hash; })
       .def_property_readonly("binding_hash", [](const TagTarget& t) { return t.binding_hash; })
-      .def_property_readonly("selector", [](const TagTarget& t) { return t.selector ? value_to_python(*t.selector) : py::object(py::none()); })
-      .def_property_readonly("refs", [](const TagTarget& t) {
-        py::list refs;
-        for (const Value& r : t.refs) refs.append(value_to_python(r));
-        return py::tuple(refs);
-      })
+      .def_property_readonly(
+          "selector",
+          [](const TagTarget& t) { return t.selector ? value_to_python(*t.selector) : py::object(py::none()); })
+      .def_property_readonly("refs",
+                             [](const TagTarget& t) {
+                               py::list refs;
+                               for (const Value& r : t.refs)
+                                 refs.append(value_to_python(r));
+                               return py::tuple(refs);
+                             })
       .def("to_dict", [](const TagTarget& t) { return value_to_python(t.to_value()); })
       .def_static("from_dict", [](const py::object& data) { return tag_target_from_value(value_from_python(data)); })
       .def("__eq__", [](const TagTarget& a, const TagTarget& b) { return a.to_value() == b.to_value(); })
       .def("__repr__", [](const TagTarget& t) { return "TagTarget(" + t.to_value().dump() + ")"; });
 
   py::class_<TagPropagation>(m, "TagPropagation", "How a tag travels through topology and history.")
-      .def(py::init([](TopologyPropagation topology, LineagePolicy lineage, std::vector<LineageDerivation> derivations) {
-             TagPropagation p;
-             p.topology = topology;
-             p.lineage = lineage;
-             p.explicit_derivations = std::move(derivations);
-             return checked(p);
-           }),
-           py::arg("topology") = TopologyPropagation::Local, py::arg("lineage") = LineagePolicy::ContinuationFragment,
-           py::arg("explicit_derivations") = py::tuple())
+      .def(
+          py::init([](TopologyPropagation topology, LineagePolicy lineage, std::vector<LineageDerivation> derivations) {
+            TagPropagation p;
+            p.topology = topology;
+            p.lineage = lineage;
+            p.explicit_derivations = std::move(derivations);
+            return checked(p);
+          }),
+          py::arg("topology") = TopologyPropagation::Local, py::arg("lineage") = LineagePolicy::ContinuationFragment,
+          py::arg("explicit_derivations") = py::tuple())
       .def_property_readonly("topology", [](const TagPropagation& p) { return p.topology; })
       .def_property_readonly("lineage", [](const TagPropagation& p) { return p.lineage; })
-      .def_property_readonly("explicit_derivations", [](const TagPropagation& p) {
-        py::list items;
-        for (const auto d : p.explicit_derivations) items.append(py::cast(d));
-        return py::tuple(items);
-      })
+      .def_property_readonly("explicit_derivations",
+                             [](const TagPropagation& p) {
+                               py::list items;
+                               for (const auto d : p.explicit_derivations)
+                                 items.append(py::cast(d));
+                               return py::tuple(items);
+                             })
       .def("to_dict", [](const TagPropagation& p) { return value_to_python(p.to_value()); })
-      .def_static("from_dict", [](const py::object& data) { return tag_propagation_from_value(value_from_python(data)); })
+      .def_static("from_dict",
+                  [](const py::object& data) { return tag_propagation_from_value(value_from_python(data)); })
       .def("__eq__", [](const TagPropagation& a, const TagPropagation& b) { return a.to_value() == b.to_value(); })
       .def("__repr__", [](const TagPropagation& p) { return "TagPropagation(" + p.to_value().dump() + ")"; });
 
@@ -255,8 +347,10 @@ void bind_records(py::module_& m) {
              TagEvidence e;
              e.kind = kind;
              if (data && !data->is_null()) {
-               if (!data->is_object()) throw TagValidationError("evidence data must be an object");
-               if (data->find("kind") != nullptr) throw TagValidationError("evidence data cannot redefine kind");
+               if (!data->is_object())
+                 throw TagValidationError("evidence data must be an object");
+               if (data->find("kind") != nullptr)
+                 throw TagValidationError("evidence data cannot redefine kind");
                e.data = std::move(*data);
              }
              return e;
@@ -273,7 +367,8 @@ void bind_records(py::module_& m) {
       .def(py::init([](const std::string& tag, TagProducer producer, std::optional<TagBindingScope> scope,
                        std::optional<TagTarget> target, std::optional<TagPropagation> propagation,
                        std::optional<TagEvidence> evidence, TagAttachment attachment, TagCertainty certainty,
-                       TagLifecycle lifecycle, std::optional<std::string> binding_id, const std::string& schema_version) {
+                       TagLifecycle lifecycle, std::optional<std::string> binding_id,
+                       const std::string& schema_version) {
              TagBinding b;
              try {
                b.tag = normalize_tag(tag, true);
@@ -281,9 +376,12 @@ void bind_records(py::module_& m) {
                throw TagValidationError(e.what());
              }
              b.policy.mut().producer = std::move(producer);
-             if (scope) b.policy.mut().scope = std::move(*scope);
-             if (target) b.policy.mut().target = std::move(*target);
-             if (propagation) b.policy.mut().propagation = std::move(*propagation);
+             if (scope)
+               b.policy.mut().scope = std::move(*scope);
+             if (target)
+               b.policy.mut().target = std::move(*target);
+             if (propagation)
+               b.policy.mut().propagation = std::move(*propagation);
              b.evidence = evidence ? std::move(*evidence) : TagEvidence{};
              b.attachment = attachment;
              b.certainty = certainty;
@@ -313,9 +411,12 @@ void bind_records(py::module_& m) {
       .def_static("from_dict", [](const py::object& data) { return tag_binding_from_value(value_from_python(data)); })
       .def("__eq__", [](const TagBinding& a, const TagBinding& b) { return a == b; })
       .def("__hash__", [](const TagBinding& b) { return py::hash(py::str(b.binding_id.str())); })
-      .def("__repr__", [](const TagBinding& b) { return "TagBinding(tag='" + b.tag.str() + "', binding_id='" + b.binding_id.str() + "')"; });
+      .def("__repr__", [](const TagBinding& b) {
+        return "TagBinding(tag='" + b.tag.str() + "', binding_id='" + b.binding_id.str() + "')";
+      });
 
-  py::class_<TagLineageWitness>(m, "TagLineageWitness", "Evidence that makes a source binding visible in lineage scope.")
+  py::class_<TagLineageWitness>(m, "TagLineageWitness",
+                                "Evidence that makes a source binding visible in lineage scope.")
       .def(py::init([](TagBinding binding, LineageDerivation derivation, std::string source_topo_id,
                        std::string target_topo_id, TagEvidence evidence, std::string coverage) {
              TagLineageWitness w;
@@ -337,7 +438,8 @@ void bind_records(py::module_& m) {
       .def_property_readonly("evidence", [](const TagLineageWitness& w) { return *w.evidence; })
       .def_property_readonly("coverage", [](const TagLineageWitness& w) { return w.coverage; })
       .def("to_dict", [](const TagLineageWitness& w) { return value_to_python(w.to_value()); })
-      .def_static("from_dict", [](const py::object& data) { return tag_lineage_witness_from_value(value_from_python(data)); })
+      .def_static("from_dict",
+                  [](const py::object& data) { return tag_lineage_witness_from_value(value_from_python(data)); })
       .def("__eq__", [](const TagLineageWitness& a, const TagLineageWitness& b) { return a == b; })
       .def("__repr__", [](const TagLineageWitness& w) { return "TagLineageWitness(" + w.to_value().dump() + ")"; });
 
@@ -365,13 +467,14 @@ void bind_records(py::module_& m) {
       });
 
   py::class_<SemanticDelta>(m, "SemanticDelta")
-      .def(py::init([](std::vector<SemanticRef> created, std::vector<SemanticRef> modified, std::vector<SemanticRef> deleted,
-                       std::optional<Value> metadata) {
+      .def(py::init([](std::vector<SemanticRef> created, std::vector<SemanticRef> modified,
+                       std::vector<SemanticRef> deleted, std::optional<Value> metadata) {
              SemanticDelta d;
              d.created = std::move(created);
              d.modified = std::move(modified);
              d.deleted = std::move(deleted);
-             if (metadata) d.metadata = std::move(*metadata);
+             if (metadata)
+               d.metadata = std::move(*metadata);
              return d;
            }),
            py::arg("created") = py::tuple(), py::arg("modified") = py::tuple(), py::arg("deleted") = py::tuple(),
@@ -407,13 +510,14 @@ void bind_tagging_functions(py::module_& m, py::module_& tagging) {
       py::arg("evidence") = py::none());
   tagging.def(
       "internal_tag_binding",
-      [](const std::string& tag, TopologyPropagation topology, const std::string& rule_id, const std::string& rule_version,
-         std::optional<Value> evidence) {
+      [](const std::string& tag, TopologyPropagation topology, const std::string& rule_id,
+         const std::string& rule_version, std::optional<Value> evidence) {
         InternalTagOptions o;
         o.topology = topology;
         o.rule_id = rule_id;
         o.rule_version = rule_version;
-        if (evidence) o.evidence = std::move(*evidence);
+        if (evidence)
+          o.evidence = std::move(*evidence);
         return internal_tag_binding(tag, o);
       },
       py::arg("tag"), py::kw_only(), py::arg("topology") = TopologyPropagation::Local,
@@ -433,23 +537,28 @@ void bind_tagging_functions(py::module_& m, py::module_& tagging) {
   tagging.def(
       "lineage_policy_allows",
       [](const py::object& policy, LineageDerivation derivation) {
-        if (py::isinstance<TagPropagation>(policy)) return lineage_policy_allows(policy.cast<const TagPropagation&>(), derivation);
+        if (py::isinstance<TagPropagation>(policy))
+          return lineage_policy_allows(policy.cast<const TagPropagation&>(), derivation);
         return lineage_policy_allows(policy.cast<LineagePolicy>(), derivation);
       },
       py::arg("policy"), py::arg("derivation"));
-  tagging.def("is_normalized_tag", [](const py::object& tag) { return py::isinstance<py::str>(tag) && is_normalized_tag(tag.cast<std::string>()); },
-              py::arg("tag"));
+  tagging.def(
+      "is_normalized_tag",
+      [](const py::object& tag) { return py::isinstance<py::str>(tag) && is_normalized_tag(tag.cast<std::string>()); },
+      py::arg("tag"));
   tagging.def(
       "normalize_tag",
       [](const py::object& tag, bool strict) {
-        if (!py::isinstance<py::str>(tag)) throw TypeError("tag must be a string");
+        if (!py::isinstance<py::str>(tag))
+          throw TypeError("tag must be a string");
         return normalize_tag(tag.cast<std::string>(), strict);
       },
       py::arg("tag"), py::kw_only(), py::arg("strict") = true);
   tagging.def(
       "normalize_tag_scope",
       [](const py::object& scope) {
-        if (py::isinstance<py::str>(scope)) return normalize_tag_scope(scope.cast<std::string>());
+        if (py::isinstance<py::str>(scope))
+          return normalize_tag_scope(scope.cast<std::string>());
         throw TypeError("tag scope must be a string or TagScope");
       },
       py::arg("scope"));
@@ -457,7 +566,8 @@ void bind_tagging_functions(py::module_& m, py::module_& tagging) {
   tagging.attr("DEFAULT_TAG_POLICY") = py::cast(default_tag_policy());
   tagging.attr("TAG_BINDING_SCHEMA_VERSION") = std::string(kTagBindingSchemaVersion);
   py::set scopes;
-  for (const char* scope : {"local", "inherited", "effective", "lineage"}) scopes.add(scope);
+  for (const char* scope : {"local", "inherited", "effective", "lineage"})
+    scopes.add(scope);
   tagging.attr("VALID_TAG_SCOPES") = py::frozenset(scopes);
 
   // The error families are one Python class in this module: every scad::Error arrives as SimpleCADError.
@@ -472,23 +582,33 @@ void bind_tagging_functions(py::module_& m, py::module_& tagging) {
         "TagProducer", "TagTarget", "TagPropagation", "TagEvidence", "TagLineageWitness", "TagPolicy"})
     tagging.attr(name) = m.attr(name);
   // The short aliases tagging.py keeps for the model names.
-  for (const auto& [alias, target] : std::initializer_list<std::pair<const char*, const char*>>{
-           {"BindingScope", "TagBindingScope"}, {"Propagation", "TagPropagation"}, {"Lineage", "LineagePolicy"},
-           {"Attachment", "TagAttachment"}, {"Producer", "TagProducer"}, {"ProducerKind", "TagProducerKind"},
-           {"Target", "TagTarget"}, {"TargetKind", "TagTargetKind"}, {"Evidence", "TagEvidence"},
-           {"EvidenceKind", "TagEvidenceKind"}, {"Certainty", "TagCertainty"}, {"Lifecycle", "TagLifecycle"}})
+  for (const auto& [alias, target] :
+       std::initializer_list<std::pair<const char*, const char*>>{{"BindingScope", "TagBindingScope"},
+                                                                  {"Propagation", "TagPropagation"},
+                                                                  {"Lineage", "LineagePolicy"},
+                                                                  {"Attachment", "TagAttachment"},
+                                                                  {"Producer", "TagProducer"},
+                                                                  {"ProducerKind", "TagProducerKind"},
+                                                                  {"Target", "TagTarget"},
+                                                                  {"TargetKind", "TagTargetKind"},
+                                                                  {"Evidence", "TagEvidence"},
+                                                                  {"EvidenceKind", "TagEvidenceKind"},
+                                                                  {"Certainty", "TagCertainty"},
+                                                                  {"Lifecycle", "TagLifecycle"}})
     tagging.attr(alias) = m.attr(target);
 }
 
 // ---- the public operators ---------------------------------------------------------------------------------------
 
 TagTargets targets_from_py(const py::object& targets) {
-  if (py::isinstance<ql::ShapeSelector>(targets)) return TagTargets(targets.cast<const ql::ShapeSelector&>().shared());
+  if (py::isinstance<ql::ShapeSelector>(targets))
+    return TagTargets(targets.cast<const ql::ShapeSelector&>().shared());
   if (py::isinstance<py::str>(targets) || py::isinstance<py::bytes>(targets) || !py::hasattr(targets, "__iter__"))
     throw TypeError("targets must be a ShapeSelector or shape sequence");
   std::vector<Shape> shapes;
   for (const py::handle item : targets) {
-    if (!py::isinstance<Shape>(item)) throw TypeError("tag assignment targets must contain only shapes");
+    if (!py::isinstance<Shape>(item))
+      throw TypeError("tag assignment targets must contain only shapes");
     shapes.push_back(item.cast<const Shape&>());
   }
   return TagTargets(std::move(shapes));
@@ -499,10 +619,12 @@ void bind_operators(py::module_& m) {
       "apply_tag",
       [](const py::object& shape, const std::string& tag) {
         if (!py::isinstance<Shape>(shape)) {
-          static const ErrorSpec spec{"apply_tag", "Failed to attach the tag to the shape.",
-                                      {"The shape is invalid.", "The tag value is empty or malformed."},
-                                      {"Pass a valid shape object.",
-                                       "Use a normalized tag string such as 'role.mounting_surface' or 'group.fasteners'."}};
+          static const ErrorSpec spec{
+              "apply_tag",
+              "Failed to attach the tag to the shape.",
+              {"The shape is invalid.", "The tag value is empty or malformed."},
+              {"Pass a valid shape object.",
+               "Use a normalized tag string such as 'role.mounting_surface' or 'group.fasteners'."}};
           raise_harness_error(spec, TypeError("expected a SimpleCAD shape"));
         }
         apply_tag(shape.cast<const Shape&>(), tag);
@@ -522,7 +644,8 @@ void bind_operators(py::module_& m) {
             {"Pass a valid scope and a non-empty ShapeSelector or shape sequence.",
              "Use a normalized tag string such as 'role.mounting_surface' or 'group.fasteners'.",
              "Ensure every explicit target belongs to the assignment scope."}};
-        return shape_to_py(guarded(spec, [&] { return apply_tag_rselection(scope, targets_from_py(targets), tag, topology, lineage); }));
+        return shape_to_py(guarded(
+            spec, [&] { return apply_tag_rselection(scope, targets_from_py(targets), tag, topology, lineage); }));
       },
       py::arg("scope"), py::arg("targets"), py::arg("tag"),
       py::arg("topology_propagation") = TopologyPropagation::Local,
@@ -533,18 +656,22 @@ void bind_operators(py::module_& m) {
       "list_tags", [](const Shape& shape, TagScope scope) { return list_tags(shape, scope); }, py::arg("shape"),
       py::arg("scope") = TagScope::Effective, "Return shape tags in deterministic sorted order for one scope.");
   m.def(
-      "explain_tag", [](const Shape& shape, const std::string& tag, TagScope scope) { return explain_tag(shape, tag, scope); },
+      "explain_tag",
+      [](const Shape& shape, const std::string& tag, TagScope scope) { return explain_tag(shape, tag, scope); },
       py::arg("shape"), py::arg("tag"), py::arg("scope") = TagScope::Effective,
       "Explain every visible binding that produces a tag token.");
   m.def(
-      "select_faces_by_tag", [](const Solid& solid, const std::string& tag, TagScope scope) { return select_faces_by_tag(solid, tag, scope); },
+      "select_faces_by_tag",
+      [](const Solid& solid, const std::string& tag, TagScope scope) { return select_faces_by_tag(solid, tag, scope); },
       py::arg("solid"), py::arg("tag"), py::arg("scope") = TagScope::Effective, "Select faces by tag.");
   m.def(
-      "select_edges_by_tag", [](const Shape& shape, const std::string& tag, TagScope scope) { return select_edges_by_tag(shape, tag, scope); },
+      "select_edges_by_tag",
+      [](const Shape& shape, const std::string& tag, TagScope scope) { return select_edges_by_tag(shape, tag, scope); },
       py::arg("shape"), py::arg("tag"), py::arg("scope") = TagScope::Effective, "Select edges by tag.");
 }
 
-// ---- TaggedMixin's private surface, on every shape class --------------------------------------------------------------
+// ---- TaggedMixin's private surface, on every shape class
+// --------------------------------------------------------------
 
 void bind_shape_methods(py::module_& m) {
   py::object cls = m.attr("AnyShape");
@@ -552,59 +679,72 @@ void bind_shape_methods(py::module_& m) {
     cls.attr(name) = py::cpp_function(std::move(fn), py::name(name), py::is_method(cls), extras...);
   };
 
-  method("_apply_user_tag",
-         [](Shape& s, const std::string& tag, TopologyPropagation topology, LineagePolicy lineage,
-            std::optional<std::string> producer_node_id) {
-           UserTagOptions o;
-           o.node_id = std::move(producer_node_id);
-           o.topology = topology;
-           o.lineage = lineage;
-           TagBinding binding = user_tag_binding(normalize_tag(tag, true), o);
-           s.add_binding(binding);
-           return binding;
-         },
-         py::arg("tag"), py::kw_only(), py::arg("topology_propagation") = TopologyPropagation::Local,
-         py::arg("lineage_policy") = LineagePolicy::ContinuationFragment, py::arg("producer_node_id") = py::none());
+  method(
+      "_apply_user_tag",
+      [](Shape& s, const std::string& tag, TopologyPropagation topology, LineagePolicy lineage,
+         std::optional<std::string> producer_node_id) {
+        UserTagOptions o;
+        o.node_id = std::move(producer_node_id);
+        o.topology = topology;
+        o.lineage = lineage;
+        TagBinding binding = user_tag_binding(normalize_tag(tag, true), o);
+        s.add_binding(binding);
+        return binding;
+      },
+      py::arg("tag"), py::kw_only(), py::arg("topology_propagation") = TopologyPropagation::Local,
+      py::arg("lineage_policy") = LineagePolicy::ContinuationFragment, py::arg("producer_node_id") = py::none());
   method("_add_tag_binding", [](Shape& s, const TagBinding& b) { s.add_binding(b); }, py::arg("binding"));
-  method("_add_tag_lineage",
-         [](Shape& s, const TagBinding& binding, LineageDerivation derivation, const std::string& source_topo_id,
-            const TagEvidence& evidence, const std::string& coverage) {
-           s.add_tag_lineage(binding, derivation, source_topo_id, evidence, coverage);
-         },
-         py::arg("binding"), py::kw_only(), py::arg("derivation"), py::arg("source_topo_id"), py::arg("evidence"),
-         py::arg("coverage") = "complete");
-  method("_remove_tag",
-         [](Shape& s, const std::string& tag, const py::object& matching) {
-           if (py::isinstance<TagProducer>(matching))
-             return static_cast<int>(s.remove_tag_bindings(tag, matching.cast<const TagProducer&>()));
-           return static_cast<int>(s.remove_tag_bindings(tag, matching.cast<TagProducerKind>()));
-         },
-         py::arg("tag"), py::kw_only(), py::arg("matching_producer") = TagProducerKind::UserOperation);
-  method("_remove_tag_binding", [](Shape& s, const std::string& id) { return s.remove_tag_binding(id); }, py::arg("binding_id"));
+  method(
+      "_add_tag_lineage",
+      [](Shape& s, const TagBinding& binding, LineageDerivation derivation, const std::string& source_topo_id,
+         const TagEvidence& evidence,
+         const std::string& coverage) { s.add_tag_lineage(binding, derivation, source_topo_id, evidence, coverage); },
+      py::arg("binding"), py::kw_only(), py::arg("derivation"), py::arg("source_topo_id"), py::arg("evidence"),
+      py::arg("coverage") = "complete");
+  method(
+      "_remove_tag",
+      [](Shape& s, const std::string& tag, const py::object& matching) {
+        if (py::isinstance<TagProducer>(matching))
+          return static_cast<int>(s.remove_tag_bindings(tag, matching.cast<const TagProducer&>()));
+        return static_cast<int>(s.remove_tag_bindings(tag, matching.cast<TagProducerKind>()));
+      },
+      py::arg("tag"), py::kw_only(), py::arg("matching_producer") = TagProducerKind::UserOperation);
+  method(
+      "_remove_tag_binding", [](Shape& s, const std::string& id) { return s.remove_tag_binding(id); },
+      py::arg("binding_id"));
   method("_local_tag_bindings", [](const Shape& s) { return s.local_tag_bindings(); });
   method("_legacy_effective_bindings", [](const Shape& s) { return s.legacy_effective_bindings(); });
   method("_inherited_tag_bindings", [](const Shape& s) { return s.inherited_tag_bindings(); });
   method("_lineage_tag_bindings", [](const Shape& s) { return s.lineage_tag_bindings(); });
-  method("_list_tag_bindings", [](const Shape& s, TagScope scope) { return s.list_tag_bindings(scope); },
-         py::arg("scope") = TagScope::Effective);
-  method("_replace_local_tag_bindings", [](Shape& s, std::vector<TagBinding> bindings) { s.replace_local_tag_bindings(std::move(bindings)); },
-         py::arg("bindings"));
-  method("_copy_tag_state_from", [](Shape& s, const Shape& source) { s.copy_tag_state_from(source); }, py::arg("source"));
-  method("_copy_semantic_state_from", [](Shape& s, const Shape& source) { s.copy_semantic_state_from(source); }, py::arg("source"));
-  method("_refresh_tag_cache", [](Shape& s, bool recursive) { s.refresh_tag_cache(recursive); }, py::kw_only(),
-         py::arg("recursive") = false);
+  method(
+      "_list_tag_bindings", [](const Shape& s, TagScope scope) { return s.list_tag_bindings(scope); },
+      py::arg("scope") = TagScope::Effective);
+  method(
+      "_replace_local_tag_bindings",
+      [](Shape& s, std::vector<TagBinding> bindings) { s.replace_local_tag_bindings(std::move(bindings)); },
+      py::arg("bindings"));
+  method(
+      "_copy_tag_state_from", [](Shape& s, const Shape& source) { s.copy_tag_state_from(source); }, py::arg("source"));
+  method(
+      "_copy_semantic_state_from", [](Shape& s, const Shape& source) { s.copy_semantic_state_from(source); },
+      py::arg("source"));
+  method(
+      "_refresh_tag_cache", [](Shape& s, bool recursive) { s.refresh_tag_cache(recursive); }, py::kw_only(),
+      py::arg("recursive") = false);
 
   const py::object property = py::module_::import("builtins").attr("property");
   cls.attr("_tag_bindings") = property(py::cpp_function([](const Shape& s) { return s.local_bindings(); }));
   cls.attr("_tag_lineage") = property(py::cpp_function([](const Shape& s) { return s.lineage_witnesses(); }));
-  cls.attr("_tags") = property(py::cpp_function([](const Shape& s) { return py::set(py::cast(s.list_tags())); }),
-                               py::cpp_function([](Shape& s, const py::object& tags) {
-                                 if (py::isinstance<py::str>(tags) || py::isinstance<py::bytes>(tags) || !py::hasattr(tags, "__iter__"))
-                                   throw TypeError("_tags compatibility cache must be assigned an iterable");
-                                 std::vector<std::string> names;
-                                 for (const py::handle item : tags) names.push_back(item.cast<std::string>());
-                                 s.set_legacy_tags(names);
-                               }));
+  cls.attr("_tags") =
+      property(py::cpp_function([](const Shape& s) { return py::set(py::cast(s.list_tags())); }),
+               py::cpp_function([](Shape& s, const py::object& tags) {
+                 if (py::isinstance<py::str>(tags) || py::isinstance<py::bytes>(tags) || !py::hasattr(tags, "__iter__"))
+                   throw TypeError("_tags compatibility cache must be assigned an iterable");
+                 std::vector<std::string> names;
+                 for (const py::handle item : tags)
+                   names.push_back(item.cast<std::string>());
+                 s.set_legacy_tags(names);
+               }));
 }
 
 }  // namespace

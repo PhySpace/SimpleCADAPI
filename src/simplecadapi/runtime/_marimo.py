@@ -33,6 +33,9 @@ from marimo._runtime.exceptions import MarimoRescheduleError, MarimoRuntimeExcep
 from marimo._runtime.executor import Evaluator
 from marimo._runtime.executor.executor import DefaultExecutor, Executor
 from marimo._runtime.executor.lifecycles import ExecutionLifecycle, Skip
+from marimo._runtime.executor.lifecycles import cached as marimo_cached
+from marimo._save.cache import Cache as MarimoCache
+from marimo._save.hash import BlockHasher
 from marimo._runtime.executor.lifecycles.cached import CachedLifecycle
 from marimo._runtime.runner.result import RunResult
 from marimo._save.loaders.lazy import LazyLoader, LazyStore
@@ -46,6 +49,9 @@ from marimo._utils.scripts import read_pyproject_from_script
 __all__ = [
     "AppScriptRunner",
     "CachedLifecycle",
+    "marimo_cached",
+    "MarimoCache",
+    "BlockHasher",
     "CellId_t",
     "CellImpl",
     "CustomStub",

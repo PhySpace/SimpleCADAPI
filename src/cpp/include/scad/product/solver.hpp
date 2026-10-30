@@ -17,7 +17,7 @@
 
 namespace scad::product {
 
-inline constexpr double kPlacementTolerance = 1e-7;   // mm
+inline constexpr double kPlacementTolerance = 1e-7;  // mm
 inline constexpr double kAngleToleranceDegrees = 1e-6;
 
 // Place every component reachable from a grounded one.
