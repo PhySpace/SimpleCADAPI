@@ -2996,7 +2996,7 @@ wheels = [
 
 [[package]]
 name = "simplecadapi"
-version = "2.2.7b1"
+version = "2.2.7"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },

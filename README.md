@@ -149,20 +149,22 @@ the full crank cycle sweeps clean in the same sim ·
 
 ---
 
-## Update Notes (2.2.7b1)
+## Update Notes (2.2.7)
 
 > Validate generated definitions, assembly constraints, and manufacturing
 > geometry before production use.
 
-- **The geometry engine is C++ on OpenCASCADE, inside the wheel.** `pip install simplecadapi` needs no
-  `cadquery-ocp`; the public API and the previous test suite are unchanged.
-- **Prebuilt wheels** for Linux x86_64 and aarch64, macOS arm64 (14+) and Windows x86_64, Python 3.10-3.13,
-  all on the same OpenCASCADE 7.9.3. This is a beta: the first release with prebuilt wheels.
-- **Faster and smaller.** On the six-axis arm: cold build 43.8 s to 29.1 s, rebuild with nothing changed
-  12.8 s to 6.0 s, `import simplecadapi` 1.6 s / 360 MB to 0.2 s / 68 MB.
-- **Errors are English** and the tag and query errors render in full, like operator errors.
+- **First stable release of the C++ engine**, inside prebuilt wheels (Linux x86_64 and aarch64, macOS arm64 14+, Windows
+  x86_64; Python 3.10-3.13; one OpenCASCADE 7.9.3). `pip install simplecadapi` needs no `cadquery-ocp`.
+- **The editor is faster.** On the six-axis arm a joint angle never seen before takes 2.7 s (was 5.7 s in the beta), one seen
+  before 0.6 s (was 5.5 s), and the model reaches the page 0.36-0.41 s after the last cell. The kernel uses about 300 MB more
+  memory at idle than the beta.
+- **`Var` and `Expr` behave like numbers**: `r > 3`, `int(r)`, `round(r, 2)`, `range(n)`, `max(r, 3)`, f-strings work, and
+  a ql predicate with a value computed from a `Var` matches. `bool(var)` and `json.dumps(var)` still raise.
+- **`shape.wrapped` is an OCP shape** when OCP is installed (`simplecadapi[verify]`), a copy, so OCCT verifier scripts run as written.
+- Failing fillets, chamfers and ql selections attach their picture again. Notebooks with saved parameter values rebuild once.
 
-Full notes for this version: [`docs/updates/2.2.7b1.md`](docs/updates/2.2.7b1.md).
+Full notes for this version: [`docs/updates/2.2.7.md`](docs/updates/2.2.7.md).
 Earlier versions: the [changelog](CHANGELOG.md) and [`docs/updates/`](docs/updates/).
 
 ---
@@ -183,7 +185,7 @@ in a compact public API for creating solids, applying features, tagging semantic
 intent, querying topology, exporting manufacturing files, and translating recorded
 models into FreeCAD workflows.
 
-Current release: `simplecadapi==2.2.7b1`.
+Current release: `simplecadapi==2.2.7`.
 
 ## What It Provides
 
@@ -664,6 +666,7 @@ and the [STEP reconstruction workflow](docs/skill/references/workflows/step-reco
 
 ## Documentation
 
+- 2.2.7 update notes: [`docs/updates/2.2.7.md`](docs/updates/2.2.7.md)
 - 2.2.7b1 update notes: [`docs/updates/2.2.7b1.md`](docs/updates/2.2.7b1.md)
 - 2.2.6.post2 update notes: [`docs/updates/2.2.6.post2.md`](docs/updates/2.2.6.post2.md)
 - 2.2.6.post1 update notes: [`docs/updates/2.2.6.post1.md`](docs/updates/2.2.6.post1.md)
