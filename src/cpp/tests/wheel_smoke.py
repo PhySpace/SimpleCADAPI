@@ -21,7 +21,8 @@ def main() -> None:
 
     # The extension is the one shipped in the wheel, and it carries its own OpenCASCADE (no OCP, no system OCCT).
     here = Path(cpp.__file__).resolve().parent
-    assert any(here.glob("_native*")), f"no compiled extension next to {cpp.__file__}"
+    # a file: a directory `_native/` next to it holds the type stubs and is not the extension
+    assert any(path.is_file() for path in here.glob("_native*")), f"no compiled extension next to {cpp.__file__}"
     from simplecadapi._cpp import occt
 
     print("python", sys.version.split()[0], "| OpenCASCADE", occt.__version__, "|", here)

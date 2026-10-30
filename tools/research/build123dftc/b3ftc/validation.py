@@ -159,6 +159,16 @@ def _interpreter(executable: str | None) -> str:
     return os.path.abspath(executable) if os.sep in executable else executable
 
 
+def _source_tree_is_built(source: Path) -> bool:
+    """Whether the compiled module sits next to the Python files of *source* (a development build).
+
+    The module is a file (`_native*.so` / `_native*.pyd`); a *directory* `_native/` next to it holds the type stubs a
+    checkout carries and says nothing about a build.
+    """
+
+    return any(path.is_file() for path in (source / "simplecadapi" / "_cpp").glob("_native*"))
+
+
 def _process(command: list[str], staging: Path, env: Mapping[str, str],
              output: Path, timeout: float) -> dict[str, Any]:
     if timeout <= 0:
@@ -222,7 +232,7 @@ def _worker(ftc_path: Path, workdir: Path | None, timeout: float,
         # The checkout's source tree goes on the path only when it is a built one (the compiled module sits next to
         # its Python files, as in a development build); otherwise it would shadow the installed wheel.
         source = repo_root / "src"
-        built = any((source / "simplecadapi" / "_cpp").glob("_native*"))
+        built = _source_tree_is_built(source)
         env["PYTHONPATH"] = os.pathsep.join(
             [*([str(source)] if built else []), str(tool_dir), env.get("PYTHONPATH", "")])
         started = time.monotonic()

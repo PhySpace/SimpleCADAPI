@@ -32,7 +32,10 @@ _TOOLS_DIR = Path(__file__).resolve().parent
 if str(_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(_TOOLS_DIR))
 # the checkout's source tree only when it is a built one (it would shadow an installed wheel otherwise)
-if str(_REPO_ROOT / "src") not in sys.path and any((_REPO_ROOT / "src" / "simplecadapi" / "_cpp").glob("_native*")):
+# (the module is a file; a directory `_native/` next to it holds the type stubs and is no sign of a build)
+if str(_REPO_ROOT / "src") not in sys.path and any(
+    path.is_file() for path in (_REPO_ROOT / "src" / "simplecadapi" / "_cpp").glob("_native*")
+):
     sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 from cqftc.tracer.trace_schema import OperationTrace  # noqa: E402
