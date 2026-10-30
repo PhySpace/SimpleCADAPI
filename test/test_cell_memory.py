@@ -265,5 +265,83 @@ class AValueAnotherCellChangedIsNotHandedOutTest(unittest.TestCase):
         self.assertIsNotNone(self.memory.recall(self.loader, Key("e")))
 
 
+class EveryChangeInPlaceIsSeenTest(unittest.TestCase):
+    """A shape counts the writes to its semantic state; an entry whose counts moved is not handed out again.
+
+    apply_tag changes the shape it is given and returns that very object, so a later cell that tags what it received
+    (the skill's ``annotate`` block) changes what the producing cell kept.  Reading, and consuming a shape in an
+    operator, change nothing and must keep the entry (otherwise the memory never hits).
+    """
+
+    def setUp(self) -> None:
+        self.memory = _CellMemory(limit=8)
+        self.loader = object()
+
+    def kept(self, value) -> None:
+        self.memory.remember(self.loader, Key("e"), {"value": value}, {})
+
+    def handed_out(self) -> bool:
+        return self.memory.recall(self.loader, Key("e")) is not None
+
+    def test_apply_tag_on_the_shape_drops_the_entry(self) -> None:
+        import simplecadapi as scad
+
+        box = scad.make_box_rsolid(2, 2, 2)
+        self.kept(box)
+        self.assertTrue(self.handed_out())
+        scad.apply_tag(shape=box, tag="role.annotated")
+        self.assertFalse(self.handed_out())
+
+    def test_apply_tag_on_a_face_of_the_shape_drops_the_entry(self) -> None:
+        import simplecadapi as scad
+        from simplecadapi import ql
+
+        box = scad.make_box_rsolid(2, 2, 2)
+        self.kept(box)
+        scad.apply_tag(shape=ql.select(ql.faces().resolve(box)).first(), tag="face.annotated")
+        self.assertFalse(self.handed_out())
+
+    def test_a_tag_on_the_body_of_a_part_or_a_component_of_an_assembly_is_seen(self) -> None:
+        import simplecadapi as scad
+
+        body = scad.make_box_rsolid(2, 2, 2)
+        part = scad.make_part_rpart(part_id="p", body=body, name="p")
+        assembly = scad.add_component_rassembly(
+            scad.make_assembly_rassembly("asm"), part, component_id="c", placement=scad.identity_placement_rplacement()
+        )
+        for held in (part, assembly):
+            with self.subTest(type(held).__name__):
+                self.memory.clear()
+                self.kept(held)
+                self.assertTrue(self.handed_out())
+                scad.apply_tag(shape=body, tag=f"role.{type(held).__name__.lower()}")
+                self.assertFalse(self.handed_out())
+
+    def test_reading_and_consuming_a_shape_keeps_the_entry(self) -> None:
+        import simplecadapi as scad
+        from simplecadapi import ql
+
+        box = scad.make_box_rsolid(20, 20, 20)
+        tool = scad.make_cylinder_rsolid(3, 30)
+        self.kept(box)
+        scad.list_tags(shape=box)
+        box.get_volume()
+        ql.select(ql.faces().resolve(box)).all()
+        scad.cut_rsolid(box, tool)
+        scad.union_rsolid(box, tool)
+        scad.translate_shape(box, (1, 2, 3))
+        scad.make_part_rpart(part_id="q", body=box, name="q")
+        scad.fillet_rsolid(solid=box, edges=ql.edges().where(ql.prop("geom.length", ">=", 19.9)).take(2), radius=1.0)
+        self.assertTrue(self.handed_out())
+
+    def test_a_tag_applied_before_the_value_was_kept_is_part_of_it(self) -> None:
+        import simplecadapi as scad
+
+        box = scad.make_box_rsolid(2, 2, 2)
+        scad.apply_tag(shape=box, tag="role.before")
+        self.kept(box)
+        self.assertTrue(self.handed_out())
+
+
 if __name__ == "__main__":
     unittest.main()

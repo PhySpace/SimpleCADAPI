@@ -2,6 +2,8 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -271,6 +273,12 @@ class Registry {
   explicit Registry(TopoDS_Shape root) : root_(std::move(root)) {}
 
   const TopoDS_Shape& root() const noexcept { return root_; }
+
+  // Counts the writes to the semantic state (tags, bindings, lineage, metadata) of any entity of this root.  A holder
+  // of a shape that must know whether somebody changed it since (the editor kernel's memory of what a cell made)
+  // compares the number it read before with the number now; an operation that only reads a shape leaves it alone.
+  std::uint64_t revision() const noexcept { return revision_.load(std::memory_order_relaxed); }
+  void touch() noexcept { revision_.fetch_add(1, std::memory_order_relaxed); }
   std::shared_ptr<Entity> acquire(Kind kind, const TopoDS_Shape& shape);
 
   // Ancestor relations of the root, built on first use: for each `child`
@@ -310,6 +318,7 @@ class Registry {
   };
 
   TopoDS_Shape root_;
+  std::atomic<std::uint64_t> revision_{0};
   Table tables_[7];
   std::vector<std::unique_ptr<AncestorTable>> ancestor_tables_;
 };

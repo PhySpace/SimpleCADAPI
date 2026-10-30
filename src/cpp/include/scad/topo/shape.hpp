@@ -79,6 +79,9 @@ class Shape {
   std::shared_ptr<const void> graph_node() const;
   // A key equal for exactly the handles for which same_entity holds (the hash of a handle).
   std::size_t entity_key() const noexcept;
+  // How many writes to semantic state (tags, bindings, lineage, metadata) the entities of this handle's root have had.
+  // Equal numbers before and after mean nobody changed the shape in between.
+  std::uint64_t semantic_revision() const noexcept;
 
   template <class T>
   T as() const {
@@ -200,6 +203,8 @@ class Shape {
   TopoDS_Shape shape_;
   std::shared_ptr<Entity> entity_;
   std::shared_ptr<Registry> registry_;
+  // The write door of the semantic state: counts the write (see semantic_revision).
+  SemanticState& writable_state();
 };
 
 // ---------------------------------------------------------------------------

@@ -133,7 +133,10 @@ void bind_common(Cls& cls) {
 }  // namespace
 
 void bind_topo(py::module_& m) {
-  py::class_<Shape>(m, "AnyShape").def_property_readonly("topo_id", &Shape::topo_id);
+  py::class_<Shape>(m, "AnyShape")
+      .def_property_readonly("topo_id", &Shape::topo_id)
+      // How many writes to semantic state the root of this shape has had: equal before and after means unchanged.
+      .def("_semantic_revision", &Shape::semantic_revision);
 
   auto vertex = py::class_<Vertex, Shape>(m, "Vertex");
   vertex.def("get_coordinates", &Vertex::coordinates).def("get_incident_edges", &Vertex::incident_edges);

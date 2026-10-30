@@ -34,6 +34,8 @@ from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from simplecadapi._cpp import Assembly, Part
+
 from .._glue.notice import say
 from ._marimo import (
     CachedLifecycle,
@@ -223,7 +225,8 @@ the kernel is a process that imported it once."""
 def _shareable(value: Any) -> bool:
     """Whether *value* may be handed to a later run as the same object: plain data and the SDK's value types.
 
-    Those are functional (an operation returns a new value), so a later cell cannot change what an earlier one made.
+    Those are functional (an operation returns a new value) except for the semantic state of a shape, which
+    :func:`_semantic_state` watches; so a later cell cannot change what an earlier one made without the memory noticing.
     A list or a dict a cell made could be changed by the next cell that reads it, so it is not shared.
     """
 
@@ -235,51 +238,26 @@ def _shareable(value: Any) -> bool:
     return kind.__module__ == "simplecadapi.core" or kind.__module__.startswith("simplecadapi.product.")
 
 
-_MUTATORS = ("set_metadata", "auto_tag_faces")
-_changed: set[int] = set()
-"""Ids of values something changed in place (a later cell calling ``set_metadata`` on a value it was given)."""
+def _semantic_state(value: Any) -> tuple[int, ...]:
+    """The semantic revision of every shape inside *value*: what a later cell could change in place.
 
-
-def _watch_changes() -> None:
-    """Note which value a ``set_metadata``/``auto_tag_faces`` call changes, for every SDK type that has them.
-
-    The SDK's values are functional except for these: they change the value they are called on, and a memory that hands
-    the same object to a later run would hand out the change (the disk copy is a fresh object each time).  The ids are
-    kept in :data:`_changed`; a memory entry holding one of them is not handed out again (a wrong id only costs a read).
+    The SDK's values are functional except for the semantic state of a shape (tags, bindings, metadata): ``apply_tag``,
+    ``set_metadata`` and ``auto_tag_faces`` change the shape they are called on, and return the very same object.  A
+    memory that hands the same object to a later run would hand out the change as well (the copy on the disk is a fresh
+    object each time and has none of it).  Each root of shapes counts its writes (``AnyShape._semantic_revision``); an
+    entry whose numbers moved since it was kept is not handed out again.  A Part is its body, an Assembly its
+    components; reading a shape, or consuming it in an operator, does not count.
     """
 
-    import functools
-
-    from .. import _cpp
-
-    native = getattr(_cpp, "_native", None)
-    for kind in vars(native).values() if native is not None else ():
-        if not isinstance(kind, type):
-            continue
-        for name in _MUTATORS:
-            original = kind.__dict__.get(name)
-            if original is None or getattr(original, "_sca_watched", False):
-                continue
-
-            def watched(self, *args, __original=original, **kwargs):
-                if len(_changed) > 100_000:
-                    _changed.clear()
-                _changed.add(id(self))
-                return __original(self, *args, **kwargs)
-
-            functools.update_wrapper(watched, original)
-            watched._sca_watched = True  # type: ignore[attr-defined]
-            setattr(kind, name, watched)
-
-
-_watch_changes()
-
-
-def _held(value: Any) -> "Iterator[Any]":
-    yield value
+    if hasattr(value, "_semantic_revision"):
+        return (value._semantic_revision(),)
+    if isinstance(value, Part):
+        return _semantic_state(value.body)
+    if isinstance(value, Assembly):
+        return tuple(n for component in value.components for n in _semantic_state(component.item))
     if isinstance(value, (tuple, frozenset)):
-        for item in value:
-            yield from _held(item)
+        return tuple(n for item in value for n in _semantic_state(item))
+    return ()
 
 
 class _CellMemory:
@@ -292,7 +270,8 @@ class _CellMemory:
 
     def __init__(self, limit: int = _MEMORY_ENTRIES) -> None:
         self._limit = limit
-        self._entries: "OrderedDict[tuple[int, str, str], tuple[Any, dict[str, Any], dict[str, Any]]]" = OrderedDict()
+        # (loader, values, meta, the semantic revisions the values had when they were kept)
+        self._entries: "OrderedDict[tuple[int, str, str], tuple[Any, dict[str, Any], dict[str, Any], tuple]]" = OrderedDict()
         self._lock = threading.Lock()
 
     @staticmethod
@@ -305,8 +284,8 @@ class _CellMemory:
             entry = self._entries.get(key)
             if entry is None or entry[0] is not loader:  # (an id is reused once its loader is gone)
                 return None
-            if any(id(held) in _changed for value in entry[1].values() for held in _held(value)):
-                del self._entries[key]  # something changed a value in place since it was kept
+            if tuple(_semantic_state(value) for value in entry[1].values()) != entry[3]:
+                del self._entries[key]  # something changed a shape in place since it was kept
                 return None
             self._entries.move_to_end(key)
             return entry[1], entry[2]
@@ -316,9 +295,9 @@ class _CellMemory:
         if stateful or not all(_shareable(value) for value in values.values()):
             return
         key = self._key(loader, key)
-        _changed.difference_update(id(held) for value in values.values() for held in _held(value))
+        revisions = tuple(_semantic_state(value) for value in values.values())
         with self._lock:
-            self._entries[key] = (loader, values, meta)
+            self._entries[key] = (loader, values, meta, revisions)
             self._entries.move_to_end(key)
             while len(self._entries) > self._limit:
                 self._entries.popitem(last=False)

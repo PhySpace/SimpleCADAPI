@@ -68,7 +68,7 @@ bool Shape::same_entity(const Shape& other) const noexcept {
 }
 
 void Shape::set_graph_node(std::shared_ptr<const void> node) const {
-  entity_->state().graph_node = std::move(node);
+  entity_->state().graph_node = std::move(node);  // a link for the recorder, not a change a reader of the shape sees
 }
 std::shared_ptr<const void> Shape::graph_node() const {
   const SemanticState* state = entity_->state_if();
@@ -77,6 +77,10 @@ std::shared_ptr<const void> Shape::graph_node() const {
 
 std::size_t Shape::entity_key() const noexcept {
   return std::hash<const void*>{}(entity_.get()) * 31u + std::hash<const void*>{}(registry_.get());
+}
+
+std::uint64_t Shape::semantic_revision() const noexcept {
+  return registry_->revision();
 }
 
 // Shape::clone_view lives with the rest of the semantic state, in shape_tags.cpp.

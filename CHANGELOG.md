@@ -56,9 +56,12 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   turns it off). marimo unpickles an entry while it answers the cache lookup, which is about a second for each of the
   six-axis arm's assemblies; the kernel now asks its memory right after the cell's key is hashed and before the disk,
   and hands out the same objects when the entry is one this process holds. Only plain data and the SDK's value types are
-  kept. They are functional except for `set_metadata` and `auto_tag_faces`, which change the value they are called on:
-  those two are watched, and an entry holding a value that one of them changed is dropped, so the next restore reads
-  the disk copy as before (a change made through a part of an assembly, `assembly.get_component(...)`, is not seen).
+  kept. They are functional except for the semantic state of a shape: `apply_tag`, `set_metadata` and `auto_tag_faces`
+  change the shape they are called on and return the same object, so a later cell that tags a shape it received would
+  change what the producing cell has kept (the disk copy has none of it). Every root of shapes now counts its writes
+  (`AnyShape._semantic_revision`); an entry whose counts moved since it was kept is dropped and the next restore reads
+  the disk copy as before. Reading a shape or consuming it in an operator does not count. Parts and assemblies are
+  followed to their bodies and components.
   The limit is twelve entries, not a number of bytes, and costs about 300 MB on the six-axis arm; only the editor's
   kernel has a memory (`sca run` and the tests do not). With a marimo whose `cache_attempt_from_hash` has another
   signature than the one this was written for, a line on stderr says so and the memory is off. `SCA_EDITOR_TRACE=1` with

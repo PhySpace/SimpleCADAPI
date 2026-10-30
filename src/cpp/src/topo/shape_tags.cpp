@@ -153,9 +153,14 @@ bool any_downward(const std::vector<TagBinding>& bindings) {
 // ---------------------------------------------------------------------------
 // Storing bindings
 // ---------------------------------------------------------------------------
+SemanticState& Shape::writable_state() {
+  registry_->touch();
+  return entity_->state();
+}
+
 void Shape::add_binding(TagBinding binding) {
   binding.validate();
-  SemanticState& state = entity_->state();
+  SemanticState& state = writable_state();
   const bool duplicate = std::any_of(state.bindings.begin(), state.bindings.end(),
                                      [&](const TagBinding& b) { return b.binding_id == binding.binding_id; });
   if (duplicate)
@@ -189,7 +194,7 @@ void Shape::add_tag_lineage(const TagBinding& binding, LineageDerivation derivat
 
 void Shape::add_lineage_witness(TagLineageWitness witness) {
   witness.validate();
-  SemanticState& state = entity_->state();
+  SemanticState& state = writable_state();
   const bool duplicate = std::any_of(state.lineage.begin(), state.lineage.end(),
                                      [&](const TagLineageWitness& w) { return same_witness(w, witness); });
   if (!duplicate)
@@ -204,6 +209,7 @@ std::size_t Shape::remove_tag_bindings(std::string_view tag, TagProducerKind mat
   const auto doomed = [&](const TagBinding& b) { return b.tag == normalized && b.producer().kind == matching; };
   const auto removed = static_cast<std::size_t>(std::count_if(state->bindings.begin(), state->bindings.end(), doomed));
   if (removed != 0) {
+    registry_->touch();
     state->bindings.erase(std::remove_if(state->bindings.begin(), state->bindings.end(), doomed),
                           state->bindings.end());
   }
@@ -218,6 +224,7 @@ std::size_t Shape::remove_tag_bindings(std::string_view tag, const TagProducer& 
   const auto doomed = [&](const TagBinding& b) { return b.tag == normalized && b.producer() == matching; };
   const auto removed = static_cast<std::size_t>(std::count_if(state->bindings.begin(), state->bindings.end(), doomed));
   if (removed != 0) {
+    registry_->touch();
     state->bindings.erase(std::remove_if(state->bindings.begin(), state->bindings.end(), doomed),
                           state->bindings.end());
   }
@@ -240,13 +247,16 @@ bool Shape::remove_tag_binding(std::string_view binding_id) {
   state->bindings.erase(std::remove_if(state->bindings.begin(), state->bindings.end(),
                                        [&](const TagBinding& b) { return b.binding_id == binding_id; }),
                         state->bindings.end());
-  return state->bindings.size() != before;
+  const bool removed = state->bindings.size() != before;
+  if (removed)
+    registry_->touch();
+  return removed;
 }
 
 void Shape::replace_local_tag_bindings(std::vector<TagBinding> bindings) {
   for (const auto& b : bindings)
     b.validate();
-  SemanticState& state = entity_->state();
+  SemanticState& state = writable_state();
   state.bindings.erase(std::remove_if(state.bindings.begin(), state.bindings.end(), is_local), state.bindings.end());
   if (any_downward(bindings))
     registry_->has_downward_bindings = true;
@@ -259,7 +269,7 @@ void Shape::set_legacy_tags(const std::vector<std::string>& tags) {
   imported.reserve(tags.size());
   for (const auto& tag : tags)
     imported.push_back(legacy_tag_binding(normalize_tag(tag, true), "Imported from a direct legacy _tags assignment."));
-  SemanticState& state = entity_->state();
+  SemanticState& state = writable_state();
   state.bindings = std::move(imported);
   state.lineage.clear();
 }
@@ -510,7 +520,7 @@ std::vector<Value> Shape::explain_tag(std::string_view tag, TagScope scope) cons
 // Metadata and runtime values
 // ---------------------------------------------------------------------------
 void Shape::set_metadata(std::string key, Value value) {
-  entity_->state().set_value(false, std::move(key), std::move(value));
+  writable_state().set_value(false, std::move(key), std::move(value));
 }
 
 bool Shape::has_metadata_key(std::string_view key) const {
@@ -519,7 +529,7 @@ bool Shape::has_metadata_key(std::string_view key) const {
 }
 
 void Shape::set_metadata_deferred(std::string_view key, const Value& value) {
-  SemanticState& state = entity_->state();
+  SemanticState& state = writable_state();
   if (state.has_key(false, key))
     state.metadata().set(std::string(key), value);
   else
@@ -527,7 +537,7 @@ void Shape::set_metadata_deferred(std::string_view key, const Value& value) {
 }
 
 void Shape::set_metadata_recipe(std::string_view key, unsigned char recipe, const Value& args) {
-  SemanticState& state = entity_->state();
+  SemanticState& state = writable_state();
   if (state.has_key(false, key))
     state.metadata().set(std::string(key), PackedValue::from_recipe(recipe, args).unpack());
   else
@@ -535,7 +545,7 @@ void Shape::set_metadata_recipe(std::string_view key, unsigned char recipe, cons
 }
 
 void Shape::set_runtime_deferred(std::string_view key, const Value& value) {
-  SemanticState& state = entity_->state();
+  SemanticState& state = writable_state();
   if (state.has_key(true, key))
     state.runtime().set(std::string(key), value);
   else
@@ -559,7 +569,7 @@ const Value& Shape::metadata() const {
 }
 
 void Shape::set_runtime(std::string key, Value value) {
-  entity_->state().set_value(true, std::move(key), std::move(value));
+  writable_state().set_value(true, std::move(key), std::move(value));
 }
 
 Value Shape::get_runtime(std::string_view key, Value fallback) const {
@@ -585,12 +595,13 @@ void Shape::copy_tag_state_from(const Shape& source) {
   const SemanticState* from = source.entity_->state_if();
   if (from == nullptr) {
     if (SemanticState* to = entity_->sem.get()) {
+      registry_->touch();
       to->bindings.clear();
       to->lineage.clear();
     }
     return;
   }
-  SemanticState& to = entity_->state();
+  SemanticState& to = writable_state();
   to.bindings = from->bindings;
   to.lineage = from->lineage;
   if (any_downward(to.bindings))
@@ -602,7 +613,7 @@ void Shape::copy_tag_state_from(const Shape& source) {
 void Shape::copy_semantic_state_from(const Shape& source) {
   copy_tag_state_from(source);
   const SemanticState* from = source.entity_->state_if();
-  SemanticState& to = entity_->state();
+  SemanticState& to = writable_state();
   to.clear_dictionaries();
   if (from == nullptr)
     return;
