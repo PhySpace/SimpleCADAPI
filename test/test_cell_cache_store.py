@@ -110,3 +110,44 @@ class TestParametersAreKeyedByValue(NotebookTestCase):
         self.assertEqual(statuses, ["ran", "ran", "cached", "cached"])
         changed = self.run_edit(derived, derived.replace("a * 2.0", "a * 3.0"))
         self.assertEqual(changed[2:], ["ran", "ran"])
+
+
+SELECTOR = notebook_text(
+    cell("plate = scad.make_box_rsolid(20.0, 10.0, 5.0)", returns="plate"),
+    cell(
+        """
+        sel_top = scad.ql.faces().where(scad.ql.prop("geom.type", "==", "PLANE")).order_by(scad.ql.key("geom.center.z"), desc=True).take(1)
+        """,
+        returns="sel_top",
+    ),
+    cell("top = sel_top.resolve(plate)", reads="plate, sel_top", returns="top"),
+    cell("part = scad.Part(part_id='sel', body=plate)", reads="plate", returns="part"),
+    table='id = "sel"',
+)
+
+
+class TestSelectorIsCacheable(NotebookTestCase):
+    """A cell may return a QL selector (not yet resolved): the cache pickles it, as it did when the selector was a
+    Python dataclass."""
+
+    def test_selector_pickles_and_roundtrips(self) -> None:
+        import copy
+        import pickle
+
+        from simplecadapi import ql
+
+        selector = ql.edges().where(ql.prop("geom.type", "==", "LINE")).order_by(ql.key("geom.center.z")).take(2)
+        for protocol in range(2, pickle.HIGHEST_PROTOCOL + 1):  # pybind11 pickling needs protocol 2+
+            self.assertEqual(pickle.loads(pickle.dumps(selector, protocol)), selector)
+        self.assertEqual(copy.deepcopy(selector), selector)
+        predicate, key = ql.prop("geom.type", "==", "LINE"), ql.key("geom.center.z")
+        self.assertEqual(pickle.loads(pickle.dumps(predicate)), predicate)
+        self.assertEqual(pickle.loads(pickle.dumps(key)), key)
+
+    def test_a_cell_returning_a_selector_is_cached(self) -> None:
+        path = self.write("sel.py", SELECTOR)
+        first = run_notebook(path)
+        second = run_notebook(path)
+        self.assertNotIn("cached", self.statuses(first))
+        # the first status is the setup cell, which always runs
+        self.assertEqual(self.statuses(second), ["ran"] + ["cached"] * (len(self.statuses(first)) - 1))
