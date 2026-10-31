@@ -1,6 +1,6 @@
 ---
 name: simplecadapi
-description: Build, assemble, inspect, reconstruct, and export parametric CAD models with the SimpleCADAPI Python SDK. Use for SimpleCAD geometry modeling, constrained sketches, parts and assemblies, standard gears and bearings, STEP/BREP inspection and reconstruction, vector-PDF drawing reconstruction, durable product packages, model JSON replay, and CAD backend translation.
+description: Build, assemble, inspect, reconstruct, and export parametric CAD models with the SimpleCADAPI Python SDK. Use for SimpleCAD geometry modeling, constrained sketches, parts and assemblies, standard gears and bearings, STEP/BREP inspection and reconstruction, mesh or image based reconstruction, vector-PDF drawing reconstruction, durable product packages, model JSON replay, and CAD backend translation.
 license: Apache-2.0
 metadata:
   project: simplecadapi
@@ -11,217 +11,84 @@ metadata:
 
 # SimpleCAD SDK Skill
 
-This file is the router: it owns load order, route selection, and
-execution discipline only. Each selected workflow owns its procedure.
-Classify the request, load exactly one workflow, follow its domain and
-discipline references, and read exact API pages for the APIs its steps
-use.
+This file is the router. Pick the route, read its batch, work. Paths are relative to this file's directory.
 
-## Mandatory load order
+## Start here
 
-Paths are relative to this file's directory.
+1. **Decide the mode** (`references/discipline/operating-modes.md`): interactive (a person can answer) or unattended (nobody
+   will). Write `Mode: ...` as the first line of the brief. The mode changes who decides, never what is checked.
+2. **Pick one route** from the table. Do not ask a route question when a row matches; if two rows plausibly match, ask one
+   question naming the candidate deliverables (unattended: take the row whose deliverable the request names, record the choice).
+3. **Read the whole batch of that row at once**, plus the two always-read pages `references/discipline/core-rules.md` and
+   `references/discipline/operating-modes.md`. Then work; the workflow's `Read when` table says when to read anything else.
+4. Before the first call of an API, read its page (`references/docs/api|stdlib|core/<name>.md`) in the same batch as the
+   other pages of that step. A method absent from its page does not exist. Never read the whole index.
 
-1. Read this file.
-2. Select exactly one workflow from Task routing. If two rows
-   plausibly match, ask one discriminator question that names the
-   candidate outcomes; never pick silently between routes with
-   different deliverables.
-3. Read the selected workflow in full. From selection on, it owns the
-   procedure; do not load another workflow's procedure.
-4. Load each required domain/discipline file the workflow names
-   before the step that uses it; optional ones only when their
-   trigger fires.
-5. Before the first call of any API, read its exact page
-   (`references/docs/api/<name>.md`, `references/docs/stdlib/<name>.md`,
-   `references/docs/core/<type>.md`). A method absent from its page
-   does not exist, however plausible it looks.
+## Reading in parallel
 
-- You MUST NOT read the full API or stdlib index up front; the workflow
-  names every page its steps need.
-- Routing questions are decided here; after selection the workflow owns
-  execution. You MUST always follow the global rules and execution
-  discipline below.
-- Questions about an existing STEP file that change nothing enter no
-  workflow; you MUST use `references/domains/step-inspection.md` for them
-  directly.
-- A person who has the code-first editor open (`sca edit`) and talks
-  about what they selected, a cell they copied, or a value they
-  tuned enters no new workflow: the modeling follows the workflow you
-  selected, and you MUST read
-  `references/domains/editor-collaboration.md` first to see what they
-  see (selection cell, `sca snapshot`, cell references) and how to
-  hand the work back. While the editor runs, `sca cell` is the only way to
-  change a regular cell; edit the file only when no editor is running, or
-  for the setup / `@app.function` cells `sca cell` refuses: the editor is
-  the file's writer.
-- Creating, installing, updating, or removing a SimpleCADAPI addon (a
-  third-party skill+tooling package around `.scadpkg`) enters no
-  workflow; you MUST use `references/domains/addon-development.md`
-  directly.
+Reading is cheap when it is one request and expensive when it is ten. Ask for a whole batch together.
 
-## Task routing
+<!-- skill:if claudecode,zcode -->
+Issue every `Read` call of the batch in one message, so the harness runs them together. Do not read a file, think, then
+read the next.
+<!-- skill:endif -->
+<!-- skill:if opencode -->
+Issue every `read` call of the batch in one response, so the harness runs them together. Do not read a file, think, then
+read the next.
+<!-- skill:endif -->
+<!-- skill:if codex -->
+Print the whole batch with one shell command from this skill's directory, for example
+`tail -n +1 references/discipline/core-rules.md references/discipline/operating-modes.md references/workflows/single-part-modeling.md`
+(each file is preceded by a `==> name <==` line). One command, not one per file.
+<!-- skill:endif -->
+<!-- skill:if omp,dsh,kimicode -->
+Request the whole batch together if your tools allow several reads in one step.
+<!-- skill:endif -->
 
-Read exactly one workflow first, per the user's goal:
+## Routes
 
-| User goal | Workflow |
-| --- | --- |
-| Model one physical part | `references/workflows/single-part-modeling.md` |
-| Multi-part product or mechanism (custom parts, stdlib gears/bearings, connectors, constraints, package) | `references/workflows/assembly-product-build.md` |
-| Rebuild an editable model from a STEP file | `references/workflows/step-reconstruction.md` |
-| Export/translate a validated package | `references/workflows/export-and-translation.md` |
-| Produce a GB engineering drawing (DXF) from validated geometry | `references/workflows/engineering-drawing.md` |
-| Rebuild a 3D model from a vector-PDF engineering drawing | `references/workflows/drawing-reconstruction.md` |
+Each row's batch is the workflow page plus its `Read now` set (the workflow page repeats it).
 
-Do not present route-choice menus when a row already matches: profile,
-strategy, and tool choices inside a route belong to that workflow's
-own gates, not to an up-front question. A missing prerequisite — state
-it and stop that route; never invent an alternative route.
+| You are asked to | Workflow | Read now |
+| --- | --- | --- |
+| Model one physical part | `references/workflows/single-part-modeling.md` | `references/workflows/single-part-modeling.md` `references/workflows/single-part-modeling/role-1-requirements.md` `references/workflows/single-part-modeling/requirements-template.md` `references/domains/requirement-refinement.md` `references/discipline/requirement-and-cad-brief.md` |
+| Build a multi-part product or mechanism | `references/workflows/assembly-product-build.md` | `references/workflows/assembly-product-build.md` `references/domains/requirement-refinement.md` `references/domains/assembly-and-product.md` `references/discipline/assembly-positioning.md` |
+| Rebuild an editable model from a STEP file | `references/workflows/step-reconstruction.md` | `references/workflows/step-reconstruction.md` `references/domains/step-inspection.md` `references/inspect/brep-reverse-engineering.md` |
+| Rebuild a model from a mesh, point cloud or photos | `references/workflows/scan-reconstruction.md` | `references/workflows/scan-reconstruction.md` `references/domains/step-inspection.md` `references/domains/part-modeling.md` |
+| Rebuild a model from a vector-PDF drawing | `references/workflows/drawing-reconstruction.md` | `references/workflows/drawing-reconstruction.md` `references/workflows/drawing-reconstruction/role-1-drawing-confirmer.md` `references/domains/drawing-inspection.md` `references/domains/requirement-refinement.md` |
+| Produce a GB engineering drawing (DXF) from validated geometry | `references/workflows/engineering-drawing.md` | `references/workflows/engineering-drawing.md` `references/domains/engineering-drawing.md` `references/domains/requirement-refinement.md` |
+| Export or translate a validated package | `references/workflows/export-and-translation.md` | `references/workflows/export-and-translation.md` `references/domains/export-and-translation.md` |
 
-## Routing discipline
+Routes without a workflow (no lifecycle, read the page and answer):
 
-| Rule | Behavior |
-| --- | --- |
-| One lifecycle per request | Every task enters exactly one workflow; domains, disciplines, and guides refine it and are never competing routes |
-| Deterministic selection | When the matrix matches, proceed without asking a route question |
-| Ambiguous request | Ask one discriminator question naming the candidate deliverables (editable model vs inspection evidence vs export package), then route |
-| Missing prerequisite | Name what is missing and stop that route |
-| Explicit user override | Honor it only when the target route's scope actually covers the request |
+- A question about an existing STEP file that changes nothing: `references/domains/step-inspection.md`.
+- A person has the editor open (`sca edit`) and talks about what they selected or tuned: keep the workflow you are in and
+  read `references/domains/editor-collaboration.md` first. While the editor runs, `sca cell` is the only way to change a
+  regular cell.
+- Creating, installing, updating or removing an addon (`.scadpkg` skill + tooling): `references/domains/addon-development.md`.
 
-## Global rules (every task)
+An explicit request for a route is honoured only when that workflow's scope covers it.
+A missing prerequisite (a file, a tool, an input): name it and stop that route; never invent another route. Unattended: record
+it as a blocker in the report and do the strongest supported work.
 
-1. Refine the requirement into a brief before modeling
-   (`references/domains/requirement-refinement.md`).
-2. Use keyword arguments for every documented public API and
-   stdlib function, except the canonical durable export call
-   `capture(result, path)`, whose two required arguments are
-   positional.
-3. Every model is a marimo notebook with a `[tool.simplecadapi]`
-   header (`references/docs/guides/notebook-runtime.md`): one part
-   per notebook; one assembly notebook per product, composing
-   children with `scad.use(...)`; parameters live in the notebook
-   that consumes them; exposed tunable parameters are `var()`/`Var`
-   declarations (optionally with `unit`, `tolerance`). Part sources
-   follow the Feature Tree Convention
-   (`references/discipline/feature-tree-convention.md`): block
-   structure `sketch → basic body op → bool → modifier`, one
-   feature per block and one block per cell, with a mandatory
-   boundary comment `# ---- feature: <slug> (<role>) ----`; 2D
-   profiles and planar paths go through the sketch API, primitives
-   only when the shape is completely contained in the basic form.
-   Where the cell boundaries go and which numbers are a `var()`
-   follow `references/discipline/notebook-cell-design.md`: read it
-   with the convention before writing any notebook; it states each rule
-   with its reason and the error you get when you break it.
-4. Booleans (`union_rsolid`, `cut_rsolid`, `cut_rsolid_list`, `intersect_rsolid`)
-   accept mixed inputs and return exactly one `Solid`; union
-   defaults to `glue=False` with a conservative scale-relative
-   tolerance and fails explicitly when it cannot produce one
-   merged solid.
-5. Build and validate incrementally: each major step prints small
-   QL-derived facts; grounding uses QL wherever possible; never
-   print whole solids or full model objects.
-6. Topology enumeration is QL-only and strictly enforced: plural
-   getters (`get_edges`, `get_faces`, `get_wires`, `get_vertices`,
-   `get_solids`, `get_inner_wires`) accept ONLY an index — the
-   no-argument list form raises. Enumerate, count, and measure via
-   `ql.<kind>().resolve(shape)`; filter with QL predicates plus
-   `take`/`exactly` cardinality; never build selections by looping
-   over an enumerated list and indexing it. Indexed picks
-   (`get_edges(index)`) are reserved for intentional, named choices
-   and are recorded as graph selection nodes.
-7. Tags: attach with `apply_tag(shape=..., tag=...)` (LOCAL scope —
-   it never propagates downward); inspect with
-   `list_tags(shape=...)`; keep numeric facts in metadata, never in
-   tags.
-8. The notebook file is the only source of truth; `.scadpkg` is
-   generated from it for exchange and publishing (`sca run
-   product.py --out out/product.scadpkg`, or
-   `capture(result, "out/product.scadpkg")` in one call) and is
-   never read back as a source. `@scad.part` / `@scad.assemble`
-   are for reusable library parts in plain modules; they may be
-   called inside a notebook cell.
-9. `simplecadapi.inspect.brep` and `simplecadapi.inspect.drawing` are
-   diagnostic-only and rejected inside `GraphSession`; obtain/export
-   geometry first, inspect outside.
-10. Standard parts first: before hand-modeling a gear, ring gear,
-    rack, cycloidal disc, or bearing, check `scad.std.gear` /
-    `scad.std.bearing`.
-11. Read `references/docs/guides/notebook-runtime.md` in full
-    before writing a notebook, composing notebooks, or reasoning
-    about the cell cache. Run models with `sca run` (`sca edit` opens
-    them in the editor for a person); never enable
-    marimo's `[tool.marimo.runtime] cache_cells` in the editor, and
-    never commit the generated `__marimo__/` directory.
-12. Manage the modeling project the way software is managed: put the
-    workspace under git from the first file, commit at verified
-    milestones (a passed verification, not a wall clock) with messages
-    that say what changed and why, and use a branch per design
-    direction when alternatives are on the table. Generated state —
-    `__marimo__/`, `.sca-editor/`, `out/` — belongs in `.gitignore`,
-    never in a commit.
+## Always-on rules
 
-## Boundaries
+`references/discipline/core-rules.md` has the full text with reasons; the IDs below are what reviews cite.
 
-- `.scadpkg` is the canonical durable product; STL/OBJ/MJCF are
-  point-in-time exports, never editable sources.
-- Model JSON is the replay/interchange contract for explicit
-  `GraphSession` flows; never hand-author payloads.
-- No claims of strength, fatigue, thermal, vibration, tolerance
-  compliance, or regulatory fitness without the corresponding
-  analysis actually run.
+- **R2** keyword arguments for every documented API (except `capture(result, path)`).
+- **R3** a model is a marimo notebook; cell boundaries and `var()` follow `references/discipline/notebook-cell-design.md`,
+  blocks follow `references/discipline/feature-tree-convention.md`. Read both before writing a cell.
+- **R6** topology is enumerated through QL only; plural getters take only an index (`references/ql-playbook.md`).
+- **R13** an API not on its page does not exist.
+- **P1** gates bind artifacts, not feelings. **P2** resolve blocking items before geometry (ask once, or record).
+  **P5** repair the owner, not the symptom. **P6** a failed check closes by changing the design or redefining the check in
+  the open, never by weakening it.
+- No claim of strength, fatigue, thermal, vibration, tolerance or regulatory fitness without the analysis run.
 
-## Execution discipline (every task)
+## Where things are
 
-1. Gates bind artifacts: a validation gate passes only when its named
-   artifact exists — printed QL facts, targeted measurements, named
-   rendered views, completed brief fields. A stated feeling of success
-   is not a gate result.
-2. Blocking waits: an Ask-or-Record blocking item resolves before any
-   geometry — asked once (batched into one question set) or recorded
-   as an explicit assumption. Proceeding with neither is the failure,
-   not the asking.
-3. Serial phases: do not preload later-phase pages or build
-   later-phase artifacts early. After an interruption, re-ground from
-   the owning artifact (source file, brief), not from conversation
-   memory.
-4. Repair the owning source: the named parameter, the brief field, or
-   the upstream selection — never the downstream symptom.
-   Candidate x parameter enumeration loops are diagnosis debt, not
-   repair (`references/discipline/failure-and-repair.md`).
-5. A failed check closes by changing the design or by redefining the
-   check with the user — never by weakening or deleting the check.
-
-## Example SDK usage
-
-```python
-import simplecadapi as scad
-from simplecadapi import GraphSession, export_model_json, replay_model_json
-
-with GraphSession(graph_id="box") as session:
-    shape = scad.make_box_rsolid(width=10.0, height=20.0, depth=30.0)
-    session.capture_result(value=shape)
-    payload = export_model_json(session=session)
-
-rebuilt = replay_model_json(json_str=payload)
-print(len(rebuilt))
-```
-
-## References
-
-- `references/README.md` — skill layer structure
-- `references/workflows/` — goal-oriented workflows, including drawing reconstruction
-- `references/domains/` — capability domains, including drawing inspection
-- `references/discipline/` — modeling knowledge and invariants
-- `references/discipline/verifier-scripts.md` — writing a verifier script (OCP through `simplecadapi.verify`)
-- `references/SDK_OVERVIEW.md` — package-level map
-- `references/inspect/brep-reverse-engineering.md`
-- `references/domains/addon-development.md` — `sca` addon CLI and authoring guide
-- `references/domains/editor-collaboration.md` — working with a person in `sca edit`:
-  selection cell, snapshot, cell references, `sca cell` / `sca new`, parameters
-- `references/docs/guides/reconstruction-agent-test-prompt.md`
-- `references/docs/guides/reconstruction-agent-strategy.md`
-- `references/docs/guides/notebook-runtime.md`
-- `references/ql-playbook.md`
-- `references/scadpkg-format.md` — `.scadpkg` consumer spec: member
-  layout, tag channel, minimal readers (addon exporters read this)
-- `references/docs/api/`, `references/docs/stdlib/`, `references/docs/core/`
+- `references/README.md`: every page by layer (workflows, domains, discipline, guides, generated API docs).
+- `references/SDK_OVERVIEW.md`: package map. `references/ql-playbook.md` and `references/ql-recipes.md`: selection.
+- `references/scadpkg-format.md`: the `.scadpkg` consumer spec.
+- `references/docs/api/`, `references/docs/stdlib/`, `references/docs/core/`: exact signatures.
+- Maintainers: the contract these pages follow is `skill-design.md` in the repository's `docs/` folder.

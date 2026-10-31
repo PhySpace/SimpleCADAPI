@@ -2,6 +2,9 @@
 name = "simplecadapi"
 source = "docs/skill"
 
+[lint]
+enabled = true   # docs/skill-design.md: page limits, headers, read sets, read budget
+
 [build]
 targets = ["omp", "opencode", "zcode", "claudecode", "codex", "dsh", "kimicode"]
 

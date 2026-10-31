@@ -3,6 +3,8 @@
 The loop for generation, solve, export, or validation failures. API behavior is
 marked as contract; diagnosis heuristics are marked as modeling guidance.
 
+**Read when:** a build, solve, export or validation step fails, or the same check has failed twice.
+
 ## Evidence labels
 
 - **SDK contract** is limited to behavior exposed by the public API or reports.
@@ -21,6 +23,17 @@ marked as contract; diagnosis heuristics are marked as modeling guidance.
 
 Never suppress the symptom: no exception swallowing, no special-cased input,
 no patching exported or solved artifacts.
+
+## Stopping rule
+
+If the same check fails twice for the same cause, do not retry the same thing a third time. Change the design (the
+operation order, the selection, the feature hypothesis, the parameter that was guessed), or redefine the check **in the
+open**: state the old definition, the new one and the reason (in the brief, the plan or the report). A check is never
+weakened or deleted to make it pass. Count by cause, not by wording: two different exceptions from one tangent
+contact are one failure. If the new design fails the same check again, stop and report what failed, what was tried and
+which claims cannot be made (see "Reporting failed repairs"). Interactive: the redefinition is agreed with the person.
+**Unattended:** decide it yourself from the evidence and record it in the report
+(`discipline/operating-modes.md`: Stopping).
 
 ## Failure classes
 ### Boolean failure
@@ -159,6 +172,6 @@ A loop over candidate sets x parameter values (radii, zoom levels,
 being guessed that should be derived. Stop enumerating and derive it:
 radii from wall thickness or feature size, framing from the bounding
 box, cardinality from feature intent. If a value truly cannot be
-derived, the check's definition is wrong — narrow it or ask. Swallowing
+derived, the check's definition is wrong — narrow it or ask (unattended: narrow it and record the new definition in the report). Swallowing
 exceptions inside an enumeration loop (`except: pass`) converts a
 search into silent damage.

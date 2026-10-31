@@ -3,6 +3,9 @@
 Model one physical, single-solid mechanical part with the core geometry API:
 primitives, profiles, 3D features, booleans, detail features, and transforms.
 
+**Read when:** the deliverable is one physical single-solid part, or an existing part source needs a geometry edit (Role 4
+of `workflows/single-part-modeling.md`).
+
 ## Use when
 
 - The deliverable is one physical part that will be manufactured or exported as

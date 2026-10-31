@@ -1,5 +1,7 @@
 # Discipline: Assembly Positioning
 
+**Read when:** you choose frames, connectors, placements or constraints for mating and motion, or placement comes out wrong after solving.
+
 How SimpleCADAPI represents mating and motion intent, plus engineering guidance
 for choosing frames and placements.
 

@@ -4,6 +4,9 @@ Author declarative, constraint-driven 2D profiles and promote them into
 topology, when the design intent is an editable sketch rather than direct
 geometry transcription.
 
+**Read when:** the part's controlling dimensions are geometric constraints, or an editable, constraint-driven profile is
+requested (sketch tier profiles and paths).
+
 ## Use when
 
 - The part's controlling dimensions are naturally expressed as geometric

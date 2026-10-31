@@ -69,6 +69,8 @@ repair_routes:
    (`domains/export-and-translation.md` table): editable FreeCAD document →
    `.FCStd`; neutral exchange → AP242 `.step`; DCC/surface inspection →
    `.obj`; additive manufacturing → `.stl`; MuJoCo simulation → MJCF.
+   **Unattended:** when the request names no format, export the default
+   STEP/STL/OBJ and record that choice as an assumption in the report.
 3. **Preflight and export from the package path**. Start with
    `uv run sca export <package>.scadpkg --output-dir <dir> --check`.
    It checks the package and default STEP/STL/OBJ targets. Add each non-default
@@ -111,6 +113,9 @@ and `validate_step_roundtrip_rdescriptor` when roundtrip validation applies.
 - FreeCAD/FreeCADCmd missing → `sca export --check --format fcstd`
   reports the missing backend before writing. Export default STEP/STL/OBJ if
   requested, offer STEP as the neutral fallback, and say so explicitly.
+  **Unattended:** do not offer; export the default STEP/STL/OBJ if requested,
+  record the missing backend and the fallback in the report, and never present
+  the fallback as the requested format.
 - STL/OBJ too coarse or too large → adjust deflection parameters, re-export;
   both formats share one tessellation pass.
 - MJCF joints missing → the assembly lacked explicit constraints; return to
@@ -129,3 +134,33 @@ is a marimo notebook, one block per cell
 (`references/docs/guides/notebook-runtime.md`): run it with `sca run`, and
 load its product from verification scripts with
 `simplecadapi.runtime.run_notebook(...)`.
+
+## Read now (one parallel batch)
+
+| File | Why |
+| --- | --- |
+| `workflows/export-and-translation.md` | the command path, steps and gates (this page) |
+| `domains/export-and-translation.md` | the consumer-contract table and format reports |
+
+## Read when
+
+| When | File |
+| --- | --- |
+| the requested formats or their reasons are unclear | `domains/requirement-refinement.md` |
+| the consumer re-imports STEP | `domains/step-inspection.md` |
+| MJCF joints are missing | `workflows/assembly-product-build.md` |
+| the package is exported through the API instead of the CLI | `docs/guides/product-export.md` |
+| a part source is edited to make the package current | `discipline/feature-tree-convention.md` |
+| a part source is run or loaded by a script | `docs/guides/notebook-runtime.md` |
+
+## Unattended mode
+
+Decide the mode first (`discipline/operating-modes.md`). This workflow has no consent gate or reviewer; its few
+decisions are recorded in the report.
+
+| Interactive gate | Unattended replacement |
+| --- | --- |
+| Step 2: which formats and why (Ask-or-Record in `domains/requirement-refinement.md`) | Take the formats the request names, else the default STEP/STL/OBJ; ledger the choice |
+| Failure route: backend missing, offer STEP as the neutral fallback | Export the default targets if requested, record the missing backend and the fallback in the report, no silent substitution |
+| Package not current or the model needs work (route to the owning modeling workflow) | Record the blocker in the report, export nothing as validated, never invent geometry |
+| Closing report to the person | The report (`discipline/operating-modes.md`): file paths, per-format facts, parameters, unavailable backends, checks not run |

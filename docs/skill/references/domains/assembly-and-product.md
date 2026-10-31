@@ -1,5 +1,7 @@
 # Task Domain: Assembly and Product
 
+**Read when:** the deliverable has more than one physical part, repeated instances, nested subassemblies, motion semantics, or a `.scadpkg` package (details under "Use when").
+
 Compose multi-part products with explicit placement, connectors, and
 declarative constraints; compose notebooks with `scad.use`, build durable
 definitions (notebook products, `@part`/`@assemble` library parts), and

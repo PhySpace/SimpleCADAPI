@@ -3,6 +3,9 @@
 Choosing origins, planes, and axes from function before the first primitive.
 The coordinate and unit statements below are SDK facts where labeled; origin
 choices and part-type defaults are modeling guidance.
+
+**Read when:** before the first primitive of a part or assembly, when choosing an origin, base plane or up axis, or when placing imported or factory geometry.
+
 ## Core rule
 
 The part-local coordinate system is chosen from the functional datum, and the

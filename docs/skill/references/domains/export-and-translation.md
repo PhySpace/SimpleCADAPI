@@ -1,5 +1,7 @@
 # Task Domain: Export and Translation
 
+**Read when:** a validated `.scadpkg` must be delivered as STEP, STL, OBJ, MJCF or an editable external CAD document.
+
 Export validated product packages to neutral and mesh formats, and translate
 them into editable external CAD backends.
 

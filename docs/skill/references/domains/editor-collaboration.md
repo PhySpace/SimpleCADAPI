@@ -1,10 +1,17 @@
 # Editor collaboration: working with a person in `sca edit`
 
+**Read when:** a person has the code-first editor open (`sca edit`) and you edit the same notebooks (a selection, a cell reference or a tuned value arrives).
+
 Use this domain when a person has the code-first editor open (`sca edit`) and
 you work on the same notebooks: they click, drag and tune; you read files and
 edit code. It is not a workflow. The modeling you do still follows the workflow
 you selected; this page says how to see what the person sees and how to hand
 work back.
+
+**Unattended:** there is no person and no editor. Do not start `sca edit`; edit the notebook file directly, check it with
+`sca run <notebook>` and read its report instead of the snapshot, the viewport image or a selection cell. A selection
+you were handed in the task is resolved and checked like any selector. Never wait for a person to run, pick or tune
+anything (`discipline/operating-modes.md`).
 
 The notebook file is the shared state. The editor autosaves every edit to
 it, and every message the person gives you (a selection, a cell reference, a
@@ -90,7 +97,7 @@ sca new bracket --kind part          # a new notebook; the open editor lists it,
 
 `sca snapshot` only has an answer while the editor runs; it reports the last
 state the editor wrote. If the snapshot is old (`updated`), ask the person to
-move the viewport or re-select, or read the notebook file instead.
+move the viewport or re-select, or read the notebook file instead. (Unattended: read the notebook file.)
 
 ## The selection cell
 
@@ -126,7 +133,8 @@ selected_item = [selected_edge_1, selected_edge_2]
 - A selector says where, not what: confirm before changing geometry. Resolve it
   and print small QL facts (count, a measurement) per the global rules. If it
   matches nothing the person's model changed since the pick: ask them to pick
-  again rather than guessing.
+  again rather than guessing. (Unattended: no selection will arrive; derive the selector from the task's evidence, print
+  its card, and record it in the report.)
 - Do not rename `selected_*` variables or delete the cell; the editor finds it
   again by its first line. When the person is done with the selection, they
   clear it themselves.
@@ -140,7 +148,7 @@ selected_item = [selected_edge_1, selected_edge_2]
    name. Keep one feature per cell; give it a feature header.
 4. Save the file. The editor shows the change (cells you edited show `stale`
    until run). Ask the person to run it, or run `sca run <notebook>` yourself
-   to check the model builds, and read the errors.
+   to check the model builds, and read the errors. (Unattended: always `sca run`.)
 
 ## Cell references
 

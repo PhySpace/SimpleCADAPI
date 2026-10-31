@@ -1,5 +1,7 @@
 # Task Domain: Engineering Drawing Generation
 
+**Read when:** a validated part or product needs a GB-standard drawing sheet (DXF + PNG).
+
 Generate GB-standard 2D engineering drawing sheets (DXF, plus a PNG rendered
 from that DXF for review) from finished 3D geometry with the declarative
 `simplecadapi.dxf_engine` namespace. Standards followed: GB/T 4458.4-2003
