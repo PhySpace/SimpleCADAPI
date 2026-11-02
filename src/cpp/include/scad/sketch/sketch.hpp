@@ -56,6 +56,8 @@ struct SketchPlaneFrame {
   Vec3 normal;
 };
 
+class SketchEditor;
+
 class Sketch {
  public:
   // `plane`: "XY" | "XZ" | "YZ" or {"origin", "x_axis", "y_axis"}.  ValueError
@@ -143,6 +145,7 @@ class Sketch {
   std::vector<Wire> closed_wires() const;
 
  private:
+  friend class SketchEditor;  // trim / extend rewrite the document in src/sketch/edit.cpp
   void add_entity(SketchEntity entity);
   SketchPoint2 entity_xy(const std::string& point_id) const;
 

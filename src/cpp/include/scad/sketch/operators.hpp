@@ -125,6 +125,53 @@ Sketch constrain_minor_radius_rsketch(const Sketch& sketch, const SketchTarget& 
 Sketch constrain_fix_rsketch(const Sketch& sketch, const SketchTarget& target,
                              const SketchConstraintId& constraint_id = std::nullopt);
 
+// ---- editing: trim, extend and the report of what an edit did --------------------
+
+// A position in the sketch plane: coordinates, or a point of the sketch (it stands for its solved position).
+class SketchPosition {
+ public:
+  SketchPosition() = default;  // only so binding layers can default-construct a slot
+  SketchPosition(double x, double y) : xy_(x, y) {}
+  SketchPosition(SketchPoint2 xy) : xy_(xy) {}                                   // NOLINT(google-explicit-constructor)
+  SketchPosition(SketchTarget point) : point_(std::move(point)) {}               // NOLINT(google-explicit-constructor)
+  SketchPosition(std::string point) : point_(SketchTarget(std::move(point))) {}  // NOLINT
+  SketchPosition(const char* point) : point_(SketchTarget(point)) {}             // NOLINT
+
+  bool is_point() const noexcept { return point_.has_value(); }
+  const SketchTarget& point() const { return *point_; }
+  const SketchPoint2& xy() const noexcept { return xy_; }
+
+ private:
+  SketchPoint2 xy_{0.0, 0.0};
+  std::optional<SketchTarget> point_;
+};
+
+// Remove the part of a line / circle / arc `entity` that contains `at`, between the nearest cuts: the places where
+// another entity crosses it (`against` limits which ones; default every entity that is not construction), or an end
+// of `entity`.  The sketch is solved first and the cuts are made on the solved geometry.  Lines and arcs keep the
+// pieces on either side; a circle keeps the arc left over (it needs two cuts); an entity nothing crosses is removed
+// whole.  A cut point is tied to the entity that cut it with a point_on constraint, a line piece inherits the
+// horizontal / vertical constraint of its line, constraints on `<entity>.start|end|center` stay on the point, and
+// constraints that name the removed entity are removed.  New ids: p<n> points, l<n> lines, a<n> arcs (lowest free n,
+// never an id the sketch had before), c_<kind>_<n> constraints.
+Sketch trim_rsketch(const Sketch& sketch, const SketchTarget& entity, const SketchPosition& at,
+                    const std::optional<std::vector<SketchTarget>>& against = std::nullopt);
+
+// Lengthen the line `entity` at its "start" or "end" until it meets `to` (default: the nearest entity ahead): the end
+// point moves onto it and is tied to it with a point_on constraint.  Refused when the end point belongs to another
+// entity.  The length dimension of the line, and any dimension or fix on the moved point, no longer hold and are
+// dropped.
+Sketch extend_rsketch(const Sketch& sketch, const SketchTarget& entity, const std::string& end,
+                      const std::optional<SketchTarget>& to = std::nullopt);
+
+// What an edit did, by id: entities (points included) and constraints created, removed or changed between two sketches.
+struct SketchDiff {
+  std::vector<std::string> created, removed, changed;
+  std::vector<std::string> created_constraints, removed_constraints, changed_constraints;
+  Value to_value() const;
+};
+SketchDiff diff_sketch_rsketchdiff(const Sketch& before, const Sketch& after);
+
 // ---- solving and promotion -----------------------------------------------------
 
 // Solve a copy of the sketch; the input keeps no solve result.  strict=false

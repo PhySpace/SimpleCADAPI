@@ -34,6 +34,35 @@ struct type_caster<scad::SketchTarget> {
   }
 };
 
+// SketchPosition <- (x, y) | point id | SketchRef.  Only real numbers are coordinates: no expressions, no booleans.
+template <>
+struct type_caster<scad::SketchPosition> {
+  PYBIND11_TYPE_CASTER(scad::SketchPosition, const_name("tuple[float, float] | str | SketchRef"));
+
+  bool load(handle src, bool) {
+    if (isinstance<scad::SketchRef>(src)) {
+      value = scad::SketchPosition(scad::SketchTarget(src.cast<scad::SketchRef>()));
+      return true;
+    }
+    if (isinstance<str>(src)) {
+      value = scad::SketchPosition(src.cast<std::string>());
+      return true;
+    }
+    if (isinstance<sequence>(src)) {
+      const sequence items = reinterpret_borrow<sequence>(src);
+      const auto number = [](handle h) {
+        return (isinstance<float_>(h) || isinstance<int_>(h)) && !isinstance<bool_>(h);
+      };
+      if (items.size() == 2 && number(items[0]) && number(items[1])) {
+        value = scad::SketchPosition(items[0].cast<double>(), items[1].cast<double>());
+        return true;
+      }
+    }
+    throw scad::TypeError("at is a point (x, y) of two numbers in sketch coordinates, or the id of a sketch point");
+  }
+  static handle cast(const scad::SketchPosition&, return_value_policy, handle) { return none().release(); }
+};
+
 // SketchControlPoint <- SketchRef | str | {"point_id": ...} | (x, y)
 template <>
 struct type_caster<scad::SketchControlPoint> {
@@ -547,6 +576,14 @@ void bind_entity_operators(py::module_& m) {
         py::kw_only(), py::arg("construction") = false);
   m.def("add_arc_rsketch", &add_arc_rsketch, py::arg("sketch"), py::arg("entity_id"), py::arg("start"), py::arg("end"),
         py::arg("center"), py::kw_only(), py::arg("construction") = false);
+  m.def("trim_rsketch", &trim_rsketch, py::arg("sketch"), py::arg("entity"), py::arg("at"), py::kw_only(),
+        py::arg("against") = py::none());
+  m.def("extend_rsketch", &extend_rsketch, py::arg("sketch"), py::arg("entity"), py::arg("end"), py::kw_only(),
+        py::arg("to") = py::none());
+  m.def(
+      "diff_sketch_rsketchdiff",
+      [](const Sketch& before, const Sketch& after) { return diff_sketch_rsketchdiff(before, after).to_value(); },
+      py::arg("before"), py::arg("after"));
 }
 
 // (sketch, a, b, *, constraint_id=None)

@@ -286,6 +286,8 @@ class TestCoverageMatrix(unittest.TestCase):
             "add_circle_rsketch",
             "add_arc_rsketch",
             "add_bspline_rsketch",
+            "trim_rsketch",
+            "extend_rsketch",
             "make_constrain_coincident_rsketch",
             "make_constrain_point_on_rsketch",
             "make_constrain_horizontal_rsketch",

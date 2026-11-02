@@ -34,6 +34,8 @@ std::string entity_type_of(std::string_view op) {
               "add_circle_rsketch",
               "add_arc_rsketch",
               "add_bspline_rsketch",
+              "trim_rsketch",
+              "extend_rsketch",
               "make_wire_from_sketch_rwire",
               "make_face_from_sketch_rface",
               "make_constrain_coincident_rsketch",
@@ -169,6 +171,7 @@ std::vector<std::string> node_labels_for_op(std::string_view op) {
       {"add_ellipse_rsketch", {"ellipse", "sketch"}},
       {"add_line_rsketch", {"line", "sketch"}},
       {"add_point_rsketch", {"point", "sketch"}},
+      {"extend_rsketch", {"edit", "sketch"}},
       {"fill_holes_rshell", {"derived", "shell", "surface"}},
       {"fit_point_grid_rface", {"face", "primitive", "surface"}},
       {"make_2d_cut_rface", {"derived", "face"}},
@@ -211,6 +214,7 @@ std::vector<std::string> node_labels_for_op(std::string_view op) {
       {"make_wire_from_edges_rwire", {"derived", "wire"}},
       {"make_wire_from_sketch_rwire", {"derived", "sketch", "wire"}},
       {"sew_faces_rshell", {"derived", "shell", "surface"}},
+      {"trim_rsketch", {"edit", "sketch"}},
       {"trim_surface_rface", {"derived", "face", "surface", "trimmed"}},
   };
   if (const auto found = table.find(op); found != table.end())

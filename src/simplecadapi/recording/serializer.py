@@ -118,6 +118,12 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
     "add_arc_rsketch": {"status": "replayable", "op": "add_arc_rsketch"},
     "add_bspline_rsketch": {"status": "replayable", "op": "add_bspline_rsketch"},
     "add_ellipse_rsketch": {"status": "replayable", "op": "add_ellipse_rsketch"},
+    "trim_rsketch": {"status": "replayable", "op": "trim_rsketch"},
+    "extend_rsketch": {"status": "replayable", "op": "extend_rsketch"},
+    "diff_sketch_rsketchdiff": {
+        "status": "diagnostic",
+        "reason": "Compares two sketches for inspection only; the edit that made the difference is the recorded node.",
+    },
     "constrain_coincident_rsketch": {
         "status": "replayable",
         "op": "make_constrain_coincident_rsketch",
@@ -536,6 +542,8 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "add_arc_rsketch",
     "add_bspline_rsketch",
     "add_ellipse_rsketch",
+    "trim_rsketch",
+    "extend_rsketch",
     "make_constrain_coincident_rsketch",
     "make_constrain_point_on_rsketch",
     "make_constrain_horizontal_rsketch",
@@ -656,6 +664,8 @@ _CANONICAL_2_1_ONLY_OPS = {
     "load_brep_region_rshell",
     "load_brep_region_rsolid",
     "make_solid_from_shell_rsolid",
+    "trim_rsketch",
+    "extend_rsketch",
 }
 CANONICAL_CORE_OP_SET_2_0: Tuple[str, ...] = tuple(
     op for op in CANONICAL_CORE_OP_SET if op not in _CANONICAL_2_1_ONLY_OPS
@@ -2825,6 +2835,37 @@ def _execute_graph(
                                 weights=cast(Any, params.get("weights")),
                                 periodic=bool(params.get("periodic", False)),
                                 construction=bool(params.get("construction", False)),
+                            )
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "trim_rsketch":
+                        ctx.require_params(
+                            node.node_id, op_name, params, ("entity", "at")
+                        )
+                        sketch_outputs = _input_outputs(ctx, outputs, node, 0)
+                        if sketch_outputs:
+                            at = params["at"]
+                            result = ops.trim_rsketch(
+                                cast(Sketch, sketch_outputs[0]),
+                                str(params["entity"]),
+                                at if isinstance(at, str) else tuple(at),
+                                against=cast(Any, params.get("against")),
+                            )
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "extend_rsketch":
+                        ctx.require_params(
+                            node.node_id, op_name, params, ("entity", "end")
+                        )
+                        sketch_outputs = _input_outputs(ctx, outputs, node, 0)
+                        if sketch_outputs:
+                            result = ops.extend_rsketch(
+                                cast(Sketch, sketch_outputs[0]),
+                                str(params["entity"]),
+                                str(params["end"]),
+                                to=cast(Any, params.get("to")),
                             )
                             _store_outputs(node, result)
                         continue

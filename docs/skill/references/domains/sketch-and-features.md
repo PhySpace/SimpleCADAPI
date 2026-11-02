@@ -62,8 +62,10 @@ Read the exact page under `references/docs/api/` for every API used:
   `constrain_fix_rsketch`. Driving `constrain_angle_rsketch` holds the
   directed angle from the first line to the second (0-360 degrees; the
   solve keeps the branch nearest the initial geometry).
+- Editing: `trim_rsketch`, `extend_rsketch` (see "Trim and extend" below).
 - Promotion: `make_wire_from_sketch_rwire`, `make_face_from_sketch_rface`.
-- Diagnostics: `inspect_sketch_rsketchresult` (non-recording).
+- Diagnostics: `inspect_sketch_rsketchresult` (non-recording),
+  `diff_sketch_rsketchdiff` (non-recording report of what an edit changed).
 
 ## Construction rules
 
@@ -80,6 +82,41 @@ Read the exact page under `references/docs/api/` for every API used:
   `backend`, `backend_version`, and `backend_status_code` for replay evidence.
 - `inner_profiles` is valid only when adjacent-carrier evidence shows the loops
   belong to the same generating profile.
+
+## Trim and extend
+
+Use `trim_rsketch` when overlapping or overshooting lines, circles and arcs must
+be cut back to where other entities cross them (a rectangle drawn as four
+over-long lines, a circle cut by a slot); use `extend_rsketch` to lengthen a line
+until it meets another entity. Both solve the sketch first and cut or extend on
+the solved geometry, return a new `Sketch`, are recorded in the graph and replay
+from model JSON. They keep the sketch connected: a new cut point is tied to the
+entity that cut it with `point_on`, a line piece keeps the `horizontal` /
+`vertical` constraint of its line, constraints on `<entity>.start|end|center`
+stay on the point, and constraints that name the removed entity (and a dimension
+that no longer holds) are removed. The edit picks the new ids: points are
+`p<n>`, lines `l<n>`, arcs `a<n>` (the lowest number never used by the sketch)
+and constraints `c_<kind>_<n>`.
+
+```python
+before = sketch
+# remove the part of line "h" that contains the point (8, 0), between the crossings
+sketch = scad.trim_rsketch(sketch, "h", (8.0, 0.0))          # at: (x, y) or a point id
+sketch = scad.trim_rsketch(sketch, "c", "click", against=["l1", "l2"])  # only these entities cut
+sketch = scad.extend_rsketch(sketch, "spur", "end")            # to the nearest entity ahead
+sketch = scad.extend_rsketch(sketch, "spur", "end", to="wall") # or to a named one
+print(scad.diff_sketch_rsketchdiff(before, sketch))
+# {'created': [...], 'removed': [...], 'changed': [...],
+#  'created_constraints': [...], 'removed_constraints': [...], 'changed_constraints': [...]}
+```
+
+- A circle needs two cuts to leave an arc (one cut is an error, no cut removes
+  it whole); an entity nothing crosses is removed whole.
+- `extend_rsketch` refuses an end point shared with another entity and names the
+  ids; ellipses and B-splines neither cut nor can be trimmed.
+- Read `diff_sketch_rsketchdiff(before, after)` instead of diffing
+  `Sketch.to_dict()` yourself; the last edit's notes are in
+  `sketch.get_metadata("last_edit")`.
 
 ## Validation gates
 

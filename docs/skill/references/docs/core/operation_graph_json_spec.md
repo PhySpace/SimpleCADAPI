@@ -910,8 +910,8 @@ fields when their target expression is unitless.
 - 多输出 graph 的最终结果集由 `leaf_ids` 显式声明
 - replay 默认 strict；permissive 仅通过 API 参数显式 opt-in
 - importer 仍识别冻结的 `2.0` contract，但 `2.0` graph 不得使用
-  `load_brep_region_rshell`、`load_brep_region_rsolid` 或
-  `make_solid_from_shell_rsolid`。
+  `load_brep_region_rshell`、`load_brep_region_rsolid`、
+  `make_solid_from_shell_rsolid`、`trim_rsketch` 或 `extend_rsketch`。
 - 为兼容早期 `2.0` model payload，importer 将缺失的
   `canonical_contract` 视为最小 legacy `{"contract_version": "2.0"}`；
   新导出的 model payload 仍必须显式包含完整 contract。
@@ -1012,6 +1012,8 @@ New canonical profile nodes use the `make_*_r*` names listed in `canonical_contr
 - `add_circle_rsketch`
 - `add_arc_rsketch`
 - `add_bspline_rsketch`
+- `trim_rsketch`
+- `extend_rsketch`
 - `make_constrain_coincident_rsketch`
 - `make_constrain_point_on_rsketch`
 - `make_constrain_horizontal_rsketch`
@@ -1309,6 +1311,19 @@ Notes:
 - Inputs: 1 `Sketch`
 - Outputs: 1 updated `Sketch`
 - Params: `sketch_id`, `entity_id`, `start`, `end`, `control_points`, `degree`, `knots`, `multiplicities`, `weights`, `periodic`, `construction`
+#### `trim_rsketch`
+
+- Inputs: 1 `Sketch`
+- Outputs: 1 updated `Sketch`
+- Params: `sketch_id`, `entity`, `at`, `against`
+- `at` is `[x, y]` in sketch coordinates or a point id; `against` is a list of entity ids or `null` (every non-construction entity). The edit is made on the solved geometry, so replay is deterministic.
+
+#### `extend_rsketch`
+
+- Inputs: 1 `Sketch`
+- Outputs: 1 updated `Sketch`
+- Params: `sketch_id`, `entity`, `end` (`start` or `end`), `to` (entity id or `null`)
+
 #### `make_constrain_*_rsketch`
 
 - Inputs: 1 `Sketch`
