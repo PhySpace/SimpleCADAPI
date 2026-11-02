@@ -164,6 +164,44 @@ Sketch trim_rsketch(const Sketch& sketch, const SketchTarget& entity, const Sket
 Sketch extend_rsketch(const Sketch& sketch, const SketchTarget& entity, const std::string& end,
                       const std::optional<SketchTarget>& to = std::nullopt);
 
+// Round the corner where the lines `a` and `b` meet (they must share an end point) with an arc of `radius`.  The sketch
+// is solved first.  Both lines are shortened to the tangent points; the arc runs counter-clockwise from its start to
+// its end around its centre and is tied to each line with a tangent constraint (at_b = the arc end that touches the
+// line) and a driving radius.  The corner point goes away unless a constraint or another entity uses it; when it stays,
+// the cut off part of each line stays as a construction line collinear with it, so the lines keep the place they had.
+// horizontal / vertical (and the other constraints that hold for a shorter line) stay; lengths and other dimensions of
+// the lines are dropped.  Refuses parallel lines, lines that share no point, and a radius that does not leave part of
+// the shorter line (the message names the largest radius).  New ids: p<n> points, a<n> the arc, l<n> construction legs,
+// c_<kind>_<n> constraints.
+Sketch fillet_corner_rsketch(const Sketch& sketch, const SketchTarget& a, const SketchTarget& b, const Scalar& radius);
+
+// As fillet_corner_rsketch, with a straight line from the point `distance` along `a` to the point `distance` along `b`
+// (measured from the corner) instead of the arc.  The new line gets a driving length (the chord) and a driving angle to
+// `a`.  `distance` must be shorter than the shorter line.  New ids: p<n> points, l<n> the chamfer line.
+Sketch chamfer_corner_rsketch(const Sketch& sketch, const SketchTarget& a, const SketchTarget& b,
+                              const Scalar& distance);
+
+// Bring geometry from another sketch (any plane) into `sketch` as reference geometry.  `source` is solved first and
+// every point goes through the plane frames of both sketches (u = (P - origin) . x_axis, v = (P - origin) . y_axis).
+// Points, lines, circles and arcs in a plane parallel to the target are copied (an arc keeps its counter-clockwise
+// sense); geometry that projects to a line (a circle / arc in a perpendicular plane) or a point (a line along the
+// target normal) is kept as a line / point; an oblique full circle becomes an ellipse; an oblique arc is refused.
+// `entities` limits the source entities (ids; default: every line, circle, arc and free point -- ellipses and
+// B-splines are skipped and reported in the notes of metadata "last_edit").  The copies are construction by default and
+// fixed at their projected coordinates.  Ids: proj_<source sketch id>_<n> (lowest free n); the list of
+// {source, entity, projected} is metadata "projections".
+Sketch project_rsketch(const Sketch& sketch, const Sketch& source,
+                       const std::optional<std::vector<std::string>>& entities = std::nullopt,
+                       bool construction = true);
+
+// The same for the edges of shapes (a Solid, Face, Shell, Wire, Edge or Compound; a Vertex is a point), in world
+// coordinates.  Lines and circles / arcs project as above; any other edge is refused (name the edges to project).
+// Ids: proj_shape_<n>; the entity of a projections entry is the topo id of the edge.
+Sketch project_rsketch(const Sketch& sketch, const std::vector<Shape>& source, bool construction = true);
+
+// Throws the structured project_rsketch error with `reason` (for binding layers that read the source argument).
+[[noreturn]] void project_rsketch_refuse(const std::string& reason);
+
 // What an edit did, by id: entities (points included) and constraints created, removed or changed between two sketches.
 struct SketchDiff {
   std::vector<std::string> created, removed, changed;

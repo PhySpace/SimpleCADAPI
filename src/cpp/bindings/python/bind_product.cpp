@@ -128,6 +128,35 @@ void bind_structure(py::module_& m) {
       },
       py::arg("assembly"), py::arg("component_id"), py::arg("placement"),
       "Move an existing assembly component by replacing its placement.");
+  m.def(
+      "explode_rassembly",
+      [](const py::object& assembly, const py::object& factor, const py::object& center, const py::object& axis,
+         const py::object& directions, const py::object& weights) {
+        return guard_operation("explode_rassembly", [&] {
+          const sp::Assembly& target = assembly_arg(assembly);
+          std::map<std::string, Vec3> direction_map;
+          if (!directions.is_none()) {
+            if (!py::isinstance<py::dict>(directions))
+              throw TypeError("directions must be a dict of component_id -> direction");
+            for (const auto& item : py::reinterpret_borrow<py::dict>(directions))
+              direction_map[text(py::reinterpret_borrow<py::object>(item.first), "a directions key")] =
+                  vec3(py::reinterpret_borrow<py::object>(item.second), "a direction");
+          }
+          std::map<std::string, double> weight_map;
+          if (!weights.is_none()) {
+            if (!py::isinstance<py::dict>(weights))
+              throw TypeError("weights must be a dict of component_id -> number");
+            for (const auto& item : py::reinterpret_borrow<py::dict>(weights))
+              weight_map[text(py::reinterpret_borrow<py::object>(item.first), "a weights key")] =
+                  number(py::reinterpret_borrow<py::object>(item.second), "a weight");
+          }
+          return sp::explode_rassembly(target, scalar(factor, "factor"), optional_vec3(center, "center"),
+                                       optional_vec3(axis, "axis"), direction_map, weight_map);
+        });
+      },
+      py::arg("assembly"), py::arg("factor"), py::kw_only(), py::arg("center") = py::none(),
+      py::arg("axis") = py::none(), py::arg("directions") = py::none(), py::arg("weights") = py::none(),
+      "Return a display copy of the assembly with its components pushed apart for an exploded view.");
 }
 
 void bind_connectors(py::module_& m) {

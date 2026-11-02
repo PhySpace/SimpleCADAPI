@@ -580,6 +580,40 @@ void bind_entity_operators(py::module_& m) {
         py::arg("against") = py::none());
   m.def("extend_rsketch", &extend_rsketch, py::arg("sketch"), py::arg("entity"), py::arg("end"), py::kw_only(),
         py::arg("to") = py::none());
+  m.def("fillet_corner_rsketch", &fillet_corner_rsketch, py::arg("sketch"), py::arg("a"), py::arg("b"),
+        py::arg("radius"));
+  m.def("chamfer_corner_rsketch", &chamfer_corner_rsketch, py::arg("sketch"), py::arg("a"), py::arg("b"),
+        py::arg("distance"));
+  m.def(
+      "project_rsketch",
+      [](const Sketch& sketch, const py::object& source, const std::optional<std::vector<std::string>>& entities,
+         bool construction) -> Sketch {
+        if (py::isinstance<Sketch>(source))
+          return project_rsketch(sketch, source.cast<const Sketch&>(), entities, construction);
+        std::vector<Shape> shapes;
+        if (py::isinstance<Shape>(source)) {
+          shapes.push_back(source.cast<Shape>());
+        } else if (py::isinstance<py::list>(source) || py::isinstance<py::tuple>(source)) {
+          for (const py::handle item : source) {
+            if (!py::isinstance<Shape>(item))
+              project_rsketch_refuse("source lists must hold shapes (edges), got a " +
+                                     std::string(py::str(py::type::of(item).attr("__name__"))));
+            shapes.push_back(item.cast<Shape>());
+          }
+        } else {
+          project_rsketch_refuse(
+              "source must be a Sketch, a shape, or a list of shapes (what a ql selection resolves to: "
+              "call .resolve(shape) first), got a " +
+              std::string(py::str(py::type::of(source).attr("__name__"))));
+        }
+        if (entities)
+          project_rsketch_refuse(
+              "entities selects entities of a source sketch; a shape source projects all its edges "
+              "(pass the edges you want instead)");
+        return project_rsketch(sketch, shapes, construction);
+      },
+      py::arg("sketch"), py::arg("source"), py::kw_only(), py::arg("entities") = py::none(),
+      py::arg("construction") = true);
   m.def(
       "diff_sketch_rsketchdiff",
       [](const Sketch& before, const Sketch& after) { return diff_sketch_rsketchdiff(before, after).to_value(); },
