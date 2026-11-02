@@ -7,8 +7,11 @@ import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectLabel, SelectGroup, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { SketchCanvas, type SketchReport } from "@/components/SketchCanvas";
 import {
   bodyChoices,
+  directionForProfile,
+  findProfile,
   filterSelection,
   formToValues,
   holeFromFace,
@@ -26,6 +29,8 @@ import {
   type Spec,
 } from "@/lib/features";
 import type { SelectionItem } from "@/lib/selection";
+import { docToJson, normalizeDoc, type SketchDoc } from "@/lib/sketch";
+import { cn } from "@/lib/utils";
 import type { SelectionMode } from "@/scene/Viewport";
 
 export type DialogRequest = { spec: Spec; edit?: FeatureRow };
@@ -81,7 +86,16 @@ function FeatureForm({
 }) {
   const { spec, edit } = request;
   const editing = Boolean(edit);
-  const [form, setForm] = useState<RawForm>(() => initialForm(spec, state.defaults[spec.id] ?? {}, edit?.gui?.values ?? {}));
+  const sketchSlot = spec.slots.find((slot) => slot.kind === "sketch");
+  const [sketch, setSketch] = useState<SketchDoc>(() => normalizeDoc(edit?.gui?.values?.[sketchSlot?.name ?? "sketch"] ?? sketchSlot?.default));
+  const [report, setReport] = useState<SketchReport | null>(null);
+  const [form, setForm] = useState<RawForm>(() => {
+    const initial = initialForm(spec, state.defaults[spec.id] ?? {}, edit?.gui?.values ?? {});
+    // A new feature on a sketch pushes along that sketch's plane normal.
+    const profileSlot = spec.slots.find((slot) => slot.kind === "profile");
+    const normal = !edit && profileSlot && typeof initial[profileSlot.name] === "string" ? directionForProfile(state, initial[profileSlot.name] as string) : null;
+    return normal && spec.slots.some((slot) => slot.name === "direction") ? { ...initial, direction: normal } : initial;
+  });
   const [name, setName] = useState(edit?.slug ?? "");
   const [busy, setBusy] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -109,7 +123,9 @@ function FeatureForm({
     setServerError(null);
   };
 
-  const { values, errors } = useMemo(() => formToValues(spec, form), [spec, form]);
+  const { values: formValues, errors: formErrors } = useMemo(() => formToValues(spec, form), [spec, form]);
+  const values = useMemo(() => (sketchSlot ? { ...formValues, [sketchSlot.name]: docToJson(sketch) } : formValues), [formValues, sketchSlot, sketch]);
+  const errors = useMemo(() => (sketchSlot && report && report.loops === 0 ? { ...formErrors, [sketchSlot.name]: "close a loop of lines or draw a circle: the face needs a profile" } : formErrors), [formErrors, sketchSlot, report]);
   const nameError = editing ? null : validateName(name, state.taken);
   const suggested = suggestName(spec.id, state.taken);
 
@@ -179,8 +195,11 @@ function FeatureForm({
     <DialogContent
       aria-describedby={undefined}
       onOpenAutoFocus={(event) => event.preventDefault()}
+      // The sketch canvas owns Escape and Enter (end a chain, commit a dimension); cancel and add are buttons.
+      onEscapeKeyDown={(event) => sketchSlot && event.preventDefault()}
+      className={sketchSlot ? "top-12 h-[calc(100vh-4rem)] max-h-none w-[min(62vw,980px)]" : undefined}
       onKeyDown={(event) => {
-        if (event.key === "Enter" && !(event.target instanceof HTMLTextAreaElement) && !(event.target instanceof HTMLButtonElement)) {
+        if (!sketchSlot && event.key === "Enter" && !(event.target instanceof HTMLTextAreaElement) && !(event.target instanceof HTMLButtonElement)) {
           event.preventDefault();
           void submit();
         }
@@ -192,7 +211,8 @@ function FeatureForm({
         </DialogTitle>
         <DialogDescription>{spec.description}</DialogDescription>
       </DialogHeader>
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
+      <div className={cn("flex min-h-0 flex-1 flex-col", sketchSlot ? "" : "gap-3 overflow-y-auto px-3 py-3")}>
+        <div className={sketchSlot ? "flex items-end gap-3 border-b-2 border-border px-3 py-2" : "contents"}>
         <Field label="Name" error={touched ? nameError : null} help={editing ? "A feature keeps its name." : undefined}>
           <Input
             value={editing ? (edit?.slug ?? "") : name}
@@ -202,7 +222,14 @@ function FeatureForm({
             onChange={(event) => setName(event.target.value)}
           />
         </Field>
-        {spec.slots.map((slot) => (
+        {sketchSlot && (
+          <p className="pb-1 text-[11px] text-muted-foreground">
+            {allErrors[sketchSlot.name] && touched ? <span className="text-fail">{allErrors[sketchSlot.name]}</span> : "Draw, constrain, then pick the profile."}
+          </p>
+        )}
+        </div>
+        {sketchSlot && <SketchCanvas doc={sketch} onDoc={setSketch} onReport={setReport} />}
+        {spec.slots.filter((slot) => slot.kind !== "sketch").map((slot) => (
           <Field key={slot.name} label={slot.label} unit={slot.kind === "point" ? slot.unit : undefined} help={spec.id === "hole" && slot.name === "position" && note ? undefined : slot.help} error={touched ? (allErrors[slot.name] ?? null) : null}>
             <SlotWidget
               slot={slot}
@@ -211,6 +238,12 @@ function FeatureForm({
               invalid={touched && Boolean(errors[slot.name])}
               bodies={bodies}
               selection={selection}
+              state={state}
+              onProfile={(name) => {
+                const normal = directionForProfile(state, name);
+                setForm((previous) => ({ ...previous, [slot.name]: name, ...(normal && spec.slots.some((other) => other.name === "direction") ? { direction: normal } : {}) }));
+                setServerError(null);
+              }}
               kept={editing && !replaced(slot)}
               picks={slot.kind === "select" ? picksOf(slot).length : 0}
             />
@@ -275,6 +308,8 @@ function SlotWidget({
   invalid,
   bodies,
   selection,
+  state,
+  onProfile,
   kept,
   picks,
 }: {
@@ -284,6 +319,8 @@ function SlotWidget({
   invalid: boolean;
   bodies: { name: string; open: boolean }[];
   selection: SelectionItem[];
+  state: FeatureState;
+  onProfile: (name: string) => void;
   kept: boolean;
   picks: number;
 }) {
@@ -337,6 +374,31 @@ function SlotWidget({
             )}
           </SelectContent>
         </Select>
+      );
+    }
+    case "profile": {
+      const profiles = state.profiles ?? [];
+      const chosen = typeof raw === "string" ? findProfile(state, raw) : undefined;
+      return (
+        <div className="flex flex-col gap-1">
+          <Select value={typeof raw === "string" ? raw : ""} onValueChange={onProfile}>
+            <SelectTrigger aria-invalid={invalid}>
+              <SelectValue placeholder="no sketch yet" />
+            </SelectTrigger>
+            <SelectContent>
+              {profiles.map((profile) => (
+                <SelectItem key={profile.name} value={profile.name}>
+                  {profile.name} ({profile.plane})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {chosen && (
+            <span className="text-[11px] text-muted-foreground">
+              Plane {chosen.plane}, normal <span className="text-name">{chosen.normal}</span>
+            </span>
+          )}
+        </div>
       );
     }
     case "point": {

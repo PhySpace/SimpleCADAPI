@@ -5,7 +5,7 @@ import type { SelectionItem } from "@/lib/selection";
 
 // -- contract -------------------------------------------------------------------------------------------------------
 
-export type SlotKind = "length" | "angle" | "float" | "count" | "bool" | "enum" | "point" | "body" | "select" | "points2d" | "points3d";
+export type SlotKind = "length" | "angle" | "float" | "count" | "bool" | "enum" | "point" | "body" | "select" | "points2d" | "points3d" | "profile" | "sketch";
 
 export type SlotOption = { value: string; label: string };
 
@@ -56,6 +56,8 @@ export type FeatureState = {
   tip: string | null;
   product: { cell: string; body: string } | null;
   defaults: Record<string, Record<string, string>>;
+  /** The face-making sketches of the notebook (what a `profile` slot chooses from). */
+  profiles?: { name: string; plane: string; normal: string }[];
   taken: string[];
   undo: number;
   redo: number;
@@ -164,6 +166,9 @@ export function initialForm(spec: Spec, bodyDefaults: Record<string, string> = {
         form[slot.name] = [0, 1, 2].map((i) => numberText(point[i] ?? 0));
         break;
       }
+      case "sketch":
+        break;
+      case "profile":
       case "body":
         form[slot.name] = typeof values[slot.name] === "string" ? (values[slot.name] as string) : (bodyDefaults[slot.name] ?? "");
         break;
@@ -198,14 +203,16 @@ export function formToValues(spec: Spec, form: RawForm): { values: Record<string
     const raw = form[slot.name];
     switch (slot.kind) {
       case "select":
+      case "sketch":
         break;
       case "bool":
         values[slot.name] = Boolean(raw);
         break;
       case "enum":
+      case "profile":
       case "body":
         if (typeof raw !== "string" || !raw) {
-          if (!slot.optional) errors[slot.name] = slot.kind === "body" ? "no body to use yet: add a solid first" : "choose a value";
+          if (!slot.optional) errors[slot.name] = slot.kind === "body" ? "no body to use yet: add a solid first" : slot.kind === "profile" ? "no sketch yet: add a sketch first" : "choose a value";
         } else values[slot.name] = raw;
         break;
       case "point": {
@@ -264,6 +271,18 @@ export function bodyChoices(state: Pick<FeatureState, "bodies" | "open">): { nam
     ...state.bodies.filter((b) => open.has(b.name)).map((b) => ({ name: b.name, open: true })),
     ...state.bodies.filter((b) => !open.has(b.name)).map((b) => ({ name: b.name, open: false })),
   ];
+}
+
+// -- sketch profiles --------------------------------------------------------------------------------------------------
+
+/** The sketch (profile) named, or undefined. */
+export function findProfile(state: Pick<FeatureState, "profiles">, name: string) {
+  return (state.profiles ?? []).find((profile) => profile.name === name);
+}
+
+/** The direction ("+z", "-y"...) a feature on this profile pushes along by default: the plane's normal. */
+export function directionForProfile(state: Pick<FeatureState, "profiles">, name: string): string | null {
+  return findProfile(state, name)?.normal ?? null;
 }
 
 // -- selection ------------------------------------------------------------------------------------------------------

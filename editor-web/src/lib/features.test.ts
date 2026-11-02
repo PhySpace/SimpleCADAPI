@@ -115,3 +115,30 @@ describe("hole from a face", () => {
     expect(holeFromFace({ properties: { centroid: [1, 2, 3] }, geometry: {} })).toEqual({ point: [1, 2, 3], direction: null });
   });
 });
+
+describe("profile and sketch slots", () => {
+  const spec = {
+    id: "extrude_sketch",
+    label: "Extrude sketch",
+    group: "Sketch",
+    role: "build",
+    produces: "solid",
+    description: "",
+    slots: [
+      { name: "profile", label: "Sketch profile", kind: "profile" as const },
+      { name: "direction", label: "Direction", kind: "enum" as const, options: [{ value: "+z", label: "+z" }, { value: "-y", label: "-y" }] },
+    ],
+  };
+  const state = { profiles: [{ name: "sk", plane: "XZ", normal: "-y" }] };
+  it("a profile slot takes the default sketch and needs a value", () => {
+    expect(initialForm(spec, { profile: "sk" }).profile).toBe("sk");
+    expect(formToValues(spec, initialForm(spec, {})).errors.profile).toMatch(/sketch/);
+    expect(formToValues(spec, initialForm(spec, { profile: "sk" })).values.profile).toBe("sk");
+  });
+  it("the direction follows the profile's normal", async () => {
+    const { directionForProfile, findProfile } = await import("@/lib/features");
+    expect(directionForProfile(state, "sk")).toBe("-y");
+    expect(directionForProfile(state, "other")).toBeNull();
+    expect(findProfile({}, "sk")).toBeUndefined();
+  });
+});
