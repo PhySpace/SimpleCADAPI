@@ -389,3 +389,38 @@ def test_a_sketch_feature_added_through_the_editor_is_extruded_into_the_product(
         if state.kernel is not None:
             state.kernel.stop()
         server.should_exit = True
+
+
+def test_a_name_that_is_taken_is_a_message_not_a_server_error(tmp_path):
+    import threading
+
+    import uvicorn
+
+    from simplecadapi.editor.gui_features import GuiError
+    from simplecadapi.editor.server import WorkspaceState, create_app
+    from simplecadapi.editor.templates import create_notebook
+
+    path = create_notebook(tmp_path, "dup", "blank")
+    state = WorkspaceState(tmp_path)
+    state.port = 17739
+    server = uvicorn.Server(uvicorn.Config(create_app(state), port=state.port, log_level="error"))
+    threading.Thread(target=server.run, daemon=True).start()
+    state.hub.attach_loop(__import__("asyncio").new_event_loop())
+    try:
+        state.start_kernel(path)
+        state.features.add({"spec": "box", "name": "base", "values": {}})
+        _wait_idle(state)
+        with pytest.raises(GuiError, match="already used"):
+            state.features.add({"spec": "box", "name": "base", "values": {}})
+        import json
+        import urllib.error
+        import urllib.request
+
+        request = urllib.request.Request(f"http://127.0.0.1:{state.port}/api/features", data=json.dumps({"op": "add", "spec": "box", "name": "base"}).encode(), method="POST")
+        with pytest.raises(urllib.error.HTTPError) as refused:
+            urllib.request.urlopen(request)
+        assert refused.value.code == 400 and "already used" in json.loads(refused.value.read())["error"]
+    finally:
+        if state.kernel is not None:
+            state.kernel.stop()
+        server.should_exit = True

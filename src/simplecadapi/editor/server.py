@@ -2032,6 +2032,8 @@ def create_app(state: WorkspaceState) -> Starlette:
             result = await asyncio.to_thread(handler, body)
         except GuiError as exc:
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=409 if exc.conflict else 400)
+        except ValueError as exc:  # a request the registry refuses (FeatureError, SketchError, AssemblyError) is the person's to fix
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
         return JSONResponse(result)
 
     async def sketch_op(request: Request) -> JSONResponse:

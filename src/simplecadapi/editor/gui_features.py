@@ -203,7 +203,10 @@ class FeatureService:
             if spec_id not in F.BY_ID:
                 raise GuiError(f"unknown operation {spec_id!r}")
             taken = set(snap["taken"])
-            slug = F.check_slug(str(request["name"]), taken) if request.get("name") else F.default_slug(spec_id, taken)
+            try:
+                slug = F.check_slug(str(request["name"]), taken) if request.get("name") else F.default_slug(spec_id, taken)
+            except F.FeatureError as exc:
+                raise GuiError(str(exc)) from exc
             bodies = {b["name"]: b["produces"] for b in snap["bodies"]}
             values = self._with_defaults(spec_id, dict(request.get("values") or {}), snap)
             rendered = self._render(spec_id, slug, values, bodies, request.get("selections"), snap)
@@ -434,6 +437,15 @@ class FeatureService:
         report = self._command("insert", {"after": anchor, "code": code, "run": run})
         index = (report.get("touched") or [None])[0]
         cell = next((c for c in report["cells"] if c["index"] == index), None)
+        if cell is None:
+            # a notebook that has only just opened may report the new cell a moment late: look for it by its code
+            import time
+
+            deadline = time.monotonic() + 5.0
+            while cell is None and time.monotonic() < deadline:
+                cell = next((c for c in self.state.cells if str(c.get("code", "")).strip() == code.strip()), None)
+                if cell is None:
+                    time.sleep(0.2)
         if cell is None:
             raise GuiError("the kernel did not create the cell")
         return {"kind": "created", "id": cell["id"], "after": anchor, "code": code}
