@@ -10,7 +10,24 @@ import pytest
 import simplecadapi as scad
 from simplecadapi.editor import features as F
 
-DEFAULTS = {spec.id: {slot.name: slot.default for slot in spec.slots if slot.kind != "select"} for spec in F.SPECS}
+RECT_SKETCH = {
+    "plane": "XY",
+    "points": [{"id": "a", "x": 0, "y": 0}, {"id": "b", "x": 41, "y": 1}, {"id": "c", "x": 40, "y": 21}, {"id": "d", "x": 1, "y": 19}],
+    "entities": [{"id": "l0", "kind": "line", "start": "a", "end": "b"}, {"id": "l1", "kind": "line", "start": "b", "end": "c"},
+                 {"id": "l2", "kind": "line", "start": "c", "end": "d"}, {"id": "l3", "kind": "line", "start": "d", "end": "a"}],
+    "constraints": [{"kind": "fix", "targets": ["a"]}, {"kind": "horizontal", "targets": ["l0"]}, {"kind": "vertical", "targets": ["l1"]},
+                    {"kind": "horizontal", "targets": ["l2"]}, {"kind": "vertical", "targets": ["l3"]},
+                    {"kind": "length", "targets": ["l0"], "value": 40.0}, {"kind": "length", "targets": ["l1"], "value": 20.0}],
+    "profile": 0, "inner": [], "fully_constrained": True,
+}
+HOLE_SKETCH = {
+    "plane": "XY",
+    "points": [{"id": "o", "x": 20, "y": 10}],
+    "entities": [{"id": "ring", "kind": "circle", "center": "o", "radius": 4.0}],
+    "constraints": [{"kind": "fix", "targets": ["o"]}, {"kind": "radius", "targets": ["ring"], "value": 4.0}],
+    "profile": 0, "inner": [], "fully_constrained": True,
+}
+DEFAULTS = {spec.id: {slot.name: slot.default for slot in spec.slots if slot.kind not in ("select", "profile")} for spec in F.SPECS}
 
 
 def _calls(source: str):
@@ -42,18 +59,22 @@ def test_the_catalog_lists_every_operation_with_typed_slots():
     assert len(ids) == len(set(ids)) >= 24
     for spec in data["specs"]:
         assert spec["slots"], spec["id"]
-        assert {slot["kind"] for slot in spec["slots"]} <= {"length", "angle", "float", "count", "bool", "enum", "point", "body", "select", "points2d", "points3d"}
+        assert {slot["kind"] for slot in spec["slots"]} <= {"length", "angle", "float", "count", "bool", "enum", "point", "body", "select", "points2d", "points3d", "profile", "sketch"}
 
 
 @pytest.mark.parametrize("spec", F.SPECS, ids=lambda s: s.id)
 def test_every_template_uses_real_sdk_functions_and_parameters(spec):
     """The drift test: an SDK change that breaks a template breaks this, not a user."""
     picks = {slot.name: [{"kind": slot.entity, "properties": {"centroid": [0, 0, 0], "area": 10.0, "length": 5.0}, "geometry": {"type": "plane"}}] for slot in spec.slots if slot.kind == "select"}
-    bodies = {"a": "solid", "b": "solid", "many": "solids"}
+    bodies = {"a": "solid", "b": "solid", "many": "solids", "prof": "face"}
     values = {k: (v if v is not None else None) for k, v in DEFAULTS[spec.id].items()}
     for slot in spec.slots:
         if slot.kind == "body":
             values[slot.name] = "a"
+        elif slot.kind == "profile":
+            values[slot.name] = "prof"
+        elif slot.kind == "sketch":
+            values[slot.name] = RECT_SKETCH
     rendered = F.render_feature(spec.id, "probe", values, bodies=bodies, selections=picks)
     seen = 0
     for call in _calls(rendered.feature):
@@ -72,8 +93,8 @@ def test_every_template_uses_real_sdk_functions_and_parameters(spec):
 def test_the_primitives_and_profiles_make_one_valid_solid_each():
     with scad.GraphSession(graph_id="features-primitives"):
         for spec in F.SPECS:
-            if any(slot.kind in ("body", "select") for slot in spec.slots):
-                continue
+            if spec.produces == "face" or any(slot.kind in ("body", "select", "profile") for slot in spec.slots):
+                continue  # sketches have their own test below
             scope: dict = {"scad": scad}
             rendered = F.render_feature(spec.id, "made", DEFAULTS[spec.id], bodies={})
             _run(rendered, scope)
@@ -289,6 +310,81 @@ def test_a_blank_notebook_gets_its_product_with_the_first_feature(tmp_path):
         _wait_idle(state)
         snap = service.snapshot()
         assert snap["product"]["body"] == "cut" and all(not f["errors"] for f in snap["features"]), snap["features"]
+    finally:
+        if state.kernel is not None:
+            state.kernel.stop()
+        server.should_exit = True
+
+
+def test_a_sketch_becomes_a_face_and_the_sketch_features_build_on_it():
+    with scad.GraphSession(graph_id="features-sketch"):
+        scope: dict = {"scad": scad}
+        bodies: dict[str, str] = {}
+
+        def add(spec_id, slug, values):
+            rendered = F.render_feature(spec_id, slug, values, bodies=bodies)
+            _run(rendered, scope)
+            bodies[slug] = rendered.produces
+            return rendered
+
+        outline = add("sketch", "outline", {"sketch": RECT_SKETCH})
+        assert outline.produces == "face" and "OUTLINE_LENGTH_L0" in "\n".join(outline.params)
+        assert outline.feature.splitlines()[0] == "# ---- feature: outline (build, profile=sketch) ----"
+        plate = add("extrude_sketch", "plate", {"profile": "outline", "direction": "+z", "distance": 6.0})
+        assert abs(scope["plate"].get_volume() - 40 * 20 * 6) < 1e-6 and plate.reads == ["outline"]
+        add("sketch", "bore", {"sketch": HOLE_SKETCH})
+        add("cut_sketch", "drilled", {"body": "plate", "profile": "bore", "direction": "+z", "depth": 6.0})
+        assert scope["drilled"].get_volume() < scope["plate"].get_volume()
+        add("boss_sketch", "stud", {"body": "drilled", "profile": "bore", "direction": "+z", "distance": 3.0})
+        assert scope["stud"].get_volume() > scope["drilled"].get_volume()
+        add("revolve_sketch", "ring", {"profile": "outline", "axis": "+y", "origin": [0.0, 0.0, 0.0], "angle": 90.0})
+        assert scope["ring"].get_volume() > 0
+        # a sketch face is not a body, and a body is not a profile
+        with pytest.raises(F.FeatureError, match="not a sketch profile"):
+            F.render_feature("extrude_sketch", "bad", {"profile": "plate", "direction": "+z", "distance": 1.0}, bodies=bodies)
+        with pytest.raises(F.FeatureError, match="not a body"):
+            F.render_feature("fillet", "bad", {"body": "outline", "radius": 1.0}, bodies=bodies, selections={"edges": [{"kind": "edge", "properties": {"centroid": [0, 0, 0], "length": 1.0}, "geometry": {"type": "line"}}]})
+
+
+def test_a_sketch_feature_added_through_the_editor_is_extruded_into_the_product(tmp_path):
+    import threading
+
+    import uvicorn
+
+    from simplecadapi.editor.server import WorkspaceState, create_app
+    from simplecadapi.editor.templates import create_notebook
+
+    path = create_notebook(tmp_path, "tab", "blank")
+    state = WorkspaceState(tmp_path)
+    state.port = 17734
+    server = uvicorn.Server(uvicorn.Config(create_app(state), port=state.port, log_level="error"))
+    threading.Thread(target=server.run, daemon=True).start()
+    state.hub.attach_loop(__import__("asyncio").new_event_loop())
+    try:
+        state.start_kernel(path)
+        service = state.features
+        service.add({"spec": "sketch", "name": "outline", "values": {"sketch": RECT_SKETCH}})
+        _wait_idle(state)
+        snap = service.snapshot()
+        assert snap["profiles"] == [{"name": "outline", "plane": "XY", "normal": "+z"}]
+        assert snap["tip"] is None and snap["product"] is None  # a face is not a body: no product yet
+        assert snap["defaults"]["extrude_sketch"] == {"profile": "outline"}
+        service.add({"spec": "extrude_sketch", "name": "tab_body", "values": {"direction": "+z", "distance": 5.0}})
+        _wait_idle(state)
+        snap = service.snapshot()
+        assert snap["tip"] == "tab_body" and snap["product"]["body"] == "tab_body"
+        assert all(not f["errors"] for f in snap["features"]), snap["features"]
+        text = path.read_text()
+        assert "scad.make_face_from_sketch_rface" in text and "TAB_BODY_DISTANCE" in text.upper() and "OUTLINE_LENGTH_L0" in text
+        # a dimension is a slider variable: editing the sketch document keeps the name and rewrites the numbers
+        outline = next(f for f in snap["features"] if f["slug"] == "outline")
+        longer = {**RECT_SKETCH, "constraints": [dict(c, value=60.0) if c.get("targets") == ["l0"] and c["kind"] == "length" else c for c in RECT_SKETCH["constraints"]]}
+        service.edit({"cell": outline["cell"], "values": {"sketch": longer}})
+        _wait_idle(state)
+        assert "default=60.0" in path.read_text()
+        # the face must be picked from a sketch that exists
+        undo_count = service.snapshot()["undo"]
+        assert undo_count >= 3
     finally:
         if state.kernel is not None:
             state.kernel.stop()

@@ -18,6 +18,7 @@ from typing import Any, Mapping
 
 from ..runtime.workspace import features_in_cell
 from . import features as F
+from . import sketch_doc
 
 _PARAMS_HEADER = re.compile(r"^#\s*-{3,}\s*params\b[^\n]*", re.MULTILINE)
 _PARAMS_FOR = re.compile(r"^#\s*-{3,}\s*params:\s*(?P<slug>[a-z][a-z0-9_]*)\s*-{3,}\s*$")
@@ -112,30 +113,41 @@ class FeatureService:
             )
         for feature in features:
             feature["params_cell"] = params_cells.get(feature["slug"])
-        open_bodies = [name for name in order if name not in consumed]
+        solids = [name for name in order if bodies[name] != "face"]
+        faces = [name for name in order if bodies[name] == "face"]
+        open_bodies = [name for name in solids if name not in consumed]
+        profiles = []
+        for feature in features:
+            gui = feature["gui"]
+            if gui and gui["spec"] == "sketch" and feature["makes"]:
+                plane = (gui["values"].get("sketch") or {}).get("plane", "XY")
+                profiles.append({"name": feature["makes"][0], "plane": plane, "normal": sketch_doc.PLANE_NORMALS.get(plane, "+z")})
         return {
             "features": features,
             "bodies": [{"name": name, "produces": bodies[name]} for name in order],
             "open": open_bodies,
             "tip": open_bodies[-1] if open_bodies else None,
+            "profiles": profiles,
             "product": product,
-            "defaults": self._defaults(open_bodies),
+            "defaults": self._defaults(open_bodies, faces),
             "taken": sorted(taken),
             "undo": len(self._undo),
             "redo": len(self._redo),
         }
 
     @staticmethod
-    def _defaults(open_bodies: list[str]) -> dict[str, dict[str, str]]:
+    def _defaults(open_bodies: list[str], faces: list[str]) -> dict[str, dict[str, str]]:
         last = open_bodies[-1] if open_bodies else None
         before = open_bodies[-2] if len(open_bodies) > 1 else last
+        profile = faces[-1] if faces else None
         out: dict[str, dict[str, str]] = {}
         for spec in F.SPECS:
             chosen: dict[str, str] = {}
             for slot in spec.slots:
-                if slot.kind != "body" or last is None:
-                    continue
-                chosen[slot.name] = before if slot.name == "base" else last
+                if slot.kind == "body" and last is not None:
+                    chosen[slot.name] = before if slot.name == "base" else last
+                elif slot.kind == "profile" and profile is not None:
+                    chosen[slot.name] = profile
             out[spec.id] = chosen
         return out
 

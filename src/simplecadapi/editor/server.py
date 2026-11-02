@@ -2033,6 +2033,20 @@ def create_app(state: WorkspaceState) -> Starlette:
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=409 if exc.conflict else 400)
         return JSONResponse(result)
 
+    async def sketch_solve(request: Request) -> JSONResponse:
+        """Solve a sketch document without recording anything (a canvas calls this at every drag step)."""
+        from .sketch_doc import SketchError, solve
+
+        try:
+            body = json.loads(await request.body() or b"{}")
+        except json.JSONDecodeError:
+            return JSONResponse({"ok": False, "error": "body is not JSON"}, status_code=400)
+        try:
+            result = await asyncio.to_thread(solve, body.get("sketch") if isinstance(body, dict) else {})
+        except SketchError as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+        return JSONResponse({"ok": True, **result})
+
     async def sdk_index(request: Request) -> JSONResponse:
         """The SDK's public API (names and parameters), for the cell editor's completion."""
         from .apiindex import build_index
@@ -2176,6 +2190,7 @@ def create_app(state: WorkspaceState) -> Starlette:
         Route("/api/cells", api_cells, methods=["GET"]),
         Route("/api/cells/{op}", api_cell_command, methods=["POST"]),
         Route("/api/features/specs", features_specs, methods=["GET"]),
+        Route("/api/sketch/solve", sketch_solve, methods=["POST"]),
         Route("/api/features", features_state, methods=["GET"]),
         Route("/api/features", features_command, methods=["POST"]),
         Route("/api/workspace", workspace_list, methods=["GET"]),

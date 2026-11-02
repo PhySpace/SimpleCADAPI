@@ -24,6 +24,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping, Sequence
 
+from . import sketch_doc
 from .selection import selector_conditions
 
 GUI_MARKER = "# gui:"
@@ -54,7 +55,8 @@ class Slot:
     """One input of a feature.
 
     kind: ``length`` (mm), ``angle`` (deg), ``float``, ``count``, ``bool``, ``enum``, ``point`` (three lengths),
-    ``body`` (a body made earlier), ``select`` (faces or edges picked in the viewport), ``points2d`` (``x, y`` per line).
+    ``body`` (a solid made earlier), ``profile`` (a sketch face made earlier), ``select`` (faces or edges picked in the
+    viewport), ``points2d`` (``x, y`` per line), ``sketch`` (a sketch document, see :mod:`.sketch_doc`).
     """
 
     name: str
@@ -89,7 +91,7 @@ class Spec:
     label: str
     group: str
     role: str  # build | add | subtract | modifier
-    produces: str  # solid | solids
+    produces: str  # solid | solids | face
     description: str
     slots: tuple[Slot, ...]
     build: Callable[["Context"], list[str]] = field(repr=False, compare=False)
@@ -171,6 +173,10 @@ class Context:
                 )
             names.append(name)
         return f"({', '.join(names)})"
+
+    def raw_params(self, lines: list[str]) -> None:
+        """Params-cell lines a template writes itself (the dimensions of a sketch)."""
+        self.params.extend(lines)
 
     def choice(self, slot: str) -> str:
         """The value of an enum slot (already checked against its options)."""
@@ -406,6 +412,44 @@ def _sweep(c: Context) -> list[str]:
     ]
 
 
+def _sketch(c: Context) -> list[str]:
+    params, lines = sketch_doc.render(c.slug, c.values["sketch"])
+    c.raw_params(params)
+    return lines
+
+
+def _profile(c: Context, slot: str = "profile") -> str:
+    return c.body(slot)
+
+
+def _extrude_sketch(c: Context) -> list[str]:
+    return [
+        f"{c.slug} = scad.extrude_rsolid(profile={_profile(c)}, direction={c.axis('direction')}, distance={c.var('distance')},",
+        f"    start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, side_faces_tag={c.tag('side')})",
+    ]
+
+
+def _revolve_sketch(c: Context) -> list[str]:
+    return [
+        f"{c.slug} = scad.revolve_rsolid(profile={_profile(c)}, axis={c.axis('axis')}, angle={c.var('angle')}, origin={c.point('origin')},",
+        "    " + (f"start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, " if c.values["angle"] < 360 else "") + f"side_faces_tag={c.tag('side')})",
+    ]
+
+
+def _cut_sketch(c: Context) -> list[str]:
+    return [
+        f"_tool = scad.extrude_rsolid(profile={_profile(c)}, direction={c.axis('direction')}, distance={c.var('depth')})",
+        f"{c.slug} = scad.cut_rsolid({c.body('body')}, _tool, skip_non_intersecting=False)",
+    ]
+
+
+def _boss_sketch(c: Context) -> list[str]:
+    return [
+        f"_boss = scad.extrude_rsolid(profile={_profile(c)}, direction={c.axis('direction')}, distance={c.var('distance')})",
+        f"{c.slug} = scad.union_rsolid({c.body('body')}, _boss)",
+    ]
+
+
 def _cut(c: Context) -> list[str]:
     return [f"{c.slug} = scad.cut_rsolid({c.body('base')}, {c.spread('tool')}, skip_non_intersecting=False)"]
 
@@ -482,6 +526,7 @@ def _scale(c: Context) -> list[str]:
 
 _AXIS = lambda name, label, default="+z": _enum(name, label, _AXIS_OPTIONS, default)  # noqa: E731
 _PLANE = lambda: _enum("plane", "Sketch plane", _PLANE_OPTIONS, "XY", help="The profile lies in this plane and is pushed along its normal.")  # noqa: E731
+_PROFILE = lambda: Slot("profile", "Sketch profile", "profile", help="A sketch made earlier.")  # noqa: E731
 _BODY = lambda: _body("body", "Body", "The body this feature works on (default: the last one made).")  # noqa: E731
 
 SPECS: tuple[Spec, ...] = (
@@ -516,6 +561,16 @@ SPECS: tuple[Spec, ...] = (
           Slot("ruled", "Straight sides", "bool", default=True)), _loft_rects),
     Spec("sweep_circle", "Sweep circle along a path", "Profiles", "build", "solid", "A circle swept along a polyline.",
          (_length("radius", "Radius", 4.0), Slot("path", "Path points (x, y, z per line)", "points3d", default=[[0, 0, 0], [0, 0, 30], [30, 0, 60]], unit="mm")), _sweep),
+    Spec("sketch", "Sketch", "Sketch", "build, profile=sketch", "face", "A constrained 2D sketch on a plane, made into a face.",
+         (Slot("sketch", "Sketch", "sketch", default={"plane": "XY", "points": [], "entities": [], "constraints": [], "profile": 0}),), _sketch),
+    Spec("extrude_sketch", "Extrude sketch", "Sketch", "build", "solid", "Push a sketch face along a direction.",
+         (_PROFILE(), _AXIS("direction", "Direction", "+z"), _signed("distance", "Distance", 10.0, min=0.001)), _extrude_sketch),
+    Spec("revolve_sketch", "Revolve sketch", "Sketch", "build", "solid", "Turn a sketch face about an axis.",
+         (_PROFILE(), _AXIS("axis", "Axis"), _point("origin", "Axis point"), Slot("angle", "Angle", "angle", default=360.0, unit="deg", min=1.0, max=360.0)), _revolve_sketch),
+    Spec("cut_sketch", "Cut sketch", "Sketch", "subtract", "solid", "Cut a body along a sketch face (a pocket or a through cut).",
+         (_BODY(), _PROFILE(), _AXIS("direction", "Direction", "-z"), _length("depth", "Depth", 10.0)), _cut_sketch),
+    Spec("boss_sketch", "Boss from sketch", "Sketch", "add", "solid", "Add material along a sketch face to a body.",
+         (_BODY(), _PROFILE(), _AXIS("direction", "Direction", "+z"), _signed("distance", "Distance", 10.0, min=0.001)), _boss_sketch),
     Spec("cut", "Cut", "Boolean", "subtract", "solid", "Take one or more bodies out of another.",
          (_body("base", "Body to cut"), _body("tool", "Tool (taken out)")), _cut),
     Spec("union", "Union", "Boolean", "add", "solid", "Join two bodies into one.",
@@ -614,11 +669,18 @@ def check_values(spec: Spec, values: Mapping[str, Any], bodies: Mapping[str, str
             if not (isinstance(raw, (list, tuple)) and len(raw) == 3):
                 raise FeatureError(f"{slot.label}: three numbers (x, y, z)")
             clean[slot.name] = [_checked_number(Slot(slot.name, slot.label, "float", min=slot.min, max=slot.max), part) for part in raw]
-        elif slot.kind == "body":
+        elif slot.kind in ("body", "profile"):
             name = str(raw)
-            if not _NAME.fullmatch(name) or name not in bodies:
-                raise FeatureError(f"{slot.label}: {name!r} is not a body in this notebook")
+            wanted = ("face",) if slot.kind == "profile" else ("solid", "solids")
+            if not _NAME.fullmatch(name) or bodies.get(name) not in wanted:
+                noun = "sketch profile" if slot.kind == "profile" else "body"
+                raise FeatureError(f"{slot.label}: {name!r} is not a {noun} in this notebook")
             clean[slot.name] = name
+        elif slot.kind == "sketch":
+            try:
+                clean[slot.name] = sketch_doc.validate(raw)
+            except sketch_doc.SketchError as exc:
+                raise FeatureError(f"{slot.label}: {exc}") from exc
         elif slot.kind in ("points2d", "points3d"):
             width = 2 if slot.kind == "points2d" else 3
             if not isinstance(raw, (list, tuple)) or len(raw) < width:
