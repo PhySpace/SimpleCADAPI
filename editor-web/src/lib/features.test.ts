@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CellFailure,
+  assertCellRan,
+  cellFailure,
+  errorLine,
   bodyChoices,
   directionOptions,
   resolveDirection,
@@ -170,5 +174,36 @@ describe("profile plane labels", () => {
   it("names a datum plane and calls a frame a face", () => {
     expect(profilePlaneLabel({ plane: "XZ" })).toBe("XZ");
     expect(profilePlaneLabel({ plane: { origin: [0, 0, 40], x_axis: [1, 0, 0], y_axis: [0, 1, 0] } })).toBe("face");
+  });
+});
+
+describe("a command whose cell failed", () => {
+  const error = "ValueError: boom\nWhat happened: the radius is larger than the line\nWhy: ...";
+  it("reads the What-happened line of the first error", () => {
+    expect(cellFailure({ cell: { id: "c3", status: "exception", errors: [error, "other"] } })).toBe("the radius is larger than the line");
+  });
+  it("reads an error object, and the first line when there is no What-happened line", () => {
+    expect(errorLine({ message: "NameError: x\nmore" })).toBe("NameError: x");
+    expect(errorLine("\n  \nplain")).toBe("plain");
+  });
+  it("is null when the cell ran, or there is no cell", () => {
+    expect(cellFailure({ cell: { id: "c3", status: "done", errors: [] } })).toBeNull();
+    expect(cellFailure({ cell: null })).toBeNull();
+  });
+  it("counts errors even when the status says done, and a bare exception status", () => {
+    expect(cellFailure({ cell: { id: "c3", status: "done", errors: ["bad"] } })).toBe("bad");
+    expect(cellFailure({ cell: { id: "c3", status: "exception" } })).toContain("exception");
+  });
+  it("throws a CellFailure carrying the cell, else returns the result", () => {
+    const failed = { cell: { id: "c3", status: "exception", errors: [error] } };
+    expect(() => assertCellRan(failed)).toThrowError(CellFailure);
+    try {
+      assertCellRan(failed);
+    } catch (e) {
+      expect((e as CellFailure).cell).toBe("c3");
+      expect((e as CellFailure).message).toBe("the radius is larger than the line");
+    }
+    const ok = { cell: { id: "c3", status: "done", errors: [] } };
+    expect(assertCellRan(ok)).toBe(ok);
   });
 });

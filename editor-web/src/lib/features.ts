@@ -115,6 +115,45 @@ export async function featureCommand(command: FeatureCommand): Promise<CommandRe
   return body as CommandResult;
 }
 
+/** The line a person reads from one cell error: its "What happened" line, else the first line (the error may be a
+ * string or an object with `message`/`error`). */
+export function errorLine(error: unknown): string {
+  const record = (error && typeof error === "object" ? error : {}) as Record<string, unknown>;
+  const text = typeof error === "string" ? error : String(record.message ?? record.error ?? record.text ?? JSON.stringify(error));
+  const what = text.split("\n").find((line) => line.trim().startsWith("What happened:"));
+  return (what ? what.replace(/^\s*What happened:\s*/, "").trim() : (text.split("\n").find((l) => l.trim()) ?? text).trim()).slice(0, 400);
+}
+
+/** The command was accepted but its cell failed to run: what the person reads, or null when the cell ran. */
+export function cellFailure(result: Pick<CommandResult, "cell">): string | null {
+  const cell = result.cell;
+  if (!cell) return null;
+  const failed = cell.status === "exception" || cell.status === "error" || (cell.errors?.length ?? 0) > 0;
+  if (!failed) return null;
+  const first = cell.errors?.[0];
+  return first === undefined ? `the cell ended with status ${cell.status}` : errorLine(first);
+}
+
+/** The error of a command whose cell failed: the feature exists (`cell`), so the form that sent it can edit it. */
+export class CellFailure extends Error {
+  readonly cell: string;
+  constructor(message: string, cell: string) {
+    super(message);
+    this.name = "CellFailure";
+    this.cell = cell;
+  }
+}
+
+/** Commands whose answer carries the cell that ran (add, edit, set_connectors). */
+export const isCellCommand = (command: FeatureCommand): boolean => command.op === "add" || command.op === "edit" || command.op === "set_connectors";
+
+/** Throws a CellFailure when the command's cell failed; returns the result otherwise. */
+export function assertCellRan<T extends Pick<CommandResult, "cell">>(result: T): T {
+  const message = cellFailure(result);
+  if (message && result.cell) throw new CellFailure(message, result.cell.id);
+  return result;
+}
+
 // -- form state: raw text in, typed values out ----------------------------------------------------------------------
 
 /** What a field holds while being typed: text for numbers and point lists, three texts for a point. */

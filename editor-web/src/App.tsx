@@ -25,7 +25,7 @@ import { EnvelopeSocket, type Envelope } from "@/lib/envelope";
 import { emptyDoc, normalizeDoc } from "@/lib/sketch";
 import { frameFromEntity, type PlaneSpec } from "@/lib/sketch-plane";
 import { useFeatures } from "@/lib/useFeatures";
-import type { FeatureCommand, FeatureRow, Spec } from "@/lib/features";
+import { assertCellRan, isCellCommand, type FeatureCommand, type FeatureRow, type Spec } from "@/lib/features";
 import { useRunLog } from "@/lib/runlog";
 import { useTheme } from "@/lib/theme";
 import { selectionPayload, variableNames, type SelectionItem } from "@/lib/selection";
@@ -441,6 +441,7 @@ export function App() {
     async (command: FeatureCommand) => {
       const result = await gui.run(command);
       log.push("ok", command.op === "undo" || command.op === "redo" ? command.op : `${command.op} ${result.name}`);
+      if (isCellCommand(command)) assertCellRan(result); // the cell failed: say so in the dialog instead of closing
       closeDialog();
     },
     [gui.run, log.push, closeDialog],
@@ -506,6 +507,7 @@ export function App() {
     async (command: FeatureCommand) => {
       const result = await gui.run(command);
       log.push("ok", command.op === "undo" || command.op === "redo" ? command.op : `${command.op} ${result.name}`);
+      if (isCellCommand(command)) assertCellRan(result);
       endSketch();
     },
     [gui.run, log.push, endSketch],
@@ -534,6 +536,7 @@ export function App() {
     async (command: FeatureCommand) => {
       const result = await gui.run(command);
       log.push("ok", command.op === "set_connectors" ? "connectors set" : `${command.op} ${result.name}`);
+      if (isCellCommand(command)) assertCellRan(result);
     },
     [gui.run, log.push],
   );
@@ -746,6 +749,7 @@ export function App() {
                     session={sketchSession}
                     view={viewRef.current}
                     taken={gui.state.taken}
+                    features={gui.state.features}
                     notice={sketchNotice}
                     onPlane={choosePlane}
                     onSubmit={submitSketch}

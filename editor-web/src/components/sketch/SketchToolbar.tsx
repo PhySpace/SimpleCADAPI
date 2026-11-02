@@ -1,4 +1,4 @@
-import { Construction, Maximize, Magnet, Undo2, Redo2, ScanLine, WandSparkles } from "lucide-react";
+import { Construction, Layers, Maximize, Magnet, Undo2, Redo2, ScanLine, WandSparkles } from "lucide-react";
 
 import { CONSTRAINT_INFO, isDimensional } from "@/lib/sketch";
 import type { SketchEditor } from "@/lib/useSketchEditor";
@@ -18,7 +18,7 @@ export function SketchToolbar({ editor, onFit, onNormal }: { editor: SketchEdito
     <div className="pointer-events-auto absolute bottom-10 left-2 top-14 z-20 flex w-[92px] flex-col overflow-y-auto [&>*]:shrink-0 border-2 border-primary bg-popover shadow-[4px_4px_0_var(--shadow-hard)]" role="toolbar" aria-label="Sketch tools">
       {TOOLS.map((t) => {
         // Trim and extend wait for a draft in progress to be finished or cancelled.
-        const blocked = (t.id === "trim" || t.id === "extend") && editor.draft !== null;
+        const blocked = (t.id === "trim" || t.id === "extend" || t.id === "fillet" || t.id === "chamfer") && editor.draft !== null;
         return (
         <button key={t.id} type="button" title={blocked ? `${t.label}: finish or cancel the draft first` : `${t.label} (${t.key})`} aria-label={t.label} aria-pressed={tool === t.id} aria-disabled={blocked} disabled={blocked} data-tool={t.id} onClick={() => editor.chooseTool(t.id)} className={cn(toggle, "disabled:opacity-40")}>
           <t.icon className="size-3.5 shrink-0" />
@@ -27,7 +27,12 @@ export function SketchToolbar({ editor, onFit, onNormal }: { editor: SketchEdito
         </button>
         );
       })}
-      <button type="button" title="Construction geometry (X): toggles the selected lines, or what you draw next" aria-label="Construction" aria-pressed={editor.construction} onClick={editor.toggleConstruction} className={cn(toggle, "border-t-2")}>
+      <button type="button" title="Project: bring another sketch of this notebook in as fixed reference geometry (J)" aria-label="Project" aria-pressed={editor.projectOpen} data-tool="project" onClick={editor.openProject} className={cn(toggle, "border-t-2")}>
+        <Layers className="size-3.5 shrink-0" />
+        <span className="flex-1">project</span>
+        <Tip>J</Tip>
+      </button>
+      <button type="button" title="Construction geometry (X): toggles the selected lines, or what you draw next" aria-label="Construction" aria-pressed={editor.construction} onClick={editor.toggleConstruction} className={toggle}>
         <Construction className="size-3.5 shrink-0" />
         <span className="flex-1">construct</span>
         <Tip>X</Tip>

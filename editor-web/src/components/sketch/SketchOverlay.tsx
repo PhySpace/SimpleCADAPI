@@ -15,6 +15,7 @@ import {
 } from "@/lib/sketch";
 import { planeToWorld, rayPlane, type PlaneSpec } from "@/lib/sketch-plane";
 import { cameraSignature, planeToScreen, scaleAt, screenRay, screenToPlane, type Viewer } from "@/lib/sketch-view";
+import { CORNER_WORD, isProjected } from "@/lib/sketch-edit";
 import type { PointerInfo, SketchEditor } from "@/lib/useSketchEditor";
 import type { SceneView } from "@/scene/scene-view";
 
@@ -214,9 +215,13 @@ export function SketchOverlay({
   // -- geometry -----------------------------------------------------------------------------------------------------------------
   const solved = editor.solved;
   const cutting = tool === "trim"; // the piece under the cursor is shown in the warning colour: it is what a click removes
+  // Fillet and chamfer: the corner under the cursor (or the one being valued) shows its point and both lines.
+  const corner = editor.cornerBox?.corner ?? editor.cornerHover;
+  const cornerLines = new Set<string>(corner ? [corner.a, corner.b] : editor.pendingLine ? [editor.pendingLine] : []);
   const strokeOf = (id: string, construct?: boolean) => {
     if (editor.flash.has(id)) return NAME;
     if (cutting && hover?.id === id) return FAIL;
+    if (cornerLines.has(id)) return FOCUS;
     if (editor.failing.has(id)) return FAIL;
     if (editor.highlighted.has(id)) return NAME;
     if (selection.includes(id)) return FOCUS;
@@ -386,8 +391,54 @@ export function SketchOverlay({
     return s ? <circle cx={s[0]} cy={s[1]} r={9} fill="none" stroke={PASS} strokeWidth={2.5} data-testid="extend-end" data-end={editor.hoverEnd} /> : null;
   })();
 
+  // The value box of a corner, beside the corner point.
+  const cornerBoxNode = (() => {
+    const cb = editor.cornerBox;
+    if (!cb) return null;
+    const at = pts.get(cb.corner.point);
+    const s = at ? project(at[0], at[1]) : null;
+    const left = Math.min(Math.max((s ? s[0] : size.w / 2) + 14, 8), size.w - 190);
+    const top = Math.min(Math.max((s ? s[1] : 80) - 34, 8), size.h - 40);
+    const word = CORNER_WORD[cb.op];
+    return (
+      <div className="absolute z-20 flex items-center gap-1 border-2 border-primary bg-popover p-1 shadow-[4px_4px_0_var(--shadow-hard)]" style={{ left, top }} data-testid="sketch-corner-box" data-op={cb.op}>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{word.label}</span>
+        <input
+          autoFocus
+          data-testid="sketch-corner-value"
+          aria-label={word.label}
+          aria-invalid={cb.bad}
+          value={cb.text}
+          onFocus={(e) => e.currentTarget.select()}
+          onChange={(e) => editor.setCornerBox({ ...cb, text: e.target.value, bad: false })}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === "Enter") {
+              e.preventDefault();
+              editor.submitCorner();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              editor.setCornerBox(null);
+              wrap.current?.focus();
+            }
+          }}
+          className="h-6 w-16 border-2 border-input bg-background px-1 text-[12px] focus-visible:border-focus focus-visible:outline-none aria-[invalid=true]:border-fail"
+        />
+        <span className="text-[10px] uppercase text-muted-foreground">mm</span>
+      </div>
+    );
+  })();
+
+  // The corner under the cursor: a ring on its point.
+  const cornerMark = (() => {
+    if (!corner) return null;
+    const at = pts.get(corner.point);
+    const s = at ? project(at[0], at[1]) : null;
+    return s ? <circle cx={s[0]} cy={s[1]} r={10} fill="none" stroke={FOCUS} strokeWidth={2.5} data-testid="corner-mark" data-corner={corner.point} /> : null;
+  })();
+
   const cursorMark = (() => {
-    if (!cursor || tool === "select" || tool === "delete" || tool === "trim" || tool === "extend") return null;
+    if (!cursor || tool === "select" || tool === "delete" || tool === "trim" || tool === "extend" || tool === "fillet" || tool === "chamfer") return null;
     const s = project(cursor.x, cursor.y);
     if (!s) return null;
     return cursor.pointId ? (
@@ -398,7 +449,7 @@ export function SketchOverlay({
   })();
 
   const dragging = editor.drag !== null;
-  const cursorStyle = moving ? "grabbing" : tool === "select" || tool === "trim" || tool === "extend" ? (dragging ? "grabbing" : hover ? "pointer" : "default") : "crosshair";
+  const cursorStyle = moving ? "grabbing" : tool === "select" || tool === "trim" || tool === "extend" || tool === "fillet" || tool === "chamfer" ? (dragging ? "grabbing" : hover ? "pointer" : "default") : "crosshair";
 
   return (
     <div ref={wrap} className="absolute inset-0 overflow-hidden outline-none" data-testid="sketch-canvas" tabIndex={-1}>
@@ -449,11 +500,13 @@ export function SketchOverlay({
         {doc.entities.map((e) => {
           const d = entityPath(e);
           if (!d) return null;
-          const picked = selection.includes(e.id) || hover?.id === e.id || editor.flash.has(e.id);
+          const picked = selection.includes(e.id) || hover?.id === e.id || editor.flash.has(e.id) || cornerLines.has(e.id);
+          const projected = isProjected(e.id); // fixed reference copies of another sketch: muted, dotted
+          const dash = projected ? "1.5 4" : e.construction ? "6 4" : undefined;
           return (
-            <g key={e.id} fill="none" strokeLinecap="round" strokeLinejoin="round" data-entity={e.id} data-flash={editor.flash.has(e.id) || undefined}>
-              <path d={d} stroke={HALO} strokeWidth={picked ? 6.5 : 5} opacity={0.85} strokeDasharray={e.construction ? "6 4" : undefined} />
-              <path d={d} stroke={strokeOf(e.id, e.construction)} strokeWidth={picked ? 3 : 2.2} strokeDasharray={e.construction ? "6 4" : undefined} />
+            <g key={e.id} fill="none" strokeLinecap="round" strokeLinejoin="round" data-entity={e.id} data-projected={projected || undefined} data-flash={editor.flash.has(e.id) || undefined}>
+              <path d={d} stroke={HALO} strokeWidth={picked ? 6.5 : 5} opacity={0.85} strokeDasharray={dash} />
+              <path d={d} stroke={strokeOf(e.id, e.construction)} strokeWidth={picked ? 3 : projected ? 2.6 : 2.2} strokeDasharray={dash} />
             </g>
           );
         })}
@@ -463,7 +516,11 @@ export function SketchOverlay({
           if (!s) return null;
           const fixed = editor.fixedPoints.has(p.id);
           const picked = selection.includes(p.id) || hover?.id === p.id;
-          const color = editor.flash.has(p.id) ? NAME : editor.failing.has(p.id) ? FAIL : editor.highlighted.has(p.id) ? NAME : picked ? FOCUS : fixed || solved ? PASS : INK;
+          const projected = isProjected(p.id);
+          const color = editor.flash.has(p.id) ? NAME : editor.failing.has(p.id) ? FAIL : editor.highlighted.has(p.id) ? NAME : picked || corner?.point === p.id ? FOCUS : projected ? MUTED : fixed || solved ? PASS : INK;
+          if (projected) {
+            return <rect key={p.id} x={s[0] - 4} y={s[1] - 4} width={8} height={8} transform={`rotate(45 ${s[0]} ${s[1]})`} fill={HALO} stroke={color} strokeWidth={2} data-point={p.id} data-projected />;
+          }
           return fixed ? (
             <rect key={p.id} x={s[0] - 4.5} y={s[1] - 4.5} width={9} height={9} fill={color} stroke={HALO} strokeWidth={1.5} data-point={p.id} />
           ) : (
@@ -471,11 +528,13 @@ export function SketchOverlay({
           );
         })}
         {hoverMark}
+        {cornerMark}
         {labelNodes}
         {preview}
         {cursorMark}
       </svg>
       {boxNode}
+      {cornerBoxNode}
     </div>
   );
 }

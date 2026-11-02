@@ -45,11 +45,34 @@ import {
   type SolveResult,
   type Spot,
 } from "@/lib/sketch";
-import { applyEdit, describeEdit, extendRequest, fetchSketchOp, nearerEnd, pushHistory, trimRequest, type EditRequest, type End } from "@/lib/sketch-edit";
+import {
+  applyEdit,
+  cornerAt,
+  cornerOfLines,
+  cornerRequest,
+  defaultCornerValue,
+  describeEdit,
+  extendRequest,
+  fetchSketchOp,
+  nearerEnd,
+  parseCornerValue,
+  projectRequest,
+  projectedCount,
+  pushHistory,
+  remapChoice,
+  trimRequest,
+  type Corner,
+  type CornerOp,
+  type EditRequest,
+  type End,
+} from "@/lib/sketch-edit";
 
-export type Tool = "select" | "point" | "line" | "circle" | "arc" | "delete" | "trim" | "extend";
+export type Tool = "select" | "point" | "line" | "circle" | "arc" | "delete" | "trim" | "extend" | "fillet" | "chamfer";
+/** The corner value box (fillet radius / chamfer distance) open at a corner. */
+export type CornerBox = { op: CornerOp; corner: Corner; text: string; bad: boolean };
 /** What the last SDK edit (trim, extend) said: its notes, or the error (which names ids). Shown in the status area. */
 export type EditNote = { tone: "ok" | "fail"; text: string };
+const EDIT_TOOLS: ReadonlySet<Tool> = new Set<Tool>(["trim", "extend", "fillet", "chamfer"]);
 export type Draft = { tool: "line"; from: Spot } | { tool: "circle"; center: Spot } | { tool: "arc"; center: Spot; start?: Spot } | null;
 export type Drag = { ids: string[]; origin: Record<string, [number, number]>; start: [number, number]; positions: Record<string, [number, number]>; releasing?: boolean };
 export type ValueBox = { kind: ConstraintKind; targets: string[]; constraintId?: string; text: string; bad: boolean };
@@ -63,7 +86,7 @@ export type KeyOutcome = "handled" | "leave" | "ignored";
 /** The state and the behaviour of the sketch editor, apart from where it is drawn: the document with its undo history,
  * the live solve, loops and the chosen profile, the tools and their drafts, drag with a temporary fix, the value box.
  * The overlay feeds it pointer events already mapped into the plane. */
-export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [number, number][] = []) {
+export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [number, number][] = [], projectFrom: readonly string[] = []) {
   const [doc, setDoc] = useState<SketchDoc>(initial);
   const [tool, setTool] = useState<Tool>("select");
   const [selection, setSelection] = useState<string[]>([]);
@@ -84,6 +107,10 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   const [editBusy, setEditBusy] = useState(false);
   const [flash, setFlash] = useState<ReadonlySet<string>>(new Set());
   const [hoverEnd, setHoverEnd] = useState<End | null>(null);
+  const [cornerHover, setCornerHover] = useState<Corner | null>(null);
+  const [pendingLine, setPendingLine] = useState<string | null>(null);
+  const [cornerBox, setCornerBox] = useState<CornerBox | null>(null);
+  const [projectOpen, setProjectOpen] = useState(false);
   const flashTimer = useRef<number | null>(null);
 
   const docRef = useRef(doc);
@@ -114,6 +141,9 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     setEdits(history.current.length);
     setSelection([]);
     setDraft(null);
+    setEditNote(null); // the note told about an edit that is now undone
+    setCornerBox(null);
+    setPendingLine(null);
   }, []);
   const redo = useCallback(() => {
     const next = future.current.pop();
@@ -122,6 +152,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     docRef.current = next;
     setDoc(next);
     setEdits(history.current.length);
+    setEditNote(null);
   }, []);
 
   // -- live solve ----------------------------------------------------------------------------------------------------------
@@ -160,6 +191,14 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   const pts = useMemo(() => solvedPoints(doc, result), [doc, result]);
   const loops = useMemo(() => findLoops(doc, result), [doc, result]);
   const loopKey = loops.map((l) => `${l.key}:${l.index}`).join("|");
+  const loopsRef = useRef(loops);
+  loopsRef.current = loops;
+  const resultRef = useRef(result);
+  resultRef.current = result;
+  const choiceRef = useRef(choice);
+  choiceRef.current = choice;
+  const ptsRef = useRef(pts);
+  ptsRef.current = pts;
 
   // The chosen outer profile and holes follow the loops' identity; the document keeps the server's indices.
   useEffect(() => {
@@ -180,7 +219,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     const d = docRef.current;
     if (d.profile !== profile || d.inner.length !== inner.length || d.inner.some((v, i) => v !== inner[i])) commit({ ...d, profile, inner }, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [choice, loopKey, drag]);
+  }, [choice, loopKey, drag, doc.profile, doc.inner]);
 
   // -- snapping -----------------------------------------------------------------------------------------------------------------
   const snapTargets = useMemo(() => {
@@ -250,13 +289,17 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   }, [selection, commit]);
 
   const chooseTool = useCallback((next: Tool) => {
-    // Trim and extend are not offered in the middle of a draft (finish or cancel it first).
-    if ((next === "trim" || next === "extend") && draftRef.current) {
+    // The SDK edits are not offered in the middle of a draft (finish or cancel it first).
+    if (EDIT_TOOLS.has(next) && draftRef.current) {
       setEditNote({ tone: "fail", text: `${next} is not available while a draft is in progress: finish it or press Esc first` });
       return;
     }
     setEditNote(null);
     setHoverEnd(null);
+    setCornerHover(null);
+    setPendingLine(null);
+    setCornerBox(null);
+    setProjectOpen(false);
     setTool(next);
     setDraft(null);
     if (next !== "select") setSelection([]);
@@ -272,11 +315,19 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       try {
         const response = await fetchSketchOp(request);
         const { doc: next, flash: created } = applyEdit(response);
+        // The server resets the profile and the holes: the chosen loops are carried over to the loops that replace them and
+        // the live solve writes the indices back.
+        setChoice(remapChoice(loopsRef.current, choiceRef.current, findLoops(next, resultRef.current)));
         commit(next);
         setSelection([]);
         setHover(null);
         setHoverEnd(null);
-        setEditNote({ tone: "ok", text: describeEdit(request.op, response) });
+        setCornerHover(null);
+        setPendingLine(null);
+        setCornerBox(null);
+        setProjectOpen(false);
+        const from = request.op === "project" ? String((request.args as { from_sketch: string }).from_sketch) : "";
+        setEditNote({ tone: "ok", text: describeEdit(request.op, response, request.op === "project" ? { ...projectedCount(next, created), from } : undefined) });
         if (flashTimer.current !== null) window.clearTimeout(flashTimer.current);
         setFlash(new Set(created));
         flashTimer.current = window.setTimeout(() => {
@@ -285,6 +336,8 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
         }, 1400);
       } catch (e) {
         setEditNote({ tone: "fail", text: `${request.op}: ${e instanceof Error ? e.message : String(e)}` });
+        setCornerBox(null);
+        setPendingLine(null);
       } finally {
         setEditBusy(false);
       }
@@ -292,6 +345,40 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     [commit],
   );
   useEffect(() => () => void (flashTimer.current !== null && window.clearTimeout(flashTimer.current)), []);
+
+  /** Open the value box of a corner (fillet radius / chamfer distance) with the offered default. */
+  const openCorner = useCallback((op: CornerOp, corner: Corner) => {
+    const value = defaultCornerValue(docRef.current, ptsRef.current, corner);
+    setCornerHover(null);
+    setPendingLine(null);
+    setCornerBox({ op, corner, text: value > 0 ? String(value) : "", bad: false });
+  }, []);
+  const submitCorner = useCallback(() => {
+    if (!cornerBox || editBusy) return;
+    const value = parseCornerValue(cornerBox.text);
+    if (value === null) {
+      setCornerBox({ ...cornerBox, bad: true });
+      return;
+    }
+    const request = cornerRequest(cornerBox.op, docRef.current, cornerBox.corner, value);
+    setCornerBox(null);
+    void runEdit(request);
+  }, [cornerBox, editBusy, runEdit]);
+
+  /** The project popover: refuses with a word when the notebook has no other sketch. */
+  const openProject = useCallback(() => {
+    if (draftRef.current) {
+      setEditNote({ tone: "fail", text: "project is not available while a draft is in progress: finish it or press Esc first" });
+      return;
+    }
+    if (projectFrom.length === 0) {
+      setEditNote({ tone: "fail", text: "project: there is no other sketch in this notebook to project from; finish and add another sketch first" });
+      return;
+    }
+    setEditNote(null);
+    setProjectOpen((open) => !open);
+  }, [projectFrom.length]);
+  const projectSketch = useCallback((slug: string) => void runEdit(projectRequest(docRef.current, slug)), [runEdit]);
 
   // -- pointer ------------------------------------------------------------------------------------------------------------------
   /** A left-button press. "press" asks the caller to capture the pointer (a selection that may become a drag). */
@@ -310,6 +397,35 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
         const request = extendRequest(d, pts, hit.id, world);
         if (request) void runEdit(request);
         else setEditNote({ tone: "fail", text: `extend: ${hit.id} has no end to extend (a circle is closed); pick a line or an arc` });
+      }
+      return "handled";
+    }
+    if (tool === "fillet" || tool === "chamfer") {
+      if (editBusy || cornerBox) return "handled";
+      const op: CornerOp = tool === "fillet" ? "fillet_corner" : "chamfer_corner";
+      const hit = hitTest(d, result, world, tol);
+      if (!hit) return "handled";
+      if (hit.kind === "point") {
+        const corner = cornerAt(d, hit.id);
+        if (corner) openCorner(op, corner);
+        else setEditNote({ tone: "fail", text: `${tool}: ${hit.id} is not a corner (a corner is a point shared by exactly two lines)` });
+        return "handled";
+      }
+      const line = d.entities.find((e) => e.id === hit.id);
+      if (!line || line.kind !== "line") {
+        setEditNote({ tone: "fail", text: `${tool}: ${hit.id} is not a line; click a corner point or two lines in turn` });
+        return "handled";
+      }
+      setEditNote(null);
+      if (!pendingLine || pendingLine === hit.id) {
+        setPendingLine(hit.id);
+        return "handled";
+      }
+      const corner = cornerOfLines(d, pendingLine, hit.id);
+      if (corner) openCorner(op, corner);
+      else {
+        setEditNote({ tone: "fail", text: `${tool}: ${pendingLine} and ${hit.id} do not meet at a corner of exactly two lines` });
+        setPendingLine(hit.id);
       }
       return "handled";
     }
@@ -423,6 +539,13 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     if (tool === "select") {
       setHover(hitTest(docRef.current, result, world, tol));
       setCursor({ x: world[0], y: world[1] });
+    } else if (tool === "fillet" || tool === "chamfer") {
+      const hit = cornerBox ? null : hitTest(docRef.current, result, world, tol);
+      setHover(hit);
+      if (hit?.kind === "point") setCornerHover(cornerAt(docRef.current, hit.id));
+      else if (hit && pendingLine && hit.id !== pendingLine) setCornerHover(cornerOfLines(docRef.current, pendingLine, hit.id));
+      else setCornerHover(null);
+      setCursor({ x: world[0], y: world[1] });
     } else if (tool === "trim" || tool === "extend") {
       const hit = entityHit(docRef.current, result, world, tol);
       setHover(hit);
@@ -466,12 +589,16 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       return "handled";
     }
     if (event.altKey) return "ignored";
-    const shortcuts: Record<string, Tool> = { v: "select", p: "point", l: "line", c: "circle", a: "arc", d: "delete", t: "trim", e: "extend" };
+    const shortcuts: Record<string, Tool> = { v: "select", p: "point", l: "line", c: "circle", a: "arc", d: "delete", t: "trim", e: "extend", r: "fillet", h: "chamfer" };
     if (shortcuts[k]) chooseTool(shortcuts[k]);
+    else if (k === "j") openProject();
     else if (k === "x") toggleConstruction();
     else if (k === "delete" || k === "backspace") deleteSelection();
     else if (k === "escape") {
       if (box) setBox(null);
+      else if (cornerBox) setCornerBox(null);
+      else if (projectOpen) setProjectOpen(false);
+      else if (pendingLine) setPendingLine(null);
       else if (draft) setDraft(null);
       else if (tool !== "select") setTool("select");
       else if (selection.length) setSelection([]);
@@ -524,6 +651,10 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
             ? draft ? (draft.tool === "arc" && draft.start ? "Click the end (counter-clockwise from start)." : "Click the start point (sets the radius).") : "Click the centre."
             : tool === "delete"
               ? "Click an item to delete it."
+              : tool === "fillet" || tool === "chamfer"
+                ? pendingLine
+                  ? `Click the second line of the corner (${pendingLine} is picked).`
+                  : `Click a corner (a point shared by two lines) or two lines in turn, then type the ${tool === "fillet" ? "radius" : "distance"}: Enter commits, Esc cancels.`
               : tool === "trim"
                 ? "Click the part of a line, arc or circle to cut away; the SDK decides the piece between its neighbours."
                 : tool === "extend"
@@ -531,6 +662,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
                   : "Click to place a point.";
 
   return {
+    cornerHover, pendingLine, cornerBox, setCornerBox, submitCorner, projectOpen, setProjectOpen, openProject, projectSketch, projectFrom,
     doc, commit, undo, redo, edits, editNote, editBusy, flash, hoverEnd, runEdit, tool, chooseTool, selection, highlight, setHighlight, draft, cursor, hover, drag, box, setBox, result, error, auto, setAuto, snapOn,
     setSnapOn, construction, choice, pts, loops, applicable, blamed, failing, highlighted, fixedPoints, solved, badge, diagnostics, outer, hint, extents,
     openBox, applyConstraint, submitBox, deleteSelection, toggleConstruction, pointerDown, pointerMove, pointerUp, pointerLeave, key,

@@ -8,7 +8,8 @@ const Dialog = DialogPrimitive.Root;
 const DialogClose = DialogPrimitive.Close;
 
 /** A docked card, not a modal: the viewport behind it stays live (the form picks faces and edges from it).
- * Render the Dialog with `modal={false}`; clicks outside never close it. */
+ * Render the Dialog with `modal={false}`; clicks outside never close it.  It docks below the Inspector's header (the
+ * header and its count of picked items stay visible; 5.25rem = the top bar plus that header). */
 function DialogContent({ className, children, ...props }: React.ComponentProps<typeof DialogPrimitive.Content>) {
   return (
     <DialogPrimitive.Portal>
@@ -16,7 +17,7 @@ function DialogContent({ className, children, ...props }: React.ComponentProps<t
         onInteractOutside={(event) => event.preventDefault()}
         onFocusOutside={(event) => event.preventDefault()}
         className={cn(
-          "fixed right-3 top-14 z-40 flex max-h-[calc(100vh-7rem)] w-[360px] max-w-[calc(100vw-1.5rem)] flex-col border-2 border-primary bg-popover text-popover-foreground shadow-[6px_6px_0_var(--shadow-hard)] outline-none",
+          "fixed right-3 top-[5.25rem] z-40 flex max-h-[calc(100vh-9.5rem)] w-[360px] max-w-[calc(100vw-1.5rem)] flex-col border-2 border-primary bg-popover text-popover-foreground shadow-[6px_6px_0_var(--shadow-hard)] outline-none",
           className,
         )}
         {...props}

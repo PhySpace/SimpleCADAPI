@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   AXES,
   KINDS,
@@ -15,6 +16,8 @@ import {
   assemblyStatus,
   compatibleAxes,
   connectorProblems,
+  disableExplode,
+  enableExplode,
   hasPhase,
   idProblem,
   needsDrive,
@@ -26,6 +29,8 @@ import {
   renameConnector,
   setAxis,
   setConnectorsCommand,
+  setExplodeFactor,
+  setExplodeVector,
   setGround,
   setKind,
   setRef,
@@ -390,6 +395,40 @@ function ConstraintCard({ k, doc, editor }: { k: Constraint; doc: AssemblyDoc; e
   );
 }
 
+/** The exploded view: a switch, the factor and an optional centre and axis.  The notebook shows the pushed-apart placement
+ * (scad.explode_rassembly); the factor also becomes a slider in the parameters panel, so 0 puts everything back. */
+function ExplodeSection({ doc, editor }: { doc: AssemblyDoc; editor: AssemblyEditor }) {
+  const explode = doc.explode;
+  const entry = (v: number | undefined) => (v === undefined || Number.isNaN(v) ? undefined : v);
+  return (
+    <Section
+      title="Exploded view"
+      aside={<Switch aria-label="Exploded view" data-testid="explode-switch" checked={Boolean(explode)} onCheckedChange={(on) => editor.setDoc(on ? enableExplode(doc) : disableExplode(doc))} />}
+    >
+      <div className="flex flex-col gap-1.5 px-2 py-2" data-testid="explode-section">
+        <p className="text-[11px] text-muted-foreground">Components move away from the assembly centre; with an axis they move along it, to the side they are on.</p>
+        {explode && (
+          <>
+            <div className="flex flex-wrap items-end gap-1.5">
+              <NumberField label="factor" testid="explode-factor" width="w-20" value={Number.isFinite(explode.factor) ? explode.factor : undefined} onChange={(v) => editor.setDoc(setExplodeFactor(doc, v ?? Number.NaN))} />
+              <span className="pb-1.5 text-[10px] text-muted-foreground">0 puts everything back</span>
+            </div>
+            {(["center", "axis"] as const).map((key) => (
+              <div key={key} className="flex flex-wrap items-end gap-1.5">
+                <span className="w-12 pb-1.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{key}{key === "center" ? " mm" : ""}</span>
+                {(["x", "y", "z"] as const).map((axis, i) => (
+                  <NumberField key={axis} label={`${key} ${axis}`} testid={`explode-${key}-${axis}`} optional value={entry(explode[key]?.[i])} onChange={(v) => editor.setDoc(setExplodeVector(doc, key, i, v))} />
+                ))}
+              </div>
+            ))}
+            <span className="text-[10px] text-muted-foreground">centre: empty = the centre of the whole assembly; axis: empty = away from the centre.</span>
+          </>
+        )}
+      </div>
+    </Section>
+  );
+}
+
 function AssemblySection({ state, editor, busy, onRun }: { state: FeatureState; editor: AssemblyEditor; busy: boolean; onRun: (command: FeatureCommand) => Promise<void> }) {
   const { doc } = editor;
   const [name, setName] = useState("");
@@ -456,6 +495,7 @@ function AssemblySection({ state, editor, busy, onRun }: { state: FeatureState; 
           {editor.target && <p className="text-[11px] text-focus" data-testid="pick-hint">Click a connector gizmo in the viewport to fill {editor.target.constraint} {editor.target.side.toUpperCase()}.</p>}
         </div>
       </Section>
+      <ExplodeSection doc={doc} editor={editor} />
       <div className="flex flex-col gap-1.5 px-2 py-2" data-testid="assembly-apply-area">
         {!state.assembly && (
           <label className="flex flex-col gap-0.5">

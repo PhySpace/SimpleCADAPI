@@ -46,7 +46,10 @@ export type Constraint = {
   pitch_radius?: number;
   phase?: number;
 };
-export type AssemblyDoc = { components: Component[]; ground: string | null; constraints: Constraint[] };
+/** The exploded view of the layout: `scad.explode_rassembly(factor, center?, axis?)`. A vector entry that is NaN is an empty
+ * box (a half-typed vector is a problem until it is whole, or all empty = absent). */
+export type Explode = { factor: number; center?: number[]; axis?: number[] };
+export type AssemblyDoc = { components: Component[]; ground: string | null; constraints: Constraint[]; explode?: Explode };
 
 /** A connector frame of a part, mm in the part's own frame. `z_axis` comes with the lists the server computes. */
 export type ConnectorFrame = { id: string; origin: Vec3; x_axis: Vec3; y_axis: Vec3; z_axis?: Vec3 };
@@ -79,7 +82,17 @@ export function normalizeAssembly(raw: unknown): AssemblyDoc {
     if (Array.isArray(k.limit) && k.limit.length === 2 && k.limit.every(finite)) out.limit = [k.limit[0], k.limit[1]];
     return out;
   });
-  return { components, ground: typeof source.ground === "string" ? source.ground : null, constraints };
+  const out: AssemblyDoc = { components, ground: typeof source.ground === "string" ? source.ground : null, constraints };
+  const explode = source.explode && typeof source.explode === "object" ? (source.explode as Record<string, unknown>) : null;
+  if (explode) {
+    const e: Explode = { factor: finite(explode.factor) ? explode.factor : 0 };
+    for (const key of ["center", "axis"] as const) {
+      const v = explode[key];
+      if (Array.isArray(v) && v.length === 3 && v.every(finite)) e[key] = [v[0], v[1], v[2]];
+    }
+    out.explode = e;
+  }
+  return out;
 }
 
 export const sameDoc = (a: AssemblyDoc, b: AssemblyDoc): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -114,6 +127,7 @@ export function addComponent(doc: AssemblyDoc, part: string, id?: string): { doc
 export function removeComponent(doc: AssemblyDoc, id: string): AssemblyDoc {
   const components = doc.components.filter((c) => c.id !== id);
   return {
+    ...doc,
     components,
     ground: doc.ground === id ? null : doc.ground,
     constraints: doc.constraints.filter((k) => k.a.component !== id && k.b.component !== id),
@@ -124,6 +138,7 @@ export function removeComponent(doc: AssemblyDoc, id: string): AssemblyDoc {
 export function renameComponent(doc: AssemblyDoc, from: string, to: string): AssemblyDoc {
   const swap = (r: ConnectorRef): ConnectorRef => (r.component === from ? { ...r, component: to } : r);
   return {
+    ...doc,
     components: doc.components.map((c) => (c.id === from ? { ...c, id: to } : c)),
     ground: doc.ground === from ? to : doc.ground,
     constraints: doc.constraints.map((k) => ({ ...k, a: swap(k.a), b: swap(k.b) })),
@@ -220,6 +235,46 @@ export function setRef(doc: AssemblyDoc, id: string, side: "a" | "b", ref: Parti
   };
 }
 
+// -- exploded view ---------------------------------------------------------------------------------------------------------
+
+export const DEFAULT_EXPLODE_FACTOR = 1.0;
+
+/** The exploded view on (factor 1.0, no centre or axis: components leave the assembly centre). Keeps the settings it had. */
+export const enableExplode = (doc: AssemblyDoc): AssemblyDoc => (doc.explode ? doc : { ...doc, explode: { factor: DEFAULT_EXPLODE_FACTOR } });
+
+/** The exploded view off: the key is removed (the notebook then shows the assembly as placed). */
+export function disableExplode(doc: AssemblyDoc): AssemblyDoc {
+  const { explode: _gone, ...rest } = doc;
+  return rest;
+}
+
+/** The factor set (NaN when the box is empty and still being typed). */
+export const setExplodeFactor = (doc: AssemblyDoc, factor: number): AssemblyDoc => (doc.explode ? { ...doc, explode: { ...doc.explode, factor } } : doc);
+
+/** One entry of the centre or of the axis set; `undefined` empties it, and a vector with every box empty is absent. */
+export function setExplodeVector(doc: AssemblyDoc, key: "center" | "axis", index: number, value: number | undefined): AssemblyDoc {
+  if (!doc.explode) return doc;
+  const next = [...(doc.explode[key] ?? [Number.NaN, Number.NaN, Number.NaN])];
+  next[index] = value ?? Number.NaN;
+  const { [key]: _old, ...rest } = doc.explode;
+  const explode: Explode = next.every((v) => Number.isNaN(v)) ? rest : { ...rest, [key]: next };
+  return { ...doc, explode };
+}
+
+/** What the server will refuse in the exploded view, one sentence each (the same rules as `assembly_doc.validate`, plus a zero axis, which has no side). */
+export function explodeProblems(explode: Explode | undefined): string[] {
+  if (!explode) return [];
+  const out: string[] = [];
+  if (!finite(explode.factor)) out.push("explode factor: type a number");
+  for (const key of ["center", "axis"] as const) {
+    const v = explode[key];
+    if (!v) continue;
+    if (v.length !== 3 || !v.every(finite)) out.push(`explode ${key}: type all three numbers, or leave all three empty`);
+    else if (key === "axis" && v.every((n) => n === 0)) out.push("explode axis: a zero vector points nowhere");
+  }
+  return out;
+}
+
 // -- validity before sending ---------------------------------------------------------------------------------------------
 
 /** What the server will refuse, found first (the same rules as `assembly_doc.validate`): one sentence per problem, empty when fine. */
@@ -258,6 +313,7 @@ export function assemblyProblems(doc: AssemblyDoc): string[] {
     }
   }
   if (doc.constraints.length > 0 && doc.ground === null) out.push("constraints need a grounded component: the solver moves everything else relative to it");
+  out.push(...explodeProblems(doc.explode));
   return out;
 }
 

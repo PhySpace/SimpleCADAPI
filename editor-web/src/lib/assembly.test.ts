@@ -11,7 +11,10 @@ import {
   connectorFrameFromFace,
   connectorProblems,
   connectorsUrl,
+  disableExplode,
   emptyAssembly,
+  enableExplode,
+  explodeProblems,
   idFromPart,
   idProblem,
   normalizeAssembly,
@@ -22,6 +25,8 @@ import {
   renameConnector,
   setAxis,
   setConnectorsCommand,
+  setExplodeFactor,
+  setExplodeVector,
   setGround,
   setKind,
   setRef,
@@ -236,5 +241,63 @@ describe("placementToWorld", () => {
   it("applies origin and axes (z = x cross y)", () => {
     expect(placementToWorld({ origin: [10, 0, 0], x_axis: "+y", y_axis: "+z" }, [1, 2, 3])).toEqual([13, 1, 2]);
     expect(placementToWorld({ origin: [0, 0, 5], x_axis: "+x", y_axis: "+y" }, [1, 2, 3])).toEqual([1, 2, 8]);
+  });
+});
+
+describe("exploded view", () => {
+  it("is absent until enabled, then factor 1.0 without centre or axis", () => {
+    const doc = two();
+    expect(doc.explode).toBeUndefined();
+    expect(enableExplode(doc).explode).toEqual({ factor: 1 });
+  });
+  it("enabling twice keeps the settings", () => {
+    const doc = setExplodeFactor(enableExplode(two()), 2.5);
+    expect(enableExplode(doc).explode).toEqual({ factor: 2.5 });
+  });
+  it("removes the key when disabled", () => {
+    const off = disableExplode(enableExplode(two()));
+    expect("explode" in off).toBe(false);
+    expect(JSON.stringify(off)).not.toContain("explode");
+  });
+  it("sets the factor, the centre and the axis entry by entry", () => {
+    let doc = enableExplode(two());
+    doc = setExplodeFactor(doc, 0);
+    expect(doc.explode?.factor).toBe(0);
+    doc = setExplodeVector(doc, "axis", 2, 1);
+    expect(doc.explode?.axis?.[2]).toBe(1);
+    expect(explodeProblems(doc.explode)).toEqual(["explode axis: type all three numbers, or leave all three empty"]);
+    doc = setExplodeVector(setExplodeVector(doc, "axis", 0, 0), "axis", 1, 0);
+    expect(doc.explode?.axis).toEqual([0, 0, 1]);
+    expect(explodeProblems(doc.explode)).toEqual([]);
+  });
+  it("drops a vector whose boxes are all empty", () => {
+    let doc = setExplodeVector(enableExplode(two()), "center", 0, 5);
+    doc = setExplodeVector(doc, "center", 0, undefined);
+    expect(doc.explode).toEqual({ factor: 1 });
+  });
+  it("refuses a bad factor, a half vector and a zero axis, as the server would", () => {
+    expect(explodeProblems({ factor: Number.NaN })).toEqual(["explode factor: type a number"]);
+    expect(explodeProblems({ factor: 1, center: [1, Number.NaN, 0] })[0]).toContain("explode center");
+    expect(explodeProblems({ factor: 1, axis: [0, 0, 0] })).toEqual(["explode axis: a zero vector points nowhere"]);
+    expect(explodeProblems({ factor: 1, center: [0, 0, 0] })).toEqual([]);
+    expect(explodeProblems(undefined)).toEqual([]);
+  });
+  it("is part of the document's validity", () => {
+    const doc = setExplodeFactor(enableExplode(two()), Number.NaN);
+    expect(assemblyProblems(doc)).toContain("explode factor: type a number");
+  });
+  it("survives a rename and a removal, and is sent with the document", () => {
+    const doc = setExplodeVector(enableExplode(two()), "axis", 0, 1);
+    expect(renameComponent(doc, "arm", "arm2").explode).toEqual(doc.explode);
+    expect(removeComponent(doc, "arm").explode).toEqual(doc.explode);
+    const command = applyCommand(setExplodeFactor(enableExplode(two()), 1.5), { cell: "c1" });
+    expect(command).toMatchObject({ op: "edit", cell: "c1", values: { assembly: { explode: { factor: 1.5 } } } });
+  });
+  it("reads the server's explode back and ignores a malformed one", () => {
+    const base = { components: [], ground: null, constraints: [] };
+    expect(normalizeAssembly({ ...base, explode: { factor: 2, center: [1, 2, 3], axis: [0, 0, 1] } }).explode).toEqual({ factor: 2, center: [1, 2, 3], axis: [0, 0, 1] });
+    expect(normalizeAssembly({ ...base, explode: { factor: 1, center: [1, 2] } }).explode).toEqual({ factor: 1 });
+    expect(normalizeAssembly({ ...base, explode: "yes" }).explode).toBeUndefined();
+    expect(normalizeAssembly(base).explode).toBeUndefined();
   });
 });

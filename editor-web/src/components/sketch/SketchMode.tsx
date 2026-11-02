@@ -4,14 +4,16 @@ import * as THREE from "three";
 
 import { SketchDrawer, StatusBadge } from "@/components/sketch/SketchDrawer";
 import { SketchOverlay, useViewer } from "@/components/sketch/SketchOverlay";
+import { SketchProject } from "@/components/sketch/SketchProject";
 import { SketchToolbar } from "@/components/sketch/SketchToolbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { FeatureCommand } from "@/lib/features";
-import { suggestName, validateName } from "@/lib/features";
+import { CellFailure, suggestName, validateName, type FeatureRow } from "@/lib/features";
 import { docToJson, type SketchDoc } from "@/lib/sketch";
 import { PLANES, frameOf, planeLabel, projectOnPlane, viewPose, worldToPlane, planeToWorld, type Plane, type PlaneSpec } from "@/lib/sketch-plane";
 import { fitDistanceMm, planeToScreen } from "@/lib/sketch-view";
+import { projectSources } from "@/lib/sketch-edit";
 import { useSketchEditor } from "@/lib/useSketchEditor";
 import type { SceneView } from "@/scene/scene-view";
 
@@ -25,6 +27,7 @@ export function SketchMode({
   session,
   view,
   taken,
+  features,
   notice,
   onPlane,
   onSubmit,
@@ -33,13 +36,15 @@ export function SketchMode({
   session: SketchSession;
   view: SceneView;
   taken: readonly string[];
+  /** The feature rows of the notebook: the other sketches are what Project offers. */
+  features: readonly FeatureRow[];
   notice: string | null;
   onPlane: (plane: PlaneSpec) => void;
   onSubmit: (command: FeatureCommand) => Promise<void>;
   onExit: () => void;
 }) {
   if (session.plane === null) return <PlaneChooser view={view} notice={notice} onPlane={onPlane} onExit={onExit} />;
-  return <SketchEditorView key={session.id} session={session} plane={session.plane} view={view} taken={taken} onSubmit={onSubmit} onExit={onExit} />;
+  return <SketchEditorView key={session.id} session={session} plane={session.plane} view={view} taken={taken} features={features} onSubmit={onSubmit} onExit={onExit} />;
 }
 
 // -- plane choice -------------------------------------------------------------------------------------------------------------
@@ -115,6 +120,7 @@ function SketchEditorView({
   plane,
   view,
   taken,
+  features,
   onSubmit,
   onExit,
 }: {
@@ -122,12 +128,15 @@ function SketchEditorView({
   plane: PlaneSpec;
   view: SceneView;
   taken: readonly string[];
+  features: readonly FeatureRow[];
   onSubmit: (command: FeatureCommand) => Promise<void>;
   onExit: () => void;
 }) {
   const editing = session.mode === "edit";
   const modelPoints = useMemo(() => view.modelVertices().map((p) => worldToPlane(plane, p)), [view, plane]);
-  const editor = useSketchEditor(session.doc, modelPoints);
+  // The sketch being edited is the feature `session.name` (a new one has no feature yet): every other sketch can be projected.
+  const sources = useMemo(() => projectSources(features, editing ? session.name : null), [features, editing, session.name]);
+  const editor = useSketchEditor(session.doc, modelPoints, sources);
   const editorRef = useRef(editor);
   editorRef.current = editor;
   const spaceRef = useRef(false);
@@ -136,6 +145,8 @@ function SketchEditorView({
   const [busy, setBusy] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  // A new sketch whose cell failed exists already: the next finish edits it instead of adding a second one.
+  const [created, setCreated] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const [wide, setWide] = useState(false);
   useEffect(() => {
@@ -233,7 +244,7 @@ function SketchEditorView({
       window.removeEventListener("keyup", up);
     };
   }, []);
-  const nameError = editing ? null : validateName(name, taken);
+  const nameError = editing || created ? null : validateName(name, taken);
   const problem = (() => {
     if (nameError) return nameError;
     if (editor.loops.length === 0) return "close a loop of lines or draw a circle: the face needs a profile";
@@ -250,10 +261,12 @@ function SketchEditorView({
     setBusy(true);
     setServerError(null);
     const values = { sketch: docToJson(editor.doc) };
-    const command: FeatureCommand = editing && session.cell ? { op: "edit", cell: session.cell, values } : { op: "add", spec: "sketch", ...(name.trim() ? { name: name.trim() } : {}), values };
+    const target = editing && session.cell ? session.cell : created;
+    const command: FeatureCommand = target ? { op: "edit", cell: target, values } : { op: "add", spec: "sketch", ...(name.trim() ? { name: name.trim() } : {}), values };
     try {
       await onSubmit(command);
     } catch (error) {
+      if (error instanceof CellFailure && !editing) setCreated(error.cell);
       setServerError(error instanceof Error ? error.message : String(error));
       setBusy(false);
     }
@@ -268,6 +281,7 @@ function SketchEditorView({
         <SketchOverlay view={view} plane={plane} editor={editor} spaceRef={spaceRef} />
       </div>
       <SketchToolbar editor={editor} onFit={() => turn.current(true)} onNormal={() => turn.current(false)} />
+      {editor.projectOpen && <SketchProject editor={editor} />}
       <SketchDrawer editor={editor} plane={planeLabel(plane)} wide={wide} />
       <div className="pointer-events-auto absolute left-1/2 top-2 z-30 flex -translate-x-1/2 flex-col items-stretch gap-1">
         <div className="flex items-center gap-2 border-2 border-primary bg-popover px-2 py-1 shadow-[4px_4px_0_var(--shadow-hard)]">

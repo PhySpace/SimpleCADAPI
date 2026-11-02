@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectLabel, SelectGroup, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
+  CellFailure,
   bodyChoices,
   directionForProfile,
   directionOptions,
@@ -99,6 +100,8 @@ function FeatureForm({
   const [serverError, setServerError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  // A new feature whose cell failed exists already: the next submit edits it instead of adding a second one.
+  const [created, setCreated] = useState<string | null>(null);
 
   // Picks present when the form opened: in edit mode only a different pick replaces the recipe.
   const [initialKeys] = useState(() => new Set(selection.map((item) => item.key)));
@@ -130,7 +133,7 @@ function FeatureForm({
     [formValues, state, profileName],
   );
   const errors = formErrors;
-  const nameError = editing ? null : validateName(name, state.taken);
+  const nameError = editing || created ? null : validateName(name, state.taken);
   const suggested = suggestName(spec.id, state.taken);
 
   const selectionErrors: Record<string, string> = {};
@@ -154,10 +157,13 @@ function FeatureForm({
     const withSelections = Object.keys(selections).length ? { selections } : {};
     const command: FeatureCommand = edit
       ? { op: "edit", cell: edit.cell, values, ...withSelections }
-      : { op: "add", spec: spec.id, ...(name.trim() ? { name: name.trim() } : {}), values, ...withSelections };
+      : created
+        ? { op: "edit", cell: created, values, ...withSelections }
+        : { op: "add", spec: spec.id, ...(name.trim() ? { name: name.trim() } : {}), values, ...withSelections };
     try {
       await onSubmit(command);
     } catch (error) {
+      if (error instanceof CellFailure && !edit) setCreated(error.cell);
       setServerError(error instanceof Error ? error.message : String(error));
       setBusy(false);
     }
