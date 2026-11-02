@@ -97,3 +97,25 @@ def test_an_agent_trims_a_sketch_feature_from_the_command_line(tmp_path, monkeyp
         if state.kernel is not None:
             state.kernel.stop()
         server.should_exit = True
+
+
+def _corner():
+    return _doc({"a": (0, 0), "b": (10, 0), "c": (10, 10)}, [_line("l0", "a", "b"), _line("l1", "b", "c")])
+
+
+def test_fillet_and_chamfer_corner_are_sdk_operations_reached_through_the_document():
+    filleted = S.apply_edit(_corner(), "fillet_corner", {"a": "l0", "b": "l1", "radius": 2.0})
+    assert any(e["kind"] == "arc" for e in filleted["sketch"]["entities"]) and filleted["created"]
+    chamfered = S.apply_edit(_corner(), "chamfer_corner", {"a": "l0", "b": "l1", "distance": 2.0})
+    assert not any(e["kind"] == "arc" for e in chamfered["sketch"]["entities"]) and len(chamfered["sketch"]["entities"]) == 3
+    with pytest.raises(S.SketchError):
+        S.apply_edit(_corner(), "fillet_corner", {"a": "l0", "b": "l1", "radius": 50.0})
+
+
+def test_project_brings_another_sketchs_geometry_in_as_fixed_reference():
+    source = _doc({"s": (2, 3), "t": (8, 3)}, [_line("edge", "s", "t")])
+    target = _doc({"o": (0, 0)}, [])
+    answer = S.apply_edit(target, "project", {"source_doc": source})
+    projected = [e for e in answer["sketch"]["entities"] if e["id"].startswith("proj_")]
+    assert projected and all(e["construction"] for e in projected)
+    assert any(c["kind"] == "fix" for c in answer["sketch"]["constraints"])

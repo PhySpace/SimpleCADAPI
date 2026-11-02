@@ -181,3 +181,34 @@ def test_connectors_of_a_gui_part_are_written_into_its_product_cell_and_read_bac
         if state.kernel is not None:
             state.kernel.stop()
         server.should_exit = True
+
+
+def test_an_exploded_view_is_the_product_and_its_factor_is_a_slider(tmp_path):
+    import uvicorn
+
+    from simplecadapi.editor.server import WorkspaceState, create_app
+    from simplecadapi.editor.templates import create_notebook
+    from test_editor_features import _wait_idle
+
+    _write_part(tmp_path, "base")
+    _write_part(tmp_path, "arm")
+    path = create_notebook(tmp_path, "view", "blank")
+    state = WorkspaceState(tmp_path)
+    state.port = 17738
+    server = uvicorn.Server(uvicorn.Config(create_app(state), port=state.port, log_level="error"))
+    threading.Thread(target=server.run, daemon=True).start()
+    state.hub.attach_loop(__import__("asyncio").new_event_loop())
+    try:
+        state.start_kernel(path)
+        doc = copy.deepcopy(DOC) | {"explode": {"factor": 1.0}}
+        state.features.add({"spec": "assembly", "name": "view", "values": {"assembly": doc}})
+        _wait_idle(state)
+        snap = state.features.snapshot()
+        assert all(not f["errors"] for f in snap["features"]), snap["features"]
+        text = path.read_text()
+        assert "view = scad.explode_rassembly(assembly=_solved, factor=VIEW_EXPLODE)" in text and "VIEW_EXPLODE = scad.var(" in text
+        assert snap["assembly"]["doc"]["explode"]["factor"] == 1.0
+    finally:
+        if state.kernel is not None:
+            state.kernel.stop()
+        server.should_exit = True

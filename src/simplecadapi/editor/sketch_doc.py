@@ -307,7 +307,7 @@ def solve(doc: Mapping[str, Any], *, max_profiles: int = 16) -> dict[str, Any]:
 # only how a GUI holds a sketch.  These adapters turn a document into an SDK ``Sketch``, call the operation by its SDK name and
 # turn the result back into a document: there is no geometry here.
 
-EDIT_OPERATIONS = frozenset({"trim", "extend"})  # the SDK's ``<name>_rsketch`` functions that edit a sketch (add more as the SDK gains them)
+EDIT_OPERATIONS = frozenset({"trim", "extend", "fillet_corner", "chamfer_corner", "project"})  # the SDK's ``<name>_rsketch`` functions that edit a sketch (add more as the SDK gains them)
 
 
 def to_sketch(doc: Mapping[str, Any]) -> Any:
@@ -383,6 +383,8 @@ def apply_edit(doc: Mapping[str, Any], operation: str, args: Mapping[str, Any]) 
     kwargs = dict(args)
     if "at" in kwargs and isinstance(kwargs["at"], (list, tuple)):
         kwargs["at"] = tuple(kwargs["at"])
+    if "source_doc" in kwargs:  # project_rsketch takes another sketch: the caller sends its document
+        kwargs["source"] = to_sketch(kwargs.pop("source_doc"))
     before = to_sketch(doc)
     try:
         after = getattr(scad, f"{operation}_rsketch")(sketch=before, **kwargs)

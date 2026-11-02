@@ -186,6 +186,14 @@ class FeatureService:
             out[spec.id] = chosen
         return out
 
+    def sketch_document(self, ref: str) -> dict[str, Any] | None:
+        """The document of the sketch feature named *ref* (slug or cell), or ``None``."""
+        for feature in self.snapshot()["features"]:
+            gui = feature["gui"]
+            if ref in (feature["slug"], feature["cell"]) and gui and gui["spec"] == "sketch":
+                return gui["values"].get("sketch")
+        return None
+
     # -- commands -----------------------------------------------------------------------------------------------------
     def add(self, request: Mapping[str, Any]) -> dict[str, Any]:
         with self._lock:

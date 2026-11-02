@@ -2044,7 +2044,13 @@ def create_app(state: WorkspaceState) -> Starlette:
             return JSONResponse({"ok": False, "error": "body is not JSON"}, status_code=400)
         body = body if isinstance(body, dict) else {}
         try:
-            result = await asyncio.to_thread(apply_edit, body.get("sketch") or {}, str(body.get("op", "")), body.get("args") or {})
+            args = dict(body.get("args") or {})
+            if "from_sketch" in args:  # project: name another sketch feature of this notebook as the source
+                source = state.features.sketch_document(str(args.pop("from_sketch")))
+                if source is None:
+                    return JSONResponse({"ok": False, "error": "from_sketch: there is no such sketch feature in this notebook"}, status_code=400)
+                args["source_doc"] = source
+            result = await asyncio.to_thread(apply_edit, body.get("sketch") or {}, str(body.get("op", "")), args)
         except SketchError as exc:
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
         return JSONResponse({"ok": True, **result})

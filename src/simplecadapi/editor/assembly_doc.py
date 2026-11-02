@@ -121,7 +121,20 @@ def validate(doc: Mapping[str, Any]) -> dict[str, Any]:
         constraints.append(item)
     if constraints and ground is None:
         raise AssemblyError("constraints need a grounded component: the solver moves everything else relative to it")
-    return {"components": components, "ground": ground, "constraints": constraints}
+    explode = doc.get("explode")
+    clean: dict[str, Any] = {"components": components, "ground": ground, "constraints": constraints}
+    if explode is not None:
+        if not isinstance(explode, Mapping):
+            raise AssemblyError("explode is {factor, center?, axis?}")
+        item = {"factor": _number(explode.get("factor", 0.0), "explode factor")}
+        for key, size in (("center", 3), ("axis", 3)):
+            if explode.get(key) is not None:
+                vec = explode[key]
+                if not (isinstance(vec, (list, tuple)) and len(vec) == size):
+                    raise AssemblyError(f"explode {key}: three numbers")
+                item[key] = [_number(v, f"explode {key}") for v in vec]
+        clean["explode"] = item
+    return clean
 
 
 def _ref(side: Mapping[str, str]) -> str:
@@ -141,8 +154,9 @@ def render(slug: str, name: str, doc: Mapping[str, Any], notebook_dir: Path | No
         variable = f"{slug}_{key}".upper()
         step = "1.0" if high - low >= 20 else "0.1"
         params.append(
-            f"{variable} = scad.var(name={json.dumps(variable.lower())}, default={_num(value)}, unit={json.dumps(unit)}, "
-            f"comment={json.dumps(label)})  # ui: slider({_num(low)}, {_num(high)}, step={step}, label={json.dumps(label)})"
+            f"{variable} = scad.var(name={json.dumps(variable.lower())}, default={_num(value)}, "
+            + (f"unit={json.dumps(unit)}, " if unit else "")
+            + f"comment={json.dumps(label)})  # ui: slider({_num(low)}, {_num(high)}, step={step}, label={json.dumps(label)})"
         )
         var[key] = variable
         return variable
@@ -188,7 +202,15 @@ def render(slug: str, name: str, doc: Mapping[str, Any], notebook_dir: Path | No
             a_name, b_name = ("pitch_radius_a", "pitch_radius_b") if kind == "gear" else ("pulley_radius_a", "pulley_radius_b")
             phase = f", phase_offset={_num(con['phase'])}" if "phase" in con else ""
             lines.append(head + f"connector_a={_ref(con['a'])}, connector_b={_ref(con['b'])}, {a_name}={_num(con[a_name])}, {b_name}={_num(con[b_name])}{phase}")
-    lines.append(f"{slug} = scad.solve_assembly_constraints_rassembly(assembly=_assembly)" if doc["constraints"] else f"{slug} = _assembly")
+    solved = "scad.solve_assembly_constraints_rassembly(assembly=_assembly)" if doc["constraints"] else "_assembly"
+    if "explode" in doc:
+        # the product is the exploded view; the factor is a slider (0 puts everything back)
+        factor = slider("explode", "explode factor", doc["explode"]["factor"], "", 0.0, max(2.0, doc["explode"]["factor"] * 2))
+        extra = "".join(f", {k}=({', '.join(_num(v) for v in doc['explode'][k])})" for k in ("center", "axis") if k in doc["explode"])
+        lines.append(f"_solved = {solved}")
+        lines.append(f"{slug} = scad.explode_rassembly(assembly=_solved, factor={factor}{extra})")
+    else:
+        lines.append(f"{slug} = {solved}")
     return {"params": params, "uses": uses, "layout": lines}
 
 
