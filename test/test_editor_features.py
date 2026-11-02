@@ -59,7 +59,7 @@ def test_the_catalog_lists_every_operation_with_typed_slots():
     assert len(ids) == len(set(ids)) >= 24
     for spec in data["specs"]:
         assert spec["slots"], spec["id"]
-        assert {slot["kind"] for slot in spec["slots"]} <= {"length", "angle", "float", "count", "bool", "enum", "point", "body", "select", "points2d", "points3d", "profile", "sketch"}
+        assert {slot["kind"] for slot in spec["slots"]} <= {"length", "angle", "float", "count", "bool", "enum", "point", "body", "select", "points2d", "points3d", "profile", "sketch", "assembly"}
 
 
 @pytest.mark.parametrize("spec", F.SPECS, ids=lambda s: s.id)
@@ -93,8 +93,8 @@ def test_every_template_uses_real_sdk_functions_and_parameters(spec):
 def test_the_primitives_and_profiles_make_one_valid_solid_each():
     with scad.GraphSession(graph_id="features-primitives"):
         for spec in F.SPECS:
-            if spec.produces == "face" or any(slot.kind in ("body", "select", "profile") for slot in spec.slots):
-                continue  # sketches have their own test below
+            if spec.produces in ("face", "assembly") or any(slot.kind in ("body", "select", "profile") for slot in spec.slots):
+                continue  # sketches and assemblies have their own tests
             scope: dict = {"scad": scad}
             rendered = F.render_feature(spec.id, "made", DEFAULTS[spec.id], bodies={})
             _run(rendered, scope)
@@ -204,7 +204,7 @@ def _wait_idle(state, timeout=120):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         statuses = {c.get("status") for c in state.cells}
-        if statuses <= {"idle", "stale", None}:
+        if statuses <= {"idle", "stale", "exception", "error", None}:
             return
         time.sleep(0.3)
 

@@ -2033,6 +2033,24 @@ def create_app(state: WorkspaceState) -> Starlette:
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=409 if exc.conflict else 400)
         return JSONResponse(result)
 
+    async def assembly_parts(request: Request) -> JSONResponse:
+        """The part notebooks of the workspace; ``?path=`` adds the connectors that one part declares."""
+        from ..runtime.workspace import scan_workspace
+        from .assembly_doc import connectors_of
+
+        rows = [{"path": entry.path, "name": Path(entry.path).stem, "kind": entry.kind} for entry in scan_workspace(state.workspace) if entry.kind == "part"]
+        wanted = request.query_params.get("path")
+        if wanted:
+            target = (state.workspace / wanted).resolve()
+            if state.workspace.resolve() not in target.parents or target.suffix != ".py" or not target.is_file():
+                return JSONResponse({"ok": False, "error": "not a notebook of this workspace"}, status_code=400)
+            try:
+                connectors = await asyncio.to_thread(connectors_of, target)
+            except Exception as exc:  # noqa: BLE001 - the part may not run; say why
+                return JSONResponse({"ok": False, "error": f"{type(exc).__name__}: {str(exc)[-300:]}"}, status_code=400)
+            return JSONResponse({"ok": True, "path": wanted, "connectors": connectors})
+        return JSONResponse({"ok": True, "parts": rows})
+
     async def sketch_solve(request: Request) -> JSONResponse:
         """Solve a sketch document without recording anything (a canvas calls this at every drag step)."""
         from .sketch_doc import SketchError, solve
@@ -2191,6 +2209,7 @@ def create_app(state: WorkspaceState) -> Starlette:
         Route("/api/cells/{op}", api_cell_command, methods=["POST"]),
         Route("/api/features/specs", features_specs, methods=["GET"]),
         Route("/api/sketch/solve", sketch_solve, methods=["POST"]),
+        Route("/api/assembly/parts", assembly_parts, methods=["GET"]),
         Route("/api/features", features_state, methods=["GET"]),
         Route("/api/features", features_command, methods=["POST"]),
         Route("/api/workspace", workspace_list, methods=["GET"]),

@@ -14,9 +14,11 @@ from __future__ import annotations
 import ast
 import re
 import threading
+from pathlib import Path
 from typing import Any, Mapping
 
 from ..runtime.workspace import features_in_cell
+from . import assembly_doc
 from . import features as F
 from . import sketch_doc
 
@@ -76,6 +78,12 @@ class FeatureService:
         taken: set[str] = set()
         product: dict[str, Any] | None = None
         params_cells: dict[str, str] = {}
+        assembly_slugs: set[str] = set()
+        for cell in cells:
+            gui = F.parse_gui(str(cell.get("code", "")))
+            heads = features_in_cell(str(cell.get("code", "")), "")
+            if gui and gui["spec"] == "assembly" and heads:
+                assembly_slugs.add(heads[0].slug)
         for index, cell in enumerate(cells):
             code = str(cell.get("code", ""))
             defined, loaded = _names(code)
@@ -94,7 +102,8 @@ class FeatureService:
             gui = F.parse_gui(code)
             consumed.update(loaded & set(bodies))
             produces = F.BY_ID[gui["spec"]].produces if gui else "solid"
-            made = defined if head.role in _ROLES_WITH_BODIES else []
+            part_of = head.slug[: -len("_parts")] if head.slug.endswith("_parts") and head.slug[: -len("_parts")] in assembly_slugs else None
+            made = defined if head.role in _ROLES_WITH_BODIES and not part_of else []
             for name in made:
                 bodies[name] = produces
                 order.append(name)
@@ -106,6 +115,7 @@ class FeatureService:
                     "role": head.role,
                     "gui": {"spec": gui["spec"], "values": gui.get("values", {}), "picked": gui.get("picked", {})} if gui else None,
                     "makes": made,
+                    "part_of": part_of,
                     "reads": sorted(loaded & set(bodies) - set(made)),
                     "status": cell.get("status"),
                     "errors": cell.get("errors") or [],
@@ -113,7 +123,7 @@ class FeatureService:
             )
         for feature in features:
             feature["params_cell"] = params_cells.get(feature["slug"])
-        solids = [name for name in order if bodies[name] != "face"]
+        solids = [name for name in order if bodies[name] in ("solid", "solids")]
         faces = [name for name in order if bodies[name] == "face"]
         open_bodies = [name for name in solids if name not in consumed]
         profiles = []
@@ -128,6 +138,14 @@ class FeatureService:
             "open": open_bodies,
             "tip": open_bodies[-1] if open_bodies else None,
             "profiles": profiles,
+            "assembly": next(
+                (
+                    {"cell": f["cell"], "slug": f["slug"], "doc": (f["gui"]["values"] or {}).get("assembly")}
+                    for f in features
+                    if f["gui"] and f["gui"]["spec"] == "assembly"
+                ),
+                None,
+            ),
             "product": product,
             "defaults": self._defaults(open_bodies, faces),
             "taken": sorted(taken),
@@ -173,6 +191,10 @@ class FeatureService:
                 steps.append(self._create(params_anchor, "\n".join(rendered.params), run=False))
                 if feature_anchor == params_anchor:  # the params cell sits where the feature goes: keep params first
                     feature_anchor = steps[-1]["id"]
+            for code in rendered.before:
+                before = self._create(feature_anchor, code, run=False)
+                steps.append(before)
+                feature_anchor = before["id"]
             made = self._create(feature_anchor, rendered.feature, run=True)
             steps.append(made)
             steps.extend(self._repoint_product(snap, rendered))
@@ -202,6 +224,12 @@ class FeatureService:
                     steps.append(self._edit(feature["params_cell"], old, new, run=False))
             elif rendered.params:
                 steps.append(self._create(self._params_anchor(self.state.cells), "\n".join(rendered.params), run=False))
+            for code in rendered.before:
+                parts = next((f for f in snap["features"] if f["part_of"] == feature["slug"]), None)
+                if parts is not None:
+                    old = self._cell(parts["cell"])["code"]
+                    if old.strip() != code.strip():
+                        steps.append(self._edit(parts["cell"], old, code, run=False))
             steps.append(self._edit(feature["cell"], cell["code"], rendered.feature, run=True))
             self._record(steps)
             return self._result(feature["cell"], steps, feature["slug"])
@@ -221,7 +249,8 @@ class FeatureService:
                 if fallback is None:
                     raise GuiError(f"the product is built from {feature['slug']}; point it at another body first")
                 steps.append(self._point_product(product, fallback))
-            for cell_id in (feature["cell"], feature["params_cell"]):
+            companions = [f["cell"] for f in snap["features"] if f["part_of"] == feature["slug"]]
+            for cell_id in (feature["cell"], *companions, feature["params_cell"]):
                 if cell_id:
                     steps.append(self._remove(cell_id))
             self._record(steps)
@@ -298,8 +327,15 @@ class FeatureService:
     def _render(self, spec_id, slug, values, bodies, selections, snap, keep=None) -> F.Rendered:
         known = {f["slug"] for f in snap["features"]}
         picked = {k: list(v) for k, v in dict(selections or {}).items() if isinstance(v, (list, tuple))}
+        notebook = getattr(self.state, "notebook", None)
+        workspace = getattr(self.state, "workspace", None)
+        env = {"name": getattr(notebook, "stem", slug), "notebook_dir": notebook.parent if notebook else None, "workspace": workspace}
+        if spec_id == "assembly" and workspace is not None:
+            for component in ((values.get("assembly") or {}).get("components") or []):
+                if not (Path(workspace) / str(component.get("part", ""))).is_file():
+                    raise GuiError(f"{component.get('id')}: the notebook {component.get('part')!r} is not in the workspace")
         try:
-            return F.render_feature(spec_id, slug, values, bodies=bodies, selections=picked, known_slugs=known, keep_recipes=keep)
+            return F.render_feature(spec_id, slug, values, bodies=bodies, selections=picked, known_slugs=known, keep_recipes=keep, env=env)
         except F.FeatureError as exc:
             raise GuiError(str(exc)) from exc
 
@@ -382,7 +418,7 @@ class FeatureService:
         try:
             if make:
                 created = self._create(step["after"] if self._exists(step["after"]) else "end", step["code"], run=True)
-                step["id"] = created["id"]
+                self._rename(step["id"], created["id"])  # the cell is a new one: every step that names it follows
             elif drop:
                 self._remove(step["id"], expect=step["code"])
             else:  # edited
@@ -390,6 +426,14 @@ class FeatureService:
                 self._edit(step["id"], old, new, run=True)
         except GuiError as exc:
             raise GuiError(f"cannot {'redo' if forward else 'undo'}: the notebook changed since ({exc})", conflict=exc.conflict) from exc
+
+    def _rename(self, old: str, new: str) -> None:
+        for steps in (*self._undo, *self._redo):
+            for step in steps:
+                if step.get("id") == old:
+                    step["id"] = new
+                if step.get("after") == old:
+                    step["after"] = new
 
     def _exists(self, ref: str) -> bool:
         return ref in ("start", "end") or any(c["id"] == ref for c in self.state.cells)

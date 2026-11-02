@@ -24,7 +24,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping, Sequence
 
-from . import sketch_doc
+from . import assembly_doc, sketch_doc
 from .selection import selector_conditions
 
 GUI_MARKER = "# gui:"
@@ -56,7 +56,8 @@ class Slot:
 
     kind: ``length`` (mm), ``angle`` (deg), ``float``, ``count``, ``bool``, ``enum``, ``point`` (three lengths),
     ``body`` (a solid made earlier), ``profile`` (a sketch face made earlier), ``select`` (faces or edges picked in the
-    viewport), ``points2d`` (``x, y`` per line), ``sketch`` (a sketch document, see :mod:`.sketch_doc`).
+    viewport), ``points2d`` (``x, y`` per line), ``sketch`` (a sketch document, see :mod:`.sketch_doc`), ``assembly`` (an
+    assembly document, see :mod:`.assembly_doc`).
     """
 
     name: str
@@ -91,7 +92,7 @@ class Spec:
     label: str
     group: str
     role: str  # build | add | subtract | modifier
-    produces: str  # solid | solids | face
+    produces: str  # solid | solids | face | assembly
     description: str
     slots: tuple[Slot, ...]
     build: Callable[["Context"], list[str]] = field(repr=False, compare=False)
@@ -114,6 +115,7 @@ class Rendered:
     spec: str
     params: list[str]  # lines of the params cell ("" when the feature has no numbers)
     feature: str  # the feature cell
+    before: list[str]  # cells that go between the params cell and the feature cell (an assembly's child uses)
     reads: list[str]  # bodies this feature consumes
     produces: str
     gui: dict[str, Any]
@@ -122,9 +124,11 @@ class Rendered:
 class Context:
     """What a template needs: the slug, the variable of each number, the bodies, the selection recipes."""
 
-    def __init__(self, spec: Spec, slug: str, values: Mapping[str, Any], bodies: Mapping[str, str], recipes: Mapping[str, list[str]]):
+    def __init__(self, spec: Spec, slug: str, values: Mapping[str, Any], bodies: Mapping[str, str], recipes: Mapping[str, list[str]], env: Mapping[str, Any] | None = None):
         self.spec, self.slug, self.values = spec, slug, values
         self._bodies, self._recipes = bodies, recipes
+        self.env = dict(env or {})
+        self.before: list[str] = []
         self.params: list[str] = []
         self.reads: list[str] = []
         self._base = slug.upper()
@@ -418,6 +422,14 @@ def _sketch(c: Context) -> list[str]:
     return lines
 
 
+def _assembly(c: Context) -> list[str]:
+    cells = assembly_doc.render(c.slug, str(c.env.get("name") or c.slug), c.values["assembly"], c.env.get("notebook_dir"), c.env.get("workspace"))
+    c.raw_params(cells["params"])
+    if cells["uses"]:
+        c.before.append("\n".join([f"# ---- feature: {c.slug}_parts (add) ----", *cells["uses"]]))
+    return cells["layout"]
+
+
 def _profile(c: Context, slot: str = "profile") -> str:
     return c.body(slot)
 
@@ -571,6 +583,8 @@ SPECS: tuple[Spec, ...] = (
          (_BODY(), _PROFILE(), _AXIS("direction", "Direction", "-z"), _length("depth", "Depth", 10.0)), _cut_sketch),
     Spec("boss_sketch", "Boss from sketch", "Sketch", "add", "solid", "Add material along a sketch face to a body.",
          (_BODY(), _PROFILE(), _AXIS("direction", "Direction", "+z"), _signed("distance", "Distance", 10.0, min=0.001)), _boss_sketch),
+    Spec("assembly", "Assembly layout", "Assembly", "add", "assembly", "Components, the grounded one, and the joints and mates between connector frames.",
+         (Slot("assembly", "Assembly", "assembly", default={"components": [], "ground": None, "constraints": []}),), _assembly),
     Spec("cut", "Cut", "Boolean", "subtract", "solid", "Take one or more bodies out of another.",
          (_body("base", "Body to cut"), _body("tool", "Tool (taken out)")), _cut),
     Spec("union", "Union", "Boolean", "add", "solid", "Join two bodies into one.",
@@ -681,6 +695,11 @@ def check_values(spec: Spec, values: Mapping[str, Any], bodies: Mapping[str, str
                 clean[slot.name] = sketch_doc.validate(raw)
             except sketch_doc.SketchError as exc:
                 raise FeatureError(f"{slot.label}: {exc}") from exc
+        elif slot.kind == "assembly":
+            try:
+                clean[slot.name] = assembly_doc.validate(raw)
+            except assembly_doc.AssemblyError as exc:
+                raise FeatureError(f"{slot.label}: {exc}") from exc
         elif slot.kind in ("points2d", "points3d"):
             width = 2 if slot.kind == "points2d" else 3
             if not isinstance(raw, (list, tuple)) or len(raw) < width:
@@ -760,6 +779,7 @@ def render_feature(
     selections: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
     known_slugs: set[str] | None = None,
     keep_recipes: Mapping[str, list[str]] | None = None,
+    env: Mapping[str, Any] | None = None,
 ) -> Rendered:
     """The cells of one feature.  *bodies* maps each body variable of the notebook to ``solid`` or ``solids``."""
     spec = BY_ID.get(spec_id)
@@ -775,7 +795,7 @@ def render_feature(
                 recipes[slot.name] = list(keep_recipes[slot.name])
             else:
                 raise FeatureError(f"{slot.label}: pick at least one {slot.entity} in the viewport")
-    ctx = Context(spec, slug, clean, bodies, recipes)
+    ctx = Context(spec, slug, clean, bodies, recipes, env)
     code = spec.build(ctx)
     # the recipe resolves against the body slot of the feature ({BODY} is filled with that name)
     body_name = clean.get("body") or ""
@@ -791,6 +811,7 @@ def render_feature(
         spec=spec.id,
         params=params,
         feature="\n".join(feature_lines),
+        before=ctx.before,
         reads=ctx.reads,
         produces=spec.produces,
         gui=gui,
