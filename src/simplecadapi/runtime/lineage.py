@@ -6,6 +6,11 @@ a cell are written beside the cell's entry (``lineage.<cell key>``) and put
 back into the process-wide node registry when the cell is restored.  Cells
 restore in dependency order, so the nodes a cell's own nodes are built on are
 registered by then.
+
+A record belongs to one cache *entry* of the cell, not to the cell: one cell has an entry for every combination of the
+values it reads (a child notebook run with other overrides, a parameter changed in the editor), all under one digest
+directory, and the nodes of two entries carry the same ids (the ids count from the cell's code) with other contents.
+The record is named by the entry's key, so restoring an entry registers the nodes that entry's values name.
 """
 
 from __future__ import annotations
@@ -23,8 +28,12 @@ def _own(node_id: str, namespace: str) -> bool:
     return node_id.startswith(namespace + "_") or node_id.startswith(_EXTERNAL)
 
 
-def save(directory: Path, cell_id: str, session: Any) -> None:
-    """Write the nodes *session* recorded (not the ones it adopted) beside the cell's entry."""
+def _record(directory: Path, cell_id: str, key: str | None) -> Path:
+    return directory / (f"{_PREFIX}{cell_id}" if key is None else f"{_PREFIX}{cell_id}.{key}")
+
+
+def save(directory: Path, cell_id: str, session: Any, key: str | None = None) -> None:
+    """Write the nodes *session* recorded (not the ones it adopted) beside the cell's entry *key*."""
 
     namespace = session.graph.namespace
     payload = session.graph.to_dict()
@@ -38,14 +47,14 @@ def save(directory: Path, cell_id: str, session: Any) -> None:
         "frames": session.frame_graph.to_dict(),
     }
     directory.mkdir(parents=True, exist_ok=True)
-    target = directory / f"{_PREFIX}{cell_id}"
+    target = _record(directory, cell_id, key)
     partial = target.with_suffix(".part")
     partial.write_bytes(zlib.compress(pickle.dumps(document, protocol=5), 1))
     partial.replace(target)
 
 
-def load(directory: Path, cell_id: str, graph_id: str | None = None) -> bool:
-    """Register the nodes saved for the cell; ``False`` when there is no entry.
+def load(directory: Path, cell_id: str, graph_id: str | None = None, key: str | None = None) -> bool:
+    """Register the nodes saved for the cell's entry *key*; ``False`` when there is no record.
 
     With *graph_id*, a record of another graph is no entry either: its nodes would be registered under that graph,
     and the values restored beside it (which name their nodes by this run's graph) would find none.
@@ -53,7 +62,7 @@ def load(directory: Path, cell_id: str, graph_id: str | None = None) -> bool:
 
     import simplecadapi._cpp as native
 
-    target = directory / f"{_PREFIX}{cell_id}"
+    target = _record(directory, cell_id, key)
     try:
         document = pickle.loads(zlib.decompress(target.read_bytes()))
     except OSError:

@@ -501,7 +501,7 @@ class CellCache(CachedLifecycle):
 
         try:
             # The entries of a run live in <state>/<id>/cache: the nodes of its cells belong to the graph of that id.
-            return lineage.load(self._root / digest, str(cell.cell_id), self._root.parent.name)
+            return lineage.load(self._root / digest, str(cell.cell_id), self._root.parent.name, self._entry_key(cell))
         except Exception as error:  # noqa: BLE001 - an unreadable record is a miss, never a failure
             say(f"unreadable lineage record of cell {cell.cell_id} ({type(error).__name__}: {error}); running it again")
             return False
@@ -525,16 +525,17 @@ class CellCache(CachedLifecycle):
                     glbls[name] = None
                     glbls[f"_cell_{cell.cell_id}_{name[1:]}"] = None
         live = glbls
+        entry_key = self._entry_key(cell)  # (marimo forgets the attempt when it tears the cell down)
         super().teardown(cell, glbls, run_result)
         if run_result.exception is None:
-            self._save_lineage(cell, loader)
+            self._save_lineage(cell, loader, entry_key)
             if attempt is not None and not attempt.hit and self._memory is not None:
                 # what this run made is what the entry names: the next evaluation with the same inputs takes it
                 values = {var: (None if var.startswith("_") else live.get(lookup)) for var, lookup in attempt.contextual_defs()}
                 if not any(is_unhashable_stub(value) for value in values.values()):
                     self._memory.remember(loader, attempt.key, values, dict(attempt.meta), attempt.stateful_refs)
 
-    def _save_lineage(self, cell: CellImpl, loader: LazyLoader) -> None:
+    def _save_lineage(self, cell: CellImpl, loader: LazyLoader, entry_key: str | None) -> None:
         from . import executor, lineage
 
         session = executor.take_session(cell.cell_id)
@@ -543,7 +544,13 @@ class CellCache(CachedLifecycle):
             return  # a restored cell keeps the record it was restored with
         if session.graph.graph_id != self._root.parent.name:
             return  # recorded under another id: not this run's lineage to keep
-        lineage.save(self._root / digest, str(cell.cell_id), session)
+        lineage.save(self._root / digest, str(cell.cell_id), session, entry_key)
+
+    def _entry_key(self, cell: CellImpl) -> str | None:
+        """The key of the entry this cell restores or writes: its record of nodes is named by it (see :mod:`.lineage`)."""
+
+        attempt = self._attempts.get(cell.cell_id)
+        return getattr(attempt, "hash", None)
 
     def _invalidate(self, cell_id: CellId_t) -> None:
         # The producer's entry lives in the store of its own digest.
