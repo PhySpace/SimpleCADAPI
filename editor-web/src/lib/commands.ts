@@ -59,6 +59,31 @@ export function commandsFromSpecs(specs: readonly Spec[], open: (spec: Spec) => 
   }));
 }
 
+/** The assembly commands: the layout panel, and the connectors of the open part.  `open` shows the panel (the left
+ * column's assembly tab); the layout is one GUI feature, so there is no per-command dialog. */
+export function assemblyCommands(open: (section: "assembly" | "connectors") => void, icons: { assembly?: LucideIcon; connectors?: LucideIcon } = {}): Command[] {
+  return [
+    {
+      id: "assembly",
+      label: "Assembly",
+      group: "Assembly",
+      keywords: ["layout", "joint", "revolute", "prismatic", "gear", "belt", "mate", "constraint", "components", "ground"],
+      description: "Place parts, ground one, and join connector frames with joints and mates.",
+      icon: icons.assembly,
+      run: () => open("assembly"),
+    },
+    {
+      id: "connectors",
+      label: "Part connectors",
+      group: "Assembly",
+      keywords: ["connector", "frame", "mount", "hinge", "face"],
+      description: "Declare the frames of this part (from picked faces) that an assembly joins by.",
+      icon: icons.connectors,
+      run: () => open("connectors"),
+    },
+  ];
+}
+
 /** Categories in the order their commands first appear (so a source that adds a group adds a chip). */
 export function commandGroups(commands: readonly Command[]): string[] {
   const groups: string[] = [];

@@ -59,6 +59,10 @@ export type FeatureState = {
   defaults: Record<string, Record<string, string>>;
   /** The face-making sketches of the notebook (what a `profile` slot chooses from). */
   profiles?: { name: string; plane: string | { origin: number[]; x_axis: number[]; y_axis: number[] }; normal: string; normal_vec?: [number, number, number] }[];
+  /** The assembly feature of the notebook (its document is the whole layout), or null. */
+  assembly?: { cell: string; slug: string; doc: unknown } | null;
+  /** The connectors the part notebook's product declares ([] without a product). */
+  connectors?: { id: string; origin: number[]; x_axis: number[]; y_axis: number[] }[];
   taken: string[];
   undo: number;
   redo: number;
@@ -79,6 +83,7 @@ export type FeatureCommand =
   | { op: "edit"; cell: string; values: Record<string, unknown>; selections?: Record<string, PickedItem[]> }
   | { op: "delete"; cell: string }
   | { op: "use_as_product"; body: string }
+  | { op: "set_connectors"; connectors: { id: string; origin: number[]; x_axis: number[]; y_axis: number[] }[] }
   | { op: "undo" }
   | { op: "redo" };
 

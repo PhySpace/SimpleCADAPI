@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { featureCommand, fetchFeatureState, fetchSpecs, type Catalog, type FeatureCommand, type FeatureState } from "@/lib/features";
 
-const EMPTY: FeatureState = { features: [], bodies: [], open: [], tip: null, product: null, defaults: {}, taken: [], undo: 0, redo: 0 };
+const EMPTY: FeatureState = { features: [], bodies: [], open: [], tip: null, product: null, defaults: {}, assembly: null, connectors: [], taken: [], undo: 0, redo: 0 };
 
 /** The GUI features of the open notebook: the catalog (once), the state (refreshed on demand, debounced), commands. */
 export function useFeatures() {

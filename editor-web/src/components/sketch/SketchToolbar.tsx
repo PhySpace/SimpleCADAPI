@@ -16,13 +16,17 @@ export function SketchToolbar({ editor, onFit, onNormal }: { editor: SketchEdito
   const toggle = "group flex h-7 items-center gap-1.5 border-b border-border px-1.5 text-left text-[10px] aria-pressed:bg-primary aria-pressed:text-primary-foreground hover:bg-accent aria-pressed:hover:bg-primary";
   return (
     <div className="pointer-events-auto absolute bottom-10 left-2 top-14 z-20 flex w-[92px] flex-col overflow-y-auto [&>*]:shrink-0 border-2 border-primary bg-popover shadow-[4px_4px_0_var(--shadow-hard)]" role="toolbar" aria-label="Sketch tools">
-      {TOOLS.map((t) => (
-        <button key={t.id} type="button" title={`${t.label} (${t.key})`} aria-label={t.label} aria-pressed={tool === t.id} data-tool={t.id} onClick={() => editor.chooseTool(t.id)} className={toggle}>
+      {TOOLS.map((t) => {
+        // Trim and extend wait for a draft in progress to be finished or cancelled.
+        const blocked = (t.id === "trim" || t.id === "extend") && editor.draft !== null;
+        return (
+        <button key={t.id} type="button" title={blocked ? `${t.label}: finish or cancel the draft first` : `${t.label} (${t.key})`} aria-label={t.label} aria-pressed={tool === t.id} aria-disabled={blocked} disabled={blocked} data-tool={t.id} onClick={() => editor.chooseTool(t.id)} className={cn(toggle, "disabled:opacity-40")}>
           <t.icon className="size-3.5 shrink-0" />
           <span className="flex-1 truncate">{t.id}</span>
           <Tip>{t.key}</Tip>
         </button>
-      ))}
+        );
+      })}
       <button type="button" title="Construction geometry (X): toggles the selected lines, or what you draw next" aria-label="Construction" aria-pressed={editor.construction} onClick={editor.toggleConstruction} className={cn(toggle, "border-t-2")}>
         <Construction className="size-3.5 shrink-0" />
         <span className="flex-1">construct</span>

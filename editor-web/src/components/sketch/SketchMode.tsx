@@ -300,6 +300,17 @@ function SketchEditorView({
             {shown}
           </p>
         )}
+        {editor.editBusy && <p className="self-center border border-border bg-popover px-2 py-0.5 text-[10px] text-muted-foreground">asking the SDK…</p>}
+        {editor.editNote && (
+          <p
+            role={editor.editNote.tone === "fail" ? "alert" : "status"}
+            data-testid="sketch-edit-note"
+            data-tone={editor.editNote.tone}
+            className={`max-w-[460px] self-center border-2 bg-popover px-2 py-1 text-[11px] ${editor.editNote.tone === "fail" ? "border-fail text-fail" : "border-pass text-foreground"}`}
+          >
+            {editor.editNote.text}
+          </p>
+        )}
         <p className="pointer-events-none max-w-[420px] self-center border border-border bg-popover/90 px-2 py-1 text-center text-[10px] leading-tight text-muted-foreground">
           {editor.hint} <span className="opacity-80">Orbit: right/middle drag or Alt+drag; pan: Shift+middle or space+drag; zoom: wheel.</span>
           {coords && <span className="ml-2 text-foreground">{coords}</span>}

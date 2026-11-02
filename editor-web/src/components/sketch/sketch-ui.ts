@@ -1,4 +1,4 @@
-import { Circle, Crosshair, MousePointer2, Slash, Spline, Trash2 } from "lucide-react";
+import { Circle, Crosshair, MousePointer2, Scissors, Slash, Spline, Trash2, UnfoldHorizontal } from "lucide-react";
 
 import type { ConstraintKind } from "@/lib/sketch";
 import type { Tool } from "@/lib/useSketchEditor";
@@ -10,6 +10,8 @@ export const TOOLS: { id: Tool; label: string; key: string; icon: typeof Slash }
   { id: "circle", label: "Circle: centre, then radius", key: "C", icon: Circle },
   { id: "arc", label: "Arc: centre, start, end (counter-clockwise)", key: "A", icon: Spline },
   { id: "delete", label: "Delete", key: "D", icon: Trash2 },
+  { id: "trim", label: "Trim: cut an entity back to its neighbours (SDK trim_rsketch)", key: "T", icon: Scissors },
+  { id: "extend", label: "Extend: grow a line's end to the next entity (SDK extend_rsketch)", key: "E", icon: UnfoldHorizontal },
 ];
 
 export const CONSTRAINT_SHORT: Record<ConstraintKind, string> = {

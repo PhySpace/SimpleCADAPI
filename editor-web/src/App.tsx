@@ -6,7 +6,11 @@ import { FeatureDialog, type DialogRequest } from "@/components/FeatureDialog";
 import { CommandBar } from "@/components/CommandBar";
 import { FEATURE_ICONS } from "@/components/feature-icons";
 import { FeatureTree } from "@/components/FeatureTree";
-import { commandsFromSpecs } from "@/lib/commands";
+import { assemblyCommands, commandsFromSpecs } from "@/lib/commands";
+import { AssemblyPanel } from "@/components/AssemblyPanel";
+import { ConnectorGizmos, type Gizmo } from "@/components/ConnectorGizmos";
+import { setRef } from "@/lib/assembly";
+import { useAssemblyEditor, useConnectorDraft } from "@/lib/useAssembly";
 import { Header } from "@/components/Header";
 import { Inspector } from "@/components/Inspector";
 import { SketchMode, type SketchSession } from "@/components/sketch/SketchMode";
@@ -26,6 +30,7 @@ import { useRunLog } from "@/lib/runlog";
 import { useTheme } from "@/lib/theme";
 import { selectionPayload, variableNames, type SelectionItem } from "@/lib/selection";
 import { cn } from "@/lib/utils";
+import { Boxes, Cable } from "lucide-react";
 import { Viewport, type PickResult, type SelectionMode } from "@/scene/Viewport";
 import type { SceneView } from "@/scene/scene-view";
 
@@ -91,6 +96,10 @@ export function App() {
   const choosingRef = useRef(false);
   choosingRef.current = sketchSession !== null && sketchSession.plane === null;
   const infoWaiters = useRef(new Map<string, (entity: { properties?: Record<string, unknown>; geometry?: Record<string, unknown> } | null) => void>());
+
+  // Assembly: the layout draft, the part's own connector draft, and what the viewport draws for them.
+  const asm = useAssemblyEditor(gui.state, currentPath);
+  const conn = useConnectorDraft(gui.state, currentPath);
 
   const kind = notebooks.find((row) => row.path === currentPath)?.kind ?? null;
   const theme = useTheme();
@@ -339,6 +348,9 @@ export function App() {
     [askEntity, choosePlane],
   );
 
+  const leftTabRef = useRef(leftTab);
+  leftTabRef.current = leftTab;
+  const selectComponent = asm.setSelected;
   const handlePick = useCallback((result: PickResult) => {
     if (choosingRef.current) {
       void pickSketchFace(result);
@@ -347,6 +359,8 @@ export function App() {
     if (sketchingRef.current) return;
     const view = viewRef.current;
     const node = view?.nodes.find((item) => item.node_id === result.nodeId);
+    // With the assembly tab open, clicking a part of the model selects its component (its connectors are drawn).
+    if (leftTabRef.current === "assembly" && node?.component_id && result.mode === "component") selectComponent(node.component_id);
     const entity = result.entity;
     const item: Omit<SelectionItem, "variable"> = {
       key: `${result.nodeId}::${result.entityId ?? "component"}`,
@@ -370,7 +384,7 @@ export function App() {
         ? previous.filter((other) => other.key !== item.key)
         : [...previous, item];
     });
-  }, [pickSketchFace]);
+  }, [pickSketchFace, selectComponent]);
 
   const handleClear = useCallback(() => {
     if (sketchingRef.current) return;
@@ -498,12 +512,69 @@ export function App() {
   );
 
   const isSketchSpec = (spec: Spec) => spec.slots.some((slot) => slot.kind === "sketch");
+  const openAssembly = useCallback(
+    (section: "assembly" | "connectors" = "assembly") => {
+      setLeftTab("assembly");
+      if (section === "connectors") setSelectionMode("face"); // faces are what a connector is placed on
+      else setSelectionMode((mode) => (mode === "face" ? "component" : mode));
+    },
+    [],
+  );
   const commands = useMemo(
-    () => commandsFromSpecs(gui.catalog?.specs ?? [], (spec) => (isSketchSpec(spec) ? startSketch() : openDialog({ spec })), FEATURE_ICONS),
-    [gui.catalog, openDialog, startSketch],
+    () => [
+      // The assembly layout is not a dialog: it is its own panel (registered below), so its spec is left out of the generic list.
+      ...commandsFromSpecs((gui.catalog?.specs ?? []).filter((spec) => spec.id !== "assembly"), (spec) => (isSketchSpec(spec) ? startSketch() : openDialog({ spec })), FEATURE_ICONS),
+      ...assemblyCommands(openAssembly, { assembly: Boxes, connectors: Cable }),
+    ],
+    [gui.catalog, openDialog, startSketch, openAssembly],
+  );
+
+  /** A command from the assembly panel: rejects with the server's message (shown in the panel). */
+  const runPanelCommand = useCallback(
+    async (command: FeatureCommand) => {
+      const result = await gui.run(command);
+      log.push("ok", command.op === "set_connectors" ? "connectors set" : `${command.op} ${result.name}`);
+    },
+    [gui.run, log.push],
+  );
+
+  /** The frames the viewport draws: the selected component's connectors (all components' while a picker is armed),
+   * and the open part's own connectors. */
+  const gizmos = useMemo<Gizmo[]>(() => {
+    if (leftTab !== "assembly") return [];
+    const out: Gizmo[] = [];
+    for (const c of asm.doc.components) {
+      if (!(c.id === asm.selected || asm.target)) continue;
+      for (const frame of asm.cache[c.part]?.connectors ?? []) out.push({ key: `${c.id}.${frame.id}`, owner: c.id, frame });
+    }
+    if (gui.state.product) for (const frame of conn.list) out.push({ key: frame.id, owner: null, frame });
+    return out;
+  }, [leftTab, asm.doc.components, asm.selected, asm.target, asm.cache, gui.state.product, conn.list]);
+  const gizmoHighlight = useMemo(() => {
+    const set = new Set<string>();
+    if (conn.selected) set.add(conn.selected);
+    for (const k of asm.doc.constraints) for (const side of [k.a, k.b]) if (side.component && side.connector) set.add(`${side.component}.${side.connector}`);
+    return set;
+  }, [conn.selected, asm.doc.constraints]);
+  const pickGizmo = useCallback(
+    (g: Gizmo) => {
+      if (g.owner === null) {
+        conn.setSelected(conn.selected === g.frame.id ? null : g.frame.id);
+        return;
+      }
+      if (asm.target) {
+        asm.setDoc(setRef(asm.doc, asm.target.constraint, asm.target.side, { component: g.owner, connector: g.frame.id }));
+        asm.setTarget(null);
+      } else asm.setSelected(g.owner);
+    },
+    [asm, conn],
   );
 
   const handleEditFeature = (feature: FeatureRow, spec: Spec) => {
+    if (spec.id === "assembly") {
+      openAssembly("assembly");
+      return;
+    }
     if (!isSketchSpec(spec)) {
       openDialog({ spec, edit: feature });
       return;
@@ -557,6 +628,7 @@ export function App() {
             <Tabs value={leftTab} onValueChange={setLeftTab} className="h-full">
               <TabsList>
                 <TabsTrigger value="features">features</TabsTrigger>
+                <TabsTrigger value="assembly">assembly</TabsTrigger>
                 <TabsTrigger value="notebook">notebook</TabsTrigger>
                 <TabsTrigger value="workspace">workspace</TabsTrigger>
                 {moduleView && <TabsTrigger value="module">{moduleView.name}</TabsTrigger>}
@@ -572,6 +644,17 @@ export function App() {
                   onUseProduct={(body) => void runFeature({ op: "use_as_product", body })}
                   onUndo={undo}
                   onRedo={redo}
+                />
+              </TabsContent>
+              <TabsContent value="assembly" className="min-h-0">
+                <AssemblyPanel
+                  state={gui.state}
+                  editor={asm}
+                  connectors={conn}
+                  selection={selection}
+                  busy={guiBusy}
+                  onSelectionMode={setSelectionMode}
+                  onRun={runPanelCommand}
                 />
               </TabsContent>
               <TabsContent value="notebook" className="min-h-0">
@@ -652,6 +735,9 @@ export function App() {
                   onPick={handlePick}
                   onClear={handleClear}
                 />
+                {!sketching && viewRef.current && gizmos.length > 0 && (
+                  <ConnectorGizmos view={viewRef.current} gizmos={gizmos} components={asm.doc.components} highlighted={gizmoHighlight} onPick={pickGizmo} />
+                )}
                 <div inert={sketching} className={cn(sketching && "opacity-40")}>
                   <CommandBar commands={commands} />
                 </div>

@@ -70,6 +70,7 @@ class FeatureService:
     # -- reading ----------------------------------------------------------------------------------------------------
     def snapshot(self) -> dict[str, Any]:
         """Features, bodies, the product, and the defaults a form should open with."""
+        self._sync()
         cells = list(self.state.cells)
         features: list[dict[str, Any]] = []
         bodies: dict[str, str] = {}

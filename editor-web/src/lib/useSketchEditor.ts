@@ -21,6 +21,7 @@ import {
   fetchSolve,
   findLoops,
   gridStep,
+  entityHit,
   hitTest,
   isDimensional,
   isFixed,
@@ -44,8 +45,11 @@ import {
   type SolveResult,
   type Spot,
 } from "@/lib/sketch";
+import { applyEdit, describeEdit, extendRequest, fetchSketchOp, nearerEnd, pushHistory, trimRequest, type EditRequest, type End } from "@/lib/sketch-edit";
 
-export type Tool = "select" | "point" | "line" | "circle" | "arc" | "delete";
+export type Tool = "select" | "point" | "line" | "circle" | "arc" | "delete" | "trim" | "extend";
+/** What the last SDK edit (trim, extend) said: its notes, or the error (which names ids). Shown in the status area. */
+export type EditNote = { tone: "ok" | "fail"; text: string };
 export type Draft = { tool: "line"; from: Spot } | { tool: "circle"; center: Spot } | { tool: "arc"; center: Spot; start?: Spot } | null;
 export type Drag = { ids: string[]; origin: Record<string, [number, number]>; start: [number, number]; positions: Record<string, [number, number]>; releasing?: boolean };
 export type ValueBox = { kind: ConstraintKind; targets: string[]; constraintId?: string; text: string; bad: boolean };
@@ -76,9 +80,16 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   const [construction, setConstructionMode] = useState(false);
   const [choice, setChoice] = useState<Choice>({ outer: null, inner: [], chosen: false });
   const [edits, setEdits] = useState(0);
+  const [editNote, setEditNote] = useState<EditNote | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
+  const [flash, setFlash] = useState<ReadonlySet<string>>(new Set());
+  const [hoverEnd, setHoverEnd] = useState<End | null>(null);
+  const flashTimer = useRef<number | null>(null);
 
   const docRef = useRef(doc);
   docRef.current = doc;
+  const draftRef = useRef<Draft>(null);
+  draftRef.current = draft;
   const history = useRef<SketchDoc[]>([]);
   const future = useRef<SketchDoc[]>([]);
   const press = useRef<{ hit: Hit; sx: number; sy: number; world: [number, number]; shift: boolean; wasSelected: boolean } | null>(null);
@@ -87,7 +98,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   // -- document changes (history) --------------------------------------------------------------------------------------
   const commit = useCallback((next: SketchDoc, record = true) => {
     if (record) {
-      history.current = [...history.current.slice(-80), docRef.current];
+      history.current = pushHistory(history.current, docRef.current);
       future.current = [];
       setEdits(history.current.length);
     }
@@ -239,10 +250,48 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   }, [selection, commit]);
 
   const chooseTool = useCallback((next: Tool) => {
+    // Trim and extend are not offered in the middle of a draft (finish or cancel it first).
+    if ((next === "trim" || next === "extend") && draftRef.current) {
+      setEditNote({ tone: "fail", text: `${next} is not available while a draft is in progress: finish it or press Esc first` });
+      return;
+    }
+    setEditNote(null);
+    setHoverEnd(null);
     setTool(next);
     setDraft(null);
     if (next !== "select") setSelection([]);
   }, []);
+
+  // -- SDK edits (trim, extend) -----------------------------------------------------------------------------------------------
+  /** Send one edit to the server (which runs the SDK function) and adopt the document it returns: undoable as one step,
+   * re-solved by the live solve, the created entities flashed.  A failure is shown, never swallowed. */
+  const runEdit = useCallback(
+    async (request: EditRequest) => {
+      setEditBusy(true);
+      setEditNote(null);
+      try {
+        const response = await fetchSketchOp(request);
+        const { doc: next, flash: created } = applyEdit(response);
+        commit(next);
+        setSelection([]);
+        setHover(null);
+        setHoverEnd(null);
+        setEditNote({ tone: "ok", text: describeEdit(request.op, response) });
+        if (flashTimer.current !== null) window.clearTimeout(flashTimer.current);
+        setFlash(new Set(created));
+        flashTimer.current = window.setTimeout(() => {
+          flashTimer.current = null;
+          setFlash(new Set());
+        }, 1400);
+      } catch (e) {
+        setEditNote({ tone: "fail", text: `${request.op}: ${e instanceof Error ? e.message : String(e)}` });
+      } finally {
+        setEditBusy(false);
+      }
+    },
+    [commit],
+  );
+  useEffect(() => () => void (flashTimer.current !== null && window.clearTimeout(flashTimer.current)), []);
 
   // -- pointer ------------------------------------------------------------------------------------------------------------------
   /** A left-button press. "press" asks the caller to capture the pointer (a selection that may become a drag). */
@@ -252,6 +301,18 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     const d = docRef.current;
     const opts = { auto, construction };
     const tol = 9 / info.scale;
+    if (tool === "trim" || tool === "extend") {
+      if (editBusy) return "handled";
+      const hit = entityHit(d, result, world, tol);
+      if (!hit) return "handled";
+      if (tool === "trim") void runEdit(trimRequest(d, hit.id, world));
+      else {
+        const request = extendRequest(d, pts, hit.id, world);
+        if (request) void runEdit(request);
+        else setEditNote({ tone: "fail", text: `extend: ${hit.id} has no end to extend (a circle is closed); pick a line or an arc` });
+      }
+      return "handled";
+    }
     if (tool === "select" || tool === "delete") {
       const hit = hitTest(d, result, world, tol);
       if (tool === "delete") {
@@ -362,6 +423,11 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     if (tool === "select") {
       setHover(hitTest(docRef.current, result, world, tol));
       setCursor({ x: world[0], y: world[1] });
+    } else if (tool === "trim" || tool === "extend") {
+      const hit = entityHit(docRef.current, result, world, tol);
+      setHover(hit);
+      setHoverEnd(hit && tool === "extend" ? nearerEnd(docRef.current, pts, hit.id, world) : null);
+      setCursor({ x: world[0], y: world[1] });
     } else {
       const s = spotAt(world, info);
       setCursor({ x: s.x, y: s.y, pointId: s.pointId });
@@ -400,7 +466,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       return "handled";
     }
     if (event.altKey) return "ignored";
-    const shortcuts: Record<string, Tool> = { v: "select", p: "point", l: "line", c: "circle", a: "arc", d: "delete" };
+    const shortcuts: Record<string, Tool> = { v: "select", p: "point", l: "line", c: "circle", a: "arc", d: "delete", t: "trim", e: "extend" };
     if (shortcuts[k]) chooseTool(shortcuts[k]);
     else if (k === "x") toggleConstruction();
     else if (k === "delete" || k === "backspace") deleteSelection();
@@ -458,10 +524,14 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
             ? draft ? (draft.tool === "arc" && draft.start ? "Click the end (counter-clockwise from start)." : "Click the start point (sets the radius).") : "Click the centre."
             : tool === "delete"
               ? "Click an item to delete it."
-              : "Click to place a point.";
+              : tool === "trim"
+                ? "Click the part of a line, arc or circle to cut away; the SDK decides the piece between its neighbours."
+                : tool === "extend"
+                  ? "Click a line near the end to extend; it grows to the next entity."
+                  : "Click to place a point.";
 
   return {
-    doc, commit, undo, redo, edits, tool, chooseTool, selection, highlight, setHighlight, draft, cursor, hover, drag, box, setBox, result, error, auto, setAuto, snapOn,
+    doc, commit, undo, redo, edits, editNote, editBusy, flash, hoverEnd, runEdit, tool, chooseTool, selection, highlight, setHighlight, draft, cursor, hover, drag, box, setBox, result, error, auto, setAuto, snapOn,
     setSnapOn, construction, choice, pts, loops, applicable, blamed, failing, highlighted, fixedPoints, solved, badge, diagnostics, outer, hint, extents,
     openBox, applyConstraint, submitBox, deleteSelection, toggleConstruction, pointerDown, pointerMove, pointerUp, pointerLeave, key,
   };

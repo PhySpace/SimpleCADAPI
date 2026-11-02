@@ -588,6 +588,17 @@ export function hitTest(doc: SketchDoc, solve: SolveResult | null, pos: readonly
   return hit ? { kind: "entity", id: hit.id } : null;
 }
 
+/** The nearest entity within `tol` of a position (never a point): what a trim or extend click points at. */
+export function entityHit(doc: SketchDoc, solve: SolveResult | null, pos: readonly [number, number], tol: number): Hit | null {
+  const pts = solvedPoints(doc, solve);
+  let hit: { id: string; d: number } | null = null;
+  for (const e of doc.entities) {
+    const d = entityDistance(doc, e, pos, pts, solve);
+    if (d <= tol && (!hit || d < hit.d)) hit = { id: e.id, d };
+  }
+  return hit ? { kind: "entity", id: hit.id } : null;
+}
+
 // -- drag: the temporary fix ----------------------------------------------------------------------------------------------
 
 export const TEMP_PREFIX = "tmp";

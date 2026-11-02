@@ -213,7 +213,10 @@ export function SketchOverlay({
 
   // -- geometry -----------------------------------------------------------------------------------------------------------------
   const solved = editor.solved;
+  const cutting = tool === "trim"; // the piece under the cursor is shown in the warning colour: it is what a click removes
   const strokeOf = (id: string, construct?: boolean) => {
+    if (editor.flash.has(id)) return NAME;
+    if (cutting && hover?.id === id) return FAIL;
     if (editor.failing.has(id)) return FAIL;
     if (editor.highlighted.has(id)) return NAME;
     if (selection.includes(id)) return FOCUS;
@@ -374,8 +377,17 @@ export function SketchOverlay({
     );
   })();
 
+  // Extend: the end of the hovered line the click would extend.
+  const hoverMark = (() => {
+    if (tool !== "extend" || !editor.hoverEnd || hover?.kind !== "entity") return null;
+    const e = doc.entities.find((item) => item.id === hover.id);
+    const at = pts.get((editor.hoverEnd === "start" ? e?.start : e?.end) ?? "");
+    const s = at ? project(at[0], at[1]) : null;
+    return s ? <circle cx={s[0]} cy={s[1]} r={9} fill="none" stroke={PASS} strokeWidth={2.5} data-testid="extend-end" data-end={editor.hoverEnd} /> : null;
+  })();
+
   const cursorMark = (() => {
-    if (!cursor || tool === "select" || tool === "delete") return null;
+    if (!cursor || tool === "select" || tool === "delete" || tool === "trim" || tool === "extend") return null;
     const s = project(cursor.x, cursor.y);
     if (!s) return null;
     return cursor.pointId ? (
@@ -386,7 +398,7 @@ export function SketchOverlay({
   })();
 
   const dragging = editor.drag !== null;
-  const cursorStyle = moving ? "grabbing" : tool === "select" ? (dragging ? "grabbing" : hover ? "pointer" : "default") : "crosshair";
+  const cursorStyle = moving ? "grabbing" : tool === "select" || tool === "trim" || tool === "extend" ? (dragging ? "grabbing" : hover ? "pointer" : "default") : "crosshair";
 
   return (
     <div ref={wrap} className="absolute inset-0 overflow-hidden outline-none" data-testid="sketch-canvas" tabIndex={-1}>
@@ -437,9 +449,9 @@ export function SketchOverlay({
         {doc.entities.map((e) => {
           const d = entityPath(e);
           if (!d) return null;
-          const picked = selection.includes(e.id) || hover?.id === e.id;
+          const picked = selection.includes(e.id) || hover?.id === e.id || editor.flash.has(e.id);
           return (
-            <g key={e.id} fill="none" strokeLinecap="round" strokeLinejoin="round" data-entity={e.id}>
+            <g key={e.id} fill="none" strokeLinecap="round" strokeLinejoin="round" data-entity={e.id} data-flash={editor.flash.has(e.id) || undefined}>
               <path d={d} stroke={HALO} strokeWidth={picked ? 6.5 : 5} opacity={0.85} strokeDasharray={e.construction ? "6 4" : undefined} />
               <path d={d} stroke={strokeOf(e.id, e.construction)} strokeWidth={picked ? 3 : 2.2} strokeDasharray={e.construction ? "6 4" : undefined} />
             </g>
@@ -451,13 +463,14 @@ export function SketchOverlay({
           if (!s) return null;
           const fixed = editor.fixedPoints.has(p.id);
           const picked = selection.includes(p.id) || hover?.id === p.id;
-          const color = editor.failing.has(p.id) ? FAIL : editor.highlighted.has(p.id) ? NAME : picked ? FOCUS : fixed || solved ? PASS : INK;
+          const color = editor.flash.has(p.id) ? NAME : editor.failing.has(p.id) ? FAIL : editor.highlighted.has(p.id) ? NAME : picked ? FOCUS : fixed || solved ? PASS : INK;
           return fixed ? (
             <rect key={p.id} x={s[0] - 4.5} y={s[1] - 4.5} width={9} height={9} fill={color} stroke={HALO} strokeWidth={1.5} data-point={p.id} />
           ) : (
             <circle key={p.id} cx={s[0]} cy={s[1]} r={picked ? 5.5 : 4.5} fill={color} stroke={HALO} strokeWidth={1.5} data-point={p.id} />
           );
         })}
+        {hoverMark}
         {labelNodes}
         {preview}
         {cursorMark}
