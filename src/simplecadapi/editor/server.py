@@ -2008,7 +2008,7 @@ def create_app(state: WorkspaceState) -> Starlette:
         return JSONResponse(await asyncio.to_thread(state.features.snapshot))
 
     async def features_command(request: Request) -> JSONResponse:
-        """``{op: add|edit|delete|use_as_product|undo|redo, ...}``: one GUI command on the open notebook."""
+        """``{op: add|edit|delete|use_as_product|set_connectors|undo|redo, ...}``: one GUI command on the open notebook."""
         from .gui_features import GuiError
 
         try:
@@ -2022,6 +2022,7 @@ def create_app(state: WorkspaceState) -> Starlette:
             "edit": state.features.edit,
             "delete": state.features.delete,
             "use_as_product": state.features.use_as_product,
+            "set_connectors": state.features.set_connectors,
             "undo": lambda _request: state.features.undo(),
             "redo": lambda _request: state.features.redo(),
         }.get(op)

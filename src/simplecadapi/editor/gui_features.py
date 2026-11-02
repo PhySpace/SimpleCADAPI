@@ -147,11 +147,19 @@ class FeatureService:
                 None,
             ),
             "product": product,
+            "connectors": self._connectors(cells, product),
             "defaults": self._defaults(open_bodies, faces),
             "taken": sorted(taken),
             "undo": len(self._undo),
             "redo": len(self._redo),
         }
+
+    @staticmethod
+    def _connectors(cells: list[dict], product: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+        if not product:
+            return []
+        code = next((str(c.get("code", "")) for c in cells if c["id"] == product["cell"]), "")
+        return assembly_doc.parse_connectors(code)
 
     @staticmethod
     def _defaults(open_bodies: list[str], faces: list[str]) -> dict[str, dict[str, str]]:
@@ -255,6 +263,29 @@ class FeatureService:
                     steps.append(self._remove(cell_id))
             self._record(steps)
             return self._result(None, steps, feature["slug"])
+
+    def set_connectors(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        """Replace the connectors of the part the product cell builds (the list is the whole truth, kept in a ``# gui:`` line)."""
+        with self._lock:
+            self._sync()
+            snap = self.snapshot()
+            product = snap["product"]
+            if not product:
+                raise GuiError("this notebook has no product cell that builds a Part from a body")
+            try:
+                items = assembly_doc.validate_connectors(request.get("connectors") or [])
+            except assembly_doc.AssemblyError as exc:
+                raise GuiError(str(exc)) from exc
+            cell = self._cell(product["cell"])
+            first = next((ln for ln in cell["code"].splitlines() if "Part(" in ln or "make_part_rpart(" in ln), None)
+            if first is None:
+                raise GuiError("the product cell does not build a Part in one line; edit it as code")
+            variable = first.split("=", 1)[0].strip()
+            first = first.replace("scad.Part(", "scad.make_part_rpart(")  # connectors need a recorded Part
+            new = "\n".join(assembly_doc.render_connectors(first, variable, items))
+            steps = [self._edit(product["cell"], cell["code"], new, run=True)] if new.strip() != cell["code"].strip() else []
+            self._record(steps)
+            return self._result(product["cell"], steps, "connectors")
 
     def use_as_product(self, request: Mapping[str, Any]) -> dict[str, Any]:
         with self._lock:
@@ -410,7 +441,7 @@ class FeatureService:
             return []
         stem = re.sub(r"\W", "_", getattr(self.state.notebook, "stem", "part") or "part").strip("_").lower() or "part"
         variable = stem if stem not in taken and stem not in F._RESERVED and not stem[0].isdigit() else f"{stem}_part"
-        return [self._create(after, f"{variable} = scad.Part(part_id=scad.notebook_id(), body={rendered.slug})", run=True)]
+        return [self._create(after, f"{variable} = scad.make_part_rpart(part_id=scad.notebook_id(), body={rendered.slug})", run=True)]
 
     def _apply(self, step: dict, *, forward: bool) -> None:
         kind = step["kind"]

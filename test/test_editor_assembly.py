@@ -136,3 +136,48 @@ def test_the_assembly_feature_is_added_edited_undone_and_deleted_in_a_real_edito
         if state.kernel is not None:
             state.kernel.stop()
         server.should_exit = True
+
+
+def test_connectors_of_a_gui_part_are_written_into_its_product_cell_and_read_back(tmp_path):
+    import uvicorn
+
+    from simplecadapi.editor.server import WorkspaceState, create_app
+    from simplecadapi.editor.templates import create_notebook
+    from test_editor_features import _wait_idle
+
+    path = create_notebook(tmp_path, "post", "blank")
+    state = WorkspaceState(tmp_path)
+    state.port = 17736
+    server = uvicorn.Server(uvicorn.Config(create_app(state), port=state.port, log_level="error"))
+    threading.Thread(target=server.run, daemon=True).start()
+    state.hub.attach_loop(__import__("asyncio").new_event_loop())
+    try:
+        state.start_kernel(path)
+        service = state.features
+        service.add({"spec": "box", "name": "base", "values": {}})
+        _wait_idle(state)
+        frames = [
+            {"id": "top", "origin": [0.0, 0.0, 20.0], "x_axis": [1.0, 0.0, 0.0], "y_axis": [0.0, 1.0, 0.0]},
+            {"id": "side", "origin": [20.0, 0.0, 10.0], "x_axis": [0.0, 1.0, 0.0], "y_axis": [0.0, 0.0, 1.0]},
+        ]
+        service.set_connectors({"connectors": frames})
+        _wait_idle(state)
+        assert service.snapshot()["connectors"] == frames
+        text = path.read_text()
+        assert text.count("scad.add_connector_rpart(part=post") == 2 and "# gui-connectors: " in text
+        assert {c["id"] for c in A.connectors_of(path)} == {"top", "side"}
+        from simplecadapi.editor.gui_features import GuiError
+
+        with pytest.raises(GuiError, match="square to each other"):
+            service.set_connectors({"connectors": [{"id": "x", "origin": [0, 0, 0], "x_axis": [1, 0, 0], "y_axis": [1, 0, 0]}]})
+        # replacing the list replaces it: one connector remains, and undo brings the two back
+        service.set_connectors({"connectors": frames[:1]})
+        _wait_idle(state)
+        assert [c["id"] for c in service.snapshot()["connectors"]] == ["top"]
+        service.undo()
+        _wait_idle(state)
+        assert [c["id"] for c in service.snapshot()["connectors"]] == ["top", "side"]
+    finally:
+        if state.kernel is not None:
+            state.kernel.stop()
+        server.should_exit = True

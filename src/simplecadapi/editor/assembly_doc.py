@@ -192,6 +192,63 @@ def render(slug: str, name: str, doc: Mapping[str, Any], notebook_dir: Path | No
     return {"params": params, "uses": uses, "layout": lines}
 
 
+# ---- the connectors of a part ------------------------------------------------------------------------------------------------
+
+_CONNECTOR_MARKER = "# gui-connectors:"
+
+
+def validate_connectors(items: Any) -> list[dict[str, Any]]:
+    """Connector frames ``{id, origin, x_axis, y_axis}`` (numbers; the axes unit and square to each other), or :class:`AssemblyError`."""
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for raw in items:
+        cid = str(raw.get("id"))
+        if not _CONNECTOR.fullmatch(cid) or cid in seen:
+            raise AssemblyError(f"connector id {cid!r} is invalid or used twice")
+        seen.add(cid)
+        frame: dict[str, Any] = {"id": cid}
+        for key in ("origin", "x_axis", "y_axis"):
+            vec = raw.get(key)
+            if not (isinstance(vec, (list, tuple)) and len(vec) == 3):
+                raise AssemblyError(f"{cid}: {key} is three numbers")
+            frame[key] = [_number(v, f"{cid} {key}") for v in vec]
+        x, y = frame["x_axis"], frame["y_axis"]
+        norms = [math.sqrt(sum(v * v for v in axis)) for axis in (x, y)]
+        if any(abs(n - 1.0) > 1e-6 for n in norms):
+            raise AssemblyError(f"{cid}: the axes must be unit vectors")
+        if abs(sum(a * b for a, b in zip(x, y))) > 1e-6:
+            raise AssemblyError(f"{cid}: the x axis and the y axis must be square to each other")
+        out.append(frame)
+    return out
+
+
+def render_connectors(part_line: str, variable: str, items: list[dict[str, Any]]) -> list[str]:
+    """The product cell: the line that builds the Part, then the connectors (listed in a marker line the GUI reads back)."""
+    lines = [part_line]
+    if items:
+        lines.append(_CONNECTOR_MARKER + " " + json.dumps(items, separators=(",", ":")))
+    for item in items:
+        origin = ", ".join(_num(v) for v in item["origin"])
+        x_axis = ", ".join(_num(v) for v in item["x_axis"])
+        y_axis = ", ".join(_num(v) for v in item["y_axis"])
+        lines.append(
+            f"{variable} = scad.add_connector_rpart(part={variable}, connector=scad.make_placement_connector_rconnector("
+            f"connector_id={json.dumps(item['id'])}, placement=scad.make_placement_rplacement(origin=({origin}), x_axis=({x_axis}), y_axis=({y_axis}))))"
+        )
+    return lines
+
+
+def parse_connectors(code: str) -> list[dict[str, Any]]:
+    for line in code.splitlines():
+        if line.startswith(_CONNECTOR_MARKER):
+            try:
+                data = json.loads(line[len(_CONNECTOR_MARKER):])
+                return validate_connectors(data)
+            except (ValueError, AssemblyError):
+                return []
+    return []
+
+
 # ---- what a part offers ----------------------------------------------------------------------------------------------------
 
 _cache: dict[tuple[str, float], list[dict[str, Any]]] = {}
@@ -228,4 +285,4 @@ def connectors_of(path: Path) -> list[dict[str, Any]]:
     return out
 
 
-__all__ = ["AXES", "AssemblyError", "KINDS", "connectors_of", "render", "validate"]
+__all__ = ["AXES", "AssemblyError", "KINDS", "connectors_of", "parse_connectors", "render", "render_connectors", "validate", "validate_connectors"]

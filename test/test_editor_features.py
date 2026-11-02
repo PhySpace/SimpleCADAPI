@@ -304,7 +304,7 @@ def test_a_blank_notebook_gets_its_product_with_the_first_feature(tmp_path):
         snap = service.snapshot()
         assert [f["slug"] for f in snap["features"]] == ["base"]
         assert snap["product"] == {"cell": snap["product"]["cell"], "body": "base"}
-        assert "plate = scad.Part(part_id=scad.notebook_id(), body=base)" in path.read_text()
+        assert "plate = scad.make_part_rpart(part_id=scad.notebook_id(), body=base)" in path.read_text()
         service.add({"spec": "cylinder", "values": {"radius": 5.0, "height": 40.0, "origin": [0.0, 0.0, -10.0]}})
         service.add({"spec": "cut", "values": {}})  # base is the second-last open body, the cylinder the last: it is cut out
         _wait_idle(state)
