@@ -1,5 +1,7 @@
 # Discipline: Mechanical Modeling
 
+**Read when:** you choose a construction strategy or decompose a mechanical part or product before selecting SimpleCADAPI operations.
+
 How to choose a construction strategy before selecting SimpleCADAPI operations.
 This document separates SDK contracts from mechanical design guidance.
 

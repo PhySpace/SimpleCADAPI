@@ -3,6 +3,8 @@
 Operation order is a robustness recommendation, not an SDK-enforced canonical
 sequence. Put fragile steps late when that improves diagnosis and repair.
 
+**Read when:** you plan the order of operations of a part, a fillet or chamfer fails, or you pattern a feature or loft sections.
+
 ## Evidence labels
 
 - **SDK contract:** documented operation results and failure behavior.

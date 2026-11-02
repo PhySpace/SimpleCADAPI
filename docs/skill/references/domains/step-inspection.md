@@ -1,5 +1,7 @@
 # Task Domain: STEP/BREP Inspection
 
+**Read when:** the input is an existing `.step`/`.stp` file and you need facts out of it, or a reconstruction candidate must be compared against a target STEP (details under "Use when").
+
 Extract bounded geometric facts from existing STEP files, compare targets and
 candidates, and gather reconstruction evidence with the
 `simplecadapi.inspect.brep` namespace.

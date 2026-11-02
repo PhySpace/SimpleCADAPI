@@ -5,6 +5,9 @@ modeling brief. The operational steps live in
 `../domains/requirement-refinement.md`; this file carries reasoning and
 evidence-handling guidance, not automatic SDK behavior.
 
+**Read when:** Role 1 (or any brief-writing step) starts: prose, images or drawings are being turned into a brief, or
+evidence conflicts.
+
 ## Every modality funnels into one brief
 
 Prose, images, drawings, and conflicts all reduce to the same artifact: a
@@ -45,6 +48,9 @@ A drawing is a dimensioned contract:
 Success for a drawing-driven model: every drawing dimension is either verified
 by a measurement after generation, or explicitly reported as not verified.
 
+**Unattended:** where this page says to flag or ask the user, record the conflict, the choice and the evidence in the
+brief's assumption ledger instead (`discipline/operating-modes.md`); the checks and the brief quality gate are unchanged.
+
 ## Assumptions are load-bearing only when reported
 
 An assumption silently applied is a future defect. Each one in the brief
@@ -69,6 +75,9 @@ assumption, the features it determines, and the default taken. When
 review invalidates an assumption, revisit every feature derived from it
 in place — a rebuild that re-encodes the same unchecked assumption
 reproduces the same rejection.
+
+**Unattended:** the one question that would be asked is recorded as an assumption (value, evidence, how to change it, the
+check that would show it wrong); nothing is asked.
 
 ## Brief quality gate
 

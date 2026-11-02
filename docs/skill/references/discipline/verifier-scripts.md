@@ -1,5 +1,8 @@
 # Discipline: Verifier Scripts
 
+**Read when:** Role 3 writes the executable check for a stage, or any task needs a script that measures a finished model
+against the specification.
+
 A verifier script measures a finished model against the specification and exits
 non-zero when a requirement fails. It is separate from the modeling script: it
 imports the model, measures it independently, and prints one line per check.

@@ -1,5 +1,7 @@
 # Discipline: Manufacturing Boundaries
 
+**Read when:** you apply default dimensions, or the request touches manufacturability, tolerance, strength or process claims.
+
 What geometric modeling may and may not conclude about manufacturing. Numeric
 defaults in this document are first-pass design heuristics, not SDK defaults.
 
@@ -9,6 +11,7 @@ defaults in this document are first-pass design heuristics, not SDK defaults.
   boundaries, and tolerance-analysis APIs.
 - **Modeling guidance:** wall thickness, fillet, clearance-hole, and backlash
   starting values. They require user confirmation or an explicit assumption.
+  **Unattended:** record the value as an assumption in the brief's ledger (`discipline/operating-modes.md`).
 
 ## Defaults are first-pass, not claims
 
