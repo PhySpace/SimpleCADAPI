@@ -4,6 +4,8 @@ import type { ThemePreference } from "@/lib/theme";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { UndoRedo } from "@/components/FeatureTree";
+import type { FeatureState } from "@/lib/features";
 
 /** Top bar: which notebook is open, whether its kernel is alive, and the
  * model's last message. Everything else lives on the cells. */
@@ -17,6 +19,9 @@ export function Header({
   onStop,
   themePreference,
   onTheme,
+  features,
+  onUndo,
+  onRedo,
 }: {
   notebook: string | null;
   kind: string | null;
@@ -28,6 +33,9 @@ export function Header({
   onStop: () => void;
   themePreference: ThemePreference;
   onTheme: () => void;
+  features: Pick<FeatureState, "undo" | "redo">;
+  onUndo: () => void;
+  onRedo: () => void;
 }) {
   const failing = status.startsWith("error");
   return (
@@ -52,6 +60,7 @@ export function Header({
       >
         {status}
       </span>
+      <UndoRedo state={features} onUndo={onUndo} onRedo={onRedo} />
       {running ? (
         <Button size="sm" variant="destructive" onClick={onStop} title="Stop the run (interrupt the kernel)">
           <Square className="fill-current" /> stop

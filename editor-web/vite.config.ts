@@ -2,7 +2,7 @@ import path from "node:path";
 
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 
 // The studio webui. In dev, API/WebSocket traffic proxies to the runtime
 // server (`sca edit`, default :7180); `npm run build` emits the
@@ -14,6 +14,8 @@ export default defineConfig({
       "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
+  // settle.test.ts is a node:test file (see its header); vitest runs the others.
+  test: { include: ["src/**/*.test.ts"], exclude: ["src/lib/settle.test.ts", "node_modules/**"] },
   server: {
     port: 5180,
     proxy: {

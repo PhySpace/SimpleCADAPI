@@ -1,0 +1,117 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  bodyChoices,
+  filterSelection,
+  formToValues,
+  holeFromFace,
+  initialForm,
+  inwardAxis,
+  parsePointList,
+  pointListText,
+  validateName,
+  type Spec,
+} from "./features";
+
+const spec: Spec = {
+  id: "demo",
+  label: "Demo",
+  group: "Primitives",
+  role: "build",
+  produces: "solid",
+  description: "",
+  slots: [
+    { name: "width", label: "Width", kind: "length", default: 10, unit: "mm", min: 0.1 },
+    { name: "count", label: "Count", kind: "count", default: 3, min: 2, max: 10 },
+    { name: "origin", label: "Origin", kind: "point", default: [0, 1, 2], unit: "mm" },
+    { name: "flag", label: "Flag", kind: "bool", default: true },
+    { name: "dir", label: "Dir", kind: "enum", default: "+x", options: [{ value: "+x", label: "+x" }, { value: "-z", label: "-z" }] },
+    { name: "base", label: "Base", kind: "body" },
+    { name: "outline", label: "Outline", kind: "points2d" },
+  ],
+};
+
+describe("parsePointList", () => {
+  it("reads one point per line, tolerating separators and blank lines", () => {
+    expect(parsePointList("0, 0\n10 0;\n\n10,5\n", 2)).toEqual({ ok: true, points: [[0, 0], [10, 0], [10, 5]] });
+  });
+  it("names the line and the problem", () => {
+    expect(parsePointList("0, 0\n1, 2, 3", 2)).toEqual({ ok: false, error: "line 2: expected 2 numbers (x, y), found 3" });
+    expect(parsePointList("1, a", 2)).toEqual({ ok: false, error: 'line 1: "a" is not a number' });
+    expect(parsePointList("1, 2", 3)).toMatchObject({ ok: false });
+  });
+  it("round-trips through pointListText", () => {
+    const points = [[0, 0.5], [3, -4]];
+    expect(parsePointList(pointListText(points), 2)).toEqual({ ok: true, points });
+  });
+});
+
+describe("initialForm", () => {
+  it("takes defaults, and the default body of the state", () => {
+    const form = initialForm(spec, { base: "box" });
+    expect(form).toMatchObject({ width: "10", count: "3", origin: ["0", "1", "2"], flag: true, dir: "+x", base: "box", outline: "" });
+  });
+  it("prefers the recipe's values in edit mode", () => {
+    const form = initialForm(spec, { base: "box" }, { width: 4, base: "other", origin: [1, 2, 3] });
+    expect(form).toMatchObject({ width: "4", base: "other", origin: ["1", "2", "3"] });
+  });
+});
+
+describe("formToValues", () => {
+  const valid = { ...initialForm(spec, { base: "box" }), outline: "0,0\n1,0\n1,1" };
+  it("converts a valid form", () => {
+    const { values, errors } = formToValues(spec, valid);
+    expect(errors).toEqual({});
+    expect(values).toMatchObject({ width: 10, count: 3, origin: [0, 1, 2], flag: true, dir: "+x", base: "box" });
+    expect(values.outline).toEqual([[0, 0], [1, 0], [1, 1]]);
+  });
+  it("checks ranges, integers and numbers", () => {
+    const { errors } = formToValues(spec, { ...valid, width: "0", count: "2.5", origin: ["a", "0", "0"] });
+    expect(errors.width).toBe("at least 0.1 mm");
+    expect(errors.count).toBe("must be a whole number");
+    expect(errors.origin).toBe("x, y and z must all be numbers");
+    expect(formToValues(spec, { ...valid, count: "11" }).errors.count).toBe("at most 10");
+    expect(formToValues(spec, { ...valid, width: "" }).errors.width).toBe("enter a number");
+  });
+  it("needs a body and enough points", () => {
+    expect(formToValues(spec, { ...valid, base: "" }).errors.base).toMatch(/add a solid/);
+    expect(formToValues(spec, { ...valid, outline: "0,0\n1,1" }).errors.outline).toBe("at least 3 points, one per line");
+  });
+});
+
+describe("validateName", () => {
+  it("accepts empty (the suggestion) and good names", () => {
+    expect(validateName("", ["a"])).toBeNull();
+    expect(validateName("base_plate", ["a"])).toBeNull();
+  });
+  it("rejects bad characters and taken names", () => {
+    expect(validateName("Base", [])).not.toBeNull();
+    expect(validateName("1abc", [])).not.toBeNull();
+    expect(validateName("box", ["box"])).toMatch(/already used/);
+    expect(validateName("box", ["BOX"])).toMatch(/already used/);
+  });
+});
+
+describe("bodies and selection", () => {
+  it("lists open bodies first", () => {
+    const state = { bodies: [{ name: "a", produces: "solid" }, { name: "b", produces: "solid" }, { name: "c", produces: "solid" }], open: ["c", "a"] };
+    expect(bodyChoices(state)).toEqual([{ name: "a", open: true }, { name: "c", open: true }, { name: "b", open: false }]);
+  });
+  it("filters picked items by entity kind", () => {
+    const items = [{ kind: "edge" }, { kind: "face" }, { kind: "edge" }];
+    expect(filterSelection(items, "edge")).toHaveLength(2);
+    expect(filterSelection(items, "face")).toHaveLength(1);
+  });
+});
+
+describe("hole from a face", () => {
+  it("points into the material, against the outward normal", () => {
+    expect(inwardAxis([0, 0, 1])).toBe("-z");
+    expect(inwardAxis([-1, 0.1, 0])).toBe("+x");
+    expect(inwardAxis([0, 0, 0])).toBeNull();
+  });
+  it("reads the centroid and the normal", () => {
+    expect(holeFromFace({ properties: { centroid: [1, 2, 3] }, geometry: { plane: { normal: [0, 1, 0] } } })).toEqual({ point: [1, 2, 3], direction: "-y" });
+    expect(holeFromFace({ properties: { centroid: [1, 2, 3] }, geometry: {} })).toEqual({ point: [1, 2, 3], direction: null });
+  });
+});

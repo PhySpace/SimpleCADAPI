@@ -2,6 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CellEditor, type NotebookCell, type NotebookFeature, type ParamMeta } from "@/components/CellEditor";
 import { Dock } from "@/components/Dock";
+import { FeatureDialog, type DialogRequest } from "@/components/FeatureDialog";
+import { CommandBar } from "@/components/CommandBar";
+import { FEATURE_ICONS } from "@/components/feature-icons";
+import { FeatureTree } from "@/components/FeatureTree";
+import { commandsFromSpecs } from "@/lib/commands";
 import { Header } from "@/components/Header";
 import { Inspector } from "@/components/Inspector";
 import { LoadingMask } from "@/components/LoadingMask";
@@ -12,6 +17,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getWorkspace, newNotebook, openNotebook, postViewport, type ModuleRow, type NotebookRow } from "@/lib/api";
 import { parsePreview, type PreviewPart } from "@/lib/preview";
 import { EnvelopeSocket, type Envelope } from "@/lib/envelope";
+import { useFeatures } from "@/lib/useFeatures";
+import type { FeatureCommand, FeatureRow } from "@/lib/features";
 import { useRunLog } from "@/lib/runlog";
 import { useTheme } from "@/lib/theme";
 import { selectionPayload, variableNames, type SelectionItem } from "@/lib/selection";
@@ -61,6 +68,14 @@ export function App() {
   // model arrives (`package`) or the work fails.  Interactive rebuilds (a
   // slider, one cell) are not veiled.
   const [loading, setLoading] = useState<string | null>("connecting");
+
+  // GUI features: the REST state is richer than `notebook.features`, so it is refreshed on every cells event.
+  const gui = useFeatures();
+  const refreshFeatures = gui.refresh;
+  const [dialog, setDialog] = useState<DialogRequest | null>(null);
+  const [guiBusy, setGuiBusy] = useState(false);
+  const [guiError, setGuiError] = useState<string | null>(null);
+  const modeBeforeDialog = useRef<SelectionMode | null>(null);
 
   const kind = notebooks.find((row) => row.path === currentPath)?.kind ?? null;
   const theme = useTheme();
@@ -128,6 +143,7 @@ export function App() {
       // an empty workspace: the way forward is the workspace tab's "new"
       if (!envelope["notebook"]) setLeftTab("workspace");
       setKernelAlive(Boolean(envelope["kernel"]));
+      refreshFeatures();
       // No notebook: nothing to wait for. Else the model is on its way.
       if (hasModel.current) return;
       const stage = envelope["notebook"] ? (envelope["kernel"] ? "building the model" : "starting the kernel") : null;
@@ -146,6 +162,8 @@ export function App() {
       setParams([]);
       setFeatures([]);
       setPicked([]);
+      setDialog(null);
+      refreshFeatures();
       setNotebook(String(envelope["notebook"] ?? ""));
       setCurrentPath((envelope["path"] as string) ?? null);
       setStatus(`opening ${envelope["notebook"]}…`);
@@ -191,6 +209,7 @@ export function App() {
       const next = (envelope["cells"] as NotebookCell[]) ?? [];
       setCells(next);
       log.knowCells(next);
+      refreshFeatures();
     });
     // A notebook was added or removed under the workspace (an agent wrote one).
     socket.on("workspace.changed", () => refreshWorkspace());
@@ -255,7 +274,7 @@ export function App() {
 
     socket.connect();
     return () => socket.close();
-  }, [loadPreviewBytes, log.push, log.cellStatus, log.knowCells, log.resetBatch, log.modelShown]);
+  }, [loadPreviewBytes, refreshFeatures, log.push, log.cellStatus, log.knowCells, log.resetBatch, log.modelShown]);
 
   // -- selection -------------------------------------------------------------------
 
@@ -319,6 +338,72 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [loading]);
 
+  // -- GUI features ------------------------------------------------------------------------------
+
+  const openDialog = useCallback(
+    (request: DialogRequest) => {
+      if (modeBeforeDialog.current === null) modeBeforeDialog.current = selectionMode;
+      setDialog(request);
+    },
+    [selectionMode],
+  );
+  const closeDialog = useCallback(() => {
+    setDialog(null);
+    if (modeBeforeDialog.current !== null) setSelectionMode(modeBeforeDialog.current);
+    modeBeforeDialog.current = null;
+  }, []);
+
+  /** A command from the dialog: rejects with the server's message (shown in the dialog), closes on success. */
+  const submitFeature = useCallback(
+    async (command: FeatureCommand) => {
+      const result = await gui.run(command);
+      log.push("ok", command.op === "undo" || command.op === "redo" ? command.op : `${command.op} ${result.name}`);
+      closeDialog();
+    },
+    [gui.run, log.push, closeDialog],
+  );
+
+  /** A command from the tree or the shortcuts: its failure shows above the tree. */
+  const runFeature = useCallback(
+    async (command: FeatureCommand) => {
+      setGuiBusy(true);
+      setGuiError(null);
+      try {
+        const result = await gui.run(command);
+        log.push("ok", command.op === "undo" || command.op === "redo" ? command.op : `${command.op} ${result.name}`);
+      } catch (error) {
+        setGuiError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setGuiBusy(false);
+      }
+    },
+    [gui.run, log.push],
+  );
+  const undo = useCallback(() => void runFeature({ op: "undo" }), [runFeature]);
+  const redo = useCallback(() => void runFeature({ op: "redo" }), [runFeature]);
+
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z undo and redo a feature change, unless a text field has the focus.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLowerCase() !== "z") return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable=true], .cm-editor")) return;
+      event.preventDefault();
+      if (event.shiftKey) redo();
+      else undo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
+
+  // The command registry the bar reads: today the feature catalog, later sketch and assembly commands too.
+  const commands = useMemo(
+    () => commandsFromSpecs(gui.catalog?.specs ?? [], (spec) => openDialog({ spec }), FEATURE_ICONS),
+    [gui.catalog, openDialog],
+  );
+
+  const handleEditFeature = (feature: FeatureRow, spec: DialogRequest["spec"]) => openDialog({ spec, edit: feature });
+
   // -- actions -----------------------------------------------------------------------
 
   const handleOpen = (path: string) => {
@@ -345,6 +430,9 @@ export function App() {
         status={status}
         themePreference={theme.preference}
         onTheme={theme.cycle}
+        features={gui.state}
+        onUndo={undo}
+        onRedo={redo}
         running={running}
         onStop={handleStop}
         onRunAll={() => {
@@ -357,10 +445,24 @@ export function App() {
           <ResizablePanel defaultSize={32} minSize={18} className="min-w-0">
             <Tabs value={leftTab} onValueChange={setLeftTab} className="h-full">
               <TabsList>
+                <TabsTrigger value="features">features</TabsTrigger>
                 <TabsTrigger value="notebook">notebook</TabsTrigger>
                 <TabsTrigger value="workspace">workspace</TabsTrigger>
                 {moduleView && <TabsTrigger value="module">{moduleView.name}</TabsTrigger>}
               </TabsList>
+              <TabsContent value="features" className="flex min-h-0 flex-col">
+                <FeatureTree
+                  catalog={gui.catalog}
+                  state={gui.state}
+                  busy={guiBusy}
+                  error={guiError ?? gui.error}
+                  onEdit={handleEditFeature}
+                  onDelete={(feature) => void runFeature({ op: "delete", cell: feature.cell })}
+                  onUseProduct={(body) => void runFeature({ op: "use_as_product", body })}
+                  onUndo={undo}
+                  onRedo={redo}
+                />
+              </TabsContent>
               <TabsContent value="notebook" className="min-h-0">
                 <CellEditor
                   cells={cells}
@@ -428,7 +530,7 @@ export function App() {
                   fit
                 </button>
               </div>
-              <div className="min-h-0 flex-1">
+              <div className="relative min-h-0 flex-1">
                 <Viewport
                   viewRef={viewRef}
                   selectionMode={selectionMode}
@@ -438,6 +540,7 @@ export function App() {
                   onPick={handlePick}
                   onClear={handleClear}
                 />
+                <CommandBar commands={commands} />
               </div>
             </div>
           </ResizablePanel>
@@ -446,6 +549,14 @@ export function App() {
             <Inspector selection={selection} />
           </ResizablePanel>
         </ResizablePanelGroup>
+        <FeatureDialog
+          request={dialog}
+          state={gui.state}
+          selection={selection}
+          onSelectionMode={setSelectionMode}
+          onSubmit={submitFeature}
+          onClose={closeDialog}
+        />
         <LoadingMask active={loading !== null} message={loading ?? ""} theme={theme.resolved} />
       </div>
       <Dock
