@@ -316,6 +316,9 @@ void bind_predicate(py::module_& q) {
           },
           py::arg("obj"))
       .def("to_dict", [](const ql::Predicate& p) { return dict_of(p.to_value()); })
+      // pickle / copy: the dict form is the whole state (marimo's cell cache pickles every returned value).
+      .def(py::pickle([](const ql::Predicate& p) { return dict_of(p.to_value()); },
+                      [](const py::dict& state) { return ql::Predicate::from_value(state.cast<Value>()); }))
       .def_static(
           "from_dict", [](const Value& payload) { return ql::Predicate::from_value(payload); }, py::arg("data"))
       .def(
@@ -350,6 +353,8 @@ void bind_predicate(py::module_& q) {
           },
           py::arg("obj"))
       .def("to_dict", [](const ql::Key& k) { return dict_of(k.to_value()); })
+      .def(py::pickle([](const ql::Key& k) { return dict_of(k.to_value()); },
+                      [](const py::dict& state) { return ql::Key::from_value(state.cast<Value>()); }))
       .def_static(
           "from_dict", [](const Value& payload) { return ql::Key::from_value(payload); }, py::arg("data"))
       .def(
@@ -363,6 +368,8 @@ void bind_predicate(py::module_& q) {
       .def(py::init([](const std::string& relation) { return ql::TraversalSpec{relation}; }), py::arg("relation"))
       .def_readonly("relation", &ql::TraversalSpec::relation)
       .def("to_dict", [](const ql::TraversalSpec& t) { return dict_of(t.to_value()); })
+      .def(py::pickle([](const ql::TraversalSpec& t) { return dict_of(t.to_value()); },
+                      [](const py::dict& state) { return ql::TraversalSpec::from_value(state.cast<Value>()); }))
       .def_static(
           "from_dict", [](const Value& payload) { return ql::TraversalSpec::from_value(payload); }, py::arg("data"))
       .def("__eq__", [](const ql::TraversalSpec& a, const ql::TraversalSpec& b) { return a == b; }, py::is_operator());
@@ -646,6 +653,9 @@ void bind_selector(py::module_& q) {
           },
           py::arg("scope"), "The shapes this query picks inside `scope` (a shape or a list of shapes).")
       .def("to_dict", [](const ql::ShapeSelector& s) { return dict_of(s.to_value()); })
+      // pickle / copy: the dict form is the whole state (marimo's cell cache pickles every returned value).
+      .def(py::pickle([](const ql::ShapeSelector& s) { return dict_of(s.to_value()); },
+                      [](const py::dict& state) { return ql::ShapeSelector::from_value(state.cast<Value>()); }))
       .def_static(
           "from_dict", [](const Value& payload) { return ql::ShapeSelector::from_value(payload); }, py::arg("data"))
       .def(
