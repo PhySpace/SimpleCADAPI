@@ -9,6 +9,7 @@ import { FeatureTree } from "@/components/FeatureTree";
 import { commandsFromSpecs } from "@/lib/commands";
 import { Header } from "@/components/Header";
 import { Inspector } from "@/components/Inspector";
+import { SketchMode, type SketchSession } from "@/components/sketch/SketchMode";
 import { LoadingMask } from "@/components/LoadingMask";
 import { ModuleView, type ModuleState } from "@/components/ModuleView";
 import { NotebookList } from "@/components/NotebookList";
@@ -17,8 +18,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getWorkspace, newNotebook, openNotebook, postViewport, type ModuleRow, type NotebookRow } from "@/lib/api";
 import { parsePreview, type PreviewPart } from "@/lib/preview";
 import { EnvelopeSocket, type Envelope } from "@/lib/envelope";
+import { emptyDoc, normalizeDoc } from "@/lib/sketch";
+import { frameFromEntity, type PlaneSpec } from "@/lib/sketch-plane";
 import { useFeatures } from "@/lib/useFeatures";
-import type { FeatureCommand, FeatureRow } from "@/lib/features";
+import type { FeatureCommand, FeatureRow, Spec } from "@/lib/features";
 import { useRunLog } from "@/lib/runlog";
 import { useTheme } from "@/lib/theme";
 import { selectionPayload, variableNames, type SelectionItem } from "@/lib/selection";
@@ -76,6 +79,18 @@ export function App() {
   const [guiBusy, setGuiBusy] = useState(false);
   const [guiError, setGuiError] = useState<string | null>(null);
   const modeBeforeDialog = useRef<SelectionMode | null>(null);
+
+  // Sketch mode: drawing happens in the viewport (see components/sketch). `plane: null` is the plane choice.
+  const [sketchSession, setSketchSession] = useState<SketchSession | null>(null);
+  const [sketchNotice, setSketchNotice] = useState<string | null>(null);
+  const sketchCounter = useRef(0);
+  const modeBeforeSketch = useRef<SelectionMode | null>(null);
+  const sketching = sketchSession !== null;
+  const sketchingRef = useRef(false);
+  sketchingRef.current = sketching;
+  const choosingRef = useRef(false);
+  choosingRef.current = sketchSession !== null && sketchSession.plane === null;
+  const infoWaiters = useRef(new Map<string, (entity: { properties?: Record<string, unknown>; geometry?: Record<string, unknown> } | null) => void>());
 
   const kind = notebooks.find((row) => row.path === currentPath)?.kind ?? null;
   const theme = useTheme();
@@ -163,6 +178,7 @@ export function App() {
       setFeatures([]);
       setPicked([]);
       setDialog(null);
+      setSketchSession(null);
       refreshFeatures();
       setNotebook(String(envelope["notebook"] ?? ""));
       setCurrentPath((envelope["path"] as string) ?? null);
@@ -240,6 +256,7 @@ export function App() {
     socket.on("entity.info", (envelope) => {
       const entityId = String(envelope["entity_id"]);
       const entity = envelope["entity"] as { properties?: Record<string, unknown>; geometry?: Record<string, unknown>; tags?: string[] } | null;
+      infoWaiters.current.get(entityId)?.(entity);
       setPicked((previous) =>
         previous.map((item) =>
           item.entityId === entityId
@@ -278,7 +295,56 @@ export function App() {
 
   // -- selection -------------------------------------------------------------------
 
+  /** The details of one entity from the kernel (null when it does not answer in time). */
+  const askEntity = useCallback(
+    (nodeId: string, entityId: string) =>
+      new Promise<{ properties?: Record<string, unknown>; geometry?: Record<string, unknown> } | null>((resolve) => {
+        const timer = window.setTimeout(() => {
+          infoWaiters.current.delete(entityId);
+          resolve(null);
+        }, 5000);
+        infoWaiters.current.set(entityId, (entity) => {
+          window.clearTimeout(timer);
+          infoWaiters.current.delete(entityId);
+          resolve(entity);
+        });
+        socketRef.current?.send({ type: "entity.info", entity_id: entityId, node_id: nodeId });
+      }),
+    [],
+  );
+
+  const choosePlane = useCallback((plane: PlaneSpec) => {
+    setSketchNotice(null);
+    setSketchSession((session) => (session ? { ...session, plane, doc: { ...session.doc, plane } } : session));
+  }, []);
+
+  /** While the sketch plane is being chosen a face pick means "sketch on this face" and never reaches the selection. */
+  const pickSketchFace = useCallback(
+    async (result: PickResult) => {
+      if (!result.entityId || result.mode !== "face") return;
+      let geometry = result.entity?.geometry as Record<string, unknown> | undefined;
+      let properties = result.entity?.properties as Record<string, unknown> | undefined;
+      if (!geometry || Object.keys(geometry).length === 0) {
+        const info = await askEntity(result.nodeId, result.entityId);
+        geometry = info?.geometry;
+        properties = info?.properties;
+      }
+      const frame = geometry ? frameFromEntity(geometry, properties) : null;
+      if (!frame) {
+        setSketchNotice("That face is not planar: click a planar face or a datum plane.");
+        return;
+      }
+      choosePlane(frame);
+    },
+    [askEntity, choosePlane],
+  );
+
   const handlePick = useCallback((result: PickResult) => {
+    if (choosingRef.current) {
+      void pickSketchFace(result);
+      return;
+    }
+    if (sketchingRef.current) return;
     const view = viewRef.current;
     const node = view?.nodes.find((item) => item.node_id === result.nodeId);
     const entity = result.entity;
@@ -304,9 +370,12 @@ export function App() {
         ? previous.filter((other) => other.key !== item.key)
         : [...previous, item];
     });
-  }, []);
+  }, [pickSketchFace]);
 
-  const handleClear = useCallback(() => setPicked((previous) => (previous.length ? [] : previous)), []);
+  const handleClear = useCallback(() => {
+    if (sketchingRef.current) return;
+    setPicked((previous) => (previous.length ? [] : previous));
+  }, []);
 
   // The notebook follows the selection: the server writes it as ql code into
   // the selection cell, and the viewport image is saved for coding agents.
@@ -385,6 +454,7 @@ export function App() {
   // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z undo and redo a feature change, unless a text field has the focus.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (sketchingRef.current) return; // the sketch has its own undo
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLowerCase() !== "z") return;
       const target = event.target as HTMLElement | null;
       if (target?.closest("input, textarea, select, [contenteditable=true], .cm-editor")) return;
@@ -397,12 +467,50 @@ export function App() {
   }, [undo, redo]);
 
   // The command registry the bar reads: today the feature catalog, later sketch and assembly commands too.
-  const commands = useMemo(
-    () => commandsFromSpecs(gui.catalog?.specs ?? [], (spec) => openDialog({ spec }), FEATURE_ICONS),
-    [gui.catalog, openDialog],
+  const beginSketch = useCallback(
+    (session: Omit<SketchSession, "id">) => {
+      setDialog(null);
+      setSketchNotice(null);
+      if (modeBeforeSketch.current === null) modeBeforeSketch.current = selectionMode;
+      setSelectionMode("face"); // a face pick chooses the sketch plane
+      setPicked([]);
+      setSketchSession({ ...session, id: ++sketchCounter.current });
+    },
+    [selectionMode],
+  );
+  const startSketch = useCallback(() => {
+    if (!sketchingRef.current) beginSketch({ mode: "new", name: "", plane: null, doc: emptyDoc() });
+  }, [beginSketch]);
+  const endSketch = useCallback(() => {
+    setSketchSession(null);
+    setSketchNotice(null);
+    if (modeBeforeSketch.current !== null) setSelectionMode(modeBeforeSketch.current);
+    modeBeforeSketch.current = null;
+  }, []);
+  /** Finish: the add or edit command; rejects with the server's message (shown in the sketch bar), leaves sketch mode on success. */
+  const submitSketch = useCallback(
+    async (command: FeatureCommand) => {
+      const result = await gui.run(command);
+      log.push("ok", command.op === "undo" || command.op === "redo" ? command.op : `${command.op} ${result.name}`);
+      endSketch();
+    },
+    [gui.run, log.push, endSketch],
   );
 
-  const handleEditFeature = (feature: FeatureRow, spec: DialogRequest["spec"]) => openDialog({ spec, edit: feature });
+  const isSketchSpec = (spec: Spec) => spec.slots.some((slot) => slot.kind === "sketch");
+  const commands = useMemo(
+    () => commandsFromSpecs(gui.catalog?.specs ?? [], (spec) => (isSketchSpec(spec) ? startSketch() : openDialog({ spec })), FEATURE_ICONS),
+    [gui.catalog, openDialog, startSketch],
+  );
+
+  const handleEditFeature = (feature: FeatureRow, spec: Spec) => {
+    if (!isSketchSpec(spec)) {
+      openDialog({ spec, edit: feature });
+      return;
+    }
+    const doc = normalizeDoc(feature.gui?.values?.sketch);
+    beginSketch({ mode: "edit", cell: feature.cell, name: feature.slug, plane: doc.plane, doc });
+  };
 
   // -- actions -----------------------------------------------------------------------
 
@@ -423,6 +531,7 @@ export function App() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
+      <div inert={sketching} className={cn(sketching && "opacity-50")}>
       <Header
         notebook={notebook}
         kind={kind}
@@ -440,9 +549,11 @@ export function App() {
           socketRef.current?.send({ type: "rerun.request" });
         }}
       />
+      </div>
       <div className="relative flex min-h-0 flex-1 flex-col">
         <ResizablePanelGroup className="min-h-0 flex-1">
           <ResizablePanel defaultSize={32} minSize={18} className="min-w-0">
+            <div inert={sketching} className={cn("h-full", sketching && "opacity-40")}>
             <Tabs value={leftTab} onValueChange={setLeftTab} className="h-full">
               <TabsList>
                 <TabsTrigger value="features">features</TabsTrigger>
@@ -500,11 +611,12 @@ export function App() {
                 </TabsContent>
               )}
             </Tabs>
+            </div>
           </ResizablePanel>
           <ResizableHandle />
           <ResizablePanel defaultSize={46} minSize={30} className="min-w-0">
             <div className="flex h-full flex-col">
-              <div className="flex h-9 shrink-0 items-center gap-1 border-b-2 border-border px-2">
+              <div inert={sketching} className={cn("flex h-9 shrink-0 items-center gap-1 border-b-2 border-border px-2", sketching && "opacity-40")}>
                 {MODES.map(({ mode, label }) => (
                   <button
                     key={mode}
@@ -540,13 +652,28 @@ export function App() {
                   onPick={handlePick}
                   onClear={handleClear}
                 />
-                <CommandBar commands={commands} />
+                <div inert={sketching} className={cn(sketching && "opacity-40")}>
+                  <CommandBar commands={commands} />
+                </div>
+                {sketchSession && viewRef.current && (
+                  <SketchMode
+                    session={sketchSession}
+                    view={viewRef.current}
+                    taken={gui.state.taken}
+                    notice={sketchNotice}
+                    onPlane={choosePlane}
+                    onSubmit={submitSketch}
+                    onExit={endSketch}
+                  />
+                )}
               </div>
             </div>
           </ResizablePanel>
           <ResizableHandle />
           <ResizablePanel defaultSize={22} minSize={14} className="min-w-0">
-            <Inspector selection={selection} />
+            <div inert={sketching} className={cn("h-full", sketching && "opacity-40")}>
+              <Inspector selection={selection} />
+            </div>
           </ResizablePanel>
         </ResizablePanelGroup>
         <FeatureDialog

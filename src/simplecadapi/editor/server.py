@@ -2034,6 +2034,21 @@ def create_app(state: WorkspaceState) -> Starlette:
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=409 if exc.conflict else 400)
         return JSONResponse(result)
 
+    async def sketch_op(request: Request) -> JSONResponse:
+        """``{sketch, op, args}`` -> ``{ok, sketch, created, removed, ...}``: one SDK sketch edit (``<op>_rsketch``) on a document."""
+        from .sketch_doc import SketchError, apply_edit
+
+        try:
+            body = json.loads(await request.body() or b"{}")
+        except json.JSONDecodeError:
+            return JSONResponse({"ok": False, "error": "body is not JSON"}, status_code=400)
+        body = body if isinstance(body, dict) else {}
+        try:
+            result = await asyncio.to_thread(apply_edit, body.get("sketch") or {}, str(body.get("op", "")), body.get("args") or {})
+        except SketchError as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+        return JSONResponse({"ok": True, **result})
+
     async def assembly_parts(request: Request) -> JSONResponse:
         """The part notebooks of the workspace; ``?path=`` adds the connectors that one part declares."""
         from ..runtime.workspace import scan_workspace
@@ -2210,6 +2225,7 @@ def create_app(state: WorkspaceState) -> Starlette:
         Route("/api/cells/{op}", api_cell_command, methods=["POST"]),
         Route("/api/features/specs", features_specs, methods=["GET"]),
         Route("/api/sketch/solve", sketch_solve, methods=["POST"]),
+        Route("/api/sketch/op", sketch_op, methods=["POST"]),
         Route("/api/assembly/parts", assembly_parts, methods=["GET"]),
         Route("/api/features", features_state, methods=["GET"]),
         Route("/api/features", features_command, methods=["POST"]),

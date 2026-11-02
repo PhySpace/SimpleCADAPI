@@ -4,8 +4,9 @@
 
 // -- contract -------------------------------------------------------------------------------------------------------
 
-export type Plane = "XY" | "XZ" | "YZ";
-export const PLANES: Plane[] = ["XY", "XZ", "YZ"];
+import { normalizePlane, planeCoords, type PlaneSpec } from "@/lib/sketch-plane";
+
+export { PLANES, planeCoords, type Frame, type Plane, type PlaneSpec } from "@/lib/sketch-plane";
 
 export type SPoint = { id: string; x: number; y: number };
 export type EntityKind = "line" | "circle" | "arc";
@@ -29,7 +30,8 @@ export type SConstraint = {
 };
 
 export type SketchDoc = {
-  plane: Plane;
+  /** A named datum plane, or a frame (origin and unit axes, mm) for a sketch on a face. */
+  plane: PlaneSpec;
   points: SPoint[];
   entities: SEntity[];
   constraints: SConstraint[];
@@ -87,7 +89,7 @@ export const isDimensional = (kind: ConstraintKind) => CONSTRAINT_INFO[kind].uni
 
 // -- document -------------------------------------------------------------------------------------------------------
 
-export function emptyDoc(plane: Plane = "XY"): SketchDoc {
+export function emptyDoc(plane: PlaneSpec = "XY"): SketchDoc {
   return { plane, points: [], entities: [], constraints: [], profile: 0, inner: [], fully_constrained: false };
 }
 
@@ -95,7 +97,7 @@ export function emptyDoc(plane: Plane = "XY"): SketchDoc {
 export function normalizeDoc(raw: unknown): SketchDoc {
   const source = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const list = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
-  const plane = PLANES.includes(source.plane as Plane) ? (source.plane as Plane) : "XY";
+  const plane = normalizePlane(source.plane);
   const num = (value: unknown, fallback = 0) => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
   return {
     plane,
@@ -488,15 +490,6 @@ export function zoomAt(v: View, sx: number, sy: number, factor: number): View {
   return { scale, ox: sx - wx * scale, oy: sy + wy * scale };
 }
 
-export function fitView(points: readonly [number, number][], width: number, height: number, margin = 60): View {
-  if (!points.length) return { scale: 8, ox: width / 2, oy: height / 2 };
-  const xs = points.map((p) => p[0]);
-  const ys = points.map((p) => p[1]);
-  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-  const scale = Math.min(Math.max(Math.min((width - 2 * margin) / Math.max(x1 - x0, 1), (height - 2 * margin) / Math.max(y1 - y0, 1)), 0.5), 60);
-  return { scale, ox: width / 2 - ((x0 + x1) / 2) * scale, oy: height / 2 + ((y0 + y1) / 2) * scale };
-}
-
 /** A "nice" grid step (mm) that is at least `minPx` wide on screen. */
 export function gridStep(scale: number, minPx = 14): number {
   for (let decade = 0.01; decade < 1e6; decade *= 10) {
@@ -739,13 +732,8 @@ export function findLoops(doc: SketchDoc, solve: SolveResult | null): Loop[] {
   return matchLoops(loops, solve?.profiles ?? [], doc.plane);
 }
 
-/** The 2D position of a server centroid (world x, y, z) in the sketch plane's (u, v). */
-export function planeCoords(plane: Plane, c: readonly [number, number, number]): [number, number] {
-  return plane === "XY" ? [c[0], c[1]] : plane === "XZ" ? [c[0], c[2]] : [c[1], c[2]];
-}
-
 /** Give each loop the index of the server profile that has its area and centroid (closest first, each profile once). */
-export function matchLoops(loops: Loop[], profiles: readonly ServerProfile[], plane: Plane): Loop[] {
+export function matchLoops(loops: Loop[], profiles: readonly ServerProfile[], plane: PlaneSpec): Loop[] {
   const pairs: { loop: number; profile: number; cost: number }[] = [];
   loops.forEach((loop, li) => {
     profiles.forEach((profile, pi) => {

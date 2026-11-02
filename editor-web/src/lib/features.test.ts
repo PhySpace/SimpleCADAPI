@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   bodyChoices,
+  directionOptions,
+  resolveDirection,
   filterSelection,
   formToValues,
   holeFromFace,
   initialForm,
   inwardAxis,
   parsePointList,
+  profilePlaneLabel,
   pointListText,
   validateName,
   type Spec,
@@ -140,5 +143,32 @@ describe("profile and sketch slots", () => {
     expect(directionForProfile(state, "sk")).toBe("-y");
     expect(directionForProfile(state, "other")).toBeNull();
     expect(findProfile({}, "sk")).toBeUndefined();
+  });
+});
+
+describe("the opposite of a sketch plane's normal", () => {
+  const options = [{ value: "+x", label: "+x" }, { value: "+z", label: "+z" }, { value: "-z", label: "-z" }, { value: "normal", label: "normal of the sketch plane" }];
+  const top = { profiles: [{ name: "top", plane: "frame", normal: "normal", normal_vec: [0, 0, 1] as [number, number, number] }] };
+  const slanted = { profiles: [{ name: "slant", plane: "frame", normal: "normal", normal_vec: [0.6, 0, 0.8] as [number, number, number] }] };
+  const xy = { profiles: [{ name: "base", plane: "XY", normal: "+z" }] };
+
+  it("is offered right after 'normal' and resolves to the opposite axis", () => {
+    const list = directionOptions(options, top, "top");
+    expect(list.map((o) => o.value)).toEqual(["+x", "+z", "-z", "normal", "-normal"]);
+    expect(resolveDirection("-normal", top, "top")).toBe("-z");
+    expect(resolveDirection("-normal", xy, "base")).toBe("-z");
+    expect(resolveDirection("+x", top, "top")).toBe("+x");
+  });
+  it("is not offered for a slanted normal or without a sketch", () => {
+    expect(directionOptions(options, slanted, "slant")).toEqual(options);
+    expect(directionOptions(options, top, null)).toEqual(options);
+    expect(resolveDirection("-normal", slanted, "slant")).toBe("normal");
+  });
+});
+
+describe("profile plane labels", () => {
+  it("names a datum plane and calls a frame a face", () => {
+    expect(profilePlaneLabel({ plane: "XZ" })).toBe("XZ");
+    expect(profilePlaneLabel({ plane: { origin: [0, 0, 40], x_axis: [1, 0, 0], y_axis: [0, 1, 0] } })).toBe("face");
   });
 });

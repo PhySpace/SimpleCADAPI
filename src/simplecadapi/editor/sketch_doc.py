@@ -301,4 +301,113 @@ def solve(doc: Mapping[str, Any], *, max_profiles: int = 16) -> dict[str, Any]:
     }
 
 
-__all__ = ["CONSTRAINTS", "ENTITY_KINDS", "PLANES", "PLANE_NORMALS", "SketchError", "plane_normal", "render", "solve", "validate", "validate_plane"]
+# ---- the SDK's sketch edit operations, through the document ----------------------------------------------------------------------
+#
+# The capabilities (solve, trim, extend, ...) are SDK operations an agent calls in code (``scad.trim_rsketch``); the document is
+# only how a GUI holds a sketch.  These adapters turn a document into an SDK ``Sketch``, call the operation by its SDK name and
+# turn the result back into a document: there is no geometry here.
+
+EDIT_OPERATIONS = frozenset({"trim", "extend"})  # the SDK's ``<name>_rsketch`` functions that edit a sketch (add more as the SDK gains them)
+
+
+def to_sketch(doc: Mapping[str, Any]) -> Any:
+    """The SDK ``Sketch`` that the validated document *doc* builds (the same calls the cell makes)."""
+    import simplecadapi as scad
+
+    clean = validate(doc)
+    plane = clean["plane"] if isinstance(clean["plane"], str) else {k: tuple(v) for k, v in clean["plane"].items()}
+    namespace: dict[str, Any] = {"scad": scad, "_sketch": scad.make_sketch_rsketch(name="canvas", plane=plane)}
+    for line in _calls(clean):
+        exec(line, namespace)  # noqa: S102 - generated from validated ids and numbers only
+    return namespace["_sketch"]
+
+
+def _target(item: Mapping[str, Any]) -> str:
+    sub = item.get("subentity")
+    return f"{item['entity_id']}.{sub}" if sub in _SUB else str(item["entity_id"])
+
+
+def from_sketch(sketch: Any, like: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """The document of an SDK ``Sketch`` (the plane, profile choice and constrained flag are taken from *like*)."""
+    data = sketch.to_dict()
+    points: list[dict[str, Any]] = []
+    entities: list[dict[str, Any]] = []
+    for item in data["entities"]:
+        if item["kind"] == "point":
+            points.append({"id": item["id"], "x": float(item["x"]), "y": float(item["y"])})
+            continue
+        if item["kind"] not in ENTITY_KINDS:
+            raise SketchError(f"the sketch has a {item['kind']} ({item['id']}), which the document cannot hold")
+        entity: dict[str, Any] = {"id": item["id"], "kind": item["kind"], "construction": bool(item.get("construction", False))}
+        for role in ENTITY_KINDS[item["kind"]]:
+            entity[role] = item[role]
+        if item["kind"] == "circle":
+            entity["radius"] = float(item["radius"])
+        entities.append(entity)
+    constraints: list[dict[str, Any]] = []
+    for item in data["constraints"]:
+        if item["kind"] not in CONSTRAINTS:
+            raise SketchError(f"the sketch has a {item['kind']} constraint ({item['id']}), which the document cannot hold")
+        constraint: dict[str, Any] = {"id": item["id"], "kind": item["kind"], "targets": [_target(t) for t in item["targets"]]}
+        if item.get("value") is not None:
+            constraint["value"] = float(item["value"])
+            constraint["driving"] = bool(item.get("driving", True))
+        meta = {**(item.get("metadata") or {}), **item}
+        for extra in CONSTRAINTS[item["kind"]][2]:
+            if meta.get(extra) is not None:
+                constraint[extra] = meta[extra]
+        constraints.append(constraint)
+    base = like or {}
+    return validate(
+        {
+            "plane": base.get("plane", "XY"),
+            "points": points,
+            "entities": entities,
+            "constraints": constraints,
+            "profile": 0,
+            "inner": [],
+            "fully_constrained": base.get("fully_constrained", False),
+        }
+    )
+
+
+def apply_edit(doc: Mapping[str, Any], operation: str, args: Mapping[str, Any]) -> dict[str, Any]:
+    """Run the SDK edit ``<operation>_rsketch`` on the sketch of *doc*; returns ``{sketch, created, removed, ...}``.
+
+    ``created``/``removed``/``changed`` are the SDK's own ``diff_sketch_rsketchdiff``; ``notes`` are the operation's.
+    """
+    import simplecadapi as scad
+
+    if operation not in EDIT_OPERATIONS:
+        raise SketchError(f"unknown sketch operation {operation!r} (known: {', '.join(sorted(EDIT_OPERATIONS))})")
+    kwargs = dict(args)
+    if "at" in kwargs and isinstance(kwargs["at"], (list, tuple)):
+        kwargs["at"] = tuple(kwargs["at"])
+    before = to_sketch(doc)
+    try:
+        after = getattr(scad, f"{operation}_rsketch")(sketch=before, **kwargs)
+    except (ValueError, TypeError) as exc:  # the SDK's errors name the ids involved
+        raise SketchError(_short(exc)) from exc
+    clean = validate(doc)
+    return {
+        "sketch": from_sketch(after, clean),
+        **scad.diff_sketch_rsketchdiff(before=before, after=after),
+        "notes": list((after.get_metadata("last_edit") or {}).get("notes", [])),
+    }
+
+
+def _short(error: Exception) -> str:
+    """The part of an SDK error a person reads: the technical details line, else the first line."""
+    text = str(error)
+    for line in text.splitlines():
+        if line.startswith("Technical details:"):
+            return line.split(":", 2)[-1].strip()
+    return text.splitlines()[0] if text else type(error).__name__
+
+
+__all__ = [
+    "EDIT_OPERATIONS",
+    "apply_edit",
+    "from_sketch",
+    "to_sketch",
+"CONSTRAINTS", "ENTITY_KINDS", "PLANES", "PLANE_NORMALS", "SketchError", "plane_normal", "render", "solve", "validate", "validate_plane"]

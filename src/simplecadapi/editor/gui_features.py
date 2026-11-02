@@ -135,6 +135,7 @@ class FeatureService:
                     {
                         "name": feature["makes"][0],
                         "plane": plane,
+                        "plane_label": plane if isinstance(plane, str) else "face",
                         "normal": sketch_doc.PLANE_NORMALS.get(plane, "normal") if isinstance(plane, str) else "normal",
                         "normal_vec": sketch_doc.plane_normal(plane),
                     }
@@ -232,11 +233,18 @@ class FeatureService:
             keep = {slot.name: F.extract_recipe(cell["code"], slot.name) for slot in spec.slots if slot.kind == "select"}
             rendered = self._render(spec_id, feature["slug"], values, bodies, request.get("selections"), snap, keep={k: v for k, v in keep.items() if v})
             steps: list[dict] = []
+            deferred: dict | None = None
             if feature["params_cell"]:
                 old = self._cell(feature["params_cell"])["code"]
                 new = "\n".join(rendered.params)
                 if rendered.params and new.strip() != old.strip():
-                    steps.append(self._edit(feature["params_cell"], old, new, run=False))
+                    # a name the new feature cell reads must exist first; a name it no longer reads goes after it, else the old
+                    # cell would read a name that is gone for a moment
+                    added = set(_names(new)[0]) - set(_names(old)[0])
+                    if added or not _names(old)[0]:
+                        steps.append(self._edit(feature["params_cell"], old, new, run=False))
+                    else:
+                        deferred = {"cell": feature["params_cell"], "old": old, "new": new}
             elif rendered.params:
                 steps.append(self._create(self._params_anchor(self.state.cells), "\n".join(rendered.params), run=False))
             for code in rendered.before:
@@ -246,6 +254,8 @@ class FeatureService:
                     if old.strip() != code.strip():
                         steps.append(self._edit(parts["cell"], old, code, run=False))
             steps.append(self._edit(feature["cell"], cell["code"], rendered.feature, run=True))
+            if deferred is not None:
+                steps.append(self._edit(deferred["cell"], deferred["old"], deferred["new"], run=True))
             self._record(steps)
             return self._result(feature["cell"], steps, feature["slug"])
 

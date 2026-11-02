@@ -11,6 +11,7 @@ import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { bindClickSelection } from './components/click-selection';
 import { disposeObject } from './cad-three';
+import { CameraRig } from './camera-rig';
 import { BRepRenderer, OVERLAY_LAYER, type CameraState, type LiveGeometryPayload } from './renderer';
 
 export type { LiveGeometryPayload };
@@ -50,6 +51,8 @@ type Mark = { key: string; color: string; overlays: THREE.Object3D[] };
 
 export class SceneView {
   readonly engine: BRepRenderer;
+  /** Direct camera control (sketch mode parks the trackball and drives the camera through it). */
+  readonly rig: CameraRig;
   onPick: ((result: PickResult) => void) | null;
   onClear: (() => void) | null;
 
@@ -65,6 +68,7 @@ export class SceneView {
     this.onClear = options.onClear ?? null;
     this.selectionMode = options.selectionMode ?? 'face';
     this.engine = new BRepRenderer(host, { background: options.background, theme: options.theme, ssao: options.ssao, seams: options.seams });
+    this.rig = new CameraRig(this.engine);
     if (options.interactive !== false) {
       this.unbindClick = bindClickSelection({
         element: this.engine.domElement,
@@ -227,6 +231,34 @@ export class SceneView {
   private edgeEntityIdForHit(hit: THREE.Intersection, sidecar: EntitySidecar | null): string | undefined {
     if (!(hit.object instanceof THREE.LineSegments) || typeof hit.index !== 'number' || !sidecar) return undefined;
     return sidecar.edge_groups.find((group: FaceGroup) => hit.index! >= group.first_index && hit.index! < group.first_index + group.index_count)?.entity_id;
+  }
+
+  /** The model's B-rep vertices in the world frame, in mm (what a sketch snaps to once projected onto its plane). */
+  modelVertices(): [number, number, number][] {
+    this.engine.modelRoot.updateMatrixWorld(true);
+    const seen = new Set<string>();
+    const out: [number, number, number][] = [];
+    const point = new THREE.Vector3();
+    this.engine.modelRoot.traverse((object) => {
+      if (!(object instanceof THREE.Points) || !Array.isArray(object.userData.vertexEntityIds)) return;
+      const position = object.geometry.getAttribute('position');
+      for (let i = 0; i < position.count; i++) {
+        point.fromBufferAttribute(position, i).applyMatrix4(object.matrixWorld).multiplyScalar(1000);
+        const key = `${Math.round(point.x * 100)}:${Math.round(point.y * 100)}:${Math.round(point.z * 100)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push([point.x, point.y, point.z]);
+      }
+    });
+    return out;
+  }
+
+  /** The model's bounding box in the world frame, mm ([min, max]), or null for an empty scene. */
+  modelBoundsMm(): { min: [number, number, number]; max: [number, number, number] } | null {
+    this.engine.modelRoot.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(this.engine.modelRoot);
+    if (box.isEmpty()) return null;
+    return { min: [box.min.x * 1000, box.min.y * 1000, box.min.z * 1000], max: [box.max.x * 1000, box.max.y * 1000, box.max.z * 1000] };
   }
 
   // -- highlight + marks -------------------------------------------------------

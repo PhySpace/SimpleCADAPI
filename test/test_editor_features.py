@@ -366,7 +366,7 @@ def test_a_sketch_feature_added_through_the_editor_is_extruded_into_the_product(
         service.add({"spec": "sketch", "name": "outline", "values": {"sketch": RECT_SKETCH}})
         _wait_idle(state)
         snap = service.snapshot()
-        assert snap["profiles"] == [{"name": "outline", "plane": "XY", "normal": "+z", "normal_vec": [0, 0, 1]}]
+        assert snap["profiles"] == [{"name": "outline", "plane": "XY", "plane_label": "XY", "normal": "+z", "normal_vec": [0, 0, 1]}]
         assert snap["tip"] is None and snap["product"] is None  # a face is not a body: no product yet
         assert snap["defaults"]["extrude_sketch"] == {"profile": "outline"}
         service.add({"spec": "extrude_sketch", "name": "tab_body", "values": {"direction": "+z", "distance": 5.0}})

@@ -2,6 +2,7 @@
  * its REST helpers, and the pure functions behind the form (defaults, text <-> values, validation, selection filtering). */
 
 import type { SelectionItem } from "@/lib/selection";
+import { axisName } from "@/lib/sketch-plane";
 
 // -- contract -------------------------------------------------------------------------------------------------------
 
@@ -57,7 +58,7 @@ export type FeatureState = {
   product: { cell: string; body: string } | null;
   defaults: Record<string, Record<string, string>>;
   /** The face-making sketches of the notebook (what a `profile` slot chooses from). */
-  profiles?: { name: string; plane: string; normal: string }[];
+  profiles?: { name: string; plane: string | { origin: number[]; x_axis: number[]; y_axis: number[] }; normal: string; normal_vec?: [number, number, number] }[];
   taken: string[];
   undo: number;
   redo: number;
@@ -275,6 +276,11 @@ export function bodyChoices(state: Pick<FeatureState, "bodies" | "open">): { nam
 
 // -- sketch profiles --------------------------------------------------------------------------------------------------
 
+/** How a sketch's plane reads: the datum plane's name, or "face" for a frame (a sketch drawn on a face). */
+export function profilePlaneLabel(profile: { plane: unknown }): string {
+  return typeof profile.plane === "string" ? profile.plane : "face";
+}
+
 /** The sketch (profile) named, or undefined. */
 export function findProfile(state: Pick<FeatureState, "profiles">, name: string) {
   return (state.profiles ?? []).find((profile) => profile.name === name);
@@ -283,6 +289,33 @@ export function findProfile(state: Pick<FeatureState, "profiles">, name: string)
 /** The direction ("+z", "-y"...) a feature on this profile pushes along by default: the plane's normal. */
 export function directionForProfile(state: Pick<FeatureState, "profiles">, name: string): string | null {
   return findProfile(state, name)?.normal ?? null;
+}
+
+/** The value of the "opposite of the sketch plane's normal" choice. */
+export const FLIP_NORMAL = "-normal";
+
+/** The axis option ("+z") opposite to the profile's plane normal, or null when that normal is not along an axis
+ * (the server's direction options are the six axes and "normal", so a slanted normal has no opposite to offer). */
+export function oppositeNormal(state: Pick<FeatureState, "profiles">, profile: string | null): string | null {
+  const found = profile ? findProfile(state, profile) : undefined;
+  if (!found) return null;
+  const axis = found.normal_vec ? axisName(found.normal_vec.map((c) => -c)) : null;
+  if (axis) return axis;
+  const named = /^([+-])([xyz])$/.exec(found.normal);
+  return named ? `${named[1] === "+" ? "-" : "+"}${named[2]}` : null;
+}
+
+/** The options of a sketch operation's direction: the server's, plus "-normal" when the profile has an axis-aligned normal. */
+export function directionOptions(options: readonly SlotOption[], state: Pick<FeatureState, "profiles">, profile: string | null): SlotOption[] {
+  const opposite = oppositeNormal(state, profile);
+  const at = options.findIndex((option) => option.value === "normal");
+  if (!opposite || at < 0) return [...options];
+  return [...options.slice(0, at + 1), { value: FLIP_NORMAL, label: `-normal (opposite, ${opposite})` }, ...options.slice(at + 1)];
+}
+
+/** What the server is sent for a direction choice: "-normal" becomes the opposite axis. */
+export function resolveDirection(value: string, state: Pick<FeatureState, "profiles">, profile: string | null): string {
+  return value === FLIP_NORMAL ? (oppositeNormal(state, profile) ?? "normal") : value;
 }
 
 // -- selection ------------------------------------------------------------------------------------------------------

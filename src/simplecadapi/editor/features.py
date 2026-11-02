@@ -42,7 +42,11 @@ _AXES = {
     "-z": (0.0, 0.0, -1.0),
 }
 _AXIS_OPTIONS = [{"value": key, "label": key} for key in _AXES]
-_DIR_OPTIONS = [*({"value": key, "label": key} for key in _AXES), {"value": "normal", "label": "normal of the sketch plane"}]
+_DIR_OPTIONS = [
+    *({"value": key, "label": key} for key in _AXES),
+    {"value": "normal", "label": "normal of the sketch plane"},
+    {"value": "-normal", "label": "against the normal of the sketch plane"},
+]
 _PLANE_NORMALS = {"XY": (0.0, 0.0, 1.0), "XZ": (0.0, 1.0, 0.0), "YZ": (1.0, 0.0, 0.0)}
 _PLANE_OPTIONS = [{"value": key, "label": key} for key in _PLANE_NORMALS]
 
@@ -189,11 +193,12 @@ class Context:
 
     def axis(self, slot: str) -> str:
         value = str(self.values[slot])
-        if value == "normal":  # the normal of the sketch plane the profile was drawn on
+        if value in ("normal", "-normal"):  # the normal of the sketch plane the profile was drawn on, or its opposite
             vector = (self.env.get("profile_normals") or {}).get(str(self.values.get("profile")))
             if vector is None:
-                raise FeatureError("the direction 'normal' needs a sketch profile")
-            return repr(tuple(round(v, 9) + 0.0 for v in vector))
+                raise FeatureError(f"the direction {value!r} needs a sketch profile")
+            sign = -1.0 if value == "-normal" else 1.0
+            return repr(tuple(round(sign * v, 9) + 0.0 for v in vector))
         return repr(_AXES[value])
 
     def normal(self, slot: str) -> str:
