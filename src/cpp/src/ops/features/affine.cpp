@@ -77,6 +77,32 @@ TopoDS_Shape general_transform(const TopoDS_Shape& solid, const Mat3& linear, co
   });
 }
 
+// A rigid motion (orthonormal linear part, determinant +1) is exact in the kernel's Trsf form, which
+// moves the geometry by location/transformation and keeps every surface, curve and p-curve as built.
+// GTransform would rebuild them as approximated B-splines, which can lose BRepCheck validity.
+bool is_rigid(const Mat3& linear) {
+  const Mat3 gram = multiply(linear, transposed(linear));
+  for (std::size_t i = 0; i < 3; ++i)
+    for (std::size_t j = 0; j < 3; ++j)
+      if (std::abs(gram[i][j] - (i == j ? 1.0 : 0.0)) > 1e-9)
+        return false;
+  return determinant(linear) > 0;
+}
+
+TopoDS_Shape rigid_transform(const TopoDS_Shape& solid, const Mat3& linear, const Vec3& translation,
+                             const char* failure) {
+  return occt_guard([&]() -> TopoDS_Shape {
+    gp_Trsf transform;
+    transform.SetValues(linear[0][0], linear[0][1], linear[0][2], translation.x, linear[1][0], linear[1][1],
+                        linear[1][2], translation.y, linear[2][0], linear[2][1], linear[2][2], translation.z);
+    BRepBuilderAPI_Transform builder(solid, transform, true);
+    builder.Build();
+    if (!builder.IsDone())
+      throw ValueError(failure);
+    return builder.Shape();
+  });
+}
+
 }  // namespace
 
 Solid scale_rsolid(const Solid& solid, const Scalar3& factors, const Scalar3& center) {
@@ -142,8 +168,10 @@ Solid transform_rsolid(const Solid& solid, const std::vector<std::vector<Scalar>
   const Vec3 origin = features_detail::place_point({0, 0, 0});
   const Mat3 linear = multiply(multiply(basis, affine), transposed(basis));
   const Vec3 offset = apply(basis, {values[0][3], values[1][3], values[2][3]});
-  const TopoDS_Shape transformed = general_transform(solid.wrapped(), linear, origin + offset - apply(linear, origin),
-                                                     "kernel could not transform the solid");
+  const Vec3 translation = origin + offset - apply(linear, origin);
+  const TopoDS_Shape transformed =
+      is_rigid(linear) ? rigid_transform(solid.wrapped(), linear, translation, "kernel could not transform the solid")
+                       : general_transform(solid.wrapped(), linear, translation, "kernel could not transform the solid");
   rec.input(solid, "body");
   return finish_solid(solid, transformed, std::move(rec).take());
 }

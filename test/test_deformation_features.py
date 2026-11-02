@@ -95,3 +95,24 @@ def test_set_boolean_compound_members_and_graph_replay(operation):
 def test_set_boolean_complete_removal_returns_no_solid():
     base = scad.make_box_rsolid(2, 2, 2)
     assert scad.boolean_rsolidlist(left=[base], right=[base], operation="cut") == []
+
+
+def _placed_matrix(angle_degrees, origin):
+    a = math.radians(angle_degrees)
+    c, s = math.cos(a), math.sin(a)
+    # A world placement: rotation about y composed with a quarter turn about x, then a translation.
+    return [[-c, -s, 0, origin[0]], [0, 0, -1, origin[1]], [s, -c, 0, origin[2]], [0, 0, 0, 1]]
+
+
+@pytest.mark.parametrize("angle", [0.0, 25.0, 65.0])
+def test_rigid_transform_of_a_valid_solid_is_never_rejected(angle):
+    # A rigid motion must be exact: it may not re-approximate the surfaces (the general path turns
+    # them into B-splines and a body built from booleans and fillets can stop being valid).
+    box = scad.make_box_rsolid(width=30, height=18, depth=12)
+    hole = scad.translate_shape(scad.make_cylinder_rsolid(radius=3.2, height=40), (4, 2, -10))
+    body = scad.cut_rsolid(box, hole)
+    edges = scad.ql.edges().where(scad.ql.prop("geom.length", ">", 11)).resolve(body)
+    body = scad.fillet_rsolid(body, list(edges), 1.5)
+    moved = scad.transform_rsolid(solid=body, matrix=_placed_matrix(angle, (0, -18, 91)))
+    assert moved.get_volume() == pytest.approx(body.get_volume(), rel=1e-9)
+    assert len(scad.ql.faces().resolve(moved)) == len(scad.ql.faces().resolve(body))
