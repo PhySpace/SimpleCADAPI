@@ -170,8 +170,9 @@ Solid transform_rsolid(const Solid& solid, const std::vector<std::vector<Scalar>
   const Vec3 offset = apply(basis, {values[0][3], values[1][3], values[2][3]});
   const Vec3 translation = origin + offset - apply(linear, origin);
   const TopoDS_Shape transformed =
-      is_rigid(linear) ? rigid_transform(solid.wrapped(), linear, translation, "kernel could not transform the solid")
-                       : general_transform(solid.wrapped(), linear, translation, "kernel could not transform the solid");
+      is_rigid(linear)
+          ? rigid_transform(solid.wrapped(), linear, translation, "kernel could not transform the solid")
+          : general_transform(solid.wrapped(), linear, translation, "kernel could not transform the solid");
   rec.input(solid, "body");
   return finish_solid(solid, transformed, std::move(rec).take());
 }
