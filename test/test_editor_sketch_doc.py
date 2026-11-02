@@ -66,3 +66,29 @@ def test_a_bad_document_is_refused_before_it_can_reach_code(mutate, message):
     mutate(doc)
     with pytest.raises(S.SketchError, match=message):
         S.validate(doc)
+
+
+def test_a_sketch_on_a_face_frame_extrudes_along_its_normal():
+    import copy
+
+    from simplecadapi.editor import features as F
+
+    frame = {"origin": [10.0, 0.0, 0.0], "x_axis": [0.0, 1.0, 0.0], "y_axis": [0.0, 0.0, 1.0]}
+    doc = copy.deepcopy(RECT_SKETCH)
+    doc["plane"] = frame
+    assert S.plane_normal(S.validate(doc)["plane"]) == [1.0, 0.0, 0.0]
+    solved = S.solve(doc)
+    assert solved["status"] == "solved" and solved["profiles"][0]["centroid"][0] == pytest.approx(10.0)
+    with scad.GraphSession(graph_id="face-sketch"):
+        scope: dict = {"scad": scad}
+        sketch = F.render_feature("sketch", "outline", {"sketch": doc}, bodies={})
+        exec("\n".join(sketch.params), scope)
+        exec(sketch.feature, scope)
+        extrude = F.render_feature("extrude_sketch", "tab", {"profile": "outline", "direction": "normal", "distance": 4.0}, bodies={"outline": "face"}, env={"profile_normals": {"outline": S.plane_normal(S.validate(doc)["plane"])}})
+        exec("\n".join(extrude.params), scope)
+        exec(extrude.feature, scope)
+        center = scope["tab"].get_center()
+        assert center.x == pytest.approx(12.0) and scope["tab"].get_volume() == pytest.approx(40 * 20 * 4)
+    for bad in ({"origin": [0, 0, 0], "x_axis": [1, 0, 0], "y_axis": [1, 0, 0]}, {"origin": [0, 0], "x_axis": [1, 0, 0], "y_axis": [0, 1, 0]}, {"origin": [0, 0, 0], "x_axis": [2, 0, 0], "y_axis": [0, 1, 0]}):
+        with pytest.raises(S.SketchError):
+            S.validate({**RECT_SKETCH, "plane": bad})

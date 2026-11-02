@@ -131,7 +131,14 @@ class FeatureService:
             gui = feature["gui"]
             if gui and gui["spec"] == "sketch" and feature["makes"]:
                 plane = (gui["values"].get("sketch") or {}).get("plane", "XY")
-                profiles.append({"name": feature["makes"][0], "plane": plane, "normal": sketch_doc.PLANE_NORMALS.get(plane, "+z")})
+                profiles.append(
+                    {
+                        "name": feature["makes"][0],
+                        "plane": plane,
+                        "normal": sketch_doc.PLANE_NORMALS.get(plane, "normal") if isinstance(plane, str) else "normal",
+                        "normal_vec": sketch_doc.plane_normal(plane),
+                    }
+                )
         return {
             "features": features,
             "bodies": [{"name": name, "produces": bodies[name]} for name in order],
@@ -360,7 +367,12 @@ class FeatureService:
         picked = {k: list(v) for k, v in dict(selections or {}).items() if isinstance(v, (list, tuple))}
         notebook = getattr(self.state, "notebook", None)
         workspace = getattr(self.state, "workspace", None)
-        env = {"name": getattr(notebook, "stem", slug), "notebook_dir": notebook.parent if notebook else None, "workspace": workspace}
+        env = {
+            "name": getattr(notebook, "stem", slug),
+            "notebook_dir": notebook.parent if notebook else None,
+            "workspace": workspace,
+            "profile_normals": {p["name"]: p["normal_vec"] for p in snap.get("profiles", [])},
+        }
         if spec_id == "assembly" and workspace is not None:
             for component in ((values.get("assembly") or {}).get("components") or []):
                 if not (Path(workspace) / str(component.get("part", ""))).is_file():

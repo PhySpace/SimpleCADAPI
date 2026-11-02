@@ -42,6 +42,7 @@ _AXES = {
     "-z": (0.0, 0.0, -1.0),
 }
 _AXIS_OPTIONS = [{"value": key, "label": key} for key in _AXES]
+_DIR_OPTIONS = [*({"value": key, "label": key} for key in _AXES), {"value": "normal", "label": "normal of the sketch plane"}]
 _PLANE_NORMALS = {"XY": (0.0, 0.0, 1.0), "XZ": (0.0, 1.0, 0.0), "YZ": (1.0, 0.0, 0.0)}
 _PLANE_OPTIONS = [{"value": key, "label": key} for key in _PLANE_NORMALS]
 
@@ -187,7 +188,13 @@ class Context:
         return str(self.values[slot])
 
     def axis(self, slot: str) -> str:
-        return repr(_AXES[str(self.values[slot])])
+        value = str(self.values[slot])
+        if value == "normal":  # the normal of the sketch plane the profile was drawn on
+            vector = (self.env.get("profile_normals") or {}).get(str(self.values.get("profile")))
+            if vector is None:
+                raise FeatureError("the direction 'normal' needs a sketch profile")
+            return repr(tuple(round(v, 9) + 0.0 for v in vector))
+        return repr(_AXES[value])
 
     def normal(self, slot: str) -> str:
         return repr(_PLANE_NORMALS[str(self.values[slot])])
@@ -576,13 +583,13 @@ SPECS: tuple[Spec, ...] = (
     Spec("sketch", "Sketch", "Sketch", "build, profile=sketch", "face", "A constrained 2D sketch on a plane, made into a face.",
          (Slot("sketch", "Sketch", "sketch", default={"plane": "XY", "points": [], "entities": [], "constraints": [], "profile": 0}),), _sketch),
     Spec("extrude_sketch", "Extrude sketch", "Sketch", "build", "solid", "Push a sketch face along a direction.",
-         (_PROFILE(), _AXIS("direction", "Direction", "+z"), _signed("distance", "Distance", 10.0, min=0.001)), _extrude_sketch),
+         (_PROFILE(), _enum("direction", "Direction", _DIR_OPTIONS, "normal"), _signed("distance", "Distance", 10.0, min=0.001)), _extrude_sketch),
     Spec("revolve_sketch", "Revolve sketch", "Sketch", "build", "solid", "Turn a sketch face about an axis.",
          (_PROFILE(), _AXIS("axis", "Axis"), _point("origin", "Axis point"), Slot("angle", "Angle", "angle", default=360.0, unit="deg", min=1.0, max=360.0)), _revolve_sketch),
     Spec("cut_sketch", "Cut sketch", "Sketch", "subtract", "solid", "Cut a body along a sketch face (a pocket or a through cut).",
-         (_BODY(), _PROFILE(), _AXIS("direction", "Direction", "-z"), _length("depth", "Depth", 10.0)), _cut_sketch),
+         (_BODY(), _PROFILE(), _enum("direction", "Direction", _DIR_OPTIONS, "normal"), _length("depth", "Depth", 10.0)), _cut_sketch),
     Spec("boss_sketch", "Boss from sketch", "Sketch", "add", "solid", "Add material along a sketch face to a body.",
-         (_BODY(), _PROFILE(), _AXIS("direction", "Direction", "+z"), _signed("distance", "Distance", 10.0, min=0.001)), _boss_sketch),
+         (_BODY(), _PROFILE(), _enum("direction", "Direction", _DIR_OPTIONS, "normal"), _signed("distance", "Distance", 10.0, min=0.001)), _boss_sketch),
     Spec("assembly", "Assembly layout", "Assembly", "add", "assembly", "Components, the grounded one, and the joints and mates between connector frames.",
          (Slot("assembly", "Assembly", "assembly", default={"components": [], "ground": None, "constraints": []}),), _assembly),
     Spec("cut", "Cut", "Boolean", "subtract", "solid", "Take one or more bodies out of another.",

@@ -73,11 +73,45 @@ def _num(value: float) -> str:
     return "0.0" if text in ("", "-0") else (text if "." in text else text + ".0")
 
 
+def _vec3(value: Any, what: str) -> list[float]:
+    if not (isinstance(value, (list, tuple)) and len(value) == 3):
+        raise SketchError(f"{what}: three numbers")
+    return [_number(v, what) for v in value]
+
+
+def validate_plane(plane: Any) -> Any:
+    """A named plane (XY, XZ, YZ) or a frame ``{origin, x_axis, y_axis}`` (unit axes, square to each other)."""
+    if isinstance(plane, str):
+        if plane not in PLANES:
+            raise SketchError(f"the sketch plane must be one of {', '.join(PLANES)}")
+        return plane
+    if not isinstance(plane, Mapping):
+        raise SketchError("the sketch plane is a name or a frame {origin, x_axis, y_axis}")
+    origin, x, y = _vec3(plane.get("origin"), "plane origin"), _vec3(plane.get("x_axis"), "plane x axis"), _vec3(plane.get("y_axis"), "plane y axis")
+    if any(abs(math.sqrt(sum(v * v for v in axis)) - 1.0) > 1e-6 for axis in (x, y)):
+        raise SketchError("the plane axes must be unit vectors")
+    if abs(sum(a * b for a, b in zip(x, y))) > 1e-6:
+        raise SketchError("the plane x axis and y axis must be square to each other")
+    return {"origin": origin, "x_axis": x, "y_axis": y}
+
+
+def plane_normal(plane: Any) -> list[float]:
+    """The normal of a validated plane: x cross y (a named plane has the SDK's own frame)."""
+    frames = {"XY": ((1, 0, 0), (0, 1, 0)), "XZ": ((1, 0, 0), (0, 0, 1)), "YZ": ((0, 1, 0), (0, 0, 1))}
+    x, y = (frames[plane] if isinstance(plane, str) else (plane["x_axis"], plane["y_axis"]))
+    return [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]]
+
+
+def _plane_literal(plane: Any) -> str:
+    if isinstance(plane, str):
+        return json.dumps(plane)
+    parts = ", ".join(f'"{key}": ({", ".join(_num(v) for v in plane[key])})' for key in ("origin", "x_axis", "y_axis"))
+    return "{" + parts + "}"
+
+
 def validate(doc: Mapping[str, Any]) -> dict[str, Any]:
     """The cleaned document, or :class:`SketchError`."""
-    plane = doc.get("plane", "XY")
-    if plane not in PLANES:
-        raise SketchError(f"the sketch plane must be one of {', '.join(PLANES)}")
+    plane = validate_plane(doc.get("plane", "XY"))
     points: list[dict[str, Any]] = []
     entities: list[dict[str, Any]] = []
     ids: set[str] = set()
@@ -220,7 +254,7 @@ def render(slug: str, doc: Mapping[str, Any]) -> tuple[list[str], list[str]]:
         var_for[constraint["id"]] = name
     inner = f"[{', '.join(str(i) for i in doc['inner'])}]"
     lines = [
-        f"_sketch = scad.make_sketch_rsketch(name={json.dumps(slug)}, plane={json.dumps(doc['plane'])})",
+        f"_sketch = scad.make_sketch_rsketch(name={json.dumps(slug)}, plane={_plane_literal(doc['plane'])})",
         *_calls(doc, var_for=var_for),
         f"{slug} = scad.make_face_from_sketch_rface(sketch=_sketch, profile={doc['profile']}, inner_profiles={inner}, require_fully_constrained={bool(doc['fully_constrained'])})",
     ]
@@ -239,7 +273,8 @@ def solve(doc: Mapping[str, Any], *, max_profiles: int = 16) -> dict[str, Any]:
 
     clean = validate(doc)
     namespace: dict[str, Any] = {"scad": scad}
-    sketch = scad.make_sketch_rsketch(name="canvas", plane=clean["plane"])
+    plane = clean["plane"] if isinstance(clean["plane"], str) else {k: tuple(v) for k, v in clean["plane"].items()}
+    sketch = scad.make_sketch_rsketch(name="canvas", plane=plane)
     namespace["_sketch"] = sketch
     for line in _calls(clean):
         exec(line, namespace)  # noqa: S102 - generated from validated ids and numbers only
@@ -266,4 +301,4 @@ def solve(doc: Mapping[str, Any], *, max_profiles: int = 16) -> dict[str, Any]:
     }
 
 
-__all__ = ["CONSTRAINTS", "ENTITY_KINDS", "PLANES", "PLANE_NORMALS", "SketchError", "render", "solve", "validate"]
+__all__ = ["CONSTRAINTS", "ENTITY_KINDS", "PLANES", "PLANE_NORMALS", "SketchError", "plane_normal", "render", "solve", "validate", "validate_plane"]
