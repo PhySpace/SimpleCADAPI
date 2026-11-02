@@ -197,6 +197,33 @@ Errors there are the same errors `sca snapshot` reports per cell. A module that
 does not compile is reported as `setup failed` with the file and line; fix that
 file first, since every cell is blocked until it compiles.
 
+## Features the person made with buttons
+
+The editor also has a Features tab and an operation palette (box, cylinder, extrude, hole, fillet, patterns ...). A click
+writes two ordinary cells, so you read and edit them like any other:
+
+```python
+# ---- params: hole ----
+HOLE_DIAMETER = scad.var(name="hole_diameter", default=6.0, unit="mm", comment="Diameter")  # ui: slider(...)
+
+# ---- feature: hole (subtract) ----
+# gui: {"spec":"hole","v":1,"values":{...}}
+...one operation that makes the new name `hole`...
+```
+
+- The `# gui:` line is how the form is rebuilt. A cell without it is code and the form never rewrites it. To take a
+  GUI feature over as code, delete the `# gui:` line (or ask the person to); to change a number, edit the `# params:` cell
+  or the form, not the call.
+- GUI commands carry the code they were made from: if you edited the cell in between, the command is refused (409), it
+  does not overwrite you. The same holds for the person's undo of a GUI command.
+- Selections in a GUI cell are written inline, resolved against the body the cell receives: the face tags the box, cylinder
+  or extrude was given (`<slug>.top`, `<slug>.side` ... they survive booleans, not fillets or chamfers) first, the picked
+  geometry second, with the count checked (`.exactly(n)`). If the model moved so that nothing matches, the cell fails and
+  the feature turns red: ask the person to pick again, never widen the selector until it matches.
+- A blank notebook (`sca new NAME --kind blank`) has no cells; the first feature adds the product cell
+  (`<name> = scad.Part(...)`), and later features that consume the body it builds from move it along.
+- Unattended: the buttons are not available; write the cells yourself (see `discipline/notebook-cell-design.md`).
+
 ## Rules of thumb
 
 - Re-read the cell before editing (`sca cell get`, or the file): the person edits and

@@ -9,7 +9,7 @@
     sca viewport [WORKSPACE] [--out PATH]  # the image of what the person sees
     sca cell ls|get|put|insert|rm|run   # edit the cells of the notebook the editor has open
     sca cell open NOTEBOOK [--wait S]   # have the editor open another notebook
-    sca new NAME [--kind part|assembly] # a new notebook; the editor lists it at once
+    sca new NAME [--kind part|assembly|blank] # a new notebook; the editor lists it at once
 """
 
 from __future__ import annotations
@@ -138,7 +138,7 @@ def configure(subparsers: argparse._SubParsersAction) -> None:
         "current directory).  A running editor on that workspace lists it without a reload.",
     )
     new.add_argument("name")
-    new.add_argument("--kind", choices=("part", "assembly"), default="part")
+    new.add_argument("--kind", choices=("part", "assembly", "blank"), default="part")
     new.add_argument("--workspace", "-w", type=Path, default=None)
     new.set_defaults(handler=_new_notebook, printer=_print_json)
 

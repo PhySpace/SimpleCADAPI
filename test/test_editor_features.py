@@ -257,3 +257,39 @@ def test_the_commands_add_edit_undo_and_redo_against_the_real_editor(tmp_path):
         if state.kernel is not None:
             state.kernel.stop()
         server.should_exit = True
+
+
+def test_a_blank_notebook_gets_its_product_with_the_first_feature(tmp_path):
+    import threading
+
+    import uvicorn
+
+    from simplecadapi.editor.server import WorkspaceState, create_app
+    from simplecadapi.editor.templates import create_notebook
+
+    path = create_notebook(tmp_path, "plate", "blank")
+    assert "@app.cell" not in path.read_text()
+    state = WorkspaceState(tmp_path)
+    state.port = 17733
+    server = uvicorn.Server(uvicorn.Config(create_app(state), port=state.port, log_level="error"))
+    threading.Thread(target=server.run, daemon=True).start()
+    state.hub.attach_loop(__import__("asyncio").new_event_loop())
+    try:
+        state.start_kernel(path)
+        service = state.features
+        assert service.snapshot()["features"] == [] and service.snapshot()["product"] is None
+        service.add({"spec": "box", "name": "base", "values": {}})
+        _wait_idle(state)
+        snap = service.snapshot()
+        assert [f["slug"] for f in snap["features"]] == ["base"]
+        assert snap["product"] == {"cell": snap["product"]["cell"], "body": "base"}
+        assert "plate = scad.Part(part_id=scad.notebook_id(), body=base)" in path.read_text()
+        service.add({"spec": "cylinder", "values": {"radius": 5.0, "height": 40.0, "origin": [0.0, 0.0, -10.0]}})
+        service.add({"spec": "cut", "values": {}})  # base is the second-last open body, the cylinder the last: it is cut out
+        _wait_idle(state)
+        snap = service.snapshot()
+        assert snap["product"]["body"] == "cut" and all(not f["errors"] for f in snap["features"]), snap["features"]
+    finally:
+        if state.kernel is not None:
+            state.kernel.stop()
+        server.should_exit = True

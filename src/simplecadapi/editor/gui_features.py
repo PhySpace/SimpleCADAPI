@@ -164,6 +164,7 @@ class FeatureService:
             made = self._create(feature_anchor, rendered.feature, run=True)
             steps.append(made)
             steps.extend(self._repoint_product(snap, rendered))
+            steps.extend(self._first_product(snap, rendered, made["id"], taken))
             self._record(steps)
             return self._result(made["id"], steps, slug)
 
@@ -354,6 +355,14 @@ class FeatureService:
         if product and product["body"] in rendered.reads and rendered.produces == "solid":
             return [self._point_product(product, rendered.slug)]
         return []
+
+    def _first_product(self, snap: Mapping[str, Any], rendered: F.Rendered, after: str, taken: set[str]) -> list[dict]:
+        """A notebook with no product yet gets one, built from its first body (a blank notebook starts without cells)."""
+        if snap["product"] is not None or rendered.produces != "solid" or any("Part(" in str(c.get("code", "")) for c in self.state.cells):
+            return []
+        stem = re.sub(r"\W", "_", getattr(self.state.notebook, "stem", "part") or "part").strip("_").lower() or "part"
+        variable = stem if stem not in taken and stem not in F._RESERVED and not stem[0].isdigit() else f"{stem}_part"
+        return [self._create(after, f"{variable} = scad.Part(part_id=scad.notebook_id(), body={rendered.slug})", run=True)]
 
     def _apply(self, step: dict, *, forward: bool) -> None:
         kind = step["kind"]
