@@ -2,6 +2,7 @@
 // simplecadapi/operators/geometry.py, under the Python names, argument names and
 // defaults (keyword-only where Python is keyword-only), plus the create_* aliases.
 #include "bindings.hpp"
+#include "typed_args.hpp"
 
 #include "scad/core/tolerance.hpp"
 #include "scad/io/brep_region.hpp"
@@ -52,6 +53,12 @@ SplineSpec spline_spec(std::vector<ScalarPoint> control_points, const py::object
           .weights = std::move(weights),
           .periodic = periodic};
 }
+
+// A file path argument: what os.fspath takes, for the signature.
+struct PathName {
+  static constexpr auto name = py::detail::const_name("str | os.PathLike[str]");
+};
+using PathArg = scad::pybind::Typed<PathName>;
 
 std::string path_text(const py::object& path) {
   return py::str(py::module_::import("os").attr("fspath")(path)).cast<std::string>();
@@ -297,7 +304,7 @@ void bind_primitives(py::module_& m) {
 void bind_brep_region(py::module_& m) {
   m.def(
       "load_brep_region_rsolid",
-      [](const py::object& path, const std::string& sha256, const OptionalString& tag_prefix) {
+      [](const PathArg& path, const std::string& sha256, const OptionalString& tag_prefix) {
         return load_brep_region_rsolid(path_text(path), sha256, tag_prefix);
       },
       py::arg("path"), py::arg("sha256"), py::kw_only(), py::arg("tag_prefix") = py::none(),
@@ -313,7 +320,7 @@ void bind_brep_region(py::module_& m) {
       "The checks on a .scadbrep locator (graph replay: relative, no drive, no '..', '/' separators).");
   m.def(
       "load_brep_region_rshell",
-      [](const py::object& path, const std::string& sha256, const OptionalString& tag_prefix) {
+      [](const PathArg& path, const std::string& sha256, const OptionalString& tag_prefix) {
         return load_brep_region_rshell(path_text(path), sha256, tag_prefix);
       },
       py::arg("path"), py::arg("sha256"), py::kw_only(), py::arg("tag_prefix") = py::none(),

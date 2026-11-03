@@ -10,9 +10,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Union
+import os
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from ..errors import raise_harness_error
+from ..types import Angle, Direction3, Length
+from simplecadapi._cpp import AnyShape, Solid
 
 
 def _shape_types() -> tuple:
@@ -167,29 +170,35 @@ def _execute_screenshot_render(prepared: Any) -> str:
 
 
 def render_screenshot_rpath(
-    shapes: Any,
-    output_path: str,
-    highlight_tags: Optional[Sequence[str]] = None,
-    tag_labels: Optional[Dict[str, str]] = None,
-    image_size: Tuple[int, int] = (1400, 900),
-    view: Union[Tuple[float, float], str] = "auto",
-    views: Optional[Sequence[Tuple[float, float, str]]] = None,
+    shapes: Solid | Sequence[Solid],
+    output_path: str | os.PathLike[str],
+    highlight_tags: Sequence[str] | None = None,
+    tag_labels: dict[str, str] | None = None,
+    image_size: tuple[int, int] = (1400, 900),
+    view: Literal[
+        "auto", "iso", "isometric", "top", "bottom", "front", "back", "left", "right",
+        "front_right", "front_left", "rear_right", "rear_left",
+    ] | tuple[Angle, Angle] | None = "auto",
+    views: Sequence[tuple[Angle, Angle, str]] | None = None,
     show_axes: bool = True,
     show_legend: bool = True,
     zoom: float = 4.0,
     show_callouts: bool = True,
-    linear_deflection: Optional[float] = None,
-    angular_deflection: Optional[float] = None,
-    style: str = "studio",
-    edge_width_scale: Optional[float] = None,
-    view_up: Optional[Sequence[float]] = None,
+    linear_deflection: Length | None = None,
+    angular_deflection: float | None = None,
+    style: Literal["studio", "standard"] = "studio",
+    edge_width_scale: float | None = None,
+    view_up: Direction3 | None = None,
     supersample: int = 2,
-    highlight_edges: Optional[Sequence[Any]] = None,
+    highlight_edges: Sequence[AnyShape] | None = None,
     highlight_edge_width: float = 4.5,
 ) -> str:
     """Render solids through the software renderer (no OCP, VTK or display needed).
 
-    Same contract as ``simplecadapi.render_screenshot_rpath`` of the ``ocp`` backend.
+    Same contract as ``simplecadapi.render_screenshot_rpath`` of the ``ocp`` backend.  ``shapes`` is a Solid or a
+    (nested) sequence of Solids; ``view`` is a preset name (matched case-insensitively) or ``(elevation, azimuth)``
+    in degrees, and ``views`` a list of ``(elevation, azimuth, label)`` panels; ``linear_deflection`` is the
+    tessellation tolerance in mm, ``angular_deflection`` in radians.
     """
 
     prepared = _prepare_screenshot_render(

@@ -5,6 +5,7 @@
 // executor to register: a recorded gear replays through the operators it was made of.
 // `build_ball_bearing` (the durable-definition wrapper over the build layer) is not provided.
 #include "bindings.hpp"
+#include "typed_args.hpp"
 
 #include <optional>
 #include <string>
@@ -21,6 +22,41 @@
 namespace {
 
 using namespace scad;
+
+// What the arguments mean, for the signature (typed_args.hpp): each converts exactly as the double / int / object it
+// wraps, so the factories take what they took before.
+struct CountTag {
+  static constexpr auto name = py::detail::const_name("simplecadapi.types.Count");
+};
+using Length = scad::pybind::Shown<double, scad::pybind::LengthTag>;
+using Angle = scad::pybind::Shown<double, scad::pybind::AngleTag>;
+using Count = scad::pybind::Shown<int, CountTag>;
+
+namespace names {
+using py::detail::const_name;
+SCAD_SIGNATURE_NAME(CountOrNone, CountTag::name + scad::pybind::kOrNone);
+// Material is bound after the std module, so its name is written out.
+SCAD_SIGNATURE_NAME(MaterialOrNone, const_name("simplecadapi._cpp._native.Material | None"));
+// The fastener styles are read case-insensitively; the signature lists the canonical spellings.
+SCAD_SIGNATURE_NAME(HeadStyle, const_name("typing.Literal['hex', 'square', 'cylindrical', 'button', 'countersunk']"));
+SCAD_SIGNATURE_NAME(ThreadStyle, const_name("typing.Literal['auto', 'full', 'partial', 'none']"));
+SCAD_SIGNATURE_NAME(ThreadDetail, const_name("typing.Literal['modeled', 'cosmetic']"));
+SCAD_SIGNATURE_NAME(ThreadForm, const_name("typing.Literal['v', 'trapezoidal']"));
+SCAD_SIGNATURE_NAME(DriveStyle, const_name("typing.Literal['none', 'slot', 'cross', 'hex_socket']"));
+SCAD_SIGNATURE_NAME(NutStyle, const_name("typing.Literal['hex', 'square', 'round', 'knurled']"));
+SCAD_SIGNATURE_NAME(HoleStyle, const_name("typing.Literal['through', 'blind']"));
+}  // namespace names
+
+using CountArg = scad::pybind::Typed<CountTag>;  // checked as a plain int by the factory
+using CountOrNoneArg = scad::pybind::Typed<names::CountOrNone>;
+using MaterialOrNoneArg = scad::pybind::Typed<names::MaterialOrNone>;
+using HeadStyleArg = scad::pybind::Typed<names::HeadStyle>;
+using ThreadStyleArg = scad::pybind::Typed<names::ThreadStyle>;
+using ThreadDetailArg = scad::pybind::Typed<names::ThreadDetail>;
+using ThreadFormArg = scad::pybind::Typed<names::ThreadForm>;
+using DriveStyleArg = scad::pybind::Typed<names::DriveStyle>;
+using NutStyleArg = scad::pybind::Typed<names::NutStyle>;
+using HoleStyleArg = scad::pybind::Typed<names::HoleStyle>;
 
 // Runs `body` with the GIL released; an exception leaves with the GIL back.
 template <class F>
@@ -64,8 +100,8 @@ stdlib::Point2 point_from_py(const py::object& value) {
 void bind_gear_factories(py::module_& gear) {
   gear.def(
       "make_spur_gear_rsolid",
-      [](int n_teeth, double module, double pressure_angle, double gear_height, double addendum_factor,
-         double clearance_factor, double backlash) {
+      [](Count n_teeth, Length module, Angle pressure_angle, Length gear_height, double addendum_factor,
+         double clearance_factor, Length backlash) {
         return unlocked([&] {
           return make_spur_gear_rsolid(n_teeth, module, pressure_angle, gear_height,
                                        tuning(addendum_factor, clearance_factor, backlash));
@@ -80,8 +116,8 @@ void bind_gear_factories(py::module_& gear) {
 
   gear.def(
       "make_straight_bevel_gear_rsolid",
-      [](int n_teeth, double module, double pitch_angle, double pressure_angle, double face_width,
-         double addendum_factor, double clearance_factor, double backlash) {
+      [](Count n_teeth, Length module, Angle pitch_angle, Angle pressure_angle, Length face_width,
+         double addendum_factor, double clearance_factor, Length backlash) {
         return unlocked([&] {
           return make_straight_bevel_gear_rsolid(n_teeth, module, pitch_angle, pressure_angle, face_width,
                                                  tuning(addendum_factor, clearance_factor, backlash));
@@ -97,8 +133,8 @@ void bind_gear_factories(py::module_& gear) {
 
   gear.def(
       "make_helical_gear_rsolid",
-      [](int n_teeth, double module, double pressure_angle, double helix_angle, double gear_height,
-         double addendum_factor, double clearance_factor, double backlash) {
+      [](Count n_teeth, Length module, Angle pressure_angle, Angle helix_angle, Length gear_height,
+         double addendum_factor, double clearance_factor, Length backlash) {
         return unlocked([&] {
           return make_helical_gear_rsolid(n_teeth, module, pressure_angle, helix_angle, gear_height,
                                           tuning(addendum_factor, clearance_factor, backlash));
@@ -112,8 +148,8 @@ void bind_gear_factories(py::module_& gear) {
 
   gear.def(
       "make_herringbone_gear_rsolid",
-      [](int n_teeth, double module, double pressure_angle, double helix_angle, double gear_height,
-         double addendum_factor, double clearance_factor, double backlash) {
+      [](Count n_teeth, Length module, Angle pressure_angle, Angle helix_angle, Length gear_height,
+         double addendum_factor, double clearance_factor, Length backlash) {
         return unlocked([&] {
           return make_herringbone_gear_rsolid(n_teeth, module, pressure_angle, helix_angle, gear_height,
                                               tuning(addendum_factor, clearance_factor, backlash));
@@ -127,7 +163,7 @@ void bind_gear_factories(py::module_& gear) {
 
   gear.def(
       "make_spur_ring_gear_rsolid",
-      [](int n_teeth, double module, double pressure_angle, double gear_height, double rim_thickness, double backlash,
+      [](Count n_teeth, Length module, Angle pressure_angle, Length gear_height, Length rim_thickness, Length backlash,
          double addendum_factor, double clearance_factor) {
         return unlocked([&] {
           return make_spur_ring_gear_rsolid(n_teeth, module, pressure_angle, gear_height, rim_thickness,
@@ -143,8 +179,8 @@ void bind_gear_factories(py::module_& gear) {
 
   gear.def(
       "make_helical_ring_gear_rsolid",
-      [](int n_teeth, double module, double pressure_angle, double helix_angle, double gear_height,
-         double rim_thickness, double backlash, double addendum_factor, double clearance_factor) {
+      [](Count n_teeth, Length module, Angle pressure_angle, Angle helix_angle, Length gear_height,
+         Length rim_thickness, Length backlash, double addendum_factor, double clearance_factor) {
         return unlocked([&] {
           return make_helical_ring_gear_rsolid(n_teeth, module, pressure_angle, helix_angle, gear_height, rim_thickness,
                                                tuning(addendum_factor, clearance_factor, backlash));
@@ -157,8 +193,8 @@ void bind_gear_factories(py::module_& gear) {
 
   gear.def(
       "make_herringbone_ring_gear_rsolid",
-      [](int n_teeth, double module, double pressure_angle, double helix_angle, double gear_height,
-         double rim_thickness, double backlash, double addendum_factor, double clearance_factor) {
+      [](Count n_teeth, Length module, Angle pressure_angle, Angle helix_angle, Length gear_height,
+         Length rim_thickness, Length backlash, double addendum_factor, double clearance_factor) {
         return unlocked([&] {
           return make_herringbone_ring_gear_rsolid(n_teeth, module, pressure_angle, helix_angle, gear_height,
                                                    rim_thickness, tuning(addendum_factor, clearance_factor, backlash));
@@ -171,9 +207,9 @@ void bind_gear_factories(py::module_& gear) {
 
   gear.def(
       "make_cycloidal_disc_rsolid",
-      [](int n_lobes, double ring_pin_pitch_radius, double roller_radius, double eccentricity, double gear_height,
-         double bore_radius, int output_pin_count, double output_pin_pitch_radius, double output_pin_clearance_radius,
-         double output_pin_phase, int sample_count_per_lobe, double spline_tolerance, int max_control_points) {
+      [](Count n_lobes, Length ring_pin_pitch_radius, Length roller_radius, Length eccentricity, Length gear_height,
+         Length bore_radius, Count output_pin_count, Length output_pin_pitch_radius, Length output_pin_clearance_radius,
+         Angle output_pin_phase, Count sample_count_per_lobe, Length spline_tolerance, Count max_control_points) {
         CycloidalDiscOptions options;
         options.bore_radius = bore_radius;
         options.output_pin_count = output_pin_count;
@@ -199,7 +235,7 @@ void bind_gear_factories(py::module_& gear) {
 
   gear.def(
       "make_spur_rack_rsolid",
-      [](double module, int n_teeth, double pressure_angle, double rack_height) {
+      [](Length module, Count n_teeth, Angle pressure_angle, Length rack_height) {
         return unlocked([&] { return make_spur_rack_rsolid(module, n_teeth, pressure_angle, rack_height); });
       },
       py::arg("module"), py::arg("n_teeth") = 10, py::arg("pressure_angle") = 20.0, py::arg("rack_height") = 6.0,
@@ -207,7 +243,7 @@ void bind_gear_factories(py::module_& gear) {
 
   gear.def(
       "make_helical_rack_rsolid",
-      [](double module, int n_teeth, double pressure_angle, double helix_angle, double rack_height) {
+      [](Length module, Count n_teeth, Angle pressure_angle, Angle helix_angle, Length rack_height) {
         return unlocked(
             [&] { return make_helical_rack_rsolid(module, n_teeth, pressure_angle, helix_angle, rack_height); });
       },
@@ -216,7 +252,7 @@ void bind_gear_factories(py::module_& gear) {
 
   gear.def(
       "make_herringbone_rack_rsolid",
-      [](double module, int n_teeth, double pressure_angle, double helix_angle, double rack_height) {
+      [](Length module, Count n_teeth, Angle pressure_angle, Angle helix_angle, Length rack_height) {
         return unlocked(
             [&] { return make_herringbone_rack_rsolid(module, n_teeth, pressure_angle, helix_angle, rack_height); });
       },
@@ -372,8 +408,8 @@ void bind_gear_internals(py::module_& gear) {
 void bind_chain(py::module_& chain) {
   chain.def(
       "make_roller_chain_sprocket_rsolid",
-      [](const py::object& n_teeth, double chain_pitch, double roller_diameter, double sprocket_thickness,
-         double bore_radius, double roller_clearance) {
+      [](const CountArg& n_teeth, Length chain_pitch, Length roller_diameter, Length sprocket_thickness,
+         Length bore_radius, Length roller_clearance) {
         if (!is_plain_int(n_teeth))
           throw ValueError("n_teeth must be an integer of at least 6");
         const int teeth = python_int(n_teeth);
@@ -396,11 +432,11 @@ void bind_chain(py::module_& chain) {
 void bind_fastener(py::module_& fastener) {
   fastener.def(
       "make_bolt_rsolid",
-      [](double diameter, double length, const py::object& head_style, const py::object& thread_style,
-         const py::object& thread_detail, const py::object& thread_form, std::optional<double> thread_pitch,
-         std::optional<double> thread_depth, std::optional<double> thread_length, std::optional<double> head_width,
-         std::optional<double> head_height, const py::object& drive_style, std::optional<double> drive_size,
-         std::optional<double> drive_depth, std::optional<double> underhead_fillet_radius) {
+      [](Length diameter, Length length, const HeadStyleArg& head_style, const ThreadStyleArg& thread_style,
+         const ThreadDetailArg& thread_detail, const ThreadFormArg& thread_form, std::optional<Length> thread_pitch,
+         std::optional<Length> thread_depth, std::optional<Length> thread_length, std::optional<Length> head_width,
+         std::optional<Length> head_height, const DriveStyleArg& drive_style, std::optional<Length> drive_size,
+         std::optional<Length> drive_depth, std::optional<Length> underhead_fillet_radius) {
         BoltOptions options;
         options.head_style = text_of(head_style);
         options.thread_style = text_of(thread_style);
@@ -430,9 +466,9 @@ void bind_fastener(py::module_& fastener) {
 
   fastener.def(
       "make_nut_rsolid",
-      [](double diameter, double width, double height, const py::object& nut_style, const py::object& hole_style,
-         const py::object& thread_detail, const py::object& thread_form, std::optional<double> thread_pitch,
-         std::optional<double> thread_depth, std::optional<double> hole_depth, const py::object& knurl_count) {
+      [](Length diameter, Length width, Length height, const NutStyleArg& nut_style, const HoleStyleArg& hole_style,
+         const ThreadDetailArg& thread_detail, const ThreadFormArg& thread_form, std::optional<Length> thread_pitch,
+         std::optional<Length> thread_depth, std::optional<Length> hole_depth, const CountArg& knurl_count) {
         NutOptions options;
         options.nut_style = text_of(nut_style);
         options.hole_style = text_of(hole_style);
@@ -460,10 +496,10 @@ void bind_fastener(py::module_& fastener) {
 void bind_bearing(py::module_& bearing) {
   bearing.def(
       "make_ball_bearing_rassembly",
-      [](double bore_diameter, double outer_diameter, double bearing_width, double ball_diameter,
-         const py::object& ball_count, double raceway_clearance, double edge_chamfer, std::string assembly_id,
-         std::optional<double> drive_angle_degrees, bool fuse_rolling_elements, double rolling_element_fuse_overlap,
-         const py::object& material) {
+      [](Length bore_diameter, Length outer_diameter, Length bearing_width, Length ball_diameter,
+         const CountOrNoneArg& ball_count, Length raceway_clearance, Length edge_chamfer, std::string assembly_id,
+         std::optional<Angle> drive_angle_degrees, bool fuse_rolling_elements, Length rolling_element_fuse_overlap,
+         const MaterialOrNoneArg& material) {
         BallBearingOptions options;
         if (!ball_count.is_none())
           options.ball_count = python_int(ball_count);
