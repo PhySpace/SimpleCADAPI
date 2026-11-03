@@ -2,6 +2,7 @@
 // the solver backend registry (duck-typed Python backends included) and the 42
 // operators, under the names and signatures of simplecadapi.
 #include "bindings.hpp"
+#include "semantic_names.hpp"
 #include "py_lifetime.hpp"
 
 #include <mutex>
@@ -37,7 +38,7 @@ struct type_caster<scad::SketchTarget> {
 // SketchPosition <- (x, y) | point id | SketchRef.  Only real numbers are coordinates: no expressions, no booleans.
 template <>
 struct type_caster<scad::SketchPosition> {
-  PYBIND11_TYPE_CASTER(scad::SketchPosition, const_name("tuple[float, float] | str | SketchRef"));
+  PYBIND11_TYPE_CASTER(scad::SketchPosition, const_name("simplecadapi.types.Point2 | str | SketchRef"));
 
   bool load(handle src, bool) {
     if (isinstance<scad::SketchRef>(src)) {
@@ -67,7 +68,7 @@ struct type_caster<scad::SketchPosition> {
 template <>
 struct type_caster<scad::SketchControlPoint> {
  public:
-  PYBIND11_TYPE_CASTER(scad::SketchControlPoint, const_name("SketchRef | str | tuple[float, float]"));
+  PYBIND11_TYPE_CASTER(scad::SketchControlPoint, const_name("SketchRef | str | simplecadapi.types.Point2"));
 
   bool load(handle src, bool) {
     if (isinstance<scad::SketchRef>(src)) {
@@ -102,7 +103,7 @@ struct type_caster<scad::SketchControlPoint> {
 // SketchProfileId <- int | str
 template <>
 struct type_caster<scad::SketchProfileId> {
-  PYBIND11_TYPE_CASTER(scad::SketchProfileId, const_name("int | str"));
+  PYBIND11_TYPE_CASTER(scad::SketchProfileId, const_name("simplecadapi.types.SketchProfile"));
 
   bool load(handle src, bool) {
     if (isinstance<str>(src)) {
@@ -127,6 +128,44 @@ namespace {
 using namespace scad;
 using pybind::value_from_python;
 using pybind::value_to_python;
+using scad::pybind::Angle;
+using scad::pybind::Choice;
+using scad::pybind::Length;
+using scad::pybind::Named;
+
+// The names the signatures show.
+struct PlaneTag {  // read by make_sketch_rsketch: a named plane or {"origin", "x_axis", "y_axis"}
+  static constexpr auto name = py::detail::const_name("simplecadapi.types.Plane");
+};
+struct EndTag {
+  static constexpr auto name = py::detail::const_name("Literal['start', 'end']");
+};
+struct TangentModeTag {
+  static constexpr auto name = py::detail::const_name("Literal['external', 'internal']");
+};
+struct ProjectSourceTag {
+  static constexpr auto name = py::detail::const_name("Sketch | AnyShape | Sequence[AnyShape]");
+};
+
+std::optional<std::string> text_of(const std::optional<Choice<EndTag>>& choice) {
+  return choice ? std::optional<std::string>(choice->value) : std::nullopt;
+}
+
+// A dimension constraint whose value is a Length or an Angle (degrees) in the signature.
+using TwoValueFn = Sketch (*)(const Sketch&, const SketchTarget&, const SketchTarget&, const Scalar&,
+                              const SketchConstraintId&, bool);
+using OneValueFn = Sketch (*)(const Sketch&, const SketchTarget&, const Scalar&, const SketchConstraintId&, bool);
+template <class Q>
+auto two_value(TwoValueFn fn) {
+  return [fn](const Sketch& s, const SketchTarget& a, const SketchTarget& b, const Q& value,
+              const SketchConstraintId& id, bool driving) { return fn(s, a, b, value, id, driving); };
+}
+template <class Q>
+auto one_value(OneValueFn fn) {
+  return [fn](const Sketch& s, const SketchTarget& target, const Q& value, const SketchConstraintId& id, bool driving) {
+    return fn(s, target, value, id, driving);
+  };
+}
 
 // A Python object that implements the SketchSolverBackend protocol.
 class PythonBackend final : public SketchSolverBackend {
@@ -557,17 +596,27 @@ void bind_sketch_class(py::module_& m) {
 void bind_entity_operators(py::module_& m) {
   m.def(
       "make_sketch_rsketch",
-      [](const std::optional<std::string>& name, const py::object& plane, const std::optional<std::string>& sketch_id) {
-        return make_sketch_rsketch(name, value_from_python(plane), sketch_id);
+      [](const std::optional<std::string>& name, const Named<PlaneTag>& plane,
+         const std::optional<std::string>& sketch_id) {
+        return make_sketch_rsketch(name, value_from_python(plane.value), sketch_id);
       },
       py::arg("name") = py::none(), py::kw_only(), py::arg("plane") = "XY", py::arg("sketch_id") = py::none());
-  m.def("add_point_rsketch", &add_point_rsketch, py::arg("sketch"), py::arg("point_id"), py::arg("x"), py::arg("y"));
+  m.def(
+      "add_point_rsketch",
+      [](const Sketch& sketch, const std::string& point_id, const Length& x, const Length& y) {
+        return add_point_rsketch(sketch, point_id, x, y);
+      },
+      py::arg("sketch"), py::arg("point_id"), py::arg("x"), py::arg("y"));
   m.def("get_sketch_entity_rsketchref", &get_sketch_entity_rsketchref, py::arg("sketch"), py::arg("entity_id"));
   m.def("get_sketch_point_rsketchref", &get_sketch_point_rsketchref, py::arg("sketch"), py::arg("point_path"));
   m.def("add_line_rsketch", &add_line_rsketch, py::arg("sketch"), py::arg("entity_id"), py::arg("start"),
         py::arg("end"), py::kw_only(), py::arg("construction") = false);
-  m.def("add_circle_rsketch", &add_circle_rsketch, py::arg("sketch"), py::arg("entity_id"), py::arg("center"),
-        py::arg("radius"), py::kw_only(), py::arg("construction") = false);
+  m.def(
+      "add_circle_rsketch",
+      [](const Sketch& sketch, const std::string& entity_id, const SketchTarget& center, const Length& radius,
+         bool construction) { return add_circle_rsketch(sketch, entity_id, center, radius, construction); },
+      py::arg("sketch"), py::arg("entity_id"), py::arg("center"), py::arg("radius"), py::kw_only(),
+      py::arg("construction") = false);
   m.def("add_ellipse_rsketch", &add_ellipse_rsketch, py::arg("sketch"), py::arg("entity_id"), py::arg("center"),
         py::arg("major_point"), py::arg("minor_point"), py::kw_only(), py::arg("construction") = false);
   m.def("add_bspline_rsketch", &add_bspline_rsketch, py::arg("sketch"), py::arg("entity_id"), py::arg("start"),
@@ -578,16 +627,28 @@ void bind_entity_operators(py::module_& m) {
         py::arg("center"), py::kw_only(), py::arg("construction") = false);
   m.def("trim_rsketch", &trim_rsketch, py::arg("sketch"), py::arg("entity"), py::arg("at"), py::kw_only(),
         py::arg("against") = py::none());
-  m.def("extend_rsketch", &extend_rsketch, py::arg("sketch"), py::arg("entity"), py::arg("end"), py::kw_only(),
-        py::arg("to") = py::none());
-  m.def("fillet_corner_rsketch", &fillet_corner_rsketch, py::arg("sketch"), py::arg("a"), py::arg("b"),
-        py::arg("radius"));
-  m.def("chamfer_corner_rsketch", &chamfer_corner_rsketch, py::arg("sketch"), py::arg("a"), py::arg("b"),
-        py::arg("distance"));
+  m.def(
+      "extend_rsketch",
+      [](const Sketch& sketch, const SketchTarget& entity, const Choice<EndTag>& end,
+         const std::optional<SketchTarget>& to) { return extend_rsketch(sketch, entity, end, to); },
+      py::arg("sketch"), py::arg("entity"), py::arg("end"), py::kw_only(), py::arg("to") = py::none());
+  m.def(
+      "fillet_corner_rsketch",
+      [](const Sketch& sketch, const SketchTarget& a, const SketchTarget& b, const Length& radius) {
+        return fillet_corner_rsketch(sketch, a, b, radius);
+      },
+      py::arg("sketch"), py::arg("a"), py::arg("b"), py::arg("radius"));
+  m.def(
+      "chamfer_corner_rsketch",
+      [](const Sketch& sketch, const SketchTarget& a, const SketchTarget& b, const Length& distance) {
+        return chamfer_corner_rsketch(sketch, a, b, distance);
+      },
+      py::arg("sketch"), py::arg("a"), py::arg("b"), py::arg("distance"));
   m.def(
       "project_rsketch",
-      [](const Sketch& sketch, const py::object& source, const std::optional<std::vector<std::string>>& entities,
-         bool construction) -> Sketch {
+      [](const Sketch& sketch, const Named<ProjectSourceTag>& source_arg,
+         const std::optional<std::vector<std::string>>& entities, bool construction) -> Sketch {
+        const py::object& source = source_arg.value;
         if (py::isinstance<Sketch>(source))
           return project_rsketch(sketch, source.cast<const Sketch&>(), entities, construction);
         std::vector<Shape> shapes;
@@ -664,7 +725,7 @@ void bind_constraint_operators(py::module_& m) {
   def_one(m, "constrain_vertical_rsketch", &constrain_vertical_rsketch, "line");
   def_two(m, "constrain_points_horizontal_rsketch", &constrain_points_horizontal_rsketch);
   def_two(m, "constrain_points_vertical_rsketch", &constrain_points_vertical_rsketch);
-  def_two_value(m, "constrain_line_distance_rsketch", &constrain_line_distance_rsketch);
+  def_two_value(m, "constrain_line_distance_rsketch", two_value<Length>(&constrain_line_distance_rsketch));
   def_two(m, "constrain_normal_rsketch", &constrain_normal_rsketch);
   m.def("constrain_mirror_rsketch", &constrain_mirror_rsketch, py::arg("sketch"), py::arg("a"), py::arg("axis"),
         py::arg("b"), py::kw_only(), py::arg("constraint_id") = py::none());
@@ -673,24 +734,30 @@ void bind_constraint_operators(py::module_& m) {
   def_two(m, "constrain_parallel_rsketch", &constrain_parallel_rsketch);
   def_two(m, "constrain_perpendicular_rsketch", &constrain_perpendicular_rsketch);
   def_two(m, "constrain_collinear_rsketch", &constrain_collinear_rsketch);
-  m.def("constrain_tangent_rsketch", &constrain_tangent_rsketch, py::arg("sketch"), py::arg("a"), py::arg("b"),
-        py::kw_only(), py::arg("at_a") = py::none(), py::arg("at_b") = py::none(), py::arg("mode") = "external",
-        py::arg("constraint_id") = py::none());
+  m.def(
+      "constrain_tangent_rsketch",
+      [](const Sketch& sketch, const SketchTarget& a, const SketchTarget& b, const std::optional<Choice<EndTag>>& at_a,
+         const std::optional<Choice<EndTag>>& at_b, const Choice<TangentModeTag>& mode,
+         const SketchConstraintId& constraint_id) {
+        return constrain_tangent_rsketch(sketch, a, b, text_of(at_a), text_of(at_b), mode, constraint_id);
+      },
+      py::arg("sketch"), py::arg("a"), py::arg("b"), py::kw_only(), py::arg("at_a") = py::none(),
+      py::arg("at_b") = py::none(), py::arg("mode") = "external", py::arg("constraint_id") = py::none());
   def_two(m, "constrain_concentric_rsketch", &constrain_concentric_rsketch);
   def_two(m, "constrain_midpoint_rsketch", &constrain_midpoint_rsketch, "point", "line");
   m.def("constrain_symmetric_rsketch", &constrain_symmetric_rsketch, py::arg("sketch"), py::arg("a"), py::arg("b"),
         py::arg("axis"), py::kw_only(), py::arg("constraint_id") = py::none());
   def_two(m, "constrain_equal_length_rsketch", &constrain_equal_length_rsketch);
   def_two(m, "constrain_equal_radius_rsketch", &constrain_equal_radius_rsketch);
-  def_two_value(m, "constrain_distance_rsketch", &constrain_distance_rsketch);
-  def_two_value(m, "constrain_distance_x_rsketch", &constrain_distance_x_rsketch);
-  def_two_value(m, "constrain_distance_y_rsketch", &constrain_distance_y_rsketch);
-  def_one_value(m, "constrain_length_rsketch", &constrain_length_rsketch, "line");
-  def_two_value(m, "constrain_angle_rsketch", &constrain_angle_rsketch);
-  def_one_value(m, "constrain_radius_rsketch", &constrain_radius_rsketch, "circle");
-  def_one_value(m, "constrain_diameter_rsketch", &constrain_diameter_rsketch, "circle");
-  def_one_value(m, "constrain_major_radius_rsketch", &constrain_major_radius_rsketch, "ellipse");
-  def_one_value(m, "constrain_minor_radius_rsketch", &constrain_minor_radius_rsketch, "ellipse");
+  def_two_value(m, "constrain_distance_rsketch", two_value<Length>(&constrain_distance_rsketch));
+  def_two_value(m, "constrain_distance_x_rsketch", two_value<Length>(&constrain_distance_x_rsketch));
+  def_two_value(m, "constrain_distance_y_rsketch", two_value<Length>(&constrain_distance_y_rsketch));
+  def_one_value(m, "constrain_length_rsketch", one_value<Length>(&constrain_length_rsketch), "line");
+  def_two_value(m, "constrain_angle_rsketch", two_value<Angle>(&constrain_angle_rsketch));
+  def_one_value(m, "constrain_radius_rsketch", one_value<Length>(&constrain_radius_rsketch), "circle");
+  def_one_value(m, "constrain_diameter_rsketch", one_value<Length>(&constrain_diameter_rsketch), "circle");
+  def_one_value(m, "constrain_major_radius_rsketch", one_value<Length>(&constrain_major_radius_rsketch), "ellipse");
+  def_one_value(m, "constrain_minor_radius_rsketch", one_value<Length>(&constrain_minor_radius_rsketch), "ellipse");
   def_one(m, "constrain_fix_rsketch", &constrain_fix_rsketch, "target");
 }
 
