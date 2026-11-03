@@ -13,6 +13,7 @@ import {
   holeFromFace,
   initialForm,
   inwardAxis,
+  isSlotVisible,
   parsePointList,
   profilePlaneLabel,
   pointListText,
@@ -214,5 +215,61 @@ describe("a command whose cell failed", () => {
     }
     const ok = { cell: { id: "c3", status: "done", errors: [] } };
     expect(assertCellRan(ok)).toBe(ok);
+  });
+});
+
+describe("isSlotVisible and hidden slots", () => {
+  const combine: Spec = {
+    id: "box",
+    label: "Box",
+    group: "Primitives",
+    role: "build",
+    produces: "solid",
+    description: "",
+    combinable: true,
+    slots: [
+      { name: "width", label: "Width", kind: "length", default: 10, min: 0.1 },
+      {
+        name: "operation",
+        label: "Operation",
+        kind: "enum",
+        default: "new",
+        options: [{ value: "join", label: "Join" }, { value: "cut", label: "Cut" }, { value: "intersect", label: "Intersect" }, { value: "new", label: "New body" }],
+      },
+      { name: "target", label: "Combine with", kind: "body", optional: true, show_when: { operation: ["join", "cut", "intersect"] } },
+    ],
+  };
+  const target = combine.slots[2];
+
+  it("shows a slot without a rule always, one with a rule only for the listed values", () => {
+    expect(isSlotVisible(combine.slots[0], {})).toBe(true);
+    expect(isSlotVisible(target, { operation: "cut" })).toBe(true);
+    expect(isSlotVisible(target, { operation: "join" })).toBe(true);
+    expect(isSlotVisible(target, { operation: "new" })).toBe(false);
+    expect(isSlotVisible(target, {})).toBe(false);
+    expect(isSlotVisible(target, { operation: ["cut"] })).toBe(false);
+  });
+  it("needs every rule to hold", () => {
+    const slot = { show_when: { a: ["1"], b: ["x", "y"] } };
+    expect(isSlotVisible(slot, { a: "1", b: "y" })).toBe(true);
+    expect(isSlotVisible(slot, { a: "1", b: "z" })).toBe(false);
+  });
+  it("omits a hidden slot from the request values and does not validate it", () => {
+    const required: Spec = { ...combine, slots: [combine.slots[0], combine.slots[1], { ...target, optional: false }] };
+    const hidden = formToValues(required, { width: "5", operation: "new", target: "" });
+    expect(hidden.errors).toEqual({});
+    expect(hidden.values).toEqual({ width: 5, operation: "new" });
+    const shown = formToValues(required, { width: "5", operation: "join", target: "" });
+    expect(shown.errors.target).toBeDefined();
+    expect(formToValues(combine, { width: "5", operation: "cut", target: "base" }).values).toEqual({ width: 5, operation: "cut", target: "base" });
+    // an invalid hidden value is no error either
+    expect(formToValues(combine, { width: "5", operation: "new", target: "stale" }).values).toEqual({ width: 5, operation: "new" });
+  });
+  it("opens the operation from the server defaults (join with a body, new without), the recipe winning when editing", () => {
+    expect(initialForm(combine, { operation: "join", target: "base" }).operation).toBe("join");
+    expect(initialForm(combine, { operation: "join", target: "base" }).target).toBe("base");
+    expect(initialForm(combine, { operation: "new" }).operation).toBe("new");
+    expect(initialForm(combine, {}).operation).toBe("new"); // the slot's own default
+    expect(initialForm(combine, { operation: "join" }, { operation: "cut" }).operation).toBe("cut");
   });
 });

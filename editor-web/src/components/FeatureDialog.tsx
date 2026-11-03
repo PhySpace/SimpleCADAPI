@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpDown, Crosshair, MousePointerClick } from "lucide-react";
+import { ArrowUpDown, Box, Combine, Crosshair, MousePointerClick, Scissors, SquarePlus, type LucideIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { OperationChooser } from "@/components/OperationChooser";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectLabel, SelectGroup, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { plainDescription, plainLabel } from "@/lib/commands";
+import { OPERATION_SLOT, TARGET_SLOT, formDefaults, type CombineState, operationOptions, targetDisplay, visibleSlots } from "@/lib/combine";
 import { defaultExtrudeDistance, profileSummary, type SketchInfo } from "@/lib/sketch-scene";
 import type { SketchSolved } from "@/lib/useSketchShapes";
 import { frameNormal, normalizePlane, dot, type Vec3 } from "@/lib/sketch-plane";
@@ -41,6 +43,9 @@ import {
 } from "@/lib/features";
 import type { SelectionItem } from "@/lib/selection";
 import type { SelectionMode } from "@/scene/Viewport";
+
+/** The icon of each way a new solid meets the body (colour stays reserved for meaning, so the icons carry no ink). */
+const OPERATION_ICONS: Record<string, LucideIcon> = { join: SquarePlus, cut: Scissors, intersect: Combine, new: Box };
 
 /** `prefill` sets starting values of slots (a sketch to extrude, a distance); `fromFace` fills a hole from the selected face. */
 export type DialogRequest = { spec: Spec; edit?: FeatureRow; prefill?: Record<string, unknown>; fromFace?: boolean };
@@ -116,7 +121,7 @@ function FeatureForm({
   const [form, setForm] = useState<RawForm>(() => {
     // A new feature takes the sketch selected in the viewport as its profile (the prefill of a command wins).
     const chosen = !edit && profileSlotOf && sketches.picked && findProfile(state, sketches.picked) ? { [profileSlotOf.name]: sketches.picked } : {};
-    const base = initialForm(spec, state.defaults[spec.id] ?? {}, { ...(edit?.gui?.values ?? {}), ...chosen, ...(request.prefill ?? {}) });
+    const base = initialForm(spec, formDefaults(spec, state.defaults[spec.id] ?? {}, editing), { ...(edit?.gui?.values ?? {}), ...chosen, ...(request.prefill ?? {}) });
     const named = profileSlotOf && typeof base[profileSlotOf.name] === "string" ? (base[profileSlotOf.name] as string) : null;
     // A new push takes about a quarter of the sketch's largest extent as its distance (unless the command said one).
     const sizeSlot = spec.slots.find((slot) => slot.name === "distance" || slot.name === "depth");
@@ -127,7 +132,7 @@ function FeatureForm({
     if (!(normal && hasDirection)) return sized;
     // A cut goes into the material: for a sketch drawn on a face (a frame, its normal pointing out) that is against the normal.
     const profile = named ? findProfile(state, named) : undefined;
-    const into = spec.id === "cut_sketch" && profile && profilePlaneLabel(profile) === "face";
+    const into = (spec.id === "cut_sketch" || base.operation === "cut") && profile && profilePlaneLabel(profile) === "face";
     return { ...sized, direction: into ? FLIP_NORMAL : normal };
   });
   const [name, setName] = useState(edit?.slug ?? "");
@@ -173,14 +178,31 @@ function FeatureForm({
   const errors = formErrors;
 
   /** The direction a profile starts with: its normal, or into the material for a cut on a face. */
-  const startDirection = (profile: string): string | null => {
+  const startDirection = (profile: string, operation: unknown): string | null => {
     const normal = directionForProfile(state, profile);
     const found = findProfile(state, profile);
-    return normal && spec.id === "cut_sketch" && found && profilePlaneLabel(found) === "face" ? FLIP_NORMAL : normal;
+    return normal && (spec.id === "cut_sketch" || operation === "cut") && found && profilePlaneLabel(found) === "face" ? FLIP_NORMAL : normal;
   };
   const applyProfile = (profile: string) => {
-    const direction = startDirection(profile);
+    const direction = startDirection(profile, form[OPERATION_SLOT]);
     setForm((previous) => ({ ...previous, ...(profileSlotOf ? { [profileSlotOf.name]: profile } : {}), ...(direction && hasDirection ? { direction } : {}) }));
+    setServerError(null);
+  };
+
+  /** Choosing Cut for a sketch drawn on a face aims the push into the material (and back out for another operation), unless the
+   * person already turned it: the direction is only changed while it still is the one the previous choice started with. */
+  const onOperation = (operation: string) => {
+    const before = form[OPERATION_SLOT];
+    setForm((previous) => {
+      const next: RawForm = { ...previous, [OPERATION_SLOT]: operation };
+      if (!(profileName && hasDirection)) return next;
+      const was = startDirection(profileName, before);
+      if (previous.direction === was) {
+        const now = startDirection(profileName, operation);
+        if (now) next.direction = now;
+      }
+      return next;
+    });
     setServerError(null);
   };
 
@@ -295,6 +317,13 @@ function FeatureForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection]);
 
+  // The feature the combine controls describe: the one being edited, or the one this form just created and whose cell failed
+  // (its product is then an open body, but not one it combines with).
+  const shaped = edit ?? (created ? state.features.find((row) => row.cell === created) : undefined);
+  // A new solid is described against the bodies open when the form opened: once it is added the state changes before the form
+  // closes, and "Combined with" must not flip to the solid just made.
+  const [openAtStart] = useState(() => state.open);
+  const combine = edit || created ? state : { open: openAtStart };
   const own = new Set(edit?.makes ?? []);
   const bodies = bodyChoices(state).filter((body) => !own.has(body.name));
 
@@ -325,12 +354,14 @@ function FeatureForm({
             onChange={(event) => setName(event.target.value)}
           />
         </Field>
-        {spec.slots.map((slot) => (
-          <Field key={slot.name} label={slot.label} unit={slot.kind === "point" ? slot.unit : undefined} help={spec.id === "hole" && slot.name === "position" && note ? undefined : slot.help} error={touched ? (allErrors[slot.name] ?? null) : null}>
+        {visibleSlots(spec, form).map((slot) => slot.name === TARGET_SLOT && spec.combinable && targetDisplay(combine, shaped, String(form[slot.name] ?? "")).kind === "hidden" ? null : (
+          <Field key={slot.name} label={combineLine(spec, slot, form, combine, shaped) ? "" : slot.label} unit={slot.kind === "point" ? slot.unit : undefined} help={(spec.id === "hole" && slot.name === "position" && note) || (spec.combinable && (slot.name === OPERATION_SLOT || slot.name === TARGET_SLOT)) ? undefined : slot.help} error={touched ? (allErrors[slot.name] ?? null) : null}>
             <SlotWidget
               slot={slot}
               form={form}
-              set={set}
+              set={slot.name === OPERATION_SLOT && spec.combinable ? (_slot, value) => onOperation(String(value)) : set}
+              edit={shaped}
+              combine={combine}
               invalid={touched && Boolean(errors[slot.name])}
               bodies={bodies}
               selection={selection}
@@ -373,6 +404,12 @@ function FeatureForm({
   );
 }
 
+/** Whether the target slot is shown as the one line "Combined with: <body>" (its field then needs no label). */
+function combineLine(spec: Spec, slot: Slot, form: RawForm, state: CombineState, edit?: FeatureRow): boolean {
+  if (!spec.combinable || slot.name !== TARGET_SLOT) return false;
+  return targetDisplay(state, edit, typeof form[slot.name] === "string" ? (form[slot.name] as string) : "").kind !== "choose";
+}
+
 function Field({
   label,
   unit,
@@ -388,10 +425,12 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <Label>
-        {label}
-        {unit ? ` (${unit})` : ""}
-      </Label>
+      {label && (
+        <Label>
+          {label}
+          {unit ? ` (${unit})` : ""}
+        </Label>
+      )}
       {children}
       {help && !error && <span className="text-[11px] text-muted-foreground">{help}</span>}
       {error && <span className="text-[11px] text-fail">{error}</span>}
@@ -416,7 +455,12 @@ function SlotWidget({
   onArm,
   flip,
   onFlip,
+  edit,
+  combine,
 }: {
+  edit?: FeatureRow;
+  /** The bodies the operation and target controls describe. */
+  combine: CombineState;
   sketches: DialogSketches;
   armed: boolean;
   onArm: (armed: boolean) => void;
@@ -435,6 +479,21 @@ function SlotWidget({
   options?: SlotOption[];
 }) {
   const raw = form[slot.name];
+  if (slot.kind === "enum" && slot.name === OPERATION_SLOT && slot.options?.some((option) => option.value === "join")) {
+    const { options: choices, note } = operationOptions(slot.options, combine, edit);
+    return <OperationChooser options={choices} value={typeof raw === "string" ? raw : ""} onChange={(value) => set(slot.name, value)} icons={OPERATION_ICONS} label={slot.label} note={note} />;
+  }
+  if (slot.kind === "body" && slot.name === TARGET_SLOT) {
+    const shown = targetDisplay(combine, edit, typeof raw === "string" ? raw : "");
+    if (shown.kind === "hidden") return null;
+    if (shown.kind === "fixed") {
+      return (
+        <span className="text-[12px]" data-testid="combined-with">
+          Combined with: <span className="text-name">{shown.name}</span>
+        </span>
+      );
+    }
+  }
   switch (slot.kind) {
     case "bool":
       return <Switch checked={Boolean(raw)} onCheckedChange={(checked) => set(slot.name, checked)} />;

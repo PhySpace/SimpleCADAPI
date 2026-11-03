@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { commandGroups, contextKind, contextualActions, fitScore, plainLabel, pushRecent, searchCommands, selectionContext, selectionHint, whenFor, type Command } from "./commands";
+import { commandsFromSpecs, visibleCommands, commandGroups, contextKind, contextualActions, fitScore, plainLabel, pushRecent, searchCommands, selectionContext, selectionHint, whenFor, type Command } from "./commands";
 
 const make = (id: string, label: string, group: string, keywords: string[] = [], description = ""): Command => ({ id, label, group, keywords, description, run: () => undefined });
 const commands = [
@@ -99,5 +99,56 @@ describe("what the selection offers", () => {
   it("uses plain words for the operations", () => {
     expect(plainLabel("extrude_sketch", "Extrude sketch")).toBe("Extrude");
     expect(plainLabel("box", "Box")).toBe("Box");
+  });
+});
+
+describe("command visibility and presets", () => {
+  const slot = (name: string) => ({ name, label: name, kind: "enum" as const });
+  const spec = (id: string, label: string, slots: string[] = []) => ({ id, label, group: "Ops", role: "build", produces: "solid", description: "", slots: slots.map(slot) });
+  const opened: { id: string; preset?: Record<string, unknown> }[] = [];
+  const registry = commandsFromSpecs(
+    [spec("box", "Box"), spec("cut", "Cut"), spec("union", "Union"), spec("intersect", "Intersect"), spec("cut_sketch", "Cut sketch"), spec("boss_sketch", "Boss sketch"), spec("hole", "Hole"), spec("fillet", "Fillet"), spec("extrude_sketch", "Extrude sketch", ["profile", "operation"])],
+    (s, preset) => opened.push({ id: s.id, preset }),
+  );
+  const ids = (openBodies: number) => visibleCommands(registry, { openBodies }).map((c) => c.id);
+
+  it("hides the stand-alone combine commands unless several bodies are open", () => {
+    for (const openBodies of [0, 1]) {
+      expect(ids(openBodies)).toEqual(expect.arrayContaining(["box", "hole", "fillet"]));
+      for (const id of ["cut", "union", "intersect", "cut_sketch", "boss_sketch"]) expect(ids(openBodies)).not.toContain(id);
+    }
+    for (const id of ["cut", "union", "intersect", "cut_sketch", "boss_sketch"]) expect(ids(2)).toContain(id);
+  });
+  it("offers only Extrude without a body, Extrude (join) and (cut) with one", () => {
+    expect(ids(0).filter((id) => id.startsWith("extrude"))).toEqual(["extrude_sketch"]);
+    expect(ids(1).filter((id) => id.startsWith("extrude"))).toEqual(["extrude_sketch_join", "extrude_sketch_cut"]);
+    expect(ids(3).filter((id) => id.startsWith("extrude"))).toEqual(["extrude_sketch_join", "extrude_sketch_cut"]);
+  });
+  it("opens the same dialog with the operation preset", () => {
+    const cut = registry.find((c) => c.id === "extrude_sketch_cut");
+    expect(cut?.label).toBe("Extrude (cut)");
+    expect(cut?.preset).toEqual({ operation: "cut" });
+    cut?.run();
+    registry.find((c) => c.id === "extrude_sketch_join")?.run();
+    registry.find((c) => c.id === "extrude_sketch")?.run();
+    expect(opened).toEqual([
+      { id: "extrude_sketch", preset: { operation: "cut" } },
+      { id: "extrude_sketch", preset: { operation: "join" } },
+      { id: "extrude_sketch", preset: undefined },
+    ]);
+  });
+  it("gives a selected sketch Extrude only without a body, the presets with one; Hole and Fillet stay as they are", () => {
+    const context = selectionContext([], ["s"]);
+    const labels = (openBodies: number) => contextualActions(visibleCommands(registry, { openBodies }), context).map((a) => a.label);
+    expect(labels(0)).toEqual(["Extrude"]);
+    expect(labels(1)).toEqual(["Extrude (join)", "Extrude (cut)"]);
+    expect(labels(2)).toEqual(["Extrude (join)", "Extrude (cut)", "Cut", "Boss"]);
+    expect(contextualActions(visibleCommands(registry, { openBodies: 1 }), selectionContext([{ kind: "face" }])).map((a) => a.label)).toEqual(["Hole here"]);
+    expect(contextualActions(visibleCommands(registry, { openBodies: 1 }), selectionContext([{ kind: "edge" }])).map((a) => a.label)).toEqual(["Fillet"]);
+  });
+  it("keeps the plain Extrude when the server has no operation slot to preset", () => {
+    const old = commandsFromSpecs([spec("extrude_sketch", "Extrude sketch", ["profile"])], () => undefined);
+    expect(old.map((c) => c.id)).toEqual(["extrude_sketch"]);
+    expect(visibleCommands(old, { openBodies: 1 })).toHaveLength(1);
   });
 });

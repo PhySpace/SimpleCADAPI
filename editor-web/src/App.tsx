@@ -9,7 +9,7 @@ import { SketchScene } from "@/components/SketchScene";
 import { CommandBar } from "@/components/CommandBar";
 import { FEATURE_ICONS } from "@/components/feature-icons";
 import { FeatureTree, type TreeSketches } from "@/components/FeatureTree";
-import { assemblyCommands, commandsFromSpecs, fitScore, selectionContext, selectionHint, whenFor, type Command } from "@/lib/commands";
+import { assemblyCommands, commandsFromSpecs, fitScore, selectionContext, selectionHint, visibleCommands, whenFor, type Command } from "@/lib/commands";
 import { AssemblyPanel } from "@/components/AssemblyPanel";
 import { ConnectorGizmos, type Gizmo } from "@/components/ConnectorGizmos";
 import { setRef } from "@/lib/assembly";
@@ -650,13 +650,13 @@ export function App() {
   }, [gui.state.features, gui.catalog]);
 
   const openSpec = useCallback(
-    (spec: Spec) => {
+    (spec: Spec, preset?: Record<string, unknown>) => {
       if (isSketchSpec(spec)) startSketch();
-      else openDialog({ spec, ...(spec.id === "hole" && selectionRef.current.some((item) => item.kind === "face") ? { fromFace: true } : {}) });
+      else openDialog({ spec, ...(preset ? { prefill: preset } : {}), ...(spec.id === "hole" && selectionRef.current.some((item) => item.kind === "face") ? { fromFace: true } : {}) });
     },
     [openDialog, startSketch],
   );
-  const commands = useMemo<Command[]>(
+  const allCommands = useMemo<Command[]>(
     () => [
       // The assembly layout is not a dialog: it is its own panel (registered below), so its spec is left out of the generic list.
       ...commandsFromSpecs((gui.catalog?.specs ?? []).filter((spec) => spec.id !== "assembly"), openSpec, FEATURE_ICONS),
@@ -686,6 +686,9 @@ export function App() {
     ],
     [gui.catalog, openSpec, sketchOnSelectedFace, editSelectedSketch, openAssembly],
   );
+  // The stand-alone combine commands (Cut, Union, Intersect, Cut/Boss with sketch) are offered only while several bodies are open:
+  // a new solid says how it meets the body in its own dialog.
+  const commands = useMemo(() => visibleCommands(allCommands, { openBodies: gui.state.open.length }), [allCommands, gui.state.open.length]);
   // A curved face cannot carry a sketch: the action stays visible, greyed, with the reason.
   const barDisabled = useMemo<Record<string, string>>(() => {
     const faces = selection.filter((item) => item.kind === "face");

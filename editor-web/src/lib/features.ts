@@ -23,6 +23,9 @@ export type Slot = {
   entity?: "face" | "edge";
   help?: string;
   optional?: boolean;
+  /** The slot is shown, validated and sent only while every listed slot holds one of the listed values
+   * (e.g. `{operation: ["join","cut"]}`); see isSlotVisible. */
+  show_when?: Record<string, string[]>;
 };
 
 export type Spec = {
@@ -33,6 +36,8 @@ export type Spec = {
   produces: string;
   description: string;
   slots: Slot[];
+  /** The operation makes a solid that is joined to, cut from or intersected with the body so far (see lib/combine.ts). */
+  combinable?: boolean;
 };
 
 export type Catalog = { version: number; groups: { id: string; label: string }[]; specs: Spec[] };
@@ -197,6 +202,17 @@ function parseNumber(text: string): number | null {
   return Number(trimmed);
 }
 
+/** Whether a slot is in play for these values (raw form text or typed values): a slot without `show_when` always is, one with
+ * it only while each named slot holds one of the listed values.  A hidden slot is not rendered, not validated, not sent. */
+export function isSlotVisible(slot: Pick<Slot, "show_when">, values: Readonly<Record<string, unknown>>): boolean {
+  const rules = slot.show_when;
+  if (!rules) return true;
+  return Object.entries(rules).every(([name, allowed]) => {
+    const value = values[name];
+    return typeof value === "string" && allowed.includes(value);
+  });
+}
+
 /** The raw form a spec opens with: the slot defaults, bodies from `defaults`, the recipe's values in edit mode. */
 export function initialForm(spec: Spec, bodyDefaults: Record<string, string> = {}, values: Record<string, unknown> = {}): RawForm {
   const form: RawForm = {};
@@ -217,9 +233,12 @@ export function initialForm(spec: Spec, bodyDefaults: Record<string, string> = {
       case "body":
         form[slot.name] = typeof values[slot.name] === "string" ? (values[slot.name] as string) : (bodyDefaults[slot.name] ?? "");
         break;
-      case "enum":
-        form[slot.name] = typeof given === "string" ? given : (slot.options?.[0]?.value ?? "");
+      case "enum": {
+        // the server's defaults (the operation of a new solid: join when a body exists) come before the slot's own default
+        const chosen = slot.name in values ? values[slot.name] : (bodyDefaults[slot.name] ?? given);
+        form[slot.name] = typeof chosen === "string" ? chosen : (slot.options?.[0]?.value ?? "");
         break;
+      }
       case "points2d":
       case "points3d":
         form[slot.name] = pointListText(given);
@@ -245,6 +264,7 @@ export function formToValues(spec: Spec, form: RawForm): { values: Record<string
   const values: Record<string, unknown> = {};
   const errors: Record<string, string> = {};
   for (const slot of spec.slots) {
+    if (!isSlotVisible(slot, form)) continue; // a hidden slot is neither checked nor sent
     const raw = form[slot.name];
     switch (slot.kind) {
       case "select":

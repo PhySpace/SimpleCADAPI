@@ -20,7 +20,42 @@ export type Command = {
   when?: (context: SelectionContext) => boolean;
   /** Listed only while it fits the selection (Edit sketch means nothing without a sketch picked). */
   contextOnly?: boolean;
+  /** Whether the command is offered at all in this state of the model (the stand-alone Cut means nothing while the part
+   * has one body).  Commands without it are always offered.  See visibleCommands. */
+  visible?: (state: CommandState) => boolean;
+  /** Values of the operation's dialog this command starts with (Extrude (cut) opens Extrude with `operation: "cut"`);
+   * `run` applies them. */
+  preset?: Record<string, unknown>;
   run: () => void;
+};
+
+/** What the model looks like, for the commands that only make sense in some states. */
+export type CommandState = { openBodies: number };
+
+/** The commands offered in this state of the model (the bar and the contextual bar read this list). */
+export function visibleCommands<T extends Pick<Command, "visible">>(commands: readonly T[], state: CommandState): T[] {
+  return commands.filter((command) => command.visible?.(state) ?? true);
+}
+
+/** The `visible` of each command id (data, not UI).  A solid now says how it meets the body when it is made (the Operation of
+ * its dialog), so the commands that combine two named bodies only matter while several bodies are open (a legacy notebook). */
+const VISIBLE: Record<string, (state: CommandState) => boolean> = {
+  cut: (s) => s.openBodies > 1,
+  union: (s) => s.openBodies > 1,
+  intersect: (s) => s.openBodies > 1,
+  cut_sketch: (s) => s.openBodies > 1,
+  boss_sketch: (s) => s.openBodies > 1,
+  extrude_sketch: (s) => s.openBodies === 0, // with a body, Extrude (join) and Extrude (cut) stand in for it
+};
+export const visibleFor = (id: string): ((state: CommandState) => boolean) | undefined => VISIBLE[id];
+
+/** Presets of one operation: extra commands that open its dialog with some values chosen.  `suffix` makes the command id
+ * (`<spec>_<suffix>`). */
+export const PRESETS: Record<string, { suffix: string; label: string; description: string; keywords: string[]; preset: Record<string, unknown> }[]> = {
+  extrude_sketch: [
+    { suffix: "join", label: "Extrude (join)", description: "Push the sketch out and add it to the body.", keywords: ["pad", "boss", "add", "union", "material"], preset: { operation: "join" } },
+    { suffix: "cut", label: "Extrude (cut)", description: "Push the sketch through the body and remove what it passes.", keywords: ["pocket", "subtract", "remove", "through", "hole"], preset: { operation: "cut" } },
+  ],
 };
 
 // -- what the selection offers ----------------------------------------------------------------------------------------------------
@@ -70,6 +105,8 @@ export const CONTEXT_ACTIONS: Record<ContextKind, { id: string; label: string }[
   ],
   sketch: [
     { id: "extrude_sketch", label: "Extrude" },
+    { id: "extrude_sketch_join", label: "Extrude (join)" },
+    { id: "extrude_sketch_cut", label: "Extrude (cut)" },
     { id: "revolve_sketch", label: "Revolve" },
     { id: "cut_sketch", label: "Cut" },
     { id: "boss_sketch", label: "Boss" },
@@ -91,6 +128,8 @@ const WHEN: Record<string, (context: SelectionContext) => boolean> = {
   fillet: (c) => c.edges >= 1 && c.sketches === 0,
   chamfer: (c) => c.edges >= 1 && c.sketches === 0,
   extrude_sketch: (c) => c.sketches === 1,
+  extrude_sketch_join: (c) => c.sketches === 1,
+  extrude_sketch_cut: (c) => c.sketches === 1,
   revolve_sketch: (c) => c.sketches === 1,
   cut_sketch: (c) => c.sketches === 1,
   boss_sketch: (c) => c.sketches === 1,
@@ -193,18 +232,42 @@ const SYNONYMS: Record<string, string[]> = {
   boss_sketch: ["pad", "add", "material"],
 };
 
-/** The commands the feature catalog offers; `open` starts the operation's dialog. */
-export function commandsFromSpecs(specs: readonly Spec[], open: (spec: Spec) => void, icons: Record<string, LucideIcon> = {}): Command[] {
-  return specs.map((spec) => ({
-    id: spec.id,
-    label: plainLabel(spec.id, spec.label),
-    group: spec.group,
-    keywords: SYNONYMS[spec.id] ?? [],
-    description: plainDescription(spec.id, spec.description),
-    icon: icons[spec.id],
-    when: whenFor(spec.id),
-    run: () => open(spec),
-  }));
+/** The commands the feature catalog offers; `open` starts the operation's dialog (with the values of a preset, if any).
+ * An operation with PRESETS is followed by its preset commands. */
+export function commandsFromSpecs(specs: readonly Spec[], open: (spec: Spec, preset?: Record<string, unknown>) => void, icons: Record<string, LucideIcon> = {}): Command[] {
+  return specs.flatMap((spec) => {
+    // a preset only exists for a spec that has the slot it presets (an older server without `operation` has none)
+    const presets = (PRESETS[spec.id] ?? [])
+      .filter((item) => Object.keys(item.preset).every((name) => spec.slots.some((slot) => slot.name === name)))
+      .map((item): Command => {
+        const id = `${spec.id}_${item.suffix}`;
+        return {
+          id,
+          label: item.label,
+          group: spec.group,
+          keywords: [...(SYNONYMS[spec.id] ?? []), ...item.keywords],
+          description: item.description,
+          icon: icons[spec.id],
+          when: whenFor(id),
+          visible: (state) => state.openBodies >= 1,
+          preset: item.preset,
+          run: () => open(spec, item.preset),
+        };
+      });
+    const base: Command = {
+      id: spec.id,
+      label: plainLabel(spec.id, spec.label),
+      group: spec.group,
+      keywords: SYNONYMS[spec.id] ?? [],
+      description: plainDescription(spec.id, spec.description),
+      icon: icons[spec.id],
+      when: whenFor(spec.id),
+      // without its presets (a server that has no operation slot) the plain command stays
+      visible: PRESETS[spec.id] && presets.length === 0 ? undefined : visibleFor(spec.id),
+      run: () => open(spec),
+    };
+    return [base, ...presets];
+  });
 }
 
 /** The assembly commands: the layout panel, and the connectors of the open part.  `open` shows the panel (the left
