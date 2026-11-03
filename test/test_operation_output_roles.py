@@ -398,17 +398,21 @@ class TestOperationOutputRoles(unittest.TestCase):
                 start_face_tag="role.start",
             )
 
-    def test_unavailable_shell_role_fails_instead_of_guessing(self):
+    def test_shell_body_role_is_kernel_proven_for_the_kept_faces(self):
+        # The kept faces stay in the result (IsSame) while generating their offset faces; since the shell
+        # kept-face fix they carry a preserved witness, so shell.body_face is proven for exactly those five.
+        # (Before it, this role was unavailable and the tag raised "requires at least one kernel-proven result".)
         box = scad.make_box_rsolid(4.0, 4.0, 4.0)
-        with self.assertRaisesRegex(
-            scad.SimpleCADError, "shell.body_face.*kernel-proven"
-        ):
-            scad.shell_rsolid(
-                box,
-                [box.get_faces(0)],
-                0.2,
-                body_faces_tag="group.body",
-            )
+        shelled = scad.shell_rsolid(
+            box,
+            [box.get_faces(0)],
+            0.2,
+            body_faces_tag="group.body",
+        )
+        self.assertEqual(_role_count(shelled, "shell.body_face"), 5)
+        tagged = [f for f in shelled._iter_faces() if "group.body" in f._list_tags()]
+        self.assertEqual(len(tagged), 5)
+        self.assertTrue(all(abs(f.get_area() - 16.0) < 1e-6 for f in tagged))
 
     def test_sweep_rejects_profiles_with_inner_wires(self):
         outer = scad.make_rectangle_rwire(3.0, 3.0)

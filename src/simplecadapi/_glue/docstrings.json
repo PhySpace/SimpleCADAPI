@@ -291,7 +291,7 @@
  "select_faces_by_tag": "Select faces by tag.",
  "set_public_connector_rassembly": "Expose an existing connector on a direct child component.",
  "sew_faces_rshell": "Sew faces into exactly one connected Shell.",
- "shell_rsolid": "Shell a solid, with optional kernel-role-based face tags.",
+ "shell_rsolid": "Shell a solid, with optional kernel-role-based face tags.\n\nThe kernel roles are ``shell.body_face`` (a face of the input that stays in\nthe result), ``shell.offset_face`` (the inner face it generates),\n``shell.closing_descendant`` (what is left of a removed face: the rim) and\n``shell.wall`` (the edges that become the walls of an opening).\n``body_faces_tag``, ``offset_faces_tag``, ``closing_faces_tag`` and\n``wall_edges_tag`` tag exactly the entities with those roles.",
  "shells": "Select Shell entities from a Shell or compatible topology scope.",
  "solve_assembly_constraints_rassembly": "Solve fixed, revolute, and prismatic assembly constraints.\n\nSolving is limit-aware: when a constraint carries a ``ScalarLimit``\n(``angle_limit`` or ``distance_limit``), the drive scalar is clamped\ninto the closed range before placement propagation.  When no drive\nscalar is present but a limit exists, the current relative-frame\nscalar is projected into the bounds.  Unresolvable closed kinematic\nloops fall back to a golden-section search over the limit bounds.\n\nA ``ConstraintReport`` is recorded on the returned assembly under the\n``constraint_report`` runtime key for later inspection via\n``inspect_assembly_constraints_rassembly``.",
  "source_binding": "Match a projected local binding by its exact source binding identity.",

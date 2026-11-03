@@ -347,14 +347,15 @@ that surfaced it is in brackets.
 - **Status:** open (comment only).
 - **Fix direction:** correct the comment; pin restore of deltas with a test, since stable references rely on it.
 
-## 23. A shell's kept faces have no successor witness [stable-refs research]
+## 23. A shell's kept faces had no successor witness [stable-refs research]
 
-- **Symptom:** after `shell_rsolid(box, [bottom], t)`, the untouched top face has only a `generated` witness (its
-  offset face); history cannot say the top face is still there.
-- **Root cause:** `tracking::query_history` emits `preserved` only when an input has neither `Modified` nor
+- **Symptom:** after `shell_rsolid(box, [bottom], t)`, the untouched top face had only a `generated` witness (its
+  offset face); history could not say the top face was still there, and `body_faces_tag` always raised.
+- **Root cause:** `tracking::query_history` emitted `preserved` only when an input had neither `Modified` nor
   `Generated` images; a kept shell face generates its offset face.
-- **Status:** open. The one-line fix changes the Python-parity goldens and an explicit assertion
-  (`test_tracking_behaviour.cpp` `shell.body_face == 0`), so it needs an owner decision (design section 7.2).
+- **Status:** fixed (owner decision, option a): `preserved` is also emitted when the input is still in the result.
+  Goldens and assertions reviewed one by one (design 7.2): shell kept faces and rim edges, and the profile edges
+  that bound an extrude / loft start cap, gain a preserved witness.
 
 ## 24. `transform_rsolid`, `offset_rsolid`, draft and scale recorded no topology delta [stable-refs research]
 

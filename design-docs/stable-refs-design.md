@@ -156,7 +156,7 @@ The kernel records one `TopoDelta` per node: witnesses with event `preserved`/`m
 | Extrude-like creators | extrude, revolve, sweep, loft, twisted sweep | roles (`extrusion.*`, `revolution.*`, `loft.*`, `sweep.*` start/end/side); side faces `Generated` from profile edges | anchor by role; sides by source edge (derived) | **[T]** end caps of all four through a union and a translate, extrude cap through a fillet; loft side correspondence is kernel-matched, not named **[R]** (playbook) |
 | Booleans | cut, union, intersect, boolean list | `modified` fragments, `preserved`, `deleted`; merged faces get one entry per parent | `ok` / `split` (several fragments) / `merged` (fragment also descends from a foreign face) / `lost(deleted)` | **[T]** all four outcomes |
 | Blends | fillet, chamfer | trimmed faces `modified`; blended edges `deleted` + patch `generated` (role `fillet.patch`) | face: `ok`; edge: `lost(deleted)` in identity, patch in derived | **[T]** face and edge->patch |
-| Shell | shell | removed face -> its rim `modified` (`shell.closing_descendant`); offset faces `generated`; **kept faces: no preserved witness** | opened face: `ok` (the rim); kept face: `lost(replaced)` | **[T]**; fix in 7.2 |
+| Shell | shell | removed face -> its rim `modified` (`shell.closing_descendant`); offset faces `generated`; kept faces `preserved` (+ their offset face generated) | opened face: `ok` (the rim); kept face: `ok` | **[T]** (kept faces fixed, 7.2) |
 | Rigid copies | translate, rotate, mirror, linear/radial pattern | every face `modified`/continuation; a pattern is one translate/rotate node per instance | `ok`; an instance is addressed by its own node | **[T]** translate, rotate, mirror, linear and radial pattern |
 | Affine / offset / draft | transform_rsolid (rigid and affine), scale (uniform and per axis), offset_rsolid, draft | face and edge witnesses from the retained OCCT history (`modification_delta`): `modified`/continuation; an offset or drafted face (OCCT: generated) continues its source face | `ok` | **[T]** every op, `test_history_through_operations_that_had_none`, the draft test, `test_modification_delta.cpp` (was `no delta` before this branch) |
 | Helical sweep | helical_sweep_rsolid | in a session it records helix + face + sweep nodes; the sweep is tracked | anchor by `sweep.*` roles | **[T]** |
@@ -257,7 +257,7 @@ Probe: box 40x20x10 with the top face tagged by kwarg (`kw.top`) and by `apply_t
 | union (coplanar) | dies **[R]** | survives **[R]** | **merged** | merge not visible to tags |
 | intersect | dies | survives | ok | plain tag gate |
 | fillet / chamfer | dies | **dies** | ok | face-channel gap in tag projection |
-| shell, face kept | dies | dies | **lost(replaced)** | kernel: no preserved witness for kept faces |
+| shell, face kept | dies | survives (since 7.2) | ok (was lost/replaced) | -- (fixed, 7.2) |
 | shell, face removed | dies | survives (on the rim) | ok (the rim) | -- |
 | translate / rotate / mirror | dies | **dies** | ok | tag projection ignores continuation witnesses |
 | linear pattern (instance 3) / radial pattern (instance 2) | dies | dies | ok | same |
@@ -317,15 +317,23 @@ O(hops). Budget [I]: < 1 ms per reference for 200-node histories, memoised per (
 recording time (the deltas are recorded already). Resolution is already negligible next to modelling (0.06 % of
 build time at N = 150).
 
-### 7.2 The shell kept-face gap needs an owner decision
-`query_history` (`src/cpp/src/semantic/tracking_core.cpp`) emits `preserved` only when an input has neither
-`Modified` nor `Generated` images. A shell's kept outer face is unchanged *and* generates its offset face, so it gets
-only the `generated` witness. Emitting `preserved` as well when the input is still in the result is a one-line fix,
-but it changes the Python-parity goldens (`tests/cpp/semantic/test_tracking_golden.cpp`: extrude/revolve profile
-edges, shell, loft/sweep) and an explicit assertion (`test_tracking_behaviour.cpp:386`,
-`count_role(.., "shell.body_face") == 0`) **[R]** (tried and reverted on this branch). Options: (a) accept the new
-witnesses and regenerate goldens (changes tag projection: profile edges and kept shell faces gain continuation), or
-(b) add a separate `survivors` list to `TopoDelta` read only by the resolver (no projection change).
+### 7.2 The shell kept-face gap: option (a), implemented [T]
+
+`query_history` (`src/cpp/src/semantic/tracking_core.cpp`) emitted `preserved` only when an input had neither
+`Modified` nor `Generated` images, so a shell's kept outer face (unchanged *and* the seed of its offset face) had
+only the `generated` witness. It now also emits `preserved` when the input is still in the result. Every changed
+expectation was reviewed:
+
+| Expectation | Before | After | Why |
+|---|---|---|---|
+| golden `shell` (C++ tracking) | 0 preserved | 5 kept faces + 4 rim edges preserved, 5 `shell.body_face` roles | the kept faces and the outer rim edges are IsSame in the result |
+| golden `extrude_rect`, `extrude_circle`, `loft`, `loft_ruled` | profile edges: generated only | also preserved | the start cap of a prism / loft is bounded by the very profile edges |
+| `test_tracking_behaviour.cpp` loft toward a point | 4 entries | 8 | the four base edges stay as the cap boundary |
+| `test_tracking_behaviour.cpp` shell roles | `shell.body_face == 0` ("every kept face was re-created": wrong) | 5 | as above |
+| goldens `ops_features_shell`, `ops_features_tag_projection` (Python port) | kept faces untagged | `face.shell.body_face` on the 5 kept faces | the role is now proven |
+| golden `ops_features_blend_failures.shell_role` | "requires at least one kernel-proven result" | no failure | same |
+| `test_operation_output_roles` | asserted `body_faces_tag` raised | asserts it tags the 5 kept faces | same |
+| audit `shell_kept_face` | lost(replaced) | ok; the kwarg tag now survives too | same |
 
 ## 8. Risks and non-goals
 - OCCT history quality bounds everything; a tracker that omits a witness makes a reference `lost`, which is the

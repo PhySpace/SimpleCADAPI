@@ -132,17 +132,21 @@ def test_a_face_cut_away_is_lost_and_says_where():
         assert r.lost_at == cut.get_metadata("graph")["node_id"]
 
 
-def test_a_shell_kept_face_is_lost_instead_of_guessed():
-    # The one remaining kernel gap (design 7.2, owner decision pending): a kept shell face has only a
-    # generated witness.  The resolver says so; it does not pick the offset face or anything else.
+def test_a_shell_kept_face_resolves_to_itself():
+    # Was the last kernel gap (a kept face had only the generated witness of its offset face); the tracker now
+    # also records that it stays (owner decision, option a).
     with scad.GraphSession():
         box, anchor = _box_with_top_anchor()
         shelled = scad.shell_rsolid(box, _faces_at(box, 0), 1.0)
 
         r = er.resolve(anchor, shelled)
-        assert r.status == "lost"
-        assert r.reason == "replaced"
-        assert r.entities == []
+        assert r.status == "ok"
+        (face,) = r.entities
+        assert face.get_center().z == pytest.approx(10.0)
+        assert face.get_area() == pytest.approx(800.0)
+        # The offset face it generated is reachable in derived mode, the face itself among the targets.
+        derived = er.resolve(anchor, shelled, follow="derived")
+        assert sorted(round(f.get_center().z, 6) for f in derived.entities) == [9.0, 10.0]
 
 
 def test_an_edge_followed_into_its_fillet_patch():
@@ -228,8 +232,7 @@ _AUDIT = {
     "intersect": (lambda b: scad.intersect_rsolid(b, scad.make_box_rsolid(30, 30, 30, (10, 0, -5))), 0, 1, "ok"),
     "fillet": (lambda b: scad.fillet_rsolid(b, _edges_at(b, 10), 2.0), 0, 0, "ok"),
     "chamfer": (lambda b: scad.chamfer_rsolid(b, _edges_at(b, 10), 2.0), 0, 0, "ok"),
-    # Kept faces of a shell carry only a Generated witness (their offset face), no Preserved one.
-    "shell_kept_face": (lambda b: scad.shell_rsolid(b, _faces_at(b, 0), 1.0), 0, 0, "lost"),
+    "shell_kept_face": (lambda b: scad.shell_rsolid(b, _faces_at(b, 0), 1.0), 0, 1, "ok"),
     "shell_opened_face": (lambda b: scad.shell_rsolid(b, _faces_at(b, 10), 1.0), 0, 1, "ok"),
     "translate": (lambda b: scad.translate_shape(b, (5, 0, 0)), 0, 0, "ok"),
     "mirror": (lambda b: scad.mirror_shape(b, (0, 0, 0), (1, 0, 0)), 0, 0, "ok"),
