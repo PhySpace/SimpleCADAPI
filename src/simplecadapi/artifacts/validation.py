@@ -136,6 +136,9 @@ def _blob_refs(manifest: Mapping[str, Any]) -> list[tuple[str, Mapping[str, Any]
         material = manifest["material_ref"]
         if material is not None:
             refs.append(("/material_ref", material))
+        for index, body in enumerate(manifest["solid_cache"].get("bodies") or ()):  # a multi-body part
+            refs.append((f"/solid_cache/bodies/{index}/body_ref", body["body_ref"]))
+            refs.append((f"/solid_cache/bodies/{index}/topology_snapshot_ref", body["topology_snapshot_ref"]))
         return refs
     return [("/feature_graph_ref", manifest["feature_graph_ref"])]
 

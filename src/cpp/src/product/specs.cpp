@@ -36,11 +36,12 @@ void add_structure(Specs& s) {
           {"Internal placement validation failed."},
           {"Report this as a SimpleCADAPI bug if it reproduces."}});
   add(s, {"make_part_rpart",
-          "Failed to create the single-body Part.",
+          "Failed to create the Part.",
           {"The part_id is empty or uses unsupported characters.", "The body is not a Solid.",
+           "Neither or both of body and bodies were given, or a body_id is malformed or repeated.",
            "A Part with the same part_id already exists in the active GraphSession."},
           {"Pass a stable part_id such as 'base_plate'.",
-           "Union intended multiple bodies into one Solid before creating the Part.",
+           "Union solids that must become one body; pass bodies={id: solid} to keep several bodies apart.",
            "Do not pass material to make_part_rpart; use assign_material_rpart instead."}});
   add(s, {"assign_material_rpart",
           "Failed to assign the material to the Part.",

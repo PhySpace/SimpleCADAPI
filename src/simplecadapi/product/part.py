@@ -14,12 +14,14 @@ from simplecadapi._cpp import (
     # bind_topo.cpp
     Solid,
     # (defined by the module itself)
+    Body,
     Connector,
     Material,
     Part,
 )
 
 __all__ = [
+    "Body",
     "Connector",
     "Material",
     "Part",

@@ -52,6 +52,26 @@ inline sp::OptionalString optional_name(const py::object& value) {
   return py::str(value).cast<std::string>();
 }
 
+// The bodies of a multi-body Part: a mapping body_id -> Solid (in its order), or a sequence of Body values.
+inline std::vector<sp::Body> body_list(const py::object& value) {
+  std::vector<sp::Body> out;
+  if (py::isinstance<py::dict>(value) || py::hasattr(value, "items")) {
+    for (const py::handle item : value.attr("items")()) {
+      const py::tuple pair = py::reinterpret_borrow<py::tuple>(item);
+      out.emplace_back(text(py::reinterpret_borrow<py::object>(pair[0]), "body_id"),
+                       typed<Solid>(py::reinterpret_borrow<py::object>(pair[1]), "bodies values must be Solids"));
+    }
+    return out;
+  }
+  if (py::isinstance<py::str>(value) || !py::isinstance<py::sequence>(value))
+    throw scad::TypeError("bodies must be a mapping body_id -> Solid or a sequence of Body values");
+  for (const py::handle item : value) {
+    out.push_back(typed<sp::Body>(py::reinterpret_borrow<py::object>(item),
+                                  "bodies must be a mapping body_id -> Solid or a sequence of Body values"));
+  }
+  return out;
+}
+
 inline scad::Scalar scalar(const py::object& value, const char* field) {
   try {
     return value.cast<scad::Scalar>();

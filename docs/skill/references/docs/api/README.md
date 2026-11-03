@@ -314,6 +314,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 ## Other
 
 - [Assembly](Assembly.md) *(from product/assembly.py)* `top-level`
+- [Body](Body.md) *(from product/part.py)* `top-level`
 - [CaptureResult](CaptureResult.md) *(from product/capture.py)* `top-level`
 - [Component](Component.md) *(from product/assembly.py)* `top-level`
 - [Connector](Connector.md) *(from product/connector.py)* `top-level`
@@ -397,6 +398,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [load_brep_region_rshell](load_brep_region_rshell.md) *(from operators/geometry.py)* `top-level`
 - [load_brep_region_rsolid](load_brep_region_rsolid.md) *(from operators/geometry.py)* `top-level`
 - [measure_constraint_residual_rconstraintresidual](measure_constraint_residual_rconstraintresidual.md) *(from operators/product.py)* `top-level`
+- [measure_part_mass_rmassreport](measure_part_mass_rmassreport.md) *(from operators/product.py)* `top-level`
 - [meta](meta.md) *(from ql.py)* `submodule:ql`
 - [not_](not_.md) *(from ql.py)* `submodule:ql`
 - [offset_rsolid](offset_rsolid.md) *(from operators/features.py)* `top-level`

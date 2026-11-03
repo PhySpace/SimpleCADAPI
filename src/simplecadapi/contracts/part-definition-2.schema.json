@@ -31,7 +31,23 @@
       "required": ["evaluator_profile", "body_ref"],
       "properties": {
         "evaluator_profile": {"const": "ocp-evaluated-solid-1"},
-        "body_ref": {"$ref": "#/$defs/blobRef"}
+        "body_ref": {"$ref": "#/$defs/blobRef"},
+        "bodies": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 10000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["body_id", "name", "body_ref", "topology_snapshot_ref"],
+            "properties": {
+              "body_id": {"type": "string", "minLength": 1, "maxLength": 128},
+              "name": {"type": ["string", "null"]},
+              "body_ref": {"$ref": "#/$defs/blobRef"},
+              "topology_snapshot_ref": {"$ref": "#/$defs/blobRef"}
+            }
+          }
+        }
       }
     },
     "topology_snapshot_ref": {"$ref": "#/$defs/blobRef"},

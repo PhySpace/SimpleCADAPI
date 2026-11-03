@@ -79,14 +79,18 @@ void bind_structure(py::module_& m) {
 
   m.def(
       "make_part_rpart",
-      [](const py::object& part_id, const py::object& body, const py::object& name) {
+      [](const py::object& part_id, const py::object& body, const py::object& name, const py::object& bodies) {
         return guard_operation("make_part_rpart", [&] {
+          if (body.is_none() == bodies.is_none())
+            throw scad::TypeError("give exactly one of body (a Solid) or bodies (several named solids)");
+          if (!bodies.is_none())
+            return sp::make_part_rpart(text(part_id, "part_id"), body_list(bodies), optional_name(name));
           return sp::make_part_rpart(text(part_id, "part_id"), typed<Solid>(body, "body must be a Solid"),
                                      optional_name(name));
         });
       },
-      py::arg("part_id"), py::arg("body"), py::arg("name") = py::none(),
-      "Wrap exactly one Solid as a semantic single-body Part.");
+      py::arg("part_id"), py::arg("body") = py::none(), py::arg("name") = py::none(), py::arg("bodies") = py::none(),
+      "Wrap one Solid (body) or several named solids (bodies) as a semantic Part.");
   m.def(
       "assign_material_rpart",
       [](const py::object& part, const py::object& material) {

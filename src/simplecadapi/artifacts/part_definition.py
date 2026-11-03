@@ -1,4 +1,11 @@
-"""Persistent single-solid PartDefinition contract."""
+"""Persistent PartDefinition contract: one evaluated Solid, or several named bodies.
+
+A one-body part is what every PartDefinition was: ``solid_cache.body_ref`` is the BRep of its Solid and
+``topology_snapshot_ref`` the semantic state of that Solid.  A multi-body part also lists ``solid_cache.bodies``:
+one :class:`BodyRef` per body (its own BRep and topology snapshot, so each body keeps its tags), in body order.  Its
+``body_ref`` is then a BRep Compound of every body (what a geometry-only reader such as STEP needs, and what a reader
+that expects exactly one Solid refuses), and ``topology_snapshot_ref`` repeats the first body's snapshot.
+"""
 
 from __future__ import annotations
 
@@ -27,6 +34,40 @@ from .references import (
 
 
 @dataclass(frozen=True, slots=True)
+class BodyRef:
+    """One body of a multi-body PartDefinition: its id, display name, BRep and topology snapshot."""
+
+    body_id: str
+    name: str | None
+    body_ref: BlobRef
+    topology_snapshot_ref: BlobRef
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "body_id", validate_logical_id(self.body_id, "/solid_cache/bodies/body_id"))
+        if self.name is not None and (not isinstance(self.name, str) or not self.name):
+            raise ArtifactValidationError("name_invalid", "/solid_cache/bodies/name", "expected a name or null")
+        if not isinstance(self.body_ref, BlobRef) or not isinstance(self.topology_snapshot_ref, BlobRef):
+            raise ArtifactValidationError("reference_invalid", "/solid_cache/bodies", "expected BlobRef values")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "body_id": self.body_id,
+            "name": self.name,
+            "body_ref": self.body_ref.to_dict(),
+            "topology_snapshot_ref": self.topology_snapshot_ref.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any], path: str) -> "BodyRef":
+        return cls(
+            body_id=str(data["body_id"]),
+            name=data.get("name"),
+            body_ref=BlobRef.from_dict(data["body_ref"], f"{path}/body_ref"),
+            topology_snapshot_ref=BlobRef.from_dict(data["topology_snapshot_ref"], f"{path}/topology_snapshot_ref"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class PartDefinition:
     """Validated durable definition for exactly one evaluated Solid."""
 
@@ -44,6 +85,7 @@ class PartDefinition:
     metadata: Mapping[str, Any] = field(default_factory=dict)
     content_hash: str = ""
     blobs: Mapping[str, bytes] = field(default_factory=dict, compare=False, repr=False)
+    bodies: tuple[BodyRef, ...] = ()  # empty for a one-body part; else every body, in order (at least two)
     _validated_manifest: bytes | None = field(
         default=None,
         init=False,
@@ -107,6 +149,20 @@ class PartDefinition:
                 "connector_invalid", "/connectors", "connector IDs must be unique"
             )
         object.__setattr__(self, "connectors", connectors)
+        bodies = tuple(self.bodies)
+        if bodies:
+            if len(bodies) < 2 or not all(isinstance(item, BodyRef) for item in bodies):
+                raise ArtifactValidationError(
+                    "bodies_invalid", "/solid_cache/bodies", "expected two or more BodyRef values"
+                )
+            body_ids = [item.body_id for item in bodies]
+            if len(set(body_ids)) != len(body_ids):
+                raise ArtifactValidationError("bodies_invalid", "/solid_cache/bodies", "body IDs must be unique")
+            if connectors:
+                raise ArtifactValidationError(
+                    "bodies_invalid", "/connectors", "connectors on a multi-body part are not supported yet"
+                )
+        object.__setattr__(self, "bodies", bodies)
         if self.material_ref is not None and not isinstance(
             self.material_ref, MaterialRef
         ):
@@ -203,6 +259,8 @@ class PartDefinition:
             "solid_cache": {
                 "evaluator_profile": "ocp-evaluated-solid-1",
                 "body_ref": self.solid_cache_ref.to_dict(),
+                # a one-body part writes the manifest it always wrote (same bytes, same content hash)
+                **({"bodies": [item.to_dict() for item in self.bodies]} if self.bodies else {}),
             },
             "topology_snapshot_ref": self.topology_snapshot_ref.to_dict(),
             "connectors": [item.to_dict() for item in self.connectors],
@@ -264,6 +322,10 @@ class PartDefinition:
             metadata=dict(data["metadata"]),
             content_hash=str(data["content_hash"]),
             blobs=blobs or {},
+            bodies=tuple(
+                BodyRef.from_dict(item, f"/solid_cache/bodies/{index}")
+                for index, item in enumerate(cache.get("bodies") or ())
+            ),
         )
 
 
@@ -299,4 +361,4 @@ def validated_part_feature_graph(definition: PartDefinition) -> Any:
     return definition._validated_feature_graph
 
 
-__all__ = ["PartDefinition"]
+__all__ = ["BodyRef", "PartDefinition"]

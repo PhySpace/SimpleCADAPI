@@ -50,7 +50,8 @@ def lineage_of(value: Any) -> Optional[Tuple[str, str]]:
 def _children(item: Any) -> Iterable[Any]:
     kind = type(item).__name__
     if kind == "Part":
-        yield item.body
+        for body in item.bodies:  # one Solid, or every body of a multi-body part
+            yield body.solid
         yield from item.connectors
         if item.material is not None:
             yield item.material

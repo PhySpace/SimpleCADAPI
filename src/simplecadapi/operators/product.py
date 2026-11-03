@@ -41,6 +41,7 @@ from simplecadapi._cpp import (
     solve_assembly_constraints_rassembly,
     unground_component_rassembly,
 )
+from ..product.bodies import measure_part_mass_rmassreport  # Python: mass properties per body
 
 __all__ = [
     "add_belt_constraint_rassembly",
@@ -67,6 +68,7 @@ __all__ = [
     "make_scalar_limit_rscalarlimit",
     "make_vertex_connector_rconnector",
     "measure_constraint_residual_rconstraintresidual",
+    "measure_part_mass_rmassreport",
     "place_component_rassembly",
     "set_public_connector_rassembly",
     "solve_assembly_constraints_rassembly",
