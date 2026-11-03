@@ -2,7 +2,11 @@ import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
+import { useDraggable } from "@/lib/useDraggable";
 import { cn } from "@/lib/utils";
+
+type Handle = ReturnType<typeof useDraggable>["handleProps"] | null;
+const DragHandle = React.createContext<Handle>(null);
 
 const Dialog = DialogPrimitive.Root;
 const DialogClose = DialogPrimitive.Close;
@@ -10,10 +14,13 @@ const DialogClose = DialogPrimitive.Close;
 /** A docked card, not a modal: the viewport behind it stays live (the form picks faces and edges from it).
  * Render the Dialog with `modal={false}`; clicks outside never close it.  It docks below the Inspector's header (the
  * header and its count of picked items stay visible; 5.25rem = the top bar plus that header). */
-function DialogContent({ className, children, ...props }: React.ComponentProps<typeof DialogPrimitive.Content>) {
+function DialogContent({ className, children, style, ...props }: React.ComponentProps<typeof DialogPrimitive.Content>) {
+  const drag = useDraggable();
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Content
+        ref={drag.ref}
+        style={{ ...style, ...drag.style }}
         onInteractOutside={(event) => event.preventDefault()}
         onFocusOutside={(event) => event.preventDefault()}
         className={cn(
@@ -22,7 +29,7 @@ function DialogContent({ className, children, ...props }: React.ComponentProps<t
         )}
         {...props}
       >
-        {children}
+        <DragHandle.Provider value={drag.handleProps}>{children}</DragHandle.Provider>
         <DialogPrimitive.Close
           className="absolute right-2 top-2 text-muted-foreground hover:text-foreground focus-visible:outline-none"
           aria-label="Close"
@@ -34,8 +41,10 @@ function DialogContent({ className, children, ...props }: React.ComponentProps<t
   );
 }
 
+/** The grab area of a floating card: dragging it moves the card. */
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("flex flex-col gap-0.5 border-b-2 border-border px-3 py-2 pr-8", className)} {...props} />;
+  const handle = React.useContext(DragHandle);
+  return <div className={cn("flex flex-col gap-0.5 border-b-2 border-border px-3 py-2 pr-8", className)} {...handle} {...props} />;
 }
 
 function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {

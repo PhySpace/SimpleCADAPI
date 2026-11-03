@@ -830,9 +830,9 @@ export function App() {
       </div>
       <div className="relative flex min-h-0 flex-1 flex-col">
         <ResizablePanelGroup className="min-h-0 flex-1">
-          <ResizablePanel defaultSize={32} minSize={18} className="min-w-0">
+          <ResizablePanel defaultSize={23} minSize={16} className="min-w-0">
             <div inert={sketching} className={cn("h-full", sketching && "opacity-40")}>
-            <Tabs value={leftTab} onValueChange={setLeftTab} className="h-full">
+            <Tabs value={leftTab} onValueChange={setLeftTab} className="h-full min-w-0 overflow-hidden">
               <TabsList>
                 <TabsTrigger value="features">features</TabsTrigger>
                 <TabsTrigger value="assembly">assembly</TabsTrigger>
@@ -905,7 +905,7 @@ export function App() {
             </div>
           </ResizablePanel>
           <ResizableHandle />
-          <ResizablePanel defaultSize={46} minSize={30} className="min-w-0 overflow-hidden">
+          <ResizablePanel defaultSize={55} minSize={30} className="min-w-0 overflow-hidden">
             <div className="flex h-full flex-col">
               <div inert={sketching} className={cn("flex h-9 shrink-0 items-center gap-1 border-b-2 border-border px-2", sketching && "opacity-40")}>
                 {MODES.map(({ mode, label }) => (

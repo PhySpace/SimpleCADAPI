@@ -527,6 +527,10 @@ export function SketchOverlay({
             <circle key={p.id} cx={s[0]} cy={s[1]} r={picked ? 5.5 : 4.5} fill={color} stroke={HALO} strokeWidth={1.5} data-point={p.id} />
           );
         })}
+        {editor.crossings.map((at, i) => {
+          const s = project(at[0], at[1]);
+          return s ? <path key={`x${i}`} d={`M${s[0] - 4} ${s[1] - 4}L${s[0] + 4} ${s[1] + 4}M${s[0] + 4} ${s[1] - 4}L${s[0] - 4} ${s[1] + 4}`} stroke={MUTED} strokeWidth={1.5} fill="none" data-crossing={i} /> : null;
+        })}
         {hoverMark}
         {cornerMark}
         {labelNodes}

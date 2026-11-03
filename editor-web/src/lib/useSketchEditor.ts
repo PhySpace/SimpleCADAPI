@@ -66,6 +66,7 @@ import {
   type EditRequest,
   type End,
 } from "@/lib/sketch-edit";
+import { findIntersections } from "@/lib/sketch-intersect";
 
 export type Tool = "select" | "point" | "line" | "circle" | "arc" | "delete" | "trim" | "extend" | "fillet" | "chamfer";
 /** The corner value box (fillet radius / chamfer distance) open at a corner. */
@@ -221,16 +222,19 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   }, [choice, loopKey, drag, doc.profile, doc.inner]);
 
   // -- snapping -----------------------------------------------------------------------------------------------------------------
+  /** Where curves of the sketch cross and no point is yet: shown, and a point can be placed on them. */
+  const crossings = useMemo(() => findIntersections(doc, result), [doc, result]);
   const snapTargets = useMemo(() => {
     const all = new Map(pts);
     modelPoints.forEach((p, i) => all.set(`m:${i}`, p));
+    crossings.forEach((p, i) => all.set(`x:${i}`, p));
     return all;
-  }, [pts, modelPoints]);
+  }, [pts, modelPoints, crossings]);
 
   const spotAt = useCallback(
     (world: [number, number], info: Pick<PointerInfo, "scale" | "alt">): Spot => {
       const s = snap(world, snapTargets, { grid: snapOn && !info.alt ? gridStep(info.scale) : null, tol: 9 / info.scale });
-      return { x: s.x, y: s.y, pointId: s.pointId?.startsWith("m:") ? undefined : s.pointId };
+      return { x: s.x, y: s.y, pointId: s.pointId?.startsWith("m:") || s.pointId?.startsWith("x:") ? undefined : s.pointId };
     },
     [snapTargets, snapOn],
   );
@@ -665,7 +669,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   return {
     cornerHover, pendingLine, cornerBox, setCornerBox, submitCorner, projectOpen, setProjectOpen, openProject, projectSketch, projectFrom,
     doc, commit, undo, redo, edits, editNote, editBusy, flash, hoverEnd, runEdit, tool, chooseTool, selection, highlight, setHighlight, draft, cursor, hover, drag, box, setBox, result, error, auto, setAuto, snapOn,
-    setSnapOn, construction, choice, pts, loops, applicable, blamed, fresh, failing, highlighted, fixedPoints, solved, badge, diagnostics, outer, hint, extents,
+    setSnapOn, construction, choice, pts, loops, applicable, blamed, fresh, crossings, failing, highlighted, fixedPoints, solved, badge, diagnostics, outer, hint, extents,
     openBox, applyConstraint, submitBox, deleteSelection, toggleConstruction, pointerDown, pointerMove, pointerUp, pointerLeave, key,
   };
 }

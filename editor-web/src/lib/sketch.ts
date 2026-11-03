@@ -358,6 +358,8 @@ export function applicableConstraints(selection: readonly string[], doc: SketchD
     if (rounds.length === 2) ["equal_radius", "concentric", "tangent"].forEach((k) => out.add(k as ConstraintKind));
     if (lines.length === 1 && rounds.length === 1) out.add("tangent");
   } else if (sel.length === 3 && points.length === 2 && lines.length === 1) out.add("symmetric");
+  // lines and arcs alone: join them end to end (a chain, or a closed outline)
+  if (sel.length >= 2 && sel.every((s) => s.kind === "line" || s.kind === "arc")) out.add("coincident");
   return CONSTRAINT_ORDER.filter((k) => out.has(k));
 }
 
@@ -387,9 +389,67 @@ export function constraintTargets(kind: ConstraintKind, selection: readonly stri
       return [lines.length ? [lines[0], rounds[0]] : [rounds[0], rounds[1]]];
     case "symmetric":
       return [[points[0], points[1], lines[0]]];
+    case "coincident":
+      if (points.length === 0) return chainCoincidences(sel.map((s) => s.id), doc);
+      return [sel.map((s) => s.id)];
     default:
       return [sel.map((s) => s.id)];
   }
+}
+
+/** Join lines and arcs end to end: a coincidence for every neighbouring pair of a chain, by where the ends are.
+ *
+ * The chain starts at the first selected entity and goes on with the entity whose end lies nearest to the chain's open end (so
+ * the order of the clicks does not matter); each link joins that pair of ends.  The two open ends of the finished chain are joined
+ * too when they are close compared to the shortest member (an outline that was drawn open).  A link that is already one point is skipped. */
+export function chainCoincidences(ids: readonly string[], doc: SketchDoc): string[][] {
+  const ents = entityMap(doc);
+  const at = (pid: string | undefined): [number, number] | null => {
+    const p = doc.points.find((q) => q.id === pid);
+    return p ? [p.x, p.y] : null;
+  };
+  type Member = { id: string; ends: [string, string] };
+  const members: Member[] = [];
+  for (const id of ids) {
+    const e = ents.get(id);
+    if (e && (e.kind === "line" || e.kind === "arc") && e.start && e.end) members.push({ id, ends: [e.start, e.end] });
+  }
+  if (members.length < 2) return [];
+  const dist = (a: string, b: string) => {
+    if (a === b) return 0;
+    const p = at(a);
+    const q = at(b);
+    return p && q ? Math.hypot(p[0] - q[0], p[1] - q[1]) : Infinity;
+  };
+  const out: string[][] = [];
+  const link = (a: string, b: string) => {
+    if (a !== b) out.push([a, b]);
+  };
+  const placed = [members[0]];
+  let open: [string, string] = members[0].ends; // [tail, head] of the chain
+  const rest = members.slice(1);
+  while (rest.length) {
+    let best: { index: number; at: 0 | 1; from: 0 | 1; gap: number } | null = null;
+    rest.forEach((m, index) => {
+      for (const from of [0, 1] as const)
+        for (const to of [0, 1] as const) {
+          const gap = dist(open[from], m.ends[to]);
+          if (!best || gap < best.gap) best = { index, at: to, from, gap };
+        }
+    });
+    const pick = best!;
+    const next = rest.splice(pick.index, 1)[0];
+    link(open[pick.from], next.ends[pick.at]);
+    const far = next.ends[pick.at === 0 ? 1 : 0];
+    open = pick.from === 1 ? [open[0], far] : [far, open[1]];
+    placed.push(next);
+  }
+  if (placed.length >= 3) {
+    const shortest = Math.min(...placed.map((m) => dist(m.ends[0], m.ends[1])));
+    const gap = dist(open[0], open[1]);
+    if (gap > 0 && gap <= 0.5 * shortest) link(open[0], open[1]);
+  }
+  return out;
 }
 
 // -- measured values ----------------------------------------------------------------------------------------------------
