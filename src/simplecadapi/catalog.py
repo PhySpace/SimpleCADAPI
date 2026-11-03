@@ -10,7 +10,7 @@ functions with the same annotations.  The catalog parses both, so a GUI, an agen
     [('radius', 'length'), ('height', 'length'), ('bottom_face_center', 'point3'), ('axis', 'direction3')]
 
 A parameter's ``kind`` is one of: the meanings of :mod:`simplecadapi.types` (``length``, ``angle``, ``point3``,
-``direction3``, ``vector3``, ``count``), ``number`` (a unitless ``float | Expr``), ``int``, ``bool``, ``text``, ``enum``
+``direction3``, ``vector3``, ``count``, ``point2``, ``plane``, ``sketch_profile``), ``number`` (a unitless ``float | Expr``), ``int``, ``bool``, ``text``, ``enum``
 (``Literal[...]``, with ``choices``), a value type (``solid``, ``face``, ``wire``, ``edge``, ``vertex``, ``shell``,
 ``shape``, ``sketch``, ``part``, ``assembly``, ...), ``query`` (a ``ql`` selection), ``points`` / ``numbers`` (sequences),
 or ``unknown`` when the signature says no more than ``object``.  ``many`` marks a sequence of the kind, ``optional`` a
@@ -56,6 +56,8 @@ _VALUE_KINDS = {
     "ShapeSelector": "query",
     "Vec3": "vector3",
     "SketchPosition": "sketch_ref",
+    "SurfaceBoundary": "surface_boundary",
+    "SurfaceFillingSettings": "filling_settings",
 }
 
 
@@ -144,7 +146,7 @@ def classify(type_text: str) -> dict[str, Any]:
         kind = inner["kind"]
         if kind in ("number", "length", "angle"):
             return {"kind": "numbers", "many": False, "optional": optional, "choices": ()}
-        if kind in ("point3", "vector3", "direction3"):
+        if kind in ("point3", "vector3", "direction3", "point2"):
             return {"kind": "points", "many": False, "optional": optional, "choices": ()}
         return {"kind": kind, "many": True, "optional": optional, "choices": inner["choices"]}
     names = [u.strip() for u in _split_top(text, "|")]
@@ -158,11 +160,17 @@ def classify(type_text: str) -> dict[str, Any]:
         return {"kind": "text", "many": False, "optional": optional, "choices": ()}
     if "SketchRef" in names:  # a point or entity of the sketch, by reference or id (a position too, where allowed)
         return {"kind": "sketch_ref", "many": False, "optional": optional, "choices": ()}
-    kinds = {_VALUE_KINDS.get(n) for n in names}
+    # A sequence alternative counts as its item kind: ``Sketch | AnyShape | Sequence[AnyShape]`` reads as sketch | shape.
+    kinds = {_VALUE_KINDS.get(n) or _sequence_item_kind(n) for n in names}
     if None not in kinds:
         kind = kinds.pop() if len(kinds) == 1 else "shape" if kinds <= {"solid", "face", "wire", "edge", "vertex", "shell", "compound", "shape"} else "|".join(sorted(kinds))
         return {"kind": kind, "many": False, "optional": optional, "choices": ()}
     return {"kind": "unknown", "many": False, "optional": optional, "choices": ()}
+
+
+def _sequence_item_kind(text: str) -> str | None:
+    match = re.fullmatch(r"(?:Sequence|list|List|tuple|Iterable)\[(.*)\]", text)
+    return _VALUE_KINDS.get(match.group(1).strip()) if match else None
 
 
 def _returns(type_text: str) -> str:

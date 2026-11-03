@@ -10,14 +10,17 @@ the meaning from there.  Each alias is the type a caller may pass (``Annotated``
 - ``Direction3``: a direction or an axis; its length does not matter.
 - ``Vector3``: an offset; direction and length both matter.
 - ``Count``: a whole number of things (copies, teeth, segments).
+- ``Point2``: a position ``(x, y)`` in a sketch plane (lengths).
+- ``Plane``: a sketch plane, ``"XY"`` / ``"XZ"`` / ``"YZ"`` or ``{"origin": Point3, "x_axis": Direction3, "y_axis": Direction3}``.
+- ``SketchProfile``: a closed profile of a sketch, by index or by id.
 
 A plain ``float | Expr`` is a number without a unit (a factor, a tolerance).
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Annotated, Union
+from collections.abc import Mapping, Sequence
+from typing import Annotated, Literal, Union
 
 from simplecadapi._cpp import Expr
 
@@ -29,6 +32,9 @@ Point3 = Annotated[Sequence[_Number], "point3"]
 Direction3 = Annotated[Sequence[_Number], "direction3"]
 Vector3 = Annotated[Sequence[_Number], "vector3"]
 Count = Annotated[int, "count"]
+Point2 = Annotated[Sequence[_Number], "point2"]
+Plane = Annotated[Union[Literal["XY", "XZ", "YZ"], Mapping[str, Sequence[_Number]]], "plane"]
+SketchProfile = Annotated[Union[int, str], "sketch_profile"]
 
 MEANINGS: dict[str, str] = {
     "Length": "length",
@@ -37,7 +43,10 @@ MEANINGS: dict[str, str] = {
     "Direction3": "direction3",
     "Vector3": "vector3",
     "Count": "count",
+    "Point2": "point2",
+    "Plane": "plane",
+    "SketchProfile": "sketch_profile",
 }
 """The type names a signature may carry, and the meaning each stands for (what :mod:`simplecadapi.catalog` reads)."""
 
-__all__ = ["Angle", "Count", "Direction3", "Length", "MEANINGS", "Point3", "Vector3"]
+__all__ = ["Angle", "Count", "Direction3", "Length", "MEANINGS", "Plane", "Point2", "Point3", "SketchProfile", "Vector3"]

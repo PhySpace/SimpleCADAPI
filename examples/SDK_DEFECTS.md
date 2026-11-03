@@ -328,6 +328,21 @@ that surfaced it is in brackets.
 - **Fix direction:** done. Every `ql` factory should resolve against any scope
   that contains its kind; check each (kind, scope) pair when adding a factory.
 
+## 21. Surface points and sketch positions cannot be expressions; the cylinder's U is radians [types-surface-sketch]
+
+- **Symptom:** `make_bezier_surface_rface`, `fit_point_grid_rface` and the `points` of `make_surface_patch_rface` refuse a
+  `scad.var` coordinate, and so do the `(x, y)` positions of `trim_rsketch` / `add_bspline_rsketch` control points; the
+  origin of `make_cylindrical_surface_rface` and `add_point_rsketch` accept one.  `make_cylindrical_surface_rface`
+  takes `u_range` in raw radians, where every other angle of the SDK (`Angle`) is degrees.
+- **Trigger:** typing the surface and sketch signatures (`simplecadapi.types.Point3` / `Point2`): the same meaning has
+  two loaders, `scad::Vec3` (doubles) and `std::array<Scalar, 3>` (expressions).
+- **Root cause:** `PointGrid` / `SurfacePatchOptions::points` are `Vec3`, and `SketchPosition` / `SketchControlPoint`
+  hold doubles; the cylinder range is passed to OCCT unconverted.
+- **Status:** open. The signatures now say what each parameter means; the loaders are unchanged (no behaviour change).
+- **Fix direction:** make the surface grids `std::vector<std::vector<ScalarVec3>>` (evaluate at build time, as the
+  cylinder does) and let sketch positions take `Scalar`; give the cylinder a degree `Angle` range (keep `u_range` as a
+  deprecated alias).
+
 ## Heuristics
 
 - Run every notebook three times: fresh, all cached, `--no-cache`. The three
