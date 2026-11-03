@@ -13,7 +13,7 @@ A parameter's ``kind`` is one of: the meanings of :mod:`simplecadapi.types` (``l
 ``direction3``, ``vector3``, ``count``), ``number`` (a unitless ``float | Expr``), ``int``, ``bool``, ``text``, ``enum``
 (``Literal[...]``, with ``choices``), a value type (``solid``, ``face``, ``wire``, ``edge``, ``vertex``, ``shell``,
 ``shape``, ``sketch``, ``part``, ``assembly``, ...), ``query`` (a ``ql`` selection), ``points`` / ``numbers`` (sequences),
-or ``unknown`` when the signature says no more than ``object``.  ``many`` marks a sequence of the kind, ``optional`` a
+``path`` (a file path), or ``unknown`` when the signature says no more than ``object``.  ``many`` marks a sequence of the kind, ``optional`` a
 ``None`` default.
 """
 
@@ -162,7 +162,33 @@ def classify(type_text: str) -> dict[str, Any]:
     if None not in kinds:
         kind = kinds.pop() if len(kinds) == 1 else "shape" if kinds <= {"solid", "face", "wire", "edge", "vertex", "shell", "compound", "shape"} else "|".join(sorted(kinds))
         return {"kind": kind, "many": False, "optional": optional, "choices": ()}
+    if names in (["str", "PathLike[str]"], ["str", "PathLike"]):
+        return {"kind": "path", "many": False, "optional": optional, "choices": ()}
+    if len(names) > 1:
+        return _classify_union(names, optional)
     return {"kind": "unknown", "many": False, "optional": optional, "choices": ()}
+
+
+def _classify_union(names: list[str], optional: bool) -> dict[str, Any]:
+    """A union of different spellings of one value: ``Literal[...] | SomeEnum`` (the choices), ``Sequence[Edge] | Query``
+    (edges, or a ``ql`` query that finds them), ``Solid | Sequence[Solid]``; or of different kinds (``Wire | Direction3``)."""
+    parts = [classify(n) for n in names]
+    literal = next((p for p in parts if p["kind"] == "enum"), None)
+    if literal is not None:  # the other members are enum classes of the same values
+        return {"kind": "enum", "many": False, "optional": optional, "choices": literal["choices"]}
+    if any(p["kind"] == "unknown" for p in parts):
+        return {"kind": "unknown", "many": False, "optional": optional, "choices": ()}
+    many = any(p["many"] for p in parts)
+    kinds = {p["kind"] for p in parts}
+    if many and len(kinds) > 1:
+        kinds.discard("query")
+    if len(kinds) == 1:
+        kind = kinds.pop()
+    elif kinds <= {"solid", "face", "wire", "edge", "vertex", "shell", "compound", "shape"}:
+        kind = "shape"
+    else:
+        kind = "|".join(sorted(kinds))
+    return {"kind": kind, "many": many, "optional": optional, "choices": ()}
 
 
 def _returns(type_text: str) -> str:
