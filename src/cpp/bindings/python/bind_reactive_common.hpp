@@ -38,5 +38,6 @@ void bind_reactive_exprs(py::module_& m);
 void bind_reactive_graph(py::module_& m);
 void bind_reactive_session(py::module_& m);
 void bind_reactive_math(py::module_& m);
+void bind_element_ref(py::module_& m);
 
 }  // namespace scad::pybind::reactive

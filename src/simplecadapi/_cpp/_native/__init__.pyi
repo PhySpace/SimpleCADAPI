@@ -708,6 +708,10 @@ class _TrackingPolicyScope:
         ...
     def __exit__(self, *args) -> None:
         ...
+def _anchors_for_role(node: OperationNode, role: str) -> list:
+    """
+    The anchors of the node's entities with a kernel output role.
+    """
 def _brep_region_path(path: typing.Any, *, for_graph: bool) -> str:
     """
     The checks on a .scadbrep locator (graph replay: relative, no drive, no '..', '/' separators).
@@ -732,6 +736,10 @@ def _interpolated_bspline_edge(points: collections.abc.Sequence[typing.Annotated
     """
     An interpolating B-spline edge through the points (GeomAPI_Interpolate).
     """
+def _resolve_by_history(target: OperationNode, anchor: dict, target_slot: typing.SupportsInt | typing.SupportsIndex = 0, follow: str = 'identity') -> typing.Any:
+    """
+    Follow an element anchor {node_id, output_slot, kind, topo_id} through the recorded topology deltas to output `target_slot` of node `target`: {status: ok|split|merged|lost, targets, hops, lost_at, reason}.
+    """
 def _sample_edge_points(edge: AnyShape, samples: typing.SupportsInt | typing.SupportsIndex = 16) -> list[typing.Annotated[list[float], "FixedSize(3)"]]:
     """
     Points along an edge, evenly in parameter.
@@ -739,6 +747,10 @@ def _sample_edge_points(edge: AnyShape, samples: typing.SupportsInt | typing.Sup
 def _set_diagnostic_image_provider(provider: typing.Any) -> None:
     """
     Install provider(kind, operation, view, caption, dedup_key, shapes, payload) -> evidence dict or None: it draws the pictures a failing operation asks for.  None removes it.
+    """
+def _subshapes_by_recorded_id(root: AnyShape, kind: str, topo_ids: collections.abc.Sequence[str]) -> list:
+    """
+    The sub-shapes of `root` with recorded topo ids ('face_face_5'); ValueError for one that is absent.
     """
 def canonical_brep_bytes(shape: AnyShape) -> bytes:
     """
