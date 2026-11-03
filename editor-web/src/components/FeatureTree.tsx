@@ -140,7 +140,7 @@ export function FeatureTree({
                     <span className="w-5 shrink-0 text-[10px] text-muted-foreground">{feature.index}</span>
                     <span className="min-w-0 flex-1 truncate text-name">{feature.slug}</span>
                     {isProduct && (
-                      <Badge variant="focus" title="The product cell builds from this body">
+                      <Badge variant="focus" title={state.product?.implicit ? "The part is this body (made by the runtime, no cell to keep)" : "The product cell builds from this body"}>
                         product
                       </Badge>
                     )}
