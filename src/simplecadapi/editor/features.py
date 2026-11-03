@@ -79,6 +79,8 @@ class Slot:
     help: str = ""
     optional: bool = False
     single: bool = False  # a selection slot that takes exactly one item
+    accepts: tuple[str, ...] | None = None  # kind == "value": the kinds of named values that fit (solid, wire, face ...)
+    many: bool = False  # kind == "value": a list of them
     show_when: dict[str, list[str]] | None = None  # the slot is shown (and used) only when another slot has one of these values
 
     def to_dict(self) -> dict[str, Any]:
@@ -93,6 +95,10 @@ class Slot:
             out["optional"] = True
         if self.single:
             out["single"] = True
+        if self.accepts:
+            out["accepts"] = list(self.accepts)
+        if self.many:
+            out["many"] = True
         if self.show_when:
             out["show_when"] = self.show_when
         return out
@@ -109,6 +115,8 @@ class Spec:
     slots: tuple[Slot, ...]
     build: Callable[["Context"], list[str]] = field(repr=False, compare=False)
     combinable: bool = False  # makes a new solid that is joined to, cut from or intersected with the body so far (see _with_combine)
+    body_slot: str = "body"  # the slot naming the body a selection recipe resolves against
+    operation: str | None = None  # the SDK operation it calls, for the forms made from the catalog (op_specs.py)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -120,6 +128,7 @@ class Spec:
             "description": self.description,
             "slots": [slot.to_dict() for slot in self.slots],
             **({"combinable": True} if self.combinable else {}),
+            **({"operation": self.operation} if self.operation else {}),
         }
 
 
@@ -223,6 +232,12 @@ class Context:
     # -- bodies and selections ------------------------------------------------------------------------------------
     def body(self, slot: str) -> str:
         name = str(self.values[slot])
+        if name not in self.reads:
+            self.reads.append(name)
+        return name
+
+    def body_named(self, name: str) -> str:
+        """A named value the feature reads (a value slot's choice)."""
         if name not in self.reads:
             self.reads.append(name)
         return name
@@ -714,16 +729,52 @@ def _with_combine(spec: Spec) -> Spec:
 
 
 SPECS = tuple(_with_combine(spec) if spec.id in _COMBINABLE else spec for spec in SPECS)
-BY_ID: dict[str, Spec] = {spec.id: spec for spec in SPECS}
+
+
+class _Registry(dict):
+    """Specs by id: the curated ones, and (loaded on first need) one per SDK operation (``op.<name>``, :mod:`.op_specs`)."""
+
+    loaded = False
+
+    def _load(self) -> None:
+        if not self.loaded:
+            self.loaded = True
+            from .op_specs import operation_specs
+
+            for spec in operation_specs():
+                self.setdefault(spec.id, spec)
+
+    def __missing__(self, key: str) -> Spec:
+        self._load()
+        if key in self:
+            return dict.__getitem__(self, key)
+        raise KeyError(key)
+
+    def __contains__(self, key: object) -> bool:
+        if dict.__contains__(self, key):
+            return True
+        self._load()
+        return dict.__contains__(self, key)
+
+    def get(self, key: str, default: Any = None) -> Any:  # type: ignore[override]
+        return self[key] if key in self else default
+
+    def all(self) -> list[Spec]:
+        self._load()
+        return list(self.values())
+
+
+BY_ID: _Registry = _Registry({spec.id: spec for spec in SPECS})
 
 
 def catalog() -> dict[str, Any]:
     """The registry as plain data, for the forms."""
     groups: list[str] = []
-    for spec in SPECS:
+    specs = BY_ID.all()
+    for spec in specs:
         if spec.group not in groups:
             groups.append(spec.group)
-    return {"version": VERSION, "groups": [{"id": g, "label": g} for g in groups], "specs": [spec.to_dict() for spec in SPECS]}
+    return {"version": VERSION, "groups": [{"id": g, "label": g} for g in groups], "specs": [spec.to_dict() for spec in specs]}
 
 
 # ---- names ----------------------------------------------------------------------------------------------------
@@ -762,6 +813,8 @@ def check_values(spec: Spec, values: Mapping[str, Any], bodies: Mapping[str, str
             raise FeatureError(f"{slot.label}: a value is required")
         if raw is None and clean.get("operation", "new") == "new":
             continue
+        if raw is None and slot.optional and slot.name != "target":
+            continue  # an optional parameter left out: the SDK's default
         if slot.kind in ("length", "angle", "float"):
             clean[slot.name] = _checked_number(slot, raw)
         elif slot.kind == "count":
@@ -793,6 +846,18 @@ def check_values(spec: Spec, values: Mapping[str, Any], bodies: Mapping[str, str
                 noun = "sketch profile" if slot.kind == "profile" else "body"
                 raise FeatureError(f"{slot.label}: {name!r} is not a {noun} in this notebook")
             clean[slot.name] = name
+        elif slot.kind == "value":
+            names = list(raw) if slot.many and isinstance(raw, (list, tuple)) else [raw]
+            if slot.many and not names:
+                raise FeatureError(f"{slot.label}: choose at least one")
+            for name in names:
+                if not _NAME.fullmatch(str(name)) or bodies.get(str(name)) not in (slot.accepts or ()):
+                    raise FeatureError(f"{slot.label}: {name!r} is not a {' or '.join(slot.accepts or ())} in this notebook")
+            clean[slot.name] = [str(n) for n in names] if slot.many else str(names[0])
+        elif slot.kind == "text":
+            if not isinstance(raw, str):
+                raise FeatureError(f"{slot.label}: text is required")
+            clean[slot.name] = raw
         elif slot.kind == "sketch":
             try:
                 clean[slot.name] = sketch_doc.validate(raw)
@@ -914,7 +979,7 @@ def render_feature(
         )
     role = _COMBINE_ROLE[operation] if spec.combinable else spec.role
     # the recipe resolves against the body slot of the feature ({BODY} is filled with that name)
-    body_name = clean.get("body") or ""
+    body_name = clean.get(spec.body_slot) or clean.get("body") or ""
     code = [line.replace("{BODY}", body_name) for line in code]
     gui = {"spec": spec.id, "v": VERSION, "values": clean}
     if selections:

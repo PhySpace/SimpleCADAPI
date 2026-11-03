@@ -161,7 +161,7 @@ class FeatureService:
             ),
             "product": product,
             "connectors": self._connectors(cells, product),
-            "defaults": self._defaults(open_bodies, faces),
+            "defaults": self._defaults(open_bodies, faces, [(name, bodies[name]) for name in order]),
             "taken": sorted(taken),
             "undo": len(self._undo),
             "redo": len(self._redo),
@@ -175,15 +175,20 @@ class FeatureService:
         return assembly_doc.parse_connectors(code)
 
     @staticmethod
-    def _defaults(open_bodies: list[str], faces: list[str]) -> dict[str, dict[str, str]]:
+    def _defaults(open_bodies: list[str], faces: list[str], made: list[tuple[str, str]] = ()) -> dict[str, dict[str, Any]]:
         last = open_bodies[-1] if open_bodies else None
         before = open_bodies[-2] if len(open_bodies) > 1 else last
         profile = faces[-1] if faces else None
-        out: dict[str, dict[str, str]] = {}
-        for spec in F.SPECS:
-            chosen: dict[str, str] = {}
+        out: dict[str, dict[str, Any]] = {}
+        for spec in F.BY_ID.all():
+            chosen: dict[str, Any] = {}
             for slot in spec.slots:
-                if slot.kind == "body" and last is not None:
+                if slot.kind == "value" and not slot.many:  # the last value of a kind that fits (the open body for a solid)
+                    fits = [name for name, kind in made if kind in (slot.accepts or ())]
+                    pick = last if "solid" in (slot.accepts or ()) and last is not None else (fits[-1] if fits else None)
+                    if pick is not None:
+                        chosen[slot.name] = pick
+                elif slot.kind == "body" and last is not None:
                     chosen[slot.name] = before if slot.name == "base" else last
                 elif slot.name == "operation" and spec.combinable:
                     chosen["operation"] = "join" if last is not None else "new"  # a part holds one solid: meet it, do not leave a second
