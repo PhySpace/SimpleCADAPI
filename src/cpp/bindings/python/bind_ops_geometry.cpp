@@ -19,6 +19,11 @@
 namespace {
 
 using namespace scad;
+using scad::pybind::Angle;
+using scad::pybind::Direction3;
+using scad::pybind::Length;
+using scad::pybind::Point3;
+using scad::pybind::Vector3;
 using namespace pybind11::literals;
 
 // Defaults as Python tuples, so help() shows (0, 0, 1) like the Python SDK.
@@ -196,7 +201,7 @@ void bind_wires_and_faces(py::module_& m) {
 void bind_primitives(py::module_& m) {
   m.def(
       "make_box_rsolid",
-      [](const Scalar& width, const Scalar& height, const Scalar& depth, const Scalar3& center,
+      [](const Length& width, const Length& height, const Length& depth, const Point3& center,
          OptionalString tag_prefix, OptionalString result_tag, OptionalString bottom, OptionalString top,
          OptionalString front, OptionalString back, OptionalString left, OptionalString right) {
         return make_box_rsolid(width, height, depth, center,
@@ -231,7 +236,7 @@ void bind_primitives(py::module_& m) {
   };
   m.def(
       "make_cylinder_rsolid",
-      [axial_tags](const Scalar& radius, const Scalar& height, const Scalar3& center, const Scalar3& axis,
+      [axial_tags](const Length& radius, const Length& height, const Point3& center, const Direction3& axis,
                    OptionalString tag_prefix, OptionalString result_tag, OptionalString start_face,
                    OptionalString end_face, OptionalString side_face, OptionalString start_edge,
                    OptionalString end_edge, OptionalString seam_edge) {

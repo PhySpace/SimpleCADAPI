@@ -161,3 +161,6 @@ struct type_caster<scad::Value> {
 };
 
 }  // namespace pybind11::detail
+
+// Length, Angle, Point3, Direction3, Vector3: the meaning of a parameter, written in its type.
+#include "semantic_types.hpp"  // IWYU pragma: export
