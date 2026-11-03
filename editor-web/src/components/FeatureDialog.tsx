@@ -60,6 +60,8 @@ export type DialogSketches = {
 };
 
 /** The form of one operation, generated from its spec.  A docked card, not a modal: the viewport stays live. */
+const round4 = (value: number) => Math.round(value * 1e4) / 1e4;
+
 export function FeatureDialog({
   request,
   state,
@@ -287,7 +289,8 @@ function FeatureForm({
       setNote("The face details are still loading; try again in a moment.");
       return;
     }
-    const { point, direction } = holeFromFace(face);
+    const { point, vector } = holeFromFace(face);
+    const direction = vector ? "face" : null;
     if (!point) {
       setNote("This face has no centroid; type the start point.");
       return;
@@ -295,11 +298,11 @@ function FeatureForm({
     setForm((previous) => ({
       ...previous,
       position: point.map((c) => String(Math.round(c * 1e4) / 1e4)),
-      ...(direction ? { direction } : {}),
+      ...(direction && vector ? { direction, dx: String(round4(vector[0])), dy: String(round4(vector[1])), dz: String(round4(vector[2])) } : {}),
     }));
     setNote(
-      direction
-        ? `Start point set from the face centroid, direction ${direction} (into the material).`
+      direction && vector
+        ? `Start point set from the face centroid; the hole follows the face's normal, into the material (${vector.map((v) => round4(v)).join(", ")}).`
         : "Start point set from the face centroid. The face reports no normal: check the direction.",
     );
     setServerError(null);

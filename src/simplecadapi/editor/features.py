@@ -499,8 +499,27 @@ def _intersect(c: Context) -> list[str]:
     return [f"{c.slug} = scad.intersect_rsolid({c.body('base')}, {c.spread('other')})"]
 
 
+_HOLE_DIRECTIONS = [
+    *_AXIS_OPTIONS,
+    {"value": "face", "label": "along the picked face's normal"},
+    {"value": "vector", "label": "a free vector"},
+]
+_HOLE_VECTOR = {"direction": ["face", "vector"]}
+
+
+def _hole_direction(c: Context) -> str:
+    """The drilling direction: one of the axes, or the unit vector of (dx, dy, dz) (a face normal or a free vector)."""
+    if str(c.values["direction"]) in _AXES:
+        return c.axis("direction")
+    vector = [float(c.values[name]) for name in ("dx", "dy", "dz")]
+    length = sum(v * v for v in vector) ** 0.5
+    if length < 1e-9:
+        raise FeatureError("the direction vector must not be zero")
+    return repr(tuple(round(v / length, 9) + 0.0 for v in vector))
+
+
 def _hole(c: Context) -> list[str]:
-    direction = c.axis("direction")
+    direction = _hole_direction(c)
     return [
         "# a cylinder from just outside the surface, in the drilling direction, taken out of the body",
         f"_dir = {direction}",
@@ -618,7 +637,10 @@ SPECS: tuple[Spec, ...] = (
          (_body("base", "First body"), _body("other", "Second body")), _intersect),
     Spec("hole", "Hole", "Features", "subtract", "solid", "A round hole from a point on a surface, in a direction, to a depth.",
          (_BODY(), _point("position", "Start point (on the surface)", help="Pick a face to fill the point and direction."),
-          _AXIS("direction", "Direction into the material", "-z"), _length("diameter", "Diameter", 6.0), _length("depth", "Depth", 10.0)), _hole),
+          _enum("direction", "Direction into the material", _HOLE_DIRECTIONS, "-z", help="An axis, the normal of the face you picked (into the material), or any vector."),
+          *(Slot(name, label, "float", default=default, min=-1000.0, max=1000.0, show_when=_HOLE_VECTOR)
+            for name, label, default in (("dx", "Direction x", 0.0), ("dy", "Direction y", 0.0), ("dz", "Direction z", -1.0))),
+          _length("diameter", "Diameter", 6.0), _length("depth", "Depth", 10.0)), _hole),
     Spec("fillet", "Fillet", "Features", "modifier", "solid", "Round the picked edges.",
          (_BODY(), Slot("edges", "Edges", "select", entity="edge"), _length("radius", "Radius", 2.0)), _fillet),
     Spec("chamfer", "Chamfer", "Features", "modifier", "solid", "Bevel the picked edges.",

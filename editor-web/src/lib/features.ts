@@ -459,10 +459,14 @@ export function inwardAxis(normal: readonly [number, number, number]): string | 
 export function holeFromFace(item: { properties: Record<string, unknown> | null; geometry: Record<string, unknown> | null }): {
   point: [number, number, number] | null;
   direction: string | null;
+  /** The unit vector into the material (against the outward normal): what "along the face's normal" drills along. */
+  vector: [number, number, number] | null;
 } {
   const point = vector3(item.properties?.centroid);
   const normal = faceNormal(item);
-  return { point, direction: normal ? inwardAxis(normal) : null };
+  const length = normal ? Math.hypot(...normal) : 0;
+  const vector = normal && length > 1e-9 ? ([-normal[0] / length, -normal[1] / length, -normal[2] / length] as [number, number, number]) : null;
+  return { point, direction: normal ? inwardAxis(normal) : null, vector };
 }
 
 const NAME_BASE: Record<string, string> = {

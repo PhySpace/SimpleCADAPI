@@ -466,3 +466,15 @@ def test_the_catalog_says_which_slots_belong_to_which_operation():
     assert [o["value"] for o in by_name["operation"]["options"]] == ["join", "cut", "intersect", "new"]
     assert by_name["target"]["show_when"] == {"operation": ["join", "cut", "intersect"]}
     assert not any(s.get("combinable") for s in F.catalog()["specs"] if s["id"] in ("fillet", "hole", "cut", "union"))
+
+
+def test_a_hole_goes_along_an_axis_a_face_normal_or_a_free_vector():
+    base = {**DEFAULTS["hole"], "body": "block", "position": [10.0, 10.0, 20.0]}
+    axis = F.render_feature("hole", "bore", {**base, "direction": "-z"}, bodies={"block": "solid"}, known_slugs={"block"})
+    assert "(0.0, 0.0, -1.0)" in axis.feature or "(0, 0, -1)" in axis.feature
+    slanted = F.render_feature("hole", "bore", {**base, "direction": "face", "dx": 3.0, "dy": 0.0, "dz": -4.0}, bodies={"block": "solid"}, known_slugs={"block"})
+    assert "(0.6, 0.0, -0.8)" in slanted.feature  # the unit vector, whatever the length typed or picked
+    free = F.render_feature("hole", "bore", {**base, "direction": "vector", "dx": 0.0, "dy": 1.0, "dz": 0.0}, bodies={"block": "solid"}, known_slugs={"block"})
+    assert "(0.0, 1.0, 0.0)" in free.feature
+    with pytest.raises(F.FeatureError, match="must not be zero"):
+        F.render_feature("hole", "bore", {**base, "direction": "vector", "dx": 0.0, "dy": 0.0, "dz": 0.0}, bodies={"block": "solid"}, known_slugs={"block"})

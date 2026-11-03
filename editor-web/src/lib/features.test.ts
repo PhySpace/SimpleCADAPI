@@ -119,8 +119,8 @@ describe("hole from a face", () => {
     expect(inwardAxis([0, 0, 0])).toBeNull();
   });
   it("reads the centroid and the normal", () => {
-    expect(holeFromFace({ properties: { centroid: [1, 2, 3] }, geometry: { plane: { normal: [0, 1, 0] } } })).toEqual({ point: [1, 2, 3], direction: "-y" });
-    expect(holeFromFace({ properties: { centroid: [1, 2, 3] }, geometry: {} })).toEqual({ point: [1, 2, 3], direction: null });
+    expect(holeFromFace({ properties: { centroid: [1, 2, 3] }, geometry: { plane: { normal: [0, 1, 0] } } })).toEqual({ point: [1, 2, 3], direction: "-y", vector: [-0, -1, -0] });
+    expect(holeFromFace({ properties: { centroid: [1, 2, 3] }, geometry: {} })).toEqual({ point: [1, 2, 3], direction: null, vector: null });
   });
 });
 
