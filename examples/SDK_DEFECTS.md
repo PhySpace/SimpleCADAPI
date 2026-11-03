@@ -343,6 +343,55 @@ that surfaced it is in brackets.
   cylinder does) and let sketch positions take `Scalar`; give the cylinder a degree `Angle` range (keep `u_range` as a
   deprecated alias).
 
+## 22. `phase_offset` of the gear, belt and rack-pinion constraints is a length, and nothing said so [catalog]
+
+- **Symptom:** next to `drive_angle_degrees`, `phase_offset` reads like an
+  angle; a GUI or agent would pass degrees.
+- **Trigger:** `add_gear_constraint_rassembly(..., phase_offset=...)` (also
+  belt, rack_pinion).
+- **Root cause:** the coupling phase is `r_a * theta_a + r_b * theta_b`
+  (`coupling.cpp: phase_from_supports`), an arc length on the pitch circle in
+  mm; the binding took `py::object` and the docstring did not say.
+- **Status:** the signature now says `phase_offset: Length | None`.
+- **Fix direction:** say "pitch-circle arc length (mm)" in the docstrings too;
+  consider renaming to `phase_offset_length` in a major version.
+
+## 23. The std bindings are registered before the product classes [catalog]
+
+- **Symptom:** `simplecadapi._cpp.std.bearing.make_ball_bearing_rassembly`
+  prints its return type as `scad::product::Assembly` (the C++ name); a
+  `Material` argument cannot take its name from the registered class.
+- **Trigger:** `bind_std(m)` runs before `bind_product(m)` in `module.cpp`; pybind
+  writes the signature when the function is defined. Likewise `bind_semantic`
+  runs before `bind_ql`, so `apply_tag_rselection` spells out `ShapeSelector`.
+- **Root cause:** registration order.
+- **Status:** open; the names are written out where needed. The C++
+  `std.bearing.make_ball_bearing_rassembly` is also shadowed by the Python one
+  in `simplecadapi.std.bearing` (two implementations of one operation).
+- **Fix direction:** bind the value classes (product, ql) before any operation
+  that uses them; drop one of the two bearing factories.
+
+## 24. `catalog.classify` read a union that starts with `Literal[` as one Literal [catalog]
+
+- **Symptom:** `Literal['auto', ...] | tuple[Angle, Angle]` gave the choices
+  `"rear_left'] | tuple[Angle"` and `'Angle'`.
+- **Root cause:** the `Literal[...]` / `Sequence[...]` / `Annotated[...]`
+  regexes were `fullmatch`ed on the whole union text.
+- **Status:** fixed. Unions are split first; a union of bracketed members is
+  the members' kinds joined (`enum|numbers`, `query|shape`, `solid` many for
+  `Solid | Sequence[Solid]`). Also new: `path`, `scalar_limit`, `<kind>_map`
+  for `dict[str, X]`, and str-enum defaults (`<E.X: 'x'>` -> `'x'`).
+- **Fix direction:** done.
+
+## 25. Style and view strings are case-insensitive, the signatures list one spelling [catalog]
+
+- **Symptom:** `make_bolt_rsolid(head_style="HEX")`, `render_screenshot_rpath(view="Top")` work, yet the signature
+  says `Literal['hex', ...]` / `Literal['top', ...]`.
+- **Root cause:** `stdlib::choice` and `view_preset` lower-case the value before matching.
+- **Status:** open by choice: the Literal lists the canonical spellings (what a form offers); the runtime still
+  accepts any case. `apply_tag_rselection`'s enums are case-sensitive.
+- **Fix direction:** pick one rule for every string enum of the SDK.
+
 ## Heuristics
 
 - Run every notebook three times: fresh, all cached, `--no-cache`. The three

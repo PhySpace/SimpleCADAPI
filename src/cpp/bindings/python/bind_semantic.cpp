@@ -5,6 +5,7 @@
 // the member or its string value ("local"), and returns members.  The casters below are the only
 // ones for these types in the module.
 #include "bindings.hpp"
+#include "typed_args.hpp"
 
 #include <algorithm>
 #include <type_traits>
@@ -614,6 +615,22 @@ TagTargets targets_from_py(const py::object& targets) {
   return TagTargets(std::move(shapes));
 }
 
+// `targets` of apply_tag_rselection, for the signature (the body checks it: targets_from_py).  ShapeSelector is bound
+// after this module, so the names are written out.
+struct TagTargetsName {
+  static constexpr auto name = py::detail::const_name(
+      "simplecadapi._cpp._native.ShapeSelector | collections.abc.Sequence[simplecadapi._cpp._native.AnyShape]");
+};
+
+// The str enums by their values (members of the Python enums are str too).
+struct TopologyPropagationName {
+  static constexpr auto name = py::detail::const_name("typing.Literal['local', 'downward']");
+};
+struct LineagePolicyName {
+  static constexpr auto name =
+      py::detail::const_name("typing.Literal['none', 'continuation', 'continuation_fragment', 'explicit']");
+};
+
 void bind_operators(py::module_& m) {
   m.def(
       "apply_tag",
@@ -634,8 +651,9 @@ void bind_operators(py::module_& m) {
 
   m.def(
       "apply_tag_rselection",
-      [](const Shape& scope, const py::object& targets, const std::string& tag, TopologyPropagation topology,
-         LineagePolicy lineage) {
+      [](const Shape& scope, const scad::pybind::Typed<TagTargetsName>& targets, const std::string& tag,
+         scad::pybind::Shown<TopologyPropagation, TopologyPropagationName> topology,
+         scad::pybind::Shown<LineagePolicy, LineagePolicyName> lineage) {
         static const ErrorSpec spec{
             "apply_tag_rselection",
             "Failed to attach the tag to the selected shapes.",

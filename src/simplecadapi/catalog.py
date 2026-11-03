@@ -10,10 +10,12 @@ functions with the same annotations.  The catalog parses both, so a GUI, an agen
     [('radius', 'length'), ('height', 'length'), ('bottom_face_center', 'point3'), ('axis', 'direction3')]
 
 A parameter's ``kind`` is one of: the meanings of :mod:`simplecadapi.types` (``length``, ``angle``, ``point3``,
-``direction3``, ``vector3``, ``count``, ``point2``, ``plane``, ``sketch_profile``), ``number`` (a unitless ``float | Expr``), ``int``, ``bool``, ``text``, ``enum``
-(``Literal[...]``, with ``choices``), a value type (``solid``, ``face``, ``wire``, ``edge``, ``vertex``, ``shell``,
-``shape``, ``sketch``, ``part``, ``assembly``, ...), ``query`` (a ``ql`` selection), ``points`` / ``numbers`` (sequences),
-or ``unknown`` when the signature says no more than ``object``.  ``many`` marks a sequence of the kind, ``optional`` a
+``direction3``, ``vector3``, ``count``, ``point2``, ``plane``, ``sketch_profile``), ``number`` (a unitless ``float | Expr``), ``int``, ``bool``, ``text``, ``path``
+(``str | os.PathLike``), ``enum`` (``Literal[...]``, with ``choices``), a value type (``solid``, ``face``, ``wire``,
+``edge``, ``vertex``, ``shell``, ``shape``, ``sketch``, ``part``, ``assembly``, ``scalar_limit``, ...), ``query`` (a
+``ql`` selection), ``points`` / ``numbers`` (sequences), ``grid`` (rows of points), ``<kind>_map`` (``dict[str, <kind>]``: a value per id),
+``<a>|<b>`` (a union of kinds, e.g. ``enum|numbers`` or ``query|shape``), or ``unknown`` when the signature says no
+more than ``object``.  ``many`` marks a sequence of the kind, ``optional`` a
 ``None`` default.
 """
 
@@ -58,6 +60,9 @@ _VALUE_KINDS = {
     "SketchPosition": "sketch_ref",
     "SurfaceBoundary": "surface_boundary",
     "SurfaceFillingSettings": "filling_settings",
+    "ScalarLimit": "scalar_limit",
+    "PathLike": "path",
+    "Path": "path",
 }
 
 
@@ -123,7 +128,9 @@ def classify(type_text: str) -> dict[str, Any]:
         union = [u for u in union if u != "None"]
     if not union:
         return {"kind": "unknown", "many": False, "optional": optional, "choices": ()}
-    text = " | ".join(union)
+    if len(union) > 1:
+        return _classify_union(union, optional)
+    text = union[0]
     annotated = re.fullmatch(r"Annotated\[(.*)\]", text)
     if annotated:
         inner, *meta = _split_top(annotated.group(1), ",")
@@ -148,8 +155,22 @@ def classify(type_text: str) -> dict[str, Any]:
             return {"kind": "numbers", "many": False, "optional": optional, "choices": ()}
         if kind in ("point3", "vector3", "direction3", "point2"):
             return {"kind": "points", "many": False, "optional": optional, "choices": ()}
+        if kind == "points":  # rows of points: a control net or a point grid
+            return {"kind": "grid", "many": False, "optional": optional, "choices": ()}
         return {"kind": kind, "many": True, "optional": optional, "choices": inner["choices"]}
-    names = [u.strip() for u in _split_top(text, "|")]
+    mapping = re.fullmatch(r"(?:dict|Dict|Mapping)\[(.*)\]", text)
+    if mapping:  # a value per name (component id, tag ...): ``direction3_map``, ``number_map``, ``text_map``
+        key_and_value = _split_top(mapping.group(1), ",")
+        inner = classify(key_and_value[-1])
+        if inner["kind"] == "unknown" or inner["many"]:
+            return {"kind": "unknown", "many": False, "optional": optional, "choices": ()}
+        return {"kind": f"{inner['kind']}_map", "many": False, "optional": optional, "choices": inner["choices"]}
+    return _classify_names([text], optional)
+
+
+def _classify_names(names: list[str], optional: bool) -> dict[str, Any]:
+    """Plain type names (no brackets but ``PathLike[str]``), alone or as a union."""
+    names = [re.sub(r"^(PathLike)\[.*\]$", r"\1", n.strip()) for n in names]
     if set(names) <= {"float", "Expr", "SupportsFloat", "SupportsIndex", "int"} and {"float", "SupportsFloat"} & set(names):
         return {"kind": "number", "many": False, "optional": optional, "choices": ()}
     if set(names) <= {"int", "SupportsInt", "SupportsIndex"}:
@@ -158,6 +179,8 @@ def classify(type_text: str) -> dict[str, Any]:
         return {"kind": "bool", "many": False, "optional": optional, "choices": ()}
     if names == ["str"]:
         return {"kind": "text", "many": False, "optional": optional, "choices": ()}
+    if set(names) <= {"str", "PathLike", "Path"} and set(names) != {"str"}:  # a file path, as text or os.PathLike
+        return {"kind": "path", "many": False, "optional": optional, "choices": ()}
     if "SketchRef" in names:  # a point or entity of the sketch, by reference or id (a position too, where allowed)
         return {"kind": "sketch_ref", "many": False, "optional": optional, "choices": ()}
     # A sequence alternative counts as its item kind: ``Sketch | AnyShape | Sequence[AnyShape]`` reads as sketch | shape.
@@ -171,6 +194,25 @@ def classify(type_text: str) -> dict[str, Any]:
 def _sequence_item_kind(text: str) -> str | None:
     match = re.fullmatch(r"(?:Sequence|list|List|tuple|Iterable)\[(.*)\]", text)
     return _VALUE_KINDS.get(match.group(1).strip()) if match else None
+
+
+def _classify_union(union: list[str], optional: bool) -> dict[str, Any]:
+    """``A | B``: plain names as one kind (``float | Expr`` is a number), else the kinds of the members joined.
+
+    ``Solid | Sequence[Solid]`` is one solid or many (``many``); ``Literal[...] | tuple[Angle, Angle]`` is
+    ``enum|numbers`` with the choices of the Literal.
+    """
+    if "SketchRef" in union:  # a point or entity of the sketch, by reference or id (a position too, where allowed)
+        return {"kind": "sketch_ref", "many": False, "optional": optional, "choices": ()}
+    if not any("[" in u for u in union) or all(re.fullmatch(r"PathLike\[.*\]", u) for u in union if "[" in u):
+        return _classify_names(union, optional)
+    infos = [classify(u) for u in union]
+    if any(info["kind"] == "unknown" for info in infos):
+        return {"kind": "unknown", "many": False, "optional": optional, "choices": ()}
+    kinds = sorted({info["kind"] for info in infos})
+    choices = next((info["choices"] for info in infos if info["choices"]), ())
+    return {"kind": "|".join(kinds), "many": any(info["many"] for info in infos), "optional": optional or any(info["optional"] for info in infos),
+            "choices": choices}
 
 
 def _returns(type_text: str) -> str:
@@ -205,7 +247,8 @@ def _summary(fn: Callable[..., Any]) -> str:
 
 def _parse_native(line: str) -> tuple[list[dict[str, Any]], str]:
     """Params and return type from a pybind signature line (parsed as a Python ``def``)."""
-    source = re.sub(r"<[^<>]*>", "None", line)  # defaults pybind cannot print: <object at 0x...>
+    source = re.sub(r"<\w+(?:\.\w+)+: ('[^'<>]*')>", r"\1", line)  # a str enum member: <TopologyPropagation.LOCAL: 'local'>
+    source = re.sub(r"<[^<>]*>", "None", source)  # defaults pybind cannot print: <object at 0x...>
     tree = ast.parse(f"def {source}: pass")
     fn = tree.body[0]
     assert isinstance(fn, ast.FunctionDef)
