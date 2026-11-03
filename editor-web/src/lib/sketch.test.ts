@@ -130,7 +130,7 @@ describe("applicableConstraints", () => {
     expect(applicableConstraints(["nope"], doc)).toEqual([]);
   });
   it("one line", () => expect(applicableConstraints(["l1"], doc)).toEqual(["horizontal", "vertical", "length"]));
-  it("two lines", () => expect(applicableConstraints(["l1", "l2"], doc)).toEqual(["parallel", "perpendicular", "collinear", "equal_length", "line_distance", "angle"]));
+  it("two lines", () => expect(applicableConstraints(["l1", "l2"], doc)).toEqual(["coincident", "parallel", "perpendicular", "collinear", "equal_length", "line_distance", "angle"]));
   it("a point and a line", () => expect(applicableConstraints(["p3", "l1"], doc)).toEqual(["point_on", "midpoint", "fix"]));
   it("two points", () =>
     expect(applicableConstraints(["p1", "p3"], doc)).toEqual(["points_horizontal", "points_vertical", "coincident", "fix", "distance", "distance_x", "distance_y"]));
