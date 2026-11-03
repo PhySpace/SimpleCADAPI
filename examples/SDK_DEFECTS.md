@@ -328,6 +328,26 @@ that surfaced it is in brackets.
 - **Fix direction:** done. Every `ql` factory should resolve against any scope
   that contains its kind; check each (kind, scope) pair when adding a factory.
 
+## 21. Angle units and expression support are not uniform across operations [types]
+
+- **Symptom:** `make_angle_arc_redge` / `_rwire` take `start_angle` and
+  `end_angle` in radians, while every other angle (`revolve_rsolid`,
+  `rotate_shape`, `chamfer_rsolid(angle=)`, `draft_rsolid`, patterns, sweeps)
+  is in degrees. `chamfer_rsolid(angle=)` and `offset_rsolid(tolerance=)`,
+  `union_rsolid(tol=)` take a plain float: a `scad.var` is read as its current
+  value.
+- **Trigger:** passing `90` (meant as degrees) to an angle arc gives a
+  different arc; a `scad.var` given as a chamfer angle is recorded as its
+  value, not as the expression.
+- **Root cause:** the arc follows OCC's `GC_MakeArcOfCircle` parameter
+  directly; `ChamferOptions::angle` is `std::optional<double>`.
+- **Status:** open. The signatures now say it: the arc angles are a plain
+  number (not `Angle`) and the docstring says radians; the chamfer angle
+  prints `Angle` but is loaded as a float.
+- **Fix direction:** a breaking change for the arc (degrees, with a
+  deprecation path), and `Scalar` for the chamfer angle so it records an
+  expression like the other parameters.
+
 ## Heuristics
 
 - Run every notebook three times: fresh, all cached, `--no-cache`. The three

@@ -5,6 +5,7 @@
 // The GIL is released around the kernel work, except while a ql selector is being resolved
 // (a property resolver registered from Python is called back from there).
 #include "bindings.hpp"
+#include "typed_object.hpp"
 
 #include <optional>
 #include <string>
@@ -19,6 +20,56 @@
 namespace {
 
 using namespace scad;
+using scad::pybind::Angle;
+using scad::pybind::Choice;
+using scad::pybind::Count;
+using scad::pybind::Direction3;
+using scad::pybind::DirectionVec;
+using scad::pybind::Length;
+using scad::pybind::PlainQuantity;
+using scad::pybind::Point3;
+using scad::pybind::TypedObject;
+using scad::pybind::Vector3;
+
+// ---- what the signatures say ------------------------------------------------------------------------------------
+// The parameters below that the binding reads as a Python object (and checks itself, with its own errors) print these.
+#define SCAD_SIGNATURE_NAME(Tag, text)                               \
+  struct Tag {                                                       \
+    static constexpr auto name = pybind11::detail::const_name(text); \
+  }
+SCAD_SIGNATURE_NAME(EdgesTag,
+                    "collections.abc.Iterable[simplecadapi._cpp._native.Edge] | "
+                    "simplecadapi._cpp._native.ql.ShapeSelector");
+SCAD_SIGNATURE_NAME(FacesTag,
+                    "collections.abc.Iterable[simplecadapi._cpp._native.Face] | "
+                    "simplecadapi._cpp._native.ql.ShapeSelector");
+SCAD_SIGNATURE_NAME(LoftSectionsTag,
+                    "collections.abc.Iterable[simplecadapi._cpp._native.Wire | simplecadapi._cpp._native.Vertex]");
+SCAD_SIGNATURE_NAME(SweepSectionsTag,
+                    "collections.abc.Iterable[simplecadapi._cpp._native.Face | simplecadapi._cpp._native.Wire]");
+SCAD_SIGNATURE_NAME(ShapesTag, "collections.abc.Iterable[simplecadapi._cpp._native.Shape]");
+SCAD_SIGNATURE_NAME(SolidsTag, "collections.abc.Iterable[simplecadapi._cpp._native.Solid]");
+SCAD_SIGNATURE_NAME(TargetTag,
+                    "simplecadapi._cpp._native.Solid | collections.abc.Iterable[simplecadapi._cpp._native.Solid]");
+SCAD_SIGNATURE_NAME(FaceOperandTag, "simplecadapi._cpp._native.Face");
+SCAD_SIGNATURE_NAME(BinormalTag, "simplecadapi._cpp._native.Wire | simplecadapi.types.Direction3 | None");
+SCAD_SIGNATURE_NAME(FactorsTag, "collections.abc.Sequence[float | Expr]");
+// A TrackingPolicy member or its value.
+SCAD_SIGNATURE_NAME(PolicyTag, "typing.Literal['full', 'graph'] | simplecadapi._cpp.TrackingPolicy");
+// The name of the mode, or an enum member with that name (build123d's Until).
+SCAD_SIGNATURE_NAME(UntilTag, "typing.Literal['NEXT', 'LAST', 'PREVIOUS', 'FIRST'] | enum.Enum");
+SCAD_SIGNATURE_NAME(HandednessTag, "typing.Literal['Right', 'Left']");
+SCAD_SIGNATURE_NAME(OffsetKindTag, "typing.Literal['ARC', 'INTERSECTION']");
+SCAD_SIGNATURE_NAME(SetOperationTag, "typing.Literal['cut', 'intersect', 'union']");
+#undef SCAD_SIGNATURE_NAME
+
+using EdgesOrQuery = TypedObject<EdgesTag>;
+using FacesOrQuery = TypedObject<FacesTag>;
+using PointArg = TypedObject<scad::pybind::PointTag>;          // checked by vector_arg
+using DirectionArg = TypedObject<scad::pybind::DirectionTag>;  // checked by vector_arg
+using VectorArg = TypedObject<scad::pybind::VectorTag>;        // checked by vector_arg
+using Policy = TypedObject<PolicyTag>;
+using Handedness = Choice<HandednessTag>;
 
 // ---- conversions ---------------------------------------------------------------------------------------------
 py::object shape_to_py(const Shape& s) {
@@ -130,7 +181,7 @@ SweepTags sweep_tags(OptionalString tag_prefix, OptionalString result_tag, Optio
 void bind_extrusion(py::module_& m) {
   m.def(
       "extrude_rsolid",
-      [](const Shape& profile, const Scalar3& direction, const Scalar& distance, OptionalString tag_prefix,
+      [](const Shape& profile, const Direction3& direction, const Length& distance, OptionalString tag_prefix,
          OptionalString result_tag, OptionalString start_face_tag, OptionalString end_face_tag,
          OptionalString side_faces_tag) {
         const SweepTags tags = sweep_tags(std::move(tag_prefix), std::move(result_tag), std::move(start_face_tag),
@@ -143,7 +194,7 @@ void bind_extrusion(py::module_& m) {
 
   m.def(
       "revolve_rsolid",
-      [](const Shape& profile, const Scalar3& axis, const Scalar& angle, const Scalar3& origin,
+      [](const Shape& profile, const Direction3& axis, const Angle& angle, const Point3& origin,
          OptionalString tag_prefix, OptionalString result_tag, OptionalString start_face_tag,
          OptionalString end_face_tag, OptionalString side_faces_tag) {
         const SweepTags tags = sweep_tags(std::move(tag_prefix), std::move(result_tag), std::move(start_face_tag),
@@ -160,7 +211,7 @@ void bind_extrusion(py::module_& m) {
 void bind_blends(py::module_& m) {
   m.def(
       "fillet_rsolid",
-      [](const Solid& solid, const py::object& edges, const Scalar& radius, OptionalString result_tag,
+      [](const Solid& solid, const EdgesOrQuery& edges, const Length& radius, OptionalString result_tag,
          OptionalString generated_faces_tag) {
         const EdgeSelection selection = selection_from<Edge>(edges);
         const BlendTags tags{std::move(result_tag), std::move(generated_faces_tag)};
@@ -172,11 +223,13 @@ void bind_blends(py::module_& m) {
 
   m.def(
       "chamfer_rsolid",
-      [](const Solid& solid, const py::object& edges, const Scalar& distance, std::optional<double> angle,
-         std::optional<Vec3> reference_direction, OptionalString result_tag, OptionalString generated_faces_tag) {
+      [](const Solid& solid, const EdgesOrQuery& edges, const Length& distance,
+         std::optional<PlainQuantity<scad::pybind::AngleTag>> angle, std::optional<DirectionVec> reference_direction,
+         OptionalString result_tag, OptionalString generated_faces_tag) {
         const EdgeSelection selection = selection_from<Edge>(edges);
-        const ChamferOptions options{
-            angle, reference_direction, {std::move(result_tag), std::move(generated_faces_tag)}};
+        const ChamferOptions options{angle ? std::optional<double>(*angle) : std::nullopt,
+                                     reference_direction ? std::optional<Vec3>(*reference_direction) : std::nullopt,
+                                     {std::move(result_tag), std::move(generated_faces_tag)}};
         return unlocked(selection.is_selector(), [&] { return chamfer_rsolid(solid, selection, distance, options); });
       },
       py::arg("solid"), py::arg("edges"), py::arg("distance"), py::kw_only(), py::arg("angle") = py::none(),
@@ -189,7 +242,7 @@ void bind_blends(py::module_& m) {
 
   m.def(
       "shell_rsolid",
-      [](const Solid& solid, const py::object& faces_to_remove, const Scalar& thickness, OptionalString result_tag,
+      [](const Solid& solid, const FacesOrQuery& faces_to_remove, const Length& thickness, OptionalString result_tag,
          OptionalString body_faces_tag, OptionalString offset_faces_tag, OptionalString closing_faces_tag,
          OptionalString wall_edges_tag) {
         const FaceSelection selection = selection_from<Face>(faces_to_remove);
@@ -207,9 +260,9 @@ void bind_blends(py::module_& m) {
 void bind_sweeps(py::module_& m) {
   m.def(
       "loft_rsolid",
-      [](const py::object& profiles, bool ruled, const py::object& tracking_policy, OptionalString tag_prefix,
-         OptionalString result_tag, OptionalString start_face_tag, OptionalString end_face_tag,
-         OptionalString side_faces_tag) {
+      [](const TypedObject<LoftSectionsTag>& profiles, bool ruled, const Policy& tracking_policy,
+         OptionalString tag_prefix, OptionalString result_tag, OptionalString start_face_tag,
+         OptionalString end_face_tag, OptionalString side_faces_tag) {
         const std::vector<Shape> sections =
             shape_list(profiles, "loft_rsolid sections must contain only Wire or Vertex objects");
         const LoftOptions options{policy_text(tracking_policy),
@@ -237,8 +290,8 @@ void bind_sweeps(py::module_& m) {
 
   m.def(
       "twisted_sweep_rsolid",
-      [](const Shape& profile, const Scalar& distance, const Scalar& twist_angle, const Scalar3& axis,
-         const Scalar3& origin, const Scalar& guide_radius, OptionalString tag_prefix, OptionalString result_tag,
+      [](const Shape& profile, const Length& distance, const Angle& twist_angle, const Direction3& axis,
+         const Point3& origin, const Length& guide_radius, OptionalString tag_prefix, OptionalString result_tag,
          OptionalString start_face_tag, OptionalString end_face_tag, OptionalString side_faces_tag) {
         const TwistedSweepOptions options{
             guide_radius, sweep_tags(std::move(tag_prefix), std::move(result_tag), std::move(start_face_tag),
@@ -254,10 +307,10 @@ void bind_sweeps(py::module_& m) {
 
   m.def(
       "helical_sweep_rsolid",
-      [](const Wire& profile, const Scalar& pitch, const Scalar& height, const Scalar& radius, const Scalar3& center,
-         const Scalar3& dir, const std::string& handedness) {
-        return unlocked(false,
-                        [&] { return helical_sweep_rsolid(profile, pitch, height, radius, center, dir, handedness); });
+      [](const Wire& profile, const Length& pitch, const Length& height, const Length& radius, const Point3& center,
+         const Direction3& dir, const Handedness& handedness) {
+        return unlocked(
+            false, [&] { return helical_sweep_rsolid(profile, pitch, height, radius, center, dir, handedness.value); });
       },
       py::arg("profile"), py::arg("pitch"), py::arg("height"), py::arg("radius"), py::arg("center") = origin(),
       py::arg("dir") = unit_z(), py::kw_only(), py::arg("handedness") = "Right",
@@ -265,7 +318,9 @@ void bind_sweeps(py::module_& m) {
 
   m.def(
       "sweep_multisection_rsolid",
-      [](const py::object& profiles, const Wire& path, bool is_frenet, const py::object& binormal) {
+      [](const TypedObject<SweepSectionsTag>& profiles, const Wire& path, bool is_frenet,
+         const TypedObject<BinormalTag>& binormal_arg) {
+        const py::object& binormal = binormal_arg;
         const std::vector<Shape> sections = shape_list(profiles, "sections must be Face or Wire");
         std::optional<Binormal> aux;
         if (py::isinstance<Wire>(binormal))
@@ -282,8 +337,8 @@ void bind_sweeps(py::module_& m) {
 void bind_derived(py::module_& m) {
   m.def(
       "offset_rsolid",
-      [](const Solid& solid, const Scalar& amount, const py::object& openings, double tolerance,
-         const std::string& kind) {
+      [](const Solid& solid, const Length& amount, const FacesOrQuery& openings, double tolerance,
+         const Choice<OffsetKindTag>& kind) {
         const FaceSelection selection = selection_from<Face>(openings);
         return unlocked(selection.is_selector(),
                         [&] { return offset_rsolid(solid, amount, selection, {tolerance, kind}); });
@@ -294,8 +349,8 @@ void bind_derived(py::module_& m) {
 
   m.def(
       "draft_rsolid",
-      [](const Solid& solid, const py::object& faces_to_draft, const Scalar& angle, const py::object& plane_origin,
-         const py::object& plane_normal) {
+      [](const Solid& solid, const FacesOrQuery& faces_to_draft, const Angle& angle, const PointArg& plane_origin,
+         const DirectionArg& plane_normal) {
         const FaceSelection selection = selection_from<Face>(faces_to_draft);
         const Scalar3 origin_value = vector_arg(plane_origin, "plane_origin"),
                       normal_value = vector_arg(plane_normal, "plane_normal");
@@ -308,7 +363,7 @@ void bind_derived(py::module_& m) {
 
   m.def(
       "extrude_taper_rsolid",
-      [](const Face& profile, const py::object& vector, const Scalar& taper, bool flip_inner) {
+      [](const Face& profile, const VectorArg& vector, const Angle& taper, bool flip_inner) {
         const Scalar3 direction = vector_arg(vector, "vector");
         return unlocked(false, [&] { return extrude_taper_rsolid(profile, direction, taper, flip_inner); });
       },
@@ -317,7 +372,10 @@ void bind_derived(py::module_& m) {
 
   m.def(
       "extrude_until_rsolid",
-      [](const Face& profile, const py::object& target, const py::object& direction, const py::object& until) {
+      [](const Face& profile, const TypedObject<TargetTag>& target_arg, const DirectionArg& direction,
+         const TypedObject<UntilTag>& until_arg) {
+        const py::object& target = target_arg;
+        const py::object& until = until_arg;
         std::vector<Solid> targets;
         if (py::isinstance<Solid>(target)) {
           targets.push_back(target.cast<Solid>());
@@ -337,7 +395,7 @@ void bind_derived(py::module_& m) {
 
   m.def(
       "scale_rsolid",
-      [](const Solid& solid, const py::object& factors, const py::object& center) {
+      [](const Solid& solid, const TypedObject<FactorsTag>& factors, const PointArg& center) {
         const Scalar3 scale = vector_arg(factors, "factors"), about = vector_arg(center, "center");
         return unlocked(false, [&] { return scale_rsolid(solid, scale, about); });
       },
@@ -387,7 +445,7 @@ void bind_tracking_policy(py::module_& m) {
       .def("__exit__", [](PolicyScope& scope, const py::args&) { scope.exit(); });
   m.def(
       "tracking_policy_scope",
-      [](const py::object& policy) {
+      [](const Policy& policy) {
         const std::string text = policy_text(policy);
         if (text == "full")
           return std::make_shared<PolicyScope>(TrackingPolicy::Full);
@@ -471,7 +529,7 @@ void bind_diagnostics(py::module_& m) {
 
   m.def(
       "raise_loft_failure_if_diagnosed",
-      [](const py::object& sections, const std::string& operation) {
+      [](const TypedObject<ShapesTag>& sections, const std::string& operation) {
         raise_loft_failure_if_diagnosed(shape_list(sections, "loft sections must be shapes"), operation);
       },
       py::arg("sections"), py::arg("operation"), "Explain a failed loft from its sections, when they do.");
@@ -510,7 +568,7 @@ std::vector<Solid> solid_group(const py::object& group) {
 void bind_booleans(py::module_& m) {
   m.def(
       "union_rsolid",
-      [](const py::args& solids, bool clean, bool glue, std::optional<double> tol, const py::object& tracking_policy) {
+      [](const py::args& solids, bool clean, bool glue, std::optional<double> tol, const Policy& tracking_policy) {
         const std::vector<Solid> operands = flattened(solids, "union_rsolid");
         const UnionOptions options{clean, glue, tol, policy_text(tracking_policy)};
         return unlocked(false, [&] { return union_rsolid(operands, options); });
@@ -520,7 +578,7 @@ void bind_booleans(py::module_& m) {
 
   m.def(
       "cut_rsolid",
-      [](const py::args& solids, bool skip_non_intersecting, const py::object& tracking_policy) {
+      [](const py::args& solids, bool skip_non_intersecting, const Policy& tracking_policy) {
         const std::vector<Solid> operands = flattened(solids, "cut_rsolid");
         const CutOptions options{skip_non_intersecting, policy_text(tracking_policy)};
         return unlocked(false, [&] { return cut_rsolid(operands, options); });
@@ -530,7 +588,7 @@ void bind_booleans(py::module_& m) {
 
   m.def(
       "cut_rsolid_list",
-      [](const py::args& solids, bool skip_non_intersecting, const py::object& tracking_policy) {
+      [](const py::args& solids, bool skip_non_intersecting, const Policy& tracking_policy) {
         const std::vector<Solid> operands = flattened(solids, "cut_rsolid_list");
         const CutOptions options{skip_non_intersecting, policy_text(tracking_policy)};
         return solids_to_py(unlocked(false, [&] { return cut_rsolid_list(operands, options); }));
@@ -549,7 +607,9 @@ void bind_booleans(py::module_& m) {
 
   m.def(
       "boolean_rsolidlist",
-      [](const py::object& left, const py::object& right, const std::string& operation) {
+      [](const TypedObject<SolidsTag>& left, const TypedObject<SolidsTag>& right,
+         const Choice<SetOperationTag>& operation_arg) {
+        const std::string& operation = operation_arg;
         if (operation != "cut" && operation != "intersect" && operation != "union") {
           throw ValueError("operation must be cut, intersect or union");
         }
@@ -563,7 +623,9 @@ void bind_booleans(py::module_& m) {
                             const char* second, const char* doc) {
     m.def(
         name,
-        [fn, name, first, second](const py::object& a, const py::object& b) {
+        [fn, name, first, second](const TypedObject<FaceOperandTag>& a_arg, const TypedObject<FaceOperandTag>& b_arg) {
+          const py::object& a = a_arg;
+          const py::object& b = b_arg;
           if (!py::isinstance<Shape>(a))
             reject_face_operand(name, first);
           if (!py::isinstance<Shape>(b))
@@ -585,14 +647,14 @@ void bind_booleans(py::module_& m) {
 void bind_transforms(py::module_& m) {
   m.def(
       "translate_shape",
-      [](const Shape& shape, const Scalar3& vector) {
+      [](const Shape& shape, const Vector3& vector) {
         return shape_to_py(unlocked(false, [&] { return translate_shape(shape, vector); }));
       },
       py::arg("shape"), py::arg("vector"), "Translate a shape by an offset vector.");
 
   m.def(
       "rotate_shape",
-      [](const Shape& shape, const Scalar& angle, const Scalar3& axis, const Scalar3& origin) {
+      [](const Shape& shape, const Angle& angle, const Direction3& axis, const Point3& origin) {
         return shape_to_py(unlocked(false, [&] { return rotate_shape(shape, angle, axis, origin); }));
       },
       py::arg("shape"), py::arg("angle"), py::arg("axis") = unit_z(), py::arg("origin") = origin(),
@@ -600,14 +662,14 @@ void bind_transforms(py::module_& m) {
 
   m.def(
       "mirror_shape",
-      [](const Shape& shape, const Scalar3& plane_origin, const Scalar3& plane_normal) {
+      [](const Shape& shape, const Point3& plane_origin, const Direction3& plane_normal) {
         return shape_to_py(unlocked(false, [&] { return mirror_shape(shape, plane_origin, plane_normal); }));
       },
       py::arg("shape"), py::arg("plane_origin"), py::arg("plane_normal"), "Mirror a shape across a plane.");
 
   m.def(
       "linear_pattern_rsolidlist",
-      [](const Shape& shape, const Scalar3& direction, int count, const Scalar& spacing) {
+      [](const Shape& shape, const Direction3& direction, const Count& count, const Length& spacing) {
         return shapes_to_py(
             unlocked(false, [&] { return linear_pattern_rsolidlist(shape, direction, count, spacing); }));
       },
@@ -616,8 +678,8 @@ void bind_transforms(py::module_& m) {
 
   m.def(
       "radial_pattern_rsolidlist",
-      [](const Shape& shape, const Scalar3& center, const Scalar3& axis, int count,
-         const Scalar& total_rotation_angle) {
+      [](const Shape& shape, const Point3& center, const Direction3& axis, const Count& count,
+         const Angle& total_rotation_angle) {
         return shapes_to_py(unlocked(
             false, [&] { return radial_pattern_rsolidlist(shape, center, axis, count, total_rotation_angle); }));
       },

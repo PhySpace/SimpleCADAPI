@@ -2,6 +2,7 @@
 // simplecadapi/operators/geometry.py, under the Python names, argument names and
 // defaults (keyword-only where Python is keyword-only), plus the create_* aliases.
 #include "bindings.hpp"
+#include "typed_object.hpp"
 
 #include "scad/core/tolerance.hpp"
 #include "scad/io/brep_region.hpp"
@@ -20,9 +21,11 @@ namespace {
 
 using namespace scad;
 using scad::pybind::Angle;
+using scad::pybind::Choice;
 using scad::pybind::Direction3;
 using scad::pybind::Length;
 using scad::pybind::Point3;
+using scad::pybind::TypedObject;
 using scad::pybind::Vector3;
 using namespace pybind11::literals;
 
@@ -34,6 +37,23 @@ py::tuple unit_z() {
   return py::make_tuple(0, 0, 1);
 }
 
+struct HandednessTag {
+  static constexpr auto name = py::detail::const_name("typing.Literal['Right', 'Left']");
+};
+using Handedness = Choice<HandednessTag>;
+// `degree` is read as any number (3.0 included).
+struct DegreeTag {
+  static constexpr auto name = py::detail::const_name("int | float");
+};
+// A file path (`os.fspath` reads it).
+struct PathTag {
+  static constexpr auto name = py::detail::const_name("str | os.PathLike[str]");
+};
+
+std::vector<Scalar3> point_list(const std::vector<Point3>& points) {
+  return {points.begin(), points.end()};
+}
+
 // `degree` takes any number: a bool or a fraction is rejected by the operator itself, with
 // its own error, as Python does (bool -> NaN is "not an integer").
 double degree_of(const py::object& degree) {
@@ -42,7 +62,7 @@ double degree_of(const py::object& degree) {
   return degree.cast<double>();
 }
 
-SplineSpec spline_spec(std::vector<ScalarPoint> control_points, const py::object& degree,
+SplineSpec spline_spec(std::vector<ScalarPoint> control_points, const TypedObject<DegreeTag>& degree,
                        std::optional<ScalarList> knots, std::optional<std::vector<int>> multiplicities,
                        std::optional<ScalarList> weights, bool periodic) {
   return {.control_points = std::move(control_points),
@@ -58,27 +78,43 @@ std::string path_text(const py::object& path) {
 }
 
 void bind_lines(py::module_& m) {
-  m.def("make_point_rvertex", &make_point_rvertex, py::arg("x"), py::arg("y"), py::arg("z"),
-        "Create a point in 3D space and return it as a vertex.");
-  m.def("make_line_redge", &make_line_redge, py::arg("start"), py::arg("end"), py::kw_only(),
-        py::arg("tag_prefix") = py::none(), "Create a straight edge between two points.");
-  m.def("make_segment_redge", &make_segment_redge, py::arg("start"), py::arg("end"),
-        "Alias of `make_line_redge` that returns a straight edge.");
-  m.def("make_segment_rwire", &make_segment_rwire, py::arg("start"), py::arg("end"),
-        "Create a wire containing a single straight segment.");
-  m.def("make_polyline_rwire", &make_polyline_rwire, py::arg("points"), py::arg("closed") = false,
-        "Create a polyline wire from a point list.");
+  m.def(
+      "make_point_rvertex",
+      [](const Length& x, const Length& y, const Length& z) { return make_point_rvertex(x, y, z); }, py::arg("x"),
+      py::arg("y"), py::arg("z"), "Create a point in 3D space and return it as a vertex.");
+  m.def(
+      "make_line_redge",
+      [](const Point3& start, const Point3& end, const OptionalString& tag_prefix) {
+        return make_line_redge(start, end, tag_prefix);
+      },
+      py::arg("start"), py::arg("end"), py::kw_only(), py::arg("tag_prefix") = py::none(),
+      "Create a straight edge between two points.");
+  m.def(
+      "make_segment_redge", [](const Point3& start, const Point3& end) { return make_segment_redge(start, end); },
+      py::arg("start"), py::arg("end"), "Alias of `make_line_redge` that returns a straight edge.");
+  m.def(
+      "make_segment_rwire", [](const Point3& start, const Point3& end) { return make_segment_rwire(start, end); },
+      py::arg("start"), py::arg("end"), "Create a wire containing a single straight segment.");
+  m.def(
+      "make_polyline_rwire",
+      [](const std::vector<Point3>& points, bool closed) { return make_polyline_rwire(point_list(points), closed); },
+      py::arg("points"), py::arg("closed") = false, "Create a polyline wire from a point list.");
 }
 
 void bind_circles(py::module_& m) {
   const auto profile = [](auto fn) {
-    return [fn](const Scalar3& center, const Scalar& radius, const Scalar3& normal, OptionalString tag_prefix,
+    return [fn](const Point3& center, const Length& radius, const Direction3& normal, OptionalString tag_prefix,
                 OptionalString edge_tag) {
       return fn(center, radius, normal, ProfileTags{std::move(tag_prefix), std::move(edge_tag)});
     };
   };
-  m.def("make_circle_redge", &make_circle_redge, py::arg("center"), py::arg("radius"), py::arg("normal") = unit_z(),
-        py::kw_only(), py::arg("tag_prefix") = py::none(), "Create a circular edge.");
+  m.def(
+      "make_circle_redge",
+      [](const Point3& center, const Length& radius, const Direction3& normal, const OptionalString& tag_prefix) {
+        return make_circle_redge(center, radius, normal, tag_prefix);
+      },
+      py::arg("center"), py::arg("radius"), py::arg("normal") = unit_z(), py::kw_only(),
+      py::arg("tag_prefix") = py::none(), "Create a circular edge.");
   m.def("make_circle_rwire", profile(&make_circle_rwire), py::arg("center"), py::arg("radius"),
         py::arg("normal") = unit_z(), py::kw_only(), py::arg("tag_prefix") = py::none(),
         py::arg("edge_tag") = py::none(), "Create a circular wire.");
@@ -86,16 +122,24 @@ void bind_circles(py::module_& m) {
         py::arg("normal") = unit_z(), py::kw_only(), py::arg("tag_prefix") = py::none(),
         py::arg("edge_tag") = py::none(), "Create a circular face.");
 
-  m.def("make_ellipse_redge", &make_ellipse_redge, py::arg("center"), py::arg("major_radius"), py::arg("minor_radius"),
-        py::arg("normal") = unit_z(), py::kw_only(), py::arg("major_direction") = py::none(),
-        py::arg("tag_prefix") = py::none(),
-        "Create a full ellipse edge.\n\n``major_direction`` orients the major axis in the ellipse plane; when\n"
-        "omitted the plane basis derived from ``normal`` picks it.");
+  m.def(
+      "make_ellipse_redge",
+      [](const Point3& center, const Length& major, const Length& minor, const Direction3& normal,
+         const std::optional<Direction3>& major_direction, const OptionalString& tag_prefix) {
+        return make_ellipse_redge(center, major, minor, normal,
+                                  major_direction ? std::optional<Scalar3>(*major_direction) : std::nullopt,
+                                  tag_prefix);
+      },
+      py::arg("center"), py::arg("major_radius"), py::arg("minor_radius"), py::arg("normal") = unit_z(), py::kw_only(),
+      py::arg("major_direction") = py::none(), py::arg("tag_prefix") = py::none(),
+      "Create a full ellipse edge.\n\n``major_direction`` orients the major axis in the ellipse plane; when\n"
+      "omitted the plane basis derived from ``normal`` picks it.");
   const auto ellipse = [](auto fn) {
-    return [fn](const Scalar3& center, const Scalar& major, const Scalar& minor, const Scalar3& normal,
-                std::optional<Scalar3> major_direction, OptionalString tag_prefix, OptionalString edge_tag) {
+    return [fn](const Point3& center, const Length& major, const Length& minor, const Direction3& normal,
+                std::optional<Direction3> major_direction, OptionalString tag_prefix, OptionalString edge_tag) {
       return fn(center, major, minor, normal,
-                EllipseOptions{std::move(major_direction), std::move(tag_prefix), std::move(edge_tag)});
+                EllipseOptions{major_direction ? std::optional<Scalar3>(*major_direction) : std::nullopt,
+                               std::move(tag_prefix), std::move(edge_tag)});
     };
   };
   m.def("make_ellipse_rwire", ellipse(&make_ellipse_rwire), py::arg("center"), py::arg("major_radius"),
@@ -108,7 +152,7 @@ void bind_circles(py::module_& m) {
 
 void bind_rectangles(py::module_& m) {
   const auto rectangle = [](auto fn) {
-    return [fn](const Scalar& width, const Scalar& height, const Scalar3& center, const Scalar3& normal,
+    return [fn](const Length& width, const Length& height, const Point3& center, const Direction3& normal,
                 OptionalString tag_prefix, std::optional<std::vector<std::string>> edge_tags) {
       return fn(width, height, center, normal, RectangleTags{std::move(tag_prefix), std::move(edge_tags)});
     };
@@ -122,22 +166,38 @@ void bind_rectangles(py::module_& m) {
 }
 
 void bind_arcs(py::module_& m) {
-  m.def("make_three_point_arc_redge", &make_three_point_arc_redge, py::arg("start"), py::arg("middle"), py::arg("end"),
-        "Create an arc edge from three points.");
-  m.def("make_three_point_arc_rwire", &make_three_point_arc_rwire, py::arg("start"), py::arg("middle"), py::arg("end"),
-        "Create a wire containing an arc defined by three points.");
-  m.def("make_angle_arc_redge", &make_angle_arc_redge, py::arg("center"), py::arg("radius"), py::arg("start_angle"),
-        py::arg("end_angle"), py::arg("normal") = unit_z(),
-        "Create an arc edge from a center, radius, and angle range.");
-  m.def("make_angle_arc_rwire", &make_angle_arc_rwire, py::arg("center"), py::arg("radius"), py::arg("start_angle"),
-        py::arg("end_angle"), py::arg("normal") = unit_z(),
-        "Create a wire containing an arc defined by a center, radius, and angle range.");
+  m.def(
+      "make_three_point_arc_redge",
+      [](const Point3& start, const Point3& middle, const Point3& end) {
+        return make_three_point_arc_redge(start, middle, end);
+      },
+      py::arg("start"), py::arg("middle"), py::arg("end"), "Create an arc edge from three points.");
+  m.def(
+      "make_three_point_arc_rwire",
+      [](const Point3& start, const Point3& middle, const Point3& end) {
+        return make_three_point_arc_rwire(start, middle, end);
+      },
+      py::arg("start"), py::arg("middle"), py::arg("end"), "Create a wire containing an arc defined by three points.");
+  // The angles are radians (a plain number), unlike the degrees of the other operations.
+  const auto angle_arc = [](auto fn) {
+    return [fn](const Point3& center, const Length& radius, const Scalar& start_angle, const Scalar& end_angle,
+                const Direction3& normal) { return fn(center, radius, start_angle, end_angle, normal); };
+  };
+  m.def("make_angle_arc_redge", angle_arc(&make_angle_arc_redge), py::arg("center"), py::arg("radius"),
+        py::arg("start_angle"), py::arg("end_angle"), py::arg("normal") = unit_z(),
+        "Create an arc edge from a center, radius, and angle range.\n\n"
+        "``start_angle`` and ``end_angle`` are in radians, counter-clockwise about ``normal``.");
+  m.def("make_angle_arc_rwire", angle_arc(&make_angle_arc_rwire), py::arg("center"), py::arg("radius"),
+        py::arg("start_angle"), py::arg("end_angle"), py::arg("normal") = unit_z(),
+        "Create a wire containing an arc defined by a center, radius, and angle range.\n\n"
+        "``start_angle`` and ``end_angle`` are in radians, counter-clockwise about ``normal``.");
 }
 
 void bind_splines(py::module_& m) {
   const auto exact = [](auto fn) {
-    return [fn](std::vector<ScalarPoint> control_points, const py::object& degree, std::optional<ScalarList> knots,
-                std::optional<std::vector<int>> multiplicities, std::optional<ScalarList> weights, bool periodic) {
+    return [fn](std::vector<ScalarPoint> control_points, const TypedObject<DegreeTag>& degree,
+                std::optional<ScalarList> knots, std::optional<std::vector<int>> multiplicities,
+                std::optional<ScalarList> weights, bool periodic) {
       return fn(spline_spec(std::move(control_points), degree, std::move(knots), std::move(multiplicities),
                             std::move(weights), periodic));
     };
@@ -172,9 +232,9 @@ void bind_splines(py::module_& m) {
 
 void bind_helix(py::module_& m) {
   const auto helix = [](auto fn) {
-    return
-        [fn](const Scalar& pitch, const Scalar& height, const Scalar& radius, const Scalar3& center, const Scalar3& dir,
-             const std::string& handedness) { return fn(pitch, height, radius, center, dir, handedness); };
+    return [fn](const Length& pitch, const Length& height, const Length& radius, const Point3& center,
+                const Direction3& dir,
+                const Handedness& handedness) { return fn(pitch, height, radius, center, dir, handedness.value); };
   };
   m.def("make_helix_redge", helix(&make_helix_redge), py::arg("pitch"), py::arg("height"), py::arg("radius"),
         py::arg("center") = origin(), py::arg("dir") = unit_z(), py::kw_only(), py::arg("handedness") = "Right",
@@ -187,11 +247,16 @@ void bind_helix(py::module_& m) {
 void bind_wires_and_faces(py::module_& m) {
   m.def("make_wire_from_edges_rwire", &make_wire_from_edges_rwire, py::arg("edges"), py::kw_only(),
         py::arg("tag_prefix") = py::none(), "Create a wire from a list of connected edges.");
-  m.def("make_face_from_wire_rface", &make_face_from_wire_rface, py::arg("wire"), py::arg("normal") = unit_z(),
-        py::kw_only(), py::arg("tag_prefix") = py::none(), "Create a face from a closed wire.");
+  m.def(
+      "make_face_from_wire_rface",
+      [](const Shape& wire, const Direction3& normal, const OptionalString& tag_prefix) {
+        return make_face_from_wire_rface(wire, normal, tag_prefix);
+      },
+      py::arg("wire"), py::arg("normal") = unit_z(), py::kw_only(), py::arg("tag_prefix") = py::none(),
+      "Create a face from a closed wire.");
   m.def(
       "make_face_from_wires_rface",
-      [](const Shape& outer, const std::optional<std::vector<Shape>>& inner, const Scalar3& normal) {
+      [](const Shape& outer, const std::optional<std::vector<Shape>>& inner, const Direction3& normal) {
         return make_face_from_wires_rface(outer, inner.value_or(std::vector<Shape>{}), normal);
       },
       py::arg("outer_wire"), py::arg("inner_wires"), py::arg("normal") = unit_z(),
@@ -262,10 +327,10 @@ void bind_primitives(py::module_& m) {
       "        system.");
   m.def(
       "make_cone_rsolid",
-      [axial_tags](const Scalar& bottom_radius, const Scalar& height, const Scalar& top_radius, const Scalar3& center,
-                   const Scalar3& axis, OptionalString tag_prefix, OptionalString result_tag, OptionalString start_face,
-                   OptionalString end_face, OptionalString side_face, OptionalString start_edge,
-                   OptionalString end_edge, OptionalString seam_edge) {
+      [axial_tags](const Length& bottom_radius, const Length& height, const Length& top_radius, const Point3& center,
+                   const Direction3& axis, OptionalString tag_prefix, OptionalString result_tag,
+                   OptionalString start_face, OptionalString end_face, OptionalString side_face,
+                   OptionalString start_edge, OptionalString end_edge, OptionalString seam_edge) {
         return make_cone_rsolid(
             bottom_radius, height, top_radius, center, axis,
             axial_tags(std::move(tag_prefix), std::move(result_tag), std::move(start_face), std::move(end_face),
@@ -290,14 +355,16 @@ void bind_primitives(py::module_& m) {
       "        ``height`` along ``axis`` from this point.\n"
       "    axis: Direction of the frustum axis in the current coordinate\n"
       "        system.");
-  m.def("make_sphere_rsolid", &make_sphere_rsolid, py::arg("radius"), py::arg("center") = origin(),
-        "Create a sphere solid.");
+  m.def(
+      "make_sphere_rsolid",
+      [](const Length& radius, const Point3& center) { return make_sphere_rsolid(radius, center); }, py::arg("radius"),
+      py::arg("center") = origin(), "Create a sphere solid.");
 }
 
 void bind_brep_region(py::module_& m) {
   m.def(
       "load_brep_region_rsolid",
-      [](const py::object& path, const std::string& sha256, const OptionalString& tag_prefix) {
+      [](const TypedObject<PathTag>& path, const std::string& sha256, const OptionalString& tag_prefix) {
         return load_brep_region_rsolid(path_text(path), sha256, tag_prefix);
       },
       py::arg("path"), py::arg("sha256"), py::kw_only(), py::arg("tag_prefix") = py::none(),
@@ -308,12 +375,14 @@ void bind_brep_region(py::module_& m) {
       "sidecar bytes.");
   m.def(
       "_brep_region_path",
-      [](const py::object& path, bool for_graph) { return scad::io::checked_region_path(path_text(path), for_graph); },
+      [](const TypedObject<PathTag>& path, bool for_graph) {
+        return scad::io::checked_region_path(path_text(path), for_graph);
+      },
       py::arg("path"), py::kw_only(), py::arg("for_graph"),
       "The checks on a .scadbrep locator (graph replay: relative, no drive, no '..', '/' separators).");
   m.def(
       "load_brep_region_rshell",
-      [](const py::object& path, const std::string& sha256, const OptionalString& tag_prefix) {
+      [](const TypedObject<PathTag>& path, const std::string& sha256, const OptionalString& tag_prefix) {
         return load_brep_region_rshell(path_text(path), sha256, tag_prefix);
       },
       py::arg("path"), py::arg("sha256"), py::kw_only(), py::arg("tag_prefix") = py::none(),
