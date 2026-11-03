@@ -287,4 +287,39 @@ def catalog_dict() -> dict[str, Any]:
     return {"version": 1, "operations": [op.to_dict() for op in operations()]}
 
 
-__all__ = ["Operation", "Param", "STD_MODULES", "catalog_dict", "classify", "describe", "operation", "operations"]
+# ---- ``sca ops`` -------------------------------------------------------------------------------------------------------
+
+
+def configure(subparsers: Any) -> None:
+    """``sca ops [NAME] [--json]``: the operation catalog (every operation and the meaning of its parameters)."""
+    import json as _json
+
+    parser = subparsers.add_parser(
+        "ops",
+        help="the SDK operations and what their parameters mean (read from the signatures)",
+        description="Without a name: one line per operation (name, result, parameters with their kinds). With a name: "
+        "that operation in full. --json prints the catalog as data (what the editor's forms are made from).",
+    )
+    parser.add_argument("name", nargs="?", help="one operation")
+    parser.add_argument("--json", action="store_true", help="print JSON")
+
+    def show(report: dict[str, Any], as_json: bool) -> None:
+        if as_json:
+            print(_json.dumps(report, indent=2, default=str))
+            return
+        ops = report.get("operations", [report])
+        for op in ops:
+            params = ", ".join(f"{p['name']}: {p['kind']}{'[]' if p['many'] else ''}{'?' if p['optional'] else ''}" for p in op["params"])
+            where = f"   [{op['module']}]" if op["module"] != "simplecadapi" else ""
+            print(f"{op['name']}({params}) -> {op['returns']}{where}")
+            if len(ops) == 1 and op["summary"]:
+                print(f"  {op['summary']}")
+
+    def run(args: Any) -> tuple[dict[str, Any], int]:
+        args.printer = lambda report: show(report, args.json)  # read by cli.run after the handler
+        return (operation(args.name).to_dict() if args.name else catalog_dict()), 0
+
+    parser.set_defaults(handler=run, printer=None)
+
+
+__all__ = ["Operation", "Param", "STD_MODULES", "catalog_dict", "classify", "configure", "describe", "operation", "operations"]

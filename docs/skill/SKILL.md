@@ -90,5 +90,7 @@ it as a blocker in the report and do the strongest supported work.
 - `references/README.md`: every page by layer (workflows, domains, discipline, guides, generated API docs).
 - `references/SDK_OVERVIEW.md`: package map. `references/ql-playbook.md` and `references/ql-recipes.md`: selection.
 - `references/scadpkg-format.md`: the `.scadpkg` consumer spec.
-- `references/docs/api/`, `references/docs/stdlib/`, `references/docs/core/`: exact signatures.
+- `references/docs/api/`, `references/docs/stdlib/`, `references/docs/core/`: exact signatures. `sca ops [NAME] [--json]`
+  lists every operation with what each parameter means (`length`, `angle`, `point3`, `direction3`, ... read from the
+  signature types in `simplecadapi.types`; `simplecadapi.catalog` in code).
 - Maintainers: the contract these pages follow is `skill-design.md` in the repository's `docs/` folder.

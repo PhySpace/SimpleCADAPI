@@ -224,6 +224,11 @@ HOLE_DIAMETER = scad.var(name="hole_diameter", default=6.0, unit="mm", comment="
   the runtime makes the Part from the open body (see `docs/guides/notebook-runtime.md`), so every new feature previews
   and a deleted cell cannot leave the notebook without a product. Setting connectors (or "use as product" on a body
   that is not the last) writes an explicit `make_part_rpart` cell, which then wins.
+- Besides the curated features (box, hole, pull face, extrude of a sketch ...), every SDK and standard-library operation
+  the forms can offer is a feature of its own, `op.<operation>` (`# gui: {"spec": "op.make_spur_gear_rsolid", ...}`): the
+  form is made from the operation's signature (`sca ops NAME`), and the cell is one plain call
+  (`gear = scad.std.gear.make_spur_gear_rsolid(n_teeth=GEAR_N_TEETH, ...)`) with its numbers in the params cell.
+  `sca feature add op.<operation> --values '{...}'` does the same from the command line.
 - Unattended: the buttons are not available; write the cells yourself (see `discipline/notebook-cell-design.md`).
 
 ## The same operations from the command line

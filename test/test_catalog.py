@@ -102,3 +102,14 @@ def test_types_classify():
     assert catalog.classify("Literal['NEXT', 'LAST']")["choices"] == ("NEXT", "LAST")
     assert catalog.classify("simplecadapi.types.Angle | None") == {"kind": "angle", "many": False, "optional": True, "choices": ()}
     assert catalog.classify("Sequence[simplecadapi.types.Point3]")["kind"] == "points"
+
+
+def test_sca_ops_prints_one_operation_and_the_whole_catalog(capsys):
+    from simplecadapi.cli import main
+
+    assert main(["ops", "make_cylinder_rsolid"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("make_cylinder_rsolid(radius: length, height: length, bottom_face_center: point3, axis: direction3")
+    assert main(["ops", "--json"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert any(op["name"] == "make_spur_gear_rsolid" for op in data["operations"])
