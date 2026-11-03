@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import {
+import { transformConnector,
   AXES,
   KINDS,
   KIND_LABEL,
@@ -230,8 +230,58 @@ function ConnectorRow({ c, active, onSelect, list, setList, onSelected }: { c: C
       <div className="mt-0.5 pl-5 text-[10px] leading-tight text-muted-foreground">
         at {f(c.origin)} mm<br />x ({f(c.x_axis)}) z ({f(c.z_axis ?? [0, 0, 0])})
       </div>
+      {active && <FrameEditor c={c} list={list} setList={setList} />}
       {error && <p className="pl-5 text-[11px] text-fail">{error}</p>}
     </li>
+  );
+}
+
+/** Change a connector's frame by hand: its origin, a move along its own axes, a turn about one of them. */
+function FrameEditor({ c, list, setList }: { c: ConnectorFrame; list: ConnectorFrame[]; setList: (l: ConnectorFrame[]) => void }) {
+  const round = (n: number) => String(Math.round(n * 1000) / 1000);
+  const [origin, setOrigin] = useState<string[]>(c.origin.map(round));
+  const [move, setMove] = useState<string[]>(["0", "0", "0"]);
+  const [axis, setAxis] = useState<"x" | "y" | "z">("z");
+  const [angle, setAngle] = useState("90");
+  useEffect(() => setOrigin(c.origin.map(round)), [c.origin]);
+  const numbers = (parts: string[]) => {
+    const out = parts.map((p) => Number(p));
+    return out.every((n) => Number.isFinite(n)) ? (out as [number, number, number]) : null;
+  };
+  const apply = (change: Parameters<typeof transformConnector>[2]) => setList(transformConnector(list, c.id, change));
+  const triple = (values: string[], set: (v: string[]) => void, label: string) => (
+    <div className="grid grid-cols-3 gap-1">
+      {["x", "y", "z"].map((a, i) => (
+        <Input key={a} aria-label={`${label} ${a}`} className="h-6 px-1 text-[11px]" inputMode="decimal" value={values[i]} onChange={(e) => set(values.map((v, k) => (k === i ? e.target.value : v)))} />
+      ))}
+    </div>
+  );
+  const originNumbers = numbers(origin);
+  const moveNumbers = numbers(move);
+  const degrees = Number(angle);
+  return (
+    <div className="mt-1 flex flex-col gap-1 pl-5" data-testid={`frame-editor-${c.id}`}>
+      <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">origin (mm)</span>
+      <div className="flex items-center gap-1">
+        <div className="flex-1">{triple(origin, setOrigin, "origin")}</div>
+        <Button type="button" size="sm" variant="outline" className="h-6 px-1.5" disabled={!originNumbers} onClick={() => originNumbers && apply({ origin: originNumbers })}>set</Button>
+      </div>
+      <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">move along its own x, y, z (mm)</span>
+      <div className="flex items-center gap-1">
+        <div className="flex-1">{triple(move, setMove, "move")}</div>
+        <Button type="button" size="sm" variant="outline" className="h-6 px-1.5" disabled={!moveNumbers} onClick={() => moveNumbers && (apply({ move: moveNumbers }), setMove(["0", "0", "0"]))}>move</Button>
+      </div>
+      <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">turn about its own axis</span>
+      <div className="flex items-center gap-1">
+        {(["x", "y", "z"] as const).map((a) => (
+          <Button key={a} type="button" size="sm" variant={axis === a ? "default" : "outline"} className="h-6 w-6 px-0" aria-pressed={axis === a} onClick={() => setAxis(a)}>{a}</Button>
+        ))}
+        <Input aria-label="turn angle" className="h-6 w-14 px-1 text-[11px]" inputMode="decimal" value={angle} onChange={(e) => setAngle(e.target.value)} />
+        <span className="text-[10px] text-muted-foreground">deg</span>
+        <Button type="button" size="sm" variant="outline" className="h-6 px-1.5" disabled={!Number.isFinite(degrees)} onClick={() => apply({ rotate: { axis, degrees } })}>turn</Button>
+        <Button type="button" size="sm" variant="ghost" className="h-6 px-1.5" title="Turn the frame over (180 deg about its x axis): z points the other way" onClick={() => apply({ rotate: { axis: "x", degrees: 180 } })}>flip z</Button>
+      </div>
+    </div>
   );
 }
 

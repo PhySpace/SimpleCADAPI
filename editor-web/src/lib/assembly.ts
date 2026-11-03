@@ -405,6 +405,43 @@ export function addConnectorFromFace(list: readonly ConnectorFrame[], face: Pick
 
 export const removeConnector = (list: readonly ConnectorFrame[], id: string): ConnectorFrame[] => list.filter((c) => c.id !== id);
 
+/** Rotate `v` about the unit axis `k` by `degrees` (Rodrigues). */
+function rotateAbout(v: Vec3, k: Vec3, degrees: number): Vec3 {
+  const t = (degrees * Math.PI) / 180;
+  const c = Math.cos(t);
+  const s = Math.sin(t);
+  const kxv = cross(k, v);
+  const kdv = dot(k, v);
+  return [0, 1, 2].map((i) => v[i] * c + kxv[i] * s + k[i] * kdv * (1 - c)) as Vec3;
+}
+
+const clean = (v: Vec3): Vec3 => v.map((n) => (Math.abs(n) < 1e-12 ? 0 : Math.round(n * 1e9) / 1e9)) as Vec3;
+
+/** A connector's frame changed by hand: a new origin, a move along its own axes, or a turn about one of them.
+ * The axes stay unit and square (the z axis is x cross y), so the server accepts the result. */
+export function transformConnector(
+  list: readonly ConnectorFrame[],
+  id: string,
+  change: { origin?: Vec3; move?: Vec3; rotate?: { axis: "x" | "y" | "z"; degrees: number } },
+): ConnectorFrame[] {
+  return list.map((c) => {
+    if (c.id !== id) return c;
+    let x = unit(c.x_axis) ?? ([1, 0, 0] as Vec3);
+    let y = unit(c.y_axis) ?? ([0, 1, 0] as Vec3);
+    let z = unit(cross(x, y)) ?? ([0, 0, 1] as Vec3);
+    let origin: Vec3 = change.origin ? [...change.origin] : [...c.origin];
+    if (change.move) origin = [0, 1, 2].map((i) => origin[i] + change.move![0] * x[i] + change.move![1] * y[i] + change.move![2] * z[i]) as Vec3;
+    if (change.rotate) {
+      const k = change.rotate.axis === "x" ? x : change.rotate.axis === "y" ? y : z;
+      x = unit(rotateAbout(x, k, change.rotate.degrees)) ?? x;
+      y = unit(rotateAbout(y, k, change.rotate.degrees)) ?? y;
+      y = unit(sub(y, x.map((v) => v * dot(x, y)) as Vec3)) ?? y; // square again against rounding
+      z = unit(cross(x, y)) ?? z;
+    }
+    return { ...c, origin: clean(origin), x_axis: clean(x), y_axis: clean(y), z_axis: clean(z) };
+  });
+}
+
 export function renameConnector(list: readonly ConnectorFrame[], from: string, to: string): { list: ConnectorFrame[] } | { error: string } {
   if (!CONNECTOR_PATTERN.test(to)) return { error: `"${to}" is not a connector name` };
   if (to !== from && list.some((c) => c.id === to)) return { error: `"${to}" is already a connector of this part` };

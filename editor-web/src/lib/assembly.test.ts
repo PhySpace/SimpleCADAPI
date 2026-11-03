@@ -301,3 +301,20 @@ describe("exploded view", () => {
     expect(normalizeAssembly(base).explode).toBeUndefined();
   });
 });
+
+describe("editing a connector's frame by hand", () => {
+  it("moves along its own axes, turns about one of them, and keeps the axes unit and square", async () => {
+    const { transformConnector, connectorProblems } = await import("@/lib/assembly");
+    const list = [{ id: "top", origin: [0, 0, 10] as [number, number, number], x_axis: [1, 0, 0] as [number, number, number], y_axis: [0, 1, 0] as [number, number, number] }];
+    const moved = transformConnector(list, "top", { move: [0, 0, 5] });
+    expect(moved[0].origin).toEqual([0, 0, 15]);
+    const turned = transformConnector(list, "top", { rotate: { axis: "z", degrees: 90 } });
+    expect(turned[0].x_axis).toEqual([0, 1, 0]);
+    expect(turned[0].y_axis).toEqual([-1, 0, 0]);
+    const odd = transformConnector(list, "top", { rotate: { axis: "x", degrees: 33.3 } });
+    expect(connectorProblems(odd)).toEqual([]);
+    const flipped = transformConnector(list, "top", { rotate: { axis: "x", degrees: 180 } });
+    expect(flipped[0].z_axis).toEqual([0, 0, -1]);
+    expect(transformConnector(list, "top", { origin: [1, 2, 3] })[0].origin).toEqual([1, 2, 3]);
+  });
+});
