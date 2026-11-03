@@ -19,6 +19,7 @@ import {
   FLIP_NORMAL,
   FRIENDLY_NAMES,
   bodyChoices,
+  valueChoices,
   directionForProfile,
   directionOptions,
   resolveDirection,
@@ -560,6 +561,55 @@ function SlotWidget({
         </Select>
       );
     }
+    case "value": {
+      const choices = valueChoices(state, slot.accepts);
+      const what = (slot.accepts ?? []).join(" / ");
+      if (slot.many) {
+        const chosen = Array.isArray(raw) ? (raw as string[]) : [];
+        return (
+          <div className="flex flex-col gap-1" data-testid={`value-list-${slot.name}`}>
+            <div className="flex flex-wrap gap-1">
+              {choices.length === 0 && <span className="text-[11px] text-muted-foreground">no {what} in this notebook yet</span>}
+              {choices.map((choice) => {
+                const at = chosen.indexOf(choice.name);
+                return (
+                  <Button
+                    key={choice.name}
+                    type="button"
+                    size="sm"
+                    variant={at >= 0 ? "default" : "outline"}
+                    className="h-6 px-2"
+                    aria-pressed={at >= 0}
+                    title={at >= 0 ? `#${at + 1}: click to leave it out` : "click to add it (the order of the clicks is the order)"}
+                    onClick={() => set(slot.name, at >= 0 ? chosen.filter((n) => n !== choice.name) : [...chosen, choice.name])}
+                  >
+                    {at >= 0 && <span className="text-[10px]">{at + 1}</span>}
+                    {choice.name}
+                  </Button>
+                );
+              })}
+            </div>
+            <span className="text-[11px] text-muted-foreground">{what}, in the order clicked</span>
+          </div>
+        );
+      }
+      return (
+        <Select value={typeof raw === "string" ? raw : ""} onValueChange={(value) => set(slot.name, value)}>
+          <SelectTrigger aria-invalid={invalid}>
+            <SelectValue placeholder={`no ${what} yet`} />
+          </SelectTrigger>
+          <SelectContent>
+            {choices.map((choice) => (
+              <SelectItem key={choice.name} value={choice.name}>
+                {choice.name} <span className="text-muted-foreground">({choice.produces})</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+    case "text":
+      return <Input value={typeof raw === "string" ? raw : ""} aria-invalid={invalid} onChange={(event) => set(slot.name, event.target.value)} />;
     case "profile": {
       const profiles = state.profiles ?? [];
       const chosen = typeof raw === "string" ? findProfile(state, raw) : undefined;

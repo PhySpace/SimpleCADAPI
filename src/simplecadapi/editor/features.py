@@ -782,6 +782,8 @@ def catalog() -> dict[str, Any]:
 
 def default_slug(spec_id: str, taken: set[str]) -> str:
     base = {"extrude_rect": "block", "extrude_circle": "disc", "extrude_polygon": "profile_solid"}.get(spec_id, spec_id)
+    if base.startswith("op."):  # an SDK operation: what it makes (make_spur_gear_rsolid -> spur_gear)
+        base = re.sub(r"^(make|add|create)_", "", base[3:].rsplit("_r", 1)[0]) or "shape"
     candidate, number = base, 1
     while candidate in taken or candidate.upper() in taken or candidate in _RESERVED:
         number += 1

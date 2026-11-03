@@ -6,7 +6,7 @@ import { axisName } from "@/lib/sketch-plane";
 
 // -- contract -------------------------------------------------------------------------------------------------------
 
-export type SlotKind = "length" | "angle" | "float" | "count" | "bool" | "enum" | "point" | "body" | "select" | "points2d" | "points3d" | "profile" | "sketch";
+export type SlotKind = "length" | "angle" | "float" | "count" | "bool" | "enum" | "point" | "body" | "select" | "points2d" | "points3d" | "profile" | "sketch" | "value" | "text";
 
 export type SlotOption = { value: string; label: string };
 
@@ -23,6 +23,10 @@ export type Slot = {
   entity?: "face" | "edge";
   /** A selection slot that takes exactly one item. */
   single?: boolean;
+  /** kind "value": the kinds of named values that fit (solid, wire, face ...: what the SDK operation takes). */
+  accepts?: string[];
+  /** kind "value": a list of them (the sections of a loft, say). */
+  many?: boolean;
   help?: string;
   optional?: boolean;
   /** The slot is shown, validated and sent only while every listed slot holds one of the listed values
@@ -248,6 +252,14 @@ export function initialForm(spec: Spec, bodyDefaults: Record<string, string> = {
         break;
       case "select":
         break;
+      case "value": {
+        const chosen = slot.name in values ? values[slot.name] : bodyDefaults[slot.name];
+        form[slot.name] = slot.many ? (Array.isArray(chosen) ? chosen.map(String) : []) : typeof chosen === "string" ? chosen : "";
+        break;
+      }
+      case "text":
+        form[slot.name] = typeof given === "string" ? given : "";
+        break;
       default:
         form[slot.name] = numberText(given);
     }
@@ -282,6 +294,18 @@ export function formToValues(spec: Spec, form: RawForm): { values: Record<string
         if (typeof raw !== "string" || !raw) {
           if (!slot.optional) errors[slot.name] = slot.kind === "body" ? "no body to use yet: add a solid first" : slot.kind === "profile" ? "no sketch yet: add a sketch first" : "choose a value";
         } else values[slot.name] = raw;
+        break;
+      case "value":
+        if (slot.many) {
+          const names = Array.isArray(raw) ? raw.filter((n): n is string => typeof n === "string" && !!n) : [];
+          if (names.length) values[slot.name] = names;
+          else if (!slot.optional) errors[slot.name] = "choose at least one";
+        } else if (typeof raw === "string" && raw) values[slot.name] = raw;
+        else if (!slot.optional) errors[slot.name] = `no ${(slot.accepts ?? ["value"]).join(" or ")} in this notebook yet`;
+        break;
+      case "text":
+        if (typeof raw === "string" && raw.trim()) values[slot.name] = raw;
+        else if (!slot.optional) errors[slot.name] = "enter a value";
         break;
       case "point": {
         const parts = Array.isArray(raw) ? raw : [];
@@ -331,6 +355,12 @@ export function validateName(name: string, taken: readonly string[]): string | n
 }
 
 // -- bodies ---------------------------------------------------------------------------------------------------------
+
+/** The named values of the notebook that fit a value slot (its accepted kinds), in the order they were made. */
+export function valueChoices(state: Pick<FeatureState, "bodies">, accepts: readonly string[] | undefined): { name: string; produces: string }[] {
+  const fits = new Set(accepts ?? []);
+  return state.bodies.filter((b) => fits.has(b.produces));
+}
 
 /** Bodies for a body select: the open ones (not yet used by another feature) first, then the rest. */
 export function bodyChoices(state: Pick<FeatureState, "bodies" | "open">): { name: string; open: boolean }[] {
@@ -487,7 +517,8 @@ export const FRIENDLY_NAMES: ReadonlySet<string> = new Set(["extrude_sketch", "r
 
 /** The name the server will give a feature when none is typed (mirrors default_slug in features.py; a hint, the server decides). */
 export function suggestName(specId: string, taken: readonly string[]): string {
-  const base = NAME_BASE[specId] ?? specId;
+  // an SDK operation names what it makes: op.make_spur_gear_rsolid -> spur_gear (the server suggests the same)
+  const base = NAME_BASE[specId] ?? (specId.startsWith("op.") ? specId.slice(3).replace(/_r[a-z]+$/, "").replace(/^(make|add|create)_/, "") || "shape" : specId);
   const used = new Set(taken);
   let candidate = base;
   for (let number = 1; used.has(candidate) || used.has(candidate.toUpperCase()); ) candidate = `${base}_${++number}`;
