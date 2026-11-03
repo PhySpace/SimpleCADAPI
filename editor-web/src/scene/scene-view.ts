@@ -12,6 +12,7 @@ import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js
 import { bindClickSelection } from './components/click-selection';
 import { disposeObject } from './cad-three';
 import { CameraRig } from './camera-rig';
+import { rayThrough } from './camera-projection';
 import { BRepRenderer, OVERLAY_LAYER, type CameraState, type LiveGeometryPayload } from './renderer';
 
 export type { LiveGeometryPayload };
@@ -165,7 +166,7 @@ export class SceneView {
     const bounds = this.engine.domElement.getBoundingClientRect();
     this.pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
     this.pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
-    this.raycaster.setFromCamera(this.pointer, this.engine.camera);
+    rayThrough(this.raycaster, this.pointer, this.engine.camera);
     const distance = this.engine.camera.position.distanceTo(this.engine.controls.target);
     const worldPerPixel = 2 * Math.tan(THREE.MathUtils.degToRad(this.engine.camera.fov * 0.5)) * distance / Math.max(bounds.height, 1);
     this.raycaster.params.Line.threshold = worldPerPixel * 5;

@@ -21,9 +21,10 @@ export class CameraRig {
   private get camera() { return this.engine.camera; }
   private get controls() { return this.engine.controls; }
 
-  /** Park the trackball (sketch mode) or give the camera back to it. */
+  /** Park the trackball (sketch mode) or give the camera back to it; the sketch looks through an orthographic projection. */
   setManual(on: boolean): void {
     this.cancelAnimation();
+    this.engine.setOrthographic(on);
     if (on) {
       this.saved ??= { min: this.controls.minDistance, max: this.controls.maxDistance };
       this.controls.minDistance = 1e-5;
@@ -63,6 +64,7 @@ export class CameraRig {
     this.controls.target.copy(pose.target);
     this.camera.lookAt(pose.target);
     this.camera.updateMatrixWorld(true);
+    this.engine.syncProjection();
     this.settle();
     this.engine.invalidate();
   }

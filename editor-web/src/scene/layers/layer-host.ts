@@ -22,6 +22,7 @@
 
 import * as THREE from 'three';
 
+import { rayThrough } from '../camera-projection';
 import { OVERLAY_LAYER } from '../renderer';
 import { ndcFromClient, pickHitAreas, type PickHit } from './pick';
 
@@ -174,7 +175,7 @@ export class SceneLayer {
     const { camera, domElement } = this.host.view.engine;
     const raycaster = this.host.raycaster;
     camera.updateMatrixWorld();
-    raycaster.setFromCamera(ndcFromClient(domElement.getBoundingClientRect(), clientX, clientY), camera);
+    rayThrough(raycaster, ndcFromClient(domElement.getBoundingClientRect(), clientX, clientY), camera);
     this.root.updateMatrixWorld(true);
     return pickHitAreas(raycaster, [...this.items.values()].map((i) => i.holder));
   }

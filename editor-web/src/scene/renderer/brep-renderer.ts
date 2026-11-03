@@ -28,6 +28,7 @@ import { PALETTES, type SceneTheme, type ScenePalette } from '../theme';
 import type { PackageFiles } from '../product-package';
 import type { PreviewData, PreviewPart } from '../../lib/preview';
 import { fitDistance } from '../camera-fit';
+import { applyOrthographic, isOrthographic } from '../camera-projection';
 import type { Entity, EntitySidecar, FaceGroup, SceneManifest, SceneNode, Vec3 } from '../scene2';
 
 /** Render layers: faces (0, default) go through lighting + AO; edges (1) and
@@ -154,6 +155,7 @@ export class BRepRenderer {
   private beautyRT: THREE.WebGLRenderTarget | null = null;
   private ssaoPass: GTAOPass | null = null;
   private ssaoEnabled: boolean;
+  private orthoRestoreSsao = true;
   private rendererClearColor: THREE.Color;
   private palette: ScenePalette;
   /** The gizmo's per-axis parts, kept to recolor on a theme change. */
@@ -182,6 +184,12 @@ export class BRepRenderer {
     this.threeScene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.01, 1000);
     this.camera.up.set(0, 0, 1);
+    const perspective = this.camera.updateProjectionMatrix.bind(this.camera);
+    // aspect, near/far and framing all call this: while orthographic it writes the orthographic matrix instead
+    this.camera.updateProjectionMatrix = () => {
+      if (isOrthographic(this.camera)) applyOrthographic(this.camera, this.camera.position.distanceTo(this.controls.target));
+      else perspective();
+    };
     this.camera.position.set(2.4, 2.1, 3.0);
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     // Background comes from the renderer clear color, NOT scene.background:
@@ -940,6 +948,21 @@ export class BRepRenderer {
 
   get seamsShown(): boolean {
     return this.seamsVisible;
+  }
+
+  /** Project orthographically (the sketch canvas) or in perspective again; ambient occlusion is off while orthographic. */
+  setOrthographic(on: boolean): void {
+    if (isOrthographic(this.camera) === on) return;
+    this.camera.userData.orthographic = on;
+    if (on) this.orthoRestoreSsao = this.ssaoEnabled;
+    this.setSSAO(on ? false : this.orthoRestoreSsao);
+    this.camera.updateProjectionMatrix();
+    this.invalidate();
+  }
+
+  /** Follow the camera's distance (a dolly changes the orthographic view height); a no-op in perspective. */
+  syncProjection(): void {
+    if (isOrthographic(this.camera)) this.camera.updateProjectionMatrix();
   }
 
   setSSAO(enabled: boolean): void {

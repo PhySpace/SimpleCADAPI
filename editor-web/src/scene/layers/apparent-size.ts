@@ -7,6 +7,8 @@
 
 import * as THREE from 'three';
 
+import { scaleDistance } from '../camera-projection';
+
 export type ApparentSizeOptions = {
   /** The distance (world units) at which the factor is exactly 1: usually the framing distance of the model. */
   referenceDistance: number;
@@ -34,7 +36,7 @@ const scratch = new THREE.Vector3();
  * Returns the factor used (callers can detect a change).  `object` must have an up-to-date world matrix. */
 export function applyApparentScale(object: THREE.Object3D, camera: THREE.Camera, baseScale: number, options: ApparentSizeOptions): number {
   object.getWorldPosition(scratch);
-  const factor = apparentFactor(scratch.distanceTo(camera.position), options);
+  const factor = apparentFactor(scaleDistance(camera, scratch.distanceTo(camera.position)), options);
   object.scale.setScalar(baseScale * factor);
   return factor;
 }

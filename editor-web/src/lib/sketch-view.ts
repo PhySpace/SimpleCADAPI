@@ -31,9 +31,12 @@ export function planeToScreen(viewer: Viewer, plane: PlaneSpec, u: number, v: nu
 export function screenRay(viewer: Viewer, sx: number, sy: number): { origin: Vec3; dir: Vec3 } {
   refresh(viewer.camera);
   const camera = viewer.camera;
-  const origin = new THREE.Vector3().setFromMatrixPosition(camera.matrixWorld);
-  const far = new THREE.Vector3((sx / viewer.width) * 2 - 1, -(sy / viewer.height) * 2 + 1, 0.5).unproject(camera);
-  const dir = far.sub(origin).normalize();
+  // through the near and the far plane: the ray of either projection (a perspective one starts at the eye, an orthographic one
+  // is parallel to the view direction and starts at the pixel)
+  const x = (sx / viewer.width) * 2 - 1;
+  const y = -(sy / viewer.height) * 2 + 1;
+  const origin = new THREE.Vector3(x, y, -1).unproject(camera);
+  const dir = new THREE.Vector3(x, y, 1).unproject(camera).sub(origin).normalize();
   return { origin: [origin.x * MM_PER_M, origin.y * MM_PER_M, origin.z * MM_PER_M], dir: [dir.x, dir.y, dir.z] };
 }
 
