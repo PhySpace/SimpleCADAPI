@@ -303,8 +303,9 @@ def test_a_blank_notebook_gets_its_product_with_the_first_feature(tmp_path):
         _wait_idle(state)
         snap = service.snapshot()
         assert [f["slug"] for f in snap["features"]] == ["base"]
-        assert snap["product"] == {"cell": snap["product"]["cell"], "body": "base"}
-        assert "plate = scad.make_part_rpart(part_id=scad.notebook_id(), body=base)" in path.read_text()
+        # the header says kind = "part": the runtime makes the Part from the open body, no product cell is written
+        assert snap["product"] == {"cell": None, "body": "base", "implicit": True}
+        assert "make_part_rpart" not in path.read_text()
         # a part holds one solid: the new cylinder says how it meets the body, so no second body is left behind
         assert service.snapshot()["defaults"]["cylinder"]["operation"] == "join"
         service.add({"spec": "cylinder", "name": "bore", "values": {"radius": 5.0, "height": 40.0, "origin": [0.0, 0.0, -10.0], "operation": "cut"}})
@@ -314,6 +315,10 @@ def test_a_blank_notebook_gets_its_product_with_the_first_feature(tmp_path):
         assert all(not f["errors"] for f in snap["features"]), snap["features"]
         assert next(f for f in snap["features"] if f["slug"] == "bore")["role"] == "subtract"
         assert "_tool = scad.make_cylinder_rsolid(" in path.read_text() and "bore = scad.cut_rsolid(base, _tool" in path.read_text()
+        from simplecadapi.runtime import run_notebook
+
+        product = run_notebook(path, cache=False).product  # the same notebook headless: its Part is the open body
+        assert product.part_id == "plate" and product.body.get_volume() < 40 * 30 * 20
     finally:
         if state.kernel is not None:
             state.kernel.stop()

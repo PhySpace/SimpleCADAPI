@@ -619,7 +619,7 @@ class RestoreTest(unittest.TestCase):
             self.assertEqual((package["cached"], package["size"]), (True, 3))
             self.assertEqual(state.latest_preview_bytes, b"PKG")
             cells = next(m for m in sent if m["type"] == "notebook.cells")["cells"]
-            self.assertEqual([c["title"] for c in cells], ["params", "base", "part"])
+            self.assertEqual([c["title"] for c in cells], ["params", "base"])  # a part needs no product cell (kind = "part")
             self.assertTrue(all(c["readonly"] for c in cells))  # not editable until a kernel has them
             self.assertIn("RADIUS", state.specs)
 
@@ -630,7 +630,7 @@ class RestoreTest(unittest.TestCase):
             path = create_notebook(Path(tmp), "part", "part")
             names = [cell["name"] for cell in _static_cells(path)]
             self.assertNotIn("setup", names)
-            self.assertEqual(len(names), 3)
+            self.assertEqual(len(names), 2)  # params and base: a part needs no product cell (kind = "part")
 
 
 class SwitchOrderTest(unittest.TestCase):

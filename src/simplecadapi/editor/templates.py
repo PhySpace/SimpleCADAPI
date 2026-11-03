@@ -1,7 +1,8 @@
 """New notebooks: a part or an assembly, as the editor's "new" action writes them.
 
 Both follow the feature tree convention (``docs/skill/.../feature-tree-convention.md``):
-a ``# ---- params ----`` cell, one cell per feature, the product last.
+a ``# ---- params ----`` cell, one cell per feature.  The header says the kind; a part needs no cell that builds its ``Part``
+(the runtime makes it from the one open body), an assembly ends with its layout.
 The parameters carry ``# ui:`` comments so the editor offers sliders.
 """
 
@@ -48,12 +49,6 @@ def _(HEIGHT, RADIUS):
         axis=(0.0, 0.0, 1.0),
     )
     return (base,)
-
-
-@app.cell
-def _(base):
-    {variable} = scad.Part(part_id=scad.notebook_id(), body=base)
-    return ({variable},)
 '''
 
 _ASSEMBLY = '''
@@ -93,12 +88,13 @@ def render_notebook(name: str, kind: str = "part", parts: list[tuple[str, str]] 
     if not _NAME.fullmatch(name):
         raise ValueError(f"invalid notebook name: {name!r}")
     variable = name.replace("-", "_")
-    header = _HEADER.format(id=name)
+    # The kind is fixed when the notebook is made (a blank one is a part the GUI fills in).
+    header = _HEADER.format(id=name).replace('# id = "', f'# kind = "{"assembly" if kind == "assembly" else "part"}"\n# id = "', 1)
     if kind == "blank":
-        # No cells: the GUI adds the first feature, and the product cell with it (see gui_features.py).
+        # No cells: the GUI adds the first feature.  A part notebook needs no product cell: its open body is the Part.
         return header + _RUNNER
     if kind == "part":
-        return header + _PART.format(variable=variable) + _RUNNER
+        return header + _PART + _RUNNER
     if kind != "assembly":
         raise ValueError(f"unknown notebook kind: {kind}")
     if not parts:

@@ -36,7 +36,11 @@ from ..build.definition import (
 )
 from ..build.dependencies import snapshot_file_inputs
 from ..build.results import AssemblyBuildResult, PartBuildResult
-from simplecadapi._cpp import Assembly, isolated_recording, Part
+from typing import Any
+
+from simplecadapi._cpp import Assembly, find_registered_node, isolated_recording, Part, Solid
+from simplecadapi._glue.session import lineage_of
+from ..operators.product import make_part_rpart
 from simplecadapi._glue.session import GraphSession
 from ..recording.source_mapping import cell_sources
 from .cells import NotebookCells, bound_requirements
@@ -98,11 +102,79 @@ def find_product(
             f"id {config.id!r} and none is the only one no other cell reads: "
             f"{', '.join(names)}"
         )
+    if config.kind == "part" and not others:
+        implicit = _implicit_part(config, values, read)
+        if implicit is not None:
+            return implicit
     found = ", ".join(sorted(others)) if others else "none"
     raise ProductNotFoundError(
         f"{config.path.name}: no top-level Part or Assembly has the notebook "
         f"id {config.id!r}; Parts and Assemblies found: {found}"
     )
+
+
+def open_bodies(values: Mapping[str, object], read: AbstractSet[str]) -> list[str]:
+    """The public top-level solids nothing else is built from, in cell order: the bodies a part notebook leaves at the end.
+
+    A solid another cell reads is not open; nor is one that another candidate was made from (a tool cut out in the same cell
+    that keeps it under a name): the operation graph the values carry says so.
+    """
+
+    seen: set[int] = set()
+    candidates: list[tuple[str, object]] = []
+    for name, value in values.items():
+        if name.startswith("_") or name in read or not isinstance(value, Solid) or id(value) in seen:
+            continue
+        seen.add(id(value))
+        candidates.append((name, value))
+    if len(candidates) < 2:
+        return [name for name, _ in candidates]
+    nodes = {name: _node(value) for name, value in candidates}
+    upstream: set[str] = set()
+    for name, node in nodes.items():
+        if node is not None:
+            upstream |= _ancestors(node)
+    return [name for name, _ in candidates if nodes[name] is None or nodes[name].node_id not in upstream]
+
+
+def _node(value: object) -> Any:
+    found = lineage_of(value)
+    if found is None:
+        return None
+    graph_id, node_id = found
+    return find_registered_node(graph_id, node_id)
+
+
+def _ancestors(node: Any) -> set[str]:
+    """The ids of the nodes *node* was made from (not itself)."""
+
+    out: set[str] = set()
+    stack = list(node.inputs)
+    while stack:
+        item = stack.pop()
+        if item.node_id in out:
+            continue
+        out.add(item.node_id)
+        stack.extend(item.inputs)
+    return out
+
+
+def _implicit_part(config: NotebookConfig, values: Mapping[str, object], read: AbstractSet[str]) -> Part | None:
+    """The product of a ``kind = "part"`` notebook without a cell that builds it: its one open body, as a Part with the notebook id.
+
+    ``None`` when there is no body yet; several open bodies are an error naming them (join them, or say which one in a
+    ``make_part_rpart`` cell).
+    """
+
+    names = open_bodies(values, read)
+    if not names:
+        return None
+    if len(names) > 1:
+        raise ProductNotFoundError(
+            f"{config.path.name}: a part holds one body and {len(names)} are left open ({', '.join(names)}): "
+            "join them, or build the Part from one in a cell (make_part_rpart)"
+        )
+    return make_part_rpart(part_id=config.id, body=values[names[0]])
 
 
 def project_product(

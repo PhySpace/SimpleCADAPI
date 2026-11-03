@@ -17,6 +17,7 @@ import threading
 from pathlib import Path
 from typing import Any, Mapping
 
+from ..runtime.config import read_notebook_config
 from ..runtime.workspace import features_in_cell
 from . import assembly_doc
 from . import features as F
@@ -141,6 +142,9 @@ class FeatureService:
                         "normal_vec": sketch_doc.plane_normal(plane),
                     }
                 )
+        if product is None and open_bodies and self._implicit_part():
+            # no cell builds the Part: the runtime makes it from the open body (one; several are an error it reports)
+            product = {"cell": None, "body": open_bodies[-1], "implicit": True}
         return {
             "features": features,
             "bodies": [{"name": name, "produces": bodies[name]} for name in order],
@@ -283,7 +287,7 @@ class FeatureService:
                 raise GuiError(f"{', '.join(users)} still use {feature['slug']}; remove those first")
             steps: list[dict] = []
             product = snap["product"]
-            if product and product["body"] in feature["makes"]:
+            if product and product["cell"] and product["body"] in feature["makes"]:
                 fallback = feature["reads"][0] if feature["reads"] else None
                 if fallback is None:
                     raise GuiError(f"the product is built from {feature['slug']}; point it at another body first")
@@ -307,6 +311,13 @@ class FeatureService:
                 items = assembly_doc.validate_connectors(request.get("connectors") or [])
             except assembly_doc.AssemblyError as exc:
                 raise GuiError(str(exc)) from exc
+            if not product["cell"]:  # the Part is implicit: connectors are its arguments, so it gets a cell now
+                made = self._product_cell(snap, product["body"])
+                variable = made["variable"]
+                first = f"{variable} = scad.make_part_rpart(part_id=scad.notebook_id(), body={product['body']})"
+                steps = [self._create(made["after"], "\n".join(assembly_doc.render_connectors(first, variable, items)), run=True)]
+                self._record(steps)
+                return self._result(steps[0]["id"], steps, "connectors")
             cell = self._cell(product["cell"])
             first = next((ln for ln in cell["code"].splitlines() if "Part(" in ln or "make_part_rpart(" in ln), None)
             if first is None:
@@ -327,6 +338,11 @@ class FeatureService:
                 raise GuiError(f"{name!r} is not a body in this notebook")
             if not snap["product"]:
                 raise GuiError("this notebook has no product cell that builds a Part from a body")
+            if not snap["product"]["cell"]:
+                made = self._product_cell(snap, name)
+                steps = [self._create(made["after"], f"{made['variable']} = scad.make_part_rpart(part_id=scad.notebook_id(), body={name})", run=True)]
+                self._record(steps)
+                return self._result(steps[0]["id"], steps, name)
             steps = [self._point_product(snap["product"], name)]
             self._record(steps)
             return self._result(snap["product"]["cell"], steps, name)
@@ -474,9 +490,17 @@ class FeatureService:
         new = _PRODUCT_BODY.sub(lambda m: f"{m.group(1)}{body}", cell["code"], count=1)
         return self._edit(product["cell"], cell["code"], new, run=True)
 
+    def _product_cell(self, snap: Mapping[str, Any], body: str) -> dict[str, str]:
+        """Where an explicit product cell goes (after the last cell) and the name it binds (the notebook's stem, free)."""
+        taken = set(snap["taken"])
+        stem = re.sub(r"\W", "_", getattr(self.state.notebook, "stem", "part") or "part").strip("_").lower() or "part"
+        variable = stem if stem not in taken and stem not in F._RESERVED and not stem[0].isdigit() else f"{stem}_part"
+        cells = list(self.state.cells)
+        return {"after": cells[-1]["id"] if cells else "end", "variable": variable}
+
     def _repoint_product(self, snap: Mapping[str, Any], rendered: F.Rendered) -> list[dict]:
         product = snap["product"]
-        if product and product["body"] in rendered.reads and rendered.produces == "solid":
+        if product and product["cell"] and product["body"] in rendered.reads and rendered.produces == "solid":
             return [self._point_product(product, rendered.slug)]
         return []
 
@@ -484,9 +508,20 @@ class FeatureService:
         """A notebook with no product yet gets one, built from its first body (a blank notebook starts without cells)."""
         if snap["product"] is not None or rendered.produces != "solid" or any("Part(" in str(c.get("code", "")) for c in self.state.cells):
             return []
+        if self._implicit_part():
+            return []  # the header says part: the runtime builds the Part from the open body, no cell to keep in step
         stem = re.sub(r"\W", "_", getattr(self.state.notebook, "stem", "part") or "part").strip("_").lower() or "part"
         variable = stem if stem not in taken and stem not in F._RESERVED and not stem[0].isdigit() else f"{stem}_part"
         return [self._create(after, f"{variable} = scad.make_part_rpart(part_id=scad.notebook_id(), body={rendered.slug})", run=True)]
+
+    def _implicit_part(self) -> bool:
+        """Whether the open notebook's header declares ``kind = "part"`` (its product needs no cell)."""
+        notebook = getattr(self.state, "notebook", None)
+        try:
+            config = read_notebook_config(notebook) if notebook is not None else None
+        except Exception:  # noqa: BLE001 - a malformed header is reported elsewhere
+            return False
+        return config is not None and config.kind == "part"
 
     def _apply(self, step: dict, *, forward: bool) -> None:
         kind = step["kind"]
