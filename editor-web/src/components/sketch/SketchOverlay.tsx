@@ -437,6 +437,50 @@ export function SketchOverlay({
     return s ? <circle cx={s[0]} cy={s[1]} r={10} fill="none" stroke={FOCUS} strokeWidth={2.5} data-testid="corner-mark" data-corner={corner.point} /> : null;
   })();
 
+  // Typed entry: the next click as numbers, beside the cursor (Tab moves between the fields, Enter places, Esc closes).
+  const entryNode = (() => {
+    const entry = editor.entry;
+    const fields = editor.entryFields;
+    if (!entry || !fields) return null;
+    const s = cursor ? project(cursor.x, cursor.y) : null;
+    const left = Math.min(Math.max((s?.[0] ?? size.w / 2) + 18, 8), size.w - 260);
+    const top = Math.min(Math.max((s?.[1] ?? size.h / 2) + 18, 8), size.h - 70);
+    return (
+      <div className="absolute z-20 flex flex-col gap-1 border-2 border-primary bg-popover p-1.5 shadow-[4px_4px_0_var(--shadow-hard)]" style={{ left, top }} data-testid="sketch-typed-entry">
+        <div className="flex items-center gap-1.5">
+          {fields.map((field, index) => (
+            <label key={field.name} className="flex items-center gap-1">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{field.label}</span>
+              <input
+                autoFocus={index === entry.focus}
+                data-testid={`typed-${field.name}`}
+                aria-label={field.label}
+                aria-invalid={!!entry.error}
+                value={entry.text[field.name] ?? ""}
+                onFocus={(e) => e.currentTarget.select()}
+                onChange={(e) => editor.setEntry({ ...entry, text: { ...entry.text, [field.name]: e.target.value }, error: null })}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    editor.submitEntry();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    editor.setEntry(null);
+                    wrap.current?.focus();
+                  }
+                }}
+                className="h-6 w-16 border-2 border-input bg-background px-1 text-[12px] focus-visible:border-focus focus-visible:outline-none aria-[invalid=true]:border-fail"
+              />
+              <span className="text-[10px] uppercase text-muted-foreground">{field.unit}</span>
+            </label>
+          ))}
+        </div>
+        <span className={entry.error ? "text-[10px] text-fail" : "text-[10px] text-muted-foreground"}>{entry.error ?? "Tab: next field · Enter: place · Esc: close"}</span>
+      </div>
+    );
+  })();
+
   const cursorMark = (() => {
     if (!cursor || tool === "select" || tool === "delete" || tool === "trim" || tool === "extend" || tool === "fillet" || tool === "chamfer") return null;
     const s = project(cursor.x, cursor.y);
@@ -538,6 +582,7 @@ export function SketchOverlay({
         {cursorMark}
       </svg>
       {boxNode}
+      {entryNode}
       {cornerBoxNode}
     </div>
   );

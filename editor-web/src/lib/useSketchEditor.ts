@@ -67,6 +67,9 @@ import {
   type End,
 } from "@/lib/sketch-edit";
 import { findIntersections } from "@/lib/sketch-intersect";
+import { typedFields, typedTarget, type TypedDims } from "@/lib/sketch-typed";
+
+const DRAW_TOOLS = new Set(["point", "line", "circle", "arc"]);
 
 export type Tool = "select" | "point" | "line" | "circle" | "arc" | "delete" | "trim" | "extend" | "fillet" | "chamfer";
 /** The corner value box (fillet radius / chamfer distance) open at a corner. */
@@ -383,6 +386,93 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   }, [projectFrom.length]);
   const projectSketch = useCallback((slug: string) => void runEdit(projectRequest(docRef.current, slug)), [runEdit]);
 
+  // -- placing: a click of a drawing tool, or the same click given as typed numbers --------------------------------------------------
+  /** Put the next point of the active drawing tool at `spot`; `dims` are typed dimensions kept as driving constraints. */
+  const place = (spot: Spot, dims: TypedDims = {}): void => {
+    const d = docRef.current;
+    const opts = { auto, construction };
+    const keep = (doc: SketchDoc, id: string): SketchDoc => {
+      let next = doc;
+      if (dims.length !== undefined) next = addConstraint(next, { kind: "length", targets: [id], value: dims.length, driving: true });
+      if (dims.radius !== undefined) next = addConstraint(next, { kind: "radius", targets: [id], value: dims.radius, driving: true });
+      return next;
+    };
+    if (tool === "point") {
+      if (!spot.pointId) commit(ensurePoint(d, spot).doc);
+      return;
+    }
+    if (tool === "line") {
+      if (!draft) {
+        setDraft({ tool: "line", from: spot });
+        return;
+      }
+      if (draft.tool !== "line") return;
+      const start = ensurePoint(d, draft.from);
+      const made = addLine(start.doc, start.id, spot, opts);
+      if (!made) return;
+      commit(keep(made.doc, made.lineId));
+      setDraft(made.reused ? null : { tool: "line", from: { x: 0, y: 0, pointId: made.endId } });
+      return;
+    }
+    if (tool === "circle") {
+      if (!draft) {
+        setDraft({ tool: "circle", center: spot });
+        return;
+      }
+      if (draft.tool !== "circle") return;
+      const made = addCircle(d, draft.center, spot, opts);
+      if (made) {
+        commit(keep(made.doc, made.id));
+        setDraft(null);
+      }
+      return;
+    }
+    if (tool === "arc") {
+      if (!draft) {
+        setDraft({ tool: "arc", center: spot });
+        return;
+      }
+      if (draft.tool !== "arc") return;
+      if (!draft.start) {
+        setDraft({ ...draft, start: spot });
+        if (dims.radius !== undefined) arcRadius.current = dims.radius;
+        return;
+      }
+      const made = addArc(d, draft.center, draft.start, spot, opts);
+      if (made) {
+        const radius = arcRadius.current;
+        arcRadius.current = undefined;
+        commit(radius === undefined ? made.doc : addConstraint(made.doc, { kind: "radius", targets: [made.id], value: radius, driving: true }));
+        setDraft(null);
+      }
+    }
+  };
+  /** The radius typed for the arc being drawn (its start), kept until the arc is made. */
+  const arcRadius = useRef<number | undefined>(undefined);
+
+  /** The typed-entry box: open while a drawing tool waits for its next point and a number was typed (or Tab pressed). */
+  const [entry, setEntry] = useState<{ text: Record<string, string>; focus: number; error: string | null } | null>(null);
+  const entryFields = typedFields(tool, draft);
+  useEffect(() => setEntry(null), [tool]);
+  const openEntry = (first?: string) => {
+    const fields = typedFields(tool, draftRef.current);
+    if (!fields) return false;
+    setEntry({ text: first === undefined ? {} : { [fields[0].name]: first }, focus: 0, error: null });
+    return true;
+  };
+  const submitEntry = () => {
+    if (!entry) return;
+    const pointsNow = pts;
+    const at = (spot: Spot): [number, number] => (spot.pointId ? (pointsNow.get(spot.pointId) ?? [spot.x, spot.y]) : [spot.x, spot.y]);
+    const target = typedTarget(tool, draftRef.current, entry.text, at);
+    if ("error" in target) {
+      setEntry({ ...entry, error: target.error });
+      return;
+    }
+    place(target.spot, target.dims);
+    setEntry(null);
+  };
+
   // -- pointer ------------------------------------------------------------------------------------------------------------------
   /** A left-button press. "press" asks the caller to capture the pointer (a selection that may become a drag). */
   const pointerDown = (info: PointerInfo, shiftKey = info.shift): "press" | "handled" => {
@@ -457,53 +547,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       if (!shiftKey) setSelection([]);
       return "handled";
     }
-    const spot = spotAt(world, info);
-    if (tool === "point") {
-      if (!spot.pointId) commit(ensurePoint(d, spot).doc);
-      return "handled";
-    }
-    if (tool === "line") {
-      if (!draft) {
-        setDraft({ tool: "line", from: spot });
-        return "handled";
-      }
-      if (draft.tool !== "line") return "handled";
-      const start = ensurePoint(d, draft.from);
-      const made = addLine(start.doc, start.id, spot, opts);
-      if (!made) return "handled";
-      commit(made.doc);
-      setDraft(made.reused ? null : { tool: "line", from: { x: 0, y: 0, pointId: made.endId } });
-      return "handled";
-    }
-    if (tool === "circle") {
-      if (!draft) {
-        setDraft({ tool: "circle", center: spot });
-        return "handled";
-      }
-      if (draft.tool !== "circle") return "handled";
-      const made = addCircle(d, draft.center, spot, opts);
-      if (made) {
-        commit(made.doc);
-        setDraft(null);
-      }
-      return "handled";
-    }
-    if (tool === "arc") {
-      if (!draft) {
-        setDraft({ tool: "arc", center: spot });
-        return "handled";
-      }
-      if (draft.tool !== "arc") return "handled";
-      if (!draft.start) {
-        setDraft({ ...draft, start: spot });
-        return "handled";
-      }
-      const made = addArc(d, draft.center, draft.start, spot, opts);
-      if (made) {
-        commit(made.doc);
-        setDraft(null);
-      }
-    }
+    place(spotAt(world, info));
     return "handled";
   };
 
@@ -592,13 +636,16 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       return "handled";
     }
     if (event.altKey) return "ignored";
+    if (entry) return "ignored"; // the box has the keyboard
+    if ((/^[0-9.\-=]$/.test(event.key) || event.key === "Tab") && DRAW_TOOLS.has(tool) && openEntry(event.key === "Tab" ? undefined : event.key)) return "handled";
     const shortcuts: Record<string, Tool> = { v: "select", p: "point", l: "line", c: "circle", a: "arc", d: "delete", t: "trim", e: "extend", r: "fillet", h: "chamfer" };
     if (shortcuts[k]) chooseTool(shortcuts[k]);
     else if (k === "j") openProject();
     else if (k === "x") toggleConstruction();
     else if (k === "delete" || k === "backspace") deleteSelection();
     else if (k === "escape") {
-      if (box) setBox(null);
+      if (entry) setEntry(null);
+      else if (box) setBox(null);
       else if (cornerBox) setCornerBox(null);
       else if (projectOpen) setProjectOpen(false);
       else if (pendingLine) setPendingLine(null);
@@ -645,8 +692,9 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     return { min: [Math.min(...list.map((p) => p[0])), Math.min(...list.map((p) => p[1]))], max: [Math.max(...list.map((p) => p[0])), Math.max(...list.map((p) => p[1]))] };
   }, [pts, result]);
 
+  const typed = DRAW_TOOLS.has(tool) ? " Or type numbers (Tab between fields, Enter places)." : "";
   const hint =
-    tool === "select"
+    (tool === "select"
       ? "Click or shift-click to select; drag a point or a line to move it; click inside a loop for the profile, shift-click for a hole."
       : tool === "line"
         ? draft ? "Click the next point; clicking an existing point ends the chain; Esc ends." : "Click the first point."
@@ -664,12 +712,12 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
                 ? "Click the part of a line, arc or circle to cut away; the SDK decides the piece between its neighbours."
                 : tool === "extend"
                   ? "Click a line near the end to extend; it grows to the next entity."
-                  : "Click to place a point.";
+                  : "Click to place a point.") + typed;
 
   return {
     cornerHover, pendingLine, cornerBox, setCornerBox, submitCorner, projectOpen, setProjectOpen, openProject, projectSketch, projectFrom,
     doc, commit, undo, redo, edits, editNote, editBusy, flash, hoverEnd, runEdit, tool, chooseTool, selection, highlight, setHighlight, draft, cursor, hover, drag, box, setBox, result, error, auto, setAuto, snapOn,
-    setSnapOn, construction, choice, pts, loops, applicable, blamed, fresh, crossings, failing, highlighted, fixedPoints, solved, badge, diagnostics, outer, hint, extents,
+    setSnapOn, construction, choice, pts, loops, applicable, blamed, fresh, crossings, entry, setEntry, entryFields, submitEntry, failing, highlighted, fixedPoints, solved, badge, diagnostics, outer, hint, extents,
     openBox, applyConstraint, submitBox, deleteSelection, toggleConstruction, pointerDown, pointerMove, pointerUp, pointerLeave, key,
   };
 }
