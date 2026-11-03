@@ -86,8 +86,11 @@ depends only on the parameters it reads, so many parameters in one cell cost
 nothing; a geometry line in the params cell would re-run with every parameter
 change.
 
-**C9. The product is made in the last cell.** Its id is the notebook id
-(`scad.notebook_id()`); a family of parts uses `scad.use(path, id=...)`.
+**C9. A part notebook (`kind = "part"`) leaves exactly one open body; the
+runtime makes the Part from it.** Write a product cell (last, id
+`scad.notebook_id()`) only for connectors, a material, or a body that is not
+the last; an assembly notebook ends with its layout cell. A family of parts
+uses `scad.use(path, id=...)`.
 
 **C10. In an assembly notebook, one `scad.use(...)` per child, the mates in
 their own cell, the solve in its own cell.** Do not carry the whole assembly
@@ -96,8 +99,8 @@ the assembly caches a full copy of it (fact 2).
 
 **C11. Make every edit step leave the names consistent.** A cell that reads a
 name nothing defines fails, and so do all cells after it. The `sca new`
-template has a params cell with `RADIUS` and `HEIGHT`, a `base` cell that
-reads them, and a product cell that reads `base`. Replacing the params cell
+template has a params cell with `RADIUS` and `HEIGHT` and a `base` cell that
+reads them (the Part is implicit). Replacing the params cell
 with `sca cell put 1` while `base` still reads `RADIUS` fails with `NameError:
 name 'RADIUS' is not defined` until `base` is replaced too. Replace or delete
 the cells that read a name before, or in the same step as, the cell that

@@ -220,8 +220,10 @@ HOLE_DIAMETER = scad.var(name="hole_diameter", default=6.0, unit="mm", comment="
   or extrude was given (`<slug>.top`, `<slug>.side` ... they survive booleans, not fillets or chamfers) first, the picked
   geometry second, with the count checked (`.exactly(n)`). If the model moved so that nothing matches, the cell fails and
   the feature turns red: ask the person to pick again, never widen the selector until it matches.
-- A blank notebook (`sca new NAME --kind blank`) has no cells; the first feature adds the product cell
-  (`<name> = scad.Part(...)`), and later features that consume the body it builds from move it along.
+- A blank notebook (`sca new NAME --kind blank`) has no cells and a `kind = "part"` header: no product cell is written,
+  the runtime makes the Part from the open body (see `docs/guides/notebook-runtime.md`), so every new feature previews
+  and a deleted cell cannot leave the notebook without a product. Setting connectors (or "use as product" on a body
+  that is not the last) writes an explicit `make_part_rpart` cell, which then wins.
 - Unattended: the buttons are not available; write the cells yourself (see `discipline/notebook-cell-design.md`).
 
 ## The same operations from the command line

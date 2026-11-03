@@ -78,6 +78,16 @@ if __name__ == "__main__":
     app.run()
 ```
 
+- **The kind** is fixed when the notebook is made: the header says
+  `kind = "part"` or `kind = "assembly"` (`sca new` and the editor write it).
+  A `kind = "part"` notebook needs **no product cell**: when no top-level
+  `Part` has the notebook id, the runtime makes one from the notebook's one
+  *open body* (a public top-level `Solid` that no other cell reads and that no
+  other such solid was built from) with the notebook id. Several open bodies
+  are an error that names them: join them, or write the Part cell yourself.
+  Write a `make_part_rpart` cell only to add connectors or a material, or to
+  ship a body other than the last one; it then wins. The headless run and the
+  editor use the same rule (`runtime/projection.py`, `find_product`).
 - **The product** is the top-level variable whose id (`Part.part_id` or
   `Assembly.assembly_id`) equals the notebook id. An assembly built up over
   several cells (components, then constraints, then the solve) carries the
