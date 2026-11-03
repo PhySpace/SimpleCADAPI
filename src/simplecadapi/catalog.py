@@ -197,22 +197,37 @@ def _sequence_item_kind(text: str) -> str | None:
 
 
 def _classify_union(union: list[str], optional: bool) -> dict[str, Any]:
-    """``A | B``: plain names as one kind (``float | Expr`` is a number), else the kinds of the members joined.
+    """``A | B``: different spellings of one value, or a choice between kinds.
 
-    ``Solid | Sequence[Solid]`` is one solid or many (``many``); ``Literal[...] | tuple[Angle, Angle]`` is
-    ``enum|numbers`` with the choices of the Literal.
+    Plain names read as one kind (``float | Expr`` is a number).  ``Literal[...] | SomeEnum`` is the enum (the enum class
+    spells the same choices); ``Sequence[Edge] | Query`` is edges (or a ``ql`` query that finds them, ``many``);
+    ``Solid | Sequence[Solid]`` is one solid or many.  Otherwise the kinds are joined (``Wire | Direction3`` ->
+    ``direction3|wire``; ``Literal[...] | tuple[Angle, Angle]`` -> ``enum|numbers`` with the Literal's choices).
     """
     if "SketchRef" in union:  # a point or entity of the sketch, by reference or id (a position too, where allowed)
         return {"kind": "sketch_ref", "many": False, "optional": optional, "choices": ()}
     if not any("[" in u for u in union) or all(re.fullmatch(r"PathLike\[.*\]", u) for u in union if "[" in u):
-        return _classify_names(union, optional)
-    infos = [classify(u) for u in union]
-    if any(info["kind"] == "unknown" for info in infos):
+        plain = _classify_names(union, optional)
+        if plain["kind"] != "unknown":
+            return plain
+    parts = [classify(u) for u in union]
+    literal = next((p for p in parts if p["kind"] == "enum"), None)
+    if literal is not None and all(p is literal or p["kind"] == "unknown" for p in parts):
+        return {"kind": "enum", "many": False, "optional": optional, "choices": literal["choices"]}
+    if any(p["kind"] == "unknown" for p in parts):
         return {"kind": "unknown", "many": False, "optional": optional, "choices": ()}
-    kinds = sorted({info["kind"] for info in infos})
-    choices = next((info["choices"] for info in infos if info["choices"]), ())
-    return {"kind": "|".join(kinds), "many": any(info["many"] for info in infos), "optional": optional or any(info["optional"] for info in infos),
-            "choices": choices}
+    many = any(p["many"] for p in parts)
+    kinds = {p["kind"] for p in parts}
+    if many and len(kinds) > 1:
+        kinds.discard("query")
+    if len(kinds) == 1:
+        kind = kinds.pop()
+    elif kinds <= {"solid", "face", "wire", "edge", "vertex", "shell", "compound", "shape"}:
+        kind = "shape"
+    else:
+        kind = "|".join(sorted(kinds))
+    choices = next((p["choices"] for p in parts if p["choices"]), ())
+    return {"kind": kind, "many": many, "optional": optional or any(p["optional"] for p in parts), "choices": choices}
 
 
 def _returns(type_text: str) -> str:
