@@ -5,6 +5,7 @@ import type { ThemePreference } from "@/lib/theme";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UndoRedo } from "@/components/FeatureTree";
+import { ModeSwitch, type EditorMode } from "@/components/ModeSwitch";
 import type { FeatureState } from "@/lib/features";
 
 /** Top bar: which notebook is open, whether its kernel is alive, and the
@@ -22,6 +23,9 @@ export function Header({
   features,
   onUndo,
   onRedo,
+  mode,
+  onMode,
+  modeLocked,
 }: {
   notebook: string | null;
   kind: string | null;
@@ -36,6 +40,10 @@ export function Header({
   features: Pick<FeatureState, "undo" | "redo">;
   onUndo: () => void;
   onRedo: () => void;
+  mode: EditorMode;
+  onMode: (mode: EditorMode) => void;
+  /** A sketch is open or the panels are moving: the mode cannot change now. */
+  modeLocked: boolean;
 }) {
   const failing = status.startsWith("error");
   return (
@@ -80,6 +88,7 @@ export function Header({
         {themePreference === "system" ? <Monitor /> : themePreference === "light" ? <Sun /> : <Moon />}
         {themePreference}
       </Button>
+      <ModeSwitch mode={mode} onChange={onMode} disabled={modeLocked} />
     </header>
   );
 }

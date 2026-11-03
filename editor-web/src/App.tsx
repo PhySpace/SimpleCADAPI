@@ -10,6 +10,8 @@ import { CommandBar } from "@/components/CommandBar";
 import { FEATURE_ICONS } from "@/components/feature-icons";
 import { FeatureTree, type TreeSketches } from "@/components/FeatureTree";
 import { assemblyCommands, commandsFromSpecs, fitScore, selectionContext, selectionHint, visibleCommands, whenFor, type Command } from "@/lib/commands";
+import { type EditorMode } from "@/components/ModeSwitch";
+import { sideStyle, useModeTransition } from "@/lib/useModeTransition";
 import { AssemblyPanel } from "@/components/AssemblyPanel";
 import { ConnectorGizmos, type Gizmo } from "@/components/ConnectorGizmos";
 import { setRef } from "@/lib/assembly";
@@ -54,6 +56,8 @@ const MODES: { mode: SelectionMode; label: string }[] = [
  * model, right = the selection. The model is the in-memory scadpkg the kernel
  * publishes whenever the cells settle; picking in the viewport writes the
  * selection into the notebook (see `selection.set`). */
+const MANUAL_TABS = ["features", "assembly"];
+
 export function App() {
   const viewRef = useRef<SceneView | null>(null);
   // Whether a model of the open notebook is on screen (it may be the last run's,
@@ -64,7 +68,20 @@ export function App() {
   const [notebooks, setNotebooks] = useState<NotebookRow[]>([]);
   const [modules, setModules] = useState<ModuleRow[]>([]);
   const [moduleView, setModuleView] = useState<ModuleState | null>(null);
-  const [leftTab, setLeftTab] = useState("notebook");
+  // Two modes, never mixed on one page: manual (features, assemblies) and code (notebook, workspace).  The left tab says which.
+  const [leftTab, setLeftTab] = useState("features");
+  const mode: EditorMode = MANUAL_TABS.includes(leftTab) ? "manual" : "code";
+  const lastTab = useRef<Record<EditorMode, string>>({ manual: "features", code: "notebook" });
+  lastTab.current[mode] = leftTab;
+  const [modeTarget, setModeTarget] = useState<EditorMode | null>(null);
+  const motion = useModeTransition((target) => {
+    setLeftTab(lastTab.current[target as EditorMode]);
+    setModeTarget(null);
+  });
+  const changeMode = (target: EditorMode) => {
+    setModeTarget(target);
+    motion.go(target);
+  };
   const [notebook, setNotebook] = useState<string | null>(null);
   // The notebook the server says is open (workspace-relative): what the list
   // highlights.  It changes the moment another is asked for, not when its
@@ -820,6 +837,9 @@ export function App() {
         features={gui.state}
         onUndo={undo}
         onRedo={redo}
+        mode={modeTarget ?? mode}
+        onMode={changeMode}
+        modeLocked={sketching || motion.moving}
         running={running}
         onStop={handleStop}
         onRunAll={() => {
@@ -830,15 +850,22 @@ export function App() {
       </div>
       <div className="relative flex min-h-0 flex-1 flex-col">
         <ResizablePanelGroup className="min-h-0 flex-1">
-          <ResizablePanel defaultSize={23} minSize={16} className="min-w-0">
-            <div inert={sketching} className={cn("h-full", sketching && "opacity-40")}>
+          <ResizablePanel defaultSize={23} minSize={16} className="min-w-0" style={{ overflow: "hidden" }}>
+            <div inert={sketching || motion.moving} className={cn("h-full", sketching && "opacity-40")} style={sideStyle(motion.phase, -1)}>
             <Tabs value={leftTab} onValueChange={setLeftTab} className="h-full min-w-0 overflow-hidden">
               <TabsList>
-                <TabsTrigger value="features">features</TabsTrigger>
-                <TabsTrigger value="assembly">assembly</TabsTrigger>
-                <TabsTrigger value="notebook">notebook</TabsTrigger>
-                <TabsTrigger value="workspace">workspace</TabsTrigger>
-                {moduleView && <TabsTrigger value="module">{moduleView.name}</TabsTrigger>}
+                {mode === "manual" ? (
+                  <>
+                    <TabsTrigger value="features">features</TabsTrigger>
+                    <TabsTrigger value="assembly">assembly</TabsTrigger>
+                  </>
+                ) : (
+                  <>
+                    <TabsTrigger value="notebook">notebook</TabsTrigger>
+                    <TabsTrigger value="workspace">workspace</TabsTrigger>
+                    {moduleView && <TabsTrigger value="module">{moduleView.name}</TabsTrigger>}
+                  </>
+                )}
               </TabsList>
               <TabsContent value="features" className="flex min-h-0 flex-col">
                 <FeatureTree
@@ -960,10 +987,12 @@ export function App() {
                 {!sketching && viewRef.current && gizmos.length > 0 && (
                   <ConnectorGizmos view={viewRef.current} gizmos={gizmos} components={asm.doc.components} highlighted={gizmoHighlight} onPick={pickGizmo} armed={!!asm.target} />
                 )}
-                <div inert={sketching} className={cn(sketching && "opacity-40")}>
-                  <CommandBar commands={commands} fit={fit} hint={hint} />
-                </div>
-                {!sketching && !dialog && leftTab !== "assembly" && loading === null && viewRef.current && (
+                {mode === "manual" && (
+                  <div inert={sketching} className={cn(sketching && "opacity-40")}>
+                    <CommandBar commands={commands} fit={fit} hint={hint} />
+                  </div>
+                )}
+                {mode === "manual" && !sketching && !dialog && leftTab !== "assembly" && loading === null && viewRef.current && (
                   <SelectionBar view={viewRef.current} commands={commands} context={context} anchorMm={anchorMm} icons={FEATURE_ICONS} notice={barNote} disabled={barDisabled} />
                 )}
                 {sketchSession && viewRef.current && (
@@ -985,8 +1014,8 @@ export function App() {
             </div>
           </ResizablePanel>
           <ResizableHandle />
-          <ResizablePanel defaultSize={22} minSize={14} className="min-w-0">
-            <div inert={sketching} className={cn("h-full", sketching && "opacity-40")}>
+          <ResizablePanel defaultSize={22} minSize={14} className="min-w-0" style={{ overflow: "hidden" }}>
+            <div inert={sketching || motion.moving} className={cn("h-full", sketching && "opacity-40")} style={sideStyle(motion.phase, 1)}>
               <Inspector selection={selection} sketches={inspectedSketches} />
             </div>
           </ResizablePanel>
