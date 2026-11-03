@@ -20,7 +20,9 @@ The amount must be finite and nonzero. Faces passed as ``openings`` form an
 open shell; with no openings the result is the closed offset solid. The
 join ``kind`` is ``ARC`` or ``INTERSECTION``. Invalid kernel results raise
 an error. The operation is recorded as ``make_offset_rsolid`` with explicit
-face selections; topology tag lineage is conservatively partial.
+face selections. The recorded node carries the kernel's face and edge history, so element
+references follow faces through it (an offset face continues its source
+face); tag lineage on the result is conservatively partial.
 ``shell_rsolid`` keeps its own contract (a positive inward wall thickness);
 this one supports both signs.
 

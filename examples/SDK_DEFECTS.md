@@ -356,14 +356,19 @@ that surfaced it is in brackets.
 - **Status:** open. The one-line fix changes the Python-parity goldens and an explicit assertion
   (`test_tracking_behaviour.cpp` `shell.body_face == 0`), so it needs an owner decision (design section 7.2).
 
-## 24. `transform_rsolid`, `offset_rsolid`, draft, scale and helical sweep record no topology delta [stable-refs research]
+## 24. `transform_rsolid`, `offset_rsolid`, draft and scale recorded no topology delta [stable-refs research]
 
-- **Symptom:** a face reference or tag through these ops cannot be followed (`lost(no_history)` in the resolver;
-  tags die).
-- **Root cause:** no `tracked_*` function for them (`include/scad/semantic/tracking.hpp`), although the OCCT makers
-  behind them (`BRepBuilderAPI_GTransform`, `BRepOffsetAPI_MakeOffsetShape`, `BRepOffsetAPI_DraftAngle`) expose
-  `Modified` / `Generated`.
-- **Status:** open; stage 1 of the stable-refs plan.
+- **Symptom:** a face reference or tag through these ops could not be followed (`lost(no_history)` in the
+  resolver).
+- **Root cause:** they finish through `finish_solid`, which recorded no delta, although the OCCT makers behind them
+  (`BRepBuilderAPI_Transform` / `GTransform` after a `Copy`, `BRepOffsetAPI_MakeThickSolid`,
+  `BRepOffsetAPI_DraftAngle`) expose `Modified` / `Generated`.
+- **Status:** fixed. `modification_delta` (`src/semantic/tracking_modify.cpp`) turns the retained OCCT history into
+  face and edge witnesses (copy and transform merged into one history; an offset or drafted face, which OCCT reports
+  as generated, continues its source); `finish_solid` records it. Tests: `test_modification_delta.cpp`,
+  `test_element_ref_history.py::test_history_through_operations_that_had_none` and the draft test. The helical
+  sweep was never a gap: inside a session it records its helix, face and sweep nodes, and the sweep is tracked
+  (`test_a_helical_sweep_cap_is_anchored_by_the_sweep_it_records`).
 
 ## 25. Two spellings of one topo id [stable-refs research]
 

@@ -64,6 +64,40 @@ void bind_element_ref(py::module_& m) {
       },
       py::arg("node"), py::arg("role"), "The anchors of the node's entities with a kernel output role.");
   m.def(
+      "_stable_anchor",
+      [](const sr::NodePtr& within, const py::dict& anchor) {
+        return value_to_python(sr::to_value(sr::stabilize(within, anchor_from(anchor))));
+      },
+      py::arg("within"), py::arg("anchor"),
+      "The re-execution-stable form {feature, op, occurrence, output_slot, kind, role, role_ordinal, topo_id} of an "
+      "anchor whose node is `within` or upstream of it.");
+  m.def(
+      "_locate_anchor",
+      [](const sr::NodePtr& within, const py::object& stable) -> py::object {
+        const auto found = sr::locate(within, sr::stable_anchor_from_value(value_from_python(stable)));
+        return found ? py::object(anchor_to(*found)) : py::object(py::none());
+      },
+      py::arg("within"), py::arg("stable"),
+      "The anchor {node_id, output_slot, kind, topo_id} a stable anchor names upstream of `within`, or None.");
+  m.def(
+      "_stable_candidates",
+      [](const sr::NodePtr& within, const py::object& stable) {
+        py::list out;
+        for (const sr::NodePtr& node :
+             sr::find_by_stable_key(within, sr::stable_anchor_from_value(value_from_python(stable)).node))
+          out.append(node->node_id);
+        return out;
+      },
+      py::arg("within"), py::arg("stable"),
+      "The node ids upstream of `within` that share the stable anchor's (feature, op, occurrence).");
+  m.def(
+      "_stable_node_key",
+      [](const sr::NodePtr& node) {
+        const sr::StableNodeKey key = sr::stable_key_of(node);
+        return py::make_tuple(key.feature, key.op, key.occurrence);
+      },
+      py::arg("node"), "(feature, op, occurrence) of a node: what a stable anchor names it by.");
+  m.def(
       "_subshapes_by_recorded_id",
       [](const Shape& root, const std::string& kind, const std::vector<std::string>& ids) {
         py::list out;

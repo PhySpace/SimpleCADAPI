@@ -132,14 +132,17 @@ def test_a_face_cut_away_is_lost_and_says_where():
         assert r.lost_at == cut.get_metadata("graph")["node_id"]
 
 
-def test_an_operation_without_history_loses_the_reference_instead_of_guessing():
+def test_a_shell_kept_face_is_lost_instead_of_guessed():
+    # The one remaining kernel gap (design 7.2, owner decision pending): a kept shell face has only a
+    # generated witness.  The resolver says so; it does not pick the offset face or anything else.
     with scad.GraphSession():
         box, anchor = _box_with_top_anchor()
-        moved = scad.transform_rsolid(box, [[1, 0, 0, 5], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+        shelled = scad.shell_rsolid(box, _faces_at(box, 0), 1.0)
 
-        r = er.resolve(anchor, moved)
+        r = er.resolve(anchor, shelled)
         assert r.status == "lost"
-        assert r.reason == "no_history"
+        assert r.reason == "replaced"
+        assert r.entities == []
 
 
 def test_an_edge_followed_into_its_fillet_patch():
@@ -233,14 +236,15 @@ _AUDIT = {
     "linear_pattern": (lambda b: scad.linear_pattern_rsolidlist(b, (1, 0, 0), 3, 50)[2], 0, 0, "ok"),
     "rotate": (lambda b: scad.rotate_shape(b, 30, (0, 0, 1)), 0, 0, "ok"),
     "radial_pattern": (lambda b: scad.radial_pattern_rsolidlist(b, (0, 0, 0), (0, 0, 1), 4, 360)[1], 0, 0, "ok"),
-    "scale": (lambda b: scad.scale_rsolid(b, (1.0, 1.0, 1.0)), 0, 0, "lost"),
+    # These five recorded no history before this branch (lost / no_history); they now carry builder history.
+    "scale": (lambda b: scad.scale_rsolid(b, (1.0, 1.0, 1.0)), 0, 0, "ok"),
     "transform_rsolid": (
         lambda b: scad.transform_rsolid(b, [[1, 0, 0, 5], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
         0,
         0,
-        "lost",
+        "ok",
     ),
-    "offset": (lambda b: scad.offset_rsolid(b, 1.0), 0, 0, "lost"),
+    "offset": (lambda b: scad.offset_rsolid(b, -1.0), 0, 0, "ok"),
 }
 
 
@@ -258,6 +262,181 @@ def test_audit_tag_channels_and_history_per_family(family):
         assert r.status == status
         if status == "lost":
             assert r.reason in {"no_history", "replaced"}
-        else:
+        elif family != "offset":
             # Whatever the history found, it is the top plane (or what is left of it).
             assert all(face.get_center().z == pytest.approx(10.0) for face in r.entities)
+
+
+# ---------------------------------------------------------------------------
+# History through the operations that had none: transform, scale, offset, draft, helical sweep
+# ---------------------------------------------------------------------------
+
+_SHEAR = [[1, 0.2, 0, 0], [0, 1, 0, 0], [0, 0, 2, 0], [0, 0, 0, 1]]
+
+
+@pytest.mark.parametrize(
+    "name, op, z, area",
+    [
+        ("transform_rigid", lambda b: scad.transform_rsolid(b, [[0, -1, 0, 5], [1, 0, 0, 0], [0, 0, 1, 3], [0, 0, 0, 1]]), 13.0, 800.0),
+        ("transform_affine", lambda b: scad.transform_rsolid(b, _SHEAR), 20.0, 800.0),
+        ("scale_uniform", lambda b: scad.scale_rsolid(b, (2.0, 2.0, 2.0)), 20.0, 3200.0),
+        ("scale_axes", lambda b: scad.scale_rsolid(b, (1.0, 0.5, 3.0)), 30.0, 400.0),
+        ("offset_out", lambda b: scad.offset_rsolid(b, 1.0), 11.0, 800.0),
+        ("offset_in", lambda b: scad.offset_rsolid(b, -1.0), 9.0, 38 * 18),
+        ("draft_zero", lambda b: scad.draft_rsolid(b, _x_faces(b), 0.0, (0, 0, 0), (0, 0, 1)), 10.0, 800.0),
+    ],
+)
+def test_history_through_operations_that_had_none(name, op, z, area):
+    with scad.GraphSession():
+        box, anchor = _box_with_top_anchor()
+        out = op(box)
+        r = er.resolve(anchor, out)
+        assert r.status == "ok", (name, r.reason)
+        (face,) = r.entities
+        assert face.get_center().z == pytest.approx(z)
+        assert face.get_area() == pytest.approx(area)
+        assert r.hops[-1]["op"] == out.get_metadata("graph")["op"]
+
+
+def _x_faces(shape):
+    return ql.faces().where(ql.prop("geom.normal.x", ">=", 0.9)).resolve(shape)
+
+
+def test_history_through_a_draft_follows_the_drafted_face_and_its_neighbour():
+    with scad.GraphSession():
+        box = scad.make_box_rsolid(40, 20, 10)
+        (side,) = _x_faces(box)
+        (top,) = _faces_at(box, 10)
+        side_anchor, top_anchor = er.anchor_of(side), er.anchor_of(top)
+        drafted = scad.draft_rsolid(box, [side], 5.0, (0, 0, 0), (0, 0, 1))
+
+        r = er.resolve(side_anchor, drafted)
+        assert r.status == "ok"
+        (face,) = r.entities
+        n = face.get_normal_at()
+        assert n.x == pytest.approx(math.cos(math.radians(5)), abs=1e-6)  # tilted by the draft angle
+        r = er.resolve(top_anchor, drafted)
+        assert r.status == "ok"
+        assert r.entities[0].get_center().z == pytest.approx(10.0)
+        assert r.entities[0].get_area() < 800.0  # trimmed by the inward draft
+
+
+def test_a_helical_sweep_cap_is_anchored_by_the_sweep_it_records():
+    with scad.GraphSession():
+        solid = scad.helical_sweep_rsolid(scad.make_circle_rwire((10, 0, 0), 1, (0, 1, 0)), 5, 10, 10)
+        (anchor,) = er.anchors_for_role(solid, "sweep.end")
+        (cap,) = er.resolve(anchor, solid).entities
+        later = scad.translate_shape(scad.union_rsolid(solid, scad.make_box_rsolid(4, 4, 4, (10, 0, -2))), (0, 0, 1))
+        r = er.resolve(anchor, later)
+        assert r.status == "ok"
+        assert r.entities[0].get_area() == pytest.approx(cap.get_area())
+
+
+# ---------------------------------------------------------------------------
+# Stable anchors: an operation inserted earlier in the cell does not shift them
+# ---------------------------------------------------------------------------
+
+
+def _cell(insert: bool):
+    """One notebook cell ("cellA"); *insert* adds operations before and after the box, as an edit would."""
+
+    with scad.GraphSession(namespace="cellA"):
+        if insert:
+            # Inserted first: another box, so the first make_box node of the cell is now this one.
+            stand = scad.make_box_rsolid(4, 4, 30, (18, 0, -10))  # pierces the plate
+        box = scad.make_box_rsolid(40, 20, 10)
+        if insert:
+            box = scad.union_rsolid(box, stand)
+            box = scad.cut_rsolid(box, scad.translate_shape(scad.make_cylinder_rsolid(1, 30), (15, 5, -5)))
+        cut = scad.cut_rsolid(box, scad.make_cylinder_rsolid(3, 30))
+        out = scad.fillet_rsolid(cut, ql.edges().where(_z(-1e-6, 1e-6)).resolve(cut), 0.5)
+    return box, out
+
+
+def test_an_operation_inserted_earlier_in_the_cell_does_not_shift_a_stable_anchor():
+    box, out = _cell(insert=False)
+    (top,) = _faces_at(out, 10)
+    raw = er.anchor_of(_faces_at(box, 10)[0])
+    stable = er.stable_anchor_of(_faces_at(box, 10)[0], out)
+    assert (stable["feature"], stable["op"], stable["occurrence"], stable["role"]) == ("cellA", "make_box_rsolid", 0, "box.top")
+    assert raw["node_id"] == "cellA_node_00000001"
+    assert er.resolve(stable, out).entities[0].get_area() == pytest.approx(top.get_area())
+
+    _, edited = _cell(insert=True)
+    # The raw node id now names the inserted stand: its top face, the wrong face, reached through the union.
+    wrong = er.resolve(raw, edited)
+    assert wrong.status in {"ok", "merged"}
+    assert all(face.get_center().z == pytest.approx(20.0) for face in wrong.entities)
+    # The stable anchor still names the plate's top: 800 - the stand's 4x4 section - the two holes.
+    right = er.resolve(stable, edited)
+    assert right.status == "ok"
+    (face,) = right.entities
+    assert face.get_center().z == pytest.approx(10.0)
+    assert face.get_area() == pytest.approx(800 - 16 - 9 * math.pi - math.pi, rel=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# Splits are an error the person resolves; lost references offer ranked look-alikes
+# ---------------------------------------------------------------------------
+
+
+def test_a_split_reference_is_an_error_that_carries_the_pieces():
+    with scad.GraphSession():
+        box, anchor = _box_with_top_anchor()
+        cut = scad.cut_rsolid(box, scad.make_box_rsolid(4, 30, 4, (0, 0, 8)))
+
+        with pytest.raises(er.ElementRefError) as caught:
+            er.require(anchor, cut)
+        error = caught.value
+        assert error.status == "split"
+        assert [round(c.center[0], 6) for c in error.candidates] == [-11.0, 11.0]  # geometric order, not OCCT's
+        described = error.resolved.describe()
+        assert described["status"] == "split" and len(described["candidates"]) == 2
+        assert {c["geom_type"] for c in described["candidates"]} == {"PLANE"}
+
+        (chosen,) = er.require(anchor, cut, piece=1)
+        assert chosen.get_center().x == pytest.approx(11.0)
+        with pytest.raises(er.ElementRefError):
+            er.require(anchor, cut, piece=2)
+
+
+def test_a_lost_reference_is_an_error_with_look_alikes_ranked_by_its_guard():
+    with scad.GraphSession():
+        box, anchor = _box_with_top_anchor()
+        guard = er.guard_of(_faces_at(box, 10)[0])
+        cut = scad.cut_rsolid(box, scad.make_box_rsolid(50, 30, 5, (0, 0, 6)))  # removes the top 4 mm
+
+        with pytest.raises(er.ElementRefError) as caught:
+            er.require(anchor, cut, guard=guard)
+        error = caught.value
+        assert error.status == "lost" and error.resolved.reason == "deleted"
+        best = error.candidates[0]
+        assert best.geom_type == "PLANE"
+        assert best.center[2] == pytest.approx(6.0)  # the new top: offered, never applied
+
+
+def test_a_parameter_edit_keeps_the_stable_anchor():
+    _, out = _cell(insert=False)
+    # Picked on the finished part; the anchor is traced back to where the face was born.
+    stable = er.stable_anchor_of(_faces_at(out, 10)[0], out)
+    assert (stable["op"], stable["role"]) == ("make_box_rsolid", "box.top")
+    with scad.GraphSession(namespace="cellA"):
+        box = scad.make_box_rsolid(55, 20, 10)  # the edit: another width
+        cut = scad.cut_rsolid(box, scad.make_cylinder_rsolid(3, 30))
+        edited = scad.fillet_rsolid(cut, ql.edges().where(_z(-1e-6, 1e-6)).resolve(cut), 0.5)
+    r = er.resolve(stable, edited)
+    assert r.status == "ok"
+    assert r.entities[0].get_area() == pytest.approx(55 * 20 - 9 * math.pi, rel=1e-6)
+
+
+def test_two_look_alike_boxes_make_the_anchor_ambiguous_never_a_guess():
+    _, out = _cell(insert=False)
+    stable = er.stable_anchor_of(_faces_at(out, 10)[0], out)
+    with scad.GraphSession(namespace="cellA"):
+        # Inserted: a box with the plate's own parameters, moved beside it and fed into the same body.
+        twin = scad.translate_shape(scad.make_box_rsolid(40, 20, 10), (40, 0, 0))
+        box = scad.union_rsolid(scad.make_box_rsolid(40, 20, 10), twin)
+        edited = scad.cut_rsolid(box, scad.make_cylinder_rsolid(3, 30))
+    r = er.resolve(stable, edited)
+    assert r.status == "lost"
+    assert r.reason == "anchor_ambiguous"

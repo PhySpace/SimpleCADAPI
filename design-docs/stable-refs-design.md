@@ -87,16 +87,39 @@ record a `Modified`/continuation witness for every face **[T]**. The data is the
 - `guard` is never used to choose between history results except inside one split (2.4) and to rank candidates for
   a lost reference (4.2).
 
-### 2.2 Stable node identity [R for the problem, I for the fix]
+### 2.2 Stable node identity (owner decision; implemented) [T]
 
-Node ids are `<cell namespace>_node_<ordinal>`, "the ids count from the cell's code" (`runtime/lineage.py` docstring)
-**[R]**. Inserting an operation earlier in the same cell shifts every later ordinal. Onshape solves this with
-hierarchical feature ids that must cover a contiguous region of operations. Proposal: the anchor names
-`(cell id, op name, occurrence index of that op name in the cell)`; for editor feature cells the feature slug is the
-cell id. The resolver maps that to the node of the current run and checks `op` matches. Two cache entries of one cell
-share node ids with different contents (`runtime/lineage.py` docstring; the known in-process mis-binding variant),
-so a resolve against a restored cell must use the node *object* the value carries
-(`shape._get_runtime("graph.node")`, which is what the spike does **[T]**), never a global id lookup.
+Node ids are `<cell namespace>_node_<counter>`, "the ids count from the cell's code" (`runtime/lineage.py`)
+**[R]**, so an operation inserted earlier in the cell shifts every later id, and a stored id then names *another*
+operation: `test_an_operation_inserted_earlier_in_the_cell_does_not_shift_a_stable_anchor` shows the raw anchor
+resolving to the wrong face (the inserted stand's top) after such an edit **[T]**.
+
+A stable anchor names the node by **(feature, op, occurrence)** (`StableNodeKey`, `element_ref.hpp`):
+
+- `feature` = the graph namespace of the node, i.e. the cell key (the editor's feature slug for a feature cell);
+- `op` = the op name;
+- `occurrence` = how many nodes of the same feature and op are **ancestors of this node** (upstream of it in the
+  graph), not how many were recorded before it.
+
+Why ancestry and not recording order (the "even more stable" choice): with recording order, *any* same-op
+operation inserted earlier in the cell shifts the anchor, including one that has nothing to do with the referenced
+body (a second sketch, a fixture box). Counting ancestors only, an inserted operation shifts the anchor only when
+it is the same op **and** feeds the anchored node itself, which is the case where the person really changed what
+the anchor is built from. Ops of another kind never shift it. **[T]** (doctest "a stable anchor names the node by
+feature, op and occurrence upstream of it"; pytest insertion, parameter-edit and ambiguity tests).
+
+Two nodes can then share a key without either feeding the other (two primitive boxes of one cell). The key carries
+the digest of the node's own parameters (refs, picks and node ids left out) as a tie-break: the candidate with
+unchanged parameters wins; when none or several match, the reference is `lost(anchor_ambiguous)`, never a guess
+**[T]**. (A parameter edit of one of two same-key siblings is the one case that needs the person.)
+
+The entity inside the node is named by its **kernel role** (the most specific role: fewest entities, then name)
+plus an ordinal among the node's entities with that role; by the positional topo id only when it has no role.
+Multi-entity roles (`extrusion.side`) are ordinal-positional until sketch geometry ids name profile edges (stage 2).
+
+A resolve against a restored cell uses the node *object* the value carries (`shape._get_runtime("graph.node")`),
+never a global id lookup, so the cache mis-binding variant (two cache entries of one cell share node ids) cannot
+redirect it **[T]** for live values, **[I]** for restored ones (stage: cache test).
 
 ### 2.3 Why the positional `topo_id` is not a name [R]
 
@@ -106,19 +129,16 @@ TopExp::MapShapes order"). It is deterministic for one input, so it is fine *ins
 resolver uses to step from node to node), but after a parameter change the same index can be another face. It is
 the analogue of FreeCAD's `Face12`. It may appear in a stored ref only next to a guard.
 
-### 2.4 Pick-time naming: backward trace [I, stage 1]
+### 2.4 Pick-time naming: backward trace (implemented) [T]
 
-When the user picks an entity of node N's output, the SDK walks N's delta *backwards* (entry with `ref` = the pick ->
-its `parent_refs` -> the parent node's entry ...) to a root: a node where the entity has a kernel role, or was
-`Generated` from a source sub-shape (recurse into the source), or has no parent (a primitive without roles). Each hop
-records `{feature, event, piece}` where `piece` is the rank of this entity among the siblings that share its parent
-at that hop, sorted by a deterministic key **computed in the kernel** (role, origin role, then a geometric key at
-fixed tolerance: centroid lexicographic, area), never OCCT's `Modified()` order. A merge yields several roots;
-the record keeps all (it resolves to `merged` if they still meet).
+`trace_to_birth` (C++): from the picked entity, follow its single same-kind parent back through every node that
+only preserved or modified it (a selection is crossed to its source), stopping at a creator, at the node that
+generated it, at a merge (several parents), or at a split (the parent has several same-kind successors: the piece
+is named at the node that made it). `stable_anchor_of(face, part)` on the finished part therefore anchors at
+`make_box_rsolid` / `box.top`, not at the fillet that last touched the face **[T]**.
 
-At resolve time the forward walk runs from the root; at a hop where the chain recorded a `piece` and the current
-history splits the same way, the piece is chosen by rank with the guard as a check; if the sibling count changed,
-the result is `split` with candidates (never a guess).
+A piece of a face that was already split when it was picked is anchored at the splitting node by its topo id
+(positional). Naming pieces by a kernel-computed geometric rank among siblings is stage 2.
 
 ---
 
@@ -138,7 +158,8 @@ The kernel records one `TopoDelta` per node: witnesses with event `preserved`/`m
 | Blends | fillet, chamfer | trimmed faces `modified`; blended edges `deleted` + patch `generated` (role `fillet.patch`) | face: `ok`; edge: `lost(deleted)` in identity, patch in derived | **[T]** face and edge->patch |
 | Shell | shell | removed face -> its rim `modified` (`shell.closing_descendant`); offset faces `generated`; **kept faces: no preserved witness** | opened face: `ok` (the rim); kept face: `lost(replaced)` | **[T]**; fix in 7.2 |
 | Rigid copies | translate, rotate, mirror, linear/radial pattern | every face `modified`/continuation; a pattern is one translate/rotate node per instance | `ok`; an instance is addressed by its own node | **[T]** translate, rotate, mirror, linear and radial pattern |
-| Affine / offset / draft | transform_rsolid, scale, offset_rsolid, draft, helical sweep | **no delta** | `lost(no_history)`: refuses instead of guessing | **[T]** transform, scale, offset; draft **[R]** probe; helical **[R]** no tracker |
+| Affine / offset / draft | transform_rsolid (rigid and affine), scale (uniform and per axis), offset_rsolid, draft | face and edge witnesses from the retained OCCT history (`modification_delta`): `modified`/continuation; an offset or drafted face (OCCT: generated) continues its source face | `ok` | **[T]** every op, `test_history_through_operations_that_had_none`, the draft test, `test_modification_delta.cpp` (was `no delta` before this branch) |
+| Helical sweep | helical_sweep_rsolid | in a session it records helix + face + sweep nodes; the sweep is tracked | anchor by `sweep.*` roles | **[T]** |
 | Identity ops | apply_tag*, make_select_* | no delta; outputs keep the source's topo ids | aliased by topo id (selection: only its `target_kind`) | **[T]** C++ and kernel (fillet through edge selections) |
 | Section / split | section, split | not probed | -- | **[I]** |
 | Sketch | sketch solve -> wire/face | no deltas on edge/wire/face construction nodes | a profile edge's identity is its sketch geometry id (FreeCAD's `g1;SKT`) | **[I]**, stage 2 |
@@ -178,17 +199,26 @@ Today a tag is projected *forward* by every operation through `apply_tracking_ta
 4. Status: none -> `lost` (latest death: node + reason); several -> `split`; one with a merged hop -> `merged`;
    else `ok`.
 
-### 4.2 Editor states [I]
+### 4.2 Editor states and the split rule (owner decision; implemented in the spike API) [T]
+
+A reference that splits is an **error the person resolves**, never "all pieces": `element_ref.require(anchor,
+shape)` raises `ElementRefError(status="split", candidates=[...])`; the candidates are in a geometric order (centre,
+then size), not OCCT's numbering; `require(..., piece=i)` is how the editor applies the person's choice, and the
+choice is written back into the reference. `ResolvedRef.describe()` is the editor payload: status, `lost_at`,
+reason, candidates (`topo_id`, kind, geometry type, centre, size, score). A lost reference with a `guard`
+(`guard_of(entity)` at pick time) carries up to five look-alikes ranked by guard distance; they are offered,
+never applied **[T]**. (A boolean that leaves a *body* in several pieces is not an error: that is a body split,
+which the multi-body work turns into several bodies; only a *reference* that no longer names one entity is.)
 
 | Status | Badge | Feature behaviour | Editor offers |
 |---|---|---|---|
 | `ok` | green | runs | -- |
 | `merged` | green with note | runs on the merged entity | "now also includes face of <feature>" |
-| `split` | amber | runs only if `pick: all` (tags) or a recorded `piece` still resolves; otherwise error | the pieces, highlighted, with "use all / use this one" (writes `pick` back) |
-| `lost` | red | the feature fails with `ElementRefLost(lost_at, reason, candidates)` | candidates ranked by guard distance (same kind and geom type first, then normal, area, centroid); accepting one writes a new ref; a unique match within tolerance may be pre-selected but is never applied without the user |
+| `split` | amber | fails with the candidates | the pieces, highlighted; picking one writes `piece` |
+| `lost` | red | fails with `lost_at`, reason, look-alikes | accept a look-alike (writes a new anchor) or re-pick |
 
-`lost` because of `no_history` is reported differently from `deleted`: the first is a kernel gap ("this operation
-does not track faces yet"), the second is a modelling fact ("the cut removed this face").
+`lost` because of `no_history` is reported differently from `deleted`: the first is a kernel gap, the second a
+modelling fact. `anchor_missing` / `anchor_ambiguous` mean the anchored node itself is gone or not unique (2.2).
 
 ### 4.3 Persistence
 
@@ -231,9 +261,10 @@ Probe: box 40x20x10 with the top face tagged by kwarg (`kw.top`) and by `apply_t
 | shell, face removed | dies | survives (on the rim) | ok (the rim) | -- |
 | translate / rotate / mirror | dies | **dies** | ok | tag projection ignores continuation witnesses |
 | linear pattern (instance 3) / radial pattern (instance 2) | dies | dies | ok | same |
-| transform_rsolid, scale_rsolid | dies | dies | lost(no_history) | kernel: no tracker |
-| offset_rsolid | dies | dies | lost(no_history) | kernel: no tracker |
-| draft, helical sweep | -- | -- | no delta **[R]** (draft probe; no `tracked_*` in `semantic/tracking.hpp`) | kernel: no tracker |
+| transform_rsolid, scale_rsolid | dies | dies | ok (was lost/no_history) | -- (fixed: `modification_delta`) |
+| offset_rsolid | dies | dies | ok (was lost/no_history) | -- (fixed) |
+| draft | -- | -- | ok, the drafted face and its trimmed neighbours | -- (fixed) |
+| helical sweep | -- | -- | ok through its sweep node | -- (never a gap) |
 | edge -> fillet patch | (edge-source tags survive, playbook) | -- | lost(deleted) identity; the patch in derived mode | -- |
 | extrude cap -> fillet | -- | **dies** | ok | face-channel gap |
 | extrude / revolve / loft / sweep end cap -> union -> translate | -- | -- | ok (same area) | -- |

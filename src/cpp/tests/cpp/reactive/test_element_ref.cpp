@@ -185,3 +185,71 @@ TEST_CASE("only the branch that leads to the target is the reference's history")
   REQUIRE(r.hops.size() == 2);
   CHECK(r.hops[0].node_id == "y");
 }
+
+TEST_CASE("the feature of a node id is its namespace") {
+  CHECK(node_feature("cellA_node_0000002a") == "cellA");
+  CHECK(node_feature("my_cell_node_00000001") == "my_cell");
+  CHECK(node_feature("node_00000001").empty());
+  CHECK(node_feature("n_00000008").empty());
+}
+
+TEST_CASE("a stable anchor names the node by feature, op and occurrence upstream of it") {
+  // Two runs of one cell: the second has a box inserted first and a translate before the cut.
+  const auto run = [](bool insert) {
+    auto g = std::make_unique<G>();
+    std::vector<NodePtr> pre;
+    Value small = Value::object();
+    small.set("width", 4.0);
+    if (insert)
+      pre.push_back(g->add("c_node_00000001", "make_box_rsolid", {}, std::nullopt, small));
+    const std::string box_id = insert ? "c_node_00000002" : "c_node_00000001";
+    NodeSpec spec;
+    spec.node_id = box_id;
+    spec.op = "make_box_rsolid";
+    spec.params = Value::object();
+    spec.params.set("width", 40.0);
+    TopoDelta delta;
+    TopoRoleEntry top;
+    top.ref = TopoRef{"g", box_id, 0, Kind::Face, "face_face_5"};
+    top.role = "box.top";
+    delta.roles.push_back(top);
+    spec.topo_delta = delta;
+    NodePtr body = g->graph.add_node(std::move(spec));
+    if (insert)
+      body =
+          g->add("c_node_00000003", "make_translate_rshape", {body},
+                 std::vector{entry(face("c_node_00000003", "face_5"), TopoEvent::Modified, {face(box_id, "face_5")})});
+    std::vector<NodePtr> inputs{body};
+    inputs.insert(inputs.end(), pre.begin(), pre.end());
+    const std::string cut_id = insert ? "c_node_00000004" : "c_node_00000002";
+    const std::string parent = insert ? "c_node_00000003" : box_id;
+    const NodePtr cut =
+        g->add(cut_id, "make_cut_rsolid", inputs,
+               std::vector{entry(face(cut_id, "face_2"), TopoEvent::Modified, {face(parent, "face_5")})});
+    return std::make_pair(std::move(g), cut);
+  };
+  const auto [g1, cut1] = run(false);
+  const StableAnchor stable = stabilize(cut1, ElementAnchor{"c_node_00000001", 0, Kind::Face, "face_face_5"});
+  CHECK(stable.node == StableNodeKey{"c", "make_box_rsolid", 0});
+  CHECK(stable.role == "box.top");
+
+  // The inserted box is not upstream of the plate's box node, so both boxes are occurrence 0; their parameters
+  // tell them apart.
+  const auto [g2, cut2] = run(true);
+  const auto located = locate(cut2, stable);
+  REQUIRE(located);
+  CHECK(located->node_id == "c_node_00000002");
+  const ResolvedRef r = resolve_by_history(cut2, *located);
+  CHECK(r.status == RefStatus::Ok);
+  CHECK(ids(r) == std::vector<std::string>{"c_node_00000004:face_face_2"});
+  // The raw node id now names the inserted box.
+  CHECK(cut2->inputs.back()->node_id == "c_node_00000001");
+  CHECK(find_by_stable_key(cut2, stable.node).size() == 2);
+  // The value form round-trips.
+  CHECK(stable_anchor_from_value(to_value(stable)).node.params_digest == stable.node.params_digest);
+
+  // Same key, same parameters: ambiguous, so nothing is located (never the first one).
+  StableAnchor blind = stable;
+  blind.node.params_digest = "0000000000000000";
+  CHECK_FALSE(locate(cut2, blind));
+}

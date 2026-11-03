@@ -19,7 +19,8 @@ Scale a solid along the current coordinate system's axes about a center.
 The three factors must be finite and nonzero. A uniform scale preserves
 analytic curves and surfaces; a nonuniform scale uses the CAD kernel's
 general affine transform. The source solid stays unchanged. The operation
-is recorded as ``make_scale_rsolid`` for graph replay; topology tag lineage
+is recorded as ``make_scale_rsolid`` for graph replay. The recorded node carries the kernel's face and edge history, so element
+references follow faces through it; tag lineage on the result
 is conservatively partial.
 
 ## Parameters

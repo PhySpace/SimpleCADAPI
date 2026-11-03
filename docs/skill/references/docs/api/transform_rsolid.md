@@ -19,7 +19,9 @@ Apply a finite nonsingular 4x4 affine matrix in the current coordinate system.
 The matrix may include shear, reflection and nonuniform scale. Perspective
 matrices and singular maps cannot define a solid and are rejected. The
 input geometry stays unchanged. The operation is recorded as
-``make_transform_rsolid`` for graph replay; topology tag lineage is partial.
+``make_transform_rsolid`` for graph replay. The recorded node carries the kernel's face and edge history, so element
+references follow faces through it;
+tag lineage on the result is partial.
 
 ## Parameters
 

@@ -1,6 +1,7 @@
 #include "scad/reactive/element_ref.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <map>
 #include <optional>
 #include <set>
@@ -11,6 +12,7 @@
 #include <TopTools_IndexedMapOfShape.hxx>
 
 #include "internal.hpp"
+#include "scad/reactive/digest.hpp"
 #include "scad/core/error.hpp"
 
 namespace scad::reactive {
@@ -369,6 +371,231 @@ Value to_value(const ResolvedRef& resolved) {
   out.set("hops", std::move(hops));
   out.set("lost_at", resolved.lost_at.empty() ? Value() : Value(resolved.lost_at));
   out.set("reason", resolved.reason.empty() ? Value() : Value(resolved.reason));
+  return out;
+}
+
+// ---- stable anchors ----------------------------------------------------------------------------------------------
+
+std::string node_feature(std::string_view node_id) {
+  // "<feature>_<prefix>_<counter>": drop the counter, then the prefix.
+  const std::size_t counter = node_id.rfind('_');
+  if (counter == std::string_view::npos || counter == 0)
+    return {};
+  const std::string_view base = node_id.substr(0, counter);
+  const std::size_t prefix = base.rfind('_');
+  return prefix == std::string_view::npos ? std::string{} : std::string(base.substr(0, prefix));
+}
+
+namespace {
+
+bool same_feature_op(const OperationNode& node, const std::string& feature, const std::string& op) {
+  return node.op == op && node_feature(node.node_id) == feature;
+}
+
+// The node's own numbers and choices; what it records about its inputs (refs, node ids, picks) is left out.
+std::string params_digest(const OperationNode& node) {
+  Value own = Value::object();
+  if (node.params.is_object()) {
+    for (const auto& [key, value] : node.params.as_object()) {
+      if (key.find("ref") != std::string::npos || key.find("node_id") != std::string::npos ||
+          key.find("selected") != std::string::npos || key == "geo_selector")
+        continue;
+      own.set(key, value);
+    }
+  }
+  return sha256_hex(own.dump()).substr(0, 16);
+}
+
+}  // namespace
+
+StableNodeKey stable_key_of(const NodePtr& node) {
+  StableNodeKey key{node_feature(node->node_id), node->op, 0, params_digest(*node)};
+  for (const NodePtr& item : upstream_closure({node})) {
+    if (item == node || item->node_id == node->node_id)
+      break;
+    if (same_feature_op(*item, key.feature, key.op))
+      ++key.occurrence;
+  }
+  return key;
+}
+
+std::vector<NodePtr> find_by_stable_key(const NodePtr& within, const StableNodeKey& key) {
+  std::vector<NodePtr> out;
+  if (!within)
+    return out;
+  for (const NodePtr& item : upstream_closure({within})) {
+    if (same_feature_op(*item, key.feature, key.op) && stable_key_of(item).occurrence == key.occurrence)
+      out.push_back(item);
+  }
+  return out;
+}
+
+NodePtr pick_by_stable_key(const NodePtr& within, const StableNodeKey& key) {
+  const std::vector<NodePtr> candidates = find_by_stable_key(within, key);
+  if (candidates.size() == 1)
+    return candidates.front();
+  NodePtr unchanged;
+  for (const NodePtr& candidate : candidates) {
+    if (!key.params_digest.empty() && params_digest(*candidate) == key.params_digest) {
+      if (unchanged)
+        return nullptr;  // two with the same parameters: ambiguous
+      unchanged = candidate;
+    }
+  }
+  return unchanged;
+}
+
+ElementAnchor trace_to_birth(const NodePtr& within, const ElementAnchor& anchor) {
+  std::unordered_map<std::string, NodePtr> nodes;
+  for (const NodePtr& item : upstream_closure({within}))
+    nodes.emplace(item->node_id, item);
+  if (nodes.count(anchor.node_id) == 0)
+    throw ValueError("node '" + anchor.node_id + "' is not upstream of '" + within->node_id + "'");
+  ElementAnchor current = anchor;
+  for (;;) {
+    const NodePtr& node = nodes.at(current.node_id);
+    if (!has_history(*node))
+      return current;  // a creator: born here
+    const std::string key = member_key(current.node_id, current.output_slot, current.kind, current.topo_id);
+    std::set<std::string> parents;
+    TopoRef parent;
+    bool born = false;
+    for (const TopoEntry& entry : node->topo_delta->entries) {
+      if (entry.event == TopoEvent::Deleted || member_key(entry.ref) != key)
+        continue;
+      if (entry.event == TopoEvent::Generated)
+        born = true;
+      for (const TopoRef& p : entry.parent_refs) {
+        if (p.kind == current.kind && parents.insert(member_key(p)).second)
+          parent = p;
+      }
+    }
+    // Born here (generated), merged here (several parents) or not witnessed: the anchor stays at this node.
+    if (born || parents.size() != 1)
+      return current;
+    // A split here: the parent has several successors of its kind; the piece is named at this node.
+    std::set<std::string> siblings;
+    for (const TopoEntry& entry : node->topo_delta->entries) {
+      if (entry.event == TopoEvent::Deleted || entry.event == TopoEvent::Generated || entry.ref.kind != current.kind)
+        continue;
+      for (const TopoRef& p : entry.parent_refs) {
+        if (member_key(p) == member_key(parent))
+          siblings.insert(member_key(entry.ref));
+      }
+    }
+    if (siblings.size() != 1)
+      return current;
+    // Step to the parent; a parent named by an identity op (a selection) is the entity of the op's input.
+    ElementAnchor next{parent.node_id, parent.output_slot, parent.kind, parent.topo_id};
+    for (auto found = nodes.find(next.node_id); found != nodes.end() && !has_history(*found->second) &&
+                                                identity_op(found->second->op) && !found->second->inputs.empty();
+         found = nodes.find(next.node_id)) {
+      next.node_id = found->second->inputs.front()->node_id;
+      next.output_slot = 0;
+    }
+    if (nodes.count(next.node_id) == 0)
+      return current;
+    current = next;
+  }
+}
+
+StableAnchor stabilize(const NodePtr& within, const ElementAnchor& picked) {
+  // Name the entity where it was born, not where it was picked: the birth node is earlier in the history and
+  // keeps its name across edits of everything after it.
+  const ElementAnchor anchor = trace_to_birth(within, picked);
+  NodePtr node;
+  for (const NodePtr& item : upstream_closure({within})) {
+    if (item->node_id == anchor.node_id) {
+      node = item;
+      break;
+    }
+  }
+  StableAnchor out;
+  out.node = stable_key_of(node);
+  out.output_slot = anchor.output_slot;
+  out.kind = anchor.kind;
+  out.topo_id = anchor.topo_id;
+  // The most specific kernel role of the entity: the one with the fewest entities, then by name.
+  if (node->topo_delta) {
+    std::set<std::string> roles;
+    for (const TopoRoleEntry& entry : node->topo_delta->roles) {
+      if (entry.ref.node_id == node->node_id && entry.ref.kind == anchor.kind && entry.ref.topo_id == anchor.topo_id &&
+          entry.ref.output_slot == anchor.output_slot)
+        roles.insert(entry.role);
+    }
+    std::size_t best = 0;
+    for (const std::string& role : roles) {
+      const std::vector<ElementAnchor> all = anchors_for_role(node, role);
+      if (!out.role.empty() && all.size() >= best)
+        continue;
+      for (std::size_t i = 0; i < all.size(); ++i) {
+        if (all[i].topo_id == anchor.topo_id && all[i].kind == anchor.kind) {
+          out.role = role;
+          out.role_ordinal = static_cast<int>(i);
+          best = all.size();
+        }
+      }
+    }
+  }
+  return out;
+}
+
+std::optional<ElementAnchor> locate(const NodePtr& within, const StableAnchor& anchor) {
+  const NodePtr node = pick_by_stable_key(within, anchor.node);
+  if (!node)
+    return std::nullopt;
+  if (anchor.role.empty())
+    return ElementAnchor{node->node_id, anchor.output_slot, anchor.kind, anchor.topo_id};
+  std::vector<ElementAnchor> all = anchors_for_role(node, anchor.role);
+  std::erase_if(all,
+                [&](const ElementAnchor& a) { return a.kind != anchor.kind || a.output_slot != anchor.output_slot; });
+  if (anchor.role_ordinal < 0 || static_cast<std::size_t>(anchor.role_ordinal) >= all.size())
+    return std::nullopt;
+  return all[static_cast<std::size_t>(anchor.role_ordinal)];
+}
+
+Value to_value(const StableAnchor& anchor) {
+  Value out = Value::object();
+  out.set("feature", anchor.node.feature);
+  out.set("op", anchor.node.op);
+  out.set("occurrence", static_cast<std::int64_t>(anchor.node.occurrence));
+  out.set("params_digest", anchor.node.params_digest);
+  out.set("output_slot", static_cast<std::int64_t>(anchor.output_slot));
+  out.set("kind", std::string(kind_name(anchor.kind)));
+  out.set("role", anchor.role.empty() ? Value() : Value(anchor.role));
+  out.set("role_ordinal", static_cast<std::int64_t>(anchor.role_ordinal));
+  out.set("topo_id", anchor.topo_id);
+  return out;
+}
+
+StableAnchor stable_anchor_from_value(const Value& value) {
+  if (!value.is_object())
+    throw ValueError("a stable anchor must be an object");
+  const auto text = [&](const char* key) { return text_field(value, key); };
+  const auto number = [&](const char* key) -> int {
+    const Value* found = value.find(key);
+    return found != nullptr && found->is_int() ? static_cast<int>(found->as_int()) : 0;
+  };
+  StableAnchor out;
+  out.node = StableNodeKey{text("feature"), text("op"), number("occurrence"), text("params_digest")};
+  if (out.node.op.empty())
+    throw ValueError("a stable anchor needs its op");
+  out.output_slot = number("output_slot");
+  std::string kind = text("kind");
+  std::transform(kind.begin(), kind.end(), kind.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  bool known = false;
+  for (const Kind k : {Kind::Vertex, Kind::Edge, Kind::Wire, Kind::Face, Kind::Shell, Kind::Solid, Kind::Compound}) {
+    if (kind_name(k) == kind) {
+      out.kind = k;
+      known = true;
+    }
+  }
+  if (!known)
+    throw ValueError("unknown topology kind '" + kind + "'");
+  out.role = text("role");
+  out.role_ordinal = number("role_ordinal");
+  out.topo_id = text("topo_id");
   return out;
 }
 

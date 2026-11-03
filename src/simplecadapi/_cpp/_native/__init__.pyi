@@ -736,6 +736,10 @@ def _interpolated_bspline_edge(points: collections.abc.Sequence[typing.Annotated
     """
     An interpolating B-spline edge through the points (GeomAPI_Interpolate).
     """
+def _locate_anchor(within: OperationNode, stable: typing.Any) -> typing.Any:
+    """
+    The anchor {node_id, output_slot, kind, topo_id} a stable anchor names upstream of `within`, or None.
+    """
 def _resolve_by_history(target: OperationNode, anchor: dict, target_slot: typing.SupportsInt | typing.SupportsIndex = 0, follow: str = 'identity') -> typing.Any:
     """
     Follow an element anchor {node_id, output_slot, kind, topo_id} through the recorded topology deltas to output `target_slot` of node `target`: {status: ok|split|merged|lost, targets, hops, lost_at, reason}.
@@ -747,6 +751,18 @@ def _sample_edge_points(edge: AnyShape, samples: typing.SupportsInt | typing.Sup
 def _set_diagnostic_image_provider(provider: typing.Any) -> None:
     """
     Install provider(kind, operation, view, caption, dedup_key, shapes, payload) -> evidence dict or None: it draws the pictures a failing operation asks for.  None removes it.
+    """
+def _stable_anchor(within: OperationNode, anchor: dict) -> typing.Any:
+    """
+    The re-execution-stable form {feature, op, occurrence, output_slot, kind, role, role_ordinal, topo_id} of an anchor whose node is `within` or upstream of it.
+    """
+def _stable_candidates(within: OperationNode, stable: typing.Any) -> list:
+    """
+    The node ids upstream of `within` that share the stable anchor's (feature, op, occurrence).
+    """
+def _stable_node_key(node: OperationNode) -> tuple[str, str, int]:
+    """
+    (feature, op, occurrence) of a node: what a stable anchor names it by.
     """
 def _subshapes_by_recorded_id(root: AnyShape, kind: str, topo_ids: collections.abc.Sequence[str]) -> list:
     """

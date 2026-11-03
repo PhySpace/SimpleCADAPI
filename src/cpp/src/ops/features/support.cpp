@@ -234,7 +234,7 @@ std::string python_float_repr(double value) {
 // ---------------------------------------------------------------------------
 // _finish
 // ---------------------------------------------------------------------------
-Solid finish_solid(const Shape& source, const TopoDS_Shape& built, OpRecord record) {
+Solid finish_solid(const Shape& source, const TopoDS_Shape& built, OpRecord record, std::optional<TopoDelta> delta) {
   const std::vector<TopoDS_Solid> solids = kernel::solids_of(built);
   if (solids.size() != 1) {
     throw ValueError(record.op + " must produce exactly one solid, got " + std::to_string(solids.size()));
@@ -258,6 +258,8 @@ Solid finish_solid(const Shape& source, const TopoDS_Shape& built, OpRecord reco
     if (auto refs = recorder->input_refs(inputs))
       record.params.set("input_refs", std::move(*refs));
   }
+  if (delta && !delta->entries.empty())
+    record.delta = std::move(delta);
   record_operation(record, {result});
   return result;
 }

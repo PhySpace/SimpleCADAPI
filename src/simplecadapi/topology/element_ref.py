@@ -1,27 +1,71 @@
 """Element references resolved through recorded operation history (spike; private, not exported).
 
-An *anchor* names a sub-shape by where it was born: ``{node_id, output_slot, kind, topo_id}`` of the
-node that produced it.  :func:`resolve` follows the anchor through the ``TopoDelta`` every later node
-recorded from OCCT's history (the C++ kernel does the walk, ``scad::reactive::resolve_by_history``) to
-the entities of a later shape, and says how it went:
+An *anchor* names a sub-shape by where it was born.  Two forms:
+
+* a raw anchor ``{node_id, output_slot, kind, topo_id}`` (:func:`anchor_of`): valid inside one run;
+* a stable anchor ``{feature, op, occurrence, output_slot, kind, role, role_ordinal, topo_id}``
+  (:func:`stable_anchor_of`): the node is named by its cell, op name and how many nodes of that cell with that
+  op feed it, the entity by its kernel role -- so an operation inserted earlier in the cell does not shift it.
+  This is the form to persist.
+
+:func:`resolve` follows the anchor through the ``TopoDelta`` every later node recorded from OCCT's history (the C++
+kernel does the walk, ``scad::reactive::resolve_by_history``) to the entities of a later shape, and says how it
+went:
 
 * ``ok``     -- exactly one entity, nothing else merged into it;
-* ``split``  -- several entities (a cut through a face);
+* ``split``  -- several entities (a cut through a face); ``candidates`` lists them;
 * ``merged`` -- one entity that also absorbed entities outside the lineage (a fuse unifying faces);
-* ``lost``   -- none; ``lost_at`` / ``reason`` say where and why (``deleted``, ``replaced``,
-  ``no_history``, ``not_downstream``).
+* ``lost``   -- none; ``lost_at`` / ``reason`` say where and why (``deleted``, ``replaced``, ``no_history``,
+  ``not_downstream``, ``anchor_missing``, ``anchor_ambiguous``); with a ``guard`` the ``candidates`` are ranked
+  look-alikes.
 
-No geometry is consulted and nothing is guessed.  See ``design-docs/stable-refs-design.md``.
+:func:`require` is what a feature uses: it returns the entities for ``ok`` / ``merged`` and raises
+:class:`ElementRefError` (carrying the candidates) for ``split`` unless the caller picked a piece, and for ``lost``.
+Nothing is ever chosen silently.  See ``design-docs/stable-refs-design.md``.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from .._cpp import _native
 
-__all__ = ["ResolvedRef", "anchor_of", "anchors_for_role", "resolve"]
+__all__ = [
+    "Candidate",
+    "ElementRefError",
+    "ResolvedRef",
+    "anchor_of",
+    "anchors_for_role",
+    "guard_of",
+    "require",
+    "resolve",
+    "stable_anchor_of",
+]
+
+
+@dataclass(frozen=True)
+class Candidate:
+    """An entity the person can choose: a piece of a split, or a look-alike of a lost entity."""
+
+    entity: Any
+    topo_id: str
+    kind: str
+    geom_type: str
+    center: tuple
+    size: float  # area of a face, length of an edge
+    score: float = 0.0  # lost only: distance to the guard, smaller is closer
+
+    def describe(self) -> Dict[str, Any]:
+        return {
+            "topo_id": self.topo_id,
+            "kind": self.kind,
+            "geom_type": self.geom_type,
+            "center": list(self.center),
+            "size": self.size,
+            "score": self.score,
+        }
 
 
 @dataclass(frozen=True)
@@ -32,6 +76,33 @@ class ResolvedRef:
     hops: List[Dict[str, Any]] = field(default_factory=list)
     lost_at: Optional[str] = None
     reason: Optional[str] = None
+    candidates: List[Candidate] = field(default_factory=list)
+
+    def describe(self) -> Dict[str, Any]:
+        """The editor-facing form: status, where it was lost and why, and the candidates to choose from."""
+
+        return {
+            "status": self.status,
+            "lost_at": self.lost_at,
+            "reason": self.reason,
+            "candidates": [c.describe() for c in self.candidates],
+        }
+
+
+class ElementRefError(ValueError):
+    """A reference that does not name exactly one entity: ``split`` (choose a piece) or ``lost``."""
+
+    def __init__(self, resolved: ResolvedRef):
+        self.resolved = resolved
+        self.status = resolved.status
+        self.candidates = resolved.candidates
+        if resolved.status == "split":
+            text = f"the referenced entity was split into {len(resolved.candidates)} pieces: choose one"
+        else:
+            text = f"the referenced entity is lost ({resolved.reason} at {resolved.lost_at})"
+            if resolved.candidates:
+                text += f"; {len(resolved.candidates)} look-alike candidate(s)"
+        super().__init__(text)
 
 
 def _node_of(shape: Any) -> Any:
@@ -42,7 +113,7 @@ def _node_of(shape: Any) -> Any:
 
 
 def anchor_of(entity: Any) -> Dict[str, Any]:
-    """The anchor of a sub-shape of a recorded output (a face picked from a solid, say)."""
+    """The raw anchor of a sub-shape of a recorded output (a face picked from a solid, say)."""
 
     ref = entity.get_metadata("topo_ref", None)
     if not ref:
@@ -50,28 +121,148 @@ def anchor_of(entity: Any) -> Dict[str, Any]:
     return {key: ref[key] for key in ("node_id", "output_slot", "kind", "topo_id")}
 
 
+def stable_anchor_of(entity: Any, shape: Any) -> Dict[str, Any]:
+    """The re-execution-stable anchor of *entity*, a sub-shape of *shape* (or of a shape *shape* descends from)."""
+
+    return dict(_native._stable_anchor(_node_of(shape), anchor_of(entity)))
+
+
 def anchors_for_role(shape: Any, role: str) -> List[Dict[str, Any]]:
-    """The anchors of the entities the node that made *shape* gave kernel role *role* (``"extrude.first_cap"``)."""
+    """The anchors of the entities the node that made *shape* gave kernel role *role* (``"extrusion.end"``)."""
 
     return list(_native._anchors_for_role(_node_of(shape), role))
 
 
-def resolve(anchor: Dict[str, Any], shape: Any, *, follow: str = "identity", output_slot: int = 0) -> ResolvedRef:
-    """Follow *anchor* through recorded history to the entities of *shape* (a later recorded output)."""
+def _size(entity: Any) -> float:
+    return float(entity.get_area()) if hasattr(entity, "get_area") else float(entity.get_length())
 
-    data = _native._resolve_by_history(_node_of(shape), anchor, output_slot, follow)
+
+def guard_of(entity: Any) -> Dict[str, Any]:
+    """A geometric fingerprint of *entity*: checks a resolution and ranks candidates for a lost one, never more."""
+
+    c = entity.get_center()
+    guard: Dict[str, Any] = {
+        "kind": type(entity).__name__.lower(),
+        "geom_type": entity._geom_type(),
+        "center": [c.x, c.y, c.z],
+        "size": _size(entity),
+    }
+    if hasattr(entity, "get_normal_at"):
+        n = entity.get_normal_at()
+        guard["normal"] = [n.x, n.y, n.z]
+    return guard
+
+
+def _candidate(entity: Any, topo_id: str, score: float = 0.0) -> Candidate:
+    c = entity.get_center()
+    return Candidate(
+        entity=entity,
+        topo_id=topo_id,
+        kind=type(entity).__name__.lower(),
+        geom_type=entity._geom_type(),
+        center=(c.x, c.y, c.z),
+        size=_size(entity),
+        score=score,
+    )
+
+
+def _geometric_order(candidates: List[Candidate]) -> List[Candidate]:
+    # A deterministic order that does not depend on OCCT's numbering: by centre, then size.
+    return sorted(candidates, key=lambda c: (tuple(round(v, 6) for v in c.center), round(c.size, 6)))
+
+
+def _ranked_lookalikes(shape: Any, guard: Dict[str, Any], kind: str, limit: int = 5) -> List[Candidate]:
+    from .. import ql
+
+    factory = {"face": ql.faces, "edge": ql.edges}.get(kind)
+    if factory is None:
+        return []
+    out: List[Candidate] = []
+    for entity in factory().resolve(shape):
+        ref = entity.get_metadata("topo_ref", None) or {}
+        c = entity.get_center()
+        distance = math.dist((c.x, c.y, c.z), guard["center"])
+        size = _size(entity)
+        score = distance + abs(size - guard["size"]) / max(guard["size"], 1e-9)
+        if entity._geom_type() != guard.get("geom_type"):
+            score += 1000.0
+        if "normal" in guard and hasattr(entity, "get_normal_at"):
+            n = entity.get_normal_at()
+            dot = n.x * guard["normal"][0] + n.y * guard["normal"][1] + n.z * guard["normal"][2]
+            score += 10.0 * (1.0 - max(-1.0, min(1.0, dot)))
+        out.append(_candidate(entity, str(ref.get("topo_id", "")), score))
+    out.sort(key=lambda c: c.score)
+    return out[:limit]
+
+
+def resolve(
+    anchor: Dict[str, Any],
+    shape: Any,
+    *,
+    follow: str = "identity",
+    output_slot: int = 0,
+    guard: Optional[Dict[str, Any]] = None,
+) -> ResolvedRef:
+    """Follow *anchor* (raw or stable) through recorded history to the entities of *shape* (a later output)."""
+
+    node = _node_of(shape)
+    raw = anchor
+    if "op" in anchor:  # a stable anchor: find its node in this run first
+        raw = _native._locate_anchor(node, anchor)
+        if raw is None:
+            # Several nodes share the key and the parameters do not tell them apart: the person chooses.
+            ambiguous = len(_native._stable_candidates(node, anchor)) > 1
+            lookalikes = _ranked_lookalikes(shape, guard, str(anchor["kind"]).lower()) if guard else []
+            reason = "anchor_ambiguous" if ambiguous else "anchor_missing"
+            return ResolvedRef("lost", [], [], [], None, reason, lookalikes)
+    data = _native._resolve_by_history(node, raw, output_slot, follow)
     targets = list(data["targets"])
     entities: List[Any] = []
     by_kind: Dict[str, List[str]] = {}
     for target in targets:
         by_kind.setdefault(str(target["kind"]).lower(), []).append(target["topo_id"])
+    candidates: List[Candidate] = []
     for kind, ids in by_kind.items():
-        entities.extend(_native._subshapes_by_recorded_id(shape, kind, ids))
+        found = list(_native._subshapes_by_recorded_id(shape, kind, ids))
+        entities.extend(found)
+        candidates.extend(_candidate(entity, topo_id) for entity, topo_id in zip(found, ids))
+    status = data["status"]
+    if status == "split":
+        candidates = _geometric_order(candidates)
+    elif status == "lost":
+        kind = str(raw["kind"]).lower()
+        candidates = _ranked_lookalikes(shape, guard, kind) if guard else []
+    else:
+        candidates = []
     return ResolvedRef(
-        status=data["status"],
+        status=status,
         entities=entities,
         targets=targets,
         hops=list(data["hops"]),
         lost_at=data.get("lost_at"),
         reason=data.get("reason"),
+        candidates=candidates,
     )
+
+
+def require(
+    anchor: Dict[str, Any],
+    shape: Any,
+    *,
+    piece: Optional[int] = None,
+    follow: str = "identity",
+    guard: Optional[Dict[str, Any]] = None,
+) -> Sequence[Any]:
+    """The entities a feature may use, or :class:`ElementRefError`.
+
+    A split is an error unless *piece* says which of ``candidates`` (geometric order) the person chose.
+    """
+
+    resolved = resolve(anchor, shape, follow=follow, guard=guard)
+    if resolved.status in ("ok", "merged"):
+        return resolved.entities
+    if resolved.status == "split" and piece is not None:
+        if not 0 <= piece < len(resolved.candidates):
+            raise ElementRefError(resolved)
+        return [resolved.candidates[piece].entity]
+    raise ElementRefError(resolved)
