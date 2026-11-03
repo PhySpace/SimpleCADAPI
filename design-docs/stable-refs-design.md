@@ -10,28 +10,25 @@ a probe run in this session, no committed test. **[I]** = inference / proposal, 
 
 ## 0. Summary
 
-1. **A reference is a query over recorded history, not a stored entity.** `ElementRef = {anchor, follow, pick, guard,
-   last}`: the anchor names where the entity was *born* (a node that is stable across re-execution, plus a
-   deterministic entity key: kernel output role, source sub-shape, or tag); resolution walks the `TopoDelta` every
-   later node recorded from OCCT history to the entities of the shape being built. This is Onshape's model
-   (`qCreatedBy` + `startTracking`/`makeRobustQuery`, `OK`/`SPLIT`/`FAILED_TO_RESOLVE`) on top of the history
-   FreeCAD 1.0 uses (Modified / Generated / IsDeleted), with typed records instead of an encoded name string.
-2. **Names are generated in the C++ kernel, per operation, from OCCT history.** That data exists today: every tracked
-   operation writes witnesses `{ref, event, parent_refs, origin_role, derivation}` into the node's `TopoDelta`
-   **[R]** (`src/cpp/src/semantic/tracking_*.cpp`, `src/cpp/src/reactive/session.cpp` `resolve_recorded_delta`). The
-   resolver is C++ too (`scad::reactive::resolve_by_history`, `src/cpp/src/reactive/element_ref.cpp`); Python only
-   stores and edits reference records.
-3. **Outcome is always one of `ok` / `split` / `merged` / `lost`**, with the entities, the hops that got there, and for
-   `lost` the node and the reason (`deleted`, `replaced`, `no_history`, `not_downstream`). Geometry is a *guard* and a
-   source of ranked candidates for the editor, never a silent fallback ("first, do no harm").
-4. **Tags become a view over references.** A tag is a named `ElementRef`; `ql.tag("x")` resolves the tag's anchor
-   through history to the queried shape. The per-op tag projection (with its face-source gate and face-channel gap)
-   stops being the long-range identity mechanism.
-5. The spike proves the resolver on the four known failures on the real kernel **[T]**
-   (`test/test_element_ref_history.py`) and on hand-built graphs for every status **[T]**
-   (`src/cpp/tests/cpp/reactive/test_element_ref.cpp`). The audit (section 6) shows where kernel history is
-   missing today: `transform_rsolid`, `offset_rsolid`, draft, scale, helical sweep record no delta, and a shell's
-   kept faces have no successor witness.
+1. **A reference is a query over recorded history, not a stored entity.** The anchor names where the entity was
+   *born* (a stable node key: feature, op, occurrence among ancestors, plus a kernel role or topo id); resolution
+   walks the `TopoDelta` every later node recorded from OCCT history to the entities of the shape being built.
+   Onshape's model (`qCreatedBy` + `startTracking`, `OK`/`SPLIT`/`FAILED_TO_RESOLVE`) on FreeCAD 1.0's history
+   (Modified / Generated / IsDeleted), with typed records instead of an encoded name string. **[T]**
+2. **Names are generated in the C++ kernel, per operation, from OCCT history** (`semantic/tracking_*.cpp`); the
+   resolver, the stable keys, the backward trace and the tag view are C++ too (`reactive/element_ref.cpp`,
+   `reactive/tag_view.cpp`). Python only stores references (`simplecadapi.topology.element_ref`). **[T]**
+3. **Outcome is always `ok` / `split` / `merged` / `lost`**, with entities, hops, bodies, and for `lost` the node and
+   reason. A split is an error carrying the candidates (owner decision); a lost reference offers guard-ranked
+   look-alikes; nothing is chosen silently. **[T]**
+4. **Tags are a view over the recorded history** (owner decision, switched directly): a tag assignment is a graph
+   node, and `ql.tag` sees every entity its targets became. Plain and op-kwarg face tags now survive every operation
+   family with history. **[T]**
+5. **Every solid modelling op records history now:** `transform_rsolid`, `scale_rsolid`, `offset_rsolid` and
+   `draft_rsolid` gained it; a shell's kept faces are preserved (option a); N-ary booleans compose their steps.
+   **[T]**
+6. Persistence: tags and references resolve on values restored from the cell cache (nodes and deltas travel in the
+   lineage records) and after pickling **[T]**; references carry a naming version **[T]**.
 
 ---
 
@@ -285,19 +282,22 @@ modelling fact. `anchor_missing` / `anchor_ambiguous` mean the anchored node its
 - **Cell cache.** `runtime/lineage.py` saves each cell's nodes with `graph.to_dict()`, which includes `topo_delta`,
   and `OperationGraph.from_value` restores it **[R]** (`graph.cpp` `from_value` parses `topo_delta`; the header
   comment "topology/semantic deltas are not restored" is stale, see SDK_DEFECTS 22). So a reference resolves through
-  restored cells as long as the value carries its node object. Pinned by a test in stage 1 [I].
+  restored cells as long as the value carries its node object **[T]** (`test_tags_and_references_resolve_on_values_restored_from_the_cell_cache`, fresh process).
 - **Model JSON / packages.** `recording/serializer.py` writes deltas per node already (`"delta"`), so the resolver
   can run on a deserialised graph; refs are data in the feature params. [R for deltas, I for refs]
 
 ---
 
-## 5. Versioning [I]
+## 5. Versioning (implemented in the spike) [T]
 
-`naming = "scad-naming/<n>"` changes whenever a tracker's witnesses or the resolver's rules change (e.g. the shell fix
-in 7.2), plus the OCCT version (history changes between OCCT releases; FreeCAD versions its element map the same
-way). On mismatch: resolve anyway, compare against `guard` and `last`; if they agree, rewrite the version silently;
-if not, report `lost(version_changed)` with candidates. Refs never need a migration step of their own because they
-store anchors and policies, not resolved names.
+`kNamingVersion = "scad-naming/1"` (`element_ref.hpp`, `element_ref.NAMING_VERSION`) is stamped into every stable
+anchor. It changes whenever a tracker's witnesses or the resolver's rules change (the shell fix of 7.2 would have
+been a bump had references been persisted before it), and should be combined with the OCCT version when OCCT is
+upgraded (FreeCAD versions its element map the same way). A reference made under another version is still resolved,
+and the result says `version_changed`; the caller (editor) compares it against its guard: agreement rewrites the
+version silently, disagreement shows the reference as `lost(version_changed)` with candidates [I]. References need no
+migration of their own because they store anchors and policies, not resolved names. Tags need none either: they are
+recomputed from the graph on every read.
 
 ## 6. Audit: tag and history propagation per family (before -> now)
 
@@ -331,32 +331,29 @@ by kwarg (`kw.top`) and by `apply_tag_rselection` (`user.top`). "Before" is `dev
 
 ## 7. Staged plan
 
-### Stage 0/1 (this branch, done)
-- `scad::reactive::resolve_by_history`, `anchors_for_role`, `subshapes_by_recorded_id` (C++), private bindings
-  `_native._resolve_by_history` / `_anchors_for_role` / `_subshapes_by_recorded_id`, Python wrapper
-  `simplecadapi.topology.element_ref` (private, not exported). Doctest: 6 cases over hand-built graphs. Pytest:
-  known failures, statuses, parameter sweep, creator caps, audit (30 tests, `test/test_element_ref_history.py`).
+### Done on this branch
+- Resolver (`resolve_by_history`), role anchors, recorded-id lookup; statuses ok / split / merged / lost.
+- History for transform / scale / offset / draft (`modification_delta`); shell kept faces preserved (7.2); N-ary
+  boolean steps composed (`merge_topo_deltas`).
+- Stable anchors (feature, op, occurrence-among-ancestors, params tie-break, role) and the backward trace to birth.
+- Splits as errors with candidates; lost references with guard-ranked look-alikes; bodies; naming version.
+- Tags as a view over history (3.1), effective includes lineage, one path per binding.
+- Tests: `test/test_element_ref_history.py` (48), `test_element_ref.cpp`, `test_tag_view.cpp`,
+  `test_modification_delta.cpp`; goldens reviewed one by one (commits `df38241`, `facccaa`).
 
-### Stage 1: names and pick-time trace (next)
-1. Backward trace (2.4) in C++: `name_of(node, entity) -> ElementRef` with deterministic sibling ranks computed in
-   the tracker (add a `piece` rank to witnesses that share a parent, sorted by a kernel geometric key).
-2. Stable node identity (2.2): `(cell, op, occurrence)` <-> node id map kept by the session; anchor check of `op`.
-3. Cache test: a reference resolved through a cell restored from the cache equals the live one.
-4. Kernel gaps, in order of user impact: `transform_rsolid` (GTransform has `Modified`), shell kept faces (see
-   7.2), offset, draft, scale, helical sweep. Each with a doctest and an audit row flipped.
-
-### Stage 2: SDK and editor
-5. Public `scad.ref` API (`faces`/`edges`, `ElementRefLost` with candidates), docstrings/modules.json/serializer
-   row/API page per the SDK checklist.
-6. Editor: `selection_recipe` emits refs; reference health badges (4.2); "use all / this piece / candidate" actions
-   writing the ref back; ws message for statuses.
-7. Sketch roots: sketch geometry ids as anchors for profile edges, so side faces are named by sketch entities.
-
-### Stage 3: tags as a view
-8. Tag bindings hold refs; `ql.tag` resolves lazily with memoisation; projection kept as a cache and compared on the
-   corpus; then retire the gates.
-9. Corpus: parameter sweeps of the examples (insert a feature mid-cell, change widths, add an upstream fillet),
-   asserting zero wrong picks and the resolved-by-history rate.
+### Next
+1. Public `scad.ref` (`of`, `resolve`, `one`, `all`) and `ql.ref(ref)` as a predicate, with the SDK checklist
+   (docstrings, modules.json, serializer row, API page); `ElementRefError` exported.
+2. Editor (`feat/gui-modeling`): `selection_recipe` emits `scad.ref.faces([...])` instead of tag-or-window code;
+   health badges and "this piece / this candidate" actions write the reference back (4.2).
+3. Sketch roots: sketch geometry ids as anchors for profile edges, so side faces have names that survive profile
+   edits; a kernel-computed geometric rank for pieces of a split (2.4).
+4. Per-node parent index for the resolver (7.1); `Query.explain(shape)` as data (the cardinality errors already
+   carry the per-predicate counts and near-miss inventory).
+5. Multi-body (`research/multi-solid`): `ql.body(name)` once named bodies land; references already resolve per
+   output slot and report the body index inside a compound.
+6. Corpus: parameter sweeps of the examples (insert a feature mid-cell, change widths, add an upstream fillet),
+   asserting zero wrong picks.
 
 ### 7.1 Performance budget
 Measured **[R]** (ad-hoc probe, Release build, Apple silicon; one top face of a 400x20x10 plate through N
@@ -369,7 +366,7 @@ successive hole cuts; the resolved face area matched 8000 - N*pi/4 at every N):
 | 150 | 4.75 s | 3.0 ms | 3.1 ms |
 
 The cost is the scan of each consuming node's delta, whose size grows with the model (O(N) entries per cut, so
-O(N^2) overall). Stage 1: a per-node index parent -> entries, built once per node and memoised, makes a resolve
+O(N^2) overall). Next: a per-node index parent -> entries, built once per node and memoised, makes a resolve
 O(hops). Budget [I]: < 1 ms per reference for 200-node histories, memoised per (ref, target node), nothing added at
 recording time (the deltas are recorded already). Resolution is already negligible next to modelling (0.06 % of
 build time at N = 150).

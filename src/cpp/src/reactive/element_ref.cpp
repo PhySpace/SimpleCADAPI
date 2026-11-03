@@ -565,6 +565,7 @@ Value to_value(const StableAnchor& anchor) {
   out.set("role", anchor.role.empty() ? Value() : Value(anchor.role));
   out.set("role_ordinal", static_cast<std::int64_t>(anchor.role_ordinal));
   out.set("topo_id", anchor.topo_id);
+  out.set("naming", anchor.naming);
   return out;
 }
 
@@ -596,6 +597,7 @@ StableAnchor stable_anchor_from_value(const Value& value) {
   out.role = text("role");
   out.role_ordinal = number("role_ordinal");
   out.topo_id = text("topo_id");
+  out.naming = text("naming");  // empty: made before versions were stamped
   return out;
 }
 

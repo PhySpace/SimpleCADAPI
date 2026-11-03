@@ -21,6 +21,11 @@
 
 namespace scad::reactive {
 
+// The version of the naming rules (trackers' witnesses + resolver + stable keys).  Stored in every stable anchor;
+// a reference made under another version is still resolved, and the caller checks it against its guard.  Bump it
+// whenever a tracker changes which witnesses it emits or the resolver changes how it follows them.
+inline constexpr std::string_view kNamingVersion = "scad-naming/1";
+
 enum class RefStatus { Ok, Split, Merged, Lost };
 std::string_view to_string(RefStatus status) noexcept;
 
@@ -102,6 +107,7 @@ struct StableAnchor {
   std::string role;      // empty: by topo id
   int role_ordinal = 0;  // among the node's entities with that role, in recorded order
   std::string topo_id;   // the recorded topo id when it was made (a hint; the only name when `role` is empty)
+  std::string naming{kNamingVersion};  // the naming version it was made under
 };
 
 // The feature (namespace) part of a node id: "cellA_node_0000002a" -> "cellA", "node_00000001" -> "".

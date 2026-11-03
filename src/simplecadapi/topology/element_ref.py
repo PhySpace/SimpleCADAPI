@@ -32,7 +32,10 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from .._cpp import _native
 
+NAMING_VERSION: str = _native._naming_version
+
 __all__ = [
+    "NAMING_VERSION",
     "Candidate",
     "ElementRefError",
     "ResolvedRef",
@@ -77,6 +80,10 @@ class ResolvedRef:
     lost_at: Optional[str] = None
     reason: Optional[str] = None
     candidates: List[Candidate] = field(default_factory=list)
+    # Which body (solid of the target shape, in its solid order) each of `entities` lies in.
+    bodies: List[Optional[int]] = field(default_factory=list)
+    # The reference was made under another naming version (NAMING_VERSION): check it against its guard.
+    version_changed: bool = False
 
     def describe(self) -> Dict[str, Any]:
         """The editor-facing form: status, where it was lost and why, and the candidates to choose from."""
@@ -85,6 +92,8 @@ class ResolvedRef:
             "status": self.status,
             "lost_at": self.lost_at,
             "reason": self.reason,
+            "bodies": list(self.bodies),
+            "version_changed": self.version_changed,
             "candidates": [c.describe() for c in self.candidates],
         }
 
@@ -195,17 +204,41 @@ def _ranked_lookalikes(shape: Any, guard: Dict[str, Any], kind: str, limit: int 
     return out[:limit]
 
 
+def _bodies_of(shape: Any, entities: List[Any]) -> List[Optional[int]]:
+    from .. import ql
+
+    if not entities:
+        return []
+    solids = ql.solids().resolve(shape) if type(shape).__name__ != "Solid" else [shape]
+    out: List[Optional[int]] = []
+    for entity in entities:
+        kind = type(entity).__name__
+        found = None
+        for index, solid in enumerate(solids):
+            members = ql.faces().resolve(solid) if kind == "Face" else ql.edges().resolve(solid)
+            if any(member == entity for member in members):
+                found = index
+                break
+        out.append(found)
+    return out
+
+
 def resolve(
     anchor: Dict[str, Any],
     shape: Any,
     *,
     follow: str = "identity",
-    output_slot: int = 0,
+    output_slot: Optional[int] = None,
     guard: Optional[Dict[str, Any]] = None,
 ) -> ResolvedRef:
-    """Follow *anchor* (raw or stable) through recorded history to the entities of *shape* (a later output)."""
+    """Follow *anchor* (raw or stable) through recorded history to the entities of *shape* (a later output).
+
+    *shape* names its node and output slot itself (a body of a multi-body result is its own slot).
+    """
 
     node = _node_of(shape)
+    if output_slot is None:
+        output_slot = int((shape.get_metadata("graph", None) or {}).get("output_slot", 0))
     raw = anchor
     if "op" in anchor:  # a stable anchor: find its node in this run first
         raw = _native._locate_anchor(node, anchor)
@@ -214,7 +247,8 @@ def resolve(
             ambiguous = len(_native._stable_candidates(node, anchor)) > 1
             lookalikes = _ranked_lookalikes(shape, guard, str(anchor["kind"]).lower()) if guard else []
             reason = "anchor_ambiguous" if ambiguous else "anchor_missing"
-            return ResolvedRef("lost", [], [], [], None, reason, lookalikes)
+            changed = anchor.get("naming", "") != NAMING_VERSION
+            return ResolvedRef("lost", [], [], [], None, reason, lookalikes, [], changed)
     data = _native._resolve_by_history(node, raw, output_slot, follow)
     targets = list(data["targets"])
     entities: List[Any] = []
@@ -242,6 +276,8 @@ def resolve(
         lost_at=data.get("lost_at"),
         reason=data.get("reason"),
         candidates=candidates,
+        bodies=_bodies_of(shape, entities),
+        version_changed="op" in anchor and anchor.get("naming", "") != NAMING_VERSION,
     )
 
 

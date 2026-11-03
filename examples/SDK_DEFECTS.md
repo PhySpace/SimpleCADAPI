@@ -339,13 +339,12 @@ that surfaced it is in brackets.
   assignment reaches every entity its targets became, per lineage policy, and effective includes lineage.
   Audit: `test_element_ref_history.py::test_audit_tag_channels_and_history_per_family` (every family 1/1).
 
-## 22. `OperationGraph::from_value` header says deltas are not restored; they are [stable-refs research]
+## 22. `OperationGraph::from_value` header said deltas are not restored; they are [stable-refs research]
 
-- **Symptom:** `include/scad/reactive/graph.hpp` comments "topology/semantic deltas are not restored" while
+- **Symptom:** `include/scad/reactive/graph.hpp` commented "topology/semantic deltas are not restored" while
   `graph.cpp` `from_value` parses `topo_delta` and `semantic_delta`.
-- **Trigger:** reading the header to decide whether history survives the cell cache (`runtime/lineage.py`).
-- **Status:** open (comment only).
-- **Fix direction:** correct the comment; pin restore of deltas with a test, since stable references rely on it.
+- **Status:** fixed (comment), and pinned: `test_tags_and_references_resolve_on_values_restored_from_the_cell_cache`
+  restores a cell's lineage record in a fresh process and resolves a tag and a reference through its deltas.
 
 ## 23. A shell's kept faces had no successor witness [stable-refs research]
 

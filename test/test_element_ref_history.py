@@ -484,3 +484,74 @@ def test_a_tag_survives_pickling_with_its_history():
     assert face.get_area() == pytest.approx(800 - 9 * math.pi)
     explained = scad.explain_tag(face, "user.top")
     assert explained and explained[0]["lineage"][0]["evidence"]["via"] == "recorded_history"
+
+
+def test_tags_and_references_resolve_on_values_restored_from_the_cell_cache(tmp_path):
+    # The cell cache writes a cell's nodes beside its entry (runtime/lineage.py) and pickles its values; a fresh
+    # process registers the nodes, then unpickles the values.  The tag view and the resolver read those nodes.
+    import json
+    import subprocess
+    import sys
+    import textwrap
+
+    root = str(tmp_path)
+    build = textwrap.dedent(
+        f"""
+        import json, pickle, math
+        from pathlib import Path
+        import simplecadapi as scad
+        from simplecadapi import ql
+        from simplecadapi._glue.session import GraphSession
+        from simplecadapi.runtime import lineage
+        from simplecadapi.topology import element_ref as er
+        with GraphSession(graph_id="g1", namespace="cellA", shared_lineage=True) as session:
+            box = scad.make_box_rsolid(40, 20, 10)
+            top = ql.faces().where(ql.prop("geom.center.z", ">=", 9.99)).exactly(1).resolve(box)
+            box = scad.apply_tag_rselection(box, top, "user.top")
+            out = scad.cut_rsolid(box, scad.make_cylinder_rsolid(3, 30))
+            anchor = er.stable_anchor_of(top[0], out)
+        lineage.save(Path({root!r}), "cellA", session)
+        Path({root!r}, "value.pkl").write_bytes(pickle.dumps(out))
+        Path({root!r}, "anchor.json").write_text(json.dumps(anchor))
+        """
+    )
+    restore = textwrap.dedent(
+        f"""
+        import json, pickle
+        from pathlib import Path
+        from simplecadapi import ql
+        from simplecadapi.runtime import lineage
+        from simplecadapi.topology import element_ref as er
+        assert lineage.load(Path({root!r}), "cellA", "g1")
+        out = pickle.loads(Path({root!r}, "value.pkl").read_bytes())
+        tagged = ql.faces().where(ql.tag("user.top")).resolve(out)
+        r = er.resolve(json.loads(Path({root!r}, "anchor.json").read_text()), out)
+        print(json.dumps({{"tagged": [f.get_area() for f in tagged], "status": r.status,
+                          "areas": [f.get_area() for f in r.entities]}}))
+        """
+    )
+    for code in (build, restore):
+        done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300)
+        assert done.returncode == 0, done.stderr[-1500:]
+    result = json.loads(done.stdout.strip().splitlines()[-1])
+    assert result["status"] == "ok"
+    assert result["tagged"] == pytest.approx([800 - 9 * math.pi])
+    assert result["areas"] == pytest.approx([800 - 9 * math.pi])
+
+
+def test_a_reference_says_which_body_and_which_naming_version():
+    with scad.GraphSession():
+        box, anchor = _box_with_top_anchor()
+        stable = er.stable_anchor_of(_faces_at(box, 10)[0], box)
+        assert stable["naming"] == er.NAMING_VERSION
+        # A cut that leaves two bodies is allowed (not a reference error): each body is its own output slot, and
+        # the reference resolves in each body to the piece of the top face that body has.
+        pieces = scad.cut_rsolid_list(box, scad.make_box_rsolid(4, 30, 30, (0, 0, -10)))
+        assert len(pieces) == 2
+        halves = [er.resolve(anchor, piece) for piece in pieces]
+        assert [r.status for r in halves] == ["ok", "ok"]
+        assert sorted(round(r.entities[0].get_center().x, 6) for r in halves) == [-11.0, 11.0]
+        assert all(r.bodies == [0] for r in halves)
+    # A reference made under another naming version still resolves, and says so (the caller checks its guard).
+    r = er.resolve(dict(stable, naming="scad-naming/0"), box)
+    assert r.status == "ok" and r.version_changed and r.bodies == [0]

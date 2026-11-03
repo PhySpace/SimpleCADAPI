@@ -941,3 +941,4 @@ SQUARE_M: simplecadapi.params.units.Unit  # value = Unit(symbol='m^2', dimension
 SQUARE_MM: simplecadapi.params.units.Unit  # value = Unit(symbol='mm^2', dimension=Dimension(length=2, angle=0), scale_to_canonical=1.0)
 VOLUME: simplecadapi.params.units.Dimension  # value = Dimension(length=3, angle=0)
 WORLD_CS: simplecadapi.core.CoordinateSystem  # value = CoordinateSystem(origin=(0, 0, 0), x_axis=(1, 0, 0), y_axis=(0, 1, 0))
+_naming_version: str = 'scad-naming/1'

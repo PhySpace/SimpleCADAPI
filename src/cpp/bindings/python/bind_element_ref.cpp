@@ -43,6 +43,7 @@ py::dict anchor_to(const sr::ElementAnchor& anchor) {
 }  // namespace
 
 void bind_element_ref(py::module_& m) {
+  m.attr("_naming_version") = std::string(sr::kNamingVersion);
   m.def(
       "_resolve_by_history",
       [](const sr::NodePtr& target, const py::dict& anchor, int target_slot, const std::string& follow) {
