@@ -25,7 +25,7 @@ from . import sketch_doc
 _PARAMS_HEADER = re.compile(r"^#\s*-{3,}\s*params\b[^\n]*", re.MULTILINE)
 _PARAMS_FOR = re.compile(r"^#\s*-{3,}\s*params:\s*(?P<slug>[a-z][a-z0-9_]*)\s*-{3,}\s*$")
 _PRODUCT_BODY = re.compile(r"(\bbody\s*=\s*)([A-Za-z_][A-Za-z0-9_]*)")
-_ROLES_WITH_BODIES = {"build", "add", "subtract", "modifier"}
+_ROLES_WITH_BODIES = {"build", "add", "subtract", "modifier", "intersect"}
 
 
 class GuiError(Exception):
@@ -181,6 +181,8 @@ class FeatureService:
             for slot in spec.slots:
                 if slot.kind == "body" and last is not None:
                     chosen[slot.name] = before if slot.name == "base" else last
+                elif slot.name == "operation" and spec.combinable:
+                    chosen["operation"] = "join" if last is not None else "new"  # a part holds one solid: meet it, do not leave a second
                 elif slot.kind == "profile" and profile is not None:
                     chosen[slot.name] = profile
             out[spec.id] = chosen

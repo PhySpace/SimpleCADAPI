@@ -17,6 +17,7 @@ what was picked is always checked.  A recipe that no longer resolves is an error
 from __future__ import annotations
 
 import builtins
+import dataclasses
 import json
 import keyword
 import math
@@ -77,6 +78,7 @@ class Slot:
     entity: str | None = None  # face | edge, for kind == "select"
     help: str = ""
     optional: bool = False
+    show_when: dict[str, list[str]] | None = None  # the slot is shown (and used) only when another slot has one of these values
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {"name": self.name, "label": self.label, "kind": self.kind}
@@ -88,6 +90,8 @@ class Slot:
             out["help"] = self.help
         if self.optional:
             out["optional"] = True
+        if self.show_when:
+            out["show_when"] = self.show_when
         return out
 
 
@@ -101,6 +105,7 @@ class Spec:
     description: str
     slots: tuple[Slot, ...]
     build: Callable[["Context"], list[str]] = field(repr=False, compare=False)
+    combinable: bool = False  # makes a new solid that is joined to, cut from or intersected with the body so far (see _with_combine)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -111,6 +116,7 @@ class Spec:
             "produces": self.produces,
             "description": self.description,
             "slots": [slot.to_dict() for slot in self.slots],
+            **({"combinable": True} if self.combinable else {}),
         }
 
 
@@ -182,6 +188,13 @@ class Context:
                 )
             names.append(name)
         return f"({', '.join(names)})"
+
+    @property
+    def out(self) -> str:
+        """What the template assigns its solid to: the feature's name, or a private tool when it is combined with a body."""
+        if self.spec.combinable and self.values.get("operation", "new") != "new":
+            return "_tool"
+        return self.slug
 
     def raw_params(self, lines: list[str]) -> None:
         """Params-cell lines a template writes itself (the dimensions of a sketch)."""
@@ -312,7 +325,7 @@ def _body(name: str, label: str, help: str = "") -> Slot:
 
 def _box(c: Context) -> list[str]:
     return [
-        f"{c.slug} = scad.make_box_rsolid(",
+        f"{c.out} = scad.make_box_rsolid(",
         f"    width={c.var('width')}, height={c.var('height')}, depth={c.var('depth')},",
         f"    bottom_face_center={c.point('origin')},",
         f"    bottom_face_tag={c.tag('bottom')}, top_face_tag={c.tag('top')},",
@@ -324,7 +337,7 @@ def _box(c: Context) -> list[str]:
 
 def _cylinder(c: Context) -> list[str]:
     return [
-        f"{c.slug} = scad.make_cylinder_rsolid(",
+        f"{c.out} = scad.make_cylinder_rsolid(",
         f"    radius={c.var('radius')}, height={c.var('height')},",
         f"    bottom_face_center={c.point('origin')}, axis={c.axis('axis')},",
         f"    start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, side_face_tag={c.tag('side')},",
@@ -333,12 +346,12 @@ def _cylinder(c: Context) -> list[str]:
 
 
 def _sphere(c: Context) -> list[str]:
-    return [f"{c.slug} = scad.make_sphere_rsolid(radius={c.var('radius')}, center={c.point('center')})"]
+    return [f"{c.out} = scad.make_sphere_rsolid(radius={c.var('radius')}, center={c.point('center')})"]
 
 
 def _cone(c: Context) -> list[str]:
     return [
-        f"{c.slug} = scad.make_cone_rsolid(",
+        f"{c.out} = scad.make_cone_rsolid(",
         f"    bottom_radius={c.var('bottom_radius')}, top_radius={c.var('top_radius')}, height={c.var('height')},",
         f"    bottom_face_center={c.point('origin')}, axis={c.axis('axis')},",
         # a true cone has no top face to name; the tag is written only when there is one
@@ -350,7 +363,7 @@ def _cone(c: Context) -> list[str]:
 def _extrude_rect(c: Context) -> list[str]:
     return [
         f"_profile = scad.make_rectangle_rface(width={c.var('width')}, height={c.var('height')}, center={c.point('center')}, normal={c.normal('plane')})",
-        f"{c.slug} = scad.extrude_rsolid(",
+        f"{c.out} = scad.extrude_rsolid(",
         f"    profile=_profile, direction={c.normal('plane')}, distance={c.var('distance')},",
         f"    start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, side_faces_tag={c.tag('side')},",
         ")",
@@ -360,7 +373,7 @@ def _extrude_rect(c: Context) -> list[str]:
 def _extrude_circle(c: Context) -> list[str]:
     return [
         f"_profile = scad.make_circle_rface(center={c.point('center')}, radius={c.var('radius')}, normal={c.normal('plane')})",
-        f"{c.slug} = scad.extrude_rsolid(",
+        f"{c.out} = scad.extrude_rsolid(",
         f"    profile=_profile, direction={c.normal('plane')}, distance={c.var('distance')},",
         f"    start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, side_faces_tag={c.tag('side')},",
         ")",
@@ -376,7 +389,7 @@ def _extrude_polygon(c: Context) -> list[str]:
     return [
         f"_outline = scad.make_polyline_rwire(points=[{pts}], closed=True)",
         "_profile = scad.make_face_from_wire_rface(wire=_outline, normal=(0.0, 0.0, 1.0))",
-        f"{c.slug} = scad.extrude_rsolid(",
+        f"{c.out} = scad.extrude_rsolid(",
         f"    profile=_profile, direction=(0.0, 0.0, 1.0), distance={c.var('distance')},",
         f"    start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, side_faces_tag={c.tag('side')},",
         ")",
@@ -388,7 +401,7 @@ def _revolve(c: Context) -> list[str]:
         "# the section sits in the XZ plane, beside the Z axis, and turns about it",
         f"_profile = scad.make_rectangle_rface(width={c.var('width')}, height={c.var('height')},",
         f"    center=({c.var('offset')} + {c.var('width')} / 2, 0.0, {c.var('height')} / 2), normal=(0.0, 1.0, 0.0))",
-        f"{c.slug} = scad.revolve_rsolid(profile=_profile, axis=(0.0, 0.0, 1.0), angle={c.var('angle')}, origin=(0.0, 0.0, 0.0),",
+        f"{c.out} = scad.revolve_rsolid(profile=_profile, axis=(0.0, 0.0, 1.0), angle={c.var('angle')}, origin=(0.0, 0.0, 0.0),",
         # a full turn has no start or end face to name; those tags are written only for a partial turn
         "    " + (f"start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, " if c.values["angle"] < 360 else "") + f"side_faces_tag={c.tag('side')})",
     ]
@@ -398,7 +411,7 @@ def _loft_circles(c: Context) -> list[str]:
     return [
         "_bottom = scad.make_circle_rwire(center=(0.0, 0.0, 0.0), radius=" + c.var("bottom_radius") + ", normal=(0.0, 0.0, 1.0))",
         "_top = scad.make_circle_rwire(center=(0.0, 0.0, " + c.var("height") + "), radius=" + c.var("top_radius") + ", normal=(0.0, 0.0, 1.0))",
-        f"{c.slug} = scad.loft_rsolid(profiles=[_bottom, _top], ruled={c.var('ruled')},",
+        f"{c.out} = scad.loft_rsolid(profiles=[_bottom, _top], ruled={c.var('ruled')},",
         f"    start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, side_faces_tag={c.tag('side')})",
     ]
 
@@ -407,7 +420,7 @@ def _loft_rects(c: Context) -> list[str]:
     return [
         f"_bottom = scad.make_rectangle_rwire(width={c.var('bottom_width')}, height={c.var('bottom_height')}, center=(0.0, 0.0, 0.0), normal=(0.0, 0.0, 1.0))",
         f"_top = scad.make_rectangle_rwire(width={c.var('top_width')}, height={c.var('top_height')}, center=(0.0, 0.0, {c.var('height')}), normal=(0.0, 0.0, 1.0))",
-        f"{c.slug} = scad.loft_rsolid(profiles=[_bottom, _top], ruled={c.var('ruled')},",
+        f"{c.out} = scad.loft_rsolid(profiles=[_bottom, _top], ruled={c.var('ruled')},",
         f"    start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, side_faces_tag={c.tag('side')})",
     ]
 
@@ -423,7 +436,7 @@ def _sweep(c: Context) -> list[str]:
         "_len = sum(_d * _d for _d in _dir) ** 0.5",
         "_dir = tuple(_d / _len for _d in _dir)",
         f"_profile = scad.make_circle_rface(center=_a, radius={c.var('radius')}, normal=_dir)",
-        f"{c.slug} = scad.sweep_rsolid(profile=_profile, path=_path, is_frenet=False,",
+        f"{c.out} = scad.sweep_rsolid(profile=_profile, path=_path, is_frenet=False,",
         f"    start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, side_faces_tag={c.tag('side')})",
     ]
 
@@ -448,14 +461,14 @@ def _profile(c: Context, slot: str = "profile") -> str:
 
 def _extrude_sketch(c: Context) -> list[str]:
     return [
-        f"{c.slug} = scad.extrude_rsolid(profile={_profile(c)}, direction={c.axis('direction')}, distance={c.var('distance')},",
+        f"{c.out} = scad.extrude_rsolid(profile={_profile(c)}, direction={c.axis('direction')}, distance={c.var('distance')},",
         f"    start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, side_faces_tag={c.tag('side')})",
     ]
 
 
 def _revolve_sketch(c: Context) -> list[str]:
     return [
-        f"{c.slug} = scad.revolve_rsolid(profile={_profile(c)}, axis={c.axis('axis')}, angle={c.var('angle')}, origin={c.point('origin')},",
+        f"{c.out} = scad.revolve_rsolid(profile={_profile(c)}, axis={c.axis('axis')}, angle={c.var('angle')}, origin={c.point('origin')},",
         "    " + (f"start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, " if c.values["angle"] < 360 else "") + f"side_faces_tag={c.tag('side')})",
     ]
 
@@ -629,6 +642,26 @@ SPECS: tuple[Spec, ...] = (
          (_BODY(), Slot("factor", "Factor", "float", default=1.5, min=0.01, max=100.0), _point("origin", "Centre")), _scale),
 )
 
+_COMBINE_OPTIONS = [
+    {"value": "join", "label": "Join"},
+    {"value": "cut", "label": "Cut"},
+    {"value": "intersect", "label": "Intersect"},
+    {"value": "new", "label": "New body"},
+]
+_COMBINABLE = frozenset({"box", "cylinder", "sphere", "cone", "extrude_rect", "extrude_circle", "extrude_polygon", "revolve", "loft_circles", "loft_rects", "sweep_circle", "extrude_sketch", "revolve_sketch"})
+_COMBINE_ROLE = {"new": "build", "join": "add", "cut": "subtract", "intersect": "intersect"}
+
+
+def _with_combine(spec: Spec) -> Spec:
+    """A part holds one solid, so a new solid is not left beside the old one: it says at once how it meets it."""
+    operation = Slot("operation", "Operation", "enum", default="new", options=_COMBINE_OPTIONS,
+                     help="How the new solid meets the body so far: join it, cut it out, keep only what they share, or (when there is no body yet) start it.")
+    target = Slot("target", "Combine with", "body", optional=True, show_when={"operation": ["join", "cut", "intersect"]},
+                  help="The body this solid is joined to, cut from or intersected with (default: the body so far).")
+    return dataclasses.replace(spec, slots=(*spec.slots, operation, target), combinable=True)
+
+
+SPECS = tuple(_with_combine(spec) if spec.id in _COMBINABLE else spec for spec in SPECS)
 BY_ID: dict[str, Spec] = {spec.id: spec for spec in SPECS}
 
 
@@ -673,8 +706,10 @@ def check_values(spec: Spec, values: Mapping[str, Any], bodies: Mapping[str, str
         raw = values.get(slot.name, slot.default)
         if slot.kind == "select":
             continue  # the recipe is built from the picked items
-        if raw is None:
+        if raw is None and not slot.optional:
             raise FeatureError(f"{slot.label}: a value is required")
+        if raw is None and clean.get("operation", "new") == "new":
+            continue
         if slot.kind in ("length", "angle", "float"):
             clean[slot.name] = _checked_number(slot, raw)
         elif slot.kind == "count":
@@ -696,6 +731,10 @@ def check_values(spec: Spec, values: Mapping[str, Any], bodies: Mapping[str, str
                 raise FeatureError(f"{slot.label}: three numbers (x, y, z)")
             clean[slot.name] = [_checked_number(Slot(slot.name, slot.label, "float", min=slot.min, max=slot.max), part) for part in raw]
         elif slot.kind in ("body", "profile"):
+            if slot.optional and clean.get("operation", "new") == "new":
+                continue  # nothing to combine with
+            if raw is None and slot.optional:
+                raise FeatureError("there is no body to combine with: choose 'New body' to start one")
             name = str(raw)
             wanted = ("face",) if slot.kind == "profile" else ("solid", "solids")
             if not _NAME.fullmatch(name) or bodies.get(name) not in wanted:
@@ -809,13 +848,24 @@ def render_feature(
                 raise FeatureError(f"{slot.label}: pick at least one {slot.entity} in the viewport")
     ctx = Context(spec, slug, clean, bodies, recipes, env)
     code = spec.build(ctx)
+    operation = clean.get("operation", "new") if spec.combinable else "new"
+    if operation != "new":
+        target = ctx.body("target")
+        code.append(
+            {
+                "join": f"{slug} = scad.union_rsolid({target}, _tool)",
+                "cut": f"{slug} = scad.cut_rsolid({target}, _tool, skip_non_intersecting=False)",
+                "intersect": f"{slug} = scad.intersect_rsolid({target}, _tool)",
+            }[operation]
+        )
+    role = _COMBINE_ROLE[operation] if spec.combinable else spec.role
     # the recipe resolves against the body slot of the feature ({BODY} is filled with that name)
     body_name = clean.get("body") or ""
     code = [line.replace("{BODY}", body_name) for line in code]
     gui = {"spec": spec.id, "v": VERSION, "values": clean}
     if selections:
         gui["picked"] = {k: len(v) for k, v in selections.items()}
-    header = f"# ---- feature: {slug} ({spec.role}) ----"
+    header = f"# ---- feature: {slug} ({role}) ----"
     feature_lines = [header, f"{GUI_MARKER} {json.dumps(gui, separators=(',', ':'))}", *code]
     params = [f"# ---- params: {slug} ----", *ctx.params] if ctx.params else []
     return Rendered(

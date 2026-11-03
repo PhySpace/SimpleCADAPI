@@ -305,11 +305,15 @@ def test_a_blank_notebook_gets_its_product_with_the_first_feature(tmp_path):
         assert [f["slug"] for f in snap["features"]] == ["base"]
         assert snap["product"] == {"cell": snap["product"]["cell"], "body": "base"}
         assert "plate = scad.make_part_rpart(part_id=scad.notebook_id(), body=base)" in path.read_text()
-        service.add({"spec": "cylinder", "values": {"radius": 5.0, "height": 40.0, "origin": [0.0, 0.0, -10.0]}})
-        service.add({"spec": "cut", "values": {}})  # base is the second-last open body, the cylinder the last: it is cut out
+        # a part holds one solid: the new cylinder says how it meets the body, so no second body is left behind
+        assert service.snapshot()["defaults"]["cylinder"]["operation"] == "join"
+        service.add({"spec": "cylinder", "name": "bore", "values": {"radius": 5.0, "height": 40.0, "origin": [0.0, 0.0, -10.0], "operation": "cut"}})
         _wait_idle(state)
         snap = service.snapshot()
-        assert snap["product"]["body"] == "cut" and all(not f["errors"] for f in snap["features"]), snap["features"]
+        assert snap["open"] == ["bore"] and snap["product"]["body"] == "bore", snap
+        assert all(not f["errors"] for f in snap["features"]), snap["features"]
+        assert next(f for f in snap["features"] if f["slug"] == "bore")["role"] == "subtract"
+        assert "_tool = scad.make_cylinder_rsolid(" in path.read_text() and "bore = scad.cut_rsolid(base, _tool" in path.read_text()
     finally:
         if state.kernel is not None:
             state.kernel.stop()
@@ -368,7 +372,7 @@ def test_a_sketch_feature_added_through_the_editor_is_extruded_into_the_product(
         snap = service.snapshot()
         assert snap["profiles"] == [{"name": "outline", "plane": "XY", "plane_label": "XY", "normal": "+z", "normal_vec": [0, 0, 1]}]
         assert snap["tip"] is None and snap["product"] is None  # a face is not a body: no product yet
-        assert snap["defaults"]["extrude_sketch"] == {"profile": "outline"}
+        assert snap["defaults"]["extrude_sketch"] == {"profile": "outline", "operation": "new"}
         service.add({"spec": "extrude_sketch", "name": "tab_body", "values": {"direction": "+z", "distance": 5.0}})
         _wait_idle(state)
         snap = service.snapshot()
@@ -424,3 +428,41 @@ def test_a_name_that_is_taken_is_a_message_not_a_server_error(tmp_path):
         if state.kernel is not None:
             state.kernel.stop()
         server.should_exit = True
+
+
+def test_a_new_solid_is_joined_cut_or_intersected_at_once_and_never_left_beside_the_body():
+    with scad.GraphSession(graph_id="features-combine"):
+        scope: dict = {"scad": scad}
+        bodies: dict[str, str] = {}
+
+        def add(spec_id, slug, values):
+            rendered = F.render_feature(spec_id, slug, values, bodies=bodies)
+            _run(rendered, scope)
+            bodies[slug] = rendered.produces
+            return rendered
+
+        base = add("box", "base", {**DEFAULTS["box"], "operation": "new"})
+        assert base.feature.splitlines()[0] == "# ---- feature: base (build) ----"
+        volume = scope["base"].get_volume()
+        pin = add("cylinder", "pin", {**DEFAULTS["cylinder"], "operation": "join", "target": "base", "origin": [0.0, 0.0, 20.0]})
+        assert pin.feature.splitlines()[0] == "# ---- feature: pin (add) ----" and "_tool = scad.make_cylinder_rsolid(" in pin.feature
+        assert scope["pin"].get_volume() > volume and pin.reads == ["base"]
+        hole = add("cylinder", "bore", {**DEFAULTS["cylinder"], "operation": "cut", "target": "pin", "radius": 3.0, "origin": [0.0, 0.0, -5.0], "height": 60.0})
+        assert hole.feature.splitlines()[0] == "# ---- feature: bore (subtract) ----" and scope["bore"].get_volume() < scope["pin"].get_volume()
+        common = add("box", "core", {**DEFAULTS["box"], "operation": "intersect", "target": "bore", "origin": [0.0, 0.0, 0.0]})
+        assert common.feature.splitlines()[0] == "# ---- feature: core (intersect) ----"
+        # the tags a primitive gives its faces are on the tool, and survive the boolean
+        assert scad.ql.faces().where(scad.ql.tag("pin.end")).exactly(1).resolve(scope["pin"])
+    with pytest.raises(F.FeatureError, match="no body to combine with"):
+        F.render_feature("box", "x", {**DEFAULTS["box"], "operation": "join"}, bodies={})
+    with pytest.raises(F.FeatureError, match="choose one of"):
+        F.render_feature("box", "x", {**DEFAULTS["box"], "operation": "merge"}, bodies={})
+
+
+def test_the_catalog_says_which_slots_belong_to_which_operation():
+    spec = next(s for s in F.catalog()["specs"] if s["id"] == "extrude_sketch")
+    assert spec.get("combinable") is True
+    by_name = {slot["name"]: slot for slot in spec["slots"]}
+    assert [o["value"] for o in by_name["operation"]["options"]] == ["join", "cut", "intersect", "new"]
+    assert by_name["target"]["show_when"] == {"operation": ["join", "cut", "intersect"]}
+    assert not any(s.get("combinable") for s in F.catalog()["specs"] if s["id"] in ("fillet", "hole", "cut", "union"))
