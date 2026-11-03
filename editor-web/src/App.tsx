@@ -905,7 +905,7 @@ export function App() {
             </div>
           </ResizablePanel>
           <ResizableHandle />
-          <ResizablePanel defaultSize={46} minSize={30} className="min-w-0">
+          <ResizablePanel defaultSize={46} minSize={30} className="min-w-0 overflow-hidden">
             <div className="flex h-full flex-col">
               <div inert={sketching} className={cn("flex h-9 shrink-0 items-center gap-1 border-b-2 border-border px-2", sketching && "opacity-40")}>
                 {MODES.map(({ mode, label }) => (
@@ -933,7 +933,7 @@ export function App() {
                   fit
                 </button>
               </div>
-              <div className="relative min-h-0 flex-1">
+              <div className="relative min-h-0 flex-1 overflow-hidden">
                 <Viewport
                   viewRef={viewRef}
                   selectionMode={selectionMode}

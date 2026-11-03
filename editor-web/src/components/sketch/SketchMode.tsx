@@ -211,8 +211,8 @@ function PlaneChooser({
   }, [view]);
 
   return (
-    <div ref={host} className="pointer-events-none absolute inset-0 z-10" data-testid="plane-chooser">
-      <svg width={size.w} height={size.h} className="pointer-events-none absolute inset-0 block select-none">
+    <div ref={host} className="pointer-events-none absolute inset-0 z-10 overflow-hidden" data-testid="plane-chooser">
+      <svg width={size.w} height={size.h} className="pointer-events-none absolute inset-0 block select-none overflow-hidden">
         {PLANES.map((plane) => {
           const corners: [number, number][] = [[-half, -half], [half, -half], [half, half], [-half, half]];
           const screen = corners.map(([u, v]) => planeToScreen(viewer, plane, u, v));
@@ -426,7 +426,7 @@ function SketchEditorView({
   const coords = editor.cursor ? `x ${editor.cursor.x.toFixed(2)}  y ${editor.cursor.y.toFixed(2)} mm` : "";
 
   return (
-    <div ref={root} className="pointer-events-none absolute inset-0 z-10" data-testid="sketch-mode">
+    <div ref={root} className="pointer-events-none absolute inset-0 z-10 overflow-hidden" data-testid="sketch-mode">
       <div className="pointer-events-auto absolute inset-0">
         <SketchOverlay view={view} plane={plane} editor={editor} spaceRef={spaceRef} />
       </div>
