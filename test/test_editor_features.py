@@ -478,3 +478,24 @@ def test_a_hole_goes_along_an_axis_a_face_normal_or_a_free_vector():
     assert "(0.0, 1.0, 0.0)" in free.feature
     with pytest.raises(F.FeatureError, match="must not be zero"):
         F.render_feature("hole", "bore", {**base, "direction": "vector", "dx": 0.0, "dy": 0.0, "dz": 0.0}, bodies={"block": "solid"}, known_slugs={"block"})
+
+
+def test_a_picked_face_is_pushed_out_or_in_along_its_normal_without_a_sketch():
+    with scad.GraphSession(graph_id="features-extrude-face"):
+        scope: dict = {"scad": scad}
+        base = F.render_feature("box", "base", DEFAULTS["box"], bodies={})
+        _run(base, scope)
+        top = scad.ql.faces().where(scad.ql.tag("base.top")).exactly(1).resolve(scope["base"])[0]
+        picked = _entity("face", top, area=top.get_area(), tags=["base.top"])
+        volume = scope["base"].get_volume()
+        area = top.get_area()
+        pad = F.render_feature("extrude_face", "pad", {**DEFAULTS["extrude_face"], "body": "base", "distance": 5.0, "operation": "join", "target": "base"},
+                               bodies={"base": "solid"}, selections={"face": [picked]}, known_slugs={"base"})
+        _run(pad, scope)
+        assert scope["pad"].get_volume() == pytest.approx(volume + 5.0 * area, rel=1e-6)
+        pocket = F.render_feature("extrude_face", "pocket", {**DEFAULTS["extrude_face"], "body": "base", "direction": "-normal", "distance": 4.0, "operation": "cut", "target": "base"},
+                                  bodies={"base": "solid"}, selections={"face": [picked]}, known_slugs={"base"})
+        _run(pocket, scope)
+        assert scope["pocket"].get_volume() == pytest.approx(volume - 4.0 * area, rel=1e-6)
+        with pytest.raises(F.FeatureError, match="exactly one"):
+            F.render_feature("extrude_face", "two", {**DEFAULTS["extrude_face"], "body": "base"}, bodies={"base": "solid"}, selections={"face": [picked, picked]}, known_slugs={"base"})

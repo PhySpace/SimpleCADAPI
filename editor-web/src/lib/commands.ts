@@ -56,6 +56,10 @@ export const PRESETS: Record<string, { suffix: string; label: string; descriptio
     { suffix: "join", label: "Extrude (join)", description: "Push the sketch out and add it to the body.", keywords: ["pad", "boss", "add", "union", "material"], preset: { operation: "join" } },
     { suffix: "cut", label: "Extrude (cut)", description: "Push the sketch through the body and remove what it passes.", keywords: ["pocket", "subtract", "remove", "through", "hole"], preset: { operation: "cut" } },
   ],
+  extrude_face: [
+    { suffix: "join", label: "Pull face", description: "Push the picked face out along its normal and add it to the body.", keywords: ["pad", "boss", "push", "pull", "extend"], preset: { operation: "join", direction: "normal" } },
+    { suffix: "cut", label: "Push face in", description: "Push the picked face into the body and remove what it passes.", keywords: ["pocket", "recess", "press", "subtract"], preset: { operation: "cut", direction: "-normal" } },
+  ],
 };
 
 // -- what the selection offers ----------------------------------------------------------------------------------------------------
@@ -95,6 +99,8 @@ export function contextKind(context: SelectionContext): ContextKind | null {
 /** The contextual actions of each kind, in order: the command id and the short word shown on the button. */
 export const CONTEXT_ACTIONS: Record<ContextKind, { id: string; label: string }[]> = {
   face: [
+    { id: "extrude_face_join", label: "Pull face" },
+    { id: "extrude_face_cut", label: "Push in" },
     { id: "sketch_on_face", label: "Sketch on this face" },
     { id: "hole", label: "Hole here" },
     { id: "shell", label: "Shell" },
@@ -124,6 +130,9 @@ export const CONTEXT_ACTIONS: Record<ContextKind, { id: string; label: string }[
 const WHEN: Record<string, (context: SelectionContext) => boolean> = {
   sketch_on_face: (c) => c.faces === 1 && c.edges === 0 && c.sketches === 0,
   hole: (c) => c.faces === 1 && c.edges === 0 && c.sketches === 0,
+  extrude_face: (c) => c.faces === 1 && c.planarFaces === 1 && c.edges === 0 && c.sketches === 0,
+  extrude_face_join: (c) => c.faces === 1 && c.planarFaces === 1 && c.edges === 0 && c.sketches === 0,
+  extrude_face_cut: (c) => c.faces === 1 && c.planarFaces === 1 && c.edges === 0 && c.sketches === 0,
   shell: (c) => c.faces >= 1 && c.edges === 0 && c.sketches === 0,
   fillet: (c) => c.edges >= 1 && c.sketches === 0,
   chamfer: (c) => c.edges >= 1 && c.sketches === 0,
@@ -216,6 +225,7 @@ const SYNONYMS: Record<string, string[]> = {
   union: ["join", "merge", "add", "combine", "fuse"],
   intersect: ["common", "overlap", "keep"],
   hole: ["drill", "bore", "pocket"],
+  extrude_face: ["pull", "push", "pad", "face", "offset"],
   fillet: ["round", "rounded", "radius", "edge"],
   chamfer: ["bevel", "edge"],
   shell: ["hollow", "thin", "wall"],

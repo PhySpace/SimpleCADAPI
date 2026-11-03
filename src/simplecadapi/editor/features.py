@@ -78,6 +78,7 @@ class Slot:
     entity: str | None = None  # face | edge, for kind == "select"
     help: str = ""
     optional: bool = False
+    single: bool = False  # a selection slot that takes exactly one item
     show_when: dict[str, list[str]] | None = None  # the slot is shown (and used) only when another slot has one of these values
 
     def to_dict(self) -> dict[str, Any]:
@@ -90,6 +91,8 @@ class Slot:
             out["help"] = self.help
         if self.optional:
             out["optional"] = True
+        if self.single:
+            out["single"] = True
         if self.show_when:
             out["show_when"] = self.show_when
         return out
@@ -530,6 +533,30 @@ def _hole(c: Context) -> list[str]:
     ]
 
 
+_FACE_DIRECTIONS = [
+    {"value": "normal", "label": "out of the face (its normal)"},
+    {"value": "-normal", "label": "into the body (against the normal)"},
+    *_AXIS_OPTIONS,
+]
+
+
+def _extrude_face(c: Context) -> list[str]:
+    """Push a picked planar face of a body out (or in) along its normal: no sketch in between."""
+    direction = str(c.values["direction"])
+    if direction in _AXES:
+        vector = c.axis("direction")
+    else:
+        sign = "-" if direction == "-normal" else ""
+        vector = f"({sign}_normal.x, {sign}_normal.y, {sign}_normal.z)"
+    return [
+        *c.recipe("face", "tip"),
+        "_face = _face_query.resolve({BODY})[0]".replace("_face_query", c.selection("face")),
+        "_normal = _face.get_normal_at()",
+        f"{c.out} = scad.extrude_rsolid(profile=_face, direction={vector}, distance={c.var('distance')},",
+        f"    start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, side_faces_tag={c.tag('side')})",
+    ]
+
+
 def _fillet(c: Context) -> list[str]:
     return [*c.recipe("edges", "tip"), f"{c.slug} = scad.fillet_rsolid(solid={c.body('body')}, edges={c.selection('edges')}, radius={c.var('radius')})"]
 
@@ -641,6 +668,9 @@ SPECS: tuple[Spec, ...] = (
           *(Slot(name, label, "float", default=default, min=-1000.0, max=1000.0, show_when=_HOLE_VECTOR)
             for name, label, default in (("dx", "Direction x", 0.0), ("dy", "Direction y", 0.0), ("dz", "Direction z", -1.0))),
           _length("diameter", "Diameter", 6.0), _length("depth", "Depth", 10.0)), _hole),
+    Spec("extrude_face", "Extrude face", "Features", "build", "solid", "Push a flat face of the body out (or into it) along its normal, without a sketch.",
+         (_BODY(), Slot("face", "Face", "select", entity="face", single=True, help="Pick one flat face of the body."),
+          _enum("direction", "Direction", _FACE_DIRECTIONS, "normal"), _signed("distance", "Distance", 10.0, min=0.001)), _extrude_face),
     Spec("fillet", "Fillet", "Features", "modifier", "solid", "Round the picked edges.",
          (_BODY(), Slot("edges", "Edges", "select", entity="edge"), _length("radius", "Radius", 2.0)), _fillet),
     Spec("chamfer", "Chamfer", "Features", "modifier", "solid", "Bevel the picked edges.",
@@ -670,7 +700,7 @@ _COMBINE_OPTIONS = [
     {"value": "intersect", "label": "Intersect"},
     {"value": "new", "label": "New body"},
 ]
-_COMBINABLE = frozenset({"box", "cylinder", "sphere", "cone", "extrude_rect", "extrude_circle", "extrude_polygon", "revolve", "loft_circles", "loft_rects", "sweep_circle", "extrude_sketch", "revolve_sketch"})
+_COMBINABLE = frozenset({"box", "cylinder", "sphere", "cone", "extrude_rect", "extrude_circle", "extrude_polygon", "revolve", "loft_circles", "loft_rects", "sweep_circle", "extrude_sketch", "revolve_sketch", "extrude_face"})
 _COMBINE_ROLE = {"new": "build", "join": "add", "cut": "subtract", "intersect": "intersect"}
 
 
@@ -863,6 +893,8 @@ def render_feature(
     for slot in spec.slots:
         if slot.kind == "select":
             if (selections or {}).get(slot.name):
+                if slot.single and len([i for i in selections[slot.name] if i.get("kind") == slot.entity]) > 1:
+                    raise FeatureError(f"{slot.label}: pick exactly one {slot.entity}")
                 recipes[slot.name] = selection_recipe(slot, selections[slot.name], known_slugs or set())
             elif keep_recipes and keep_recipes.get(slot.name):
                 recipes[slot.name] = list(keep_recipes[slot.name])

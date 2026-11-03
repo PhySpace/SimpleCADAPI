@@ -21,6 +21,8 @@ export type Slot = {
   step?: number;
   options?: SlotOption[];
   entity?: "face" | "edge";
+  /** A selection slot that takes exactly one item. */
+  single?: boolean;
   help?: string;
   optional?: boolean;
   /** The slot is shown, validated and sent only while every listed slot holds one of the listed values

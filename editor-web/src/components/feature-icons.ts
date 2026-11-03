@@ -1,4 +1,4 @@
-import { Blend, Box, CircleDot, Circle, Combine, Copy, Cylinder, FlipHorizontal2, Globe, Layers, Move3d, RotateCw, Scaling, Scissors, Shell, Spline, Square, Triangle, type LucideIcon } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Blend, Box, CircleDot, Circle, Combine, Copy, Cylinder, FlipHorizontal2, Globe, Layers, Move3d, RotateCw, Scaling, Scissors, Shell, Spline, Square, Triangle, type LucideIcon } from "lucide-react";
 
 /** The icon of each feature operation, by spec id (an operation without one shows none). */
 export const FEATURE_ICONS: Record<string, LucideIcon> = {
@@ -17,6 +17,11 @@ export const FEATURE_ICONS: Record<string, LucideIcon> = {
   union: Combine,
   intersect: Combine,
   hole: CircleDot,
+  extrude_face: ArrowUpFromLine,
+  extrude_face_join: ArrowUpFromLine,
+  extrude_face_cut: ArrowDownToLine,
+  extrude_sketch_join: ArrowUpFromLine,
+  extrude_sketch_cut: ArrowDownToLine,
   fillet: Blend,
   chamfer: Triangle,
   shell: Shell,
