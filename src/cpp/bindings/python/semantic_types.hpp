@@ -26,9 +26,8 @@ namespace scad::pybind {
 template <class Tag>
 struct Quantity {
   Scalar value;
-  operator const Scalar&() const {
-    return value;
-  }  // NOLINT(google-explicit-constructor): the binding passes it on as is
+  // The binding passes it on as is.
+  operator const Scalar&() const { return value; }  // NOLINT(google-explicit-constructor)
 };
 
 template <class Tag>
