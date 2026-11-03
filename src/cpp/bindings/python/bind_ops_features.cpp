@@ -5,7 +5,6 @@
 // The GIL is released around the kernel work, except while a ql selector is being resolved
 // (a property resolver registered from Python is called back from there).
 #include "bindings.hpp"
-#include "typed_object.hpp"
 
 #include <optional>
 #include <string>
@@ -21,6 +20,7 @@ namespace {
 
 using namespace scad;
 using scad::pybind::Angle;
+using scad::pybind::AnyOf;
 using scad::pybind::Choice;
 using scad::pybind::Count;
 using scad::pybind::Direction3;
@@ -28,7 +28,6 @@ using scad::pybind::DirectionVec;
 using scad::pybind::Length;
 using scad::pybind::PlainQuantity;
 using scad::pybind::Point3;
-using scad::pybind::TypedObject;
 using scad::pybind::Vector3;
 
 // ---- what the signatures say ------------------------------------------------------------------------------------
@@ -63,12 +62,12 @@ SCAD_SIGNATURE_NAME(OffsetKindTag, "typing.Literal['ARC', 'INTERSECTION']");
 SCAD_SIGNATURE_NAME(SetOperationTag, "typing.Literal['cut', 'intersect', 'union']");
 #undef SCAD_SIGNATURE_NAME
 
-using EdgesOrQuery = TypedObject<EdgesTag>;
-using FacesOrQuery = TypedObject<FacesTag>;
-using PointArg = TypedObject<scad::pybind::PointTag>;          // checked by vector_arg
-using DirectionArg = TypedObject<scad::pybind::DirectionTag>;  // checked by vector_arg
-using VectorArg = TypedObject<scad::pybind::VectorTag>;        // checked by vector_arg
-using Policy = TypedObject<PolicyTag>;
+using EdgesOrQuery = AnyOf<EdgesTag>;
+using FacesOrQuery = AnyOf<FacesTag>;
+using PointArg = AnyOf<scad::pybind::PointTag>;          // checked by vector_arg
+using DirectionArg = AnyOf<scad::pybind::DirectionTag>;  // checked by vector_arg
+using VectorArg = AnyOf<scad::pybind::VectorTag>;        // checked by vector_arg
+using Policy = AnyOf<PolicyTag>;
 using Handedness = Choice<HandednessTag>;
 
 // ---- conversions ---------------------------------------------------------------------------------------------
@@ -260,9 +259,9 @@ void bind_blends(py::module_& m) {
 void bind_sweeps(py::module_& m) {
   m.def(
       "loft_rsolid",
-      [](const TypedObject<LoftSectionsTag>& profiles, bool ruled, const Policy& tracking_policy,
-         OptionalString tag_prefix, OptionalString result_tag, OptionalString start_face_tag,
-         OptionalString end_face_tag, OptionalString side_faces_tag) {
+      [](const AnyOf<LoftSectionsTag>& profiles, bool ruled, const Policy& tracking_policy, OptionalString tag_prefix,
+         OptionalString result_tag, OptionalString start_face_tag, OptionalString end_face_tag,
+         OptionalString side_faces_tag) {
         const std::vector<Shape> sections =
             shape_list(profiles, "loft_rsolid sections must contain only Wire or Vertex objects");
         const LoftOptions options{policy_text(tracking_policy),
@@ -318,8 +317,8 @@ void bind_sweeps(py::module_& m) {
 
   m.def(
       "sweep_multisection_rsolid",
-      [](const TypedObject<SweepSectionsTag>& profiles, const Wire& path, bool is_frenet,
-         const TypedObject<BinormalTag>& binormal_arg) {
+      [](const AnyOf<SweepSectionsTag>& profiles, const Wire& path, bool is_frenet,
+         const AnyOf<BinormalTag>& binormal_arg) {
         const py::object& binormal = binormal_arg;
         const std::vector<Shape> sections = shape_list(profiles, "sections must be Face or Wire");
         std::optional<Binormal> aux;
@@ -372,8 +371,8 @@ void bind_derived(py::module_& m) {
 
   m.def(
       "extrude_until_rsolid",
-      [](const Face& profile, const TypedObject<TargetTag>& target_arg, const DirectionArg& direction,
-         const TypedObject<UntilTag>& until_arg) {
+      [](const Face& profile, const AnyOf<TargetTag>& target_arg, const DirectionArg& direction,
+         const AnyOf<UntilTag>& until_arg) {
         const py::object& target = target_arg;
         const py::object& until = until_arg;
         std::vector<Solid> targets;
@@ -395,7 +394,7 @@ void bind_derived(py::module_& m) {
 
   m.def(
       "scale_rsolid",
-      [](const Solid& solid, const TypedObject<FactorsTag>& factors, const PointArg& center) {
+      [](const Solid& solid, const AnyOf<FactorsTag>& factors, const PointArg& center) {
         const Scalar3 scale = vector_arg(factors, "factors"), about = vector_arg(center, "center");
         return unlocked(false, [&] { return scale_rsolid(solid, scale, about); });
       },
@@ -529,7 +528,7 @@ void bind_diagnostics(py::module_& m) {
 
   m.def(
       "raise_loft_failure_if_diagnosed",
-      [](const TypedObject<ShapesTag>& sections, const std::string& operation) {
+      [](const AnyOf<ShapesTag>& sections, const std::string& operation) {
         raise_loft_failure_if_diagnosed(shape_list(sections, "loft sections must be shapes"), operation);
       },
       py::arg("sections"), py::arg("operation"), "Explain a failed loft from its sections, when they do.");
@@ -607,8 +606,7 @@ void bind_booleans(py::module_& m) {
 
   m.def(
       "boolean_rsolidlist",
-      [](const TypedObject<SolidsTag>& left, const TypedObject<SolidsTag>& right,
-         const Choice<SetOperationTag>& operation_arg) {
+      [](const AnyOf<SolidsTag>& left, const AnyOf<SolidsTag>& right, const Choice<SetOperationTag>& operation_arg) {
         const std::string& operation = operation_arg;
         if (operation != "cut" && operation != "intersect" && operation != "union") {
           throw ValueError("operation must be cut, intersect or union");
@@ -623,7 +621,7 @@ void bind_booleans(py::module_& m) {
                             const char* second, const char* doc) {
     m.def(
         name,
-        [fn, name, first, second](const TypedObject<FaceOperandTag>& a_arg, const TypedObject<FaceOperandTag>& b_arg) {
+        [fn, name, first, second](const AnyOf<FaceOperandTag>& a_arg, const AnyOf<FaceOperandTag>& b_arg) {
           const py::object& a = a_arg;
           const py::object& b = b_arg;
           if (!py::isinstance<Shape>(a))

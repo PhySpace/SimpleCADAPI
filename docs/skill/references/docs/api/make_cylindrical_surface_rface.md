@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_cylindrical_surface_rface(radius, u_range, v_range, origin=[0.0, 0.0, 0.0], axis=[0.0, 0.0, 1.0], x_direction=None, *, tolerance=1e-07, tag_prefix=None)
+def make_cylindrical_surface_rface(radius, u_range, v_range, origin=(0.0, 0.0, 0.0), axis=(0.0, 0.0, 1.0), x_direction=None, *, tolerance=1e-07, tag_prefix=None)
 ```
 
 *Source: operators/geometry.py*

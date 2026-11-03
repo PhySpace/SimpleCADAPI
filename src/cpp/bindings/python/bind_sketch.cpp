@@ -2,7 +2,6 @@
 // the solver backend registry (duck-typed Python backends included) and the 42
 // operators, under the names and signatures of simplecadapi.
 #include "bindings.hpp"
-#include "semantic_names.hpp"
 #include "py_lifetime.hpp"
 
 #include <mutex>
@@ -129,9 +128,9 @@ using namespace scad;
 using pybind::value_from_python;
 using pybind::value_to_python;
 using scad::pybind::Angle;
+using scad::pybind::AnyOf;
 using scad::pybind::Choice;
 using scad::pybind::Length;
-using scad::pybind::Named;
 
 // The names the signatures show.
 struct PlaneTag {  // read by make_sketch_rsketch: a named plane or {"origin", "x_axis", "y_axis"}
@@ -596,7 +595,7 @@ void bind_sketch_class(py::module_& m) {
 void bind_entity_operators(py::module_& m) {
   m.def(
       "make_sketch_rsketch",
-      [](const std::optional<std::string>& name, const Named<PlaneTag>& plane,
+      [](const std::optional<std::string>& name, const AnyOf<PlaneTag>& plane,
          const std::optional<std::string>& sketch_id) {
         return make_sketch_rsketch(name, value_from_python(plane.value), sketch_id);
       },
@@ -646,7 +645,7 @@ void bind_entity_operators(py::module_& m) {
       py::arg("sketch"), py::arg("a"), py::arg("b"), py::arg("distance"));
   m.def(
       "project_rsketch",
-      [](const Sketch& sketch, const Named<ProjectSourceTag>& source_arg,
+      [](const Sketch& sketch, const AnyOf<ProjectSourceTag>& source_arg,
          const std::optional<std::vector<std::string>>& entities, bool construction) -> Sketch {
         const py::object& source = source_arg.value;
         if (py::isinstance<Sketch>(source))

@@ -5,7 +5,6 @@
 // the Python package.  This is also where the units hook of the surface area is wired to the
 // reactive area's dimension inference.
 #include "bindings.hpp"
-#include "semantic_names.hpp"
 
 #include <array>
 #include <optional>
@@ -37,10 +36,10 @@
 namespace {
 
 using namespace scad;
+using scad::pybind::AnyOf;
 using scad::pybind::Choice;
 using scad::pybind::Direction3;
 using scad::pybind::Length;
-using scad::pybind::Named;
 using scad::pybind::Point3;
 using scad::pybind::PointVec3;
 
@@ -276,7 +275,7 @@ void bind_surface(py::module_& m) {
 
   m.def(
       "loft_rshell",
-      [](const std::vector<Named<LoftSectionTag>>& raw_sections, bool ruled, const TagPrefix& tag_prefix,
+      [](const std::vector<AnyOf<LoftSectionTag>>& raw_sections, bool ruled, const TagPrefix& tag_prefix,
          const std::optional<std::string>& result_tag, const std::optional<std::string>& start_wire_tag,
          const std::optional<std::string>& end_wire_tag, const std::optional<std::string>& side_faces_tag) {
         std::vector<LoftSection> sections;

@@ -5,7 +5,6 @@
 // the member or its string value ("local"), and returns members.  The casters below are the only
 // ones for these types in the module.
 #include "bindings.hpp"
-#include "typed_args.hpp"
 
 #include <algorithm>
 #include <type_traits>
@@ -651,9 +650,9 @@ void bind_operators(py::module_& m) {
 
   m.def(
       "apply_tag_rselection",
-      [](const Shape& scope, const scad::pybind::Typed<TagTargetsName>& targets, const std::string& tag,
-         scad::pybind::Shown<TopologyPropagation, TopologyPropagationName> topology,
-         scad::pybind::Shown<LineagePolicy, LineagePolicyName> lineage) {
+      [](const Shape& scope, const scad::pybind::AnyOf<TagTargetsName>& targets, const std::string& tag,
+         scad::pybind::Renamed<TopologyPropagation, TopologyPropagationName> topology,
+         scad::pybind::Renamed<LineagePolicy, LineagePolicyName> lineage) {
         static const ErrorSpec spec{
             "apply_tag_rselection",
             "Failed to attach the tag to the selected shapes.",

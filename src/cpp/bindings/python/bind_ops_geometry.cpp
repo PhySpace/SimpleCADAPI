@@ -2,7 +2,6 @@
 // simplecadapi/operators/geometry.py, under the Python names, argument names and
 // defaults (keyword-only where Python is keyword-only), plus the create_* aliases.
 #include "bindings.hpp"
-#include "typed_object.hpp"
 
 #include "scad/core/tolerance.hpp"
 #include "scad/io/brep_region.hpp"
@@ -21,11 +20,11 @@ namespace {
 
 using namespace scad;
 using scad::pybind::Angle;
+using scad::pybind::AnyOf;
 using scad::pybind::Choice;
 using scad::pybind::Direction3;
 using scad::pybind::Length;
 using scad::pybind::Point3;
-using scad::pybind::TypedObject;
 using scad::pybind::Vector3;
 using namespace pybind11::literals;
 
@@ -62,7 +61,7 @@ double degree_of(const py::object& degree) {
   return degree.cast<double>();
 }
 
-SplineSpec spline_spec(std::vector<ScalarPoint> control_points, const TypedObject<DegreeTag>& degree,
+SplineSpec spline_spec(std::vector<ScalarPoint> control_points, const AnyOf<DegreeTag>& degree,
                        std::optional<ScalarList> knots, std::optional<std::vector<int>> multiplicities,
                        std::optional<ScalarList> weights, bool periodic) {
   return {.control_points = std::move(control_points),
@@ -195,12 +194,12 @@ void bind_arcs(py::module_& m) {
 
 void bind_splines(py::module_& m) {
   const auto exact = [](auto fn) {
-    return [fn](std::vector<ScalarPoint> control_points, const TypedObject<DegreeTag>& degree,
-                std::optional<ScalarList> knots, std::optional<std::vector<int>> multiplicities,
-                std::optional<ScalarList> weights, bool periodic) {
-      return fn(spline_spec(std::move(control_points), degree, std::move(knots), std::move(multiplicities),
-                            std::move(weights), periodic));
-    };
+    return
+        [fn](std::vector<ScalarPoint> control_points, const AnyOf<DegreeTag>& degree, std::optional<ScalarList> knots,
+             std::optional<std::vector<int>> multiplicities, std::optional<ScalarList> weights, bool periodic) {
+          return fn(spline_spec(std::move(control_points), degree, std::move(knots), std::move(multiplicities),
+                                std::move(weights), periodic));
+        };
   };
   m.def("make_spline_redge", exact(&make_spline_redge), py::kw_only(), py::arg("control_points"), py::arg("degree") = 3,
         py::arg("knots") = py::none(), py::arg("multiplicities") = py::none(), py::arg("weights") = py::none(),
@@ -364,7 +363,7 @@ void bind_primitives(py::module_& m) {
 void bind_brep_region(py::module_& m) {
   m.def(
       "load_brep_region_rsolid",
-      [](const TypedObject<PathTag>& path, const std::string& sha256, const OptionalString& tag_prefix) {
+      [](const AnyOf<PathTag>& path, const std::string& sha256, const OptionalString& tag_prefix) {
         return load_brep_region_rsolid(path_text(path), sha256, tag_prefix);
       },
       py::arg("path"), py::arg("sha256"), py::kw_only(), py::arg("tag_prefix") = py::none(),
@@ -375,14 +374,14 @@ void bind_brep_region(py::module_& m) {
       "sidecar bytes.");
   m.def(
       "_brep_region_path",
-      [](const TypedObject<PathTag>& path, bool for_graph) {
+      [](const AnyOf<PathTag>& path, bool for_graph) {
         return scad::io::checked_region_path(path_text(path), for_graph);
       },
       py::arg("path"), py::kw_only(), py::arg("for_graph"),
       "The checks on a .scadbrep locator (graph replay: relative, no drive, no '..', '/' separators).");
   m.def(
       "load_brep_region_rshell",
-      [](const TypedObject<PathTag>& path, const std::string& sha256, const OptionalString& tag_prefix) {
+      [](const AnyOf<PathTag>& path, const std::string& sha256, const OptionalString& tag_prefix) {
         return load_brep_region_rshell(path_text(path), sha256, tag_prefix);
       },
       py::arg("path"), py::arg("sha256"), py::kw_only(), py::arg("tag_prefix") = py::none(),

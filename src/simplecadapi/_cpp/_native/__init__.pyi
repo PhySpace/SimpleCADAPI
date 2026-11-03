@@ -717,7 +717,7 @@ class _TrackingPolicyScope:
         ...
     def __exit__(self, *args) -> None:
         ...
-def _brep_region_path(path: typing.Any, *, for_graph: bool) -> str:
+def _brep_region_path(path: str | os.PathLike[str], *, for_graph: bool) -> str:
     """
     The checks on a .scadbrep locator (graph replay: relative, no drive, no '..', '/' separators).
     """
@@ -893,7 +893,7 @@ def tessellate_solid(shape: AnyShape, *, linear_deflection: typing.SupportsFloat
     """
     (vertices Nx3 float64, triangles Mx3 int32): the shape's surface tessellated, vertices welded.
     """
-def tracking_policy_scope(policy: typing.Any) -> _TrackingPolicyScope:
+def tracking_policy_scope(policy: typing.Literal['full', 'graph'] | simplecadapi._cpp.TrackingPolicy) -> _TrackingPolicyScope:
     """
     Run a block with graph-only or full topology tracking.
     """

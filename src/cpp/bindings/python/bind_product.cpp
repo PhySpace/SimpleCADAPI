@@ -5,9 +5,8 @@
 // Every operator takes py::object for the arguments whose type Python checks inside its wrapped
 // body, and converts them inside guard_operation, so a wrong type is the operation's
 // SimpleCADError exactly as in Python (see bind_product_args.hpp).  The py::object arrives as a
-// `Typed<Name>` (typed_args.hpp), so the signature still says what each argument is.
+// `AnyOf<Name>` (semantic_types.hpp), so the signature still says what each argument is.
 #include "bind_product_args.hpp"
-#include "typed_args.hpp"
 
 #include "scad/reactive/registry.hpp"
 
@@ -52,35 +51,35 @@ SCAD_SIGNATURE_NAME(Ref, type_name<sp::ConnectorRef>());
 SCAD_SIGNATURE_NAME(Limit, type_name<sp::ScalarLimit>() + kOrNone);
 }  // namespace names
 
-using scad::pybind::Typed;
-using TextArg = Typed<names::Text>;
-using NameArg = Typed<names::TextOrNone>;  // anything str() takes: a display name
-using TextOrNoneArg = Typed<names::TextOrNone>;
-using NumberArg = Typed<names::Number>;
-using NumberOrNoneArg = Typed<names::NumberOrNone>;
-using BoolArg = Typed<names::Bool>;  // any object, read by its truth value
-using ColorArg = Typed<names::Color>;
-using LengthArg = Typed<names::Length>;
-using LengthOrNoneArg = Typed<names::LengthOrNone>;
-using AngleOrNoneArg = Typed<names::AngleOrNone>;
-using PointArg = Typed<names::Point>;
-using PointOrNoneArg = Typed<names::PointOrNone>;
-using DirectionArg = Typed<names::Direction>;
-using DirectionOrNoneArg = Typed<names::DirectionOrNone>;
-using DirectionsArg = Typed<names::Directions>;
-using WeightsArg = Typed<names::Weights>;
-using SolidArg = Typed<names::Solid>;
-using FaceArg = Typed<names::Face>;
-using EdgeArg = Typed<names::Edge>;
-using VertexArg = Typed<names::Vertex>;
-using PartArg = Typed<names::Part>;
-using AssemblyArg = Typed<names::Assembly>;
-using ItemArg = Typed<names::Item>;
-using PlacementArg = Typed<names::Placement>;
-using MaterialArg = Typed<names::Material>;
-using ConnectorArg = Typed<names::Connector>;
-using RefArg = Typed<names::Ref>;
-using LimitArg = Typed<names::Limit>;
+using scad::pybind::AnyOf;
+using TextArg = AnyOf<names::Text>;
+using NameArg = AnyOf<names::TextOrNone>;  // anything str() takes: a display name
+using TextOrNoneArg = AnyOf<names::TextOrNone>;
+using NumberArg = AnyOf<names::Number>;
+using NumberOrNoneArg = AnyOf<names::NumberOrNone>;
+using BoolArg = AnyOf<names::Bool>;  // any object, read by its truth value
+using ColorArg = AnyOf<names::Color>;
+using LengthArg = AnyOf<names::Length>;
+using LengthOrNoneArg = AnyOf<names::LengthOrNone>;
+using AngleOrNoneArg = AnyOf<names::AngleOrNone>;
+using PointArg = AnyOf<names::Point>;
+using PointOrNoneArg = AnyOf<names::PointOrNone>;
+using DirectionArg = AnyOf<names::Direction>;
+using DirectionOrNoneArg = AnyOf<names::DirectionOrNone>;
+using DirectionsArg = AnyOf<names::Directions>;
+using WeightsArg = AnyOf<names::Weights>;
+using SolidArg = AnyOf<names::Solid>;
+using FaceArg = AnyOf<names::Face>;
+using EdgeArg = AnyOf<names::Edge>;
+using VertexArg = AnyOf<names::Vertex>;
+using PartArg = AnyOf<names::Part>;
+using AssemblyArg = AnyOf<names::Assembly>;
+using ItemArg = AnyOf<names::Item>;
+using PlacementArg = AnyOf<names::Placement>;
+using MaterialArg = AnyOf<names::Material>;
+using ConnectorArg = AnyOf<names::Connector>;
+using RefArg = AnyOf<names::Ref>;
+using LimitArg = AnyOf<names::Limit>;
 
 const sp::Assembly& assembly_arg(const py::object& value) {
   return typed<sp::Assembly>(value, "assembly must be an Assembly");

@@ -5,7 +5,6 @@
 // executor to register: a recorded gear replays through the operators it was made of.
 // `build_ball_bearing` (the durable-definition wrapper over the build layer) is not provided.
 #include "bindings.hpp"
-#include "typed_args.hpp"
 
 #include <optional>
 #include <string>
@@ -23,14 +22,12 @@ namespace {
 
 using namespace scad;
 
-// What the arguments mean, for the signature (typed_args.hpp): each converts exactly as the double / int / object it
-// wraps, so the factories take what they took before.
-struct CountTag {
-  static constexpr auto name = py::detail::const_name("simplecadapi.types.Count");
-};
-using Length = scad::pybind::Shown<double, scad::pybind::LengthTag>;
-using Angle = scad::pybind::Shown<double, scad::pybind::AngleTag>;
-using Count = scad::pybind::Shown<int, CountTag>;
+// What the arguments mean, for the signature (semantic_types.hpp): each converts exactly as the double / int / object
+// it wraps, so the factories take what they took before.
+using CountTag = scad::pybind::CountTag;
+using Length = scad::pybind::PlainQuantity<scad::pybind::LengthTag>;
+using Angle = scad::pybind::PlainQuantity<scad::pybind::AngleTag>;
+using Count = scad::pybind::Count;
 
 namespace names {
 using py::detail::const_name;
@@ -47,16 +44,16 @@ SCAD_SIGNATURE_NAME(NutStyle, const_name("typing.Literal['hex', 'square', 'round
 SCAD_SIGNATURE_NAME(HoleStyle, const_name("typing.Literal['through', 'blind']"));
 }  // namespace names
 
-using CountArg = scad::pybind::Typed<CountTag>;  // checked as a plain int by the factory
-using CountOrNoneArg = scad::pybind::Typed<names::CountOrNone>;
-using MaterialOrNoneArg = scad::pybind::Typed<names::MaterialOrNone>;
-using HeadStyleArg = scad::pybind::Typed<names::HeadStyle>;
-using ThreadStyleArg = scad::pybind::Typed<names::ThreadStyle>;
-using ThreadDetailArg = scad::pybind::Typed<names::ThreadDetail>;
-using ThreadFormArg = scad::pybind::Typed<names::ThreadForm>;
-using DriveStyleArg = scad::pybind::Typed<names::DriveStyle>;
-using NutStyleArg = scad::pybind::Typed<names::NutStyle>;
-using HoleStyleArg = scad::pybind::Typed<names::HoleStyle>;
+using CountArg = scad::pybind::AnyOf<CountTag>;  // checked as a plain int by the factory
+using CountOrNoneArg = scad::pybind::AnyOf<names::CountOrNone>;
+using MaterialOrNoneArg = scad::pybind::AnyOf<names::MaterialOrNone>;
+using HeadStyleArg = scad::pybind::AnyOf<names::HeadStyle>;
+using ThreadStyleArg = scad::pybind::AnyOf<names::ThreadStyle>;
+using ThreadDetailArg = scad::pybind::AnyOf<names::ThreadDetail>;
+using ThreadFormArg = scad::pybind::AnyOf<names::ThreadForm>;
+using DriveStyleArg = scad::pybind::AnyOf<names::DriveStyle>;
+using NutStyleArg = scad::pybind::AnyOf<names::NutStyle>;
+using HoleStyleArg = scad::pybind::AnyOf<names::HoleStyle>;
 
 // Runs `body` with the GIL released; an exception leaves with the GIL back.
 template <class F>
