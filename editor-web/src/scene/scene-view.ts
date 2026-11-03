@@ -19,7 +19,7 @@ import type { PackageFiles } from './product-package';
 import type { PreviewData } from '../lib/preview';
 import type { Entity, EntitySidecar, FaceGroup, SceneNode } from './scene2';
 
-export type SelectionMode = 'component' | 'solid' | 'face' | 'edge' | 'vertex';
+export type SelectionMode = 'component' | 'solid' | 'face' | 'edge' | 'vertex' | 'sketch';
 export type PickResult = {
   nodeId: string;
   entityId: string | null;
@@ -36,6 +36,8 @@ export type SceneViewOptions = {
   onPick?: (result: PickResult) => void;
   /** A click that hit nothing. */
   onClear?: () => void;
+  /** A click in sketch mode: the name of the sketch under it, or null (the sketch layer answers which). */
+  onSketchPick?: (name: string | null, additive: boolean) => void;
   selectionMode?: SelectionMode;
   background?: string;
   /** The scene's theme (default dark). */
@@ -55,6 +57,9 @@ export class SceneView {
   readonly rig: CameraRig;
   onPick: ((result: PickResult) => void) | null;
   onClear: (() => void) | null;
+  onSketchPick: ((name: string | null, additive: boolean) => void) | null;
+  /** Which sketch is under a pointer event (set by the sketch layer; null when nothing is). */
+  sketchHitter: ((event: { clientX: number; clientY: number }) => string | null) | null = null;
 
   private raycaster = new THREE.Raycaster();
   private pointer = new THREE.Vector2();
@@ -66,6 +71,7 @@ export class SceneView {
   constructor(host: HTMLElement, options: SceneViewOptions = {}) {
     this.onPick = options.onPick ?? null;
     this.onClear = options.onClear ?? null;
+    this.onSketchPick = options.onSketchPick ?? null;
     this.selectionMode = options.selectionMode ?? 'face';
     this.engine = new BRepRenderer(host, { background: options.background, theme: options.theme, ssao: options.ssao, seams: options.seams });
     this.rig = new CameraRig(this.engine);
@@ -75,6 +81,10 @@ export class SceneView {
         camera: this.engine.camera,
         controls: this.engine.controls,
         onClick: (event) => {
+          if (this.selectionMode === 'sketch') {
+            this.onSketchPick?.(this.sketchHitter?.(event) ?? null, event.ctrlKey || event.metaKey);
+            return;
+          }
           const result = this.pick(event);
           if (result) this.onPick?.({ ...result, additive: event.ctrlKey || event.metaKey });
           else if (!(event.ctrlKey || event.metaKey)) this.onClear?.();
@@ -171,6 +181,7 @@ export class SceneView {
   }
 
   pick(event: PointerEvent): PickResult | null {
+    if (this.selectionMode === 'sketch') return null; // sketches are picked by the sketch layer, not by ray
     this.pointerRay(event);
     const hits = this.raycaster.intersectObjects(this.engine.modelRoot.children, true).filter((hit) => {
       if (hit.object.userData.pickable === false || !this.isEffectivelyVisible(hit.object)) return false;

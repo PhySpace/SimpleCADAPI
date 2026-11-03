@@ -27,7 +27,7 @@ function writeStore(key: string, value: string) {
 /** A floating command bar over the viewport: category chips, a search box, a short result list.
  * `/` or Ctrl/Cmd+K focuses the search; Up/Down move, Enter runs, Esc closes the list.
  * It collapses to a pill and docks at the bottom (default) or the top. */
-export function CommandBar({ commands }: { commands: Command[] }) {
+export function CommandBar({ commands, fit, hint }: { commands: Command[]; /** How much a command fits the selection (see fitScore): the fitting ones come first. */ fit?: (command: Command) => number; /** One line saying what the selection can do. */ hint?: string | null }) {
   const [dock, setDock] = useState<"top" | "bottom">(() => readStore<"top" | "bottom">(DOCK_KEY, "bottom", (raw) => (raw === "top" || raw === "bottom" ? raw : null)));
   const [collapsed, setCollapsed] = useState(false);
   const [recent, setRecent] = useState<string[]>(() => readStore<string[]>(RECENT_KEY, [], (raw) => (Array.isArray(JSON.parse(raw)) ? (JSON.parse(raw) as string[]) : null)));
@@ -42,9 +42,10 @@ export function CommandBar({ commands }: { commands: Command[] }) {
 
   const groups = useMemo(() => commandGroups(commands), [commands]);
   const results = useMemo(() => {
-    const pool = group && !query.trim() ? commands.filter((command) => command.group === group) : commands;
-    return searchCommands(pool, query, recent);
-  }, [commands, group, query, recent]);
+    const listed = commands.filter((command) => !command.contextOnly || (fit?.(command) ?? 0) > 0);
+    const pool = group && !query.trim() ? listed.filter((command) => command.group === group) : listed;
+    return searchCommands(pool, query, recent, fit);
+  }, [commands, group, query, recent, fit]);
   const shown = open ? results : [];
   const at = Math.min(highlight, Math.max(shown.length - 1, 0));
 
@@ -174,11 +175,16 @@ export function CommandBar({ commands }: { commands: Command[] }) {
                   {Icon ? <Icon className="size-3.5 shrink-0" /> : <span className="size-3.5 shrink-0" />}
                   <span className="shrink-0 font-semibold">{command.label}</span>
                   <span className={cn("min-w-0 flex-1 truncate text-[11px]", index === at ? "opacity-80" : "text-muted-foreground")}>{command.description}</span>
-                  <span className="shrink-0 text-[10px] uppercase tracking-[0.08em] opacity-70">{command.group}</span>
+                  <span className={cn("shrink-0 text-[10px] uppercase tracking-[0.08em]", fit && fit(command) > 0 ? "font-bold" : "opacity-70")}>{fit && fit(command) > 0 ? "fits selection" : command.group}</span>
                 </li>
               );
             })}
           </ul>
+        )}
+        {hint && (
+          <p data-testid="command-hint" className={cn("absolute inset-x-0 border-2 border-focus bg-popover px-2 py-0.5 text-[11px]", shown.length > 0 ? "hidden" : bottom ? "bottom-full mb-1" : "top-full mt-1")}>
+            {hint}
+          </p>
         )}
         <div className="flex flex-wrap items-center gap-1 border-2 border-primary bg-background p-1 shadow-[4px_4px_0_var(--shadow-hard)]">
           <div className="flex flex-wrap items-center gap-0.5">

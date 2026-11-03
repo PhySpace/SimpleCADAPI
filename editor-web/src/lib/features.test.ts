@@ -170,6 +170,15 @@ describe("the opposite of a sketch plane's normal", () => {
   });
 });
 
+describe("a server that lists '-normal' itself", () => {
+  const withFlip = [{ value: "+x", label: "+x" }, { value: "normal", label: "normal" }, { value: "-normal", label: "against the normal" }];
+  const slanted = { profiles: [{ name: "slant", plane: "frame", normal: "normal", normal_vec: [0.6, 0, 0.8] as [number, number, number] }] };
+  it("is used as it is: no second '-normal', and the value goes to the server unchanged (slanted normals too)", () => {
+    expect(directionOptions(withFlip, slanted, "slant").map((o) => o.value)).toEqual(["+x", "normal", "-normal"]);
+    expect(resolveDirection("-normal", slanted, "slant", true)).toBe("-normal");
+  });
+});
+
 describe("profile plane labels", () => {
   it("names a datum plane and calls a frame a face", () => {
     expect(profilePlaneLabel({ plane: "XZ" })).toBe("XZ");

@@ -349,8 +349,10 @@ export function oppositeNormal(state: Pick<FeatureState, "profiles">, profile: s
   return named ? `${named[1] === "+" ? "-" : "+"}${named[2]}` : null;
 }
 
-/** The options of a sketch operation's direction: the server's, plus "-normal" when the profile has an axis-aligned normal. */
+/** The options of a sketch operation's direction: the server's, plus "-normal" when the profile has an axis-aligned normal
+ * (a server that lists "-normal" itself is used as it is). */
 export function directionOptions(options: readonly SlotOption[], state: Pick<FeatureState, "profiles">, profile: string | null): SlotOption[] {
+  if (options.some((option) => option.value === FLIP_NORMAL)) return [...options]; // the server offers the opposite itself
   const opposite = oppositeNormal(state, profile);
   const at = options.findIndex((option) => option.value === "normal");
   if (!opposite || at < 0) return [...options];
@@ -358,7 +360,8 @@ export function directionOptions(options: readonly SlotOption[], state: Pick<Fea
 }
 
 /** What the server is sent for a direction choice: "-normal" becomes the opposite axis. */
-export function resolveDirection(value: string, state: Pick<FeatureState, "profiles">, profile: string | null): string {
+export function resolveDirection(value: string, state: Pick<FeatureState, "profiles">, profile: string | null, serverFlips = false): string {
+  if (serverFlips) return value; // the server turns "-normal" into the opposite of any normal, slanted ones too
   return value === FLIP_NORMAL ? (oppositeNormal(state, profile) ?? "normal") : value;
 }
 
@@ -442,7 +445,18 @@ export function holeFromFace(item: { properties: Record<string, unknown> | null;
   return { point, direction: normal ? inwardAxis(normal) : null };
 }
 
-const NAME_BASE: Record<string, string> = { extrude_rect: "block", extrude_circle: "disc", extrude_polygon: "profile_solid" };
+const NAME_BASE: Record<string, string> = {
+  extrude_rect: "block",
+  extrude_circle: "disc",
+  extrude_polygon: "profile_solid",
+  extrude_sketch: "extrusion",
+  revolve_sketch: "revolution",
+  cut_sketch: "pocket",
+  boss_sketch: "boss",
+};
+
+/** Operations whose default name is chosen here (a plain word) instead of by the server (the operation's internal id). */
+export const FRIENDLY_NAMES: ReadonlySet<string> = new Set(["extrude_sketch", "revolve_sketch", "cut_sketch", "boss_sketch"]);
 
 /** The name the server will give a feature when none is typed (mirrors default_slug in features.py; a hint, the server decides). */
 export function suggestName(specId: string, taken: readonly string[]): string {

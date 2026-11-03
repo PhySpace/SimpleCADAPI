@@ -1,10 +1,12 @@
-import { ArrowRight, Pencil, Redo2, Trash2, Undo2 } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Pencil, Redo2, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { plainLabel } from "@/lib/commands";
 import type { Catalog, FeatureRow, FeatureState, Spec } from "@/lib/features";
+import type { SketchInfo } from "@/lib/sketch-scene";
 import { cn } from "@/lib/utils";
 
 /** Undo and redo with their counts. */
@@ -42,7 +44,19 @@ function statusColor(feature: FeatureRow): string {
   return "bg-muted-foreground";
 }
 
-/** The features of the notebook in order, with edit, delete (arm, then click), and the product marker. */
+/** The sketches of the notebook as the tree shows them: visibility (an eye), selection and the hover shared with the viewport. */
+export type TreeSketches = {
+  infos: readonly SketchInfo[];
+  hidden: ReadonlySet<string>;
+  selected: readonly string[];
+  hover: string | null;
+  onToggleHidden: (name: string) => void;
+  onSelect: (name: string, additive: boolean) => void;
+  onHover: (name: string | null) => void;
+};
+
+/** The features of the notebook in order, with edit, delete (arm, then click), and the product marker.
+ * A sketch row has an eye (show or hide it in the viewport), selects on click and highlights with the viewport. */
 export function FeatureTree({
   catalog,
   state,
@@ -53,7 +67,9 @@ export function FeatureTree({
   onUseProduct,
   onUndo,
   onRedo,
+  sketches,
 }: {
+  sketches?: TreeSketches;
   catalog: Catalog | null;
   state: FeatureState;
   busy: boolean;
@@ -101,8 +117,24 @@ export function FeatureTree({
               const problem = errorText(feature);
               const isProduct = state.product !== null && feature.makes.includes(state.product.body);
               const canEdit = Boolean(feature.gui && spec);
+              const sketch = sketches?.infos.find((info) => info.cell === feature.cell);
+              const hiddenSketch = sketch ? sketches?.hidden.has(sketch.name) : false;
+              const selectedSketch = sketch ? sketches?.selected.includes(sketch.name) : false;
+              const hoveredSketch = sketch ? sketches?.hover === sketch.name : false;
               return (
-                <li key={feature.cell} className="border-b border-border px-3 py-2">
+                <li
+                  key={feature.cell}
+                  data-sketch={sketch?.name}
+                  data-selected={selectedSketch || undefined}
+                  data-hover={hoveredSketch || undefined}
+                  className={cn("border-b border-border px-3 py-2", sketch && "cursor-pointer", hoveredSketch && "bg-accent", selectedSketch && "border-l-4 border-l-focus bg-accent")}
+                  onMouseEnter={sketch ? () => sketches?.onHover(sketch.name) : undefined}
+                  onMouseLeave={sketch ? () => sketches?.onHover(null) : undefined}
+                  onClick={sketch ? (event) => {
+                    if ((event.target as HTMLElement).closest("button")) return;
+                    sketches?.onSelect(sketch.name, event.ctrlKey || event.metaKey);
+                  } : undefined}
+                >
                   <div className="flex items-center gap-2">
                     <span className={cn("inline-block h-2 w-2 shrink-0", statusColor(feature))} title={feature.status ?? "unknown"} />
                     <span className="w-5 shrink-0 text-[10px] text-muted-foreground">{feature.index}</span>
@@ -113,12 +145,32 @@ export function FeatureTree({
                       </Badge>
                     )}
                     <Badge variant="secondary">{feature.role}</Badge>
-                    <Badge variant={feature.gui ? "outline" : "name"}>{spec ? spec.label : feature.gui ? feature.gui.spec : "code"}</Badge>
+                    {sketch && sketch.usedBy.length > 0 && (
+                      <Badge variant="secondary" title={`Used by ${sketch.usedBy.join(", ")}: drawn dimmer in the viewport`}>
+                        used
+                      </Badge>
+                    )}
+                    <Badge variant={feature.gui ? "outline" : "name"}>{spec ? plainLabel(spec.id, spec.label) : feature.gui ? feature.gui.spec.replace(/_/g, " ") : "code"}</Badge>
                   </div>
                   <div className="mt-1 flex items-center gap-2 pl-[22px]">
                     <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground" title={`${feature.reads.join(", ")} -> ${feature.makes.join(", ")}`}>
                       {feature.reads.length > 0 ? feature.reads.join(", ") : "start"} <ArrowRight className="inline size-3" /> {feature.makes.length > 0 ? feature.makes.join(", ") : "no body"}
                     </span>
+                    {sketch && (
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        data-testid={`sketch-eye-${sketch.name}`}
+                        aria-pressed={!hiddenSketch}
+                        aria-label={hiddenSketch ? `show ${sketch.name} in the viewport` : `hide ${sketch.name} in the viewport`}
+                        title={hiddenSketch ? "Show this sketch in the viewport" : "Hide this sketch in the viewport"}
+                        onClick={() => sketches?.onToggleHidden(sketch.name)}
+                      >
+                        {hiddenSketch ? <EyeOff className="text-muted-foreground" /> : <Eye />}
+                      </Button>
+                    )}
                     <span title={canEdit ? "Edit this feature" : "Written as code: edit it in the notebook"}>
                       <Button type="button" size="icon" variant="ghost" className="h-6 w-6" disabled={!canEdit || busy} aria-label={`edit ${feature.slug}`} onClick={() => spec && onEdit(feature, spec)}>
                         <Pencil />

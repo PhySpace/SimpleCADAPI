@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { MousePointerClick } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowUpDown, Crosshair, MousePointerClick } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -7,8 +7,15 @@ import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectLabel, SelectGroup, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { plainDescription, plainLabel } from "@/lib/commands";
+import { defaultExtrudeDistance, profileSummary, type SketchInfo } from "@/lib/sketch-scene";
+import type { SketchSolved } from "@/lib/useSketchShapes";
+import { frameNormal, normalizePlane, dot, type Vec3 } from "@/lib/sketch-plane";
+import { directionVector } from "@/scene/sketch-layer";
 import {
   CellFailure,
+  FLIP_NORMAL,
+  FRIENDLY_NAMES,
   bodyChoices,
   directionForProfile,
   directionOptions,
@@ -35,13 +42,24 @@ import {
 import type { SelectionItem } from "@/lib/selection";
 import type { SelectionMode } from "@/scene/Viewport";
 
-export type DialogRequest = { spec: Spec; edit?: FeatureRow };
+/** `prefill` sets starting values of slots (a sketch to extrude, a distance); `fromFace` fills a hole from the selected face. */
+export type DialogRequest = { spec: Spec; edit?: FeatureRow; prefill?: Record<string, unknown>; fromFace?: boolean };
+
+/** What the form knows of the notebook's sketches: who they are, their solved shapes, and the one selected in the viewport. */
+export type DialogSketches = {
+  infos: readonly SketchInfo[];
+  shapes: ReadonlyMap<string, SketchSolved>;
+  picked: string | null;
+  /** The arrow the viewport draws for the push the form describes (null: none). */
+  onPreview: (arrow: { sketch: string; direction: Vec3; distance: number } | null) => void;
+};
 
 /** The form of one operation, generated from its spec.  A docked card, not a modal: the viewport stays live. */
 export function FeatureDialog({
   request,
   state,
   selection,
+  sketches,
   onSelectionMode,
   onSubmit,
   onClose,
@@ -49,6 +67,7 @@ export function FeatureDialog({
   request: DialogRequest | null;
   state: FeatureState;
   selection: SelectionItem[];
+  sketches: DialogSketches;
   onSelectionMode: (mode: SelectionMode) => void;
   /** Runs the command; rejects with the server's message, shown inline. */
   onSubmit: (command: FeatureCommand) => Promise<void>;
@@ -62,6 +81,7 @@ export function FeatureDialog({
           request={request}
           state={state}
           selection={selection}
+          sketches={sketches}
           onSelectionMode={onSelectionMode}
           onSubmit={onSubmit}
           onClose={onClose}
@@ -75,6 +95,7 @@ function FeatureForm({
   request,
   state,
   selection,
+  sketches,
   onSelectionMode,
   onSubmit,
   onClose,
@@ -82,18 +103,32 @@ function FeatureForm({
   request: DialogRequest;
   state: FeatureState;
   selection: SelectionItem[];
+  sketches: DialogSketches;
   onSelectionMode: (mode: SelectionMode) => void;
   onSubmit: (command: FeatureCommand) => Promise<void>;
   onClose: () => void;
 }) {
   const { spec, edit } = request;
   const editing = Boolean(edit);
+  const profileSlotOf = spec.slots.find((slot) => slot.kind === "profile");
+  const hasDirection = spec.slots.some((slot) => slot.name === "direction");
+  const serverFlips = Boolean(spec.slots.find((slot) => slot.name === "direction")?.options?.some((option) => option.value === FLIP_NORMAL));
   const [form, setForm] = useState<RawForm>(() => {
-    const initial = initialForm(spec, state.defaults[spec.id] ?? {}, edit?.gui?.values ?? {});
+    // A new feature takes the sketch selected in the viewport as its profile (the prefill of a command wins).
+    const chosen = !edit && profileSlotOf && sketches.picked && findProfile(state, sketches.picked) ? { [profileSlotOf.name]: sketches.picked } : {};
+    const base = initialForm(spec, state.defaults[spec.id] ?? {}, { ...(edit?.gui?.values ?? {}), ...chosen, ...(request.prefill ?? {}) });
+    const named = profileSlotOf && typeof base[profileSlotOf.name] === "string" ? (base[profileSlotOf.name] as string) : null;
+    // A new push takes about a quarter of the sketch's largest extent as its distance (unless the command said one).
+    const sizeSlot = spec.slots.find((slot) => slot.name === "distance" || slot.name === "depth");
+    const shape = named ? sketches.shapes.get(named)?.shape : undefined;
+    const sized: RawForm = !edit && sizeSlot && shape?.extent && !(request.prefill && sizeSlot.name in request.prefill) ? { ...base, [sizeSlot.name]: String(defaultExtrudeDistance(shape, Number(base[sizeSlot.name]) || 10)) } : base;
     // A new feature on a sketch pushes along that sketch's plane normal.
-    const profileSlot = spec.slots.find((slot) => slot.kind === "profile");
-    const normal = !edit && profileSlot && typeof initial[profileSlot.name] === "string" ? directionForProfile(state, initial[profileSlot.name] as string) : null;
-    return normal && spec.slots.some((slot) => slot.name === "direction") ? { ...initial, direction: normal } : initial;
+    const normal = !edit && named ? directionForProfile(state, named) : null;
+    if (!(normal && hasDirection)) return sized;
+    // A cut goes into the material: for a sketch drawn on a face (a frame, its normal pointing out) that is against the normal.
+    const profile = named ? findProfile(state, named) : undefined;
+    const into = spec.id === "cut_sketch" && profile && profilePlaneLabel(profile) === "face";
+    return { ...sized, direction: into ? FLIP_NORMAL : normal };
   });
   const [name, setName] = useState(edit?.slug ?? "");
   const [busy, setBusy] = useState(false);
@@ -113,8 +148,11 @@ function FeatureForm({
     return !editing || keys.length !== initialKeys.size || keys.some((key) => !initialKeys.has(key));
   };
 
+  // The sketch field is armed: a click on a sketch in the viewport or the tree fills it (until the person turns it off).
+  const [armed, setArmed] = useState(() => Boolean(profileSlotOf) && !(request.prefill && profileSlotOf && request.prefill[profileSlotOf.name]));
+
   // The viewport picks what the form asks for while it is open, and goes back after.
-  const wanted = (selectSlots[0]?.entity ?? (spec.id === "hole" ? "face" : null)) as SelectionMode | null;
+  const wanted = (selectSlots[0]?.entity ?? (spec.id === "hole" ? "face" : profileSlotOf && armed ? "sketch" : null)) as SelectionMode | null;
   useEffect(() => {
     if (wanted) onSelectionMode(wanted);
   }, [wanted, onSelectionMode]);
@@ -129,10 +167,57 @@ function FeatureForm({
   const profileRaw = profileSlotName ? form[profileSlotName] : undefined;
   const profileName = typeof profileRaw === "string" ? profileRaw : null;
   const values = useMemo(
-    () => (typeof formValues.direction === "string" ? { ...formValues, direction: resolveDirection(formValues.direction, state, profileName) } : formValues),
-    [formValues, state, profileName],
+    () => (typeof formValues.direction === "string" ? { ...formValues, direction: resolveDirection(formValues.direction, state, profileName, serverFlips) } : formValues),
+    [formValues, state, profileName, serverFlips],
   );
   const errors = formErrors;
+
+  /** The direction a profile starts with: its normal, or into the material for a cut on a face. */
+  const startDirection = (profile: string): string | null => {
+    const normal = directionForProfile(state, profile);
+    const found = findProfile(state, profile);
+    return normal && spec.id === "cut_sketch" && found && profilePlaneLabel(found) === "face" ? FLIP_NORMAL : normal;
+  };
+  const applyProfile = (profile: string) => {
+    const direction = startDirection(profile);
+    setForm((previous) => ({ ...previous, ...(profileSlotOf ? { [profileSlotOf.name]: profile } : {}), ...(direction && hasDirection ? { direction } : {}) }));
+    setServerError(null);
+  };
+
+  // A sketch picked in the viewport or the tree fills the armed profile field.
+  const lastPicked = useRef(sketches.picked);
+  useEffect(() => {
+    if (sketches.picked === lastPicked.current) return;
+    lastPicked.current = sketches.picked;
+    if (armed && sketches.picked && profileSlotOf && findProfile(state, sketches.picked)) applyProfile(sketches.picked);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sketches.picked]);
+
+  // The viewport shows which way the push goes, from the sketch, as an arrow (and says nothing once the form is gone).
+  const previewRef = useRef(sketches.onPreview);
+  previewRef.current = sketches.onPreview;
+  const directionText = typeof values.direction === "string" ? values.direction : null;
+  const pushed = typeof values.distance === "number" ? values.distance : typeof values.depth === "number" ? values.depth : null;
+  useEffect(() => {
+    const found = profileName ? findProfile(state, profileName) : undefined;
+    const vector = found && directionText ? directionVector(directionText, normalizePlane(found.plane)) : null;
+    previewRef.current(found && vector ? { sketch: found.name, direction: vector, distance: Math.abs(pushed ?? 10) } : null);
+  }, [profileName, directionText, pushed, state]);
+  useEffect(() => () => previewRef.current(null), []);
+
+  /** Which way the push goes relative to the sketch's own normal (null without a sketch), and whether it can be flipped. */
+  const flip = useMemo(() => {
+    const found = profileName ? findProfile(state, profileName) : undefined;
+    if (!found || !hasDirection || !directionText) return null;
+    const plane = normalizePlane(found.plane);
+    const normal = found.normal_vec ?? frameNormal(plane as never as { origin: Vec3; x_axis: Vec3; y_axis: Vec3 });
+    const vector = directionVector(directionText, plane);
+    const against = vector ? dot(vector, normal as Vec3) < 0 : false;
+    const axis = /^[+-][xyz]$/.test(found.normal) ? found.normal : "normal";
+    return { against, axis, can: directionOptions(spec.slots.find((slot) => slot.name === "direction")?.options ?? [], state, profileName).some((option) => option.value === FLIP_NORMAL) };
+  }, [profileName, directionText, state, hasDirection, spec]);
+  const onFlip = () => set("direction", flip?.against ? "normal" : FLIP_NORMAL);
+
   const nameError = editing || created ? null : validateName(name, state.taken);
   const suggested = suggestName(spec.id, state.taken);
 
@@ -159,7 +244,7 @@ function FeatureForm({
       ? { op: "edit", cell: edit.cell, values, ...withSelections }
       : created
         ? { op: "edit", cell: created, values, ...withSelections }
-        : { op: "add", spec: spec.id, ...(name.trim() ? { name: name.trim() } : {}), values, ...withSelections };
+        : { op: "add", spec: spec.id, ...(name.trim() ? { name: name.trim() } : FRIENDLY_NAMES.has(spec.id) ? { name: suggested } : {}), values, ...withSelections };
     try {
       await onSubmit(command);
     } catch (error) {
@@ -169,7 +254,7 @@ function FeatureForm({
     }
   };
 
-  const useFace = () => {
+  const fillFromFace = () => {
     const faces = filterSelection(selection, "face");
     if (faces.length !== 1) {
       setNote("Pick exactly one face in the viewport first.");
@@ -198,6 +283,18 @@ function FeatureForm({
     setServerError(null);
   };
 
+  // A hole opened from a selected face takes its start point and direction from it as soon as the face is described.
+  const faceUsed = useRef(false);
+  useEffect(() => {
+    if (!request.fromFace || faceUsed.current) return;
+    const faces = filterSelection(selection, "face");
+    if (faces.length === 1 && isDescribed(faces[0])) {
+      faceUsed.current = true;
+      fillFromFace();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selection]);
+
   const own = new Set(edit?.makes ?? []);
   const bodies = bodyChoices(state).filter((body) => !own.has(body.name));
 
@@ -214,9 +311,9 @@ function FeatureForm({
     >
       <DialogHeader>
         <DialogTitle>
-          {editing ? "Edit" : "Add"} {spec.label.toLowerCase()}
+          {editing ? "Edit" : "Add"} {plainLabel(spec.id, spec.label).toLowerCase()}
         </DialogTitle>
-        <DialogDescription>{spec.description}</DialogDescription>
+        <DialogDescription>{plainDescription(spec.id, spec.description)}</DialogDescription>
       </DialogHeader>
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
         <Field label="Name" error={touched ? nameError : null} help={editing ? "A feature keeps its name." : undefined}>
@@ -238,18 +335,19 @@ function FeatureForm({
               bodies={bodies}
               selection={selection}
               state={state}
-              onProfile={(name) => {
-                const normal = directionForProfile(state, name);
-                setForm((previous) => ({ ...previous, [slot.name]: name, ...(normal && spec.slots.some((other) => other.name === "direction") ? { direction: normal } : {}) }));
-                setServerError(null);
-              }}
+              onProfile={applyProfile}
+              sketches={sketches}
+              armed={armed}
+              onArm={setArmed}
+              flip={slot.name === "direction" && slot.kind === "enum" ? flip : null}
+              onFlip={onFlip}
               kept={editing && !replaced(slot)}
               picks={slot.kind === "select" ? picksOf(slot).length : 0}
               options={slot.name === "direction" && slot.kind === "enum" ? directionOptions(slot.options ?? [], state, profileName) : undefined}
             />
             {spec.id === "hole" && slot.name === "position" && (
               <div className="mt-1 flex flex-col gap-1">
-                <Button type="button" size="sm" variant="outline" onClick={useFace}>
+                <Button type="button" size="sm" variant="outline" onClick={fillFromFace}>
                   <MousePointerClick /> use picked face
                 </Button>
                 {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
@@ -313,7 +411,17 @@ function SlotWidget({
   kept,
   picks,
   options,
+  sketches,
+  armed,
+  onArm,
+  flip,
+  onFlip,
 }: {
+  sketches: DialogSketches;
+  armed: boolean;
+  onArm: (armed: boolean) => void;
+  flip: { against: boolean; axis: string; can: boolean } | null;
+  onFlip: () => void;
   slot: Slot;
   form: RawForm;
   set: (slot: string, value: RawForm[string]) => void;
@@ -332,18 +440,30 @@ function SlotWidget({
       return <Switch checked={Boolean(raw)} onCheckedChange={(checked) => set(slot.name, checked)} />;
     case "enum":
       return (
-        <Select value={typeof raw === "string" ? raw : ""} onValueChange={(value) => set(slot.name, value)}>
-          <SelectTrigger aria-invalid={invalid}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {(options ?? slot.options ?? []).map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col gap-1">
+          <Select value={typeof raw === "string" ? raw : ""} onValueChange={(value) => set(slot.name, value)}>
+            <SelectTrigger aria-invalid={invalid}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(options ?? slot.options ?? []).map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {flip && (
+            <div className="flex items-center gap-2" data-testid="direction-flip" data-against={flip.against}>
+              <Button type="button" size="sm" variant="outline" className="h-6 px-2" data-testid="flip-direction" disabled={!flip.can} title="Push the other way (the arrow in the viewport turns)" onClick={onFlip}>
+                <ArrowUpDown /> flip
+              </Button>
+              <span className="text-[11px] text-muted-foreground">
+                pushes <span className="text-focus">{flip.against ? "against" : "along"}</span> the sketch normal ({flip.axis}); the arrow in the viewport shows it
+              </span>
+            </div>
+          )}
+        </div>
       );
     case "body": {
       const open = bodies.filter((body) => body.open);
@@ -381,10 +501,21 @@ function SlotWidget({
     case "profile": {
       const profiles = state.profiles ?? [];
       const chosen = typeof raw === "string" ? findProfile(state, raw) : undefined;
+      const info = chosen ? sketches.infos.find((item) => item.name === chosen.name) : undefined;
+      const loops = chosen ? sketches.shapes.get(chosen.name)?.shape.loopCount ?? 0 : 0;
+      const summary = info ? profileSummary(info.doc, loops) : null;
       return (
         <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2 border-2 border-input px-2 py-1" data-testid="sketch-field" data-armed={armed}>
+            <span className="min-w-0 flex-1 truncate text-[12px]">
+              Sketch: {chosen ? <span className="text-name">{chosen.name}</span> : <span className="text-muted-foreground">none picked</span>}
+            </span>
+            <Button type="button" size="sm" variant={armed ? "default" : "outline"} className="h-6 px-2" data-testid="sketch-pick" aria-pressed={armed} title="Click a sketch in the viewport or the features list to use it" onClick={() => onArm(!armed)}>
+              <Crosshair /> {armed ? "picking…" : "pick in viewport"}
+            </Button>
+          </div>
           <Select value={typeof raw === "string" ? raw : ""} onValueChange={onProfile}>
-            <SelectTrigger aria-invalid={invalid}>
+            <SelectTrigger aria-invalid={invalid} aria-label="Sketch (list)">
               <SelectValue placeholder="no sketch yet" />
             </SelectTrigger>
             <SelectContent>
@@ -398,6 +529,11 @@ function SlotWidget({
           {chosen && (
             <span className="text-[11px] text-muted-foreground">
               Plane {profilePlaneLabel(chosen)}, normal <span className="text-name">{chosen.normal}</span>
+            </span>
+          )}
+          {summary && (
+            <span className="text-[11px] text-muted-foreground" data-testid="profile-summary">
+              This sketch has several loops; it uses what was chosen in the sketch ({summary}).
             </span>
           )}
         </div>

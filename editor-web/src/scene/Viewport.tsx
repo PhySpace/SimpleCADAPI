@@ -26,6 +26,7 @@ export function Viewport({
   theme,
   onPick,
   onClear,
+  onSketchPick,
 }: {
   viewRef: React.MutableRefObject<SceneView | null>;
   selectionMode: SelectionMode;
@@ -34,12 +35,16 @@ export function Viewport({
   theme: SceneTheme;
   onPick: (pick: PickResult) => void;
   onClear: () => void;
+  /** A click in the sketch selection mode: the sketch under it (null: none) and whether Ctrl/Cmd was held. */
+  onSketchPick?: (name: string | null, additive: boolean) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const pickRef = useRef(onPick);
   pickRef.current = onPick;
   const clearRef = useRef(onClear);
   clearRef.current = onClear;
+  const sketchPickRef = useRef(onSketchPick);
+  sketchPickRef.current = onSketchPick;
   const overlayRef = useRef<THREE.Object3D[]>([]);
   // The theme the view was created with; later changes go through setTheme.
   const themeRef = useRef(theme);
@@ -65,6 +70,7 @@ export function Viewport({
     const view = new SceneView(host, {
       onPick: (result) => pickRef.current(result),
       onClear: () => clearRef.current(),
+      onSketchPick: (name, additive) => sketchPickRef.current?.(name, additive),
       selectionMode: "solid",
       theme: themeRef.current,
     });

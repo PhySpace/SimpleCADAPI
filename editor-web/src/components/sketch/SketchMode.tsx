@@ -1,7 +1,8 @@
-import { Check, Pencil, X } from "lucide-react";
+import { Check, Pencil, Rocket, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
+import { HintBanner } from "@/components/HintBanner";
 import { SketchDrawer, StatusBadge } from "@/components/sketch/SketchDrawer";
 import { SketchOverlay, useViewer } from "@/components/sketch/SketchOverlay";
 import { SketchProject } from "@/components/sketch/SketchProject";
@@ -11,14 +12,22 @@ import { Input } from "@/components/ui/input";
 import type { FeatureCommand } from "@/lib/features";
 import { CellFailure, suggestName, validateName, type FeatureRow } from "@/lib/features";
 import { docToJson, type SketchDoc } from "@/lib/sketch";
-import { PLANES, frameOf, planeLabel, projectOnPlane, viewPose, worldToPlane, planeToWorld, type Plane, type PlaneSpec } from "@/lib/sketch-plane";
-import { fitDistanceMm, planeToScreen } from "@/lib/sketch-view";
+import { PLANES, frameOf, planeLabel, projectOnPlane, rayPlane, viewPose, worldToPlane, planeToWorld, type Plane, type PlaneSpec } from "@/lib/sketch-plane";
+import { defaultExtrudeDistance, sketchShape } from "@/lib/sketch-scene";
+import { fitDistanceMm, planeToScreen, screenRay } from "@/lib/sketch-view";
 import { projectSources } from "@/lib/sketch-edit";
 import { useSketchEditor } from "@/lib/useSketchEditor";
-import type { SceneView } from "@/scene/scene-view";
+import { disposeObject } from "@/scene/cad-three";
+import type { PickResult, SceneView } from "@/scene/scene-view";
 
 /** A sketch being made or edited in the viewport.  `plane` is null while the plane is being chosen. */
 export type SketchSession = { id: number; mode: "new" | "edit"; cell?: string; name: string; plane: PlaneSpec | null; doc: SketchDoc };
+
+/** What the sketch asks the app to do once its feature is added (the "Finish and extrude" button). */
+export type SketchAfter = { extrude: { distance: number } };
+
+/** What is known of a face under the pointer: whether a sketch can lie on it, and the kind of surface it is. */
+export type FaceCheck = { planar: boolean; type: string | null };
 
 const isTyping = (event: KeyboardEvent) => Boolean((event.target as HTMLElement | null)?.closest?.("input, textarea, select, [contenteditable=true]"));
 
@@ -29,6 +38,9 @@ export function SketchMode({
   taken,
   features,
   notice,
+  faceCheck,
+  faceInk,
+  sketchPlanes,
   onPlane,
   onSubmit,
   onExit,
@@ -39,11 +51,17 @@ export function SketchMode({
   /** The feature rows of the notebook: the other sketches are what Project offers. */
   features: readonly FeatureRow[];
   notice: string | null;
+  /** Whether the face of a pick can carry a sketch (asks the kernel for its details when the pick has none). */
+  faceCheck: (result: PickResult) => Promise<FaceCheck>;
+  /** The colour a hovered face is lit in. */
+  faceInk: string;
+  /** The planes of the notebook's sketches: a new sketch can lie on one of them. */
+  sketchPlanes: { name: string; plane: PlaneSpec }[];
   onPlane: (plane: PlaneSpec) => void;
-  onSubmit: (command: FeatureCommand) => Promise<void>;
+  onSubmit: (command: FeatureCommand, after?: SketchAfter) => Promise<void>;
   onExit: () => void;
 }) {
-  if (session.plane === null) return <PlaneChooser view={view} notice={notice} onPlane={onPlane} onExit={onExit} />;
+  if (session.plane === null) return <PlaneChooser view={view} notice={notice} faceCheck={faceCheck} faceInk={faceInk} sketchPlanes={sketchPlanes} onPlane={onPlane} onExit={onExit} />;
   return <SketchEditorView key={session.id} session={session} plane={session.plane} view={view} taken={taken} features={features} onSubmit={onSubmit} onExit={onExit} />;
 }
 
@@ -51,16 +69,37 @@ export function SketchMode({
 
 const DATUM_COLOR: Record<Plane, string> = { XY: "var(--name)", XZ: "var(--pass)", YZ: "var(--fail)" };
 
-function PlaneChooser({ view, notice, onPlane, onExit }: { view: SceneView; notice: string | null; onPlane: (plane: PlaneSpec) => void; onExit: () => void }) {
+function PlaneChooser({
+  view,
+  notice,
+  faceCheck,
+  faceInk,
+  sketchPlanes,
+  onPlane,
+  onExit,
+}: {
+  view: SceneView;
+  notice: string | null;
+  faceCheck: (result: PickResult) => Promise<FaceCheck>;
+  faceInk: string;
+  sketchPlanes: { name: string; plane: PlaneSpec }[];
+  onPlane: (plane: PlaneSpec) => void;
+  onExit: () => void;
+}) {
   const host = useRef<HTMLDivElement>(null);
   const { viewer, size } = useViewer(view, host);
   const [hover, setHover] = useState<Plane | null>(null);
+  const [faceNote, setFaceNote] = useState<string | null>(null);
   const half = useMemo(() => {
     const bounds = view.modelBoundsMm();
     if (!bounds) return 60;
     const extent = Math.max(...bounds.max.map((v, i) => v - bounds.min[i]), ...bounds.max.map(Math.abs), ...bounds.min.map(Math.abs));
     return Math.max(25, Math.round(extent * 0.6));
   }, [view]);
+  const halfRef = useRef(half);
+  halfRef.current = half;
+  const callbacks = useRef({ onPlane, faceCheck, faceInk });
+  callbacks.current = { onPlane, faceCheck, faceInk };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -73,6 +112,104 @@ function PlaneChooser({ view, notice, onPlane, onExit }: { view: SceneView; noti
     return () => window.removeEventListener("keydown", onKey);
   }, [onExit]);
 
+  // The pointer over the model lights the face under it (a flat one in the selection ink, a curved one in the fail ink, with
+  // the reason); over a datum plane where no face is, it lights that plane.  A click on a face is the app's pick; a click on
+  // a plane (no face under it) is taken here.  The planes never swallow the pointer, so every face stays pickable.
+  useEffect(() => {
+    const element = view.engine.domElement;
+    let overlays: THREE.Object3D[] = [];
+    let shown: string | null = null;
+    let frame = 0;
+    let last: PointerEvent | null = null;
+    let down: { x: number; y: number } | null = null;
+    const drop = () => {
+      for (const overlay of overlays) {
+        overlay.parent?.remove(overlay);
+        disposeObject(overlay);
+      }
+      overlays = [];
+      shown = null;
+      view.engine.invalidate();
+    };
+    const planeAt = (event: PointerEvent): Plane | null => {
+      const rect = element.getBoundingClientRect();
+      const ray = screenRay({ camera: view.engine.camera, width: rect.width, height: rect.height }, event.clientX - rect.left, event.clientY - rect.top);
+      let best: { plane: Plane; t: number } | null = null;
+      for (const plane of PLANES) {
+        const hit = rayPlane(ray.origin, ray.dir, plane);
+        if (hit && Math.abs(hit[0]) <= halfRef.current && Math.abs(hit[1]) <= halfRef.current && (!best || hit[2] < best.t)) best = { plane, t: hit[2] };
+      }
+      return best?.plane ?? null;
+    };
+    const run = () => {
+      frame = 0;
+      const event = last;
+      if (!event) return;
+      const face = view.pick(event);
+      if (!face || !face.entityId) {
+        drop();
+        setFaceNote(null);
+        setHover(planeAt(event));
+        return;
+      }
+      setHover(null);
+      const key = `${face.nodeId}::${face.entityId}`;
+      if (key === shown) return;
+      drop();
+      shown = key;
+      overlays = view.buildEntityOverlays(face.nodeId, face.entityId, callbacks.current.faceInk, 0.4);
+      view.engine.invalidate();
+      void callbacks.current.faceCheck(face).then((check) => {
+        if (shown !== key) return;
+        if (check.planar) {
+          setFaceNote(null);
+          return;
+        }
+        setFaceNote(`This face is ${check.type ? `a ${check.type.toLowerCase()}` : "curved"}: a sketch needs a flat face. Pick a flat face or a plane.`);
+        for (const overlay of overlays) {
+          overlay.parent?.remove(overlay);
+          disposeObject(overlay);
+        }
+        overlays = view.buildEntityOverlays(face.nodeId, face.entityId!, "#d12b3c", 0.4);
+        view.engine.invalidate();
+      });
+    };
+    const move = (event: PointerEvent) => {
+      if (event.buttons) return;
+      last = event;
+      if (!frame) frame = requestAnimationFrame(run);
+    };
+    const leave = () => {
+      last = null;
+      drop();
+      setHover(null);
+      setFaceNote(null);
+    };
+    const pointerDown = (event: PointerEvent) => {
+      down = { x: event.clientX, y: event.clientY };
+    };
+    const pointerUp = (event: PointerEvent) => {
+      const start = down;
+      down = null;
+      if (!start || event.button !== 0 || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 4) return;
+      if (view.pick(event)) return; // a face: the app's pick takes it
+      const plane = planeAt(event);
+      if (plane) callbacks.current.onPlane(plane);
+    };
+    element.addEventListener("pointermove", move);
+    element.addEventListener("pointerleave", leave);
+    element.addEventListener("pointerdown", pointerDown);
+    element.addEventListener("pointerup", pointerUp);
+    return () => {
+      element.removeEventListener("pointermove", move);
+      element.removeEventListener("pointerleave", leave);
+      element.removeEventListener("pointerdown", pointerDown);
+      element.removeEventListener("pointerup", pointerUp);
+      if (frame) cancelAnimationFrame(frame);
+      drop();
+    };
+  }, [view]);
+
   return (
     <div ref={host} className="pointer-events-none absolute inset-0 z-10" data-testid="plane-chooser">
       <svg width={size.w} height={size.h} className="pointer-events-none absolute inset-0 block select-none">
@@ -83,10 +220,11 @@ function PlaneChooser({ view, notice, onPlane, onExit }: { view: SceneView; noti
           const label = planeToScreen(viewer, plane, half * 0.72, half * 0.88);
           const on = hover === plane;
           return (
-            <g key={plane} data-plane={plane} style={{ pointerEvents: "all", cursor: "pointer" }} onPointerEnter={() => setHover(plane)} onPointerLeave={() => setHover(null)} onClick={() => onPlane(plane)}>
-              <polygon points={screen.map((s) => s!.join(",")).join(" ")} fill={DATUM_COLOR[plane]} fillOpacity={on ? 0.34 : 0.14} stroke={DATUM_COLOR[plane]} strokeWidth={on ? 2.5 : 1.5} />
+            <g key={plane} data-plane={plane} style={{ cursor: "pointer" }} onClick={() => onPlane(plane)}>
+              {/* the fill never takes the pointer (faces under it stay pickable); the edge and the label do */}
+              <polygon points={screen.map((s) => s!.join(",")).join(" ")} fill={DATUM_COLOR[plane]} fillOpacity={on ? 0.3 : 0.1} stroke={DATUM_COLOR[plane]} strokeWidth={on ? 2.5 : 1.5} style={{ pointerEvents: "stroke" }} />
               {label && (
-                <text x={label[0]} y={label[1]} textAnchor="middle" dominantBaseline="middle" fontSize={13} fontWeight={800} fill={DATUM_COLOR[plane]} stroke="var(--background)" strokeWidth={4} paintOrder="stroke" style={{ fontFamily: "var(--mono)" }}>
+                <text x={label[0]} y={label[1]} textAnchor="middle" dominantBaseline="middle" fontSize={13} fontWeight={800} fill={DATUM_COLOR[plane]} stroke="var(--background)" strokeWidth={4} paintOrder="stroke" style={{ fontFamily: "var(--mono)", pointerEvents: "all" }}>
                   {plane}
                 </text>
               )}
@@ -94,21 +232,30 @@ function PlaneChooser({ view, notice, onPlane, onExit }: { view: SceneView; noti
           );
         })}
       </svg>
-      <div className="pointer-events-auto absolute left-1/2 top-3 z-30 flex max-w-[96%] -translate-x-1/2 items-center gap-3 border-2 border-primary bg-popover px-3 py-1.5 shadow-[4px_4px_0_var(--shadow-hard)]">
-        <Pencil className="size-3.5 shrink-0" />
-        <span className="flex flex-col leading-tight">
-          <span className="whitespace-nowrap text-[12px] font-semibold">Choose the sketch plane</span>
-          <span className="text-[11px] text-muted-foreground">click XY, XZ or YZ, or a planar face of the model</span>
-        </span>
-        <Button type="button" size="sm" variant="ghost" className="h-6 px-2" aria-label="Cancel the sketch" onClick={onExit}>
-          <X /> esc
-        </Button>
-      </div>
-      {notice && (
-        <div role="alert" className="pointer-events-none absolute left-1/2 top-14 z-30 -translate-x-1/2 border-2 border-fail bg-popover px-3 py-1 text-[11px] text-fail">
-          {notice}
-        </div>
-      )}
+      <HintBanner
+        testId="chooser-banner"
+        icon={<Pencil className="size-3.5 shrink-0" />}
+        title="Choose the sketch plane"
+        hint="Click a face of the model, or a plane"
+        notice={notice ?? faceNote}
+        controls={
+          <span className="flex flex-wrap items-center gap-1">
+            {PLANES.map((plane) => (
+              <Button key={plane} type="button" size="sm" variant="outline" className="h-6 px-2" data-testid={`chooser-plane-${plane}`} title={`Sketch on the ${plane} plane`} onClick={() => onPlane(plane)} onPointerEnter={() => setHover(plane)} onPointerLeave={() => setHover(null)}>
+                {plane}
+              </Button>
+            ))}
+            {sketchPlanes.map((item) => (
+              <Button key={item.name} type="button" size="sm" variant="outline" className="h-6 px-2" data-testid={`chooser-sketch-${item.name}`} title={`Sketch on the plane of ${item.name}`} onClick={() => onPlane(item.plane)}>
+                plane of {item.name}
+              </Button>
+            ))}
+            <Button type="button" size="sm" variant="ghost" className="h-6 px-2" aria-label="Cancel the sketch" onClick={onExit}>
+              <X /> esc
+            </Button>
+          </span>
+        }
+      />
     </div>
   );
 }
@@ -129,7 +276,7 @@ function SketchEditorView({
   view: SceneView;
   taken: readonly string[];
   features: readonly FeatureRow[];
-  onSubmit: (command: FeatureCommand) => Promise<void>;
+  onSubmit: (command: FeatureCommand, after?: SketchAfter) => Promise<void>;
   onExit: () => void;
 }) {
   const editing = session.mode === "edit";
@@ -255,7 +402,7 @@ function SketchEditorView({
     return null;
   })();
 
-  const finish = async () => {
+  const finish = async (thenExtrude = false) => {
     setTouched(true);
     if (problem || busy) return;
     setBusy(true);
@@ -264,7 +411,7 @@ function SketchEditorView({
     const target = editing && session.cell ? session.cell : created;
     const command: FeatureCommand = target ? { op: "edit", cell: target, values } : { op: "add", spec: "sketch", ...(name.trim() ? { name: name.trim() } : {}), values };
     try {
-      await onSubmit(command);
+      await onSubmit(command, thenExtrude ? { extrude: { distance: defaultExtrudeDistance(sketchShape(editor.doc, editor.result)) } } : undefined);
     } catch (error) {
       if (error instanceof CellFailure && !editing) setCreated(error.cell);
       setServerError(error instanceof Error ? error.message : String(error));
@@ -284,7 +431,7 @@ function SketchEditorView({
       {editor.projectOpen && <SketchProject editor={editor} />}
       <SketchDrawer editor={editor} plane={planeLabel(plane)} wide={wide} />
       <div className="pointer-events-auto absolute left-1/2 top-2 z-30 flex -translate-x-1/2 flex-col items-stretch gap-1">
-        <div className="flex items-center gap-2 border-2 border-primary bg-popover px-2 py-1 shadow-[4px_4px_0_var(--shadow-hard)]">
+        <div className="flex flex-wrap items-center gap-2 border-2 border-primary bg-popover px-2 py-1 shadow-[4px_4px_0_var(--shadow-hard)]">
           <Pencil className="size-3.5 shrink-0" />
           <Input
             aria-label="Sketch name"
@@ -302,9 +449,14 @@ function SketchEditorView({
           />
           <span className="whitespace-nowrap text-[10px] uppercase tracking-[0.08em] text-muted-foreground">on {planeLabel(plane)}</span>
           <StatusBadge editor={editor} compact />
-          <Button type="button" size="sm" className="h-7 gap-1 px-2" data-testid="sketch-finish" aria-label="Finish the sketch" title="Finish: add the sketch to the notebook" disabled={busy} onClick={() => void finish()}>
+          <Button type="button" size="sm" variant={editing ? "default" : "outline"} className="h-7 gap-1 px-2" data-testid="sketch-finish" aria-label="Finish the sketch" title="Finish: add the sketch to the notebook" disabled={busy} onClick={() => void finish()}>
             <Check /> {busy ? "working…" : "finish"}
           </Button>
+          {!editing && (
+            <Button type="button" size="sm" className="h-7 gap-1 px-2" data-testid="sketch-finish-extrude" aria-label="Finish the sketch and extrude it" title="Finish, then extrude the sketch (the most common next step)" disabled={busy} onClick={() => void finish(true)}>
+              <Rocket /> finish and extrude
+            </Button>
+          )}
           <Button type="button" size="sm" variant="outline" className="h-7 px-2" data-testid="sketch-cancel" aria-label="Cancel the sketch" title="Cancel (Esc twice)" onClick={leave}>
             <X />
           </Button>
