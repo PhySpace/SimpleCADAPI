@@ -328,6 +328,52 @@ that surfaced it is in brackets.
 - **Fix direction:** done. Every `ql` factory should resolve against any scope
   that contains its kind; check each (kind, scope) pair when adding a factory.
 
+## 21. Op-kwarg face tags die at translate, mirror and patterns despite full history [stable-refs research]
+
+- **Symptom:** `make_box_rsolid(..., top_face_tag="kw.top")` then `translate_shape`, `mirror_shape` or
+  `linear_pattern_rsolidlist`: `ql.tag("kw.top")` finds 0 faces on the result.
+- **Trigger:** any rigid copy after an op-kwarg tag; plain `apply_tag_rselection` face tags die at every op.
+- **Root cause:** the tag projection drops the channel, not the kernel: these nodes record a `modified` /
+  `continuation` witness for every face (`test_element_ref_history.py` audit resolves the face through them).
+- **Status:** open; documented in `design-docs/stable-refs-design.md` section 6.
+- **Fix direction:** make tags a view over history-resolved references (design section 3.1) instead of per-op
+  projection with per-channel gates.
+
+## 22. `OperationGraph::from_value` header says deltas are not restored; they are [stable-refs research]
+
+- **Symptom:** `include/scad/reactive/graph.hpp` comments "topology/semantic deltas are not restored" while
+  `graph.cpp` `from_value` parses `topo_delta` and `semantic_delta`.
+- **Trigger:** reading the header to decide whether history survives the cell cache (`runtime/lineage.py`).
+- **Status:** open (comment only).
+- **Fix direction:** correct the comment; pin restore of deltas with a test, since stable references rely on it.
+
+## 23. A shell's kept faces have no successor witness [stable-refs research]
+
+- **Symptom:** after `shell_rsolid(box, [bottom], t)`, the untouched top face has only a `generated` witness (its
+  offset face); history cannot say the top face is still there.
+- **Root cause:** `tracking::query_history` emits `preserved` only when an input has neither `Modified` nor
+  `Generated` images; a kept shell face generates its offset face.
+- **Status:** open. The one-line fix changes the Python-parity goldens and an explicit assertion
+  (`test_tracking_behaviour.cpp` `shell.body_face == 0`), so it needs an owner decision (design section 7.2).
+
+## 24. `transform_rsolid`, `offset_rsolid`, draft, scale and helical sweep record no topology delta [stable-refs research]
+
+- **Symptom:** a face reference or tag through these ops cannot be followed (`lost(no_history)` in the resolver;
+  tags die).
+- **Root cause:** no `tracked_*` function for them (`include/scad/semantic/tracking.hpp`), although the OCCT makers
+  behind them (`BRepBuilderAPI_GTransform`, `BRepOffsetAPI_MakeOffsetShape`, `BRepOffsetAPI_DraftAngle`) expose
+  `Modified` / `Generated`.
+- **Status:** open; stage 1 of the stable-refs plan.
+
+## 25. Two spellings of one topo id [stable-refs research]
+
+- **Symptom:** a recorded delta names a face `face_face_5`; the entity's own `topo_id` is `face_5`; `get_metadata(
+  "topo_ref")` re-prefixes on the fly (`bind_topo.cpp`) and `index_output_entities` builds the long form.
+- **Root cause:** the Python SDK's text form was kept for parity.
+- **Status:** open, harmless but every consumer must know which form it holds (`subshapes_by_recorded_id` takes the
+  recorded form).
+- **Fix direction:** one canonical form at the next graph schema version.
+
 ## Heuristics
 
 - Run every notebook three times: fresh, all cached, `--no-cache`. The three
