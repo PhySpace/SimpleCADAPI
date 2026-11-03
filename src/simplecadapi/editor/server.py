@@ -2248,8 +2248,19 @@ def create_app(state: WorkspaceState) -> Starlette:
     ]
     app = Starlette(routes=routes)
     if DIST_DIR.is_dir():
-        app.mount("/", StaticFiles(directory=DIST_DIR, html=True), name="webui")
+        app.mount("/", _WebUI(directory=DIST_DIR, html=True), name="webui")
     return app
+
+
+class _WebUI(StaticFiles):
+    """The built web UI. The page itself is never cached (a rebuilt UI must load on the next visit); its assets carry
+    content hashes in their names and may be."""
+
+    async def get_response(self, path: str, scope: Any) -> Response:
+        response = await super().get_response(path, scope)
+        if path in ("", ".", "index.html") or path.endswith(".html"):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 def serve_workspace(
