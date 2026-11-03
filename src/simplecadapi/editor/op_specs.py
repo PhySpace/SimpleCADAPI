@@ -99,9 +99,10 @@ def _slot(param: C.Param, features: Any) -> Any | None:
         return Slot(param.name, label, slot_kind, default=default, unit=unit, min=minimum, optional=optional)
     if kind in _VECTOR_KINDS and not param.many:
         default = list(param.default) if isinstance(param.default, (list, tuple)) and len(param.default) == 3 else ([0.0, 0.0, 1.0] if kind == "direction3" else [0.0, 0.0, 0.0])
+        unit = None if kind == "direction3" else "mm"
         if param.has_default and param.default is None:
-            return Slot(param.name, label, "point", default=None, unit="mm", min=-10000.0, optional=True)
-        return Slot(param.name, label, "point", default=[float(v) for v in default], unit="mm", min=-10000.0)
+            return Slot(param.name, label, "point", default=None, unit=unit, min=-10000.0, optional=True)
+        return Slot(param.name, label, "point", default=[float(v) for v in default], unit=unit, min=-10000.0)
     if kind == "points":
         return Slot(param.name, label, "points3d", default=[[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [10.0, 10.0, 0.0]], unit="mm")
     if kind == "bool":

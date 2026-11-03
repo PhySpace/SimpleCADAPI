@@ -193,11 +193,14 @@ class Context:
             name = f"{self._base}_{slot.upper()}_{axis.upper()}"
             if name not in self.used:
                 self.used.add(name)
-                low, high = _range(spec, float(value))
-                self.params.append(
-                    f"{name} = scad.var(name={json.dumps(f'{self.slug}_{slot}_{axis}')}, default={_num(float(value))}, unit=\"mm\", "
-                    f"comment={json.dumps(f'{spec.label} {axis}')})  # ui: slider({_num(low)}, {_num(high)}, step=1, label={json.dumps(f'{spec.label} {axis}')})"
-                )
+                if spec.unit is None:  # a direction: plain numbers (its length does not matter, it has no unit)
+                    self.params.append(f"{name} = {_num(float(value))}  # ui: number(-1, 1, step=0.1, label={json.dumps(f'{spec.label} {axis}')})")
+                else:
+                    low, high = _range(spec, float(value))
+                    self.params.append(
+                        f"{name} = scad.var(name={json.dumps(f'{self.slug}_{slot}_{axis}')}, default={_num(float(value))}, unit=\"mm\", "
+                        f"comment={json.dumps(f'{spec.label} {axis}')})  # ui: slider({_num(low)}, {_num(high)}, step=1, label={json.dumps(f'{spec.label} {axis}')})"
+                    )
             names.append(name)
         return f"({', '.join(names)})"
 
