@@ -150,7 +150,7 @@ through the role map to the owning artifact.
 
 ## Failure routes
 
-- Boolean fails or yields multiple bodies → `domains/part-modeling.md`
+- Boolean fails, or a cut splits the body into pieces → `domains/part-modeling.md`
   boolean discipline (overlap, overshoot tools, isolate the pair).
 - Fillet/chamfer fails → smaller radius, narrower selection, later order;
   selection problems follow the edge-selection defaults.

@@ -20,8 +20,9 @@ before writing any cell.
 **R4. Sketch first.** 2D profiles and planar paths go through the sketch API; primitives only when the shape is entirely
 the basic form.
 
-**R5. Booleans** (`union_rsolid`, `cut_rsolid`, `cut_rsolid_list`, `intersect_rsolid`) accept mixed inputs and return
-exactly one `Solid`. Union defaults to `glue=False` with a conservative scale-relative tolerance and fails explicitly when
+**R5. Booleans** (`union_rsolid`, `cut_rsolid`, `cut_rsolid_list`, `intersect_rsolid`) accept mixed inputs. Union and
+intersect return exactly one `Solid`; `cut_rsolid` returns one `Solid`, or the pieces (`list[Solid]`, centroid order)
+when the cut splits the body (`on_split="error"` refuses instead); `cut_rsolid_list` always returns a list. Union defaults to `glue=False` with a conservative scale-relative tolerance and fails explicitly when
 it cannot produce one merged solid.
 
 **R6. Topology is enumerated through QL only.** Plural getters (`get_edges`, `get_faces`, `get_wires`, `get_vertices`,

@@ -143,8 +143,8 @@ class FeatureService:
                     }
                 )
         if product is None and open_bodies and self._implicit_part():
-            # no cell builds the Part: the runtime makes it from the open body (one; several are an error it reports)
-            product = {"cell": None, "body": open_bodies[-1], "implicit": True}
+            # no cell builds the Part: the runtime makes it from the open bodies (several are the bodies of one Part)
+            product = {"cell": None, "body": open_bodies[-1], "bodies": list(open_bodies), "implicit": True}
         return {
             "features": features,
             "bodies": [{"name": name, "produces": bodies[name]} for name in order],

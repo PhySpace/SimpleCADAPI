@@ -221,7 +221,8 @@ HOLE_DIAMETER = scad.var(name="hole_diameter", default=6.0, unit="mm", comment="
   geometry second, with the count checked (`.exactly(n)`). If the model moved so that nothing matches, the cell fails and
   the feature turns red: ask the person to pick again, never widen the selector until it matches.
 - A blank notebook (`sca new NAME --kind blank`) has no cells and a `kind = "part"` header: no product cell is written,
-  the runtime makes the Part from the open body (see `docs/guides/notebook-runtime.md`), so every new feature previews
+  the runtime makes the Part from the open bodies (see `docs/guides/notebook-runtime.md`; a solid made with "New body"
+  is one more body of the same Part, not an assembly), so every new feature previews
   and a deleted cell cannot leave the notebook without a product. Setting connectors (or "use as product" on a body
   that is not the last) writes an explicit `make_part_rpart` cell, which then wins.
 - Besides the curated features (box, hole, pull face, extrude of a sketch ...), every SDK and standard-library operation

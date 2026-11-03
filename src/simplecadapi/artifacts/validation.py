@@ -25,13 +25,16 @@ _SCHEMA_FILES = {
     "part_definition": "part-definition-2.schema.json",
     "assembly_definition": "assembly-definition-2.schema.json",
 }
+# Part definitions of a multi-body part carry profile 3 and are validated by their own schema.
+_PROFILE_SCHEMA_FILES = {"simplecad-part-definition-3": "part-definition-3.schema.json"}
 
 
-@lru_cache(maxsize=2)
-def _schema(kind: str) -> Mapping[str, Any]:
+@lru_cache(maxsize=4)
+def _schema(kind: str, profile: str | None = None) -> Mapping[str, Any]:
     if kind not in _ARTIFACT_KINDS:
         raise ArtifactValidationError("artifact_kind_invalid", "/artifact_kind", "unsupported artifact kind")
-    resource = files("simplecadapi").joinpath("contracts", _SCHEMA_FILES[kind])
+    name = _PROFILE_SCHEMA_FILES.get(profile or "", _SCHEMA_FILES[kind]) if kind == "part_definition" else _SCHEMA_FILES[kind]
+    resource = files("simplecadapi").joinpath("contracts", name)
     schema = json.loads(resource.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
     return schema
@@ -44,7 +47,7 @@ def _pointer(parts: Iterable[Any]) -> str:
 
 def _schema_validate(manifest: Mapping[str, Any], kind: str) -> None:
     errors = sorted(
-        Draft202012Validator(_schema(kind)).iter_errors(manifest),
+        Draft202012Validator(_schema(kind, manifest.get("profile") if isinstance(manifest.get("profile"), str) else None)).iter_errors(manifest),
         key=lambda item: (list(item.absolute_path), item.message),
     )
     if errors:
@@ -136,6 +139,9 @@ def _blob_refs(manifest: Mapping[str, Any]) -> list[tuple[str, Mapping[str, Any]
         material = manifest["material_ref"]
         if material is not None:
             refs.append(("/material_ref", material))
+        for index, body in enumerate(manifest["solid_cache"].get("bodies") or ()):  # a multi-body part
+            refs.append((f"/solid_cache/bodies/{index}/body_ref", body["body_ref"]))
+            refs.append((f"/solid_cache/bodies/{index}/topology_snapshot_ref", body["topology_snapshot_ref"]))
         return refs
     return [("/feature_graph_ref", manifest["feature_graph_ref"])]
 

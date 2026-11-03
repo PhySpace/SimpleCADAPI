@@ -81,12 +81,13 @@ if __name__ == "__main__":
 - **The kind** is fixed when the notebook is made: the header says
   `kind = "part"` or `kind = "assembly"` (`sca new` and the editor write it).
   A `kind = "part"` notebook needs **no product cell**: when no top-level
-  `Part` has the notebook id, the runtime makes one from the notebook's one
-  *open body* (a public top-level `Solid` that no other cell reads and that no
-  other such solid was built from) with the notebook id. Several open bodies
-  are an error that names them: join them, or write the Part cell yourself.
+  `Part` has the notebook id, the runtime makes one from the notebook's
+  *open bodies* (public top-level `Solid`s, or the piece lists of split cuts,
+  that no other cell reads and that no other such value was built from), with
+  the notebook id. One open body is a one-body Part (body id `"body"`); several
+  are the bodies of one Part, named by their variables (pieces `<name>_1..n`).
   Write a `make_part_rpart` cell only to add connectors or a material, or to
-  ship a body other than the last one; it then wins. The headless run and the
+  choose and name the bodies yourself; it then wins. The headless run and the
   editor use the same rule (`runtime/projection.py`, `find_product`).
 - **The product** is the top-level variable whose id (`Part.part_id` or
   `Assembly.assembly_id`) equals the notebook id. An assembly built up over
@@ -97,6 +98,12 @@ if __name__ == "__main__":
   (`run_notebook(..., id=...)`, `scad.use(..., id=...)`, `sca run --id`);
   cells read the id of their run with `scad.notebook_id()` — see
   [Part families](notebook-composition-and-cache.md#part-families).
+- **A part with several bodies** is one product:
+  `scad.make_part_rpart(part_id=scad.notebook_id(), bodies={"base": base, "lid": lid})`.
+  Each body keeps its own BRep, topology snapshot and tags in the package, whose
+  part definition then has profile `simplecad-part-definition-3` (an older SDK
+  refuses it instead of reading one body). One-body parts are unchanged.
+  The cell cache restores a multi-body part like any other value.
 - **Parameters** are ordinary top-level variables. Overriding one replaces it,
   and the cell that defines it does not run, so all variables of that cell
   must be overridden together. Group parameters into cells by what changes

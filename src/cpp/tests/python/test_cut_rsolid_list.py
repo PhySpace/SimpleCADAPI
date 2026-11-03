@@ -73,12 +73,21 @@ def test_one_piece_result_and_a_missing_tool():
 
 
 def test_cut_rsolid_refuses_a_split_instead_of_dropping_pieces():
+    # strict mode (on_split="error") keeps the old refusal; the default keeps every piece (see below)
     with pytest.raises(scad.SimpleCADError) as error:
-        scad.cut_rsolid(bar(), slot(0))
+        scad.cut_rsolid(bar(), slot(0), on_split="error")
     text = str(error.value)
     assert "returned 2 solids" in text and "cut_rsolid_list" in text
     with pytest.raises(scad.SimpleCADError, match="no valid solid"):
         scad.cut_rsolid(plate(), cylinder(75))
+
+
+def test_cut_rsolid_keeps_a_split_as_pieces_ordered_by_centroid():
+    pieces = scad.cut_rsolid(bar(), [slot(-20), slot(20)])
+    assert isinstance(pieces, list) and len(pieces) == 3
+    xs = [p.get_center().x for p in pieces]
+    assert xs == sorted(xs)
+    assert isinstance(scad.cut_rsolid(bar(), cylinder(3)), scad.Solid)  # one piece: a Solid, as always
 
 
 def test_the_pieces_carry_the_cut_tags_and_one_graph_node():

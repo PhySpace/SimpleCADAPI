@@ -162,9 +162,9 @@ def classify(type_text: str) -> dict[str, Any]:
     if mapping:  # a value per name (component id, tag ...): ``direction3_map``, ``number_map``, ``text_map``
         key_and_value = _split_top(mapping.group(1), ",")
         inner = classify(key_and_value[-1])
-        if inner["kind"] == "unknown" or inner["many"]:
+        if inner["kind"] == "unknown":
             return {"kind": "unknown", "many": False, "optional": optional, "choices": ()}
-        return {"kind": f"{inner['kind']}_map", "many": False, "optional": optional, "choices": inner["choices"]}
+        return {"kind": f"{inner['kind']}_map", "many": inner["many"], "optional": optional, "choices": inner["choices"]}
     return _classify_names([text], optional)
 
 

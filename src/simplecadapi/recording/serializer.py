@@ -31,6 +31,7 @@ from ..errors import raise_harness_error
 from simplecadapi._cpp import (
     AnyShape,
     Assembly,
+    Body,
     Compound,
     Connector,
     ConnectorRef,
@@ -369,6 +370,14 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
     "measure_constraint_residual_rconstraintresidual": {
         "status": "diagnostic",
         "reason": "Measures current constraint residuals without changing model state.",
+    },
+    "inspect_body_overlaps_rlist": {
+        "status": "diagnostic",
+        "reason": "Reports which bodies of a Part share volume without changing model state.",
+    },
+    "measure_part_mass_rmassreport": {
+        "status": "diagnostic",
+        "reason": "Measures volume and mass of each body without changing model state.",
     },
     "inspect_assembly_constraints_rconstraintreport": {
         "status": "diagnostic",
@@ -3071,7 +3080,24 @@ def _execute_graph(
                     if op_name == "make_part_rpart":
                         ctx.require_params(node.node_id, op_name, params, ("part_id",))
                         body_outputs = _feature_input_shapes(ctx, graph, outputs, node, params)
-                        if body_outputs:
+                        rows = params.get("bodies")
+                        if body_outputs and isinstance(rows, list) and len(rows) > 1:
+                            # a multi-body part: one recorded input per body, in the order of the rows
+                            if len(body_outputs) != len(rows):
+                                raise ValueError(
+                                    f"make_part_rpart node {node.node_id}: {len(rows)} bodies recorded, "
+                                    f"{len(body_outputs)} inputs resolved"
+                                )
+                            result = ops.make_part_rpart(
+                                str(params["part_id"]),
+                                name=cast(Optional[str], params.get("name")),
+                                bodies=[
+                                    Body(str(row["body_id"]), cast(Solid, shape), row.get("name"))
+                                    for row, shape in zip(rows, body_outputs)
+                                ],
+                            )
+                            _store_outputs(node, result)
+                        elif body_outputs:
                             result = ops.make_part_rpart(
                                 str(params["part_id"]),
                                 cast(Solid, body_outputs[0]),
@@ -3914,14 +3940,22 @@ def _execute_graph(
                                     f"Graph node '{node.node_id}' ({op_name}) requires at least two inputs"
                                 )
                             continue
-                        result = ops.cut_rsolid_list(
-                            cast(Solid, inputs[0]),
-                            [cast(Solid, tool) for tool in inputs[1:]],
-                            skip_non_intersecting=bool(
+                        cut_options = {
+                            "skip_non_intersecting": bool(
                                 _param(ctx, node.node_id, op_name, params, "skip_non_intersecting", False)
                             ),
-                            tracking_policy=str(params.get("tracking_policy", "full")),
-                        )
+                            "tracking_policy": str(params.get("tracking_policy", "full")),
+                        }
+                        if params.get("piece_order") == "centroid":
+                            # a split recorded by cut_rsolid(on_split="pieces"): the pieces in centroid order
+                            pieces = ops.cut_rsolid(
+                                cast(Solid, inputs[0]), [cast(Solid, tool) for tool in inputs[1:]], **cut_options
+                            )
+                            result = pieces if isinstance(pieces, list) else [pieces]
+                        else:
+                            result = ops.cut_rsolid_list(
+                                cast(Solid, inputs[0]), [cast(Solid, tool) for tool in inputs[1:]], **cut_options
+                            )
                         _store_outputs(node, result)
                         continue
 

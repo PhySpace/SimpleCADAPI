@@ -115,7 +115,8 @@ export function FeatureTree({
             {state.features.map((feature) => {
               const spec = feature.gui ? catalog?.specs.find((item) => item.id === feature.gui?.spec) : undefined;
               const problem = errorText(feature);
-              const isProduct = state.product !== null && feature.makes.includes(state.product.body);
+              const productBodies = state.product ? (state.product.bodies ?? [state.product.body]) : [];
+              const isProduct = feature.makes.some((name) => productBodies.includes(name));
               const canEdit = Boolean(feature.gui && spec);
               const sketch = sketches?.infos.find((info) => info.cell === feature.cell);
               const hiddenSketch = sketch ? sketches?.hidden.has(sketch.name) : false;

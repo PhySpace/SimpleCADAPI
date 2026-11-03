@@ -1002,7 +1002,7 @@ def render_feature(
         )
     role = _COMBINE_ROLE[operation] if spec.combinable else spec.role
     # the recipe resolves against the body slot of the feature ({BODY} is filled with that name)
-    body_name = clean.get(spec.body_slot) or clean.get("body") or ""
+    body_name = next((v for v in (clean.get(spec.body_slot), clean.get("body")) if isinstance(v, str)), "")
     code = [line.replace("{BODY}", body_name) for line in code]
     gui = {"spec": spec.id, "v": VERSION, "values": clean}
     if selections:

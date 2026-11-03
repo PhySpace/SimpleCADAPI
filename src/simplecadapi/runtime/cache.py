@@ -245,14 +245,14 @@ def _semantic_state(value: Any) -> tuple[int, ...]:
     ``set_metadata`` and ``auto_tag_faces`` change the shape they are called on, and return the very same object.  A
     memory that hands the same object to a later run would hand out the change as well (the copy on the disk is a fresh
     object each time and has none of it).  Each root of shapes counts its writes (``AnyShape._semantic_revision``); an
-    entry whose numbers moved since it was kept is not handed out again.  A Part is its body, an Assembly its
+    entry whose numbers moved since it was kept is not handed out again.  A Part is its bodies, an Assembly its
     components; reading a shape, or consuming it in an operator, does not count.
     """
 
     if hasattr(value, "_semantic_revision"):
         return (value._semantic_revision(),)
     if isinstance(value, Part):
-        return _semantic_state(value.body)
+        return tuple(n for body in value.bodies for n in _semantic_state(body.solid))
     if isinstance(value, Assembly):
         return tuple(n for component in value.components for n in _semantic_state(component.item))
     if isinstance(value, (tuple, frozenset)):

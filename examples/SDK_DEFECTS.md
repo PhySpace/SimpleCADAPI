@@ -412,6 +412,62 @@ that surfaced it is in brackets.
   deprecation path), and `Scalar` for the chamfer angle so it records an
   expression like the other parameters.
 
+## 27. `Compound([solids])` silently drops the solids' tags [multi-solid research]
+
+- **Symptom:** `scad.Compound([a, b])` of two tagged boxes has no face tags;
+  `compound._copy_semantic_state_from(a)` copies nothing either.
+- **Trigger:** any code that bundles solids into a Compound and later selects
+  by tag (the first multi-body spike stored a part's bodies as one Compound).
+- **Root cause:** a Compound is a new shape root with its own entity registry;
+  the semantic state of the input roots is not carried over, and the copy
+  helper only works within one root.
+- **Status:** open. Multi-body parts keep their bodies as separate Solid roots
+  (`Part.bodies`), so they are not affected; `product.bodies.part_shape`
+  documents that its Compound is a geometry view without tags.
+- **Fix direction:** either carry tags into a Compound built from tagged
+  roots (sub-shapes are shared, so the mapping is exact), or refuse
+  `_copy_semantic_state_from` across roots instead of doing nothing.
+
+## 28. Value pickling reads constructor arguments back by attribute name [multi-solid research]
+
+- **Symptom:** adding `Part(bodies=...)` broke pickling of multi-body parts:
+  the reducer called `part.body`, which (rightly) raises for several bodies.
+- **Trigger:** any product value whose constructor parameter is not a plain
+  readable attribute of the same name.
+- **Root cause:** `_glue/values.py` parses the parameter names out of the
+  pybind11 `__init__` docstring and reads each back with `getattr`.
+- **Status:** worked around: `_ARGUMENTS` maps a class to per-parameter
+  readers (Part: `body`/`bodies`).
+- **Fix direction:** give the C++ values an explicit `__getstate__`/
+  `py::pickle` (as `ql` selectors have) instead of docstring parsing.
+
+## 29. "One solid per definition" is spelled into ids and kinds [multi-solid research]
+
+- **Symptom:** a second body of a part has nowhere to live in the existing
+  names: entity ids are `entity/<definition>/<kind>/<topo>` with root-local
+  topo ids (every body has a `face_0`), preview nodes are one per part, and
+  the definition kind is called `single_solid` (about 20 places in Python).
+- **Trigger:** any part with more than one solid.
+- **Root cause:** "is a part" and "has one solid" were the same fact until
+  now.
+- **Status:** worked around: bodies get an id segment `body:<body_id>`
+  (`entity/<part>/body:<id>/...`, `node/<part>/body:<id>`), one-body parts
+  keep their old ids byte for byte; the kind stays `single_solid`.
+- **Fix direction:** treat `single_solid` as the name of the part kind (rename
+  at the next package schema bump) and keep the `body:` segment the only
+  way to address a body.
+
+## 30. Error guidance is frozen by parity goldens [multi-solid research]
+
+- **Symptom:** the `make_part_rpart` guidance still says "Union intended multiple bodies into one Solid before
+  creating the Part.", which is wrong now that `bodies=` exists; changing it fails
+  `src/cpp/tests/python/test_product_values.py::test_part_creation_and_errors`.
+- **Root cause:** the C++ port compares every error's `what_happened` / `possible_causes` / `how_to_fix` with goldens
+  captured from the old Python SDK (`tests/golden/product_*.json`), so guidance cannot follow the API.
+- **Status:** open; the old text is kept.
+- **Fix direction:** compare error *codes* and kinds against the goldens, and let guidance text change with the API
+  (or regenerate the goldens on a deliberate API change).
+
 ## Heuristics
 
 - Run every notebook three times: fresh, all cached, `--no-cache`. The three

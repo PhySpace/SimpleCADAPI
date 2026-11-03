@@ -319,6 +319,8 @@ def _part_geometry(
     str,
 ]:
     runtime = materialize_definition(definition)
+    if runtime.multi_body:
+        raise ProductSceneError(f"part {definition.definition_id!r} has several bodies: use _body_geometries")
     body = runtime.body
     if not isinstance(body, Solid):
         raise ProductSceneError(f"part {definition.definition_id!r} has no solid body")
@@ -330,9 +332,70 @@ def _part_geometry(
         body=body,
         feature_graph=_feature_graph(definition),
     )
+    return _solid_geometry(
+        definition.definition_id,
+        definition.definition_id,
+        body,
+        snapshot,
+        linear_tolerance=linear_tolerance,
+        angular_tolerance=angular_tolerance,
+    )
+
+
+def _body_geometries(
+    definition: PartDefinition,
+    *,
+    linear_tolerance: float,
+    angular_tolerance: float,
+) -> list[tuple[str, str | None, tuple[list[dict[str, Any]], dict[str, Any], dict[str, bytes], str, str]]]:
+    """The geometry of every body of a multi-body part: ``(body_id, name, the _solid_geometry tuple)`` in body order.
+
+    Each body has its own GLB and entity document; its entities are ``entity/<part>/body:<body_id>/<kind>/<topo>``.
+    """
+
+    runtime = materialize_definition(definition)
+    mark_part_definition_validated(definition, body=runtime.bodies, feature_graph=_feature_graph(definition))
+    refs = {item.body_id: item for item in definition.bodies}
+    out = []
+    for body in runtime.bodies:
+        snapshot = parse_artifact_json(definition.blobs[refs[body.body_id].topology_snapshot_ref.path])
+        out.append(
+            (
+                body.body_id,
+                body.name,
+                _solid_geometry(
+                    definition.definition_id,
+                    f"{definition.definition_id}/body:{body.body_id}",
+                    body.solid,
+                    snapshot,
+                    linear_tolerance=linear_tolerance,
+                    angular_tolerance=angular_tolerance,
+                ),
+            )
+        )
+    return out
+
+
+def _solid_geometry(
+    definition_id: str,
+    namespace: str,
+    body: Solid,
+    snapshot: Mapping[str, Any],
+    *,
+    linear_tolerance: float,
+    angular_tolerance: float,
+) -> tuple[
+    list[dict[str, Any]],
+    dict[str, Any],
+    dict[str, bytes],
+    str,
+    str,
+]:
+    """GLBs and the entity document of one solid; entity ids are ``entity/<namespace>/<kind>/<topo>``."""
+
     source_by_key = {
         (str(item["kind"]), str(item["topo_id"])): _entity_source(
-            definition.definition_id, item["feature_output"]
+            definition_id, item["feature_output"]
         )
         for item in snapshot["entities"]
     }
@@ -345,16 +408,16 @@ def _part_geometry(
             vertices_by_id.setdefault(vertex.topo_id, vertex)
     vertices = list(vertices_by_id.values())
     face_ids = {
-        face.topo_id: _entity_id(definition.definition_id, "face", face.topo_id)
+        face.topo_id: _entity_id(namespace, "face", face.topo_id)
         for face in faces
     }
     edge_ids = {
-        edge.topo_id: _entity_id(definition.definition_id, "edge", edge.topo_id)
+        edge.topo_id: _entity_id(namespace, "edge", edge.topo_id)
         for edge in edges
     }
     vertex_ids = {
         vertex.topo_id: _entity_id(
-            definition.definition_id, "vertex", vertex.topo_id
+            namespace, "vertex", vertex.topo_id
         )
         for vertex in vertices
     }
@@ -381,7 +444,7 @@ def _part_geometry(
         _asset_record(line_glb, uri=edge_uri, media_type="model/gltf-binary"),
     ]
 
-    solid_id = _entity_id(definition.definition_id, "solid", body.topo_id)
+    solid_id = _entity_id(namespace, "solid", body.topo_id)
     entities: list[dict[str, Any]] = [
         {
             "entity_id": solid_id,
@@ -482,7 +545,7 @@ def _part_geometry(
         )
     entity_document = {
         "schema_version": "2.0",
-        "definition_id": definition.definition_id,
+        "definition_id": definition_id,
         "geometry_asset_id": geometry_hash,
         "edge_asset_id": edge_hash,
         "entities": sorted(entities, key=lambda item: item["entity_id"]),
@@ -544,6 +607,7 @@ def _build_nodes(
     definitions: Mapping[str, Definition],
     geometry_ids: Mapping[str, str],
     entity_ids: Mapping[str, str],
+    body_assets: Mapping[str, list[tuple[str, str | None, str, str]]] = {},
 ) -> tuple[
     list[dict[str, Any]],
     dict[str, list[str]],
@@ -589,6 +653,26 @@ def _build_nodes(
                 },
             }
         )
+        part_node = nodes[-1]
+        for body_id, body_name, geometry_id, entity_id in body_assets.get(definition.definition_id, ()):
+            # a body of a multi-body part: a solid node under the part node, at the part's origin
+            nodes.append(
+                {
+                    "node_id": f"{node_id}/body:{body_id}",
+                    "parent_node_id": node_id,
+                    "display_name": body_name or body_id,
+                    "node_kind": "solid",
+                    "definition_id": definition.definition_id,
+                    "definition_kind": definition.definition_kind,
+                    "component_id": None,
+                    "instance_id": None,
+                    "transform": identity_placement().to_dict(),
+                    "geometry_asset_id": geometry_id,
+                    "entity_asset_id": entity_id,
+                    "material_id": part_node["material_id"],
+                    "properties": {"body_id": body_id},
+                }
+            )
         if isinstance(definition, AssemblyDefinition):
             for instance in definition.instances:
                 child = definitions[instance.definition_id]
@@ -819,7 +903,7 @@ def _camera(part_definitions: list[PartDefinition]) -> dict[str, Any]:
     bounds = []
     for definition in part_definitions:
         part = materialize_definition(definition)
-        bounds.append(solid_asset_bounds(part.body))
+        bounds.extend(solid_asset_bounds(body.solid) for body in part.bodies)
     minimum = [min(item[0][axis] for item in bounds) for axis in range(3)]
     maximum = [max(item[1][axis] for item in bounds) for axis in range(3)]
     target = [(minimum[axis] + maximum[axis]) * 0.5 for axis in range(3)]
@@ -954,7 +1038,21 @@ def compile_product_scene(
         for definition in definitions.values()
         if isinstance(definition, PartDefinition)
     ]
+    body_assets: dict[str, list[tuple[str, str | None, str, str]]] = {}
     for definition in sorted(part_definitions, key=lambda item: item.definition_id):
+        if definition.bodies:  # a multi-body part: one GLB and entity document per body, drawn by child nodes
+            rows = []
+            for body_id, body_name, (records, entity_record, part_blobs, geometry_id, entity_id) in _body_geometries(
+                definition, linear_tolerance=linear_tolerance, angular_tolerance=angular_tolerance
+            ):
+                for record in records:
+                    geometry_assets_by_id.setdefault(record["asset_id"], record)
+                if all(item["asset_id"] != entity_record["asset_id"] for item in entity_assets):
+                    entity_assets.append(entity_record)
+                blobs.update(part_blobs)
+                rows.append((body_id, body_name, geometry_id, entity_id))
+            body_assets[definition.definition_id] = rows
+            continue
         geometry_records, entity_record, part_blobs, geometry_id, entity_id = (
             _part_geometry(
                 definition,
@@ -970,7 +1068,7 @@ def compile_product_scene(
         entity_ids[definition.definition_id] = entity_id
 
     nodes, occurrences, children = _build_nodes(
-        root, definitions, geometry_ids, entity_ids
+        root, definitions, geometry_ids, entity_ids, body_assets
     )
     connectors, connector_index = _connectors(
         definitions, feature_graphs, occurrences

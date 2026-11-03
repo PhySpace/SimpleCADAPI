@@ -32,34 +32,35 @@ using scad::pybind::Vector3;
 
 // ---- what the signatures say ------------------------------------------------------------------------------------
 // The parameters below that the binding reads as a Python object (and checks itself, with its own errors) print these.
-#define SCAD_SIGNATURE_NAME(Tag, text)                               \
-  struct Tag {                                                       \
-    static constexpr auto name = pybind11::detail::const_name(text); \
-  }
-SCAD_SIGNATURE_NAME(EdgesTag,
+// SCAD_SIGNATURE_NAME and the vocabulary are in semantic_types.hpp; these name what the operations here accept.
+#define SCAD_SIGNATURE_TEXT(Tag, text) SCAD_SIGNATURE_NAME(Tag, pybind11::detail::const_name(text))
+SCAD_SIGNATURE_TEXT(EdgesTag,
                     "collections.abc.Iterable[simplecadapi._cpp._native.Edge] | "
                     "simplecadapi._cpp._native.ql.ShapeSelector");
-SCAD_SIGNATURE_NAME(FacesTag,
+SCAD_SIGNATURE_TEXT(FacesTag,
                     "collections.abc.Iterable[simplecadapi._cpp._native.Face] | "
                     "simplecadapi._cpp._native.ql.ShapeSelector");
-SCAD_SIGNATURE_NAME(LoftSectionsTag,
+SCAD_SIGNATURE_TEXT(LoftSectionsTag,
                     "collections.abc.Iterable[simplecadapi._cpp._native.Wire | simplecadapi._cpp._native.Vertex]");
-SCAD_SIGNATURE_NAME(SweepSectionsTag,
+SCAD_SIGNATURE_TEXT(SweepSectionsTag,
                     "collections.abc.Iterable[simplecadapi._cpp._native.Face | simplecadapi._cpp._native.Wire]");
-SCAD_SIGNATURE_NAME(ShapesTag, "collections.abc.Iterable[simplecadapi._cpp._native.Shape]");
-SCAD_SIGNATURE_NAME(SolidsTag, "collections.abc.Iterable[simplecadapi._cpp._native.Solid]");
-SCAD_SIGNATURE_NAME(TargetTag,
+SCAD_SIGNATURE_TEXT(ShapesTag, "collections.abc.Iterable[simplecadapi._cpp._native.Shape]");
+SCAD_SIGNATURE_TEXT(SolidsTag, "collections.abc.Iterable[simplecadapi._cpp._native.Solid]");
+SCAD_SIGNATURE_TEXT(TargetTag,
                     "simplecadapi._cpp._native.Solid | collections.abc.Iterable[simplecadapi._cpp._native.Solid]");
-SCAD_SIGNATURE_NAME(FaceOperandTag, "simplecadapi._cpp._native.Face");
-SCAD_SIGNATURE_NAME(BinormalTag, "simplecadapi._cpp._native.Wire | simplecadapi.types.Direction3 | None");
-SCAD_SIGNATURE_NAME(FactorsTag, "collections.abc.Sequence[float | Expr]");
+SCAD_SIGNATURE_TEXT(FaceOperandTag, "simplecadapi._cpp._native.Face");
+SCAD_SIGNATURE_TEXT(BinormalTag, "simplecadapi._cpp._native.Wire | simplecadapi.types.Direction3 | None");
+SCAD_SIGNATURE_TEXT(FactorsTag, "collections.abc.Sequence[float | Expr]");
 // A TrackingPolicy member or its value.
-SCAD_SIGNATURE_NAME(PolicyTag, "typing.Literal['full', 'graph'] | simplecadapi._cpp.TrackingPolicy");
+SCAD_SIGNATURE_TEXT(PolicyTag, "typing.Literal['full', 'graph'] | simplecadapi._cpp.TrackingPolicy");
 // The name of the mode, or an enum member with that name (build123d's Until).
-SCAD_SIGNATURE_NAME(UntilTag, "typing.Literal['NEXT', 'LAST', 'PREVIOUS', 'FIRST'] | enum.Enum");
-SCAD_SIGNATURE_NAME(HandednessTag, "typing.Literal['Right', 'Left']");
-SCAD_SIGNATURE_NAME(OffsetKindTag, "typing.Literal['ARC', 'INTERSECTION']");
-SCAD_SIGNATURE_NAME(SetOperationTag, "typing.Literal['cut', 'intersect', 'union']");
+SCAD_SIGNATURE_TEXT(UntilTag, "typing.Literal['NEXT', 'LAST', 'PREVIOUS', 'FIRST'] | enum.Enum");
+SCAD_SIGNATURE_TEXT(HandednessTag, "typing.Literal['Right', 'Left']");
+// cut_rsolid: what a cut that splits the body gives (every piece, or an error), and what it returns.
+SCAD_SIGNATURE_TEXT(OnSplitTag, "typing.Literal['pieces', 'error']");
+SCAD_SIGNATURE_TEXT(SolidOrPiecesTag, "simplecadapi._cpp._native.Solid | list[simplecadapi._cpp._native.Solid]");
+SCAD_SIGNATURE_TEXT(OffsetKindTag, "typing.Literal['ARC', 'INTERSECTION']");
+SCAD_SIGNATURE_TEXT(SetOperationTag, "typing.Literal['cut', 'intersect', 'union']");
 #undef SCAD_SIGNATURE_NAME
 
 using EdgesOrQuery = AnyOf<EdgesTag>;
@@ -577,12 +578,21 @@ void bind_booleans(py::module_& m) {
 
   m.def(
       "cut_rsolid",
-      [](const py::args& solids, bool skip_non_intersecting, const Policy& tracking_policy) {
+      [](const py::args& solids, bool skip_non_intersecting, const Policy& tracking_policy,
+         const Choice<OnSplitTag>& on_split) -> AnyOf<SolidOrPiecesTag> {
         const std::vector<Solid> operands = flattened(solids, "cut_rsolid");
         const CutOptions options{skip_non_intersecting, policy_text(tracking_policy)};
-        return unlocked(false, [&] { return cut_rsolid(operands, options); });
+        if (on_split.value == "error")
+          return {py::cast(unlocked(false, [&] { return cut_rsolid(operands, options); }))};
+        if (on_split.value != "pieces")
+          throw scad::ValueError("on_split must be 'pieces' or 'error'");
+        CutOutcome outcome = unlocked(false, [&] { return cut_rsolid_keep_split(operands, options); });
+        if (outcome.solid)
+          return {py::cast(*outcome.solid)};
+        return {solids_to_py(outcome.pieces)};  // the cut split the body: every piece, ordered by centroid
       },
       py::kw_only(), py::arg("skip_non_intersecting") = true, py::arg("tracking_policy") = "full",
+      py::arg("on_split") = "pieces",
       "Compute the boolean difference of solids: the first is the base, the rest are subtracted in order.");
 
   m.def(

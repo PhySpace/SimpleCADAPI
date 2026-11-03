@@ -36,11 +36,12 @@ from ..build.definition import (
 )
 from ..build.dependencies import snapshot_file_inputs
 from ..build.results import AssemblyBuildResult, PartBuildResult
+import weakref
 from typing import Any
 
 from simplecadapi._cpp import Assembly, find_registered_node, isolated_recording, Part, Solid
 from simplecadapi._glue.session import lineage_of
-from ..operators.product import make_part_rpart
+from ..product.bodies import part_from_bodies
 from simplecadapi._glue.session import GraphSession
 from ..recording.source_mapping import cell_sources
 from .cells import NotebookCells, bound_requirements
@@ -123,13 +124,16 @@ def open_bodies(values: Mapping[str, object], read: AbstractSet[str]) -> list[st
     seen: set[int] = set()
     candidates: list[tuple[str, object]] = []
     for name, value in values.items():
-        if name.startswith("_") or name in read or not isinstance(value, Solid) or id(value) in seen:
+        pieces = isinstance(value, (list, tuple)) and bool(value) and all(isinstance(v, Solid) for v in value)
+        if name.startswith("_") or name in read or not (isinstance(value, Solid) or pieces) or id(value) in seen:
             continue
         seen.add(id(value))
+        if pieces:  # the pieces of a split cut: one candidate, its lineage is the first piece's
+            seen.update(id(v) for v in value)  # type: ignore[union-attr]
         candidates.append((name, value))
     if len(candidates) < 2:
         return [name for name, _ in candidates]
-    nodes = {name: _node(value) for name, value in candidates}
+    nodes = {name: _node(value[0] if isinstance(value, (list, tuple)) else value) for name, value in candidates}
     upstream: set[str] = set()
     for name, node in nodes.items():
         if node is not None:
@@ -160,21 +164,22 @@ def _ancestors(node: Any) -> set[str]:
 
 
 def _implicit_part(config: NotebookConfig, values: Mapping[str, object], read: AbstractSet[str]) -> Part | None:
-    """The product of a ``kind = "part"`` notebook without a cell that builds it: its one open body, as a Part with the notebook id.
+    """The product of a ``kind = "part"`` notebook without a cell that builds it: its open bodies, as a Part with the notebook id.
 
-    ``None`` when there is no body yet; several open bodies are an error naming them (join them, or say which one in a
-    ``make_part_rpart`` cell).
+    One open body is a one-body Part (body id ``"body"``); several are the bodies of one Part, named by their variables
+    (the pieces of a split cut ``<name>_1..n``).  ``None`` when there is no body yet.
     """
 
     names = open_bodies(values, read)
     if not names:
         return None
-    if len(names) > 1:
-        raise ProductNotFoundError(
-            f"{config.path.name}: a part holds one body and {len(names)} are left open ({', '.join(names)}): "
-            "join them, or build the Part from one in a cell (make_part_rpart)"
-        )
-    return make_part_rpart(part_id=config.id, body=values[names[0]])
+    part = part_from_bodies(config.id, {name: values[name] for name in names})
+    _IMPLICIT[id(part)] = part
+    return part
+
+
+_IMPLICIT: "weakref.WeakValueDictionary[int, Part]" = weakref.WeakValueDictionary()
+"""The Parts :func:`_implicit_part` made (outside any cell): :func:`project_product` records them in the definition."""
 
 
 def project_product(
@@ -203,6 +208,11 @@ def project_product(
     # an assembly records its solve, which must not see the caller's session
     # or coordinate system.
     with isolated_recording(), cell_sources(cells):
+        if _IMPLICIT.get(id(product)) is product:
+            # the implicit Part of a kind = "part" notebook was made outside any cell: make it here, recorded, so the
+            # definition has its one result node (the Part), whatever the number of bodies
+            with session:
+                product = part_from_bodies(product.part_id, {body.body_id: body.solid for body in product.bodies})
         session.validate_graph_ownership(product)
         for node in session.graph.topological_order():
             for expression in node.expressions:

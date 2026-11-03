@@ -21,6 +21,7 @@ from typing import Any, Dict, Tuple
 # class name -> (constructor parameter names, has state dictionaries)
 _VALUES: Dict[str, bool] = {
     "Part": True,
+    "Body": False,
     "Assembly": True,
     "Placement": True,
     "Material": True,
@@ -93,9 +94,20 @@ def _token_for(key: str, item: Any) -> str:
     return f"{_TOKEN}{key}:{id(item):x}"
 
 
+# Constructor arguments that are not read back by the attribute of the same name.  A Part holds one ``body`` or
+# several ``bodies``, and is rebuilt from exactly one of them (``Part.body`` raises for a multi-body Part).
+_ARGUMENTS: Dict[str, Dict[str, Any]] = {
+    "Part": {
+        "body": lambda value: None if value.multi_body else value.body,
+        "bodies": lambda value: value.bodies if value.multi_body else None,
+    },
+}
+
+
 def _reduce(has_state: bool, names: Tuple[str, ...]):
     def reduce(value: Any) -> tuple:
-        args = tuple(getattr(value, name) for name in names)
+        readers = _ARGUMENTS.get(type(value).__name__, {})
+        args = tuple(readers[name](value) if name in readers else getattr(value, name) for name in names)
         state = None
         if has_state:
             runtime = value._runtime_dict()

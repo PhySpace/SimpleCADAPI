@@ -12,6 +12,7 @@ from typing import Any
 
 from ..artifacts import materialize_definition
 from simplecadapi._cpp import Assembly, Part
+from ..product.bodies import part_shape
 from ..translator.package_units import (
     ProductPackageInput,
     read_product_package_translation_units,
@@ -73,7 +74,8 @@ def _native_definitions(root_value: Part | Assembly, units: Any) -> list[dict[st
                 "id": definition_id,
                 "kind": kind,
                 "name": value.name or value.part_id,
-                "shape": value.body,
+                # a multi-body part is one STEP product whose shape holds every body
+                "shape": part_shape(value),
                 "metadata": {
                     "record_kind": "definition",
                     "definition_id": value.part_id,

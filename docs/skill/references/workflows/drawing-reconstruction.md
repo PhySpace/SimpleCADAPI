@@ -183,7 +183,7 @@ in unattended mode never ask, write the assumption ledger into `REQUIREMENTS.md`
   native format. No OCR improvisation.
 - Calibration not accepted → re-anchor with independent dimensions; never
   produce derived numbers from a failed calibration.
-- Boolean fails or yields multiple bodies → `domains/part-modeling.md`
+- Boolean fails, or a cut splits the body into pieces → `domains/part-modeling.md`
   boolean discipline (overlap, overshoot, isolate the pair).
 - Fillet/chamfer fails → smaller radius, narrower selection, later order.
 - Dimension mismatch at a stage → re-measure against the ledger; fix the

@@ -1,15 +1,18 @@
 # Task Domain: Part Modeling
 
-Model one physical, single-solid mechanical part with the core geometry API:
-primitives, profiles, 3D features, booleans, detail features, and transforms.
+Model one physical mechanical part with the core geometry API: primitives,
+profiles, 3D features, booleans, detail features, and transforms. A part is
+usually one solid body; it may hold several named bodies (see "Multi-body
+parts" below).
 
-**Read when:** the deliverable is one physical single-solid part, or an existing part source needs a geometry edit (Role 4
-of `workflows/single-part-modeling.md`).
+**Read when:** the deliverable is one physical part (one body or several bodies kept apart in one product item), or an
+existing part source needs a geometry edit (Role 4 of `workflows/single-part-modeling.md`).
 
 ## Use when
 
 - The deliverable is one physical part that will be manufactured or exported as
-  a single solid body.
+  one product item: normally a single solid body, or several bodies of one part
+  (a case and its lid modelled side by side, the pieces of a split cut).
 - The request names brackets, plates, enclosures bodies, shafts, spacers,
     bosses, flanges, blades, or any monolithic part geometry.
 - An existing part source needs a geometry edit: new features, dimension
@@ -37,7 +40,8 @@ of `workflows/single-part-modeling.md`).
 ## Outputs
 
 - A positive-volume, closed `Solid`, or a `Part` via `make_part_rpart` when the
-  product boundary is needed.
+  product boundary is needed (`body=solid`, or `bodies={"base": base, "lid": lid}`
+  for a multi-body part).
 - Semantic tags on mating/role surfaces and numeric facts in metadata.
 - A replayable `GraphSession` model JSON when the flow must be replayable or
   interchange-exported.
@@ -83,9 +87,37 @@ consult their own documentation before the first call.
   (`skip_non_intersecting=True`); pass `skip_non_intersecting=False` for strict
   diagnostics — a skipped cut is never a completed feature.
 - A cut can split a body (a slot through a bar leaves two parts) or consume it
-  (a tool that encloses the whole body). `cut_rsolid` returns one `Solid`, so it
-  raises instead of dropping parts; use `cut_rsolid_list(base, tools)` to get
-  every piece as a list (empty when nothing is left).
+  (a tool that encloses the whole body). `cut_rsolid` returns a `Solid` when
+  one piece is left and, when the cut splits the body, every piece as a
+  `list[Solid]` ordered by centroid (x, then y, then z); it never drops a piece.
+  Pass `on_split="error"` where exactly one Solid is required. A tool that
+  consumes the body still raises. `cut_rsolid_list(base, tools)` always returns
+  a list (empty when nothing is left). The pieces become bodies of the part:
+  `make_part_rpart(part_id=..., body=pieces)` gives `body_1 .. body_n`,
+  `bodies={"bar": pieces}` gives `bar_1 .. bar_n`. A body is one closed volume:
+  OCCT and STEP have no valid "one solid with several lumps".
+
+## Multi-body parts
+
+- `make_part_rpart(part_id=scad.notebook_id(), bodies={"base": base, "lid": lid})`
+  keeps several solids apart in one Part. The dict order is the body order;
+  body ids are identifiers, unique within the part.
+- Read them with `part.bodies` (`Body.body_id`, `Body.solid`, `Body.name`),
+  `part.get_body("lid")`, `part.body_ids()`. `part.body` is the Solid of a
+  one-body part (id `"body"`) and raises `TypeError` on a multi-body part.
+- Bodies have no placements, joints or connectors: anything that moves, or is
+  bought or made separately, is a component of an assembly
+  (`domains/assembly-and-product.md`). Connectors on a multi-body part are
+  refused for now.
+- Tool and construction solids are not bodies: leave them as notebook values
+  and do not pass them to the Part.
+- Overlapping bodies are allowed but warned (`BodyOverlapWarning` when the
+  definition is built); check with `inspect_body_overlaps_rlist(part)`. Union
+  bodies that are one piece of material.
+- Mass per body and in total: `measure_part_mass_rmassreport(part)` (density
+  from the part's material, or `density=`).
+- The preview draws one node per body (`node/<part>/body:<id>`); STEP export
+  writes one product holding every body.
 
 ## Validation gates
 

@@ -857,7 +857,10 @@ class ApiIndexTest(unittest.TestCase):
         part = self.scad["Part"]
         self.assertEqual(part["k"], "c")
         names = [p["n"] for p in part["p"]]
-        self.assertEqual([p["n"] for p in part["p"] if p["r"]], ["part_id", "body"])
+        # a Part takes one ``body`` or several ``bodies`` (multi-body parts), so only part_id is required
+        self.assertEqual([p["n"] for p in part["p"] if p["r"]], ["part_id"])
+        self.assertIn("body", names)
+        self.assertIn("bodies", names)
         self.assertFalse([n for n in names if n.startswith("_")])
 
     def test_namespaces_and_submodules(self) -> None:

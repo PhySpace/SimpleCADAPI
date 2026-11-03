@@ -36,9 +36,9 @@ def solids_of(values: Iterable[Any]) -> Iterator[Solid]:
             return
         seen.add(id(item))
         if isinstance(item, Part):
-            body = item.body
-            if isinstance(body, Solid):
-                yield body
+            for body in item.bodies:  # every body of a multi-body part
+                if isinstance(body.solid, Solid):
+                    yield body.solid
         elif isinstance(item, Assembly):
             for component in item.components:
                 yield from visit(component.item)

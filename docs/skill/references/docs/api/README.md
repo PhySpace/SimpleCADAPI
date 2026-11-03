@@ -316,6 +316,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 ## Other
 
 - [Assembly](Assembly.md) *(from product/assembly.py)* `top-level`
+- [Body](Body.md) *(from product/part.py)* `top-level`
 - [CaptureResult](CaptureResult.md) *(from product/capture.py)* `top-level`
 - [Component](Component.md) *(from product/assembly.py)* `top-level`
 - [Connector](Connector.md) *(from product/connector.py)* `top-level`
@@ -396,6 +397,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [ground_component_rassembly](ground_component_rassembly.md) *(from operators/product.py)* `top-level`
 - [identity_placement_rplacement](identity_placement_rplacement.md) *(from operators/product.py)* `top-level`
 - [inspect_assembly_constraints_rconstraintreport](inspect_assembly_constraints_rconstraintreport.md) *(from operators/product.py)* `top-level`
+- [inspect_body_overlaps_rlist](inspect_body_overlaps_rlist.md) *(from operators/product.py)* `top-level`
 - [inspect_sketch_rsketchcrossings](inspect_sketch_rsketchcrossings.md) *(from operators/sketch.py)* `top-level`
 - [inspect_sketch_rsketchprofiles](inspect_sketch_rsketchprofiles.md) *(from operators/sketch.py)* `top-level`
 - [inspect_sketch_rsketchresult](inspect_sketch_rsketchresult.md) *(from operators/sketch.py)* `top-level`
@@ -404,6 +406,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [load_brep_region_rshell](load_brep_region_rshell.md) *(from operators/geometry.py)* `top-level`
 - [load_brep_region_rsolid](load_brep_region_rsolid.md) *(from operators/geometry.py)* `top-level`
 - [measure_constraint_residual_rconstraintresidual](measure_constraint_residual_rconstraintresidual.md) *(from operators/product.py)* `top-level`
+- [measure_part_mass_rmassreport](measure_part_mass_rmassreport.md) *(from operators/product.py)* `top-level`
 - [meta](meta.md) *(from ql.py)* `submodule:ql`
 - [not_](not_.md) *(from ql.py)* `submodule:ql`
 - [offset_rsolid](offset_rsolid.md) *(from operators/features.py)* `top-level`

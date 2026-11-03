@@ -304,7 +304,7 @@ def test_a_blank_notebook_gets_its_product_with_the_first_feature(tmp_path):
         snap = service.snapshot()
         assert [f["slug"] for f in snap["features"]] == ["base"]
         # the header says kind = "part": the runtime makes the Part from the open body, no product cell is written
-        assert snap["product"] == {"cell": None, "body": "base", "implicit": True}
+        assert snap["product"] == {"cell": None, "body": "base", "bodies": ["base"], "implicit": True}
         assert "make_part_rpart" not in path.read_text()
         # a part holds one solid: the new cylinder says how it meets the body, so no second body is left behind
         assert service.snapshot()["defaults"]["cylinder"]["operation"] == "join"

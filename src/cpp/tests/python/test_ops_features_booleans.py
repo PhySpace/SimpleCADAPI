@@ -118,5 +118,6 @@ def test_2d_booleans():
 
 def test_signatures_match_python():
     assert parameter_names(scad.union_rsolid) == ["solids", "clean", "glue", "tol", "tracking_policy"]  # *solids
-    assert parameter_names(scad.cut_rsolid) == ["solids", "skip_non_intersecting", "tracking_policy"]  # *solids
+    # on_split: a cut that splits the body returns its pieces by default (multi-body parts), "error" refuses
+    assert parameter_names(scad.cut_rsolid) == ["solids", "skip_non_intersecting", "tracking_policy", "on_split"]
     assert parameter_names(scad.boolean_rsolidlist) == ["left", "right", "operation"]

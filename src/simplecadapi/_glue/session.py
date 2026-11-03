@@ -47,10 +47,15 @@ def lineage_of(value: Any) -> Optional[Tuple[str, str]]:
     return graph_id, node_id
 
 
+_PRODUCT_KINDS = frozenset({"Part", "Assembly", "Component", "Connector"})
+"""The product values whose children :func:`_children` lists (not walked as plain dataclasses)."""
+
+
 def _children(item: Any) -> Iterable[Any]:
     kind = type(item).__name__
     if kind == "Part":
-        yield item.body
+        for body in item.bodies:  # one Solid, or every body of a multi-body part
+            yield body.solid
         yield from item.connectors
         if item.material is not None:
             yield item.material
@@ -85,7 +90,9 @@ def walk_values(value: Any, *, deep: bool, seen: Optional[Set[int]] = None) -> I
         for item in value:
             yield from walk_values(item, deep=deep, seen=seen)
     elif deep:
-        if dataclasses.is_dataclass(value) and not isinstance(value, type):  # a result wrapped in the caller's own dataclass
+        # a result wrapped in the caller's own dataclass (the product values have their own children: a multi-body Part's
+        # `body` field refuses to name one body)
+        if dataclasses.is_dataclass(value) and not isinstance(value, type) and type(value).__name__ not in _PRODUCT_KINDS:
             for field in dataclasses.fields(value):
                 if not field.name.startswith("_"):
                     yield from walk_values(getattr(value, field.name), deep=True, seen=seen)

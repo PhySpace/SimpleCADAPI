@@ -67,7 +67,7 @@ export type FeatureState = {
   open: string[];
   tip: string | null;
   /** The body the notebook's Part is built from: by a product cell, or (`implicit`, no cell) by the runtime from the open body. */
-  product: { cell: string | null; body: string; implicit?: boolean } | null;
+  product: { cell: string | null; body: string; bodies?: string[]; implicit?: boolean } | null;
   defaults: Record<string, Record<string, string>>;
   /** The face-making sketches of the notebook (what a `profile` slot chooses from). */
   profiles?: { name: string; plane: string | { origin: number[]; x_axis: number[]; y_axis: number[] }; normal: string; normal_vec?: [number, number, number] }[];
