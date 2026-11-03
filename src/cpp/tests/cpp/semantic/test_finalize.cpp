@@ -306,10 +306,13 @@ TEST_CASE("user tags follow a cut only through proven lineage") {
         std::any_of(track.find("origin_roles")->as_array().begin(), track.find("origin_roles")->as_array().end(),
                     [](const Value& v) { return v.as_string() == "body"; });
     if (from_body && track.find("status")->as_string() == "proven") {
-      CHECK_FALSE(face.has_tag("role.source_face", TagScope::Effective));
       const std::string coverage = face.get_runtime("semantic.lineage.coverage").as_string();
-      if (coverage == "complete" && face.has_tag("role.source_face", TagScope::Lineage))
+      if (coverage == "complete" && face.has_tag("role.source_face", TagScope::Lineage)) {
         lineage_seen = true;
+        // Effective includes what the lineage carries (tags as a view over history), never a local copy.
+        CHECK(face.has_tag("role.source_face", TagScope::Effective));
+        CHECK_FALSE(face.has_tag("role.source_face", TagScope::Local));
+      }
     }
   }
   CHECK(lineage_seen);

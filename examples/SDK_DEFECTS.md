@@ -328,16 +328,16 @@ that surfaced it is in brackets.
 - **Fix direction:** done. Every `ql` factory should resolve against any scope
   that contains its kind; check each (kind, scope) pair when adding a factory.
 
-## 21. Op-kwarg face tags die at translate, mirror and patterns despite full history [stable-refs research]
+## 21. Face tags died at the next operation, op-kwarg ones at blends and copies [stable-refs research]
 
-- **Symptom:** `make_box_rsolid(..., top_face_tag="kw.top")` then `translate_shape`, `mirror_shape` or
-  `linear_pattern_rsolidlist`: `ql.tag("kw.top")` finds 0 faces on the result.
-- **Trigger:** any rigid copy after an op-kwarg tag; plain `apply_tag_rselection` face tags die at every op.
-- **Root cause:** the tag projection drops the channel, not the kernel: these nodes record a `modified` /
-  `continuation` witness for every face (`test_element_ref_history.py` audit resolves the face through them).
-- **Status:** open; documented in `design-docs/stable-refs-design.md` section 6.
-- **Fix direction:** make tags a view over history-resolved references (design section 3.1) instead of per-op
-  projection with per-channel gates.
+- **Symptom:** a plain `apply_tag_rselection` face tag was gone after any later operation; an op-kwarg face tag
+  (`top_face_tag=`) survived booleans but not fillet, chamfer, translate, mirror or patterns, although those nodes
+  record a witness for every face.
+- **Root cause:** tags were copied forward per operation (`autotag.cpp`) through channel-specific gates (the
+  face-source gate, the face channel of blends), and the effective scope excluded lineage.
+- **Status:** fixed. Tags are a view over the recorded history (`scad/reactive/tag_view.hpp`): a recorded tag
+  assignment reaches every entity its targets became, per lineage policy, and effective includes lineage.
+  Audit: `test_element_ref_history.py::test_audit_tag_channels_and_history_per_family` (every family 1/1).
 
 ## 22. `OperationGraph::from_value` header says deltas are not restored; they are [stable-refs research]
 

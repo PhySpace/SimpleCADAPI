@@ -51,7 +51,7 @@ def test_plain_face_tag_after_a_boolean():
         box, anchor = _box_with_top_anchor()
         cut = scad.cut_rsolid(box, scad.make_cylinder_rsolid(3, 30))
 
-        assert _tagged(cut, "user.top") == 0  # today: the face-source gate drops the tag
+        assert _tagged(cut, "user.top") == 1  # the tag is a view over the same history (it used to die here)
 
         r = er.resolve(anchor, cut)
         assert r.status == "ok"
@@ -66,7 +66,7 @@ def test_plain_face_tag_after_a_fillet():
         box, anchor = _box_with_top_anchor()
         filleted = scad.fillet_rsolid(box, _edges_at(box, 10), 2.0)
 
-        assert _tagged(filleted, "user.top") == 0
+        assert _tagged(filleted, "user.top") == 1
 
         r = er.resolve(anchor, filleted)
         assert r.status == "ok"
@@ -81,7 +81,7 @@ def test_extrude_cap_after_a_fillet_of_its_edges():
         (anchor,) = er.anchors_for_role(solid, "extrusion.end")
         filleted = scad.fillet_rsolid(solid, _edges_at(solid, 10), 2.0)
 
-        assert _tagged(filleted, "cap.top") == 0  # today: the op-kwarg face channel stops at blends
+        assert _tagged(filleted, "cap.top") == 1  # the op-kwarg face channel used to stop at blends
 
         r = er.resolve(anchor, filleted)
         assert r.status == "ok"
@@ -226,28 +226,29 @@ def test_a_creator_end_cap_anchor_survives_a_boolean_and_a_copy(kind):
 # ---------------------------------------------------------------------------
 
 _AUDIT = {
-    # family: (op on the tagged box, plain tag survives, op-kwarg tag survives, history status)
-    "cut": (lambda b: scad.cut_rsolid(b, scad.make_cylinder_rsolid(3, 30)), 0, 1, "ok"),
-    "union": (lambda b: scad.union_rsolid(b, scad.make_box_rsolid(4, 4, 4, (0, 0, 10))), 0, 1, "ok"),
-    "intersect": (lambda b: scad.intersect_rsolid(b, scad.make_box_rsolid(30, 30, 30, (10, 0, -5))), 0, 1, "ok"),
-    "fillet": (lambda b: scad.fillet_rsolid(b, _edges_at(b, 10), 2.0), 0, 0, "ok"),
-    "chamfer": (lambda b: scad.chamfer_rsolid(b, _edges_at(b, 10), 2.0), 0, 0, "ok"),
-    "shell_kept_face": (lambda b: scad.shell_rsolid(b, _faces_at(b, 0), 1.0), 0, 1, "ok"),
-    "shell_opened_face": (lambda b: scad.shell_rsolid(b, _faces_at(b, 10), 1.0), 0, 1, "ok"),
-    "translate": (lambda b: scad.translate_shape(b, (5, 0, 0)), 0, 0, "ok"),
-    "mirror": (lambda b: scad.mirror_shape(b, (0, 0, 0), (1, 0, 0)), 0, 0, "ok"),
-    "linear_pattern": (lambda b: scad.linear_pattern_rsolidlist(b, (1, 0, 0), 3, 50)[2], 0, 0, "ok"),
-    "rotate": (lambda b: scad.rotate_shape(b, 30, (0, 0, 1)), 0, 0, "ok"),
-    "radial_pattern": (lambda b: scad.radial_pattern_rsolidlist(b, (0, 0, 0), (0, 0, 1), 4, 360)[1], 0, 0, "ok"),
+    # family: (op on the tagged box, plain tag survives, op-kwarg tag survives, history status).  Before tags
+    # became a view over history the plain tag survived nothing and the kwarg tag only booleans and the shell.
+    "cut": (lambda b: scad.cut_rsolid(b, scad.make_cylinder_rsolid(3, 30)), 1, 1, "ok"),
+    "union": (lambda b: scad.union_rsolid(b, scad.make_box_rsolid(4, 4, 4, (0, 0, 10))), 1, 1, "ok"),
+    "intersect": (lambda b: scad.intersect_rsolid(b, scad.make_box_rsolid(30, 30, 30, (10, 0, -5))), 1, 1, "ok"),
+    "fillet": (lambda b: scad.fillet_rsolid(b, _edges_at(b, 10), 2.0), 1, 1, "ok"),
+    "chamfer": (lambda b: scad.chamfer_rsolid(b, _edges_at(b, 10), 2.0), 1, 1, "ok"),
+    "shell_kept_face": (lambda b: scad.shell_rsolid(b, _faces_at(b, 0), 1.0), 1, 1, "ok"),
+    "shell_opened_face": (lambda b: scad.shell_rsolid(b, _faces_at(b, 10), 1.0), 1, 1, "ok"),
+    "translate": (lambda b: scad.translate_shape(b, (5, 0, 0)), 1, 1, "ok"),
+    "mirror": (lambda b: scad.mirror_shape(b, (0, 0, 0), (1, 0, 0)), 1, 1, "ok"),
+    "linear_pattern": (lambda b: scad.linear_pattern_rsolidlist(b, (1, 0, 0), 3, 50)[2], 1, 1, "ok"),
+    "rotate": (lambda b: scad.rotate_shape(b, 30, (0, 0, 1)), 1, 1, "ok"),
+    "radial_pattern": (lambda b: scad.radial_pattern_rsolidlist(b, (0, 0, 0), (0, 0, 1), 4, 360)[1], 1, 1, "ok"),
     # These five recorded no history before this branch (lost / no_history); they now carry builder history.
-    "scale": (lambda b: scad.scale_rsolid(b, (1.0, 1.0, 1.0)), 0, 0, "ok"),
+    "scale": (lambda b: scad.scale_rsolid(b, (1.0, 1.0, 1.0)), 1, 1, "ok"),
     "transform_rsolid": (
         lambda b: scad.transform_rsolid(b, [[1, 0, 0, 5], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
-        0,
-        0,
+        1,
+        1,
         "ok",
     ),
-    "offset": (lambda b: scad.offset_rsolid(b, -1.0), 0, 0, "ok"),
+    "offset": (lambda b: scad.offset_rsolid(b, -1.0), 1, 1, "ok"),
 }
 
 
@@ -443,3 +444,43 @@ def test_two_look_alike_boxes_make_the_anchor_ambiguous_never_a_guess():
     r = er.resolve(stable, edited)
     assert r.status == "lost"
     assert r.reason == "anchor_ambiguous"
+
+
+# ---------------------------------------------------------------------------
+# Tags as a view over history: chains, persistence
+# ---------------------------------------------------------------------------
+
+
+def test_an_n_ary_cut_composes_its_steps():
+    # One node cuts three tools in turn; its steps name the intermediate solids, which the delta now composes
+    # back to the real inputs, so the top face is followed through all three (here: split by the groove).
+    with scad.GraphSession():
+        box, anchor = _box_with_top_anchor()
+        cut = scad.cut_rsolid(
+            box,
+            scad.make_cylinder_rsolid(3, 30),
+            scad.translate_shape(scad.make_cylinder_rsolid(2, 30), (10, 0, 0)),
+            scad.translate_shape(scad.make_box_rsolid(4, 30, 4, (0, 0, 8)), (-14, 0, 0)),
+        )
+        r = er.resolve(anchor, cut)
+        assert r.status == "split"
+        assert sorted(round(f.get_area(), 2) for f in r.entities) == [80.0, round(640 - 13 * math.pi, 2)]
+        assert sorted(round(f.get_area(), 2) for f in ql.faces().where(ql.tag("user.top")).resolve(cut)) == [
+            80.0,
+            round(640 - 13 * math.pi, 2),
+        ]
+
+
+def test_a_tag_survives_pickling_with_its_history():
+    import pickle
+
+    with scad.GraphSession():
+        box, _ = _box_with_top_anchor()
+        holed = scad.cut_rsolid(box, scad.make_cylinder_rsolid(3, 30))
+        cut = scad.fillet_rsolid(holed, _edges_at(holed, 0), 1.0)
+        data = pickle.dumps(cut)
+    restored = pickle.loads(data)
+    (face,) = ql.faces().where(ql.tag("user.top")).resolve(restored)
+    assert face.get_area() == pytest.approx(800 - 9 * math.pi)
+    explained = scad.explain_tag(face, "user.top")
+    assert explained and explained[0]["lineage"][0]["evidence"]["via"] == "recorded_history"

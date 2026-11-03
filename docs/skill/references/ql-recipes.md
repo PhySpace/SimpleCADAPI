@@ -77,7 +77,7 @@ with GraphSession(graph_id="blend") as s:
 
 ## Recipe: tagged bore -> rim chamfer
 
-Tag the bore wall right after the cut (Ground rule 3: tag in time),
+Tag the bore wall right after the cut (Ground rule 3: tag the value you go on with),
 then chamfer its top rim:
 
 ```python

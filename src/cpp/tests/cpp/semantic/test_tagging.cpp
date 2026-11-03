@@ -196,7 +196,7 @@ TEST_CASE("explain_tag names the inherited path from the ancestor down") {
   CHECK(own[0].find("attachment")->as_string() == "local");
 }
 
-TEST_CASE("effective tags exclude lineage; lineage needs complete history") {
+TEST_CASE("effective tags include lineage; the lineage scope needs complete history") {
   Solid source = box_solid(1, 1, 1);
   Solid result = box_solid(2, 2, 2);
   const TagBinding binding = user_tag_binding("role.datum");
@@ -208,7 +208,9 @@ TEST_CASE("effective tags exclude lineage; lineage needs complete history") {
 
   result.add_tag_lineage(binding, LineageDerivation::Continuation, source.topo_id(), topology_change());
   result.set_runtime("semantic.lineage.coverage", "complete");
-  CHECK_FALSE(contains(result.list_tags(TagScope::Effective), "role.datum"));
+  // Tags are a view over history: what the lineage carries is part of the entity's effective tags.
+  CHECK(contains(result.list_tags(TagScope::Effective), "role.datum"));
+  CHECK(result.has_tag("role.datum", TagScope::Effective));
   CHECK(result.list_tags(TagScope::Lineage) == std::vector<std::string>{"role.datum"});
   CHECK(result.has_tag("role.datum", TagScope::Lineage));
   // The same witness twice is one witness.

@@ -164,22 +164,79 @@ The kernel records one `TopoDelta` per node: witnesses with event `preserved`/`m
 | Section / split | section, split | not probed | -- | **[I]** |
 | Sketch | sketch solve -> wire/face | no deltas on edge/wire/face construction nodes | a profile edge's identity is its sketch geometry id (FreeCAD's `g1;SKT`) | **[I]**, stage 2 |
 
-### 3.1 Tag propagation, production-grade [I]
+### 3.1 Tags are a view over recorded history (owner decision: switch directly)
 
-Today a tag is projected *forward* by every operation through `apply_tracking_tags` with per-channel lineage policies
-(`LineagePolicy`, `lineage_policy_allows`) **[R]**, which is where the gates and gaps live. Proposal:
+**Model.** A tag assignment is already a graph node: `apply_tag_rselection` and every op-kwarg tag
+(`top_face_tag=`) record an `apply_tag_*` node whose `tag_binding` parameter holds the binding and its target
+anchors (`explicit_refs`, or `selection_query` with `evidence.selected_refs`) **[R]**. So a tag needs no copy on
+every later shape: the tags of an entity of node N's output are *computed* from N's upstream graph:
 
-- A tag binding stores an `ElementRef` (anchor at the node where the tag was applied, `follow` and `pick` from the
-  tag's lineage policy: `continuation_fragment` ~ identity with `pick: all`, an edge-source tag ~ derived).
-- `ql.tag("x")` on shape S = resolve the binding's refs to S's node. Split -> all pieces carry the tag (status kept
-  so `.exactly(n)` can explain itself); merged -> the merged face carries it; lost -> the tag is absent and
-  `explain_tag` says where it died and why.
-- Resolution is lazy (at query time) and memoised per (binding, node): no per-op projection cost, and old tags keep
-  working on values restored from the cell cache because the deltas travel with the nodes (2.2, 4.3).
-- Stage it behind the existing API: keep the projection for one release, compare both on the test corpus, then make
-  the projection a cache of the resolver.
+```
+tags(N, e) = own bindings of e (the op's kernel roles; bindings set on N's own output)
+           + every binding B of a tag node upstream of N whose anchors reach e through the deltas,
+             step by step, as B's lineage policy allows
+```
 
----
+Per step (node M with a delta, for every witness whose parent carries B):
+
+| witness | carried when |
+|---|---|
+| `preserved` / `modified`, same kind | `lineage_policy_allows(B, derivation)`: continuation (`continuation`), continuation + fragment (`continuation_fragment`, the default: a split face tags *all* its pieces), explicit list |
+| `generated` | never by continuation: a face a feature generates from a tagged source (fillet / chamfer patch from its edge, extrude / loft side from its profile edge) is *named* by that operation after its source when it runs (the projected binding, `semantic/autotag.cpp`), an op-local fact like a kernel role |
+| `deleted`, not mentioned, or a node without history | not carried: the tag ends there, and `explain_tag` says where |
+
+Identity ops (tag assignments, selections) pass everything on under their own node. The view is computed
+**incrementally per node** from its inputs' views and its own delta (O(delta entries) per node), memoised per node
+object (nodes are immutable), so a query costs a lookup after the first one. It lives in the C++ kernel
+(`scad::reactive` tag view, `src/cpp/src/reactive/tag_view.cpp`) and is installed as the topo layer's
+history-witness provider, so `Shape::has_tag` / `list_tags` / `list_tag_bindings` / `explain_tag` and therefore
+every `ql.tag(...)` call site see it without any API change **[T]** (`test_tag_view.cpp`, the audit).
+
+**One path per binding, chosen by where the binding lives.** A binding a *recorded* tag assignment made
+(producer `user_operation` with a node id, on a value that is part of a recorded graph) is carried only by the view:
+the per-operation copy (`carry_source_lineage`, `project_source_bindings` in `semantic/autotag.cpp`) skips it. What
+only the shapes know keeps the copy: imported sidecar facts (`provenance.*` of a `.scadbrep`), sketch topology names,
+tags assigned outside a session, values replayed without a recording session, and the projected names above. There
+is no binding that both paths carry, so nothing is duplicated, and no compatibility switch. **[T]** (full suite: the
+brep provenance, sketch exact-source-identity and replayed-connector tests exercise the shape path.)
+
+**Scopes.** `local` = bindings stored on the entity; `inherited` = from containing entities (downward
+propagation); `lineage` = the history view; `effective` (the default of `ql.tag`) = local + inherited + lineage.
+This is the visible change: a plain user face tag now survives booleans, blends, shells, copies and patterns
+(it used to stop at the face-source gate), and an op-kwarg tag survives fillets and copies.
+
+**Persistence and versioning.** The tag lives in its graph node, so it travels with the cell cache (the lineage
+record of a cell holds its nodes, deltas and `tag_binding` params) and with model JSON; nothing is pickled on
+shapes. The binding has its schema version; the view algorithm is versioned with the naming version (section 5).
+
+**Bodies.** A view entry is keyed by (output slot, kind, topo id) of the node's output, so a multi-body node
+(several slots, or one compound of bodies) keeps the body apart; references report which body (slot / solid) each
+target lies in.
+
+### 3.2 Target API: queries, references, tags (production-grade)
+
+```python
+# selection: a query is data (serialisable), resolution is explicit, cardinality is asserted
+q = ql.faces().where(ql.tag("mount.face"))           # tags through history (3.1)
+faces = q.exactly(2).resolve(part)                   # error lists per-predicate counts and near misses
+report = q.explain(part)                             # the same, as data: counts per predicate, candidates
+
+# references: stable anchors resolved through history (section 2, 4)
+ref = scad.ref.of(face, part)                        # ElementRef: stable anchor + guard, JSON
+ref.resolve(part)  -> Resolution(status, entities, candidates, lost_at, reason, hops, bodies)
+ref.one(part) / ref.all(part)                        # ElementRefError(status, candidates) unless exactly one / ok
+ql.faces().where(ql.ref(ref))                        # a reference as a predicate
+
+# tags: names over references
+scad.apply_tag_rselection(part, faces, "mount.face") # unchanged; recorded as a tag node
+scad.explain_tag(face, "mount.face")                 # binding, anchors, hops, where it stopped and why
+ql.tag("mount.face", follow="derived")               # also generated descendants (edge tag -> its patch)
+ql.faces().where(ql.body("left"))                    # with research/multi-solid: per-body scoping
+```
+
+Stages: the view and the scopes (3.1) and the resolver (`simplecadapi.topology.element_ref`: `resolve`,
+`require`, `stable_anchor_of`, `guard_of`) are on this branch; `scad.ref` as a public module, `ql.ref`,
+`ql.body`, `Query.explain` follow (section 7).
 
 ## 4. Resolution, failure statuses, and what the editor shows
 
@@ -242,33 +299,33 @@ way). On mismatch: resolve anyway, compare against `guard` and `last`; if they a
 if not, report `lost(version_changed)` with candidates. Refs never need a migration step of their own because they
 store anchors and policies, not resolved names.
 
-## 6. Audit: does tag/history propagation work per family today
+## 6. Audit: tag and history propagation per family (before -> now)
 
 All rows **[T]** in `test/test_element_ref_history.py` (`test_audit_tag_channels_and_history_per_family` and the
-status tests) unless marked; **[R]** cells were seen in a probe run but are not asserted.
-Probe: box 40x20x10 with the top face tagged by kwarg (`kw.top`) and by `apply_tag_rselection` (`user.top`).
+status tests) unless marked; **[R]** = seen in a probe, not asserted. Probe: box 40x20x10 with the top face tagged
+by kwarg (`kw.top`) and by `apply_tag_rselection` (`user.top`). "Before" is `dev` @ `093ef71`.
 
-| Family | plain tag | kwarg tag | history resolver | Missing |
-|---|---|---|---|---|
-| cut | dies | survives | ok (trimmed top) | plain tag gate |
-| cut through the face | dies **[R]** | survives on both pieces **[R]** | **split** (2 pieces) | -- (statuses are new) |
-| cut removing the face | dies **[R]** | dies **[R]** | lost(deleted) | -- |
-| union (disjoint top) | dies | survives | ok | plain tag gate |
-| union (coplanar) | dies **[R]** | survives **[R]** | **merged** | merge not visible to tags |
-| intersect | dies | survives | ok | plain tag gate |
-| fillet / chamfer | dies | **dies** | ok | face-channel gap in tag projection |
-| shell, face kept | dies | survives (since 7.2) | ok (was lost/replaced) | -- (fixed, 7.2) |
-| shell, face removed | dies | survives (on the rim) | ok (the rim) | -- |
-| translate / rotate / mirror | dies | **dies** | ok | tag projection ignores continuation witnesses |
-| linear pattern (instance 3) / radial pattern (instance 2) | dies | dies | ok | same |
-| transform_rsolid, scale_rsolid | dies | dies | ok (was lost/no_history) | -- (fixed: `modification_delta`) |
-| offset_rsolid | dies | dies | ok (was lost/no_history) | -- (fixed) |
-| draft | -- | -- | ok, the drafted face and its trimmed neighbours | -- (fixed) |
-| helical sweep | -- | -- | ok through its sweep node | -- (never a gap) |
-| edge -> fillet patch | (edge-source tags survive, playbook) | -- | lost(deleted) identity; the patch in derived mode | -- |
-| extrude cap -> fillet | -- | **dies** | ok | face-channel gap |
-| extrude / revolve / loft / sweep end cap -> union -> translate | -- | -- | ok (same area) | -- |
-| loft sides | -- | -- | not probed; playbook says kernel-matched | section naming |
+| Family | plain tag before -> now | kwarg tag before -> now | history resolver before -> now |
+|---|---|---|---|
+| cut | dies -> survives | survives -> survives | ok |
+| cut through the face | dies -> both pieces **[R]** | both pieces **[R]** | split (2 pieces) |
+| cut removing the face | dies | dies | lost(deleted) |
+| N-ary cut (3 tools) | dies -> both pieces | -- | lost(replaced) -> split (composed steps, 7) |
+| union (disjoint / coplanar) | dies -> survives | survives | ok / merged |
+| intersect | dies -> survives | survives | ok |
+| fillet / chamfer | dies -> survives | dies -> survives | ok |
+| shell, face kept | dies -> survives | dies -> survives | lost(replaced) -> ok (7.2) |
+| shell, face removed | dies -> survives (the rim) | survives | ok (the rim) |
+| translate / rotate / mirror | dies -> survives | dies -> survives | ok |
+| linear / radial pattern instance | dies -> survives | dies -> survives | ok |
+| transform_rsolid, scale_rsolid, offset_rsolid | dies -> survives | dies -> survives | lost(no_history) -> ok |
+| draft | -- | -- | lost(no_history) -> ok (drafted face and neighbours) |
+| helical sweep | -- | -- | ok through its sweep node (never a gap) |
+| edge -> fillet patch | the fillet names the patch after the edge (projection, unchanged) | -- | lost(deleted) identity; the patch in derived mode |
+| extrude cap -> fillet | -- | dies -> survives | ok |
+| creator end caps (extrude / revolve / loft / sweep) -> union -> translate | -- | -- | ok |
+| tag after pickling the value | -- | -- | survives (`test_a_tag_survives_pickling_with_its_history`) |
+| loft sides | -- | -- | not probed; kernel-matched (section naming, stage 2) |
 
 ---
 
