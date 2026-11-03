@@ -6,7 +6,7 @@ import { axisName } from "@/lib/sketch-plane";
 
 // -- contract -------------------------------------------------------------------------------------------------------
 
-export type SlotKind = "length" | "angle" | "float" | "count" | "bool" | "enum" | "point" | "body" | "select" | "points2d" | "points3d" | "profile" | "sketch" | "value" | "text";
+export type SlotKind = "length" | "angle" | "float" | "count" | "bool" | "enum" | "point" | "body" | "select" | "points2d" | "points3d" | "profile" | "sketch" | "value" | "text" | "grid";
 
 export type SlotOption = { value: string; label: string };
 
@@ -260,6 +260,9 @@ export function initialForm(spec: Spec, bodyDefaults: Record<string, string> = {
       case "text":
         form[slot.name] = typeof given === "string" ? given : "";
         break;
+      case "grid":
+        form[slot.name] = gridText(given);
+        break;
       default:
         form[slot.name] = numberText(given);
     }
@@ -303,6 +306,12 @@ export function formToValues(spec: Spec, form: RawForm): { values: Record<string
         } else if (typeof raw === "string" && raw) values[slot.name] = raw;
         else if (!slot.optional) errors[slot.name] = `no ${(slot.accepts ?? ["value"]).join(" or ")} in this notebook yet`;
         break;
+      case "grid": {
+        const parsed = parseGrid(typeof raw === "string" ? raw : "");
+        if ("error" in parsed) errors[slot.name] = parsed.error;
+        else values[slot.name] = parsed.grid;
+        break;
+      }
       case "text":
         if (typeof raw === "string" && raw.trim()) values[slot.name] = raw;
         else if (!slot.optional) errors[slot.name] = "enter a value";
@@ -355,6 +364,32 @@ export function validateName(name: string, taken: readonly string[]): string | n
 }
 
 // -- bodies ---------------------------------------------------------------------------------------------------------
+
+/** A grid of points as text: one row per line, the points of a row separated by ";" (``x, y, z; x, y, z``). */
+export function gridText(grid: unknown): string {
+  if (!Array.isArray(grid)) return "";
+  return grid.map((row) => (Array.isArray(row) ? row.map((p) => (Array.isArray(p) ? p.map((v) => numberText(v)).join(", ") : "")).join("; ") : "")).join("\n");
+}
+
+/** Parse a grid typed as {@link gridText} writes it: every row the same length, every point three numbers. */
+export function parseGrid(text: string): { grid: number[][][] } | { error: string } {
+  const rows = text.split("\n").map((line) => line.trim()).filter(Boolean);
+  if (rows.length < 2) return { error: "at least two rows, one per line" };
+  const grid: number[][][] = [];
+  for (const [r, line] of rows.entries()) {
+    const points = line.split(";").map((part) => part.trim()).filter(Boolean);
+    if (points.length < 2) return { error: `row ${r + 1}: at least two points, separated by ";"` };
+    const row: number[][] = [];
+    for (const point of points) {
+      const numbers = point.split(/[\s,]+/).filter(Boolean).map(Number);
+      if (numbers.length !== 3 || numbers.some((n) => !Number.isFinite(n))) return { error: `row ${r + 1}: "${point}" is not x, y, z` };
+      row.push(numbers);
+    }
+    if (grid.length && row.length !== grid[0].length) return { error: `row ${r + 1} has ${row.length} points, row 1 has ${grid[0].length}` };
+    grid.push(row);
+  }
+  return { grid };
+}
 
 /** The named values of the notebook that fit a value slot (its accepted kinds), in the order they were made. */
 export function valueChoices(state: Pick<FeatureState, "bodies">, accepts: readonly string[] | undefined): { name: string; produces: string }[] {

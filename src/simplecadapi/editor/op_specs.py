@@ -103,6 +103,8 @@ def _slot(param: C.Param, features: Any) -> Any | None:
         if param.has_default and param.default is None:
             return Slot(param.name, label, "point", default=None, unit=unit, min=-10000.0, optional=True)
         return Slot(param.name, label, "point", default=[float(v) for v in default], unit=unit, min=-10000.0)
+    if kind == "grid":  # a control net: rows of points (a flat 3 x 3 patch to start from)
+        return Slot(param.name, label, "grid", default=[[[x * 10.0, y * 10.0, 0.0] for x in range(3)] for y in range(3)], unit="mm")
     if kind == "points":
         return Slot(param.name, label, "points3d", default=[[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [10.0, 10.0, 0.0]], unit="mm")
     if kind == "bool":
@@ -184,6 +186,8 @@ def _builder(op: C.Operation):
                 expr = c.point(slot.name)
             elif slot.kind == "points3d":
                 expr = "[" + ", ".join("(" + ", ".join(repr(float(v)) for v in row) + ")" for row in value) + "]"
+            elif slot.kind == "grid":
+                expr = "[" + ", ".join("[" + ", ".join("(" + ", ".join(repr(float(v)) for v in p) + ")" for p in row) + "]" for row in value) + "]"
             elif slot.kind in ("bool", "enum", "text"):
                 expr = json.dumps(value) if slot.kind != "bool" else repr(bool(value))
             elif slot.kind == "select":

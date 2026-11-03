@@ -859,6 +859,24 @@ def check_values(spec: Spec, values: Mapping[str, Any], bodies: Mapping[str, str
                 if not _NAME.fullmatch(str(name)) or bodies.get(str(name)) not in (slot.accepts or ()):
                     raise FeatureError(f"{slot.label}: {name!r} is not a {' or '.join(slot.accepts or ())} in this notebook")
             clean[slot.name] = [str(n) for n in names] if slot.many else str(names[0])
+        elif slot.kind == "grid":
+            if not isinstance(raw, (list, tuple)) or len(raw) < 2:
+                raise FeatureError(f"{slot.label}: at least two rows of points")
+            width = None
+            grid = []
+            for row in raw:
+                if not isinstance(row, (list, tuple)) or len(row) < 2:
+                    raise FeatureError(f"{slot.label}: each row needs at least two points")
+                if width is not None and len(row) != width:
+                    raise FeatureError(f"{slot.label}: every row needs the same number of points")
+                width = len(row)
+                points = []
+                for point in row:
+                    if not (isinstance(point, (list, tuple)) and len(point) == 3):
+                        raise FeatureError(f"{slot.label}: each point needs 3 numbers")
+                    points.append([_checked_number(Slot(slot.name, slot.label, "float"), v) for v in point])
+                grid.append(points)
+            clean[slot.name] = grid
         elif slot.kind == "text":
             if not isinstance(raw, str):
                 raise FeatureError(f"{slot.label}: text is required")

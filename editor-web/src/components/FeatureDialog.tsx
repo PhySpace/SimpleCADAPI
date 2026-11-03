@@ -608,6 +608,17 @@ function SlotWidget({
         </Select>
       );
     }
+    case "grid":
+      return (
+        <Textarea
+          rows={5}
+          spellCheck={false}
+          value={typeof raw === "string" ? raw : ""}
+          aria-invalid={invalid}
+          placeholder={"x, y, z; x, y, z; x, y, z\nx, y, z; x, y, z; x, y, z"}
+          onChange={(event) => set(slot.name, event.target.value)}
+        />
+      );
     case "text":
       return <Input value={typeof raw === "string" ? raw : ""} aria-invalid={invalid} onChange={(event) => set(slot.name, event.target.value)} />;
     case "profile": {

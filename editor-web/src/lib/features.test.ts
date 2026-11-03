@@ -273,3 +273,15 @@ describe("isSlotVisible and hidden slots", () => {
     expect(initialForm(combine, { operation: "join" }, { operation: "cut" }).operation).toBe("cut");
   });
 });
+
+describe("a grid of points (a control net)", () => {
+  it("reads one row per line, points separated by semicolons, and writes it back the same", async () => {
+    const { gridText, parseGrid } = await import("@/lib/features");
+    const grid = [[[0, 0, 0], [10, 0, 0]], [[0, 10, 1], [10, 10, 2]]];
+    const text = gridText(grid);
+    expect(text).toBe("0, 0, 0; 10, 0, 0\n0, 10, 1; 10, 10, 2");
+    expect(parseGrid(text)).toEqual({ grid });
+    expect(parseGrid("0,0,0; 1,0,0\n0,1,0")).toEqual({ error: "row 2: at least two points, separated by \";\"" });
+    expect(parseGrid("0,0,0; 1,0,0\n0,1,0; 1,1,0; 2,1,0")).toEqual({ error: "row 2 has 3 points, row 1 has 2" });
+  });
+});
