@@ -66,7 +66,6 @@ import {
   type EditRequest,
   type End,
 } from "@/lib/sketch-edit";
-import { findIntersections } from "@/lib/sketch-intersect";
 import { typedFields, typedTarget, type TypedDims } from "@/lib/sketch-typed";
 
 const DRAW_TOOLS = new Set(["point", "line", "circle", "arc"]);
@@ -225,8 +224,8 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   }, [choice, loopKey, drag, doc.profile, doc.inner]);
 
   // -- snapping -----------------------------------------------------------------------------------------------------------------
-  /** Where curves of the sketch cross and no point is yet: shown, and a point can be placed on them. */
-  const crossings = useMemo(() => findIntersections(doc, result), [doc, result]);
+  /** Where curves of the sketch cross and no point is yet (the SDK's answer for the last solve): shown, and snapped to. */
+  const crossings = useMemo(() => (result?.crossings ?? []).map((c) => c.at), [result]);
   const snapTargets = useMemo(() => {
     const all = new Map(pts);
     modelPoints.forEach((p, i) => all.set(`m:${i}`, p));

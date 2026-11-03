@@ -487,3 +487,19 @@ def test_a_sketch_with_scad_var_parameters_can_be_edited_and_keeps_its_parameter
     after = scad.trim_rsketch(kept, "c", (0.0, 4.0))
     assert [e["id"] for e in entities_of(after, "circle")] == ["keep"]
     assert entities_of(after, "circle")[0]["radius"] == pytest.approx(4.0)
+
+
+def test_crossings_are_where_trim_would_cut_and_never_an_existing_point():
+    crossing = scad.inspect_sketch_rsketchcrossings(plus())
+    assert len(crossing) == 1 and sorted(crossing[0]["entities"]) == ["h", "v"]
+    assert crossing[0]["at"] == pytest.approx([5.0, 0.0], abs=1e-6)
+    # a line through a circle: two crossings; a line that ends on the circle at a shared point: none there
+    ring = build({"c": (0, 0), "a": (-10, 0), "b": (10, 0)}, [("circle", "r", "c", 5.0), ("line", "l", "a", "b")])
+    assert sorted(round(item["at"][0], 6) for item in scad.inspect_sketch_rsketchcrossings(ring)) == [-5.0, 5.0]
+    ends = build({"c": (0, 0), "a": (-10, 0), "e": (5, 0), "q": (0, 9)}, [("arc", "k", "c", "e", "q"), ("line", "l", "a", "e")])
+    assert scad.inspect_sketch_rsketchcrossings(ends) == []
+    # construction geometry does not cross
+    guide = build({"a": (0, 0), "b": (10, 0)}, [("line", "h", "a", "b")])
+    guide = scad.add_point_rsketch(scad.add_point_rsketch(guide, "c", 5, -5), "d", 5, 5)
+    guide = scad.add_line_rsketch(guide, "v", "c", "d", construction=True)
+    assert scad.inspect_sketch_rsketchcrossings(guide) == []

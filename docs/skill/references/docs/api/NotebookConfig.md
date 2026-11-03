@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class NotebookConfig(path: Path, id: str, revision: str, tolerance_profile: str, inputs: tuple[FileInput, ...])
+class NotebookConfig(path: Path, id: str, revision: str, tolerance_profile: str, inputs: tuple[FileInput, ...], kind: str | None = None)
 ```
 
 *Source: runtime/config.py*

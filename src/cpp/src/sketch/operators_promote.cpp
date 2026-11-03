@@ -1,4 +1,5 @@
-// inspect_sketch_rsketchresult, inspect_sketch_rsketchprofiles, make_wire_from_sketch_rwire, make_face_from_sketch_rface.
+// inspect_sketch_rsketchresult, inspect_sketch_rsketchprofiles, make_wire_from_sketch_rwire,
+// make_face_from_sketch_rface.
 #include <TopoDS.hxx>
 
 #include "finalize.hpp"

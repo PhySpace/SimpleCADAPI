@@ -283,6 +283,7 @@ def solve(doc: Mapping[str, Any]) -> dict[str, Any]:
     result = scad.inspect_sketch_rsketchresult(sketch=sketch, strict=False)
     data = result.to_dict()
     listed = scad.inspect_sketch_rsketchprofiles(sketch=sketch, strict=False)
+    crossings = scad.inspect_sketch_rsketchcrossings(sketch=sketch)
     return {
         "status": data.get("status"),
         "dof": data.get("dof"),
@@ -293,6 +294,7 @@ def solve(doc: Mapping[str, Any]) -> dict[str, Any]:
         "diagnostics": data.get("diagnostics") or [],
         "profiles": listed["profiles"],
         "unusable": listed["unusable"],
+        "crossings": crossings,
     }
 
 

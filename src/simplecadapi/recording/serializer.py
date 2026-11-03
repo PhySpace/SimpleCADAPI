@@ -251,6 +251,10 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
         "status": "diagnostic",
         "reason": "Runs the sketch solver for inspection only; solve evidence is recorded on sketch promotion nodes.",
     },
+    "inspect_sketch_rsketchcrossings": {
+        "status": "diagnostic",
+        "reason": "Lists where the solved sketch's curves cross, for inspection only; an edit that uses a crossing is the recorded node.",
+    },
     "inspect_sketch_rsketchprofiles": {
         "status": "diagnostic",
         "reason": "Lists the profiles of the solved sketch for inspection only; promotion records the chosen profile.",

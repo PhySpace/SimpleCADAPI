@@ -615,6 +615,9 @@ void bind_entity_operators(py::module_& m) {
       py::arg("sketch"), py::arg("source"), py::kw_only(), py::arg("entities") = py::none(),
       py::arg("construction") = true);
   m.def(
+      "inspect_sketch_rsketchcrossings", [](const Sketch& sketch) { return inspect_sketch_rsketchcrossings(sketch); },
+      py::arg("sketch"));
+  m.def(
       "diff_sketch_rsketchdiff",
       [](const Sketch& before, const Sketch& after) { return diff_sketch_rsketchdiff(before, after).to_value(); },
       py::arg("before"), py::arg("after"));

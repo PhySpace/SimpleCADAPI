@@ -1,4 +1,4 @@
-// trim_rsketch, extend_rsketch and diff_sketch_rsketchdiff.
+// trim_rsketch, extend_rsketch, diff_sketch_rsketchdiff and inspect_sketch_rsketchcrossings.
 //
 // Both edits work on the *solved* geometry: the sketch is solved first, every point is moved to where the solver put
 // it, and the cuts are computed on those coordinates.  Lines, circles and arcs are the entities that can be cut or
@@ -228,8 +228,10 @@ bool uses_point(const SketchEntity& entity, const std::string& point_id) {
 // rewrites the document, which the functional API of Sketch cannot do).
 class SketchEditor {
  public:
-  explicit SketchEditor(const Sketch& source) : work_(source.clone(false)) {
-    SketchSolveRequest request;  // strict: a conflicting sketch has no geometry to cut
+  // strict: a conflicting sketch has no geometry to cut (an inspection passes false and looks at what the solver left)
+  explicit SketchEditor(const Sketch& source, bool strict = true) : work_(source.clone(false)) {
+    SketchSolveRequest request;
+    request.strict = strict;
     const SketchSolveResult solved = work_.solve(request);
     for (const auto& [id, point] : solved.solved_points)
       if (work_.entities_.contains(id))
@@ -248,6 +250,61 @@ class SketchEditor {
     }
     for (const SketchConstraint& constraint : work_.constraints_)
       taken_constraints_.insert(constraint.id);
+  }
+
+  // Where two non-construction lines, circles or arcs cross away from every point of the sketch: [{at: [x, y],
+  // entities: [a, b]}], in entity order.  The same crossings trim cuts at; a crossing that is already a point is not
+  // listed.
+  Value crossings() const {
+    std::vector<const SketchEntity*> curves;
+    for (const auto& [id, entity] : work_.entities_)
+      if (curve_kind(entity.kind) && !entity.construction)
+        curves.push_back(&entity);
+    Value::Array out;
+    std::vector<Pt> seen;
+    for (const auto& [id, p] : geo_.points)
+      seen.push_back(p);
+    const auto keep = [&](const Pt& p, const SketchEntity& a, const SketchEntity& b) {
+      for (const Pt& q : seen)
+        if (std::hypot(p.first - q.first, p.second - q.second) <= kTol * 10.0)
+          return;
+      seen.push_back(p);
+      Value item = Value::object();
+      item.set("at", Value(Value::Array{Value(p.first), Value(p.second)}));
+      item.set("entities", Value(Value::Array{Value(a.id), Value(b.id)}));
+      out.push_back(std::move(item));
+    };
+    for (std::size_t i = 0; i < curves.size(); ++i) {
+      for (std::size_t j = i + 1; j < curves.size(); ++j) {
+        const SketchEntity& a = *curves[i];
+        const SketchEntity& b = *curves[j];
+        if (a.kind == kLineKind) {
+          const Pt p1 = geo_.at(a, "start");
+          const Pt p2 = geo_.at(a, "end");
+          const double len = std::hypot(p2.first - p1.first, p2.second - p1.second);
+          if (len < kTol)
+            continue;
+          for (const double t : line_params(geo_, a, b))
+            if (t >= -kTol / len && t <= 1.0 + kTol / len)
+              keep({p1.first + t * (p2.first - p1.first), p1.second + t * (p2.second - p1.second)}, a, b);
+          continue;
+        }
+        const Circ circle = geo_.circle_of(a);
+        if (circle.radius < kTol)
+          continue;
+        for (const double angle : angle_params(geo_, a, b)) {
+          if (a.kind == kArcKind) {
+            const auto [start, sweep] = geo_.arc_span(a);
+            if (!on_arc(angle, start, sweep, kTol / circle.radius))
+              continue;
+          }
+          keep({circle.center.first + circle.radius * std::cos(angle),
+                circle.center.second + circle.radius * std::sin(angle)},
+               a, b);
+        }
+      }
+    }
+    return Value(std::move(out));
   }
 
   Sketch trim(const SketchTarget& entity_target, const SketchPosition& at,
@@ -755,6 +812,14 @@ Value SketchDiff::to_value() const {
   out.set("removed_constraints", list(removed_constraints));
   out.set("changed_constraints", list(changed_constraints));
   return out;
+}
+
+Value inspect_sketch_rsketchcrossings(const Sketch& sketch) {
+  static const ErrorSpec kSpec{"inspect_sketch_rsketchcrossings",
+                               "Failed to list where the sketch's curves cross.",
+                               {"An argument is not a Sketch."},
+                               {"Pass a sketch; a conflicting one is solved as far as it goes (strict=False)."}};
+  return guarded(kSpec, [&] { return SketchEditor(sketch, /*strict=*/false).crossings(); });
 }
 
 SketchDiff diff_sketch_rsketchdiff(const Sketch& before, const Sketch& after) {

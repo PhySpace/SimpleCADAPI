@@ -210,13 +210,18 @@ struct SketchDiff {
 };
 SketchDiff diff_sketch_rsketchdiff(const Sketch& before, const Sketch& after);
 
+// Where the non-construction lines, circles and arcs of the solved sketch cross, away from every point:
+// [{"at": [x, y], "entities": [a, b]}].  The crossings trim_rsketch cuts at; not recorded in the graph.
+Value inspect_sketch_rsketchcrossings(const Sketch& sketch);
+
 // ---- solving and promotion -----------------------------------------------------
 
 // Solve a copy of the sketch; the input keeps no solve result.  strict=false
 // returns conflicting / failed results instead of raising.
 SketchSolveResult inspect_sketch_rsketchresult(const Sketch& sketch, const SketchSolveRequest& request = {});
 
-// The profiles a solved sketch offers, in the index order make_face_from_sketch_rface / make_wire_from_sketch_rwire use:
+// The profiles a solved sketch offers, in the index order make_face_from_sketch_rface / make_wire_from_sketch_rwire
+// use:
 // {"profiles": [{index, id, kind, closed, entity_ids, point_ids, reversed}], "unusable": [why an edge set is no
 // profile]}.  Entities are named by id; the geometry is the solved sketch's.
 Value inspect_sketch_rsketchprofiles(const Sketch& sketch, const SketchSolveRequest& request = {});

@@ -56,6 +56,8 @@ export type SolveResult = {
   profiles: ServerProfile[];
   /** Why edge sets are no profile (a branch point, say), as the SDK words it. */
   unusable: string[];
+  /** Where curves cross away from every point (the SDK's ``inspect_sketch_rsketchcrossings``: the places trim cuts at). */
+  crossings?: { at: [number, number]; entities: [string, string] }[];
 };
 
 export const ID_PATTERN = /^[a-z][a-z0-9_]{0,30}$/;

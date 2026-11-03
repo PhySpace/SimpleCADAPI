@@ -1,38 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { addCircle, addLine, emptyDoc, ensurePoint, type SketchDoc } from "@/lib/sketch";
-import { findIntersections } from "@/lib/sketch-intersect";
+import { addLine, emptyDoc, ensurePoint, type SketchDoc } from "@/lib/sketch";
 
 const opts = { auto: false, construction: false };
 const line = (doc: SketchDoc, a: [number, number], b: [number, number]) => {
   const start = ensurePoint(doc, { x: a[0], y: a[1] });
   return addLine(start.doc, start.id, { x: b[0], y: b[1] }, opts)!.doc;
 };
-
-describe("crossings of the sketch's curves", () => {
-  it("finds where two lines cross, and not where they only would", () => {
-    let doc = line(emptyDoc(), [-10, 0], [10, 0]);
-    doc = line(doc, [0, -5], [0, 5]);
-    expect(findIntersections(doc, null)).toEqual([[0, 0]]);
-    expect(findIntersections(line(line(emptyDoc(), [-10, 0], [10, 0]), [0, 5], [0, 9]), null)).toEqual([]);
-  });
-  it("finds a line through a circle twice, and none where a shared point already is", () => {
-    const circle = addCircle(emptyDoc(), { x: 0, y: 0 }, { x: 5, y: 0 }, opts)!.doc;
-    const crossing = findIntersections(line(circle, [-10, 0], [10, 0]), null);
-    expect(crossing).toHaveLength(2);
-    expect(crossing.map((p) => Math.round(p[0])).sort((a, b) => a - b)).toEqual([-5, 5]);
-    // a line that ends on the circle with a point there: that point is the crossing already
-    const ends = line(circle, [0, 0], [5, 0]);
-    expect(findIntersections(ends, null)).toEqual([]);
-  });
-  it("finds two circles crossing, and ignores construction geometry", () => {
-    let doc = addCircle(emptyDoc(), { x: 0, y: 0 }, { x: 5, y: 0 }, opts)!.doc;
-    doc = addCircle(doc, { x: 6, y: 0 }, { x: 11, y: 0 }, opts)!.doc;
-    expect(findIntersections(doc, null)).toHaveLength(2);
-    const construction = { ...doc, entities: doc.entities.map((e) => (e.kind === "circle" ? { ...e, construction: true } : e)) };
-    expect(findIntersections(construction, null)).toEqual([]);
-  });
-});
 
 describe("joining lines end to end", () => {
   const open = () => {
