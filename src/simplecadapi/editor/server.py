@@ -142,6 +142,9 @@ class WorkspaceState:
         self.selection_items: list[dict] = []
         self.viewport_png: bytes | None = None
         self.cells: list[dict] = []
+        from .gui_features import FeatureService
+
+        self.features = FeatureService(self)  # GUI-made features: commands and undo (see gui_features.py)
         self.specs: dict[str, ParamSpec] = {}
         self._pending_params: dict[str, float | int | bool] = {}
         self._rebuild_inflight = False
@@ -1994,6 +1997,98 @@ def create_app(state: WorkspaceState) -> Starlette:
         status = 409 if str(report.get("error", "")).startswith("conflict") else 400 if "error" in report else 200
         return JSONResponse(report, status_code=status)
 
+    async def features_specs(request: Request) -> JSONResponse:
+        """The operations a person can add with a button, as typed forms (see features.py)."""
+        from .features import catalog
+
+        return JSONResponse(catalog(), headers={"Cache-Control": "max-age=3600"})
+
+    async def features_state(request: Request) -> JSONResponse:
+        """The features of the open notebook, its bodies, the product, and the defaults a form opens with."""
+        return JSONResponse(await asyncio.to_thread(state.features.snapshot))
+
+    async def features_command(request: Request) -> JSONResponse:
+        """``{op: add|edit|delete|use_as_product|set_connectors|undo|redo, ...}``: one GUI command on the open notebook."""
+        from .gui_features import GuiError
+
+        try:
+            body = json.loads(await request.body() or b"{}")
+        except json.JSONDecodeError:
+            return JSONResponse({"ok": False, "error": "body is not JSON"}, status_code=400)
+        body = body if isinstance(body, dict) else {}
+        op = str(body.get("op", ""))
+        handler = {
+            "add": state.features.add,
+            "edit": state.features.edit,
+            "delete": state.features.delete,
+            "use_as_product": state.features.use_as_product,
+            "set_connectors": state.features.set_connectors,
+            "undo": lambda _request: state.features.undo(),
+            "redo": lambda _request: state.features.redo(),
+        }.get(op)
+        if handler is None:
+            return JSONResponse({"ok": False, "error": f"unknown operation {op!r}"}, status_code=400)
+        try:
+            result = await asyncio.to_thread(handler, body)
+        except GuiError as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=409 if exc.conflict else 400)
+        except ValueError as exc:  # a request the registry refuses (FeatureError, SketchError, AssemblyError) is the person's to fix
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+        return JSONResponse(result)
+
+    async def sketch_op(request: Request) -> JSONResponse:
+        """``{sketch, op, args}`` -> ``{ok, sketch, created, removed, ...}``: one SDK sketch edit (``<op>_rsketch``) on a document."""
+        from .sketch_doc import SketchError, apply_edit
+
+        try:
+            body = json.loads(await request.body() or b"{}")
+        except json.JSONDecodeError:
+            return JSONResponse({"ok": False, "error": "body is not JSON"}, status_code=400)
+        body = body if isinstance(body, dict) else {}
+        try:
+            args = dict(body.get("args") or {})
+            if "from_sketch" in args:  # project: name another sketch feature of this notebook as the source
+                source = state.features.sketch_document(str(args.pop("from_sketch")))
+                if source is None:
+                    return JSONResponse({"ok": False, "error": "from_sketch: there is no such sketch feature in this notebook"}, status_code=400)
+                args["source_doc"] = source
+            result = await asyncio.to_thread(apply_edit, body.get("sketch") or {}, str(body.get("op", "")), args)
+        except SketchError as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+        return JSONResponse({"ok": True, **result})
+
+    async def assembly_parts(request: Request) -> JSONResponse:
+        """The part notebooks of the workspace; ``?path=`` adds the connectors that one part declares."""
+        from ..runtime.workspace import scan_workspace
+        from .assembly_doc import connectors_of
+
+        rows = [{"path": entry.path, "name": Path(entry.path).stem, "kind": entry.kind} for entry in scan_workspace(state.workspace) if entry.kind == "part"]
+        wanted = request.query_params.get("path")
+        if wanted:
+            target = (state.workspace / wanted).resolve()
+            if state.workspace.resolve() not in target.parents or target.suffix != ".py" or not target.is_file():
+                return JSONResponse({"ok": False, "error": "not a notebook of this workspace"}, status_code=400)
+            try:
+                connectors = await asyncio.to_thread(connectors_of, target)
+            except Exception as exc:  # noqa: BLE001 - the part may not run; say why
+                return JSONResponse({"ok": False, "error": f"{type(exc).__name__}: {str(exc)[-300:]}"}, status_code=400)
+            return JSONResponse({"ok": True, "path": wanted, "connectors": connectors})
+        return JSONResponse({"ok": True, "parts": rows})
+
+    async def sketch_solve(request: Request) -> JSONResponse:
+        """Solve a sketch document without recording anything (a canvas calls this at every drag step)."""
+        from .sketch_doc import SketchError, solve
+
+        try:
+            body = json.loads(await request.body() or b"{}")
+        except json.JSONDecodeError:
+            return JSONResponse({"ok": False, "error": "body is not JSON"}, status_code=400)
+        try:
+            result = await asyncio.to_thread(solve, body.get("sketch") if isinstance(body, dict) else {})
+        except SketchError as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+        return JSONResponse({"ok": True, **result})
+
     async def sdk_index(request: Request) -> JSONResponse:
         """The SDK's public API (names and parameters), for the cell editor's completion."""
         from .apiindex import build_index
@@ -2136,6 +2231,12 @@ def create_app(state: WorkspaceState) -> Starlette:
         Route("/api/sdk", sdk_index, methods=["GET"]),
         Route("/api/cells", api_cells, methods=["GET"]),
         Route("/api/cells/{op}", api_cell_command, methods=["POST"]),
+        Route("/api/features/specs", features_specs, methods=["GET"]),
+        Route("/api/sketch/solve", sketch_solve, methods=["POST"]),
+        Route("/api/sketch/op", sketch_op, methods=["POST"]),
+        Route("/api/assembly/parts", assembly_parts, methods=["GET"]),
+        Route("/api/features", features_state, methods=["GET"]),
+        Route("/api/features", features_command, methods=["POST"]),
         Route("/api/workspace", workspace_list, methods=["GET"]),
         Route("/api/workspace/open", workspace_open, methods=["POST"]),
         Route("/api/workspace/new", workspace_new, methods=["POST"]),

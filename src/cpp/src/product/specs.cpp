@@ -59,6 +59,15 @@ void add_structure(Specs& s) {
           {"Wrap solids explicitly with make_part_rpart before adding them to assemblies.",
            "Use a unique component_id within the parent assembly.",
            "Create placements with make_placement_rplacement or identity_placement_rplacement."}});
+  add(s, {"explode_rassembly",
+          "Failed to explode the assembly.",
+          {"The assembly input is not an Assembly.", "factor is not a finite number.",
+           "center or axis is not a finite vector (axis must be nonzero).",
+           "directions or weights name a component that is not in the assembly, or a direction is zero.",
+           "The components occupy a single point, so there is no size to scale by."},
+          {"Pass an Assembly and a finite factor (1 is a clear explosion).",
+           "Use component ids from assembly.component_ids(); directions are nonzero 3-vectors.",
+           "Give the components some geometry, or explode a larger assembly."}});
   add(s, {"place_component_rassembly",
           "Failed to place the assembly component.",
           {"The assembly input is not an Assembly.", "The component_id does not exist in the assembly.",

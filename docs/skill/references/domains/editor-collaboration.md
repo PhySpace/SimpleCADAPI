@@ -197,6 +197,60 @@ Errors there are the same errors `sca snapshot` reports per cell. A module that
 does not compile is reported as `setup failed` with the file and line; fix that
 file first, since every cell is blocked until it compiles.
 
+## Features the person made with buttons
+
+The editor also has a Features tab and an operation palette (box, cylinder, extrude, hole, fillet, patterns ...). A click
+writes two ordinary cells, so you read and edit them like any other:
+
+```python
+# ---- params: hole ----
+HOLE_DIAMETER = scad.var(name="hole_diameter", default=6.0, unit="mm", comment="Diameter")  # ui: slider(...)
+
+# ---- feature: hole (subtract) ----
+# gui: {"spec":"hole","v":1,"values":{...}}
+...one operation that makes the new name `hole`...
+```
+
+- The `# gui:` line is how the form is rebuilt. A cell without it is code and the form never rewrites it. To take a
+  GUI feature over as code, delete the `# gui:` line (or ask the person to); to change a number, edit the `# params:` cell
+  or the form, not the call.
+- GUI commands carry the code they were made from: if you edited the cell in between, the command is refused (409), it
+  does not overwrite you. The same holds for the person's undo of a GUI command.
+- Selections in a GUI cell are written inline, resolved against the body the cell receives: the face tags the box, cylinder
+  or extrude was given (`<slug>.top`, `<slug>.side` ... they survive booleans, not fillets or chamfers) first, the picked
+  geometry second, with the count checked (`.exactly(n)`). If the model moved so that nothing matches, the cell fails and
+  the feature turns red: ask the person to pick again, never widen the selector until it matches.
+- A blank notebook (`sca new NAME --kind blank`) has no cells; the first feature adds the product cell
+  (`<name> = scad.Part(...)`), and later features that consume the body it builds from move it along.
+- Unattended: the buttons are not available; write the cells yourself (see `discipline/notebook-cell-design.md`).
+
+## The same operations from the command line
+
+An agent does not click: `sca feature` and `sca sketch` do what the buttons do, with the same checks, as JSON in and JSON out.
+
+```bash
+sca feature specs [SPEC]             # operations and their typed slots (lengths mm, angles deg, bodies by name)
+sca feature ls                       # features, bodies, tip, product, defaults
+sca feature add box --name base --values '{"width": 40, "height": 30, "depth": 20}'
+sca feature add fillet --values '{"radius": 2}' --selections '{"edges": [{"kind": "edge", "properties": {...}, "geometry": {...}}]}'
+sca feature edit base --values '{"width": 50}'      # a GUI feature; a code feature is refused
+sca feature rm base | sca feature undo | sca feature redo
+sca sketch ls | get CELL | put CELL -f doc.json | solve CELL
+sca sketch op CELL trim --args '{"entity": "h", "at": [8, 0]}' [--dry-run]
+sca sketch op CELL extend --args '{"entity": "h", "end": "end"}'
+```
+
+- The edits are the SDK's own operations, not editor features: `sca sketch op CELL trim ...` calls `scad.trim_rsketch` on the
+  sketch the document builds and writes the result back, so the same edit in a notebook cell is
+  `_sketch = scad.trim_rsketch(sketch=_sketch, entity="h", at=(8.0, 0.0))`; `scad.diff_sketch_rsketchdiff(before=..., after=...)`
+  says what changed (`created`, `removed`, `changed` entities and `created_constraints`, `removed_constraints`,
+  `changed_constraints`). `trim` cuts an entity at the crossings around the point `at` on the solved geometry and ties each cut
+  point to the entity that made it (`point_on`); a piece keeps the horizontal/vertical constraint of its line; dimensions that
+  no longer hold are removed (they appear in `removed_constraints`). New ids are the lowest free `p<n>`, `l<n>`, `a<n>` and
+  `c_<kind>_<n>`. `--dry-run` prints without writing.
+- Errors name ids (`there is no entity 'x'`, `nothing is ahead of the end of h`); fix the call, do not retry it unchanged.
+- Everything a command writes is an ordinary cell; `sca cell` still works on it (see the `# gui:` rules above).
+
 ## Rules of thumb
 
 - Re-read the cell before editing (`sca cell get`, or the file): the person edits and

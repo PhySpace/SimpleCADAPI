@@ -27,6 +27,7 @@ import { DEFAULT_BASE_COLOR, CAD_EDGE_LINE_WIDTH, cadPointToGltf, disposeObject,
 import { PALETTES, type SceneTheme, type ScenePalette } from '../theme';
 import type { PackageFiles } from '../product-package';
 import type { PreviewData, PreviewPart } from '../../lib/preview';
+import { fitDistance } from '../camera-fit';
 import type { Entity, EntitySidecar, FaceGroup, SceneManifest, SceneNode, Vec3 } from '../scene2';
 
 /** Render layers: faces (0, default) go through lighting + AO; edges (1) and
@@ -997,13 +998,10 @@ export class BRepRenderer {
     // FIT is also the escape hatch from a rolled-around trackball orientation:
     // restore the canonical Z-up before re-framing.
     this.camera.up.set(0, 0, 1);
-    // 2.3 (not the textbook ~2.8, nor 2.05): the bounding sphere over-covers
-    // flat parts, but 2.05 read as slightly too large in review.
-    // Fit the bounding sphere in the narrower of the two view angles, so a
-    // tall, narrow viewport frames the model as well as a wide one.
-    const verticalFov = THREE.MathUtils.degToRad(this.camera.fov);
-    const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * this.camera.aspect);
-    const distance = (radius / Math.sin(Math.min(verticalFov, horizontalFov) / 2)) * 0.82;
+    // The bounding sphere must be fully inside the view with a 15 % margin, in the narrower of the two view
+    // angles (a tall, narrow viewport frames the model as well as a wide one): see camera-fit.ts.  (A former
+    // 0.82 factor pulled the camera INSIDE the sphere's tangent distance and cropped the model.)
+    const distance = fitDistance(radius, THREE.MathUtils.degToRad(this.camera.fov), this.camera.aspect);
     this.camera.position.copy(center).add(new THREE.Vector3(1, 0.78, 1).normalize().multiplyScalar(distance));
     this.camera.near = Math.max(radius / 100, 1e-5);
     this.camera.far = Math.max(radius * 100, 0.5);

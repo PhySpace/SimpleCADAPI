@@ -910,8 +910,10 @@ fields when their target expression is unitless.
 - 多输出 graph 的最终结果集由 `leaf_ids` 显式声明
 - replay 默认 strict；permissive 仅通过 API 参数显式 opt-in
 - importer 仍识别冻结的 `2.0` contract，但 `2.0` graph 不得使用
-  `load_brep_region_rshell`、`load_brep_region_rsolid` 或
-  `make_solid_from_shell_rsolid`。
+  `load_brep_region_rshell`、`load_brep_region_rsolid`、
+  `make_solid_from_shell_rsolid`、`trim_rsketch`、`extend_rsketch`、
+  `fillet_corner_rsketch`、`chamfer_corner_rsketch`、`project_rsketch` 或
+  `explode_rassembly`。
 - 为兼容早期 `2.0` model payload，importer 将缺失的
   `canonical_contract` 视为最小 legacy `{"contract_version": "2.0"}`；
   新导出的 model payload 仍必须显式包含完整 contract。
@@ -1012,6 +1014,11 @@ New canonical profile nodes use the `make_*_r*` names listed in `canonical_contr
 - `add_circle_rsketch`
 - `add_arc_rsketch`
 - `add_bspline_rsketch`
+- `trim_rsketch`
+- `extend_rsketch`
+- `fillet_corner_rsketch`
+- `chamfer_corner_rsketch`
+- `project_rsketch`
 - `make_constrain_coincident_rsketch`
 - `make_constrain_point_on_rsketch`
 - `make_constrain_horizontal_rsketch`
@@ -1309,6 +1316,40 @@ Notes:
 - Inputs: 1 `Sketch`
 - Outputs: 1 updated `Sketch`
 - Params: `sketch_id`, `entity_id`, `start`, `end`, `control_points`, `degree`, `knots`, `multiplicities`, `weights`, `periodic`, `construction`
+#### `trim_rsketch`
+
+- Inputs: 1 `Sketch`
+- Outputs: 1 updated `Sketch`
+- Params: `sketch_id`, `entity`, `at`, `against`
+- `at` is `[x, y]` in sketch coordinates or a point id; `against` is a list of entity ids or `null` (every non-construction entity). The edit is made on the solved geometry, so replay is deterministic.
+
+#### `extend_rsketch`
+
+- Inputs: 1 `Sketch`
+- Outputs: 1 updated `Sketch`
+- Params: `sketch_id`, `entity`, `end` (`start` or `end`), `to` (entity id or `null`)
+
+#### `fillet_corner_rsketch` / `chamfer_corner_rsketch`
+
+- Inputs: 1 `Sketch`
+- Outputs: 1 updated `Sketch`
+- Params: `sketch_id`, `a`, `b` (line ids), `radius` (fillet) or `distance` (chamfer)
+- The edit is made on the solved geometry and picks its own ids (`p<n>`, `a<n>`, `l<n>`, `c_<kind>_<n>`), so replay is deterministic. `radius` / `distance` are recorded as symbolic parameters when they were `Var` / `Expr`.
+
+#### `project_rsketch`
+
+- Inputs: the target `Sketch` and either the source `Sketch` (`source_kind: "sketch"`: inputs `[target, source]`) or the projected shapes (`source_kind: "shapes"`: the shape inputs, then the target `Sketch`)
+- Outputs: 1 updated `Sketch`
+- Params: `sketch_id`, `source_kind`, `source` (source sketch id, or the number of shapes), `entities` (source entity ids or `null`; sketch sources only), `construction`
+- Projected ids are `proj_<source sketch id>_<n>` (`proj_shape_<n>` for shapes); the target sketch's `projections` metadata lists `{source, entity, projected}`.
+
+#### `explode_rassembly`
+
+- Inputs: 1 `Assembly`
+- Outputs: 1 `Assembly` (a display copy: only component placements differ)
+- Params: `assembly_id`, `factor`, `center`, `axis` (3-vectors or `null`), `directions` (component id to 3-vector), `weights` (component id to number)
+- `factor` is recorded as a symbolic parameter when it was a `Var` / `Expr`. Constraints are not re-solved; solving the result moves the components back.
+
 #### `make_constrain_*_rsketch`
 
 - Inputs: 1 `Sketch`

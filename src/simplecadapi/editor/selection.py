@@ -44,13 +44,12 @@ _POSITION_TOLERANCE = 0.1
 _RELATIVE_TOLERANCE = 0.01
 
 
-def selector_expression(kind: str, properties: Mapping[str, Any], geometry: Mapping[str, Any]) -> str | None:
-    """A ``scad.ql`` expression selecting the one entity, or ``None``.
+def selector_conditions(kind: str, properties: Mapping[str, Any], geometry: Mapping[str, Any]) -> list[str] | None:
+    """The ``scad.ql.prop(...)`` conditions that single out one entity by its geometry, or ``None``.
 
     *properties* and *geometry* are the scene sidecar's entity fields.
     """
-    factory = _FACTORY.get(kind)
-    if factory is None:
+    if kind not in _FACTORY:
         return None
     conditions: list[str] = []
     ql_type = _QL_TYPES.get(str(geometry.get("type", "")))
@@ -70,10 +69,16 @@ def selector_expression(kind: str, properties: Mapping[str, Any], geometry: Mapp
             low, high = size * (1 - _RELATIVE_TOLERANCE), size * (1 + _RELATIVE_TOLERANCE)
             conditions.append(f'scad.ql.prop("{name}", ">=", {_number(low)})')
             conditions.append(f'scad.ql.prop("{name}", "<=", {_number(high)})')
-    if not conditions:
+    return conditions or None
+
+
+def selector_expression(kind: str, properties: Mapping[str, Any], geometry: Mapping[str, Any]) -> str | None:
+    """A ``scad.ql`` expression selecting the one entity, or ``None``."""
+    conditions = selector_conditions(kind, properties, geometry)
+    if conditions is None:
         return None
     body = ",\n    ".join(conditions)
-    return f"scad.ql.{factory}().where(scad.ql.and_(\n    {body},\n)).exactly(1)"
+    return f"scad.ql.{_FACTORY[kind]}().where(scad.ql.and_(\n    {body},\n)).exactly(1)"
 
 
 def selection_cell_code(items: Sequence[Mapping[str, Any]]) -> str:

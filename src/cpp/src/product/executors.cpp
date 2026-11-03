@@ -14,6 +14,7 @@ void register_product_executors(reactive::ExecutorRegistry& registry) {
       "make_assembly_rassembly",
       "make_add_component_rassembly",
       "make_place_component_rassembly",
+      "explode_rassembly",
       "make_face_connector_rconnector",
       "make_edge_connector_rconnector",
       "make_vertex_connector_rconnector",

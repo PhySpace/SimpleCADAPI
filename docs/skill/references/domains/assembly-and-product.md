@@ -87,9 +87,34 @@ composing notebooks.
   `NotebookConfig`, `sca run` CLI.
 - Product build: `part`, `assemble`, `file_input`, `PartBuildResult`,
   `AssemblyBuildResult`.
+- Exploded view: `explode_rassembly(assembly, factor, *, center, axis,
+  directions, weights)` returns a display copy whose component placements are
+  pushed apart (see "Exploded view" below).
 - Packages: `capture`, `CaptureResult`, `ProductPackage`,
   `build_product_package`, `read_product_package`, `load_product_package`,
   `validate_product_package`.
+
+## Exploded view
+
+`explode_rassembly(assembly, factor, ...)` is a pure function of the assembly:
+each top-level component moves by `factor * weight * direction * size`, where
+`size` is the diagonal of the box that holds all component bodies, so
+`factor=1` is a clear explosion and `factor=0` gives the same placements.
+`direction` is `directions[id]`, else `axis` (signed by the side of the centre),
+else from the assembly centre (`center`, default the centre of the bodies' box)
+to the component's own centre. A component with no direction (at the centre)
+stays and is listed in `get_metadata("explode")`; to keep a component, such as
+the grounded base, put it in `weights` as `0` (nothing is special-cased).
+
+```python
+view = scad.explode_rassembly(assembly, 1.0, weights={"base": 0.0})
+view = scad.explode_rassembly(assembly, 0.6, axis=(0, 0, 1), directions={"cover": (1, 0, 0)})
+```
+
+The result is for display, rendering and export of an exploded view: parts,
+constraints, grounding and public connectors are unchanged and the constraints
+are not re-solved, so solving the result moves the components back. It is
+recorded in the graph and replays from model JSON.
 
 ## Validation gates
 

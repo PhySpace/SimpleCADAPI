@@ -118,6 +118,15 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
     "add_arc_rsketch": {"status": "replayable", "op": "add_arc_rsketch"},
     "add_bspline_rsketch": {"status": "replayable", "op": "add_bspline_rsketch"},
     "add_ellipse_rsketch": {"status": "replayable", "op": "add_ellipse_rsketch"},
+    "trim_rsketch": {"status": "replayable", "op": "trim_rsketch"},
+    "extend_rsketch": {"status": "replayable", "op": "extend_rsketch"},
+    "fillet_corner_rsketch": {"status": "replayable", "op": "fillet_corner_rsketch"},
+    "chamfer_corner_rsketch": {"status": "replayable", "op": "chamfer_corner_rsketch"},
+    "project_rsketch": {"status": "replayable", "op": "project_rsketch"},
+    "diff_sketch_rsketchdiff": {
+        "status": "diagnostic",
+        "reason": "Compares two sketches for inspection only; the edit that made the difference is the recorded node.",
+    },
     "constrain_coincident_rsketch": {
         "status": "replayable",
         "op": "make_constrain_coincident_rsketch",
@@ -279,6 +288,7 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
         "status": "replayable",
         "op": "make_place_component_rassembly",
     },
+    "explode_rassembly": {"status": "replayable", "op": "explode_rassembly"},
     "make_compound_from_assembly_rcompound": {
         "status": "replayable",
         "op": "make_compound_from_assembly_rcompound",
@@ -536,6 +546,11 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "add_arc_rsketch",
     "add_bspline_rsketch",
     "add_ellipse_rsketch",
+    "trim_rsketch",
+    "extend_rsketch",
+    "fillet_corner_rsketch",
+    "chamfer_corner_rsketch",
+    "project_rsketch",
     "make_constrain_coincident_rsketch",
     "make_constrain_point_on_rsketch",
     "make_constrain_horizontal_rsketch",
@@ -580,6 +595,7 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "reference_definition",
     "make_add_component_rassembly",
     "make_place_component_rassembly",
+    "explode_rassembly",
     "make_compound_from_assembly_rcompound",
     "make_face_connector_rconnector",
     "make_edge_connector_rconnector",
@@ -656,6 +672,12 @@ _CANONICAL_2_1_ONLY_OPS = {
     "load_brep_region_rshell",
     "load_brep_region_rsolid",
     "make_solid_from_shell_rsolid",
+    "trim_rsketch",
+    "extend_rsketch",
+    "fillet_corner_rsketch",
+    "chamfer_corner_rsketch",
+    "project_rsketch",
+    "explode_rassembly",
 }
 CANONICAL_CORE_OP_SET_2_0: Tuple[str, ...] = tuple(
     op for op in CANONICAL_CORE_OP_SET if op not in _CANONICAL_2_1_ONLY_OPS
@@ -2829,6 +2851,94 @@ def _execute_graph(
                             _store_outputs(node, result)
                         continue
 
+                    if op_name == "trim_rsketch":
+                        ctx.require_params(
+                            node.node_id, op_name, params, ("entity", "at")
+                        )
+                        sketch_outputs = _input_outputs(ctx, outputs, node, 0)
+                        if sketch_outputs:
+                            at = params["at"]
+                            result = ops.trim_rsketch(
+                                cast(Sketch, sketch_outputs[0]),
+                                str(params["entity"]),
+                                at if isinstance(at, str) else tuple(at),
+                                against=cast(Any, params.get("against")),
+                            )
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "extend_rsketch":
+                        ctx.require_params(
+                            node.node_id, op_name, params, ("entity", "end")
+                        )
+                        sketch_outputs = _input_outputs(ctx, outputs, node, 0)
+                        if sketch_outputs:
+                            result = ops.extend_rsketch(
+                                cast(Sketch, sketch_outputs[0]),
+                                str(params["entity"]),
+                                str(params["end"]),
+                                to=cast(Any, params.get("to")),
+                            )
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name in {"fillet_corner_rsketch", "chamfer_corner_rsketch"}:
+                        size_param = (
+                            "radius" if op_name == "fillet_corner_rsketch" else "distance"
+                        )
+                        ctx.require_params(
+                            node.node_id, op_name, params, ("a", "b", size_param)
+                        )
+                        sketch_outputs = _input_outputs(ctx, outputs, node, 0)
+                        if sketch_outputs:
+                            corner_op = getattr(ops, op_name)
+                            result = corner_op(
+                                cast(Sketch, sketch_outputs[0]),
+                                str(params["a"]),
+                                str(params["b"]),
+                                params[size_param],
+                            )
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "project_rsketch":
+                        ctx.require_params(
+                            node.node_id, op_name, params, ("source_kind",)
+                        )
+                        input_values = [
+                            value
+                            for index in range(len(node.inputs))
+                            for value in _input_outputs(ctx, outputs, node, index)
+                        ]
+                        input_sketches = [v for v in input_values if isinstance(v, Sketch)]
+                        if params["source_kind"] == "sketch":
+                            if len(input_sketches) >= 2:
+                                result = ops.project_rsketch(
+                                    input_sketches[0],
+                                    input_sketches[1],
+                                    entities=cast(Any, params.get("entities")),
+                                    construction=bool(params.get("construction", True)),
+                                )
+                                _store_outputs(node, result)
+                            elif ctx.strict:
+                                ctx.fail(
+                                    f"Graph node '{node.node_id}' ({op_name}) needs the target sketch and the source sketch as inputs"
+                                )
+                        else:
+                            shapes = [v for v in input_values if not isinstance(v, Sketch)]
+                            if input_sketches and shapes:
+                                result = ops.project_rsketch(
+                                    input_sketches[0],
+                                    shapes,
+                                    construction=bool(params.get("construction", True)),
+                                )
+                                _store_outputs(node, result)
+                            elif ctx.strict:
+                                ctx.fail(
+                                    f"Graph node '{node.node_id}' ({op_name}) needs the target sketch and the projected shapes as inputs"
+                                )
+                        continue
+
                     if op_name in _SKETCH_CONSTRAINT_KIND_BY_OP:
                         ctx.require_params(node.node_id, op_name, params, ("targets",))
                         sketch_outputs = _input_outputs(ctx, outputs, node, 0)
@@ -3083,6 +3193,33 @@ def _execute_graph(
                                 cast(Assembly, assembly_outputs[0]),
                                 str(params["component_id"]),
                                 placement,
+                            )
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "explode_rassembly":
+                        ctx.require_params(node.node_id, op_name, params, ("factor",))
+                        assembly_outputs = _input_outputs(ctx, outputs, node, 0)
+                        if assembly_outputs:
+
+                            def _vector(value: Any) -> Any:
+                                return None if value is None else tuple(value)
+
+                            result = ops.explode_rassembly(
+                                cast(Assembly, assembly_outputs[0]),
+                                params["factor"],
+                                center=_vector(params.get("center")),
+                                axis=_vector(params.get("axis")),
+                                directions={
+                                    str(k): tuple(v)
+                                    for k, v in (params.get("directions") or {}).items()
+                                }
+                                or None,
+                                weights={
+                                    str(k): float(v)
+                                    for k, v in (params.get("weights") or {}).items()
+                                }
+                                or None,
                             )
                             _store_outputs(node, result)
                         continue

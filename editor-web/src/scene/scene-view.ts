@@ -11,6 +11,7 @@ import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { bindClickSelection } from './components/click-selection';
 import { disposeObject } from './cad-three';
+import { CameraRig } from './camera-rig';
 import { BRepRenderer, OVERLAY_LAYER, type CameraState, type LiveGeometryPayload } from './renderer';
 
 export type { LiveGeometryPayload };
@@ -18,7 +19,7 @@ import type { PackageFiles } from './product-package';
 import type { PreviewData } from '../lib/preview';
 import type { Entity, EntitySidecar, FaceGroup, SceneNode } from './scene2';
 
-export type SelectionMode = 'component' | 'solid' | 'face' | 'edge' | 'vertex';
+export type SelectionMode = 'component' | 'solid' | 'face' | 'edge' | 'vertex' | 'sketch';
 export type PickResult = {
   nodeId: string;
   entityId: string | null;
@@ -35,6 +36,8 @@ export type SceneViewOptions = {
   onPick?: (result: PickResult) => void;
   /** A click that hit nothing. */
   onClear?: () => void;
+  /** A click in sketch mode: the name of the sketch under it, or null (the sketch layer answers which). */
+  onSketchPick?: (name: string | null, additive: boolean) => void;
   selectionMode?: SelectionMode;
   background?: string;
   /** The scene's theme (default dark). */
@@ -50,8 +53,13 @@ type Mark = { key: string; color: string; overlays: THREE.Object3D[] };
 
 export class SceneView {
   readonly engine: BRepRenderer;
+  /** Direct camera control (sketch mode parks the trackball and drives the camera through it). */
+  readonly rig: CameraRig;
   onPick: ((result: PickResult) => void) | null;
   onClear: (() => void) | null;
+  onSketchPick: ((name: string | null, additive: boolean) => void) | null;
+  /** Which sketch is under a pointer event (set by the sketch layer; null when nothing is). */
+  sketchHitter: ((event: { clientX: number; clientY: number }) => string | null) | null = null;
 
   private raycaster = new THREE.Raycaster();
   private pointer = new THREE.Vector2();
@@ -63,14 +71,20 @@ export class SceneView {
   constructor(host: HTMLElement, options: SceneViewOptions = {}) {
     this.onPick = options.onPick ?? null;
     this.onClear = options.onClear ?? null;
+    this.onSketchPick = options.onSketchPick ?? null;
     this.selectionMode = options.selectionMode ?? 'face';
     this.engine = new BRepRenderer(host, { background: options.background, theme: options.theme, ssao: options.ssao, seams: options.seams });
+    this.rig = new CameraRig(this.engine);
     if (options.interactive !== false) {
       this.unbindClick = bindClickSelection({
         element: this.engine.domElement,
         camera: this.engine.camera,
         controls: this.engine.controls,
         onClick: (event) => {
+          if (this.selectionMode === 'sketch') {
+            this.onSketchPick?.(this.sketchHitter?.(event) ?? null, event.ctrlKey || event.metaKey);
+            return;
+          }
           const result = this.pick(event);
           if (result) this.onPick?.({ ...result, additive: event.ctrlKey || event.metaKey });
           else if (!(event.ctrlKey || event.metaKey)) this.onClear?.();
@@ -167,6 +181,7 @@ export class SceneView {
   }
 
   pick(event: PointerEvent): PickResult | null {
+    if (this.selectionMode === 'sketch') return null; // sketches are picked by the sketch layer, not by ray
     this.pointerRay(event);
     const hits = this.raycaster.intersectObjects(this.engine.modelRoot.children, true).filter((hit) => {
       if (hit.object.userData.pickable === false || !this.isEffectivelyVisible(hit.object)) return false;
@@ -227,6 +242,34 @@ export class SceneView {
   private edgeEntityIdForHit(hit: THREE.Intersection, sidecar: EntitySidecar | null): string | undefined {
     if (!(hit.object instanceof THREE.LineSegments) || typeof hit.index !== 'number' || !sidecar) return undefined;
     return sidecar.edge_groups.find((group: FaceGroup) => hit.index! >= group.first_index && hit.index! < group.first_index + group.index_count)?.entity_id;
+  }
+
+  /** The model's B-rep vertices in the world frame, in mm (what a sketch snaps to once projected onto its plane). */
+  modelVertices(): [number, number, number][] {
+    this.engine.modelRoot.updateMatrixWorld(true);
+    const seen = new Set<string>();
+    const out: [number, number, number][] = [];
+    const point = new THREE.Vector3();
+    this.engine.modelRoot.traverse((object) => {
+      if (!(object instanceof THREE.Points) || !Array.isArray(object.userData.vertexEntityIds)) return;
+      const position = object.geometry.getAttribute('position');
+      for (let i = 0; i < position.count; i++) {
+        point.fromBufferAttribute(position, i).applyMatrix4(object.matrixWorld).multiplyScalar(1000);
+        const key = `${Math.round(point.x * 100)}:${Math.round(point.y * 100)}:${Math.round(point.z * 100)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push([point.x, point.y, point.z]);
+      }
+    });
+    return out;
+  }
+
+  /** The model's bounding box in the world frame, mm ([min, max]), or null for an empty scene. */
+  modelBoundsMm(): { min: [number, number, number]; max: [number, number, number] } | null {
+    this.engine.modelRoot.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(this.engine.modelRoot);
+    if (box.isEmpty()) return null;
+    return { min: [box.min.x * 1000, box.min.y * 1000, box.min.z * 1000], max: [box.max.x * 1000, box.max.y * 1000, box.max.z * 1000] };
   }
 
   // -- highlight + marks -------------------------------------------------------

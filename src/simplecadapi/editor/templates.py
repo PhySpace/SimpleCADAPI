@@ -94,6 +94,9 @@ def render_notebook(name: str, kind: str = "part", parts: list[tuple[str, str]] 
         raise ValueError(f"invalid notebook name: {name!r}")
     variable = name.replace("-", "_")
     header = _HEADER.format(id=name)
+    if kind == "blank":
+        # No cells: the GUI adds the first feature, and the product cell with it (see gui_features.py).
+        return header + _RUNNER
     if kind == "part":
         return header + _PART.format(variable=variable) + _RUNNER
     if kind != "assembly":
