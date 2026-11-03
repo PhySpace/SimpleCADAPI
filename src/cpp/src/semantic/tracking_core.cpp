@@ -173,6 +173,12 @@ void query_history(HistorySource& history, const TopTools_IndexedMapOfShape& inp
       emit(input_id, TopoEvent::Preserved, spec.kind, "continuation", pick_role(spec.preserved_role, spec.result_role));
       continue;
     }
+    // Untouched and still in the result, while also the seed of new entities (a shell's kept face generates its
+    // offset face, an extrude's profile edge its side face): it stays, as well as what it generated.  Without this
+    // witness the entity has no successor at all and a reference to it is lost although it is still there.
+    if (!deleted && (modified.empty() || modified_is_self) && !generated.empty() && spec.result != nullptr &&
+        spec.result->contains(sub))
+      emit(input_id, TopoEvent::Preserved, spec.kind, "continuation", pick_role(spec.preserved_role, spec.result_role));
 
     if (!modified.empty() && !modified_is_self) {
       for (const TopoDS_Shape& shape : modified) {

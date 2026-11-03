@@ -292,6 +292,7 @@
         10.0
       ],
       [
+        "face.box.top",
         "face.shell.closing_descendant",
         "role.rim"
       ]
@@ -363,7 +364,10 @@
         -0.0,
         5.0
       ],
-      []
+      [
+        "face.box.back",
+        "face.shell.body_face"
+      ]
     ],
     [
       [
@@ -372,7 +376,10 @@
         -5.0,
         5.0
       ],
-      []
+      [
+        "face.box.left",
+        "face.shell.body_face"
+      ]
     ],
     [
       [
@@ -381,7 +388,10 @@
         0.0,
         0.0
       ],
-      []
+      [
+        "face.box.bottom",
+        "face.shell.body_face"
+      ]
     ],
     [
       [
@@ -390,7 +400,10 @@
         5.0,
         5.0
       ],
-      []
+      [
+        "face.box.right",
+        "face.shell.body_face"
+      ]
     ],
     [
       [
@@ -399,7 +412,10 @@
         -0.0,
         5.0
       ],
-      []
+      [
+        "face.box.front",
+        "face.shell.body_face"
+      ]
     ]
   ],
   "faces": 11,

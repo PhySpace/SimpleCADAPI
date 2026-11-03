@@ -284,10 +284,35 @@ const std::vector<TagBinding>& Shape::local_bindings() const {
   return state != nullptr ? state->bindings : empty;
 }
 
-const std::vector<TagLineageWitness>& Shape::lineage_witnesses() const {
+namespace {
+std::atomic<HistoryWitnessProvider> history_provider{nullptr};
+}  // namespace
+
+void set_history_witness_provider(HistoryWitnessProvider provider) noexcept {
+  history_provider.store(provider, std::memory_order_release);
+}
+
+const std::vector<TagLineageWitness>& Shape::stored_lineage_witnesses() const {
   static const std::vector<TagLineageWitness> empty;
   const SemanticState* state = entity_->state_if();
   return state != nullptr ? state->lineage : empty;
+}
+
+std::vector<TagLineageWitness> Shape::history_lineage_witnesses() const {
+  const HistoryWitnessProvider provider = history_provider.load(std::memory_order_acquire);
+  return provider != nullptr ? provider(*this) : std::vector<TagLineageWitness>{};
+}
+
+std::vector<TagLineageWitness> Shape::lineage_witnesses() const {
+  std::vector<TagLineageWitness> out = stored_lineage_witnesses();
+  for (TagLineageWitness& witness : history_lineage_witnesses())
+    out.push_back(std::move(witness));
+  return out;
+}
+
+Shape Shape::root() const {
+  const TopoDS_Shape& top = registry_->root();
+  return Shape(top, registry_->acquire(kind_of(top), top), registry_);
 }
 
 // ---------------------------------------------------------------------------
@@ -332,6 +357,27 @@ std::vector<TagBinding> Shape::inherited_tag_bindings() const {
   return out;
 }
 
+namespace {
+
+// The bindings the witnesses carry, once each, as their own lineage policy allows.  strict: an incomplete witness
+// refuses the query (the lineage scope promises complete history); otherwise it is skipped.
+std::vector<TagBinding> policy_allowed(const std::vector<TagLineageWitness>& witnesses, bool strict) {
+  std::vector<TagBinding> out;
+  std::set<std::string> seen;
+  for (const auto& w : witnesses) {
+    if (w.coverage != "complete") {
+      if (strict)
+        throw UnsupportedQueryCapabilityError("lineage tag scope has incomplete lineage witnesses");
+      continue;
+    }
+    if (lineage_policy_allows(w.binding.propagation(), w.derivation) && seen.insert(w.binding.binding_id).second)
+      out.push_back(w.binding);
+  }
+  return out;
+}
+
+}  // namespace
+
 std::vector<TagBinding> Shape::lineage_tag_bindings() const {
   const SemanticState* state = entity_->state_if();
   Value coverage_scratch;
@@ -342,17 +388,7 @@ std::vector<TagBinding> Shape::lineage_tag_bindings() const {
     throw UnsupportedQueryCapabilityError("lineage tag scope requires complete topology history; coverage=" +
                                           available);
   }
-  std::vector<TagBinding> out;
-  if (state == nullptr)
-    return out;
-  for (const auto& w : state->lineage)
-    if (w.coverage != "complete")
-      throw UnsupportedQueryCapabilityError("lineage tag scope has incomplete lineage witnesses");
-  std::set<std::string> seen;
-  for (const auto& w : state->lineage)
-    if (lineage_policy_allows(w.binding.propagation(), w.derivation) && seen.insert(w.binding.binding_id).second)
-      out.push_back(w.binding);
-  return out;
+  return policy_allowed(lineage_witnesses(), /*strict=*/true);
 }
 
 std::vector<TagBinding> Shape::list_tag_bindings(TagScope scope) const {
@@ -373,6 +409,9 @@ std::vector<TagBinding> Shape::list_tag_bindings(TagScope scope) const {
   for (auto& b : inherited_tag_bindings())
     all.push_back(std::move(b));
   for (auto& b : legacy_effective_bindings())
+    all.push_back(std::move(b));
+  // Effective includes what the history carries to this entity (tags as a view over the recorded graph).
+  for (auto& b : policy_allowed(lineage_witnesses(), /*strict=*/false))
     all.push_back(std::move(b));
   std::vector<TagBinding> unique;
   std::set<std::string> seen;
@@ -407,6 +446,8 @@ std::vector<std::string> Shape::list_tags(TagScope scope) const {
         for (const auto& b : state->bindings)
           names.insert(b.tag.str());
       for (const auto& b : inherited_tag_bindings())
+        names.insert(b.tag.str());
+      for (const auto& b : policy_allowed(lineage_witnesses(), /*strict=*/false))
         names.insert(b.tag.str());
       break;
   }
@@ -458,8 +499,12 @@ bool Shape::has_tag(std::string_view tag, TagScope scope) const {
       return stored();
     case TagScope::Inherited:
       return inherited();
-    case TagScope::Effective:
-      return stored() || holds(true) || inherited();
+    case TagScope::Effective: {
+      if (stored() || holds(true) || inherited())
+        return true;
+      const auto carried = policy_allowed(lineage_witnesses(), /*strict=*/false);
+      return std::any_of(carried.begin(), carried.end(), [&](const TagBinding& b) { return b.tag == *symbol; });
+    }
     case TagScope::Lineage: {
       const auto bindings = lineage_tag_bindings();
       return std::any_of(bindings.begin(), bindings.end(), [&](const TagBinding& b) { return b.tag == *symbol; });
@@ -496,8 +541,8 @@ std::vector<Value> Shape::explain_tag(std::string_view tag, TagScope scope) cons
     }
 
     Value witnesses = Value::array();
-    if (state != nullptr) {
-      for (const auto& w : state->lineage) {
+    {
+      for (const auto& w : lineage_witnesses()) {
         if (w.binding.binding_id != binding.binding_id || !lineage_policy_allows(binding.propagation(), w.derivation))
           continue;
         Value entry = Value::object();

@@ -299,7 +299,8 @@ TEST_CASE("loft toward a point still finds its one cap") {
   CHECK(count_role(up.delta, "loft.side") == 4);
   CHECK(count_role(up.delta, "loft.start") == 1);
   CHECK(count_role(up.delta, "loft.end") == 0);
-  CHECK(up.delta.entries.size() == 4);
+  // Four generated side faces, and the four base edges, which stay in the result as the cap's boundary.
+  CHECK(up.delta.entries.size() == 8);
 
   const TrackedResult down = tracked_loft({tip, base});
   CHECK(count_role(down.delta, "loft.start") == 0);
@@ -383,7 +384,9 @@ TEST_CASE("shell roles: body, offset, closing descendants and walls") {
   CHECK(count_role(tracked.delta, "shell.offset_face") == 5);
   CHECK(count_role(tracked.delta, "shell.closing_descendant") == 1);
   CHECK(count_role(tracked.delta, "shell.wall") == 4);
-  CHECK(count_role(tracked.delta, "shell.body_face") == 0);  // every kept face was re-created
+  // The five kept faces are still the input's faces (IsSame in the result) while each also generates its offset
+  // face: they are preserved, with their body role, as well as the seeds of the offset faces.
+  CHECK(count_role(tracked.delta, "shell.body_face") == 5);
 }
 
 // ---------------------------------------------------------------------------

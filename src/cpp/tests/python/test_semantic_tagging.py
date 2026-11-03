@@ -182,7 +182,7 @@ def test_lineage_scope_needs_complete_history():
     result._add_tag_lineage(binding, derivation="continuation", source_topo_id=source.topo_id,
                             evidence=tagging.TagEvidence("topology_change", {"change_ids": ["c1"]}))
     result._set_runtime("semantic.lineage.coverage", "complete")
-    assert "role.datum" not in result._list_tags("effective")
+    assert "role.datum" in result._list_tags("effective")  # effective includes lineage (tags as a view)
     assert result._list_tags("lineage") == ["role.datum"]
     explained = scad.explain_tag(result, "role.datum", "lineage")
     assert explained[0]["lineage"][0]["derivation"] == "continuation"

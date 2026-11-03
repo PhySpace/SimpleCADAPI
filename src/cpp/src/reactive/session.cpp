@@ -1,4 +1,5 @@
 #include "scad/reactive/session.hpp"
+#include "scad/reactive/tag_view.hpp"
 
 #include <algorithm>
 #include <map>
@@ -406,7 +407,10 @@ std::string_view to_string(NodeStatus status) noexcept {
 Session::Session(Options options)
     : graph_(options.graph_id, options.ns),
       options_(options),
-      registry_(options.registry != nullptr ? options.registry : &ExecutorRegistry::global()) {}
+      registry_(options.registry != nullptr ? options.registry : &ExecutorRegistry::global()) {
+  // Tags of recorded values are read through the recorded history.
+  install_tag_view();
+}
 
 Session::~Session() {
   // Destroyed while still installed: leave the thread as it was found.  stop() is noexcept, so nothing

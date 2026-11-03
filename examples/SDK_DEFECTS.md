@@ -468,6 +468,57 @@ that surfaced it is in brackets.
 - **Fix direction:** compare error *codes* and kinds against the goldens, and let guidance text change with the API
   (or regenerate the goldens on a deliberate API change).
 
+## 31. Face tags died at the next operation, op-kwarg ones at blends and copies [stable-refs research]
+
+- **Symptom:** a plain `apply_tag_rselection` face tag was gone after any later operation; an op-kwarg face tag
+  (`top_face_tag=`) survived booleans but not fillet, chamfer, translate, mirror or patterns, although those nodes
+  record a witness for every face.
+- **Root cause:** tags were copied forward per operation (`autotag.cpp`) through channel-specific gates (the
+  face-source gate, the face channel of blends), and the effective scope excluded lineage.
+- **Status:** fixed. Tags are a view over the recorded history (`scad/reactive/tag_view.hpp`): a recorded tag
+  assignment reaches every entity its targets became, per lineage policy, and effective includes lineage.
+  Audit: `test_element_ref_history.py::test_audit_tag_channels_and_history_per_family` (every family 1/1).
+
+## 32. `OperationGraph::from_value` header said deltas are not restored; they are [stable-refs research]
+
+- **Symptom:** `include/scad/reactive/graph.hpp` commented "topology/semantic deltas are not restored" while
+  `graph.cpp` `from_value` parses `topo_delta` and `semantic_delta`.
+- **Status:** fixed (comment), and pinned: `test_tags_and_references_resolve_on_values_restored_from_the_cell_cache`
+  restores a cell's lineage record in a fresh process and resolves a tag and a reference through its deltas.
+
+## 33. A shell's kept faces had no successor witness [stable-refs research]
+
+- **Symptom:** after `shell_rsolid(box, [bottom], t)`, the untouched top face had only a `generated` witness (its
+  offset face); history could not say the top face was still there, and `body_faces_tag` always raised.
+- **Root cause:** `tracking::query_history` emitted `preserved` only when an input had neither `Modified` nor
+  `Generated` images; a kept shell face generates its offset face.
+- **Status:** fixed (owner decision, option a): `preserved` is also emitted when the input is still in the result.
+  Goldens and assertions reviewed one by one (design 7.2): shell kept faces and rim edges, and the profile edges
+  that bound an extrude / loft start cap, gain a preserved witness.
+
+## 34. `transform_rsolid`, `offset_rsolid`, draft and scale recorded no topology delta [stable-refs research]
+
+- **Symptom:** a face reference or tag through these ops could not be followed (`lost(no_history)` in the
+  resolver).
+- **Root cause:** they finish through `finish_solid`, which recorded no delta, although the OCCT makers behind them
+  (`BRepBuilderAPI_Transform` / `GTransform` after a `Copy`, `BRepOffsetAPI_MakeThickSolid`,
+  `BRepOffsetAPI_DraftAngle`) expose `Modified` / `Generated`.
+- **Status:** fixed. `modification_delta` (`src/semantic/tracking_modify.cpp`) turns the retained OCCT history into
+  face and edge witnesses (copy and transform merged into one history; an offset or drafted face, which OCCT reports
+  as generated, continues its source); `finish_solid` records it. Tests: `test_modification_delta.cpp`,
+  `test_element_ref_history.py::test_history_through_operations_that_had_none` and the draft test. The helical
+  sweep was never a gap: inside a session it records its helix, face and sweep nodes, and the sweep is tracked
+  (`test_a_helical_sweep_cap_is_anchored_by_the_sweep_it_records`).
+
+## 35. Two spellings of one topo id [stable-refs research]
+
+- **Symptom:** a recorded delta names a face `face_face_5`; the entity's own `topo_id` is `face_5`; `get_metadata(
+  "topo_ref")` re-prefixes on the fly (`bind_topo.cpp`) and `index_output_entities` builds the long form.
+- **Root cause:** the Python SDK's text form was kept for parity.
+- **Status:** open, harmless but every consumer must know which form it holds (`subshapes_by_recorded_id` takes the
+  recorded form).
+- **Fix direction:** one canonical form at the next graph schema version.
+
 ## Heuristics
 
 - Run every notebook three times: fresh, all cached, `--no-cache`. The three

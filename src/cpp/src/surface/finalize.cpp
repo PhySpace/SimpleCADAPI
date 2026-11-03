@@ -112,7 +112,7 @@ void carry_face_provenance(const std::vector<Face>& result_faces, const std::vec
 }
 
 bool has_semantic_state(const Shape& shape) {
-  return !shape.local_bindings().empty() || !shape.lineage_witnesses().empty() || shape.metadata().size() != 0 ||
+  return !shape.local_bindings().empty() || !shape.stored_lineage_witnesses().empty() || shape.metadata().size() != 0 ||
          shape.runtime().size() != 0;
 }
 

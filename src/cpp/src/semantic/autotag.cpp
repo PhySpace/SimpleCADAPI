@@ -262,6 +262,17 @@ std::optional<LineageDerivation> lineage_derivation_or_none(const std::string& t
   }
 }
 
+// A binding a recorded tag assignment made (apply_tag_rselection, an op-kwarg tag): it is part of the graph, and
+// the tag view (scad/reactive/tag_view.hpp) carries it through the recorded history, so its continuation is never
+// copied onto a result here.  What is copied is what only the shapes know (imported sidecar facts, sketch topology
+// names, tags assigned outside a recording session) and an operation's own naming of what it generates.
+// That holds while the source is part of a recorded graph; a value replayed or built outside a session has no
+// graph to read, so there the shape carries the binding as before.
+bool graph_borne(const TagBinding& binding, const Shape& source) {
+  return binding.producer().kind == TagProducerKind::UserOperation && binding.producer().node_id.has_value() &&
+         source.root().graph_node() != nullptr;
+}
+
 const Shape* source_of(const Value& witness, const TopologyIndex& sources) {
   const Value* id = member(witness, "input_topo_id");
   return present(id) ? sources.find(py_str(*id)) : nullptr;
@@ -289,7 +300,7 @@ void carry_source_lineage(Shape& target, const Value& entry, const TopologyIndex
                 {"derivation", derivation_token}});
 
     std::vector<TagBinding> bindings = source->local_tag_bindings();
-    for (const TagLineageWitness& carried : source->lineage_witnesses())
+    for (const TagLineageWitness& carried : source->stored_lineage_witnesses())
       if (carried.coverage == "complete" && lineage_policy_allows(carried.binding.propagation(), carried.derivation))
         bindings.push_back(carried.binding);
     // One binding per id; the later record of an id replaces the earlier, keeping its place.
@@ -303,7 +314,7 @@ void carry_source_lineage(Shape& target, const Value& entry, const TopologyIndex
         unique.push_back(std::move(binding));
     }
     for (const TagBinding& binding : unique) {
-      if (!lineage_policy_allows(binding.propagation(), *derivation))
+      if (graph_borne(binding, *source) || !lineage_policy_allows(binding.propagation(), *derivation))
         continue;
       target.add_tag_lineage(binding, *derivation, source->topo_id(), evidence, coverage);
     }
@@ -363,6 +374,10 @@ void project_source_bindings(Shape& target, const Value& entry, const TopologyIn
     }
 
     for (const TagBinding& binding : source->local_tag_bindings()) {
+      // A generated entity named after its source (an edge's fillet patch, a profile edge's side face) is this
+      // operation's own naming fact, for any binding.  The continuation of a recorded assignment is the view's.
+      if (graph_borne(binding, *source) && event != "generated")
+        continue;
       const Value& evidence = binding.evidence->data;
       const bool is_user = binding.producer().kind == TagProducerKind::UserOperation;
       const bool is_prior_projection = binding.producer().kind == TagProducerKind::AutoRule &&

@@ -3,6 +3,7 @@
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepOffsetAPI_DraftAngle.hxx>
 #include <BRepOffsetAPI_MakeThickSolid.hxx>
+#include <BRepTools_History.hxx>
 #include <GeomAbs_JoinType.hxx>
 #include <GeomAbs_SurfaceType.hxx>
 #include <TopTools_ListOfShape.hxx>
@@ -15,6 +16,7 @@
 #include "scad/core/tolerance.hpp"
 #include "scad/kernel/convert.hpp"
 #include "scad/ops/features/blends.hpp"
+#include "scad/semantic/tracking.hpp"
 
 namespace scad {
 
@@ -30,6 +32,7 @@ Solid offset_rsolid(const Solid& solid, const Scalar& amount, const FaceSelectio
   const GeomAbs_JoinType join = options.kind == "ARC" ? GeomAbs_Arc : GeomAbs_Intersection;
   const std::vector<Face> faces = openings.resolve(solid);
 
+  BRepTools_History history;
   const TopoDS_Shape built = occt_guard([&]() -> TopoDS_Shape {
     TopTools_ListOfShape open;
     for (const Face& face : faces)
@@ -40,6 +43,9 @@ Solid offset_rsolid(const Solid& solid, const Scalar& amount, const FaceSelectio
     builder.Build();
     if (!builder.IsDone())
       throw ValueError("kernel could not offset the solid");
+    TopTools_ListOfShape input;
+    input.Append(solid.wrapped());
+    history = BRepTools_History(input, builder);
     return builder.Shape();
   });
 
@@ -54,7 +60,9 @@ Solid offset_rsolid(const Solid& solid, const Scalar& amount, const FaceSelectio
     picks.apply_ids(rec, "selected_face_node_ids", {});
   }
   rec.input(solid, "body").inputs(faces, "face");
-  return finish_solid(solid, built, std::move(rec).take());
+  // An offset face is the input face moved: it keeps the identity (generated_faces_continue).
+  TopoDelta delta = modification_delta(history, solid.wrapped(), built, "fragment", /*generated_faces_continue=*/true);
+  return finish_solid(solid, built, std::move(rec).take(), std::move(delta));
 }
 
 Solid draft_rsolid(const Solid& solid, const FaceSelection& faces_to_draft, const Scalar& angle,
@@ -92,6 +100,7 @@ Solid draft_rsolid(const Solid& solid, const FaceSelection& faces_to_draft, cons
       selected.push_back(face);
   }
 
+  BRepTools_History history;  // empty for a zero angle: every face is preserved
   const TopoDS_Shape built = degrees == 0 ? solid.wrapped() : occt_guard([&]() -> TopoDS_Shape {
     const gp_Dir direction = kernel::to_dir(global_normal, "plane_normal");
     const gp_Pln plane(kernel::to_pnt(global_origin), direction);
@@ -104,6 +113,9 @@ Solid draft_rsolid(const Solid& solid, const FaceSelection& faces_to_draft, cons
     builder.Build();
     if (!builder.IsDone())
       throw ValueError("kernel could not build the drafted solid");
+    TopTools_ListOfShape input;
+    input.Append(solid.wrapped());
+    history = BRepTools_History(input, builder);
     return builder.Shape();
   });
 
@@ -118,7 +130,9 @@ Solid draft_rsolid(const Solid& solid, const FaceSelection& faces_to_draft, cons
     picks.apply_ids(rec, "selected_face_node_ids", {});
   }
   rec.input(solid, "body").inputs(selected, "face");
-  return finish_solid(solid, built, std::move(rec).take());
+  // OCCT reports a drafted face as generated (the tilted face replaces it): it is the same face, so it continues.
+  TopoDelta delta = modification_delta(history, solid.wrapped(), built, "fragment", /*generated_faces_continue=*/true);
+  return finish_solid(solid, built, std::move(rec).take(), std::move(delta));
 }
 
 }  // namespace scad
