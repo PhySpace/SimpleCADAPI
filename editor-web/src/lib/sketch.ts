@@ -41,7 +41,8 @@ export type SketchDoc = {
 };
 
 export type Diagnostic = { constraint_id: string | null; severity: string; code: string; message: string; residual: number | null };
-export type ServerProfile = { index: number; area: number; centroid: [number, number, number] };
+/** One profile of the SDK's ``inspect_sketch_rsketchprofiles``: a free circle, or a loop / chain of edges in walking order. */
+export type ServerProfile = { index: number; id: string; kind: string; closed: boolean; entity_ids: string[]; reversed: boolean[] };
 export type SolveStatus = "solved" | "underconstrained" | "conflicting" | "failed";
 export type SolveResult = {
   ok: boolean;
@@ -53,6 +54,8 @@ export type SolveResult = {
   entities: Record<string, Record<string, unknown>>;
   diagnostics: Diagnostic[];
   profiles: ServerProfile[];
+  /** Why edge sets are no profile (a branch point, say), as the SDK words it. */
+  unusable: string[];
 };
 
 export const ID_PATTERN = /^[a-z][a-z0-9_]{0,30}$/;
@@ -635,7 +638,7 @@ export type Loop = {
   polygon: [number, number][];
   area: number;
   centroid: [number, number];
-  /** The index of the server profile it matches, when the last solve listed one. */
+  /** The index of its SDK profile: what the face is made with. */
   index: number | null;
 };
 
@@ -665,109 +668,50 @@ export function pointInPolygon(p: readonly [number, number], poly: readonly [num
   return inside;
 }
 
-type HalfEdge = { entity: string; from: string; to: string; path: [number, number][]; angle: number; twin: number };
-
-/** The closed loops of the (non-construction) geometry: every free circle, and the bounded faces of the line/arc graph.
- * Edges that dangle make no loop. */
+/** The closed loops of the sketch: the SDK's own closed profiles (``inspect_sketch_rsketchprofiles``), drawn from the solved
+ * geometry. There is no second opinion on what a loop is: a loop exists when the SDK offers it as a profile, and its `index` is
+ * the one the face is made with. */
 export function findLoops(doc: SketchDoc, solve: SolveResult | null): Loop[] {
   const pts = solvedPoints(doc, solve);
+  const byId = new Map(doc.entities.map((e) => [e.id, e]));
   const loops: Loop[] = [];
-  const edges: HalfEdge[] = [];
-  const heading = (path: [number, number][]) => Math.atan2(path[1][1] - path[0][1], path[1][0] - path[0][0]);
-  for (const e of doc.entities) {
-    if (e.construction) continue;
-    if (e.kind === "circle") {
+  for (const profile of solve?.profiles ?? []) {
+    if (!profile.closed || profile.entity_ids.length === 0) continue;
+    const entities = profile.entity_ids.map((id) => byId.get(id));
+    if (entities.some((e) => !e)) continue; // a result older than the document
+    let polygon: [number, number][] = [];
+    let area = 0;
+    let centroid: [number, number] = [0, 0];
+    if (profile.kind === "circle") {
+      const e = entities[0]!;
       const c = pts.get(e.center ?? "");
-      if (!c) continue;
       const r = circleRadius(doc, e, pts, solve);
-      if (!(r > 0)) continue;
-      const poly: [number, number][] = Array.from({ length: 48 }, (_, i) => [c[0] + r * Math.cos((2 * Math.PI * i) / 48), c[1] + r * Math.sin((2 * Math.PI * i) / 48)]);
-      loops.push({ key: e.id, entities: [e.id], polygon: poly, area: Math.PI * r * r, centroid: [c[0], c[1]], index: null });
-      continue;
-    }
-    const s = pts.get(e.start ?? "");
-    const t = pts.get(e.end ?? "");
-    if (!s || !t || !e.start || !e.end || e.start === e.end) continue;
-    let path: [number, number][] = [s, t];
-    if (e.kind === "arc") {
-      const c = pts.get(e.center ?? "");
-      if (!c) continue;
-      path = sampleArc(c, s, t);
-    }
-    const reversed = [...path].reverse();
-    const i = edges.length;
-    edges.push({ entity: e.id, from: e.start, to: e.end, path, angle: heading(path), twin: i + 1 });
-    edges.push({ entity: e.id, from: e.end, to: e.start, path: reversed, angle: heading(reversed), twin: i });
-  }
-  const outgoing = new Map<string, number[]>();
-  edges.forEach((h, i) => outgoing.set(h.from, [...(outgoing.get(h.from) ?? []), i]));
-  const visited = new Set<number>();
-  for (let start = 0; start < edges.length; start++) {
-    if (visited.has(start)) continue;
-    const face: number[] = [];
-    let at = start;
-    let closed = false;
-    for (let guard = 0; guard <= edges.length; guard++) {
-      if (visited.has(at) && at !== start) break;
-      face.push(at);
-      visited.add(at);
-      const h = edges[at];
-      const options = (outgoing.get(h.to) ?? []).filter((i) => i !== h.twin);
-      const back = edges[h.twin].angle;
-      // the next edge is the first one clockwise from the way back (so the face stays on the left)
-      let pick = h.twin;
-      let bestTurn = Infinity;
-      for (const i of options) {
-        let turn = back - edges[i].angle;
-        while (turn <= 1e-9) turn += 2 * Math.PI;
-        if (turn < bestTurn) {
-          bestTurn = turn;
-          pick = i;
+      if (!c || !(r > 0)) continue;
+      polygon = Array.from({ length: 48 }, (_, i) => [c[0] + r * Math.cos((2 * Math.PI * i) / 48), c[1] + r * Math.sin((2 * Math.PI * i) / 48)]);
+      area = Math.PI * r * r;
+      centroid = [c[0], c[1]];
+    } else if (profile.kind === "edge_loop") {
+      let broken = false;
+      profile.entity_ids.forEach((_, i) => {
+        const e = entities[i]!;
+        const s = pts.get(e.start ?? "");
+        const t = pts.get(e.end ?? "");
+        const c = e.kind === "arc" ? pts.get(e.center ?? "") : undefined;
+        if (!s || !t || (e.kind === "arc" && !c)) {
+          broken = true;
+          return;
         }
-      }
-      at = pick;
-      if (at === start) {
-        closed = true;
-        break;
-      }
-    }
-    if (!closed || face.length < 2) continue;
-    const ents = face.map((i) => edges[i].entity);
-    if (new Set(ents).size !== ents.length) continue; // an edge walked twice: it dangles
-    const polygon: [number, number][] = [];
-    for (const i of face) polygon.push(...edges[i].path.slice(0, -1));
-    const { area, centroid } = polygonArea(polygon);
-    if (area <= 1e-9) continue; // the outer boundary of its component
-    loops.push({ key: [...ents].sort().join("+"), entities: ents, polygon, area, centroid, index: null });
+        let path: [number, number][] = e.kind === "arc" ? sampleArc(c!, s, t) : [s, t];
+        if (profile.reversed[i]) path = [...path].reverse();
+        polygon.push(...path.slice(0, -1));
+      });
+      if (broken || polygon.length < 3) continue;
+      ({ area, centroid } = polygonArea(polygon));
+      area = Math.abs(area);
+    } else continue;
+    loops.push({ key: [...profile.entity_ids].sort().join("+"), entities: profile.entity_ids, polygon, area, centroid, index: profile.index });
   }
-  return matchLoops(loops, solve?.profiles ?? [], doc.plane);
-}
-
-/** Give each loop the index of the server profile that has its area and centroid (closest first, each profile once). */
-export function matchLoops(loops: Loop[], profiles: readonly ServerProfile[], plane: PlaneSpec): Loop[] {
-  const pairs: { loop: number; profile: number; cost: number }[] = [];
-  loops.forEach((loop, li) => {
-    profiles.forEach((profile, pi) => {
-      const areaErr = Math.abs(profile.area - loop.area) / Math.max(loop.area, 1e-9);
-      if (areaErr > 0.05) return;
-      const c = planeCoords(plane, profile.centroid);
-      const scale = Math.sqrt(Math.max(loop.area, 1e-9));
-      const where = Math.hypot(c[0] - loop.centroid[0], c[1] - loop.centroid[1]) / scale;
-      if (where > 0.25) return;
-      pairs.push({ loop: li, profile: pi, cost: areaErr + where });
-    });
-  });
-  pairs.sort((a, b) => a.cost - b.cost);
-  const loopTaken = new Set<number>();
-  const profileTaken = new Set<number>();
-  const index = new Map<number, number>();
-  for (const pair of pairs) {
-    if (loopTaken.has(pair.loop) || profileTaken.has(pair.profile)) continue;
-    loopTaken.add(pair.loop);
-    profileTaken.add(pair.profile);
-    index.set(pair.loop, profiles[pair.profile].index);
-  }
-  return loops.map((loop, li) => ({ ...loop, index: index.get(li) ?? null }));
+  return loops;
 }
 
 /** The loop under a position: the smallest one containing it. */

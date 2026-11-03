@@ -50,7 +50,7 @@ describe("the sketches of the notebook", () => {
 });
 
 describe("the solve cache", () => {
-  const ok = (doc: SketchDoc): SolveResult => ({ ok: true, status: "solved", dof: doc.points.length, residual: 0, points: {}, scalars: {}, entities: {}, diagnostics: [], profiles: [] });
+  const ok = (doc: SketchDoc): SolveResult => ({ ok: true, status: "solved", dof: doc.points.length, residual: 0, points: {}, scalars: {}, entities: {}, diagnostics: [], profiles: [], unusable: [] });
 
   it("is independent of key order", () => {
     expect(stableStringify({ b: 1, a: [2, { d: 1, c: 2 }] })).toBe(stableStringify({ a: [2, { c: 2, d: 1 }], b: 1 }));
@@ -95,7 +95,8 @@ describe("the solve cache", () => {
 
 describe("the shape of a sketch", () => {
   it("samples lines, circles and arcs, and fills the chosen profile", () => {
-    const shape = sketchShape(rectDoc(40, 20), null);
+    const loop = { index: 0, id: "l1", kind: "edge_loop", closed: true, entity_ids: ["l1", "l2", "l3", "l4"], reversed: [false, false, false, false] };
+    const shape = sketchShape(rectDoc(40, 20), { ok: true, status: "solved", dof: 0, residual: 0, points: {}, scalars: {}, entities: {}, diagnostics: [], profiles: [loop], unusable: [] });
     expect(shape.curves).toHaveLength(4);
     expect(shape.extent).toEqual({ min: [0, 0], max: [40, 20] });
     expect(shape.regions).toHaveLength(1);
@@ -114,13 +115,13 @@ describe("the shape of a sketch", () => {
     expect(shape.curves.find((c) => c.id === "l9")?.construction).toBe(true);
   });
   it("draws the seeds, flagged failed, when the solve failed", () => {
-    const failed = { ok: false, status: "failed", dof: 0, residual: null, points: { p1: [500, 500] }, scalars: {}, entities: {}, diagnostics: [], profiles: [] } as SolveResult;
+    const failed = { ok: false, status: "failed", dof: 0, residual: null, points: { p1: [500, 500] }, scalars: {}, entities: {}, diagnostics: [], profiles: [], unusable: [] } as SolveResult;
     const shape = sketchShape(rectDoc(40, 20), failed);
     expect(shape.failed).toBe(true);
     expect(shape.extent).toEqual({ min: [0, 0], max: [40, 20] });
   });
   it("uses the solved points over the seeds", () => {
-    const solved = { ok: true, status: "solved", dof: 0, residual: 0, points: { p2: [60, 0], p3: [60, 20] }, scalars: {}, entities: {}, diagnostics: [], profiles: [] } as SolveResult;
+    const solved = { ok: true, status: "solved", dof: 0, residual: 0, points: { p2: [60, 0], p3: [60, 20] }, scalars: {}, entities: {}, diagnostics: [], profiles: [], unusable: [] } as SolveResult;
     expect(sketchShape(rectDoc(40, 20), solved).extent?.max[0]).toBe(60);
   });
   it("needs a line to have been drawn for addLine to be used", () => {

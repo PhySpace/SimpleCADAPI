@@ -264,8 +264,9 @@ def render(slug: str, doc: Mapping[str, Any]) -> tuple[list[str], list[str]]:
 # ---- solve ----------------------------------------------------------------------------------------------------------------
 
 
-def solve(doc: Mapping[str, Any], *, max_profiles: int = 16) -> dict[str, Any]:
-    """Solve *doc* without recording anything: status, degrees of freedom, solved geometry, diagnostics and the profiles.
+def solve(doc: Mapping[str, Any]) -> dict[str, Any]:
+    """Solve *doc* without recording anything: status, degrees of freedom, solved geometry, diagnostics and the profiles
+    (the SDK's own list, ``inspect_sketch_rsketchprofiles``: the same indices ``make_face_from_sketch_rface`` takes).
 
     Never raises for a sketch that is merely wrong (conflicting, under-constrained): that is the answer.
     """
@@ -281,14 +282,7 @@ def solve(doc: Mapping[str, Any], *, max_profiles: int = 16) -> dict[str, Any]:
     sketch = namespace["_sketch"]
     result = scad.inspect_sketch_rsketchresult(sketch=sketch, strict=False)
     data = result.to_dict()
-    profiles = []
-    for index in range(max_profiles):
-        try:
-            face = scad.make_face_from_sketch_rface(sketch=sketch, profile=index, strict=False)
-        except Exception:  # noqa: BLE001 - there is no profile with this index
-            break
-        center = face.get_center()
-        profiles.append({"index": index, "area": face.get_area(), "centroid": [center.x, center.y, center.z]})
+    listed = scad.inspect_sketch_rsketchprofiles(sketch=sketch, strict=False)
     return {
         "status": data.get("status"),
         "dof": data.get("dof"),
@@ -297,7 +291,8 @@ def solve(doc: Mapping[str, Any], *, max_profiles: int = 16) -> dict[str, Any]:
         "scalars": data.get("solved_scalars") or {},
         "entities": data.get("solved_entities") or {},
         "diagnostics": data.get("diagnostics") or [],
-        "profiles": profiles,
+        "profiles": listed["profiles"],
+        "unusable": listed["unusable"],
     }
 
 

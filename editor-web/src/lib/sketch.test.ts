@@ -20,7 +20,6 @@ import {
   hitTest,
   isFixed,
   loopAt,
-  matchLoops,
   measure,
   nextId,
   normalizeDoc,
@@ -54,7 +53,7 @@ function rectangle(w = 40, h = 20): SketchDoc {
   return addLine(doc, at, { x: 0, y: 0, pointId: first }, opts)!.doc;
 }
 
-const result = (over: Partial<SolveResult> = {}): SolveResult => ({ ok: true, status: "underconstrained", dof: 1, residual: 0, points: {}, scalars: {}, entities: {}, diagnostics: [], profiles: [], ...over });
+const result = (over: Partial<SolveResult> = {}): SolveResult => ({ ok: true, status: "underconstrained", dof: 1, residual: 0, points: {}, scalars: {}, entities: {}, diagnostics: [], profiles: [], unusable: [], ...over });
 
 describe("ids", () => {
   it("generates p, l, c, a, k ids without clashes", () => {
@@ -216,79 +215,58 @@ describe("hit testing", () => {
   });
 });
 
+// What the SDK's inspect_sketch_rsketchprofiles answers for the documents below: the loops are the SDK's, never the frontend's.
+const loopProfile = (index: number, entity_ids: string[]) => ({ index, id: entity_ids[0], kind: "edge_loop", closed: true, entity_ids, reversed: entity_ids.map(() => false) });
+const circleProfile = (index: number, id: string) => ({ index, id, kind: "circle", closed: true, entity_ids: [id], reversed: [] as boolean[] });
+const withCircle = () => addCircle(rectangle(), { x: 20, y: 10 }, { x: 23, y: 10 }, opts)!.doc;
+const solved = [circleProfile(0, "c1"), loopProfile(1, ["l1", "l2", "l3", "l4"])];
+
 describe("loops", () => {
-  it("finds the rectangle and a free circle, and not dangling edges", () => {
-    const doc = addCircle(rectangle(), { x: 20, y: 10 }, { x: 23, y: 10 }, opts)!.doc;
-    const loops = findLoops(doc, null);
+  it("are the SDK's closed profiles, drawn from the solved geometry", () => {
+    const loops = findLoops(withCircle(), result({ profiles: solved }));
     expect(loops).toHaveLength(2);
     const rect = loops.find((l) => l.entities.length === 4)!;
+    expect(rect.index).toBe(1);
     expect(rect.area).toBeCloseTo(800);
     expect(rect.centroid[0]).toBeCloseTo(20);
     expect(rect.centroid[1]).toBeCloseTo(10);
-    expect(loops.find((l) => l.key === "c1")!.area).toBeCloseTo(Math.PI * 9);
-    const open = removeEntity(rectangle(), "l4");
-    expect(findLoops(open, null)).toHaveLength(0);
+    const circle = loops.find((l) => l.key === "c1")!;
+    expect(circle.index).toBe(0);
+    expect(circle.area).toBeCloseTo(Math.PI * 9);
   });
-  it("splits a rectangle with a divider into two faces", () => {
-    let doc = rectangle(40, 20);
-    const a = ensurePoint(doc, { x: 20, y: 0 });
-    doc = a.doc;
-    // split the bottom edge: p1-p2 stays, so build a fresh doc with a mid point instead
-    doc = emptyDoc();
-    let at = ensurePoint(doc, { x: 0, y: 0 });
-    doc = at.doc;
-    const ids: string[] = [at.id];
-    for (const spot of [{ x: 20, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 20 }, { x: 20, y: 20 }, { x: 0, y: 20 }]) {
-      const made = addLine(doc, ids[ids.length - 1], spot, opts)!;
-      doc = made.doc;
-      ids.push(made.endId);
-    }
-    doc = addLine(doc, ids[ids.length - 1], { x: 0, y: 0, pointId: ids[0] }, opts)!.doc;
-    doc = addLine(doc, ids[1], { x: 20, y: 20, pointId: ids[4] }, opts)!.doc;
-    const loops = findLoops(doc, null);
-    expect(loops.map((l) => Math.round(l.area)).sort()).toEqual([400, 400]);
+  it("are none until the SDK has answered, and none for what it does not offer (open chains, branched edges)", () => {
+    expect(findLoops(withCircle(), null)).toHaveLength(0);
+    const chain = { ...loopProfile(0, ["l1", "l2", "l3"]), kind: "edge_chain", closed: false };
+    expect(findLoops(removeEntity(rectangle(), "l4"), result({ profiles: [chain] }))).toHaveLength(0);
   });
-  it("traverses arcs counter-clockwise: a D shape", () => {
+  it("ignore a profile of entities the document no longer has (a result older than the document)", () => {
+    expect(findLoops(removeEntity(rectangle(), "l4"), result({ profiles: [loopProfile(0, ["l1", "l2", "l3", "l4"])] }))).toHaveLength(0);
+  });
+  it("walk arcs and reversed edges as the profile says: a D shape", () => {
     let doc = emptyDoc();
     const c = ensurePoint(doc, { x: 0, y: 0 });
     doc = c.doc;
-    const arc = addArc(doc, { x: 0, y: 0, pointId: c.id }, { x: 0, y: -5 }, { x: 0, y: 5 }, opts)!;
-    doc = arc.doc;
+    doc = addArc(doc, { x: 0, y: 0, pointId: c.id }, { x: 0, y: -5 }, { x: 0, y: 5 }, opts)!.doc;
     doc = addLine(doc, "p3", { x: 0, y: -5, pointId: "p2" }, opts)!.doc;
-    const [loop] = findLoops(doc, null);
+    const [loop] = findLoops(doc, result({ profiles: [loopProfile(0, ["a1", "l1"])] }));
     expect(loop.area).toBeGreaterThan(30);
     expect(loop.area).toBeLessThan(40); // about half of pi * 25 = 39.3 (24 chord samples)
     expect(loop.centroid[0]).toBeGreaterThan(0);
+    const wrong = findLoops(doc, result({ profiles: [{ ...loopProfile(0, ["a1", "l1"]), reversed: [true, true] }] }));
+    expect(wrong[0].area).toBeCloseTo(loop.area); // the same face walked the other way round
   });
-  it("finds the loop under a position, smallest first", () => {
-    const doc = addCircle(rectangle(), { x: 20, y: 10 }, { x: 23, y: 10 }, opts)!.doc;
-    const loops = findLoops(doc, null);
+  it("find the loop under a position, smallest first", () => {
+    const loops = findLoops(withCircle(), result({ profiles: solved }));
     expect(loopAt(loops, [20, 10])!.key).toBe("c1");
     expect(loopAt(loops, [2, 2])!.entities).toHaveLength(4);
     expect(loopAt(loops, [100, 100])).toBeNull();
   });
 });
 
-describe("profile matching and choice", () => {
-  const doc = addCircle(rectangle(), { x: 20, y: 10 }, { x: 23, y: 10 }, opts)!.doc;
-  const profiles = [
-    { index: 0, area: Math.PI * 9, centroid: [20, 10, 0] as [number, number, number] },
-    { index: 1, area: 800, centroid: [20, 10, 0] as [number, number, number] },
-  ];
-  it("matches loops to server profiles by area and centroid, whatever the order", () => {
-    const loops = matchLoops(findLoops(doc, null), profiles, "XY");
-    expect(loops.find((l) => l.key === "c1")!.index).toBe(0);
-    expect(loops.find((l) => l.entities.length === 4)!.index).toBe(1);
-    const reversed = matchLoops(findLoops(doc, null), [{ ...profiles[1], index: 0 }, { ...profiles[0], index: 1 }], "XY");
-    expect(reversed.find((l) => l.key === "c1")!.index).toBe(1);
-  });
-  it("reads centroids in the sketch plane", () => {
-    const xz = matchLoops(findLoops(doc, null), [{ index: 5, area: 800, centroid: [20, 0, 10] }], "XZ");
-    expect(xz.find((l) => l.entities.length === 4)!.index).toBe(5);
-    expect(matchLoops(findLoops(doc, null), [{ index: 5, area: 800, centroid: [20, 0, 10] }], "XY").every((l) => l.index === null)).toBe(true);
-  });
-  it("defaults the outer profile to the largest loop and turns choices into indices", () => {
-    const loops = matchLoops(findLoops(doc, null), profiles, "XY");
+describe("profile choice", () => {
+  const doc = withCircle();
+  it("defaults the outer profile to the largest loop and turns choices into the SDK's indices", () => {
+    const loops = findLoops(doc, result({ profiles: solved }));
     let choice = reconcileChoice({ outer: null, inner: [], chosen: false }, loops);
     expect(choiceToIndices(choice, loops)).toEqual({ profile: 1, inner: [] });
     choice = pickLoop(choice, "c1", true);

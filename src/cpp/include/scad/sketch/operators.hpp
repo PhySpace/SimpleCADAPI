@@ -216,6 +216,11 @@ SketchDiff diff_sketch_rsketchdiff(const Sketch& before, const Sketch& after);
 // returns conflicting / failed results instead of raising.
 SketchSolveResult inspect_sketch_rsketchresult(const Sketch& sketch, const SketchSolveRequest& request = {});
 
+// The profiles a solved sketch offers, in the index order make_face_from_sketch_rface / make_wire_from_sketch_rwire use:
+// {"profiles": [{index, id, kind, closed, entity_ids, point_ids, reversed}], "unusable": [why an edge set is no
+// profile]}.  Entities are named by id; the geometry is the solved sketch's.
+Value inspect_sketch_rsketchprofiles(const Sketch& sketch, const SketchSolveRequest& request = {});
+
 // Promote a profile (closed loop or open chain) to a wire, solving internally.
 Wire make_wire_from_sketch_rwire(const Sketch& sketch, const SketchProfileId& profile = 0,
                                  const SketchSolveRequest& request = {});

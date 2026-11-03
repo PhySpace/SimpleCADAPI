@@ -251,6 +251,10 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
         "status": "diagnostic",
         "reason": "Runs the sketch solver for inspection only; solve evidence is recorded on sketch promotion nodes.",
     },
+    "inspect_sketch_rsketchprofiles": {
+        "status": "diagnostic",
+        "reason": "Lists the profiles of the solved sketch for inspection only; promotion records the chosen profile.",
+    },
     "make_wire_from_sketch_rwire": {
         "status": "replayable",
         "op": "make_wire_from_sketch_rwire",

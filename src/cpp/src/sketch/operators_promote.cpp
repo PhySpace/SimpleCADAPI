@@ -1,4 +1,4 @@
-// inspect_sketch_rsketchresult, make_wire_from_sketch_rwire, make_face_from_sketch_rface.
+// inspect_sketch_rsketchresult, inspect_sketch_rsketchprofiles, make_wire_from_sketch_rwire, make_face_from_sketch_rface.
 #include <TopoDS.hxx>
 
 #include "finalize.hpp"
@@ -6,6 +6,7 @@
 #include "scad/core/error.hpp"
 #include "scad/kernel/features.hpp"
 #include "scad/sketch/operators.hpp"
+#include "scad/sketch/profile.hpp"
 
 namespace scad {
 
@@ -51,6 +52,50 @@ SketchSolveResult inspect_sketch_rsketchresult(const Sketch& sketch, const Sketc
   return guarded(kSpec, [&] {
     Sketch working = sketch.clone(/*include_solve=*/false);
     return working.solve(request);
+  });
+}
+
+Value inspect_sketch_rsketchprofiles(const Sketch& sketch, const SketchSolveRequest& request) {
+  static const ErrorSpec kSpec{"inspect_sketch_rsketchprofiles",
+                               "Failed to list the sketch profiles.",
+                               {"The sketch has invalid or conflicting constraints and strict=True."},
+                               {"Pass strict=False to list the profiles of a sketch that does not solve cleanly."}};
+  return guarded(kSpec, [&] {
+    Sketch working = sketch.clone(/*include_solve=*/false);
+    const SketchSolveResult result = working.solve(request);
+    const auto strings = [](const std::vector<std::string>& ids) {
+      Value::Array out;
+      for (const std::string& id : ids)
+        out.emplace_back(id);
+      return Value(std::move(out));
+    };
+    Value::Array profiles;
+    Value::Array components;
+    if (!result.solved_points.empty()) {
+      int index = 0;
+      for (const SketchProfile& profile : sketch_profiles(working, result)) {
+        Value item = Value::object();
+        item.set("index", index++);
+        item.set("id", profile.id);
+        item.set("kind", profile.kind);
+        item.set("closed", profile.closed);
+        item.set("entity_ids", strings(profile.entity_ids));
+        item.set("point_ids", strings(profile.point_ids));
+        Value::Array reversed;
+        for (const bool flag : profile.reversed)
+          reversed.emplace_back(flag);
+        item.set("reversed", Value(std::move(reversed)));
+        profiles.push_back(std::move(item));
+      }
+      for (const std::string& text : describe_edge_components(working)) {
+        if (text.rfind("closed loop", 0) != 0 && text.rfind("open chain", 0) != 0)
+          components.emplace_back(text);
+      }
+    }
+    Value out = Value::object();
+    out.set("profiles", Value(std::move(profiles)));
+    out.set("unusable", Value(std::move(components)));
+    return out;
   });
 }
 

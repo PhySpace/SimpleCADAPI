@@ -214,7 +214,6 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   useEffect(() => {
     if (drag || !result) return;
     const outer = loops.find((l) => l.key === choice.outer);
-    if (choice.outer && outer && outer.index === null) return;
     const { profile, inner } = choiceToIndices(choice, loops);
     const d = docRef.current;
     if (d.profile !== profile || d.inner.length !== inner.length || d.inner.some((v, i) => v !== inner[i])) commit({ ...d, profile, inner }, false);
@@ -620,6 +619,8 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     return new Set(c ? c.targets.map((t) => t.split(".")[0]) : []);
   }, [doc.constraints, highlight]);
   const fixedPoints = useMemo(() => new Set(doc.constraints.filter((c) => c.kind === "fix").map((c) => c.targets[0].split(".")[0])), [doc.constraints]);
+  /** The solve answers the document as it is now (profiles and indices are the SDK's for exactly this sketch). */
+  const fresh = solve !== null && solve.for === effective;
   const solved = result?.status === "solved";
   const badge = statusBadge(result, error);
   const diagnostics = (result?.diagnostics ?? []).filter((d) => d.code !== "underconstrained");
@@ -664,7 +665,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   return {
     cornerHover, pendingLine, cornerBox, setCornerBox, submitCorner, projectOpen, setProjectOpen, openProject, projectSketch, projectFrom,
     doc, commit, undo, redo, edits, editNote, editBusy, flash, hoverEnd, runEdit, tool, chooseTool, selection, highlight, setHighlight, draft, cursor, hover, drag, box, setBox, result, error, auto, setAuto, snapOn,
-    setSnapOn, construction, choice, pts, loops, applicable, blamed, failing, highlighted, fixedPoints, solved, badge, diagnostics, outer, hint, extents,
+    setSnapOn, construction, choice, pts, loops, applicable, blamed, fresh, failing, highlighted, fixedPoints, solved, badge, diagnostics, outer, hint, extents,
     openBox, applyConstraint, submitBox, deleteSelection, toggleConstruction, pointerDown, pointerMove, pointerUp, pointerLeave, key,
   };
 }

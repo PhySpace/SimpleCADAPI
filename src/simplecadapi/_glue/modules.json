@@ -234,6 +234,7 @@
 "inspect_assembly_constraints": "simplecadapi.product.solver",
 "inspect_assembly_constraints_rconstraintreport": "simplecadapi.operators.product",
 "inspect_sketch_rsketchresult": "simplecadapi.operators.sketch",
+"inspect_sketch_rsketchprofiles": "simplecadapi.operators.sketch",
 "internal_tag_binding": "simplecadapi.topology.tagging",
 "intersect_rsolid": "simplecadapi.operators.boolean",
 "inverse_placement": "simplecadapi.product.placement",

@@ -394,11 +394,14 @@ function SketchEditorView({
   const nameError = editing || created ? null : validateName(name, taken);
   const problem = (() => {
     if (nameError) return nameError;
-    if (editor.loops.length === 0) return "close a loop of lines or draw a circle: the face needs a profile";
-    const status = editor.result?.status;
     if (editor.error) return editor.error;
+    if (!editor.fresh) return "solving the sketch…";
+    if (editor.loops.length === 0) {
+      const why = editor.result?.unusable?.[0];
+      return why ? `no closed profile: ${why}` : "close a loop of lines or draw a circle: the face needs a profile";
+    }
+    const status = editor.result?.status;
     if (status === "conflicting" || status === "failed") return "the sketch has a conflict: fix the constraints marked in red";
-    if (editor.outer && editor.outer.index === null) return "the profile is still being matched: try again in a moment";
     return null;
   })();
 

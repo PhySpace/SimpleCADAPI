@@ -700,6 +700,13 @@ void bind_solve_operators(py::module_& m) {
       py::arg("sketch"), py::kw_only(), py::arg("require_fully_constrained") = false, py::arg("strict") = true,
       py::arg("tolerance") = tol::kSketchSolveResidual, py::arg("max_iterations") = 80);
   m.def(
+      "inspect_sketch_rsketchprofiles",
+      [](const Sketch& sketch, bool strict, double tolerance, int max_iterations) {
+        return inspect_sketch_rsketchprofiles(sketch, request_of(false, strict, tolerance, max_iterations));
+      },
+      py::arg("sketch"), py::kw_only(), py::arg("strict") = true, py::arg("tolerance") = tol::kSketchSolveResidual,
+      py::arg("max_iterations") = 80);
+  m.def(
       "make_wire_from_sketch_rwire",
       [](const Sketch& sketch, const SketchProfileId& profile, bool fully, bool strict, double tolerance,
          int max_iterations) {
