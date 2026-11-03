@@ -112,3 +112,11 @@ export function parsePreview(buffer: ArrayBuffer, cache: ReadonlyMap<string, Pre
   }
   return { parts, nodes, missing };
 }
+
+
+/** What the header says about a preview: parts (a multi-body part's bodies are scene nodes `<part node>/body:<id>`) and bodies. */
+export function previewSummary(nodes: readonly { nodeId: string }[]): string {
+  const parts = new Set(nodes.map((node) => node.nodeId.replace(/\/body:[^/]+$/, "")));
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  return nodes.length > parts.size ? `${plural(parts.size, "part")} · ${plural(nodes.length, "body").replace("bodys", "bodies")}` : plural(parts.size, "part");
+}

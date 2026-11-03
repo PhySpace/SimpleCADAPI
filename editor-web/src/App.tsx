@@ -25,7 +25,7 @@ import { NotebookList } from "@/components/NotebookList";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getWorkspace, newNotebook, openNotebook, postViewport, type ModuleRow, type NotebookRow } from "@/lib/api";
-import { parsePreview, type PreviewPart } from "@/lib/preview";
+import { parsePreview, previewSummary, type PreviewPart } from "@/lib/preview";
 import { EnvelopeSocket, type Envelope } from "@/lib/envelope";
 import { emptyDoc, normalizeDoc } from "@/lib/sketch";
 import { frameFromEntity, type PlaneSpec } from "@/lib/sketch-plane";
@@ -186,7 +186,7 @@ export function App() {
       }
       partCache.current = preview.parts; // the parts on screen: the next frame may leave them out
       view.loadPreview(preview);
-      setStatus(`${preview.nodes.length} ${preview.nodes.length === 1 ? "part" : "parts"} · ${preview.parts.size} distinct`);
+      setStatus(previewSummary(preview.nodes));
       if (framedNotebook.current !== name) {
         view.frame();
         framedNotebook.current = name;
