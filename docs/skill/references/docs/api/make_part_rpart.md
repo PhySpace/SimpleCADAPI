@@ -30,7 +30,7 @@ first when they must become one body.
 
 ### body
 
-- **Description**: The Solid of a one-body Part.
+- **Description**: The Solid of a one-body Part. The pieces of a split cut (a list of Solids) become the bodies ``body_1 .. body_n``.
 
 ### name
 
@@ -38,7 +38,11 @@ first when they must become one body.
 
 ### bodies
 
-- **Description**: Instead of ``body``: several solids kept apart in one Part, as a mapping ``body_id -> Solid`` (in its order) or a sequence of ``Body`` values. Body ids are identifiers, unique within the part.
+- **Description**: Instead of ``body``: several solids kept apart in one Part, as a mapping ``body_id -> Solid`` (in its order) or a sequence of ``Body`` values. A mapping value may be the pieces of a split cut (a list of
+
+### Solids)
+
+- **Description**: they become ``<body_id>_1 .. <body_id>_n``. Body ids are identifiers, unique within the part. Overlapping bodies are allowed; building the definition warns (``BodyOverlapWarning``).
 
 ## Returns
 

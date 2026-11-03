@@ -22,12 +22,16 @@ deliver `.scadpkg` packages.
 
 - Monolithic single-body manufacturing intent: fuse with `union_rsolid` in
   `domains/part-modeling.md`.
+- Several bodies of one part that never move apart and are one BOM item
+  (a multi-body part, `make_part_rpart(bodies=...)`): `domains/part-modeling.md`.
 - Export or translation decisions: they branch from the package in
   `domains/export-and-translation.md`.
 ## Structure model
 
-- `Part` wraps exactly one `Solid` plus identity and optional material
-  (`make_part_rpart`, `assign_material_rpart`, `make_material_rmaterial`).
+- `Part` wraps one `Solid` (or several named bodies, `bodies=`) plus identity
+  and optional material (`make_part_rpart`, `assign_material_rpart`,
+  `make_material_rmaterial`). In an assembly a multi-body part is one component;
+  its bodies are never placed or jointed separately.
 - `Assembly` holds component instances with placements
   (`make_assembly_rassembly`, `add_component_rassembly`,
   `place_component_rassembly`, `make_placement_rplacement`,

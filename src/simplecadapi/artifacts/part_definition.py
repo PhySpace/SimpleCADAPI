@@ -5,6 +5,8 @@ A one-body part is what every PartDefinition was: ``solid_cache.body_ref`` is th
 one :class:`BodyRef` per body (its own BRep and topology snapshot, so each body keeps its tags), in body order.  Its
 ``body_ref`` is then a BRep Compound of every body (what a geometry-only reader such as STEP needs, and what a reader
 that expects exactly one Solid refuses), and ``topology_snapshot_ref`` repeats the first body's snapshot.
+A multi-body definition has profile ``simplecad-part-definition-3`` (``contracts/part-definition-3.schema.json``), so
+a reader that knows only profile 2 refuses it; a one-body definition keeps profile 2 and its bytes.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from typing import Any, Mapping, Sequence
 
 from .canonical import (
     ARTIFACT_SCHEMA_VERSION,
+    MULTI_BODY_PART_DEFINITION_PROFILE,
     PART_DEFINITION_PROFILE,
     ArtifactValidationError,
     canonical_bytes,
@@ -163,6 +166,8 @@ class PartDefinition:
                     "bodies_invalid", "/connectors", "connectors on a multi-body part are not supported yet"
                 )
         object.__setattr__(self, "bodies", bodies)
+        # a multi-body part is profile 3, so a profile-2 reader refuses it (one-body parts keep profile 2 and their bytes)
+        object.__setattr__(self, "profile", MULTI_BODY_PART_DEFINITION_PROFILE if bodies else PART_DEFINITION_PROFILE)
         if self.material_ref is not None and not isinstance(
             self.material_ref, MaterialRef
         ):

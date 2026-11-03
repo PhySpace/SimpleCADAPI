@@ -72,7 +72,7 @@ from simplecadapi._cpp import (
     suspend_graph_recording,
 )
 from ..product.assembly import _AUTHORED_PLACEMENTS_RUNTIME_KEY, _component_occurrence_placements
-from ..product.bodies import part_shape
+from ..product.bodies import part_shape, warn_body_overlaps
 from ..product.placement import canonical_frame, placement_ticks
 from simplecadapi._glue.session import GraphSession, record_operation_if_active
 from ..recording.graph import attach_graph_node, attach_semantic_graph_node
@@ -171,6 +171,7 @@ def _part_definition(
     body_blobs: dict[str, bytes] = {}
     body_refs: tuple[BodyRef, ...] = ()
     if part.multi_body:
+        warn_body_overlaps(part, stacklevel=4)  # allowed, but said once per build
         # every body keeps its own BRep and snapshot (its tags); the part's BRep is a Compound of all of them
         rows = []
         for item in part.bodies:

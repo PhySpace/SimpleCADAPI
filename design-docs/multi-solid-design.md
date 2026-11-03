@@ -1,7 +1,8 @@
 # Multi-body parts (several solids in one part, without an assembly)
 
 Status: research and spike on `research/multi-solid` (cut from `dev`). The spike is in the code and in
-`test/test_multi_body_part.py`. Everything under "Staged plan" after stage 1 is a proposal.
+`test/test_multi_body_part.py`. Everything under "Staged plan" after stage 1 is a proposal. Section 9 records the
+owner's decisions and how they are implemented; where it differs from an earlier section, section 9 wins.
 
 ## 1. The decision
 
@@ -293,8 +294,7 @@ named solids. The rules the editor and the docs follow:
    variable name is nicer in the editor, but changing it would change ids that exist today.
 4. Does "New body" in the editor need confirmation the first time a notebook gets a second body, given that until now
    a second solid was a mistake?
-5. Should `cut_rsolid` keep refusing splits now that a split can become bodies? The spike keeps the refusal:
-   splitting stays explicit through `cut_rsolid_list`.
+5. (Decided, section 9: splits are kept as pieces by default.) Should `cut_rsolid` keep refusing splits?
 
 ## 8. The spike
 
@@ -326,3 +326,60 @@ named solids. The rules the editor and the docs follow:
   - scene solid nodes;
   - STEP with one product and two solids;
   - one-body definitions without `bodies`.
+
+## 9. Owner decisions (implemented)
+
+1. **Overlapping bodies warn, never refuse.**
+   - `inspect_body_overlaps_rlist(part)` is a diagnostic op. It lists pairs that share volume: a bounding-box
+     prefilter, then the OCCT common volume. Bodies that only touch along a face, an edge or a point are not reported.
+   - Building the definition warns once per pair with `BodyOverlapWarning`. That covers a notebook run, `@part` and a
+     package. `make_part_rpart` itself never runs the check, so the live editor loop stays cheap.
+2. **Multi-body definitions are profile `simplecad-part-definition-3`.**
+   - The new schema `contracts/part-definition-3.schema.json` requires `solid_cache.bodies`.
+   - `part-definition-2.schema.json` is back to its dev bytes. A profile-2 reader fails schema validation on
+     `profile` (`const`), so it refuses the file rather than reading it wrongly. This is tested by validating a profile-3
+     manifest against schema 2.
+   - One-body parts stay profile 2, so their bytes and content hashes do not change.
+   - `validate_manifest` picks the schema by the manifest's profile.
+3. **Default body ids.** A one-body part keeps `"body"`; a multi-body part uses the names it was given. This is
+   unchanged from the spike.
+4. **Choosing "New body" is the confirmation.** The editor asks nothing more.
+
+   **Implicit Part** (the `kind = "part"` rule on `feat/gui-modeling`, `runtime/projection.py`): every open body
+   becomes a body of the implicit Part, named by its variable. The drop-in is `simplecadapi.product.bodies.part_from_bodies(part_id, {name: solid_or_pieces})`. It makes a one-body Part
+   (id `"body"`) for one open Solid, and otherwise `make_part_rpart(bodies=...)` with the pieces of a split expanded to
+   `<name>_1..n`. The exact change on `feat/gui-modeling`:
+   - in `open_bodies`, also accept a non-empty `list`/`tuple` of `Solid` (the pieces of a split cut) as a candidate. Use
+     the lineage of its first element for the "made from" test, and treat `id()` of each piece as seen;
+   - in `_implicit_part`, drop the `len(names) > 1` error and return
+     `part_from_bodies(config.id, {name: values[name] for name in names})`;
+   - update its docstring and the test that expected the error. Expected: two open bodies give a Part with those two
+     body ids.
+5. **A cut that splits the body is not refused.**
+   - `cut_rsolid(..., on_split="pieces")` is the default. A one-piece result is a `Solid`, exactly as before, with the
+     same record, so the hashes of existing notebooks do not change. A split returns every piece as `list[Solid]`,
+     ordered by centroid (x, then y, then z). It is recorded as `make_cut_rsolid_list` with
+     `params.piece_order = "centroid"`, and both the C++ executor and the Python serializer replay it in that order.
+   - `on_split="error"` keeps the strict behaviour.
+   - Pieces become bodies directly: `make_part_rpart(body=pieces)` gives `body_1..n`, and `bodies={"bar": pieces}` gives
+     `bar_1..n`.
+   - **Default: separate bodies, not one solid with several lumps.** OCCT has no valid single solid with several lumps.
+     A `TopoDS_Solid` built from the two outer shells of a split bar fails `BRepCheck_Analyzer`, and STEP writes it as
+     `BREP_WITH_VOIDS`, with the second lump turned into a void. This was checked with a small OCCT program.
+     Fusion ("a body is a single container for a contiguous 3D shape") and FreeCAD ("a single contiguous solid") agree
+     that a body is one closed volume.
+   - "Keeping the pieces together" is therefore a naming matter: they share the prefix of the value they came from
+     (`bar_1`, `bar_2`), and the editor can show them as one row with two bodies.
+   - A Body that holds several lumps would be a later, additive extension (`Body.lumps`). It is not needed for valid
+     geometry.
+   - Downstream single-solid features (a fillet on `bar`) now fail with a clear type error when `bar` is a list. The
+     editor should then offer to pick a piece or keep the pieces as bodies (stage 2).
+
+Skill pages updated with these rules: `domains/part-modeling.md` (with a new "Multi-body parts" section),
+`domains/assembly-and-product.md`, `discipline/core-rules.md` R5, `discipline/failure-and-repair.md`,
+`discipline/mechanical-modeling.md`, `discipline/notebook-cell-design.md` C9, `docs/core/compound.md`,
+`docs/guides/notebook-runtime.md`, `workflows/single-part-modeling.md` and `role-4-build.md`, and
+`workflows/drawing-reconstruction.md`. The API pages are regenerated. Tags on cut pieces: a plain `cut_rsolid` outside
+a recording session carries no input face tags, a behaviour that predates this work. Tag and ref propagation belongs to
+`research/stable-geometry-refs`.
+

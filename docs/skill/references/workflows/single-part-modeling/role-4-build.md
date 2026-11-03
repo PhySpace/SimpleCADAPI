@@ -34,7 +34,8 @@ For the current stage:
      from a named base solid, create each additive boss/rib/flange or
      subtractive bore/pocket/opening as a separately named solid or tool, then
      use `union_rsolid`, `cut_rsolid`, or `intersect_rsolid` to obtain the next
-     single Solid. Repeat construct-feature -> Boolean -> verify for each
+     single Solid (a cut that splits the body returns its pieces as a list:
+     keep them as bodies of the part only when that is the design). Repeat construct-feature -> Boolean -> verify for each
      required feature group; ensure intentional positive overlap for unions
      and tool overshoot for cuts. Do not assemble an opaque final shape in one
      expression.

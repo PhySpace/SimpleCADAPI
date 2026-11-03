@@ -208,7 +208,7 @@ from . import boolean  # noqa: F401
 from . import transform  # noqa: F401
 from . import selection  # noqa: F401
 from . import product  # noqa: F401
-from .product import measure_part_mass_rmassreport  # Python-defined (product/bodies.py)
+from .product import inspect_body_overlaps_rlist, measure_part_mass_rmassreport  # Python-defined (product/bodies.py)
 from . import sketch  # noqa: F401
 
 __all__ = [
@@ -354,6 +354,7 @@ __all__ = [
     "make_wire_from_sketch_rwire",
     "measure_constraint_residual_rconstraintresidual",
     "measure_part_mass_rmassreport",
+    "inspect_body_overlaps_rlist",
     "mirror_shape",
     "offset_rsolid",
     "place_component_rassembly",

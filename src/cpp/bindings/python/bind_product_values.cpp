@@ -454,8 +454,13 @@ void bind_part(py::module_& m) {
             }
             if (body.is_none() == bodies.is_none())
               throw scad::TypeError("give exactly one of body (a Solid) or bodies (several named solids)");
-            if (!bodies.is_none()) {
-              return std::make_shared<Part>(text(part_id, "part_id"), body_list(bodies), optional_name(name),
+            if (!bodies.is_none() || is_pieces(body)) {  // several bodies, or the pieces of a split cut
+              std::vector<Body> values;
+              if (bodies.is_none())
+                add_bodies(values, kDefaultBodyId, body);
+              else
+                values = body_list(bodies);
+              return std::make_shared<Part>(text(part_id, "part_id"), std::move(values), optional_name(name),
                                             material_value, std::move(connector_values));
             }
             return std::make_shared<Part>(text(part_id, "part_id"), typed<Solid>(body, "body must be a Solid"),

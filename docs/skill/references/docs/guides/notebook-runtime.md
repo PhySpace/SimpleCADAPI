@@ -87,6 +87,12 @@ if __name__ == "__main__":
   (`run_notebook(..., id=...)`, `scad.use(..., id=...)`, `sca run --id`);
   cells read the id of their run with `scad.notebook_id()` — see
   [Part families](notebook-composition-and-cache.md#part-families).
+- **A part with several bodies** is one product:
+  `scad.make_part_rpart(part_id=scad.notebook_id(), bodies={"base": base, "lid": lid})`.
+  Each body keeps its own BRep, topology snapshot and tags in the package, whose
+  part definition then has profile `simplecad-part-definition-3` (an older SDK
+  refuses it instead of reading one body). One-body parts are unchanged.
+  The cell cache restores a multi-body part like any other value.
 - **Parameters** are ordinary top-level variables. Overriding one replaces it,
   and the cell that defines it does not run, so all variables of that cell
   must be overridden together. Group parameters into cells by what changes

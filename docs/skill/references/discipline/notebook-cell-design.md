@@ -87,7 +87,10 @@ nothing; a geometry line in the params cell would re-run with every parameter
 change.
 
 **C9. The product is made in the last cell.** Its id is the notebook id
-(`scad.notebook_id()`); a family of parts uses `scad.use(path, id=...)`.
+(`scad.notebook_id()`); a family of parts uses `scad.use(path, id=...)`. A part
+with several bodies names them there:
+`make_part_rpart(part_id=scad.notebook_id(), bodies={"base": base, "lid": lid})`;
+solids left out of it (tools, construction) are not part of the product.
 
 **C10. In an assembly notebook, one `scad.use(...)` per child, the mates in
 their own cell, the solve in its own cell.** Do not carry the whole assembly

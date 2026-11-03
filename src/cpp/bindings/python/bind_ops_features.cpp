@@ -520,12 +520,21 @@ void bind_booleans(py::module_& m) {
 
   m.def(
       "cut_rsolid",
-      [](const py::args& solids, bool skip_non_intersecting, const py::object& tracking_policy) {
+      [](const py::args& solids, bool skip_non_intersecting, const py::object& tracking_policy,
+         const std::string& on_split) -> py::object {
         const std::vector<Solid> operands = flattened(solids, "cut_rsolid");
         const CutOptions options{skip_non_intersecting, policy_text(tracking_policy)};
-        return unlocked(false, [&] { return cut_rsolid(operands, options); });
+        if (on_split == "error")
+          return py::cast(unlocked(false, [&] { return cut_rsolid(operands, options); }));
+        if (on_split != "pieces")
+          throw scad::ValueError("on_split must be 'pieces' or 'error'");
+        CutOutcome outcome = unlocked(false, [&] { return cut_rsolid_keep_split(operands, options); });
+        if (outcome.solid)
+          return py::cast(*outcome.solid);
+        return solids_to_py(outcome.pieces);  // the cut split the body: every piece, ordered by centroid
       },
       py::kw_only(), py::arg("skip_non_intersecting") = true, py::arg("tracking_policy") = "full",
+      py::arg("on_split") = "pieces",
       "Compute the boolean difference of solids: the first is the base, the rest are subtracted in order.");
 
   m.def(

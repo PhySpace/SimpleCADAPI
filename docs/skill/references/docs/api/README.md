@@ -392,6 +392,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [ground_component_rassembly](ground_component_rassembly.md) *(from operators/product.py)* `top-level`
 - [identity_placement_rplacement](identity_placement_rplacement.md) *(from operators/product.py)* `top-level`
 - [inspect_assembly_constraints_rconstraintreport](inspect_assembly_constraints_rconstraintreport.md) *(from operators/product.py)* `top-level`
+- [inspect_body_overlaps_rlist](inspect_body_overlaps_rlist.md) *(from operators/product.py)* `top-level`
 - [inspect_sketch_rsketchresult](inspect_sketch_rsketchresult.md) *(from operators/sketch.py)* `top-level`
 - [key](key.md) *(from ql.py)* `submodule:ql`
 - [linear_pattern_rsolidlist](linear_pattern_rsolidlist.md) *(from operators/transform.py)* `top-level`

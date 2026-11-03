@@ -155,8 +155,10 @@ void register_booleans(reactive::ExecutorRegistry& registry) {
         cut_rsolid(rest<Solid>(in, 0, in.size()), {flag(p, "skip_non_intersecting"), text(p, "tracking_policy")}));
   });
   registry.add("make_cut_rsolid_list", [](Params p, Inputs in, const ScalarValues&) {
-    return many(
-        cut_rsolid_list(rest<Solid>(in, 0, in.size()), {flag(p, "skip_non_intersecting"), text(p, "tracking_policy")}));
+    CutOptions options{flag(p, "skip_non_intersecting"), text(p, "tracking_policy")};
+    const Value* order = p.find("piece_order");  // absent on records made before ordered pieces
+    options.order_pieces = order != nullptr && order->is_string() && order->as_string() == "centroid";
+    return many(cut_rsolid_list(rest<Solid>(in, 0, in.size()), options));
   });
   registry.add("make_intersect_rsolid", [](Params, Inputs in, const ScalarValues&) {
     return one(intersect_rsolid(rest<Solid>(in, 0, in.size())));

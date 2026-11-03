@@ -85,6 +85,15 @@ void bind_structure(py::module_& m) {
             throw scad::TypeError("give exactly one of body (a Solid) or bodies (several named solids)");
           if (!bodies.is_none())
             return sp::make_part_rpart(text(part_id, "part_id"), body_list(bodies), optional_name(name));
+          if (is_pieces(body) && py::len(body) > 1) {  // a split cut: its pieces are bodies body_1 .. body_n
+            std::vector<sp::Body> pieces;
+            add_bodies(pieces, sp::kDefaultBodyId, body);
+            return sp::make_part_rpart(text(part_id, "part_id"), pieces, optional_name(name));
+          }
+          if (is_pieces(body))
+            return sp::make_part_rpart(text(part_id, "part_id"),
+                                       typed<Solid>(py::reinterpret_borrow<py::object>(body[py::int_(0)]), "body"),
+                                       optional_name(name));
           return sp::make_part_rpart(text(part_id, "part_id"), typed<Solid>(body, "body must be a Solid"),
                                      optional_name(name));
         });

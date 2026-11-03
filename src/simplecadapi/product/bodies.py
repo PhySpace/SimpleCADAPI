@@ -7,10 +7,12 @@ properties) walk ``part.bodies``.
 
 from __future__ import annotations
 
+import warnings
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from simplecadapi._cpp import Compound, Part, Solid
+from simplecadapi._cpp import Compound, Part, Solid, make_part_rpart
 
 # density unit -> factor to kg/mm^3 (the model is in millimetres)
 _DENSITY_TO_KG_MM3 = {
@@ -161,4 +163,112 @@ def measure_part_mass_rmassreport(
     )
 
 
-__all__ = ["BodyMass", "MassReport", "measure_part_mass_rmassreport", "part_shape"]
+class BodyOverlapWarning(UserWarning):
+    """Two bodies of one Part share volume: mass counts it twice and STEP holds both copies."""
+
+
+@dataclass(frozen=True)
+class BodyOverlap:
+    """Two bodies of a Part that share volume (mm^3)."""
+
+    first: str
+    second: str
+    volume_mm3: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"first": self.first, "second": self.second, "volume_mm3": self.volume_mm3}
+
+
+def _boxes_meet(a: tuple[float, ...], b: tuple[float, ...], tol: float) -> bool:
+    return all(a[axis] <= b[axis + 3] + tol and b[axis] <= a[axis + 3] + tol for axis in range(3))
+
+
+def inspect_body_overlaps_rlist(part: Part, *, min_volume_mm3: float = 1e-6) -> list[BodyOverlap]:
+    """List the pairs of bodies of a Part that share volume.
+
+    Overlapping bodies are allowed (a Part does not fuse them), but mass counts the
+    shared volume once per body and STEP holds both copies. Bodies that only touch
+    (a face, an edge or a point in common) do not overlap.
+
+    Args:
+        part: The Part to inspect; a one-body Part has no overlaps.
+        min_volume_mm3: Shared volume below which a pair is not reported.
+
+    Returns:
+        list[BodyOverlap]: ``(first, second, volume_mm3)`` per overlapping pair, in body order.
+
+    Raises:
+        SimpleCADError: The value is not a Part.
+
+    Usage:
+        ``scad.inspect_body_overlaps_rlist(case)`` before export. Building the part's
+        definition (a notebook run, ``@part``, a package) warns with ``BodyOverlapWarning``
+        for the same pairs.
+    """
+
+    import simplecadapi._cpp._native as native
+
+    if not isinstance(part, Part):
+        raise TypeError("part must be a Part")
+    occt = native._occt
+    bodies = list(part.bodies)
+    boxes = [body.solid._bounds() for body in bodies]
+    out: list[BodyOverlap] = []
+    for i in range(len(bodies)):
+        for j in range(i + 1, len(bodies)):
+            if not _boxes_meet(boxes[i], boxes[j], 1e-7):
+                continue
+            common = occt.BRepAlgoAPI_Common(bodies[i].solid.wrapped, bodies[j].solid.wrapped).Shape()
+            props = occt.GProp_GProps()
+            occt.BRepGProp.VolumeProperties_s(common, props)
+            volume = float(props.Mass())
+            if volume > min_volume_mm3:
+                out.append(BodyOverlap(bodies[i].body_id, bodies[j].body_id, volume))
+    return out
+
+
+def warn_body_overlaps(part: Part, *, stacklevel: int = 2) -> list[BodyOverlap]:
+    """Warn (``BodyOverlapWarning``) once per overlapping pair of bodies of *part*; returns the pairs."""
+
+    if not part.multi_body:
+        return []
+    overlaps = inspect_body_overlaps_rlist(part)
+    for item in overlaps:
+        warnings.warn(
+            f"part {part.part_id!r}: bodies {item.first!r} and {item.second!r} overlap by {item.volume_mm3:.6g} mm^3 "
+            "(mass counts it twice; union them, or cut one from the other, if they are one piece of material)",
+            BodyOverlapWarning,
+            stacklevel=stacklevel,
+        )
+    return overlaps
+
+
+def part_from_bodies(part_id: str, bodies: Mapping[str, Solid | Sequence[Solid]], *, name: str | None = None) -> Part:
+    """The Part of named solids, the way a notebook names them: one name and one Solid is a one-body Part (body id
+    ``"body"``); otherwise every name is a body, and the pieces of a split cut (a list) are ``<name>_1 .. <name>_n``.
+
+    This is the rule of an implicit product (a ``kind = "part"`` notebook without a ``make_part_rpart`` cell: its open
+    bodies, by variable name) and of an editor product cell with several bodies.
+    """
+
+    items = dict(bodies)
+    if not items:
+        raise ValueError("a Part needs at least one body")
+    if len(items) == 1:
+        (value,) = items.values()
+        if isinstance(value, Solid) or (isinstance(value, (list, tuple)) and len(value) == 1):
+            return make_part_rpart(part_id=part_id, body=value, name=name)
+    return make_part_rpart(part_id=part_id, bodies=items, name=name)
+
+
+__all__ = [
+    "BodyMass",
+    "BodyOverlap",
+    "BodyOverlapWarning",
+    "MassReport",
+    "inspect_body_overlaps_rlist",
+    "measure_part_mass_rmassreport",
+    "part_from_bodies",
+    "part_shape",
+    "warn_body_overlaps",
+]

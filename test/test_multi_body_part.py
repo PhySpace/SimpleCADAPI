@@ -244,5 +244,91 @@ class TestMultiBodyNotebook(NotebookTestCase):
         self.assertEqual(definition.bodies, ())
 
 
+class TestSplitCutsAndOverlaps(unittest.TestCase):
+    """Owner decisions: a splitting cut is not refused; overlapping bodies warn but are allowed."""
+
+    @staticmethod
+    def _bar_and_slot() -> tuple[scad.Solid, scad.Solid]:
+        return scad.make_box_rsolid(40.0, 10.0, 10.0, tag_prefix="bar"), scad.make_box_rsolid(4.0, 20.0, 20.0, (0.0, -5.0, -5.0))
+
+    def test_a_splitting_cut_returns_its_pieces_in_centroid_order(self) -> None:
+        bar, slot = self._bar_and_slot()
+        pieces = scad.cut_rsolid(bar, slot)
+        self.assertIsInstance(pieces, list)
+        self.assertEqual([round(p.get_center().x, 6) for p in pieces], [-11.0, 11.0])
+        with self.assertRaisesRegex(Exception, "split the body"):
+            scad.cut_rsolid(*self._bar_and_slot(), on_split="error")
+
+    def test_pieces_become_bodies(self) -> None:
+        bar, slot = self._bar_and_slot()
+        pieces = scad.cut_rsolid(bar, slot)
+        self.assertEqual(scad.make_part_rpart(part_id="bar", body=pieces).body_ids(), ("body_1", "body_2"))
+        lid = _lid()
+        part = scad.make_part_rpart(part_id="bar", bodies={"bar": pieces, "lid": lid})
+        self.assertEqual(part.body_ids(), ("bar_1", "bar_2", "lid"))
+        self.assertAlmostEqual(part.get_body("bar_2").solid.get_volume(), 1800.0, places=6)
+
+    def test_a_split_replays_with_the_same_piece_order(self) -> None:
+        with scad.GraphSession() as session:
+            bar, slot = self._bar_and_slot()
+            scad.make_part_rpart(part_id="bar", body=scad.cut_rsolid(bar, slot))
+        (part,) = [x for x in scad.replay_model_json(scad.export_model_json(session)) if isinstance(x, scad.Part)]
+        self.assertEqual(part.body_ids(), ("body_1", "body_2"))
+        self.assertLess(part.get_body("body_1").solid.get_center().x, part.get_body("body_2").solid.get_center().x)
+
+    def test_overlaps_are_reported_and_warned_not_refused(self) -> None:
+        a = scad.make_box_rsolid(10.0, 10.0, 10.0)
+        b = scad.make_box_rsolid(10.0, 10.0, 10.0, (5.0, 0.0, 0.0))
+        c = scad.make_box_rsolid(10.0, 10.0, 10.0, (15.0, 0.0, 0.0))  # touches b only along a face
+        part = scad.make_part_rpart(part_id="stack", bodies={"a": a, "b": b, "c": c})
+        overlaps = scad.inspect_body_overlaps_rlist(part)
+        self.assertEqual([(o.first, o.second) for o in overlaps], [("a", "b")])
+        self.assertAlmostEqual(overlaps[0].volume_mm3, 500.0, places=6)
+
+        @scad.part(id="stack")
+        def stack() -> scad.Part:
+            return scad.make_part_rpart(
+                part_id="stack",
+                bodies={"a": scad.make_box_rsolid(10.0, 10.0, 10.0), "b": scad.make_box_rsolid(10.0, 10.0, 10.0, (5.0, 0.0, 0.0))},
+            )
+
+        with self.assertWarns(scad.BodyOverlapWarning):
+            result = stack()
+        self.assertEqual([item.body_id for item in result.definition.bodies], ["a", "b"])
+
+    def test_part_from_bodies_is_the_implicit_part_rule(self) -> None:
+        from simplecadapi.product.bodies import part_from_bodies
+
+        one = part_from_bodies("plate", {"plate": _base()})
+        self.assertEqual(one.body_ids(), ("body",))
+        bar, slot = self._bar_and_slot()
+        split = part_from_bodies("bar", {"bar": scad.cut_rsolid(bar, slot)})
+        self.assertEqual(split.body_ids(), ("bar_1", "bar_2"))
+        both = part_from_bodies("case", {"base": _base(), "lid": _lid()})
+        self.assertEqual(both.body_ids(), ("base", "lid"))
+
+
+class TestProfileThree(unittest.TestCase):
+    def test_a_multi_body_definition_is_profile_3_and_a_profile_2_reader_refuses_it(self) -> None:
+        from simplecadapi.artifacts.canonical import ArtifactValidationError
+        from simplecadapi.artifacts.validation import _schema_validate, validate_manifest
+
+        @scad.part(id="case")
+        def case() -> scad.Part:
+            return _case()
+
+        manifest = case().definition.to_dict()
+        self.assertEqual(manifest["profile"], "simplecad-part-definition-3")
+        validate_manifest(manifest)  # this SDK reads it
+        with self.assertRaises(ArtifactValidationError):  # what an SDK that knows only profile 2 does
+            _schema_validate({**manifest, "profile": "simplecad-part-definition-2"}, "part_definition")
+
+        @scad.part(id="plate")
+        def plate() -> scad.Part:
+            return scad.make_part_rpart(part_id="plate", body=_base())
+
+        self.assertEqual(plate().definition.to_dict()["profile"], "simplecad-part-definition-2")
+
+
 if __name__ == "__main__":
     unittest.main()

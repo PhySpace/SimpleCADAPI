@@ -2,6 +2,7 @@
 #include "scad/core/tolerance.hpp"
 #include "scad/ops/features/booleans.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -355,10 +356,13 @@ void record_cut(const std::vector<Solid>& solids, const CutOptions& options, Tra
 
 }  // namespace
 
-Solid cut_rsolid(const std::vector<Solid>& solids, const CutOptions& options) {
+namespace {
+
+// The body of cut_rsolid.  With `allow_split`, a result of several pieces returns nullopt before anything is recorded.
+std::optional<Solid> cut_one(const std::vector<Solid>& solids, const CutOptions& options, bool allow_split) {
   bool no_intersection = false;
   try {
-    return occt_guard([&]() -> Solid {
+    return occt_guard([&]() -> std::optional<Solid> {
       const TrackingPolicy policy = resolve_tracking_policy(options.tracking_policy);
       if (solids.empty())
         throw ValueError("cut_rsolid requires at least one Solid input");
@@ -368,10 +372,13 @@ Solid cut_rsolid(const std::vector<Solid>& solids, const CutOptions& options) {
       CutRun run = run_cuts(solids, options, policy, "cut_rsolid", no_intersection);
       if (run.pieces.empty())
         throw ValueError("The cut failed: OCC returned no valid solid");
+      if (run.pieces.size() > 1 && allow_split)
+        return std::nullopt;
       if (run.pieces.size() != 1) {
-        throw ValueError("cut_rsolid expected a single Solid result but the kernel returned " +
-                         std::to_string(run.pieces.size()) +
-                         " solids; the cut split the body. Use cut_rsolid_list to keep every piece.");
+        throw ValueError(
+            "cut_rsolid expected a single Solid result but the kernel returned " + std::to_string(run.pieces.size()) +
+            " solids; the cut split the body. Use on_split=\"pieces\" (the default) or cut_rsolid_list to keep every "
+            "piece.");
       }
 
       Solid result_solid = run.pieces.front();
@@ -397,6 +404,20 @@ Solid cut_rsolid(const std::vector<Solid>& solids, const CutOptions& options) {
   }
 }
 
+}  // namespace
+
+Solid cut_rsolid(const std::vector<Solid>& solids, const CutOptions& options) {
+  return *cut_one(solids, options, false);
+}
+
+CutOutcome cut_rsolid_keep_split(const std::vector<Solid>& solids, const CutOptions& options) {
+  if (std::optional<Solid> one = cut_one(solids, options, true))
+    return {std::move(one), {}};
+  CutOptions ordered = options;
+  ordered.order_pieces = true;
+  return {std::nullopt, cut_rsolid_list(solids, ordered)};
+}
+
 std::vector<Solid> cut_rsolid_list(const std::vector<Solid>& solids, const CutOptions& options) {
   bool no_intersection = false;
   try {
@@ -410,6 +431,23 @@ std::vector<Solid> cut_rsolid_list(const std::vector<Solid>& solids, const CutOp
       CutRun run = run_cuts(solids, options, policy, "cut_rsolid_list", no_intersection);
 
       std::vector<Solid> pieces = std::move(run.pieces);
+      if (options.order_pieces) {
+        std::vector<std::pair<Vec3, Solid>> keyed;
+        for (Solid& piece : pieces)
+          keyed.emplace_back(kernel::center_of_mass(piece.wrapped()), std::move(piece));
+        std::stable_sort(keyed.begin(), keyed.end(), [](const auto& a, const auto& b) {
+          const double ax[3] = {a.first.x, a.first.y, a.first.z};
+          const double bx[3] = {b.first.x, b.first.y, b.first.z};
+          for (int axis = 0; axis < 3; ++axis) {
+            if (std::abs(ax[axis] - bx[axis]) > 1e-6)
+              return ax[axis] < bx[axis];
+          }
+          return false;
+        });
+        pieces.clear();
+        for (auto& item : keyed)
+          pieces.push_back(std::move(item.second));
+      }
       std::optional<TopoDelta> merged = merge_topo_deltas(run.deltas);
       const bool tracked = policy != TrackingPolicy::Graph && run.cut_performed && merged;
       std::vector<Shape> sources(solids.begin(), solids.end());
@@ -424,6 +462,8 @@ std::vector<Solid> cut_rsolid_list(const std::vector<Solid>& solids, const CutOp
 
       FeatureRecord rec(kCutListOp);
       record_cut(solids, options, policy, rec);
+      if (options.order_pieces)
+        rec.param("piece_order", Value(std::string("centroid")));
       OpRecord record = std::move(rec).take();
       if (Recorder* recorder = current_recorder()) {
         std::vector<Shape> ordered;

@@ -373,6 +373,17 @@ that surfaced it is in brackets.
   at the next package schema bump) and keep the `body:` segment the only
   way to address a body.
 
+## 24. Error guidance is frozen by parity goldens [multi-solid research]
+
+- **Symptom:** the `make_part_rpart` guidance still says "Union intended multiple bodies into one Solid before
+  creating the Part.", which is wrong now that `bodies=` exists; changing it fails
+  `src/cpp/tests/python/test_product_values.py::test_part_creation_and_errors`.
+- **Root cause:** the C++ port compares every error's `what_happened` / `possible_causes` / `how_to_fix` with goldens
+  captured from the old Python SDK (`tests/golden/product_*.json`), so guidance cannot follow the API.
+- **Status:** open; the old text is kept.
+- **Fix direction:** compare error *codes* and kinds against the goldens, and let guidance text change with the API
+  (or regenerate the goldens on a deliberate API change).
+
 ## Heuristics
 
 - Run every notebook three times: fresh, all cached, `--no-cache`. The three
