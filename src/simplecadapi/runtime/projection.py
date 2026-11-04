@@ -39,7 +39,7 @@ from ..build.results import AssemblyBuildResult, PartBuildResult
 import weakref
 from typing import Any
 
-from simplecadapi._cpp import Assembly, find_registered_node, isolated_recording, Part, Solid
+from simplecadapi._cpp import Assembly, find_registered_node, isolated_recording, Part, SimpleWorkplane, Solid
 from simplecadapi._glue.session import lineage_of
 from ..product.bodies import part_from_bodies
 from simplecadapi._glue.session import GraphSession
@@ -64,6 +64,22 @@ def _as_product(value: object) -> Product | None:
     if isinstance(value, (Part, Assembly)):
         return value
     return None
+
+
+def product_reads(cells: Iterable[Any], values: Mapping[str, object]) -> frozenset[str]:
+    """The names the cells read, as :func:`find_product` and :func:`open_bodies` take them (*read*).
+
+    A cell whose values are all workplanes reads a body without building on it (a workplane on the top face of ``base``
+    is a datum, not a feature of the body): its reads leave the body open.
+    """
+
+    out: set[str] = set()
+    for cell in cells:
+        made = [values[name] for name in cell.defs if name in values]
+        if made and all(isinstance(value, SimpleWorkplane) for value in made):
+            continue
+        out.update(cell.refs)
+    return frozenset(out)
 
 
 def find_product(

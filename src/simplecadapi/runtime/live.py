@@ -26,7 +26,7 @@ from ._marimo import safe_get_context
 from .cells import NotebookCells
 from .config import read_notebook_config
 from .executor import finish_kernel_cache
-from .projection import find_product, project_product
+from .projection import find_product, product_reads, project_product
 
 PACKAGE_MEDIA_TYPE = "application/vnd.simplecad.scadpkg"
 PREVIEW_MEDIA_TYPE = "application/vnd.simplecad.preview"
@@ -69,7 +69,7 @@ def live_package(*, validate: bool = False) -> LivePackage:
     values = {
         name: glbls[name] for cell in ordered for name in cell.defs if name in glbls
     }
-    read = frozenset().union(*(cell.refs for cell in ordered))
+    read = product_reads(ordered, values)
     product = project_product(
         find_product(config, values, read),
         config=config,
@@ -111,7 +111,7 @@ def _live_scene() -> PreviewScene:
     glbls = context.globals
     ordered = list(context.graph.cells.values())
     values = {name: glbls[name] for cell in ordered for name in cell.defs if name in glbls}
-    read = frozenset().union(*(cell.refs for cell in ordered))
+    read = product_reads(ordered, values)
     scene = compile_preview(find_product(config, values, read))
     last_timings["compile_ms"] = round((time.perf_counter() - started) * 1000, 1)
     _last_preview = scene

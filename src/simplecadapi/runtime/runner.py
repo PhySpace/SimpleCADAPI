@@ -68,7 +68,7 @@ from .deps import (
     write_dependencies,
 )
 from .executor import NotebookScope, SimpleCadExecutor
-from .projection import Product, find_product, project_product
+from .projection import Product, find_product, product_reads, project_product
 
 _T = TypeVar("_T")
 
@@ -305,7 +305,7 @@ def _run(
     values = {
         name: glbls[name] for cell in ordered for name in cell.defs if name in glbls
     }
-    read = frozenset().union(*(cell.refs for cell in ordered))
+    read = product_reads(ordered, values)
     product_value: Product | None = None
     if product:
         product_value = project_product(

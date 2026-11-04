@@ -103,7 +103,8 @@ class FeatureService:
                 continue
             head = heads[0]
             gui = F.parse_gui(code)
-            consumed.update(loaded & set(bodies))
+            if head.role != "datum":  # a workplane on a body's face is not built from the body: the body stays open
+                consumed.update(loaded & set(bodies))
             produces = F.BY_ID[gui["spec"]].produces if gui else "solid"
             part_of = head.slug[: -len("_parts")] if head.slug.endswith("_parts") and head.slug[: -len("_parts")] in assembly_slugs else None
             made = defined if head.role in _ROLES_WITH_BODIES and not part_of else []

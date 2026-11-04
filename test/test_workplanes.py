@@ -280,3 +280,21 @@ def test_a_workplane_cell_is_cached_and_a_sketch_on_it_follows_a_parameter_chang
     assert _close(taller.values["wp_top"].origin, (0, 0, 9))
     assert _close(_centre(taller.values["boss"]), (0, 0, 10.5), 1e-6)
     assert _close(_centre(taller.values["peg"]), (0, 0, 10), 1e-6)
+
+
+def test_a_workplane_on_a_body_leaves_it_the_open_body_of_a_part_notebook(tmp_path):
+    """A datum reads the body without building on it: the implicit Part of a ``kind = "part"`` notebook is still the body."""
+    text = (
+        '# /// script\n# [tool.simplecadapi]\n# kind = "part"\n# id = "plate"\n# ///\nimport marimo\n\napp = marimo.App()\n\n'
+        "with app.setup:\n    import simplecadapi as scad\n\n\n"
+        '@app.cell\ndef _():\n    base = scad.make_box_rsolid(10.0, 20.0, 5.0, tag_prefix="base")\n    return (base,)\n\n\n'
+        "@app.cell\ndef _(base):\n"
+        '    _top = scad.ql.faces().where(scad.ql.tag("base.face.top")).exactly(1).resolve(base)[0]\n'
+        "    wp = scad.make_workplane_from_face_rworkplane(_top)\n    return (wp,)\n\n\n"
+        'if __name__ == "__main__":\n    app.run()\n'
+    )
+    path = tmp_path / "plate.py"
+    path.write_text(text, encoding="utf-8")
+    run = run_notebook(path)
+    assert isinstance(run.values["wp"], scad.Workplane)
+    assert abs(run.product.bodies[0].solid.get_volume() - 1000.0) < 1e-6
