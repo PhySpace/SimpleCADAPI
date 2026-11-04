@@ -167,11 +167,16 @@ def anchors_for_role(shape: Any, role: str) -> List[Dict[str, Any]]:
 def _size(entity: Any) -> float:
     if type(entity).__name__ == "Solid":
         return float(entity.get_volume())
+    if type(entity).__name__ == "Vertex":
+        return 0.0  # a point has no size: its centre is all there is to it
     return float(entity.get_area()) if hasattr(entity, "get_area") else float(entity.get_length())
 
 
 def _geom_type(entity: Any) -> str:
-    return "SOLID" if type(entity).__name__ == "Solid" else entity._geom_type()
+    kind = type(entity).__name__
+    if kind in ("Solid", "Vertex"):
+        return kind.upper()
+    return entity._geom_type()
 
 
 def guard_of(entity: Any) -> Dict[str, Any]:
@@ -211,7 +216,7 @@ def _geometric_order(candidates: List[Candidate]) -> List[Candidate]:
 def _ranked_lookalikes(shape: Any, guard: Dict[str, Any], kind: str, limit: int = 5) -> List[Candidate]:
     from .. import ql
 
-    factory = {"face": ql.faces, "edge": ql.edges, "solid": ql.solids}.get(kind)
+    factory = {"face": ql.faces, "edge": ql.edges, "vertex": ql.vertices, "solid": ql.solids}.get(kind)
     if factory is None:
         return []
     out: List[Candidate] = []

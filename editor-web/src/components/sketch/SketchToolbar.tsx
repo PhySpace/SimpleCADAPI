@@ -1,4 +1,4 @@
-import { Construction, Layers, Maximize, Magnet, Undo2, Redo2, ScanLine, WandSparkles } from "lucide-react";
+import { Construction, Layers, Maximize, Magnet, Undo2, Redo2, ScanLine, Spline, WandSparkles } from "lucide-react";
 
 import { CONSTRAINT_INFO, isDimensional } from "@/lib/sketch";
 import type { SketchEditor } from "@/lib/useSketchEditor";
@@ -31,6 +31,11 @@ export function SketchToolbar({ editor, onFit, onNormal }: { editor: SketchEdito
         <Layers className="size-3.5 shrink-0" />
         <span className="flex-1">project</span>
         <Tip>J</Tip>
+      </button>
+      <button type="button" title="Anchor mode (Shift+A, with a B-spline picked): a click on its curve adds an anchor, a click on an inner anchor removes it (SDK insert/remove_spline_anchor_rsketch); Esc leaves" aria-label="Anchor mode" aria-pressed={editor.anchorMode !== null} data-tool="anchors" onClick={editor.toggleAnchorMode} className={toggle}>
+        <Spline className="size-3.5 shrink-0" />
+        <span className="flex-1">anchors</span>
+        <Tip>⇧A</Tip>
       </button>
       <button type="button" title="Construction geometry (X): toggles the selected lines, or what you draw next" aria-label="Construction" aria-pressed={editor.construction} onClick={editor.toggleConstruction} className={toggle}>
         <Construction className="size-3.5 shrink-0" />

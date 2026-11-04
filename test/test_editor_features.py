@@ -59,7 +59,7 @@ def test_the_catalog_lists_every_operation_with_typed_slots():
     assert len(ids) == len(set(ids)) >= 24
     for spec in data["specs"]:
         assert spec["slots"], spec["id"]
-        assert {slot["kind"] for slot in spec["slots"]} <= {"length", "angle", "float", "count", "bool", "enum", "point", "body", "select", "points2d", "points3d", "profile", "sketch", "assembly", "value", "text", "grid", "color"}  # value, text, grid, color: forms made from the SDK catalog
+        assert {slot["kind"] for slot in spec["slots"]} <= {"length", "angle", "float", "count", "bool", "enum", "point", "body", "select", "points2d", "points3d", "profile", "sketch", "assembly", "value", "text", "grid", "color", "curve"}  # value, text, grid, color: forms made from the SDK catalog
 
 
 @pytest.mark.parametrize("spec", F.SPECS, ids=lambda s: s.id)
@@ -75,6 +75,8 @@ def test_every_template_uses_real_sdk_functions_and_parameters(spec):
             values[slot.name] = "prof"
         elif slot.kind == "sketch":
             values[slot.name] = RECT_SKETCH
+        elif slot.kind == "curve":
+            values[slot.name] = {"points": [{"id": "p1", "at": [0, 0, 0]}, {"id": "p2", "at": [10, 0, 5]}], "curves": [{"id": "c1", "kind": "line", "points": ["p1", "p2"]}]}
     rendered = F.render_feature(spec.id, "probe", values, bodies=bodies, selections=picks, env={"profile_normals": {"prof": (0.0, 0.0, 1.0)}})
     seen = 0
     for call in _calls(rendered.feature):

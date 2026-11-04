@@ -155,3 +155,15 @@ def test_the_preview_scene_lists_the_entities_of_each_piece():
     assert row["into"] == ["mount.top.split1", "mount.top.split2"]
     assert sorted(p["piece"] for p in row["pieces"]) == [0, 1]
     assert all(p["entity_id"].startswith("entity/grooved/face/") for p in row["pieces"])
+
+
+def test_a_tag_given_to_several_entities_names_a_set_and_keeps_its_pieces():
+    with scad.GraphSession():
+        profile = scad.make_rectangle_rface(40.0, 10.0)
+        solid = scad.extrude_rsolid(profile=profile, direction=(0.0, 0.0, 1.0), distance=10.0, side_faces_tag="ex.side", end_face_tag="ex.end")
+        # a slot through the whole bar splits the end face and the two long side faces
+        halves = scad.cut_rsolid(solid, scad.make_box_rsolid(2.0, 20.0, 20.0, bottom_face_center=(0.0, 0.0, -5.0)))
+        sides = [len(ql.faces().where(ql.tag("ex.side")).resolve(half)) for half in halves]
+        assert sides == [3, 3]  # every piece of a side face is still a side face
+        assert [_tags(half, "ex.end") for half in halves] == [["ex.end.split1"], ["ex.end.split2"]]
+        assert [row["tag"] for row in scad.list_tag_splits(halves[0])] == ["ex.end"]

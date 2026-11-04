@@ -521,8 +521,37 @@ export function SketchOverlay({
     );
   })();
 
+  // "+ anchor" on a spline's curve (a drawing click, or a click in anchor mode, adds an anchor there); "- anchor" on an inner
+  // anchor in anchor mode (a click removes it).
+  const anchorMark = (at: P, remove: boolean, key: string) => {
+    const s = project(at[0], at[1]);
+    if (!s) return null;
+    const ink = remove ? FAIL : NAME;
+    return (
+      <g key={key} data-anchor-mark={remove ? "remove" : "add"} pointerEvents="none">
+        <rect x={s[0] - 7} y={s[1] - 7} width={14} height={14} transform={`rotate(45 ${s[0]} ${s[1]})`} fill={ink} fillOpacity={0.15} stroke={ink} strokeWidth={2.2} />
+        <path d={remove ? `M${s[0] - 4} ${s[1]}H${s[0] + 4}` : `M${s[0] - 4} ${s[1]}H${s[0] + 4}M${s[0]} ${s[1] - 4}V${s[1] + 4}`} stroke={ink} strokeWidth={2} />
+        <text x={s[0] + 14} y={s[1] - 12} fontSize={10} fontWeight={700} fill={ink} stroke={HALO} strokeWidth={3} paintOrder="stroke" style={{ fontFamily: "var(--mono)" }}>
+          {remove ? "- anchor" : "+ anchor"}
+        </text>
+      </g>
+    );
+  };
+  const modeMark = (() => {
+    const action = editor.anchorMode ? editor.anchorHover : null;
+    if (!action || action.kind === "refuse") return null;
+    if (action.kind === "add") return anchorMark(action.at, false, "mode-add");
+    const at = pts.get(action.anchor);
+    return at ? anchorMark(at, true, "mode-remove") : null;
+  })();
   const cursorMark = (() => {
     if (!cursor || tool === "select" || tool === "delete" || tool === "trim" || tool === "extend" || tool === "fillet" || tool === "chamfer") return null;
+    if (cursor.onSpline) return anchorMark([cursor.x, cursor.y], false, "on-curve");
+    if (cursor.onEdge) {
+      // on an edge of the face the sketch is on
+      const e = project(cursor.x, cursor.y);
+      return e ? <rect x={e[0] - 5} y={e[1] - 5} width={10} height={10} fill="none" stroke={NAME} strokeWidth={2} data-snap-edge /> : null;
+    }
     const s = project(cursor.x, cursor.y);
     if (!s) return null;
     return cursor.pointId ? (
@@ -536,10 +565,10 @@ export function SketchOverlay({
   })();
 
   const dragging = editor.drag !== null;
-  const cursorStyle = moving ? "grabbing" : tool === "select" || tool === "trim" || tool === "extend" || tool === "fillet" || tool === "chamfer" ? (dragging ? "grabbing" : hover ? "pointer" : "default") : "crosshair";
+  const cursorStyle = moving ? "grabbing" : editor.anchorMode && tool === "select" ? (editor.anchorHover?.kind === "add" ? "copy" : editor.anchorHover?.kind === "remove" ? "pointer" : "crosshair") : tool === "select" || tool === "trim" || tool === "extend" || tool === "fillet" || tool === "chamfer" ? (dragging ? "grabbing" : hover ? "pointer" : "default") : "crosshair";
 
   return (
-    <div ref={wrap} className="absolute inset-0 overflow-hidden outline-none" data-testid="sketch-canvas" tabIndex={-1}>
+    <div ref={wrap} className="absolute inset-0 overflow-hidden outline-none" data-testid="sketch-canvas" data-anchor-mode={editor.anchorMode ?? undefined} tabIndex={-1}>
       <svg
         ref={svg}
         width={size.w}
@@ -567,6 +596,10 @@ export function SketchOverlay({
           <text x={patch.tip.v[0] + 10} y={patch.tip.v[1]} fill={PASS} fontSize={11} fontWeight={700} textAnchor="middle" stroke={HALO} strokeWidth={3} paintOrder="stroke">
             y
           </text>
+        )}
+        {editor.faceEdges.length > 0 && (
+          // the face the sketch is on (and every model edge in its plane): what drawing snaps to
+          <path d={editor.faceEdges.map((seg) => polyline(seg)).join(" ")} stroke={NAME} strokeWidth={1.6} opacity={0.55} fill="none" pointerEvents="none" data-face-edges={editor.faceEdges.length} />
         )}
         {loops.map((loop) => {
           const wireMode = doc.output === "wire"; // a wire sketch fills the loop it makes the wire of, and has no holes
@@ -656,6 +689,7 @@ export function SketchOverlay({
         {labelNodes}
         {preview}
         {cursorMark}
+        {modeMark}
       </svg>
       {boxNode}
       {entryNode}

@@ -62,6 +62,13 @@ HOLE_DIAMETER = scad.var(name="hole_diameter", default=6.0, unit="mm", comment="
   rz=...)` (on a face: `make_workplane_from_face_rworkplane(face, x_dir=...)` as the base), the numbers in its params cell.
   Each new plane becomes the active one and the next Space starts on it: a chain of planes in space, each sketched on and
   promoted to a wire (below) to loft or sweep between. Shift+Space looks straight at the active workplane.
+- 3D curves (W, or the command "3D curve"): lines (L), three-point arcs (A) and splines (S) one after another through points
+  on the drawing plane (the active workplane, else XY; Tab changes it between points), snapped to the model's vertices
+  and edge midpoints, the workplanes' origins, the points of other curves and the plane's grid. Enter makes a `curve`
+  feature (`# ---- feature: path (datum) ----`): a point drawn on a workplane is `wp.point(u, v)` (it follows the
+  workplane), one snapped to a vertex is `scad.ref.vertex(...).one(base).get_coordinates()` (it follows the model), others
+  are numbers; the curves become one `make_wire_from_edges_rwire([...])`, a value sweep/loft forms take. Every wire or
+  edge value of the notebook is drawn in the viewport from the kernel's samples (`runtime/live_curves.py`).
 - A hole is placed with the pointer: while its form is open a ghost of the hole (its diameter and depth) follows the model
   under the pointer, along the surface's normal there by default ("along the picked face's normal"), and a click writes
   the start point and direction into the form. Nothing is computed by the kernel until Add.
@@ -123,9 +130,13 @@ sca sketch op CELL insert_spline_anchor --args '{"spline": "s1", "at": [12, 8]}'
 - The spline tool (B) is a pen: a click places an anchor, press-and-drag pulls out its two handles; the curve is a B-spline in
   anchor form (`"knots": [0, 1, ..], "multiplicities": [4, 3, .., 4]`, control points `[A0, out0, in1, A1, ..]`; see
   `sketch-and-features.md`, "B-splines with anchors"). Picking the spline shows its handles: dragging an anchor carries its
-  handles, dragging a handle keeps a smooth anchor smooth (Alt while dragging: a corner; S smooths again), a double-click on
-  the curve inserts an anchor and Delete removes the picked anchor (the SDK edits above). A B-spline with control points
-  (older documents) shows its control polygon and a "convert to anchors" button (K).
+  handles; dragging a handle moves only that handle (each side has its own direction and pull; Shift while dragging turns
+  the other handle into line, keeping its length; S smooths the picked anchors). Inserting anchors is part of drawing: a
+  point, line or pen click on an anchor-form spline's curve (the cursor shows "+ anchor") inserts an anchor there with
+  `insert_spline_anchor_rsketch` and uses that point. With a spline picked, Shift+A (or the "anchors" toolbar button) is
+  anchor mode: a click on a curve adds an anchor, a click on an inner anchor removes it (`remove_spline_anchor_rsketch`);
+  Esc or Shift+A leaves. Delete removes the picked anchor; a double-click on the curve inserts one. A B-spline with control
+  points (older documents) shows its control polygon and a "convert to anchors" button (K).
 - A sketch document may say `"output": "wire"`: the cell then ends in
   `name = scad.make_wire_from_sketch_rwire(sketch=_sketch, profile=<i>, ...)` (a closed loop or an open chain from
   `inspect_sketch_rsketchprofiles`, whose `closed` says which) and the notebook lists it as a wire, so `op.sweep_rsolid`

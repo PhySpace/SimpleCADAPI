@@ -791,6 +791,14 @@ void bind_solve_operators(py::module_& m) {
       py::arg("sketch"), py::arg("profile") = 0, py::kw_only(), py::arg("require_fully_constrained") = false,
       py::arg("strict") = true, py::arg("tolerance") = tol::kSketchSolveResidual, py::arg("max_iterations") = 80);
   m.def(
+      "make_faces_from_sketch_rfacelist",
+      [](const Sketch& sketch, const std::optional<std::vector<SketchProfileId>>& profiles, bool fully, bool strict,
+         double tolerance, int max_iterations) {
+        return make_faces_from_sketch_rfacelist(sketch, profiles, request_of(fully, strict, tolerance, max_iterations));
+      },
+      py::arg("sketch"), py::arg("profiles") = py::none(), py::kw_only(), py::arg("require_fully_constrained") = false,
+      py::arg("strict") = true, py::arg("tolerance") = tol::kSketchSolveResidual, py::arg("max_iterations") = 80);
+  m.def(
       "make_face_from_sketch_rface",
       [](const Sketch& sketch, const SketchProfileId& profile, const std::vector<SketchProfileId>& inner, bool fully,
          bool strict, double tolerance, int max_iterations) {

@@ -9,7 +9,7 @@ export const TOOLS: { id: Tool; label: string; key: string; icon: typeof Slash }
   { id: "line", label: "Line (chained; Esc ends)", key: "L", icon: Slash },
   { id: "circle", label: "Circle: centre, then radius", key: "C", icon: Circle },
   { id: "arc", label: "Arc: centre, start, end (counter-clockwise)", key: "A", icon: Spline },
-  { id: "spline", label: "Spline (pen): click anchors, press and drag for handles; Enter makes it, a click on the first anchor closes it (SDK add_bspline_rsketch, anchor form)", key: "B", icon: Waves },
+  { id: "spline", label: "Spline (pen): click anchors, press and drag for handles, click another spline's curve to add an anchor there; Enter makes it, a click on the first anchor closes it (SDK add_bspline_rsketch, anchor form)", key: "B", icon: Waves },
   { id: "delete", label: "Delete", key: "D", icon: Trash2 },
   { id: "trim", label: "Trim: cut an entity back to its neighbours (SDK trim_rsketch)", key: "T", icon: Scissors },
   { id: "extend", label: "Extend: grow a line's end to the next entity (SDK extend_rsketch)", key: "E", icon: UnfoldHorizontal },

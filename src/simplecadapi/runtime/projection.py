@@ -39,7 +39,7 @@ from ..build.results import AssemblyBuildResult, PartBuildResult
 import weakref
 from typing import Any
 
-from simplecadapi._cpp import Assembly, find_registered_node, isolated_recording, Part, SimpleWorkplane, Solid
+from simplecadapi._cpp import Assembly, Edge, find_registered_node, isolated_recording, Part, SimpleWorkplane, Solid, Wire
 from simplecadapi._glue.session import lineage_of
 from ..product.bodies import part_from_bodies
 from simplecadapi._glue.session import GraphSession
@@ -66,17 +66,21 @@ def _as_product(value: object) -> Product | None:
     return None
 
 
+_CONSTRUCTION = (SimpleWorkplane, Wire, Edge)
+"""Values that are construction geometry, not bodies: a cell making only these does not build on what it reads."""
+
+
 def product_reads(cells: Iterable[Any], values: Mapping[str, object]) -> frozenset[str]:
     """The names the cells read, as :func:`find_product` and :func:`open_bodies` take them (*read*).
 
-    A cell whose values are all workplanes reads a body without building on it (a workplane on the top face of ``base``
-    is a datum, not a feature of the body): its reads leave the body open.
+    A cell whose values are all construction geometry -- workplanes, wires, edges -- reads a body without building on it
+    (a workplane on the top face of ``base``, a 3D path drawn through its vertices): its reads leave the body open.
     """
 
     out: set[str] = set()
     for cell in cells:
         made = [values[name] for name in cell.defs if name in values]
-        if made and all(isinstance(value, SimpleWorkplane) for value in made):
+        if made and all(isinstance(value, _CONSTRUCTION) for value in made):
             continue
         out.update(cell.refs)
     return frozenset(out)

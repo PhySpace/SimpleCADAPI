@@ -83,7 +83,9 @@ if __name__ == "__main__":
   A `kind = "part"` notebook needs **no product cell**: when no top-level
   `Part` has the notebook id, the runtime makes one from the notebook's
   *open bodies* (public top-level `Solid`s, or the piece lists of split cuts,
-  that no other cell reads and that no other such value was built from), with
+  that no other cell reads and that no other such value was built from; a cell
+  that only makes construction geometry -- workplanes, wires, edges, e.g. a path
+  through the body's vertices -- does not count as reading it), with
   the notebook id. One open body is a one-body Part (body id `"body"`); several
   are the bodies of one Part, named by their variables (pieces `<name>_1..n`).
   Write a `make_part_rpart` cell only to add connectors or a material, or to
@@ -227,6 +229,9 @@ The editor and a coding agent share the notebook file:
   selection, each cell's state and errors, the parameter values, and the path
   of the viewport image (`.sca-editor/viewport.png`) the agent can look at. The
   editor keeps `.sca-editor/snapshot.json` current while it runs.
+  When a cell failed, the editor previews the model before it and the snapshot
+  says so in `partial` (the failing cell, its error, the cells that did not run,
+  the bodies shown; `runtime.live.preview_product`); `null` when the model is whole.
 - The local modules a notebook imports (`from dimensions import DIMS`) are
   listed under *modules* in the workspace tab, with the notebooks that use
   them. A module opens in a module view: its source, autosaved, and the fields

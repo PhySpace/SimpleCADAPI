@@ -197,6 +197,22 @@ Errors there are the same errors `sca snapshot` reports per cell. A module that
 does not compile is reported as `setup failed` with the file and line; fix that
 file first, since every cell is blocked until it compiles.
 
+## When a step fails: the model before it
+
+A cell that fails (a parameter change that breaks a fillet, an edit) leaves no
+values, and the cells after it do not run, so the product is not made. The
+viewport then shows **the model before the failing step**, not the last model
+that built: for a part notebook the open bodies of the cells that are left (the
+body the failing feature was applied to); for an assembly built up over cells,
+the assembly before the failing cell. A red notice in the viewport says which
+step failed and why, and the snapshot carries it as `partial`:
+`{failed: [{cell, name, status, error}], skipped: [cell ids that did not run],
+shown: [bodies on screen]}` (`null` when the model is whole). Fix the failing
+cell; the whole model replaces it. When nothing before the failing cell makes a
+model (a broken params cell, an assembly made in one cell), the last model stays
+on screen and the error names the failing cell. Exports never use a partial
+model: they fail until the cell is fixed.
+
 ## Features the person made with buttons
 
 Cells with a `# gui:` line, the `sca feature` / `sca sketch` commands, sketches, workplanes and `scad.ref` selections

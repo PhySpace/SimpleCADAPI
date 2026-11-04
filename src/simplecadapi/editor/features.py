@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping, Sequence
 
 from .. import ref as _ref
-from . import assembly_doc, sketch_doc
+from . import assembly_doc, curve_doc, sketch_doc
 from .selection import selector_conditions
 
 GUI_MARKER = "# gui:"
@@ -405,6 +405,22 @@ def _sketch(c: Context) -> list[str]:
     return lines
 
 
+def _curve(c: Context) -> list[str]:
+    """A 3D path: points in space, on workplanes, at model vertices; lines, arcs and splines joined into one wire."""
+    doc = c.values["curve"]
+    for workplane in curve_doc.workplanes_of(doc):
+        c.body_named(workplane)
+    body = None
+    if curve_doc.needs_body(doc):
+        if not c.values.get("body"):
+            raise FeatureError("a point is at a vertex of the model, and there is no body yet")
+        body = c.body("body")
+    try:
+        return curve_doc.render(c.slug, doc, body)
+    except curve_doc.CurveError as exc:
+        raise FeatureError(str(exc)) from exc
+
+
 def _assembly(c: Context) -> list[str]:
     cells = assembly_doc.render(c.slug, str(c.env.get("name") or c.slug), c.values["assembly"], c.env.get("notebook_dir"), c.env.get("workspace"))
     c.raw_params(cells["params"])
@@ -684,6 +700,11 @@ SPECS: tuple[Spec, ...] = (
          (_BODY(), Slot("angle", "Angle", "angle", default=45.0, unit="deg", min=-360.0, max=360.0), _AXIS("axis", "Axis"), _point("origin", "Axis point")), _rotate),
     Spec("scale", "Scale", "Transform", "build", "solid", "Scale a body uniformly about a point.",
          (_BODY(), Slot("factor", "Factor", "float", default=1.5, min=0.01, max=100.0), _point("origin", "Centre")), _scale),
+    Spec("curve", "3D curve", "Sketch", "datum", "wire",
+         "A path in space: lines, arcs and splines through points in space, on workplanes or at vertices of the model, "
+         "joined into one wire (a sweep path, a rail). Drawn in the viewport with snapping.",
+         (dataclasses.replace(_BODY(), optional=True),
+          Slot("curve", "Curve", "curve", default={"points": [], "curves": []})), _curve),
     Spec("workplane", "Workplane", "Datums", "datum", "workplane",
          "A workplane from picked geometry: on a planar face (x along an edge if one is picked, an offset along the normal), "
          "halfway between two parallel faces, through three vertices, or through an edge turned about it; or placed by hand "
@@ -891,6 +912,11 @@ def check_values(spec: Spec, values: Mapping[str, Any], bodies: Mapping[str, str
             try:
                 clean[slot.name] = sketch_doc.validate(raw)
             except sketch_doc.SketchError as exc:
+                raise FeatureError(f"{slot.label}: {exc}") from exc
+        elif slot.kind == "curve":
+            try:
+                clean[slot.name] = curve_doc.validate(raw)
+            except curve_doc.CurveError as exc:
                 raise FeatureError(f"{slot.label}: {exc}") from exc
         elif slot.kind == "assembly":
             try:

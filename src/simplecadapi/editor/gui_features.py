@@ -109,7 +109,9 @@ class FeatureService:
             if gui and gui["spec"] == "sketch":  # a sketch makes a face or a wire, as its document says
                 produces = sketch_doc.output_of(gui.get("values", {}).get("sketch") or {})
             part_of = head.slug[: -len("_parts")] if head.slug.endswith("_parts") and head.slug[: -len("_parts")] in assembly_slugs else None
-            made = defined if head.role in _ROLES_WITH_BODIES and not part_of else []
+            # a datum that is not a workplane (a 3D curve) is a value later features take (a sweep path), not a body
+            makes_value = head.role == "datum" and produces not in ("workplane",)
+            made = defined if (head.role in _ROLES_WITH_BODIES or makes_value) and not part_of else []
             for name in made:
                 bodies[name] = produces
                 order.append(name)
@@ -228,6 +230,7 @@ class FeatureService:
                 raise GuiError(str(exc)) from exc
             bodies = {b["name"]: b["produces"] for b in snap["bodies"]}
             values = self._with_defaults(spec_id, dict(request.get("values") or {}), snap)
+            values = self._name_curve_points(spec_id, values)
             rendered = self._render(spec_id, slug, values, bodies, request.get("selections"), snap)
             self._check_param_names(rendered, taken)
             steps: list[dict] = []
@@ -261,6 +264,7 @@ class FeatureService:
             spec_id = feature["gui"]["spec"]
             spec = F.BY_ID[spec_id]
             values = {**feature["gui"]["values"], **dict(request.get("values") or {})}
+            values = self._name_curve_points(spec_id, values)
             bodies = {b["name"]: b["produces"] for b in snap["bodies"] if b["name"] != feature["slug"]}
             keep = {slot.name: F.extract_recipe(cell["code"], slot.name) for slot in spec.slots if slot.kind == "select"}
             rendered = self._render(spec_id, feature["slug"], values, bodies, request.get("selections"), snap, keep={k: v for k, v in keep.items() if v})
@@ -430,6 +434,28 @@ class FeatureService:
             return kernel.references(function, *args)
         except Exception as exc:  # noqa: BLE001 - the kernel's words are the message
             raise GuiError(str(exc)) from exc
+
+    def _name_curve_points(self, spec_id: str, values: dict[str, Any]) -> dict[str, Any]:
+        """A 3D curve's points snapped to a model vertex (``entity_id``) named by their stable reference (``vertex``),
+        as a pick is; a vertex the kernel cannot name keeps its coordinates (``at``) only."""
+        doc = values.get("curve") if spec_id == "curve" else None
+        if not isinstance(doc, Mapping):
+            return values
+        points = [dict(p) for p in doc.get("points") or [] if isinstance(p, Mapping)]
+        ids = [str(p["entity_id"]) for p in points if p.get("entity_id") and not p.get("vertex")]
+        named: dict[str, Any] = {}
+        kernel = getattr(self.state, "kernel", None)
+        if ids and kernel is not None:
+            try:
+                answers = kernel.references("entity_refs", ids)
+            except Exception:  # noqa: BLE001 - no kernel answer: the coordinates
+                answers = []
+            named = {entity_id: answer.get("record") for entity_id, answer in zip(ids, answers or []) if isinstance(answer, Mapping)}
+        for point in points:
+            record = named.get(str(point.pop("entity_id", "")))
+            if record:
+                point["vertex"] = record
+        return {**values, "curve": {**doc, "points": points}}
 
     def _name_picks(self, picked: dict[str, list]) -> dict[str, list]:
         """Each picked entity with its stable reference (``ref``: a record), named in the kernel from the value it

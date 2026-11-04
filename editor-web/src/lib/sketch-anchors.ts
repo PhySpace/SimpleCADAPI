@@ -6,7 +6,7 @@
  * anchor smooth while one of its handles is dragged.  A B-spline in another form (control points, an old file) has no anchors
  * here: it shows its control polygon and offers `convert_spline_to_anchors_rsketch`. */
 
-import { ensurePoint, nextId, type DrawOptions, type SEntity, type SketchDoc, type Spot } from "@/lib/sketch";
+import { ensurePoint, nextId, solvedPoints, splinePath, type DrawOptions, type SEntity, type SketchDoc, type SolveResult, type Spot } from "@/lib/sketch";
 
 type P = [number, number];
 
@@ -69,6 +69,47 @@ export function shownHandles(doc: SketchDoc, selection: readonly string[], roles
 /** Every handle point of every anchor-form spline (hidden ones are not picked or snapped to). */
 export function handlePoints(roles: Map<string, AnchorRole>): Set<string> {
   return new Set([...roles].filter(([, r]) => r.kind === "handle").map(([id]) => id));
+}
+
+/** The place on an anchor-form spline's curve nearest `pos`, within `tol` (sketch units): where a click adds an anchor.  The
+ * curve is the SDK's samples of the last solve; the SDK puts the anchor at the curve point nearest the click. */
+export function curveAt(doc: SketchDoc, solve: SolveResult | null, pos: readonly [number, number], tol: number): { spline: string; at: P } | null {
+  const pts = solvedPoints(doc, solve);
+  let best: { spline: string; at: P; d: number } | null = null;
+  for (const e of doc.entities) {
+    if (!isAnchorSpline(e)) continue;
+    const path = splinePath(e, pts, solve);
+    for (let i = 0; i + 1 < path.length; i++) {
+      const [a, b] = [path[i], path[i + 1]];
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const len2 = dx * dx + dy * dy;
+      const t = len2 > 0 ? Math.min(1, Math.max(0, ((pos[0] - a[0]) * dx + (pos[1] - a[1]) * dy) / len2)) : 0;
+      const at: P = [a[0] + t * dx, a[1] + t * dy];
+      const d = Math.hypot(pos[0] - at[0], pos[1] - at[1]);
+      if (d <= tol && (!best || d < best.d)) best = { spline: e.id, at, d };
+    }
+  }
+  return best ? { spline: best.spline, at: best.at } : null;
+}
+
+/** What a click in anchor mode does where it lands: remove the inner anchor under it (`hit`: a point id within reach), else add
+ * an anchor on the curve under it, else nothing.  End anchors and handles are not removed (the reason is the `refuse` text). */
+export type AnchorAction = { kind: "add"; spline: string; at: P } | { kind: "remove"; spline: string; anchor: string } | { kind: "refuse"; text: string } | null;
+
+export function anchorAction(doc: SketchDoc, solve: SolveResult | null, pos: readonly [number, number], tol: number, hit: string | null, roles: Map<string, AnchorRole> = anchorRoles(doc)): AnchorAction {
+  const role = hit ? roles.get(hit) : undefined;
+  if (hit && role?.kind === "anchor" && !role.end) {
+    const e = doc.entities.find((x) => x.id === role.spline);
+    const closedSeam = e?.start === hit; // the seam of a closed spline is its start and end
+    if (!closedSeam) return { kind: "remove", spline: role.spline, anchor: hit };
+    return { kind: "refuse", text: `${hit} is where ${role.spline} starts and ends: it cannot be removed` };
+  }
+  if (hit && role?.kind === "anchor") return { kind: "refuse", text: `${hit} is an end of ${role.spline}: an end anchor cannot be removed (trim the spline instead)` };
+  const on = curveAt(doc, solve, pos, tol);
+  if (on) return { kind: "add", spline: on.spline, at: on.at };
+  if (hit && role?.kind === "handle") return { kind: "refuse", text: `${hit} is a handle of ${role.spline}: click its anchor ${role.anchor} to remove the anchor` };
+  return null;
 }
 
 // -- the drawn path -------------------------------------------------------------------------------------------------------

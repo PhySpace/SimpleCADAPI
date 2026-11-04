@@ -587,6 +587,10 @@ class MarimoKernel:
             "try:\n"
             f"    _p = _preview({url!r}, step={step!r})\n"
             "    print('SCA-PREVIEWED', _p['nodes'], _p['parts'], _p['bytes'], _p.get('compile_ms', 0), _p.get('encode_ms', 0), _p.get('post_ms', 0))\n"
+            # a cell failed: the model is the one before it (what failed, what is shown)
+            "    if _p.get('partial') is not None:\n"
+            "        import json as _pjson\n"
+            "        print('SCA-PARTIAL', _pjson.dumps(_p['partial']))\n"
             "except Exception as _e:\n"
             "    print('SCA-PREVIEW-ERROR', type(_e).__name__ + ':', str(_e).splitlines()[0] if str(_e) else '')\n"
             # the workplanes ride along, product or not (a notebook mid-edit has workplanes before it has a product)
@@ -594,6 +598,13 @@ class MarimoKernel:
             "    from simplecadapi.runtime.live import live_workplanes as _workplanes\n"
             "    import json as _wjson\n"
             "    print('SCA-WORKPLANES', _wjson.dumps(_workplanes()))\n"
+            "except Exception:\n"
+            "    pass\n"
+            # the notebook's wires and edges (3D paths, rails), sampled by the SDK: the viewport draws them
+            "try:\n"
+            "    from simplecadapi.runtime.live_curves import live_curves as _curves\n"
+            "    import json as _cjson\n"
+            "    print('SCA-CURVES', _cjson.dumps(_curves()))\n"
             "except Exception:\n"
             "    pass\n"
             # the tagged entities the model's operations split, with the entities of their pieces (a diagnostic)
@@ -614,9 +625,19 @@ class MarimoKernel:
                     out["workplanes"] = json.loads(line[len("SCA-WORKPLANES "):])
                 except ValueError:
                     pass
+            elif line.startswith("SCA-CURVES "):
+                try:
+                    out["curves"] = json.loads(line[len("SCA-CURVES "):])
+                except ValueError:
+                    pass
             elif line.startswith("SCA-TAGSPLITS "):
                 try:
                     out["tag_splits"] = json.loads(line[len("SCA-TAGSPLITS "):])
+                except ValueError:
+                    pass
+            elif line.startswith("SCA-PARTIAL "):
+                try:
+                    out["partial"] = json.loads(line[len("SCA-PARTIAL "):])
                 except ValueError:
                     pass
         return out

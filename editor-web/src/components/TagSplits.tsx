@@ -47,11 +47,12 @@ export function TagSplits({ view, splits, sceneVersion }: { view: SceneView; spl
 
   if (!open) return null;
   return (
-    <div className="pointer-events-auto absolute left-3 top-3 z-20 flex max-w-[min(420px,80%)] flex-col gap-1.5 border-2 border-[var(--focus)] bg-popover px-3 py-2 text-[11px] shadow-[4px_4px_0_var(--shadow-hard)]" data-testid="tag-splits">
+    <div className="pointer-events-auto absolute left-3 top-3 z-20 flex max-h-[min(50%,360px)] max-w-[min(420px,80%)] flex-col gap-1.5 border-2 border-[var(--focus)] bg-popover px-3 py-2 text-[11px] shadow-[4px_4px_0_var(--shadow-hard)]" data-testid="tag-splits">
       <div className="flex items-center gap-2 font-semibold">
         <Scissors className="size-3.5 text-[var(--focus)]" />
         <span>{splits.length === 1 ? "A tagged entity was split" : `${splits.length} tagged entities were split`}</span>
       </div>
+      <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-1">
       {splits.map((row) => (
         <div key={`${row.op}:${row.tag}:${row.into.join(",")}`} className="flex flex-col gap-1">
           <span className="text-muted-foreground">
@@ -67,7 +68,8 @@ export function TagSplits({ view, splits, sceneVersion }: { view: SceneView; spl
           </span>
         </div>
       ))}
-      <div className="flex gap-2 pt-0.5">
+      </div>
+      <div className="flex shrink-0 gap-2 pt-0.5">
         <button type="button" className="border border-border px-2 py-0.5 hover:bg-accent" onClick={() => setShown((value) => !value)}>
           {shown ? "Hide highlight" : "Show highlight"}
         </button>

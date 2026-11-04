@@ -17,8 +17,34 @@ import { defaultExtrudeDistance, sketchShape } from "@/lib/sketch-scene";
 import { fitDistanceMm, planeToScreen, screenRay } from "@/lib/sketch-view";
 import { projectSources } from "@/lib/sketch-edit";
 import { useSketchEditor } from "@/lib/useSketchEditor";
+import { planeSegments } from "@/lib/sketch-face";
 import { disposeObject } from "@/scene/cad-three";
 import type { PickResult, SceneView } from "@/scene/scene-view";
+
+/** The model's edges (the line segments the viewport draws them with) in world mm, visible ones only. */
+function modelEdges(view: SceneView): [[number, number, number], [number, number, number]][] {
+  const root = view.engine.modelRoot;
+  root.updateMatrixWorld(true);
+  const out: [[number, number, number], [number, number, number]][] = [];
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const shown = (object: THREE.Object3D): boolean => {
+    for (let at: THREE.Object3D | null = object; at; at = at.parent) if (!at.visible) return false;
+    return true;
+  };
+  root.traverse((object) => {
+    if (!(object instanceof THREE.LineSegments) || !shown(object)) return;
+    const position = object.geometry.getAttribute("position");
+    const index = object.geometry.getIndex();
+    const count = index ? index.count : position.count;
+    for (let i = 0; i + 1 < count; i += 2) {
+      a.fromBufferAttribute(position, index ? index.getX(i) : i).applyMatrix4(object.matrixWorld).multiplyScalar(1000);
+      b.fromBufferAttribute(position, index ? index.getX(i + 1) : i + 1).applyMatrix4(object.matrixWorld).multiplyScalar(1000);
+      out.push([[a.x, a.y, a.z], [b.x, b.y, b.z]]);
+    }
+  });
+  return out;
+}
 
 /** A sketch being made or edited in the viewport.  `plane` is null while the plane is being chosen. */
 export type SketchSession = { id: number; mode: "new" | "edit"; cell?: string; name: string; plane: PlaneSpec | null; doc: SketchDoc };
@@ -293,7 +319,9 @@ function SketchEditorView({
   const modelPoints = useMemo(() => view.modelVertices().map((p) => worldToPlane(plane, p)), [view, plane]);
   // The sketch being edited is the feature `session.name` (a new one has no feature yet): every other sketch can be projected.
   const sources = useMemo(() => projectSources(features, editing ? session.name : null), [features, editing, session.name]);
-  const editor = useSketchEditor(session.doc, modelPoints, sources);
+  // The model's edges in the sketch plane (the boundary of the face the sketch is on): drawn faintly and snapped to.
+  const faceEdges = useMemo(() => planeSegments(modelEdges(view), plane), [view, plane]);
+  const editor = useSketchEditor(session.doc, modelPoints, sources, faceEdges);
   const editorRef = useRef(editor);
   editorRef.current = editor;
   const spaceRef = useRef(false);
@@ -448,8 +476,9 @@ function SketchEditorView({
       <SketchToolbar editor={editor} onFit={() => turn.current(true)} onNormal={() => turn.current(false)} />
       {editor.projectOpen && <SketchProject editor={editor} />}
       <SketchDrawer editor={editor} plane={planeLabel(plane)} wide={wide} />
-      <div className="pointer-events-auto absolute left-1/2 top-2 z-30 flex -translate-x-1/2 flex-col items-stretch gap-1">
-        <div className="flex flex-wrap items-center gap-2 border-2 border-primary bg-popover px-2 py-1 shadow-[4px_4px_0_var(--shadow-hard)]">
+      {/* The bar and its notes take the pointer; the space between them (beside the hint) is the canvas. */}
+      <div className="pointer-events-none absolute left-1/2 top-2 z-30 flex -translate-x-1/2 flex-col items-stretch gap-1">
+        <div className="pointer-events-auto flex flex-wrap items-center gap-2 border-2 border-primary bg-popover px-2 py-1 shadow-[4px_4px_0_var(--shadow-hard)]">
           <Pencil className="size-3.5 shrink-0" />
           <Input
             aria-label="Sketch name"
@@ -481,7 +510,7 @@ function SketchEditorView({
           </Button>
         </div>
         {shown && (
-          <p role="alert" data-testid="sketch-error" className="border-2 border-fail bg-popover px-2 py-1 text-[11px] text-fail">
+          <p role="alert" data-testid="sketch-error" className="pointer-events-auto border-2 border-fail bg-popover px-2 py-1 text-[11px] text-fail">
             {shown}
           </p>
         )}
@@ -491,7 +520,7 @@ function SketchEditorView({
             role={editor.editNote.tone === "fail" ? "alert" : "status"}
             data-testid="sketch-edit-note"
             data-tone={editor.editNote.tone}
-            className={`max-w-[460px] self-center border-2 bg-popover px-2 py-1 text-[11px] ${editor.editNote.tone === "fail" ? "border-fail text-fail" : "border-pass text-foreground"}`}
+            className={`pointer-events-auto max-w-[460px] self-center border-2 bg-popover px-2 py-1 text-[11px] ${editor.editNote.tone === "fail" ? "border-fail text-fail" : "border-pass text-foreground"}`}
           >
             {editor.editNote.text}
           </p>
@@ -501,7 +530,7 @@ function SketchEditorView({
           {coords && <span className="ml-2 text-foreground">{coords}</span>}
         </p>
         {confirming && (
-          <div className="flex items-center gap-2 border-2 border-focus bg-popover px-2 py-1 text-[11px]" data-testid="sketch-confirm">
+          <div className="pointer-events-auto flex items-center gap-2 border-2 border-focus bg-popover px-2 py-1 text-[11px]" data-testid="sketch-confirm">
             <span className="flex-1">Discard the unsaved sketch edits?</span>
             <Button type="button" size="sm" variant="destructive" className="h-6 px-2" onClick={onExit}>
               discard

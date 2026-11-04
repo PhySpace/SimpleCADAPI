@@ -486,6 +486,7 @@
 "translate_z_placement": "simplecadapi.product.placement",
 "trim_rsketch": "simplecadapi.operators.sketch",
 "insert_spline_anchor_rsketch": "simplecadapi.operators.sketch",
+"make_faces_from_sketch_rfacelist": "simplecadapi.operators.sketch",
 "remove_spline_anchor_rsketch": "simplecadapi.operators.sketch",
 "convert_spline_to_anchors_rsketch": "simplecadapi.operators.sketch",
 "trim_surface_face": "simplecadapi.kernel.ocp_surfaces",

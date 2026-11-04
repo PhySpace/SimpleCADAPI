@@ -298,15 +298,18 @@ class SketchProjection {
         TopExp::MapShapes(shape.wrapped(), TopAbs_EDGE, edges);
         if (edges.Extent() == 0)
           throw ValueError("a " + std::string(kind_name(shape.kind())) + " source has no edges to project");
+        // An edge named on its own must project; the edges of a face (a solid, a wire ...) that do not are skipped with
+        // a note, so a face's boundary comes in with every line and arc it has.
+        const bool named = shape.kind() == Kind::Edge;
         for (int i = 1; i <= edges.Extent(); ++i)
-          project_edge(shape.sub(edges(i)), prims);
+          project_edge(shape.sub(edges(i)), prims, named);
       });
     }
     return emit(prims, "shape", construction, "shapes");
   }
 
  private:
-  void project_edge(const Shape& edge_shape, std::vector<Prim>& out) {
+  void project_edge(const Shape& edge_shape, std::vector<Prim>& out, bool named) {
     const TopoDS_Edge edge = TopoDS::Edge(edge_shape.wrapped());
     const std::string id = edge_shape.topo_id();
     if (BRep_Tool::Degenerated(edge)) {
@@ -332,6 +335,9 @@ class SketchProjection {
         round.end = vec_of(curve.Value(last));
       }
       out.push_back(project_round(frame_, round, id, "edge"));
+    } else if (!named) {
+      notes_.push_back("skipped " + id + " (a " + std::string(curve_name(curve.GetType())) +
+                       " curve): only lines and circles / arcs project");
     } else {
       throw ValueError("edge '" + id + "' is a " + curve_name(curve.GetType()) +
                        " curve: only lines and circles / arcs project (pass the line and circle edges you need, for "

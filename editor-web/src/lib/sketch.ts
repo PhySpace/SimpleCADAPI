@@ -217,7 +217,9 @@ export function addSpline(doc: SketchDoc, spots: readonly Spot[], opts: DrawOpti
 
 const round = (v: number) => Math.round(v * 1e4) / 1e4;
 
-export type Spot = { x: number; y: number; pointId?: string };
+/** Where a drawing click lands: an existing point (`pointId`), or a place on the curve of an anchor-form B-spline
+ * (`onSpline`: the SDK inserts an anchor there first, and the click uses it), or a free / grid position. */
+export type Spot = { x: number; y: number; pointId?: string; onSpline?: string; onEdge?: boolean };
 
 /** The point a spot names (an existing one) or a new one at its position. */
 export function ensurePoint(doc: SketchDoc, spot: Spot): { doc: SketchDoc; id: string; created: boolean } {

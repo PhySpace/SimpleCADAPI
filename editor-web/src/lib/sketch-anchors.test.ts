@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { emptyDoc, normalizeDoc, wireProfiles, type SketchDoc, type SolveResult } from "@/lib/sketch";
-import { addPenSpline, anchorRoles, bezierPath, handlePoints, isAnchorSpline, isSmooth, mirrorHandle, penPoles, shownHandles, smoothAnchors } from "@/lib/sketch-anchors";
+import { addPenSpline, anchorAction, anchorRoles, bezierPath, curveAt, handlePoints, isAnchorSpline, isSmooth, mirrorHandle, penPoles, shownHandles, smoothAnchors } from "@/lib/sketch-anchors";
 import { convertSplineRequest, insertAnchorRequest, removeAnchorRequest } from "@/lib/sketch-edit";
 
 const opts = { auto: false, construction: false };
@@ -107,5 +107,30 @@ describe("anchor edits are SDK requests; a wire sketch chooses any profile", () 
     expect("output" in normalizeDoc({ output: "face" })).toBe(false);
     const solve = { profiles: [{ index: 0, id: "l0", kind: "edge_chain", closed: false, entity_ids: ["l1", "l0"], reversed: [false, false] }] } as unknown as SolveResult;
     expect(wireProfiles(solve)).toEqual([{ index: 0, key: "l0+l1", closed: false, entities: ["l1", "l0"] }]);
+  });
+});
+
+/** Two spans along the x axis (anchors at 0, 15 and 30; the handles on the axis too), so its path is the x axis from 0 to 30. */
+function straight(): SketchDoc {
+  return addPenSpline(emptyDoc(), [{ spot: { x: 0, y: 0 }, handle: [5, 0] }, { spot: { x: 15, y: 0 }, handle: [5, 0] }, { spot: { x: 30, y: 0 }, handle: [5, 0] }], false, opts, at)!.doc;
+}
+
+describe("adding and removing anchors by clicking", () => {
+  it("a place on an anchor-form curve is found within the pick distance", () => {
+    const doc = straight();
+    expect(curveAt(doc, null, [7, 0.5], 1)).toEqual({ spline: "s1", at: [7, 0] });
+    expect(curveAt(doc, null, [7, 3], 1)).toBeNull();
+    // a control-point B-spline offers no place for an anchor
+    const old: SketchDoc = { ...doc, entities: [{ ...doc.entities[0], knots: [0, 0.3, 0.6, 1], multiplicities: [4, 1, 2, 4] }] };
+    expect(curveAt(old, null, [7, 0.5], 1)).toBeNull();
+  });
+
+  it("anchor mode: an inner anchor is removed, the curve gets an anchor, an end anchor or a handle is refused", () => {
+    const doc = straight();
+    const ids = doc.entities[0].control_points!;
+    expect(anchorAction(doc, null, [15, 0], 1, ids[3])).toEqual({ kind: "remove", spline: "s1", anchor: ids[3] });
+    expect(anchorAction(doc, null, [22, 0.2], 1, null)).toEqual({ kind: "add", spline: "s1", at: [22, 0] });
+    expect(anchorAction(doc, null, [0, 0], 1, ids[0])).toMatchObject({ kind: "refuse" });
+    expect(anchorAction(doc, null, [9, 5], 1, null)).toBeNull();
   });
 });

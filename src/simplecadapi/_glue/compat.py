@@ -557,7 +557,7 @@ def signature_of(obj: Any) -> Any:
 
 
 _WITH_SIGNATURE: Dict[int, Any] = {}
-_OP_SUFFIXES = ("_rsolid", "_rsolidlist", "_rshell", "_rface", "_rpart", "_rworkplane")
+_OP_SUFFIXES = ("_rsolid", "_rsolidlist", "_rshell", "_rface", "_rfacelist", "_rpart", "_rworkplane")
 _SHAPE_FUNCTIONS = frozenset({"translate_shape", "rotate_shape", "mirror_shape", "scale_shape"})
 """Operations that may receive the pieces of a split body (see :mod:`.pieces`)."""
 

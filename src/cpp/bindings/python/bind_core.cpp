@@ -112,6 +112,14 @@ void bind_core(py::module_& m) {
           "plane", [](const Workplane& w) { return scad::pybind::value_to_python(w.plane_value()); },
           "The frame as a sketch plane mapping {'origin', 'x_axis', 'y_axis'} (world coordinates).")
       .def(
+          "point",
+          [tuple3](const Workplane& w, double u, double v, double h) {
+            return tuple3(w.cs().transform_point({u, v, h}));
+          },
+          py::arg("u"), py::arg("v"), py::arg("w") = 0.0,
+          "The world point (x, y, z) at (u, v) in the plane (and w along its normal): where a point drawn on this "
+          "workplane is, so it moves with the workplane.")
+      .def(
           "__enter__",
           [](Workplane& w) -> Workplane& {
             w.enter();

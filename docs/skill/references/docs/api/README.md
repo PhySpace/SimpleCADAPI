@@ -37,6 +37,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [make_face_from_sketch_rface](make_face_from_sketch_rface.md) *(from operators/sketch.py)* `top-level`
 - [make_face_from_wire_rface](make_face_from_wire_rface.md) *(from operators/geometry.py)* `top-level`
 - [make_face_from_wires_rface](make_face_from_wires_rface.md) *(from operators/geometry.py)* `top-level`
+- [make_faces_from_sketch_rfacelist](make_faces_from_sketch_rfacelist.md) *(from operators/sketch.py)* `top-level`
 - [make_gordon_surface_rface](make_gordon_surface_rface.md) *(from operators/geometry.py)* `top-level`
 - [make_helix_redge](make_helix_redge.md) *(from operators/geometry.py)* `top-level`
 - [make_helix_rwire](make_helix_rwire.md) *(from operators/geometry.py)* `top-level`

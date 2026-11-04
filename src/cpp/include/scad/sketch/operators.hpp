@@ -223,8 +223,10 @@ Sketch project_rsketch(const Sketch& sketch, const Sketch& source,
                        bool construction = true);
 
 // The same for the edges of shapes (a Solid, Face, Shell, Wire, Edge or Compound; a Vertex is a point), in world
-// coordinates.  Lines and circles / arcs project as above; any other edge is refused (name the edges to project).
-// Ids: proj_shape_<n>; the entity of a projections entry is the topo id of the edge.
+// coordinates.  Lines and circles / arcs project as above; any other edge named on its own (an Edge source) is refused,
+// and one found inside a face, wire, shell, solid or compound is skipped with a note (so the boundary of a face comes
+// in with all its lines and arcs: a sketch on the face can snap and be constrained to it). Ids: proj_shape_<n>; the
+// entity of a projections entry is the topo id of the edge.
 Sketch project_rsketch(const Sketch& sketch, const std::vector<Shape>& source, bool construction = true);
 
 // Throws the structured project_rsketch error with `reason` (for binding layers that read the source argument).
@@ -257,6 +259,15 @@ Value inspect_sketch_rsketchprofiles(const Sketch& sketch, const SketchSolveRequ
 // Promote a profile (closed loop or open chain) to a wire, solving internally.
 Wire make_wire_from_sketch_rwire(const Sketch& sketch, const SketchProfileId& profile = 0,
                                  const SketchSolveRequest& request = {});
+
+// One face per region of the sketch: a closed outer loop minus the loops directly inside it (holes come by themselves;
+// a loop inside a hole is the outer loop of another region).  `profiles` names the regions by their outer profile (an
+// index of inspect_sketch_rsketchprofiles or a profile id); nullopt: every region, in profile order.  Each face is
+// recorded as make_face_from_sketch_rface(sketch, outer, inner_profiles=holes).  Refuses an open chain, a hole and an
+// unknown profile by name.
+std::vector<Face> make_faces_from_sketch_rfacelist(
+    const Sketch& sketch, const std::optional<std::vector<SketchProfileId>>& profiles = std::nullopt,
+    const SketchSolveRequest& request = {});
 
 // Promote an outer profile and optional hole profiles to a face.
 Face make_face_from_sketch_rface(const Sketch& sketch, const SketchProfileId& profile = 0,

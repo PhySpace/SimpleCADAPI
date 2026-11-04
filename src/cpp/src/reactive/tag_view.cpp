@@ -122,6 +122,11 @@ std::vector<std::pair<std::string, std::string>> targets_of(const TagBinding& bi
   return out;
 }
 
+// Whether the assignment named one entity (not a set of them).
+bool names_one(const TagBinding& binding) {
+  return targets_of(binding).size() <= 1;
+}
+
 // The view of `node`, given the views of its inputs.
 TagView build_view(const OperationNode& node,
                    const std::unordered_map<const OperationNode*, std::shared_ptr<const TagView>>& done) {
@@ -225,7 +230,10 @@ TagView build_view(const OperationNode& node,
         CarriedTag next = *tag;
         next.derivation = *derivation;
         next.op = node.op;
-        if (piece) {
+        // A tag that names one entity follows it as a reference does: split, the pieces are named <tag>.split<i>.  A
+        // tag given to several entities at once names a set (every side face of an extrusion): a piece of a member is
+        // still a member, so it keeps the tag and nothing is reported.
+        if (piece && names_one(tag->binding)) {
           next.binding = piece_binding(tag->binding, node.node_id, *piece);
           note_split(view, splits, *tag, parent, entry, node, next.binding.tag.str());
         }

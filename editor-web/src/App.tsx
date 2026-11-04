@@ -16,7 +16,12 @@ import { AssemblyPanel } from "@/components/AssemblyPanel";
 import { ConnectorGizmos, type Gizmo } from "@/components/ConnectorGizmos";
 import { WorkplanePatches } from "@/components/WorkplanePatches";
 import { TagSplits, parseTagSplits, type TagSplit } from "@/components/TagSplits";
+import { PartialNotice } from "@/components/PartialModel";
+import { describePartial, parsePartial, samePartial, type PartialModel } from "@/lib/partial";
 import { WorkplanePlacePanel, WorkplanePlacer, type PlaceBase, type PlaceMode } from "@/components/WorkplanePlacer";
+import { CurveDrawer } from "@/components/CurveDrawer";
+import { CurveLines, curveEnds, parseCurves, type CurveSample } from "@/components/CurveLines";
+import type { CurveDoc, DrawPlane } from "@/lib/curve3d";
 import { NAMED_FRAMES, ZERO_PLACE, cleanValues, faceFrame, type PlaceFrame, type PlaceValues } from "@/lib/workplane-place";
 import { parseWorkplanes, resolvePlane, workplanePlane, workplaneRequest, type WorkplaneFrame } from "@/lib/workplanes";
 import { fitDistanceMm } from "@/lib/sketch-view";
@@ -106,10 +111,19 @@ export function App() {
   // The notebook's workplanes as the kernel reported them, and the one Space made (or chose) last: new sketches go on it.
   const [workplanes, setWorkplanes] = useState<WorkplaneFrame[]>([]);
   const [tagSplits, setTagSplits] = useState<TagSplit[]>([]);
+  // A cell failed: the model shown is the one before it (the preview says which step failed); null when it is whole.
+  const [partial, setPartial] = useState<PartialModel | null>(null);
+  const partialRef = useRef<PartialModel | null>(null);
+  const cellTitles = useMemo(() => new Map(cells.map((cell) => [cell.id, cell.title ?? ""])), [cells]);
+  const [curves, setCurves] = useState<CurveSample[]>([]);
   // A workplane being placed by hand (Space): its base, the numbers the handles write, move or turn, its name.
   const [placing, setPlacing] = useState<{ base: string; values: PlaceValues; mode: PlaceMode; name: string; face: { item: SelectionItem; frame: PlaceFrame } | null; error: string | null } | null>(null);
   const placingRef = useRef(placing);
   placingRef.current = placing;
+  // A 3D curve being drawn in the viewport (W): the plane it starts on, the error of a failed commit.
+  const [drawing, setDrawing] = useState<{ plane: string; error: string | null } | null>(null);
+  const drawingRef = useRef(drawing);
+  drawingRef.current = drawing;
   const [activeWorkplane, setActiveWorkplane] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("solid");
   const [sceneVersion, setSceneVersion] = useState(0);
@@ -327,11 +341,21 @@ export function App() {
     socket.on("notebook.features", (envelope) => setFeatures((envelope["features"] as NotebookFeature[]) ?? []));
     socket.on("workplanes", (envelope) => setWorkplanes(parseWorkplanes(envelope["workplanes"])));
     socket.on("tag_splits", (envelope) => setTagSplits(parseTagSplits(envelope["splits"])));
+    socket.on("curves", (envelope) => setCurves(parseCurves(envelope["curves"])));
 
     socket.on("preview", (envelope) => {
       setLoading(null);
       const shown = hasModel.current;
       hasModel.current = true;
+      // Every preview says whether it is whole or the model before a failing step (an unchanged one too); a new failure
+      // is noted in the log once (the cell's own error is logged already), not on every slider tick that fails the same way.
+      const nextPartial = parsePartial(envelope["partial"]);
+      if (nextPartial && !samePartial(partialRef.current, nextPartial)) {
+        const { title, reason } = describePartial(nextPartial);
+        log.push("info", `showing ${title.charAt(0).toLowerCase()}${title.slice(1)}: ${reason}`);
+      }
+      partialRef.current = nextPartial;
+      setPartial(nextPartial);
       // The kernel published the model that is already on screen: nothing to
       // reload.  (A page that has none yet, a refresh replaying this envelope, needs it.)
       if (envelope["unchanged"] && shown) {
@@ -465,7 +489,7 @@ export function App() {
   leftTabRef.current = leftTab;
   const selectComponent = asm.setSelected;
   const handlePick = useCallback((result: PickResult) => {
-    if (placingRef.current) return; // a click on the handles is not a pick
+    if (placingRef.current || drawingRef.current) return; // a click on the handles, or a curve's point, is not a pick
     if (dialogRef.current?.spec.id === "hole") return; // a click places the hole (HolePlacer), it picks nothing
     if (choosingRef.current) {
       void pickSketchFace(result);
@@ -731,6 +755,63 @@ export function App() {
     }
   }, [gui.run, log.push]);
 
+  // -- drawing a 3D curve ----------------------------------------------------------------------------------------------
+
+  /** The planes a 3D curve is drawn on: the datum planes and every workplane (as the kernel reported its frame). */
+  const drawPlanes = useMemo<DrawPlane[]>(
+    () => [
+      ...(["XY", "XZ", "YZ"] as const).map((name) => ({ name, workplane: false, ...NAMED_FRAMES[name] })),
+      ...workplanes.map((wp) => ({ name: wp.name, workplane: true, origin: wp.origin, x_axis: wp.x_axis, y_axis: wp.y_axis, normal: wp.normal })),
+    ],
+    [workplanes],
+  );
+  /** The points of the notebook's 3D curves, from their documents: a new path snaps to them. */
+  const curveSnapPoints = useMemo(
+    () =>
+      (gui.state?.features ?? []).flatMap((feature) =>
+        feature.gui?.spec === "curve"
+          ? ((feature.gui.values?.curve as CurveDoc | undefined)?.points ?? []).map((point) => ({ at: point.at, label: `${feature.slug}.${point.id}` }))
+          : [],
+      ).concat(curveEnds(curves)),
+    [gui.state?.features, curves],
+  );
+  const startDrawing = useCallback(() => {
+    if (sketchingRef.current || placingRef.current) return;
+    const active = activeWorkplaneRef.current;
+    setPicked([]);
+    setDrawing({ plane: active && workplanesRef.current.some((wp) => wp.name === active) ? active : "XY", error: null });
+  }, []);
+  const commitCurve = useCallback(
+    async (doc: CurveDoc, name: string) => {
+      setGuiBusy(true);
+      try {
+        const result = await gui.run({ op: "add", spec: "curve", name, values: { curve: doc } });
+        assertCellRan(result);
+        log.push("ok", `add ${result.name}`);
+        setDrawing(null);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setDrawing((d) => (d ? { ...d, error: message } : d));
+      } finally {
+        setGuiBusy(false);
+      }
+    },
+    [gui.run, log.push],
+  );
+  // W: draw a 3D curve (not while typing, sketching or placing a workplane).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "w" || event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return;
+      if (drawingRef.current || sketchingRef.current || placingRef.current) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable=true], .cm-editor, [role=dialog]")) return;
+      event.preventDefault();
+      startDrawing();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [startDrawing]);
+
   // -- placing a workplane by hand ----------------------------------------------------------------------------------
 
   /** The bases a workplane can be placed on: the datum planes, every workplane of the notebook, and the picked face. */
@@ -868,7 +949,7 @@ export function App() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== " " || event.repeat || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (sketchingRef.current || placingRef.current) return; // space pans the sketch view
+      if (sketchingRef.current || placingRef.current || drawingRef.current) return; // space pans the sketch view
       const target = event.target as HTMLElement | null;
       if (target?.closest("input, textarea, select, button, [contenteditable=true], .cm-editor, [role=dialog]")) return;
       event.preventDefault();
@@ -905,7 +986,16 @@ export function App() {
   const allCommands = useMemo<Command[]>(
     () => [
       // The assembly layout is not a dialog: it is its own panel (registered below), so its spec is left out of the generic list.
-      ...commandsFromSpecs((gui.catalog?.specs ?? []).filter((spec) => spec.id !== "assembly" && spec.id !== "workplane"), openSpec, FEATURE_ICONS),
+      ...commandsFromSpecs((gui.catalog?.specs ?? []).filter((spec) => spec.id !== "assembly" && spec.id !== "workplane" && spec.id !== "curve"), openSpec, FEATURE_ICONS),
+      {
+        id: "curve_draw",
+        label: "3D curve",
+        group: "Sketch",
+        keywords: ["curve", "wire", "path", "3d", "polyline", "spline", "arc", "rail", "sweep"],
+        description: "Draw a path in space (W): lines, arcs and splines on workplanes, snapped to the model; it becomes a wire to sweep along or loft through.",
+        icon: FEATURE_ICONS.sketch,
+        run: () => startDrawing(),
+      },
       {
         id: "workplane_place",
         label: "Workplane",
@@ -949,7 +1039,7 @@ export function App() {
       },
       ...assemblyCommands(openAssembly, { assembly: Boxes, connectors: Cable }),
     ],
-    [gui.catalog, openSpec, sketchOnSelectedFace, editSelectedSketch, openAssembly, workplaneFromSelection],
+    [gui.catalog, openSpec, sketchOnSelectedFace, editSelectedSketch, openAssembly, workplaneFromSelection, startPlacing, startDrawing],
   );
   // The stand-alone combine commands (Cut, Union, Intersect, Cut/Boss with sketch) are offered only while several bodies are open:
   // a new solid says how it meets the body in its own dialog.
@@ -1236,7 +1326,21 @@ export function App() {
                   onHover={setHoverSketch}
                 />
                 {viewRef.current && workplanes.length > 0 && <WorkplanePatches view={viewRef.current} workplanes={workplanes} active={activeWorkplane} />}
-                {!sketching && !placing && viewRef.current && <TagSplits view={viewRef.current} splits={tagSplits} sceneVersion={sceneVersion} />}
+                {!sketching && !placing && !drawing && viewRef.current && <TagSplits view={viewRef.current} splits={tagSplits} sceneVersion={sceneVersion} />}
+                {partial && !sketching && <PartialNotice partial={partial} titles={cellTitles} />}
+                {viewRef.current && curves.length > 0 && <CurveLines view={viewRef.current} curves={curves} />}
+                {drawing && viewRef.current && (
+                  <CurveDrawer
+                    view={viewRef.current}
+                    planes={drawPlanes}
+                    others={curveSnapPoints}
+                    plane={drawing.plane}
+                    busy={guiBusy}
+                    error={drawing.error}
+                    onCommit={(doc, name) => void commitCurve(doc, name)}
+                    onCancel={() => setDrawing(null)}
+                  />
+                )}
                 {placing && viewRef.current && placeBase && (
                   <>
                     <WorkplanePlacer

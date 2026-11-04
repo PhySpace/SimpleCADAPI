@@ -123,6 +123,7 @@ class WorkspaceState:
         "selection",
         "workplanes",
         "tag_splits",
+        "curves",
     )
 
     def __init__(self, workspace: Path, notebook: Path | None = None) -> None:
@@ -135,6 +136,9 @@ class WorkspaceState:
         self.latest: dict[str, dict] = {}
         self._workplanes: list[dict] | None = None  # the frames last sent (see _push_workplanes)
         self._tag_splits: list[dict] | None = None  # the tag splits last sent (see _push_tag_splits)
+        self._curves: list[dict] | None = None  # the curves last sent (see _push_curves)
+        # A cell failed and the model shown is the one before it: {failed, skipped, shown} (see runtime.live.preview_product)
+        self.partial: dict | None = None
         self.latest_package_bytes: bytes | None = None  # a full package, made on demand (export)
         # The latest preview (replaced as a whole, so a reader on another thread never sees half of one) and the
         # parts of it by key: a page is sent only the parts it lacks.
@@ -272,6 +276,8 @@ class WorkspaceState:
             restored = self._restore(notebook, generation)
         self._workplanes = None  # a new notebook: its workplanes are sent on its first settle, whatever they are
         self._tag_splits = None
+        self._curves = None
+        self.partial = None
         kernel = MarimoKernel(
             notebook,
             server_port=self.port,
@@ -428,6 +434,7 @@ class WorkspaceState:
                 "name": notebook.stem,
                 "size": len(data),
                 "cached": True,
+                "partial": None,  # only a whole model is filed
             }
         )
         self.hub.broadcast({"type": "status", "info": "restored from the last run; the kernel is starting…"})
@@ -1144,6 +1151,7 @@ class WorkspaceState:
             published = time.perf_counter()
             self.push_cells()
             self._push_workplanes(result.get("workplanes"))
+            self._push_curves(result.get("curves"))
             if result.get("ok"):  # a failed preview keeps what was last shown
                 self._push_tag_splits(result.get("tag_splits"))
             if os.environ.get("SCA_EDITOR_TRACE"):
@@ -1173,6 +1181,14 @@ class WorkspaceState:
             if message != self._last_publish_error:
                 self._last_publish_error = message
                 self.hub.broadcast({"type": "status", "error": message[-300:]})
+
+    def _push_curves(self, curves: Any) -> None:
+        """The notebook's wires and edges, sampled by the kernel (3D paths are not solids: the preview does not draw
+        them): sent when they change."""
+        if not isinstance(curves, list) or curves == (self._curves or []):
+            return
+        self._curves = curves
+        self.emit({"type": "curves", "curves": curves})
 
     def _push_tag_splits(self, splits: Any) -> None:
         """The tagged entities the model's operations split, and the entities of their pieces: sent when they change."""
@@ -1495,8 +1511,9 @@ class WorkspaceState:
         saved = read_saved_params(config)
         # A drag that pauses and is then released sends its value twice (the pause, the release): the second is
         # what the model already shows.  Rebuilding for it would run the cells that depend on child notebooks
-        # again for nothing -- unless the last run failed, when the person may be asking for a retry.
-        if not self._last_publish_error:
+        # again for nothing -- unless the last run failed (no model, or the model before a failing step), when the person
+        # may be asking for a retry.
+        if not self._last_publish_error and self.partial is None:
             values = {name: value for name, value in values.items() if saved.get(name, self.specs[name].default) != value}
             if not values:
                 self.emit_params()  # keep the page's controls in step
@@ -1673,6 +1690,9 @@ class WorkspaceState:
             },
             "modified_parameters": sorted(saved),
             "model_revision": self.preview_revision,
+            # a cell failed: the model shown is the one before it -- failed: [{cell, name, status, error}], skipped: the
+            # cells after it that did not run, shown: the bodies (or product) on screen; null when the model is whole
+            "partial": self.partial,
             # tagged entities the model's operations split: the pieces carry <tag>.split<i>, highlighted in the viewport
             "tag_splits": [
                 {"tag": row.get("tag"), "into": row.get("into"), "op": row.get("op")} for row in self._tag_splits or []
@@ -1931,6 +1951,17 @@ def _is_function_cell(code: str) -> bool:
     return len(body) == 1 and isinstance(body[0], (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
 
 
+def _partial_header(text: str | None) -> dict | None:
+    """The ``X-Preview-Partial`` header of a published preview: what failed and what the model shown is (else ``None``)."""
+    if not text:
+        return None
+    try:
+        partial = json.loads(text)
+    except ValueError:
+        return None
+    return partial if isinstance(partial, dict) else None
+
+
 def create_app(state: WorkspaceState) -> Starlette:
     hub = state.hub
 
@@ -1962,6 +1993,8 @@ def create_app(state: WorkspaceState) -> Starlette:
         except KeyError as missing:
             # Parts the kernel left out are not here (the server was given another model since): it sends them all.
             return JSONResponse({"ok": False, "missing": missing.args[0]}, status_code=409)
+        partial = _partial_header(request.headers.get("X-Preview-Partial"))
+        state.partial = partial
         state.preview_revision += 1
         state.emit(
             {
@@ -1972,6 +2005,8 @@ def create_app(state: WorkspaceState) -> Starlette:
                 "size": len(state.latest_preview_bytes or b""),
                 # The model on screen is this model: nothing to reload.
                 "unchanged": unchanged,
+                # A cell failed: this is the model before it ({failed, skipped, shown}); None for the whole product.
+                "partial": partial,
             }
         )
         # The pages have the model.  Filing it on disk (and the snapshot an agent reads) wait for nothing: the kernel
@@ -1979,7 +2014,8 @@ def create_app(state: WorkspaceState) -> Starlette:
         hub.broadcast({"type": "status", "error": ""})  # the model is fine again: clear a stale "no product yet"
         threading.Thread(
             target=state.after_publish,
-            args=(arrived, len(body), state.take_signing(), state.latest_preview_bytes),
+            # the model before a failing step is not filed: a restart restores only a whole model
+            args=(arrived, len(body), state.take_signing(), None if partial else state.latest_preview_bytes),
             name="after-publish",
             daemon=True,
         ).start()

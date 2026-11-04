@@ -72,11 +72,15 @@ import {
   type End,
 } from "@/lib/sketch-edit";
 import { typedFields, typedTarget, type TypedDims } from "@/lib/sketch-typed";
-import { addPenSpline, anchorRoles, handlePoints, isAnchorSpline, isSmooth, mirrorHandle, shownHandles, smoothAnchors } from "@/lib/sketch-anchors";
+import { edgeSnap, type Segment } from "@/lib/sketch-face";
+import { addPenSpline, anchorAction, anchorRoles, curveAt, handlePoints, isAnchorSpline, mirrorHandle, shownHandles, smoothAnchors, type AnchorAction } from "@/lib/sketch-anchors";
 
 /** How near the pointer (screen pixels) must be to a point or a curve to snap to it or pick it. */
 const PICK_PX = 16;
 const DRAW_TOOLS = new Set(["point", "line", "circle", "arc", "spline"]);
+/** The drawing tools whose click on the curve of a B-spline in anchor form adds an anchor there and uses it (a point on the
+ * curve, a line's end on it, a pen path through it). */
+const ON_CURVE_TOOLS = new Set(["point", "line", "spline"]);
 
 export type Tool = "select" | "point" | "line" | "circle" | "arc" | "spline" | "delete" | "trim" | "extend" | "fillet" | "chamfer";
 /** The corner value box (fillet radius / chamfer distance) open at a corner. */
@@ -87,8 +91,9 @@ const EDIT_TOOLS: ReadonlySet<Tool> = new Set<Tool>(["trim", "extend", "fillet",
 /** The spline draft is a pen path: its anchors and, for each, the out-handle a drag pulled out (an offset; null: none). */
 export type SplineDraft = { tool: "spline"; points: Spot[]; handles: ([number, number] | null)[] };
 export type Draft = { tool: "line"; from: Spot } | { tool: "circle"; center: Spot } | { tool: "arc"; center: Spot; start?: Spot } | SplineDraft | null;
-/** A drag of points.  `lead` is the point that snaps (an anchor; its handles follow it); `mirror` keeps a smooth anchor smooth
- * while one of its handles is dragged: the opposite handle turns with it and keeps its own length. */
+/** A drag of points.  `lead` is the point that snaps (an anchor; its handles follow it).  A dragged handle moves alone (each
+ * side of an anchor has its own direction and pull); `mirror` is the opposite handle of its anchor, which turns into line with
+ * it, keeping its own length, while Shift is held. */
 export type Drag = {
   ids: string[];
   origin: Record<string, [number, number]>;
@@ -109,13 +114,17 @@ export type KeyOutcome = "handled" | "leave" | "ignored";
 /** The state and the behaviour of the sketch editor, apart from where it is drawn: the document with its undo history,
  * the live solve, loops and the chosen profile, the tools and their drafts, drag with a temporary fix, the value box.
  * The overlay feeds it pointer events already mapped into the plane. */
-export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [number, number][] = [], projectFrom: readonly string[] = []) {
+export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [number, number][] = [], projectFrom: readonly string[] = [], faceEdges: readonly Segment[] = []) {
   const [doc, setDoc] = useState<SketchDoc>(initial);
   const [tool, setTool] = useState<Tool>("select");
   const [selection, setSelection] = useState<string[]>([]);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(null);
-  const [cursor, setCursor] = useState<{ x: number; y: number; pointId?: string } | null>(null);
+  const [cursor, setCursor] = useState<{ x: number; y: number; pointId?: string; onSpline?: string; onEdge?: boolean } | null>(null);
+  /** Anchor mode (Shift+A with a B-spline picked): a click on a curve adds an anchor, a click on an inner anchor removes it.
+   * Holds the spline it was entered with; `anchorHover` is what a click would do where the pointer is. */
+  const [anchorMode, setAnchorMode] = useState<string | null>(null);
+  const [anchorHover, setAnchorHover] = useState<AnchorAction>(null);
   const [hover, setHover] = useState<Hit | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [box, setBox] = useState<ValueBox | null>(null);
@@ -294,11 +303,27 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   }, [pts, modelPoints, crossings, roles]);
 
   const spotAt = useCallback(
-    (world: [number, number], info: Pick<PointerInfo, "scale" | "alt">): Spot => {
-      const s = snap(world, snapTargets, { grid: snapOn && !info.alt ? gridStep(info.scale) : null, tol: PICK_PX / info.scale });
-      return { x: s.x, y: s.y, pointId: s.pointId?.startsWith("m:") || s.pointId?.startsWith("x:") ? undefined : s.pointId };
+    (world: [number, number], info: Pick<PointerInfo, "scale" | "alt">, curves = false): Spot => {
+      const tol = PICK_PX / info.scale;
+      const s = snap(world, snapTargets, { grid: snapOn && !info.alt ? gridStep(info.scale) : null, tol });
+      const pointId = s.pointId?.startsWith("m:") || s.pointId?.startsWith("x:") ? undefined : s.pointId;
+      if (pointId || !snapOn || info.alt) return { x: s.x, y: s.y, pointId };
+      if (!curves) {
+        if (s.kind === "point") return { x: s.x, y: s.y };
+        const edge = edgeSnap(world, faceEdges, tol);
+        return edge ? { x: edge[0], y: edge[1], onEdge: true } : { x: s.x, y: s.y };
+      }
+      // A point of the sketch wins; then the curve of a spline in anchor form beats the grid (a crossing on it keeps its place).
+      if (s.kind === "point") {
+        const on = curveAt(docRef.current, resultRef.current, [s.x, s.y], tol / 4);
+        return on ? { x: s.x, y: s.y, onSpline: on.spline } : { x: s.x, y: s.y };
+      }
+      const on = curveAt(docRef.current, resultRef.current, world, tol);
+      if (on) return { x: on.at[0], y: on.at[1], onSpline: on.spline };
+      const edge = edgeSnap(world, faceEdges, tol); // the edges of the face the sketch is on beat the grid
+      return edge ? { x: edge[0], y: edge[1], onEdge: true } : { x: s.x, y: s.y };
     },
-    [snapTargets, snapOn],
+    [snapTargets, snapOn, faceEdges],
   );
 
   // -- constraints, value box -------------------------------------------------------------------------------------------------
@@ -358,6 +383,8 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     setPendingLine(null);
     setCornerBox(null);
     setProjectOpen(false);
+    setAnchorMode(null);
+    setAnchorHover(null);
     setTool(next);
     setDraft(null);
     if (next !== "select") setSelection([]);
@@ -447,6 +474,46 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       }),
     [runEdit],
   );
+  /** A drawing click on a spline's curve: the SDK adds an anchor there first, then the click goes on with that point. */
+  const placeOnCurve = useCallback(
+    async (spot: Spot, then: (spot: Spot) => void) => {
+      let anchor: string | undefined;
+      await runEdit(insertAnchorRequest(docRef.current, spot.onSpline!, [spot.x, spot.y]), (next, created) => {
+        const made = anchorRoles(next);
+        anchor = created.find((id) => made.get(id)?.kind === "anchor");
+        return [];
+      });
+      const at = anchor ? docRef.current.points.find((p) => p.id === anchor) : undefined;
+      if (at) then({ x: at.x, y: at.y, pointId: at.id });
+    },
+    [runEdit],
+  );
+
+  /** Shift+A: anchor mode on (a B-spline in anchor form, or a point of one, must be picked) or off. */
+  const toggleAnchorMode = useCallback(() => {
+    if (anchorMode) {
+      setAnchorMode(null);
+      setAnchorHover(null);
+      return;
+    }
+    const d = docRef.current;
+    const picked = selection.map((id) => roles.get(id)?.spline ?? id).find((id) => d.entities.some((e) => e.id === id && e.kind === "bspline"));
+    const spline = d.entities.find((e) => e.id === picked);
+    if (!spline) {
+      setEditNote({ tone: "fail", text: "anchor mode: pick a B-spline first (click its curve), then Shift+A" });
+      return;
+    }
+    if (!isAnchorSpline(spline)) {
+      setEditNote({ tone: "fail", text: `anchor mode: ${spline.id} has control points, not anchors: convert it first (K; the shape stays)` });
+      return;
+    }
+    setTool("select");
+    setDraft(null);
+    setEditNote(null);
+    setSelection([spline.id]);
+    setAnchorMode(spline.id);
+  }, [anchorMode, selection, roles]);
+
   /** The selected B-spline that has control points rather than anchors (the one a convert would change), or null. */
   const convertTarget = useMemo(() => {
     const picked = doc.entities.filter((e) => e.kind === "bspline" && selection.includes(e.id));
@@ -659,6 +726,16 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       }
       return "handled";
     }
+    if (anchorMode && tool === "select") {
+      if (editBusy) return "handled";
+      const hit = hitTest(d, result, world, tol, hidden);
+      const action = anchorAction(d, result, world, tol, hit?.kind === "point" ? hit.id : null, roles);
+      if (action?.kind === "add") void runEdit(insertAnchorRequest(d, action.spline, action.at), () => [action.spline]);
+      else if (action?.kind === "remove") void runEdit(removeAnchorRequest(d, action.spline, action.anchor), () => [action.spline]);
+      else if (action?.kind === "refuse") setEditNote({ tone: "fail", text: action.text });
+      setAnchorHover(null);
+      return "handled";
+    }
     if (tool === "select" || tool === "delete") {
       const hit = hitTest(d, result, world, tol, hidden);
       if (tool === "delete") {
@@ -697,6 +774,15 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       }
       if (!shiftKey) setSelection([]);
       return "handled";
+    }
+    if (ON_CURVE_TOOLS.has(tool)) {
+      const spot = spotAt(world, info, true);
+      const path = draftRef.current?.tool === "spline" ? draftRef.current.points : [];
+      const ending = path.length >= 2 && [path[0], path[path.length - 1]].some((a) => Math.hypot(a.x - spot.x, a.y - spot.y) <= tol);
+      if (spot.onSpline && !ending) {
+        if (!editBusy) void placeOnCurve(spot, (made) => place(made));
+        return "handled";
+      }
     }
     if (tool === "spline") {
       // The pen: a press places an anchor (or finishes / closes the path, as a click does); a drag from it pulls out handles.
@@ -743,11 +829,10 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
           ids = [p.hit.id, ...role.handles.filter((h) => !isFixed(d, h))];
           lead = p.hit.id;
         } else if (role?.kind === "handle" && role.other && !isFixed(d, role.other)) {
-          // a handle of a smooth anchor turns the opposite handle with it
+          // the opposite handle of the anchor, which Shift turns into line with this one
           const a = pts.get(role.anchor);
-          const h = pts.get(p.hit.id);
           const o = pts.get(role.other);
-          if (a && h && o && isSmooth(a, h, o)) mirror = { other: role.other, anchor: a, length: Math.hypot(o[0] - a[0], o[1] - a[1]) };
+          if (a && o) mirror = { other: role.other, anchor: a, length: Math.hypot(o[0] - a[0], o[1] - a[1]) };
         }
         if (ids.length && !ids.some((id) => isFixed(d, id))) {
           const origin: Record<string, [number, number]> = {};
@@ -762,12 +847,13 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
         // the lead point snaps; the points it carries move by as much
         const lead = drag.lead ?? drag.ids[0];
         const s = snap(world, snapTargets, { grid: snapOn && !info.alt ? gridStep(info.scale) : null, tol: snapOn ? tol : 0, skip: new Set(drag.ids) });
-        positions[lead] = [s.x, s.y];
+        const edge = s.kind !== "point" && snapOn && !info.alt ? edgeSnap(world, faceEdges, tol) : null;
+        positions[lead] = edge ?? [s.x, s.y];
         const dx = s.x - drag.origin[lead][0];
         const dy = s.y - drag.origin[lead][1];
         for (const id of drag.ids) if (id !== lead) positions[id] = [drag.origin[id][0] + dx, drag.origin[id][1] + dy];
-        // Alt while dragging a handle breaks the anchor into a corner: the opposite handle stays where it was
-        const turned = drag.mirror && !info.alt ? mirrorHandle(drag.mirror.anchor, positions[lead], drag.mirror.length) : null;
+        // Shift while dragging a handle makes the anchor smooth: the opposite handle turns into line, keeping its own length
+        const turned = drag.mirror && info.shift ? mirrorHandle(drag.mirror.anchor, positions[lead], drag.mirror.length) : null;
         if (drag.mirror && turned) positions[drag.mirror.other] = turned;
       } else {
         const dx = world[0] - drag.start[0];
@@ -789,7 +875,12 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
         setDraft(next);
       }
     }
-    if (tool === "select") {
+    if (tool === "select" && anchorMode) {
+      const hit = hitTest(docRef.current, result, world, tol, hidden);
+      setAnchorHover(anchorAction(docRef.current, result, world, tol, hit?.kind === "point" ? hit.id : null, roles));
+      setHover(null);
+      setCursor({ x: world[0], y: world[1] });
+    } else if (tool === "select") {
       setHover(hitTest(docRef.current, result, world, tol, hidden));
       setCursor({ x: world[0], y: world[1] });
     } else if (tool === "fillet" || tool === "chamfer") {
@@ -805,8 +896,8 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       setHoverEnd(hit && tool === "extend" ? nearerEnd(docRef.current, pts, hit.id, world) : null);
       setCursor({ x: world[0], y: world[1] });
     } else {
-      const s = spotAt(world, info);
-      setCursor({ x: s.x, y: s.y, pointId: s.pointId });
+      const s = spotAt(world, info, ON_CURVE_TOOLS.has(tool));
+      setCursor({ x: s.x, y: s.y, pointId: s.pointId, onSpline: s.onSpline, onEdge: s.onEdge });
     }
   };
 
@@ -855,7 +946,9 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       if (draft.points.length >= 2) finishSpline(draft, false);
       return "handled";
     }
-    if (k === "s" && tool === "select") smoothSelection();
+    if (k === "a" && event.shiftKey) toggleAnchorMode(); // before A (arc): Shift+A is anchor mode
+    else if (anchorMode && (k === "delete" || k === "backspace")) return "handled"; // a click removes in anchor mode
+    else if (k === "s" && tool === "select") smoothSelection();
     else if (k === "k" && tool === "select") {
       if (convertTarget) convertSpline(convertTarget);
       else setEditNote({ tone: "fail", text: "convert: select one B-spline that has control points (a spline drawn with the spline tool already has anchors)" });
@@ -869,7 +962,10 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       else if (cornerBox) setCornerBox(null);
       else if (projectOpen) setProjectOpen(false);
       else if (pendingLine) setPendingLine(null);
-      else if (draft) setDraft(null);
+      else if (anchorMode) {
+        setAnchorMode(null);
+        setAnchorHover(null);
+      } else if (draft) setDraft(null);
       else if (tool !== "select") setTool("select");
       else if (selection.length) setSelection([]);
       else return "leave";
@@ -914,20 +1010,22 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
 
   const typed = DRAW_TOOLS.has(tool) ? " Or type numbers (Tab between fields, Enter places)." : "";
   const hint =
-    (tool === "select"
+    (tool === "select" && anchorMode
+      ? "ANCHOR MODE: click a spline's curve to add an anchor (the curve stays), click an inner anchor to remove it. Esc or Shift+A leaves."
+      : tool === "select"
       ? shown.size
-        ? "Drag an anchor (its handles follow) or a handle (its length is that side's pull); a smooth anchor keeps its handles in line: hold Alt while dragging for a corner, S smooths it again. Double-click the curve to add an anchor; Delete removes the selected anchor."
+        ? "Drag an anchor (its handles follow) or a handle: each side has its own direction and pull. Hold Shift while dragging a handle to put the other one in line (smooth); S smooths the selected anchors. Shift+A: anchor mode (add/remove anchors by clicking); Delete removes the selected anchor."
         : convertTarget
           ? `${convertTarget} has control points, not anchors: K (or the button by the curve) converts it, keeping its shape.`
           : "Click or shift-click to select; drag a point or a line to move it; click inside a loop for the profile, shift-click for a hole. Click a spline to show its handles."
       : tool === "line"
-        ? draft ? "Click the next point; clicking an existing point ends the chain; Esc ends." : "Click the first point."
+        ? draft ? "Click the next point; clicking an existing point ends the chain (a click on a spline's curve adds an anchor there and ends on it); Esc ends." : "Click the first point (on a spline's curve: an anchor is added there)."
         : tool === "circle"
           ? draft ? "Click a point on the circle." : "Click the centre."
           : tool === "spline"
             ? draft
-              ? "Click the next anchor; press and drag to pull out its handles. Finish: Enter, the last anchor again (double-click) or the button; the first anchor closes it. Esc drops it."
-              : "Click the first anchor; press and drag to pull out its handles (a click alone makes a smooth curve through the anchors)."
+              ? "Click the next anchor; press and drag to pull out its handles; a click on another spline's curve adds an anchor there and goes through it. Finish: Enter, the last anchor again (double-click) or the button; the first anchor closes it. Esc drops it."
+              : "Click the first anchor; press and drag to pull out its handles (a click alone makes a smooth curve through the anchors). A click on a spline's curve adds an anchor there and starts from it."
           : tool === "arc"
             ? draft ? (draft.tool === "arc" && draft.start ? "Click the end (counter-clockwise from start)." : "Click the start point (sets the radius).") : "Click the centre."
             : tool === "delete"
@@ -940,13 +1038,14 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
                 ? "Click the part of a line, arc or circle to cut away; the SDK decides the piece between its neighbours."
                 : tool === "extend"
                   ? "Click a line near the end to extend; it grows to the next entity."
-                  : "Click to place a point.") + typed;
+                  : "Click to place a point; on a spline's curve the point is a new anchor of the spline.") + typed;
 
   return {
     cornerHover, pendingLine, cornerBox, setCornerBox, submitCorner, projectOpen, setProjectOpen, openProject, projectSketch, projectFrom,
     doc, commit, undo, redo, edits, editNote, editBusy, flash, hoverEnd, runEdit, tool, chooseTool, selection, highlight, setHighlight, draft, cursor, hover, drag, box, setBox, result, error, auto, setAuto, snapOn,
     setSnapOn, construction, choice, pts, loops, applicable, blamed, fresh, crossings, finishSplineDraft: () => draft?.tool === "spline" && draft.points.length >= 2 && finishSpline(draft, false), entry,
-    wires, wire, setWireKey, setOutput,
+    wires, wire, setWireKey, setOutput, faceEdges,
+    anchorMode, anchorHover, toggleAnchorMode,
     roles, shown, hidden, convertTarget, convertSpline, insertAnchor, smoothSelection, pressingPen: () => pen.current !== null, setEntry, entryFields, submitEntry, failing, highlighted, fixedPoints, solved, badge, diagnostics, outer, hint, extents,
     openBox, applyConstraint, submitBox, deleteSelection, toggleConstruction, pointerDown, pointerMove, pointerUp, pointerLeave, key,
   };

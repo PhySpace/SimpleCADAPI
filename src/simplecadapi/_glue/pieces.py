@@ -17,8 +17,8 @@ from typing import Any, Callable
 TAKES_PIECES = frozenset({"make_part_rpart", "fillet_rsolid", "chamfer_rsolid", "union_rsolid", "boolean_rsolidlist"})
 """Operations that read a list of pieces as such (all of them together), not one piece at a time."""
 
-SPLITS = frozenset({"cut_rsolid", "fillet_rsolid", "chamfer_rsolid"})
-"""Operations whose list result is the pieces of one body."""
+SPLITS = frozenset({"cut_rsolid", "fillet_rsolid", "chamfer_rsolid", "make_faces_from_sketch_rfacelist"})
+"""Operations whose list result flows on as :class:`Pieces`: the pieces of one body, and the region faces of a sketch."""
 
 
 class TagSplitWarning(UserWarning):

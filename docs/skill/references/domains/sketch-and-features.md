@@ -145,9 +145,9 @@ control points `[A0, out0, in1, A1, out1, in2, A2, ...]`, the anchors `A<i>` on 
 curve, each with an in-handle and an out-handle (a pen tool's curve; the editor's
 spline tool draws this form, knots `0..n`, multiplicities `[4, 3, ..., 3, 4]`). Every
 control point is a sketch point and the solver moves all of them, so moving an anchor
-or a handle is moving a point; the two handles of an anchor are independent (their
-lengths are the pull on each side; in one line the anchor is smooth). Trim and extend
-keep the form.
+or a handle is moving a point; the two handles of an anchor are independent (each
+has its own direction and length, the pull on that side; they need not be in one line
+-- when they are, the anchor is smooth). Trim and extend keep the form.
 
 ```python
 sketch = scad.insert_spline_anchor_rsketch(sketch, "s1", (12.0, 8.0))  # curve unchanged: new p<n> anchor + 2 handles
