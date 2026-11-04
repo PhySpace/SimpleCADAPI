@@ -26,7 +26,7 @@ from ._marimo import safe_get_context
 from .cells import NotebookCells
 from .config import read_notebook_config
 from .executor import finish_kernel_cache
-from .projection import find_product, project_product
+from .projection import find_product, product_reads, project_product
 
 PACKAGE_MEDIA_TYPE = "application/vnd.simplecad.scadpkg"
 PREVIEW_MEDIA_TYPE = "application/vnd.simplecad.preview"
@@ -69,7 +69,7 @@ def live_package(*, validate: bool = False) -> LivePackage:
     values = {
         name: glbls[name] for cell in ordered for name in cell.defs if name in glbls
     }
-    read = frozenset().union(*(cell.refs for cell in ordered))
+    read = product_reads(ordered, values)
     product = project_product(
         find_product(config, values, read),
         config=config,
@@ -111,7 +111,7 @@ def _live_scene() -> PreviewScene:
     glbls = context.globals
     ordered = list(context.graph.cells.values())
     values = {name: glbls[name] for cell in ordered for name in cell.defs if name in glbls}
-    read = frozenset().union(*(cell.refs for cell in ordered))
+    read = product_reads(ordered, values)
     scene = compile_preview(find_product(config, values, read))
     last_timings["compile_ms"] = round((time.perf_counter() - started) * 1000, 1)
     _last_preview = scene
@@ -189,6 +189,41 @@ def publish_preview(url: str, *, step: str = "", timeout: float = 60.0) -> dict[
     return {"nodes": len(scene.nodes), "parts": len(scene.parts), "bytes": len(data), **last_timings}
 
 
+def workplane_frames(values: dict[str, Any]) -> list[dict[str, Any]]:
+    """The workplanes among *values*: ``{name, origin, x_axis, y_axis, normal}`` per variable, in world coordinates.
+
+    The frames are the SDK's own (``SimpleWorkplane.origin`` ...), as the kernel computed them: an editor draws and
+    sketches on them without recomputing any geometry.
+    """
+
+    from .._cpp import SimpleWorkplane
+
+    out: list[dict[str, Any]] = []
+    for name, value in values.items():
+        if isinstance(value, SimpleWorkplane):
+            out.append(
+                {
+                    "name": name,
+                    "origin": [float(v) for v in value.origin],
+                    "x_axis": [float(v) for v in value.x_dir],
+                    "y_axis": [float(v) for v in value.y_dir],
+                    "normal": [float(v) for v in value.normal],
+                }
+            )
+    return out
+
+
+def live_workplanes() -> list[dict[str, Any]]:
+    """The workplane variables of the running notebook (see :func:`workplane_frames`); empty outside a kernel."""
+
+    context = safe_get_context()
+    if context is None:
+        return []
+    glbls = context.globals
+    values = {name: glbls[name] for cell in context.graph.cells.values() for name in cell.defs if name in glbls}
+    return workplane_frames(values)
+
+
 def preview_entity_info(entity_id: str) -> dict[str, Any] | None:
     """The properties of one entity of the scene last previewed (see :func:`entity_info`)."""
 
@@ -216,6 +251,8 @@ def publish_live(url: str, *, step: str = "", timeout: float = 60.0) -> LivePack
 
 
 __all__ = [
+    "live_workplanes",
+    "workplane_frames",
     "LivePackage",
     "LiveUnavailableError",
     "live_package",

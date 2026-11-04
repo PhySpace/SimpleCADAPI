@@ -28,6 +28,10 @@ requested (sketch tier profiles and paths).
 
 - Plane mapping (which model plane the sketch lives on), closure requirements,
   arc direction conventions, spline definitions, and known degrees of freedom.
+- A sketch off the XY/XZ/YZ planes goes on a workplane value: `plane=wp` where `wp` is a recorded
+  `make_workplane_*_rworkplane` (a face, three points, an axis, a midplane, a curve's normal plane; see
+  `references/docs/core/simple_workplane.md`). It follows the geometry the workplane was made from; a frame mapping of
+  copied numbers does not.
 
 ## Outputs
 

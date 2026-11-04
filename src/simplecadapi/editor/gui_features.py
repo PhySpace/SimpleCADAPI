@@ -81,6 +81,7 @@ class FeatureService:
         product: dict[str, Any] | None = None
         params_cells: dict[str, str] = {}
         assembly_slugs: set[str] = set()
+        workplanes: list[dict[str, Any]] = []
         for cell in cells:
             gui = F.parse_gui(str(cell.get("code", "")))
             heads = features_in_cell(str(cell.get("code", "")), "")
@@ -102,13 +103,17 @@ class FeatureService:
                 continue
             head = heads[0]
             gui = F.parse_gui(code)
-            consumed.update(loaded & set(bodies))
+            if head.role != "datum":  # a workplane on a body's face is not built from the body: the body stays open
+                consumed.update(loaded & set(bodies))
             produces = F.BY_ID[gui["spec"]].produces if gui else "solid"
             part_of = head.slug[: -len("_parts")] if head.slug.endswith("_parts") and head.slug[: -len("_parts")] in assembly_slugs else None
             made = defined if head.role in _ROLES_WITH_BODIES and not part_of else []
             for name in made:
                 bodies[name] = produces
                 order.append(name)
+            if head.role == "datum" and produces == "workplane":
+                made = sorted(defined)
+                workplanes.extend({"name": name, "cell": cell["id"], "slug": head.slug} for name in made)
             features.append(
                 {
                     "cell": cell["id"],
@@ -118,7 +123,7 @@ class FeatureService:
                     "gui": {"spec": gui["spec"], "values": gui.get("values", {}), "picked": gui.get("picked", {})} if gui else None,
                     "makes": made,
                     "part_of": part_of,
-                    "reads": sorted(loaded & set(bodies) - set(made)),
+                    "reads": sorted(loaded & (set(bodies) | {w["name"] for w in workplanes}) - set(made)),
                     "status": cell.get("status"),
                     "errors": cell.get("errors") or [],
                 }
@@ -137,7 +142,7 @@ class FeatureService:
                     {
                         "name": feature["makes"][0],
                         "plane": plane,
-                        "plane_label": plane if isinstance(plane, str) else "face",
+                        "plane_label": plane if isinstance(plane, str) else (sketch_doc.plane_workplane(plane) or "face"),
                         "normal": sketch_doc.PLANE_NORMALS.get(plane, "normal") if isinstance(plane, str) else "normal",
                         "normal_vec": sketch_doc.plane_normal(plane),
                     }
@@ -151,6 +156,7 @@ class FeatureService:
             "open": open_bodies,
             "tip": open_bodies[-1] if open_bodies else None,
             "profiles": profiles,
+            "workplanes": workplanes,
             "assembly": next(
                 (
                     {"cell": f["cell"], "slug": f["slug"], "doc": (f["gui"]["values"] or {}).get("assembly")}

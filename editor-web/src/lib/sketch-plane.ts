@@ -6,8 +6,10 @@ export type Vec3 = [number, number, number];
 export type Plane = "XY" | "XZ" | "YZ";
 export const PLANES: Plane[] = ["XY", "XZ", "YZ"];
 
-/** A plane by its origin and unit axes (mm); the normal is x_axis cross y_axis. */
-export type Frame = { origin: Vec3; x_axis: Vec3; y_axis: Vec3 };
+/** A plane by its origin and unit axes (mm); the normal is x_axis cross y_axis.  `workplane` names the notebook's
+ * workplane variable the frame belongs to: the sketch cell then writes `plane=<that variable>` (and follows it), and the
+ * frame is the one the kernel reported, kept for drawing and solving. */
+export type Frame = { origin: Vec3; x_axis: Vec3; y_axis: Vec3; workplane?: string };
 export type PlaneSpec = Plane | Frame;
 
 export const isNamedPlane = (plane: unknown): plane is Plane => typeof plane === "string" && PLANES.includes(plane as Plane);
@@ -69,7 +71,8 @@ export function normalizePlane(raw: unknown): PlaneSpec {
     if (origin && ux && y) {
       const along = dot(y, ux);
       const uy = unit([y[0] - ux[0] * along, y[1] - ux[1] * along, y[2] - ux[2] * along]);
-      if (uy) return { origin, x_axis: ux, y_axis: uy };
+      const workplane = typeof o.workplane === "string" && /^[A-Za-z_][A-Za-z0-9_]*$/.test(o.workplane) ? o.workplane : null;
+      if (uy) return workplane ? { workplane, origin, x_axis: ux, y_axis: uy } : { origin, x_axis: ux, y_axis: uy };
     }
   }
   return "XY";
@@ -80,7 +83,8 @@ export function frameSpec(frame: Frame): Frame {
   const x = unit(roundVec(unit(frame.x_axis) ?? [1, 0, 0], 9)) ?? [1, 0, 0];
   const n = unit(cross(x, unit(frame.y_axis) ?? [0, 1, 0])) ?? [0, 0, 1];
   const y = unit(roundVec(unit(cross(n, x)) ?? [0, 1, 0], 9)) ?? [0, 1, 0];
-  return { origin: roundVec(frame.origin, 6), x_axis: x, y_axis: y };
+  const out: Frame = { origin: roundVec(frame.origin, 6), x_axis: x, y_axis: y };
+  return frame.workplane ? { workplane: frame.workplane, ...out } : out;
 }
 
 /** A stable x axis for a plane that came without one: horizontal (Z cross n); for floors and ceilings, X. */
@@ -112,6 +116,7 @@ export function frameFromEntity(geometry: Record<string, unknown> | null | undef
 
 /** The document's plane value for a frame: a named plane when it is exactly one at the origin, else the frame. */
 export function planeValue(frame: Frame): PlaneSpec {
+  if (frame.workplane) return frameSpec(frame);  // a workplane stays itself, even where it equals a datum plane
   for (const name of PLANES) {
     const n = NAMED[name];
     if (length(sub(frame.origin, n.origin)) < 1e-6 && length(sub(frame.x_axis, n.x_axis)) < 1e-6 && length(sub(frame.y_axis, n.y_axis)) < 1e-6) return name;
@@ -119,7 +124,10 @@ export function planeValue(frame: Frame): PlaneSpec {
   return frameSpec(frame);
 }
 
-export const planeLabel = (plane: PlaneSpec): string => (isNamedPlane(plane) ? plane : "face");
+export const planeLabel = (plane: PlaneSpec): string => (isNamedPlane(plane) ? plane : plane.workplane ?? "face");
+
+/** The workplane variable a plane names, or null (a datum plane or a face's frame). */
+export const planeWorkplane = (plane: PlaneSpec): string | null => (isNamedPlane(plane) ? null : plane.workplane ?? null);
 
 /** The position of a world point (mm) in the plane's (u, v). */
 export function worldToPlane(plane: PlaneSpec, p: Vec3): [number, number] {

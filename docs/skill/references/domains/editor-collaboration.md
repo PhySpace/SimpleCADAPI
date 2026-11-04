@@ -235,6 +235,16 @@ HOLE_DIAMETER = scad.var(name="hole_diameter", default=6.0, unit="mm", comment="
   ("name a face": pick the faces, type the tag). A colour slot is the `color` kind of the catalog
   (`simplecadapi.types.Color`); the picker's `#rrggbb` is written as linear RGB. A person's face name is a tag: read it
   with `scad.ql.tag(...)`, never invent another naming scheme.
+- Workplanes: with a selection, Space (or the command "Workplane from selection") writes a `workplane` feature
+  (`# ---- feature: wp (datum) ----`, `wp = scad.make_workplane_*_rworkplane(...)` with the picks resolved inline, offset
+  and flip in the params cell). One flat face -> on it; a face and an edge -> x along the edge; two parallel faces ->
+  the midplane; three vertices (in pick order) -> through them; one edge -> through it, turned by an angle. The new
+  workplane becomes the active one (the camera turns to it, it is drawn blue); a new sketch goes on it, and the plane
+  chooser lists every workplane variable. Each workplane variable of the notebook (GUI or code) is drawn as a small
+  labelled patch at the frame the kernel computed (the server's `workplanes` envelope).
+- A sketch on a workplane has `plane={"workplane": "wp", origin, x_axis, y_axis}` in its `# gui:` document and
+  `plane=wp` in its code: the frame in the document is only for drawing before the cell runs; the cell follows `wp`.
+  A workplane cell reads the body without consuming it (the body stays the open body / product).
 - Unattended: the buttons are not available; write the cells yourself (see `discipline/notebook-cell-design.md`).
 
 ## The same operations from the command line

@@ -43,6 +43,26 @@ Datum features: mating faces, screw axes, centerlines, locating features
 `CoordinateSystem` exist for local contexts; use them when a feature is
 naturally authored in a local frame, and say so in the source.
 
+## Workplanes from the model (SDK facts)
+
+A datum that comes from geometry is a recorded workplane, not copied numbers:
+`make_workplane_from_face_rworkplane` (a planar face, optional `offset`, `x_edge`,
+`flip`), `make_workplane_from_points_rworkplane` (three vertices or points),
+`make_workplane_from_axis_rworkplane` (an edge or a hole's axis, turned by `angle`),
+`make_workplane_midplane_rworkplane` (two parallel faces: a symmetry plane) and
+`make_workplane_normal_to_curve_rworkplane` (a sweep profile's plane at a fraction of
+a path). See `references/docs/core/simple_workplane.md`.
+
+- Give the workplane its own name in its own cell (`wp_top = ...`), then sketch on it
+  (`make_sketch_rsketch(..., plane=wp_top)`) or model in it (`with wp_top:`). A later
+  cell may enter it again; it is cached with its cell.
+- A sketch or feature on a workplane made from a face follows the face when the
+  model changes (the notebook re-runs it; a model-JSON replay rebuilds the frame
+  from the recorded op). Copying `wp.origin` / `wp.normal` into literals breaks that
+  link: use the workplane value.
+- Name the datum in the brief like any other: "boss sketch on `wp_top` (top face of
+  base), x along the long edge".
+
 ## Placement semantics
 
 - Part-local coordinates equal the wrapped solid's modeling coordinates. If a

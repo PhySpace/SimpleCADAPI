@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "scad/core/scalar.hpp"
+#include "scad/core/coordinate_system.hpp"
 #include "scad/core/value.hpp"
 #include "scad/sketch/profile.hpp"
 #include "scad/sketch/sketch.hpp"
@@ -24,8 +25,14 @@ using SketchConstraintId = std::optional<std::string>;
 // ---- documents and entities ------------------------------------------------
 
 // `plane`: "XY" | "XZ" | "YZ" or {"origin", "x_axis", "y_axis"}, read in the
-// *current* coordinate system (the sketch stores it in world coordinates).
+// *current* coordinate system (the sketch stores it in world coordinates).  A mapping that also says
+// "workplane": true is a world frame already (what a sketch on a workplane records) and is not transformed.
 Sketch make_sketch_rsketch(const std::optional<std::string>& name = std::nullopt, const Value& plane = Value("XY"),
+                           const std::optional<std::string>& sketch_id = std::nullopt);
+// On a workplane: its frame, in world coordinates whatever the current system.  The workplane's node (when it
+// was recorded) is an input of the sketch's, and `plane` is recorded as {"workplane": true, origin, x_axis,
+// y_axis}, so a replay takes the frame from the replayed workplane.
+Sketch make_sketch_rsketch(const std::optional<std::string>& name, const Workplane& plane,
                            const std::optional<std::string>& sketch_id = std::nullopt);
 
 Sketch add_point_rsketch(const Sketch& sketch, const std::string& point_id, const Scalar& x, const Scalar& y);

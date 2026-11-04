@@ -18,11 +18,13 @@ recording anything, so a canvas can show the solved geometry, the degrees of fre
 from __future__ import annotations
 
 import json
+import keyword
 import math
 import re
 from typing import Any, Mapping
 
 _ID = re.compile(r"[a-z][a-z0-9_]{0,30}")
+_VARIABLE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,60}")
 _SUB = ("start", "end", "center")
 PLANES = ("XY", "XZ", "YZ")
 PLANE_NORMALS = {"XY": "+z", "XZ": "-y", "YZ": "+x"}
@@ -83,7 +85,12 @@ def _vec3(value: Any, what: str) -> list[float]:
 
 
 def validate_plane(plane: Any) -> Any:
-    """A named plane (XY, XZ, YZ) or a frame ``{origin, x_axis, y_axis}`` (unit axes, square to each other)."""
+    """A named plane (XY, XZ, YZ), a frame ``{origin, x_axis, y_axis}`` (unit axes, square to each other), or a workplane
+    of the notebook: ``{"workplane": "<variable>", origin, x_axis, y_axis}``.
+
+    A workplane plane is written as ``plane=<variable>`` in the cell, so the sketch follows the workplane (and the face it
+    was made from); its frame is the one the kernel reported, kept for solving and drawing before the cell runs.
+    """
     if isinstance(plane, str):
         if plane not in PLANES:
             raise SketchError(f"the sketch plane must be one of {', '.join(PLANES)}")
@@ -95,7 +102,25 @@ def validate_plane(plane: Any) -> Any:
         raise SketchError("the plane axes must be unit vectors")
     if abs(sum(a * b for a, b in zip(x, y))) > 1e-6:
         raise SketchError("the plane x axis and y axis must be square to each other")
-    return {"origin": origin, "x_axis": x, "y_axis": y}
+    out: dict[str, Any] = {"origin": origin, "x_axis": x, "y_axis": y}
+    workplane = plane.get("workplane")
+    if workplane is not None:
+        if not isinstance(workplane, str) or not _VARIABLE.fullmatch(workplane) or keyword.iskeyword(workplane):
+            raise SketchError("the workplane of a sketch plane is the name of a notebook variable")
+        out = {"workplane": workplane, **out}
+    return out
+
+
+def plane_workplane(plane: Any) -> str | None:
+    """The workplane variable a validated plane names, or ``None`` (a named plane or a plain frame)."""
+    return plane.get("workplane") if isinstance(plane, Mapping) else None
+
+
+def plane_frame(plane: Any) -> Any:
+    """What ``make_sketch_rsketch(plane=...)`` takes outside the notebook: the name, or the frame as tuples."""
+    if isinstance(plane, str):
+        return plane
+    return {key: tuple(plane[key]) for key in ("origin", "x_axis", "y_axis")}
 
 
 def plane_normal(plane: Any) -> list[float]:
@@ -108,6 +133,8 @@ def plane_normal(plane: Any) -> list[float]:
 def _plane_literal(plane: Any) -> str:
     if isinstance(plane, str):
         return json.dumps(plane)
+    if plane.get("workplane"):
+        return str(plane["workplane"])  # the notebook's workplane value: the sketch follows it
     parts = ", ".join(f'"{key}": ({", ".join(_num(v) for v in plane[key])})' for key in ("origin", "x_axis", "y_axis"))
     return "{" + parts + "}"
 
@@ -329,8 +356,7 @@ def solve(doc: Mapping[str, Any]) -> dict[str, Any]:
 
     clean = validate(doc)
     namespace: dict[str, Any] = {"scad": scad}
-    plane = clean["plane"] if isinstance(clean["plane"], str) else {k: tuple(v) for k, v in clean["plane"].items()}
-    sketch = scad.make_sketch_rsketch(name="canvas", plane=plane)
+    sketch = scad.make_sketch_rsketch(name="canvas", plane=plane_frame(clean["plane"]))
     namespace["_sketch"] = sketch
     for line in _calls(clean):
         exec(line, namespace)  # noqa: S102 - generated from validated ids and numbers only
@@ -397,8 +423,7 @@ def to_sketch(doc: Mapping[str, Any]) -> Any:
     import simplecadapi as scad
 
     clean = validate(doc)
-    plane = clean["plane"] if isinstance(clean["plane"], str) else {k: tuple(v) for k, v in clean["plane"].items()}
-    namespace: dict[str, Any] = {"scad": scad, "_sketch": scad.make_sketch_rsketch(name="canvas", plane=plane)}
+    namespace: dict[str, Any] = {"scad": scad, "_sketch": scad.make_sketch_rsketch(name="canvas", plane=plane_frame(clean["plane"]))}
     for line in _calls(clean):
         exec(line, namespace)  # noqa: S102 - generated from validated ids and numbers only
     return namespace["_sketch"]
@@ -504,4 +529,4 @@ __all__ = [
     "apply_edit",
     "from_sketch",
     "to_sketch",
-"CONSTRAINTS", "ENTITY_KINDS", "PLANES", "PLANE_NORMALS", "SketchError", "plane_normal", "render", "solve", "validate", "validate_plane"]
+"CONSTRAINTS", "ENTITY_KINDS", "PLANES", "PLANE_NORMALS", "SketchError", "plane_frame", "plane_normal", "plane_workplane", "render", "solve", "validate", "validate_plane"]

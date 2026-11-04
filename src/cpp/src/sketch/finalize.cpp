@@ -8,12 +8,12 @@ namespace scad::sketch_detail {
 // The only place the sketch library hands an operation to the semantic pipeline.
 
 void finalize_sketch_object(const std::string& op, Value params, SymbolicArgs symbolic, const Sketch& output,
-                            const Sketch* input) {
+                            const Sketch* input, std::vector<ValueLineage> values) {
   OpRecord record;
   record.op = op;
   record.params = std::move(params);
   record.symbolic = std::move(symbolic);
-  std::vector<ValueLineage> inputs;
+  std::vector<ValueLineage> inputs = std::move(values);
   if (input != nullptr)
     if (auto lineage = value_lineage_of(*input))
       inputs.push_back(std::move(*lineage));
