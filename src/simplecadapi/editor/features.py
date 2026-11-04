@@ -63,7 +63,7 @@ class Slot:
     kind: ``length`` (mm), ``angle`` (deg), ``float``, ``count``, ``bool``, ``enum``, ``point`` (three lengths),
     ``body`` (a solid made earlier), ``profile`` (a sketch face made earlier), ``select`` (faces or edges picked in the
     viewport), ``points2d`` (``x, y`` per line), ``sketch`` (a sketch document, see :mod:`.sketch_doc`), ``assembly`` (an
-    assembly document, see :mod:`.assembly_doc`).
+    assembly document, see :mod:`.assembly_doc`), ``color`` (a display colour, RGB in [0, 1]).
     """
 
     name: str
@@ -877,6 +877,10 @@ def check_values(spec: Spec, values: Mapping[str, Any], bodies: Mapping[str, str
                     points.append([_checked_number(Slot(slot.name, slot.label, "float"), v) for v in point])
                 grid.append(points)
             clean[slot.name] = grid
+        elif slot.kind == "color":
+            if not (isinstance(raw, (list, tuple)) and len(raw) == 3):
+                raise FeatureError(f"{slot.label}: three numbers (red, green, blue) between 0 and 1")
+            clean[slot.name] = [_checked_number(Slot(slot.name, slot.label, "float", min=0.0, max=1.0), part) for part in raw]
         elif slot.kind == "text":
             if not isinstance(raw, str):
                 raise FeatureError(f"{slot.label}: text is required")
