@@ -9,13 +9,20 @@ Nothing in this module runs a kernel or touches a file.  :func:`render_feature` 
 every value that reaches the text is a number, a choice from a fixed list, a name from the notebook, or a tag built from
 the slug, so a request cannot put code into a cell.
 
-Selections are written as *recipes* inside the feature cell, resolved against the body the cell receives: the face tags a
-primitive or extrude was given (they survive booleans, not fillets) first, the picked geometry second, and the count of
-what was picked is always checked.  A recipe that no longer resolves is an error on the feature, never another face.
+Selections are written as stable references, one statement per selection slot::
+
+    _edges = scad.ref.edges(scad.ref.edge("base", "make_box_rsolid", between=("box.front", "box.top"), guard=(...)))
+
+The server names each picked entity in the kernel (:func:`simplecadapi.ref.of`, through
+:mod:`simplecadapi.runtime.live_refs`); this module only writes the references it is given and reads them back
+(:func:`extract_refs`, :func:`replace_refs`).  A reference that splits or is lost is an error on the feature that lists
+the candidates, never another face.  An item that could not be named (a body without recorded history) falls back to
+the older *recipe*: the face tags first, the picked geometry second, the count checked.
 """
 
 from __future__ import annotations
 
+import ast
 import builtins
 import dataclasses
 import json
@@ -25,6 +32,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping, Sequence
 
+from .. import ref as _ref
 from . import assembly_doc, sketch_doc
 from .selection import selector_conditions
 
@@ -917,12 +925,35 @@ def check_values(spec: Spec, values: Mapping[str, Any], bodies: Mapping[str, str
 # ---- selection recipes ----------------------------------------------------------------------------------------------
 
 
+def _picked_refs(slot: Slot, picked: Sequence[Mapping[str, Any]]) -> list[_ref.ElementRef] | None:
+    """The references the server attached to the picked items (``item["ref"]``: a record), or ``None`` if one has none."""
+    refs: list[_ref.ElementRef] = []
+    for item in picked:
+        record = item.get("ref")
+        if not isinstance(record, Mapping):
+            return None
+        try:
+            reference = _ref.ElementRef.from_dict(record)
+        except (TypeError, ValueError) as exc:
+            raise FeatureError(f"{slot.label}: {exc}") from exc
+        if reference.kind != slot.entity:
+            raise FeatureError(f"{slot.label}: a {reference.kind} reference where a {slot.entity} is picked")
+        refs.append(reference)
+    return refs
+
+
 def selection_recipe(slot: Slot, items: Sequence[Mapping[str, Any]], known_slugs: set[str]) -> list[str]:
-    """Source lines of a recipe that selects the picked *items* inside the feature cell (bound to ``_<slot>``)."""
+    """Source lines that select the picked *items* inside the feature cell (bound to ``_<slot>``).
+
+    One ``scad.ref`` statement when every item carries its reference; the older tag-or-geometry recipe otherwise.
+    """
     factory = {"face": "faces", "edge": "edges"}[slot.entity or "face"]
     picked = [item for item in items if item.get("kind") == slot.entity]
     if not picked:
         raise FeatureError(f"{slot.label}: pick at least one {slot.entity} in the viewport")
+    refs = _picked_refs(slot, picked)
+    if refs is not None:
+        return f"_{slot.name} = {_ref.selection_code(slot.entity or 'face', refs)}".splitlines()
     geometry: list[str] = []
     tags: list[str] = []
     all_tagged = True
@@ -953,8 +984,49 @@ def selection_recipe(slot: Slot, items: Sequence[Mapping[str, Any]], known_slugs
 # ---- rendering ----------------------------------------------------------------------------------------------------------
 
 
+def _ref_statement(code: str, slot: str) -> tuple[int, int, str, list[_ref.ElementRef]] | None:
+    """(first line, last line, kind, references) of ``_<slot> = scad.ref.<kinds>(...)`` in *code* (0-based lines)."""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return None
+    for node in tree.body:
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == f"_{slot}"
+        ):
+            try:
+                kind, refs = _ref.parse_selection(node.value)
+            except ValueError:
+                return None
+            return node.lineno - 1, (node.end_lineno or node.lineno) - 1, kind, refs
+    return None
+
+
+def extract_refs(code: str, slot: str) -> list[_ref.ElementRef] | None:
+    """The references of a selection slot written as ``scad.ref`` in a feature cell, or ``None``."""
+    found = _ref_statement(code, slot)
+    return found[3] if found else None
+
+
+def replace_refs(code: str, slot: str, refs: Sequence[_ref.ElementRef]) -> str:
+    """*code* with the ``scad.ref`` statement of *slot* rewritten to name *refs* (a repair writes its choice so)."""
+    found = _ref_statement(code, slot)
+    if found is None:
+        raise FeatureError(f"the feature has no scad.ref selection for {slot!r}")
+    first, last, kind, _ = found
+    lines = code.splitlines()
+    lines[first : last + 1] = f"_{slot} = {_ref.selection_code(kind, list(refs))}".splitlines()
+    return "\n".join(lines) + ("\n" if code.endswith("\n") else "")
+
+
 def extract_recipe(code: str, slot: str) -> list[str] | None:
     """The recipe lines of a selection slot in an existing feature cell, so an edit can keep what was picked."""
+    found = _ref_statement(code, slot)
+    if found is not None:
+        return code.splitlines()[found[0] : found[1] + 1]
     lines = code.splitlines()
     start = next((i for i, line in enumerate(lines) if line.startswith("# ") and "picked in the viewport" in line), None)
     if start is None:
@@ -1049,7 +1121,9 @@ __all__ = [
     "check_values",
     "default_slug",
     "extract_recipe",
+    "extract_refs",
     "parse_gui",
     "render_feature",
+    "replace_refs",
     "selection_recipe",
 ]

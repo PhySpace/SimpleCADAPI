@@ -633,6 +633,29 @@ class MarimoKernel:
                     return None
         return None
 
+    def references(self, function: str, *args: object) -> object:
+        """Call ``simplecadapi.runtime.live_refs.<function>(*args)`` in the kernel; its JSON answer.
+
+        Raises :class:`KernelError` with the kernel's words when the call fails.
+        """
+        if function not in ("entity_refs", "reference_status", "reference_choose"):
+            raise KernelError(f"unknown reference call {function!r}")
+        result = self.execute(
+            "import json as _json\n"
+            "from simplecadapi.runtime import live_refs as _refs\n"
+            "try:\n"
+            f"    _r = _refs.{function}(*_json.loads({json.dumps(json.dumps(list(args)))}))\n"
+            "    print('SCA-REFS', _json.dumps(_r))\n"
+            "except Exception as _e:\n"
+            "    print('SCA-REFS-ERROR', type(_e).__name__ + ':', str(_e).splitlines()[0] if str(_e) else '')\n"
+        )
+        for line in (result.get("log") or "").splitlines():
+            if line.startswith("SCA-REFS "):
+                return json.loads(line[len("SCA-REFS "):])
+            if line.startswith("SCA-REFS-ERROR "):
+                raise KernelError(line[len("SCA-REFS-ERROR "):])
+        raise KernelError((result.get("log") or "the reference call gave no answer").strip()[-300:])
+
     def publish(self, url: str, step: str = "") -> dict:
         """Have the kernel project its product and POST the package to *url*.
 

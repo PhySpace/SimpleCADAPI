@@ -179,6 +179,21 @@ def test_an_edge_between_faces_that_no_longer_meet_is_lost():
         assert resolution.candidates  # look-alikes by its guard
 
 
+def test_a_pick_made_by_a_later_cell_does_not_hide_the_history_of_the_value_it_read():
+    # Cell "cup" picks the top of base (recording the pick re-stamps the shared face, SDK_DEFECTS 43); cell "groove"
+    # cuts base afterwards: its history names the pick as the parent, and the reference still follows the face.
+    from simplecadapi._glue.session import GraphSession
+
+    with GraphSession(graph_id="picks", namespace="base.c1", shared_lineage=True):
+        base = scad.make_box_rsolid(40, 20, 10)
+    with GraphSession(graph_id="picks", namespace="cup.c2", shared_lineage=True):
+        scad.apply_tag_rselection(base, scad.ref.faces(TOP), "lid")
+    with GraphSession(graph_id="picks", namespace="groove.c3", shared_lineage=True):
+        groove = scad.cut_rsolid(base, scad.make_box_rsolid(4, 30, 4, (0, 0, 8)))
+    resolution = TOP.resolve(groove)
+    assert resolution.status == "split", (resolution.reason, resolution.lost_at)
+
+
 def test_multi_body_results_say_which_body():
     saw = _tool("saw", lambda: scad.make_box_rsolid(4, 30, 30, (0, 0, -10)))
     with _session():
