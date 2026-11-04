@@ -5,6 +5,7 @@
 
 import type { FeatureRow } from "@/lib/features";
 import {
+  splinePath,
   choiceFromDoc,
   circleRadius,
   findLoops,
@@ -176,6 +177,11 @@ export function sketchShape(doc: SketchDoc, solve: SolveResult | null, state: { 
       curves.push({ id: entity.id, construction, uv });
       continue;
     }
+    if (entity.kind === "bspline") {
+      const uv = splinePath(entity, pts, usable);
+      if (uv.length > 1) curves.push({ id: entity.id, construction, uv });
+      continue;
+    }
     const s = pts.get(entity.start ?? "");
     const t = pts.get(entity.end ?? "");
     if (!s || !t) continue;
@@ -232,7 +238,7 @@ export function sketchCentre(doc: Pick<SketchDoc, "plane">, shape: Pick<SketchSh
 /** What the inspector says about a sketch. */
 export function describeSketch(info: SketchInfo, shape: SketchShape | null, solve: SolveResult | null): { label: string; value: string }[] {
   const counts = (kind: string) => info.doc.entities.filter((entity) => entity.kind === kind && !entity.construction).length;
-  const parts = [`${counts("line")} lines`, `${counts("circle")} circles`, `${counts("arc")} arcs`];
+  const parts = [`${counts("line")} lines`, `${counts("circle")} circles`, `${counts("arc")} arcs`, `${counts("bspline")} splines`];
   const construction = info.doc.entities.filter((entity) => entity.construction).length;
   const rows = [
     { label: "plane", value: planeLabel(info.doc.plane) },

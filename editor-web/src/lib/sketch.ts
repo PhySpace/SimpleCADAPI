@@ -9,8 +9,9 @@ import { normalizePlane, planeCoords, type PlaneSpec } from "@/lib/sketch-plane"
 export { PLANES, planeCoords, type Frame, type Plane, type PlaneSpec } from "@/lib/sketch-plane";
 
 export type SPoint = { id: string; x: number; y: number };
-export type EntityKind = "line" | "circle" | "arc";
-export type SEntity = { id: string; kind: EntityKind; start?: string; end?: string; center?: string; radius?: number; construction?: boolean };
+export type EntityKind = "line" | "circle" | "arc" | "bspline";
+/** A B-spline lists its control points (point ids; the first is its start, the last its end) and its degree. */
+export type SEntity = { id: string; kind: EntityKind; start?: string; end?: string; center?: string; radius?: number; control_points?: string[]; degree?: number; construction?: boolean };
 
 export type ConstraintKind =
   | "fix" | "coincident" | "point_on" | "horizontal" | "vertical" | "points_horizontal" | "points_vertical"
@@ -54,6 +55,8 @@ export type SolveResult = {
   entities: Record<string, Record<string, unknown>>;
   diagnostics: Diagnostic[];
   profiles: ServerProfile[];
+  /** Each B-spline as the SDK drew it (``sample_curve_rcurvature``): points, normals and curvatures along it, sketch coordinates. */
+  curves?: Record<string, { points: [number, number][]; normals: [number, number][]; curvatures: number[] }>;
   /** Why edge sets are no profile (a branch point, say), as the SDK words it. */
   unusable: string[];
   /** Where curves cross away from every point (the SDK's ``inspect_sketch_rsketchcrossings``: the places trim cuts at). */
@@ -130,7 +133,7 @@ export function nextId(prefix: string, doc: SketchDoc): string {
   for (let n = 1; ; n++) if (!used.has(`${prefix}${n}`)) return `${prefix}${n}`;
 }
 
-const ENTITY_PREFIX: Record<EntityKind, string> = { line: "l", circle: "c", arc: "a" };
+const ENTITY_PREFIX: Record<EntityKind, string> = { line: "l", circle: "c", arc: "a", bspline: "s" };
 export const entityPrefix = (kind: EntityKind) => ENTITY_PREFIX[kind];
 
 export const pointMap = (doc: SketchDoc) => new Map(doc.points.map((p) => [p.id, p] as const));
@@ -145,7 +148,21 @@ export function itemKind(doc: SketchDoc, id: string): ItemKind | null {
 export const baseOf = (target: string) => target.split(".")[0];
 
 export function entityPointIds(e: SEntity): string[] {
-  return [e.start, e.center, e.end].filter((id): id is string => Boolean(id));
+  const ids = [e.start, e.center, e.end, ...(e.control_points ?? [])].filter((id): id is string => Boolean(id));
+  return [...new Set(ids)];
+}
+
+/** The path of a B-spline: the SDK's samples of the last solve, else its control polygon (until the solve answers). */
+export function splinePath(e: SEntity, pts: Map<string, [number, number]>, solve: SolveResult | null): [number, number][] {
+  const drawn = solve?.curves?.[e.id]?.points;
+  if (drawn && drawn.length > 1) return drawn;
+  return (e.control_points ?? []).map((id) => pts.get(id)).filter((p): p is [number, number] => Boolean(p));
+}
+
+function polylineDistance(pos: readonly [number, number], path: readonly [number, number][]): number {
+  let best = Infinity;
+  for (let i = 0; i + 1 < path.length; i++) best = Math.min(best, segmentDistance(pos, path[i], path[i + 1]));
+  return best;
 }
 
 /** Points with positions from the last solve laid over the seeds (what the canvas draws). */
@@ -166,6 +183,23 @@ export function circleRadius(doc: SketchDoc, e: SEntity, pts: Map<string, [numbe
 }
 
 // -- editing --------------------------------------------------------------------------------------------------------
+
+/** A B-spline through the control points at `spots` (existing points are reused): degree 3, or less with fewer points.
+ * A spline that ends on its first point is closed (one seam point). */
+export function addSpline(doc: SketchDoc, spots: readonly Spot[], opts: DrawOptions): { doc: SketchDoc; id: string } | null {
+  let next = doc;
+  const ids: string[] = [];
+  for (const spot of spots) {
+    const made = ensurePoint(next, spot);
+    next = made.doc;
+    if (ids[ids.length - 1] !== made.id) ids.push(made.id);
+  }
+  if (ids.length < 2) return null;
+  const degree = Math.min(3, ids.length - 1);
+  const id = nextId("s", next);
+  const entity: SEntity = { id, kind: "bspline", start: ids[0], end: ids[ids.length - 1], control_points: ids, degree, construction: opts.construction };
+  return { doc: { ...next, entities: [...next.entities, entity] }, id };
+}
 
 const round = (v: number) => Math.round(v * 1e4) / 1e4;
 
@@ -613,6 +647,7 @@ export function sampleArc(c: readonly [number, number], s: readonly [number, num
 
 /** Distance (world units) from a position to an entity. */
 export function entityDistance(doc: SketchDoc, e: SEntity, pos: readonly [number, number], pts: Map<string, [number, number]>, solve: SolveResult | null): number {
+  if (e.kind === "bspline") return polylineDistance(pos, splinePath(e, pts, solve));
   if (e.kind === "line") {
     const a = pts.get(e.start ?? "");
     const b = pts.get(e.end ?? "");
@@ -759,6 +794,13 @@ export function findLoops(doc: SketchDoc, solve: SolveResult | null): Loop[] {
         const s = pts.get(e.start ?? "");
         const t = pts.get(e.end ?? "");
         const c = e.kind === "arc" ? pts.get(e.center ?? "") : undefined;
+        if (e.kind === "bspline") {
+          let path = splinePath(e, pts, solve);
+          if (profile.reversed[i]) path = [...path].reverse();
+          if (path.length < 2) broken = true;
+          else polygon.push(...path.slice(0, -1));
+          return;
+        }
         if (!s || !t || (e.kind === "arc" && !c)) {
           broken = true;
           return;

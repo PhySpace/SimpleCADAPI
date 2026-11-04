@@ -119,3 +119,27 @@ def test_the_solve_lists_the_sdks_profiles_and_says_why_an_edge_set_is_none():
     sketch = S.to_sketch(doc)
     face = scad.make_face_from_sketch_rface(sketch=sketch, profile=result["profiles"][0]["index"])
     assert face.get_area() == pytest.approx(3.14159265 * 9, rel=1e-6)
+
+
+def test_a_bspline_is_a_sketch_entity_the_sdk_draws_and_a_face_can_be_made_of():
+    doc = {
+        "plane": "XY",
+        "points": [{"id": f"p{i}", "x": x, "y": y} for i, (x, y) in enumerate([(0, 0), (10, 10), (20, 0), (30, 10), (40, 0)])],
+        "entities": [
+            {"id": "s1", "kind": "bspline", "start": "p0", "end": "p4", "control_points": ["p0", "p1", "p2", "p3", "p4"], "degree": 3},
+            {"id": "l1", "kind": "line", "start": "p4", "end": "p0"},
+        ],
+        "constraints": [],
+    }
+    solved = S.solve(doc)
+    assert [p["entity_ids"] for p in solved["profiles"]] == [["s1", "l1"]]
+    curve = solved["curves"]["s1"]
+    assert len(curve["points"]) == 64 and curve["points"][0] == pytest.approx([0.0, 0.0]) and curve["points"][-1] == pytest.approx([40.0, 0.0])
+    assert len(curve["curvatures"]) == 64
+    params, lines = S.render("wave", S.validate(doc))
+    assert any("add_bspline_rsketch(" in line and 'control_points=["p0", "p1", "p2", "p3", "p4"], degree=3' in line for line in lines)
+    assert S.from_sketch(S.to_sketch(doc), doc)["entities"][0]["control_points"] == ["p0", "p1", "p2", "p3", "p4"]
+    face = scad.make_face_from_sketch_rface(sketch=S.to_sketch(doc), profile=0)
+    assert face.get_area() > 100
+    with pytest.raises(S.SketchError, match="at least 4 control points"):
+        S.validate({**doc, "entities": [{"id": "s1", "kind": "bspline", "start": "p0", "end": "p2", "control_points": ["p0", "p1", "p2"], "degree": 3}]})

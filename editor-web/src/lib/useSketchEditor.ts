@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LatestSolver,
   addArc,
+  addSpline,
   addCircle,
   addConstraint,
   addLine,
@@ -68,15 +69,15 @@ import {
 } from "@/lib/sketch-edit";
 import { typedFields, typedTarget, type TypedDims } from "@/lib/sketch-typed";
 
-const DRAW_TOOLS = new Set(["point", "line", "circle", "arc"]);
+const DRAW_TOOLS = new Set(["point", "line", "circle", "arc", "spline"]);
 
-export type Tool = "select" | "point" | "line" | "circle" | "arc" | "delete" | "trim" | "extend" | "fillet" | "chamfer";
+export type Tool = "select" | "point" | "line" | "circle" | "arc" | "spline" | "delete" | "trim" | "extend" | "fillet" | "chamfer";
 /** The corner value box (fillet radius / chamfer distance) open at a corner. */
 export type CornerBox = { op: CornerOp; corner: Corner; text: string; bad: boolean };
 /** What the last SDK edit (trim, extend) said: its notes, or the error (which names ids). Shown in the status area. */
 export type EditNote = { tone: "ok" | "fail"; text: string };
 const EDIT_TOOLS: ReadonlySet<Tool> = new Set<Tool>(["trim", "extend", "fillet", "chamfer"]);
-export type Draft = { tool: "line"; from: Spot } | { tool: "circle"; center: Spot } | { tool: "arc"; center: Spot; start?: Spot } | null;
+export type Draft = { tool: "line"; from: Spot } | { tool: "circle"; center: Spot } | { tool: "arc"; center: Spot; start?: Spot } | { tool: "spline"; points: Spot[] } | null;
 export type Drag = { ids: string[]; origin: Record<string, [number, number]>; start: [number, number]; positions: Record<string, [number, number]>; releasing?: boolean };
 export type ValueBox = { kind: ConstraintKind; targets: string[]; constraintId?: string; text: string; bad: boolean };
 
@@ -426,6 +427,16 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       }
       return;
     }
+    if (tool === "spline") {
+      const points = draft?.tool === "spline" ? draft.points : [];
+      const closes = points.length >= 3 && spot.pointId !== undefined && (points[0].pointId === spot.pointId || samePlace(points[0], spot));
+      if (closes) {
+        finishSpline([...points, { ...spot, pointId: points[0].pointId ?? spot.pointId }]);
+        return;
+      }
+      setDraft({ tool: "spline", points: [...points, spot] });
+      return;
+    }
     if (tool === "arc") {
       if (!draft) {
         setDraft({ tool: "arc", center: spot });
@@ -446,6 +457,13 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       }
     }
   };
+  /** Make the B-spline of the clicked control points (Enter, or a click back on the first point closes it). */
+  const finishSpline = (points: Spot[]): void => {
+    setDraft(null);
+    const made = addSpline(docRef.current, points, { auto, construction });
+    if (made) commit(made.doc);
+  };
+  const samePlace = (a: Spot, b: Spot) => Math.hypot(a.x - b.x, a.y - b.y) < 1e-9;
   /** The radius typed for the arc being drawn (its start), kept until the arc is made. */
   const arcRadius = useRef<number | undefined>(undefined);
 
@@ -637,7 +655,11 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     if (event.altKey) return "ignored";
     if (entry) return "ignored"; // the box has the keyboard
     if ((/^[0-9.\-=]$/.test(event.key) || event.key === "Tab") && DRAW_TOOLS.has(tool) && openEntry(event.key === "Tab" ? undefined : event.key)) return "handled";
-    const shortcuts: Record<string, Tool> = { v: "select", p: "point", l: "line", c: "circle", a: "arc", d: "delete", t: "trim", e: "extend", r: "fillet", h: "chamfer" };
+    const shortcuts: Record<string, Tool> = { v: "select", p: "point", l: "line", c: "circle", a: "arc", b: "spline", d: "delete", t: "trim", e: "extend", r: "fillet", h: "chamfer" };
+    if (k === "enter" && draft?.tool === "spline") {
+      if (draft.points.length >= 2) finishSpline(draft.points);
+      return "handled";
+    }
     if (shortcuts[k]) chooseTool(shortcuts[k]);
     else if (k === "j") openProject();
     else if (k === "x") toggleConstruction();
@@ -699,6 +721,8 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
         ? draft ? "Click the next point; clicking an existing point ends the chain; Esc ends." : "Click the first point."
         : tool === "circle"
           ? draft ? "Click a point on the circle." : "Click the centre."
+          : tool === "spline"
+            ? draft ? "Click the next control point; Enter makes the spline, a click on the first point closes it; Esc drops it." : "Click the first control point."
           : tool === "arc"
             ? draft ? (draft.tool === "arc" && draft.start ? "Click the end (counter-clockwise from start)." : "Click the start point (sets the radius).") : "Click the centre."
             : tool === "delete"

@@ -36,3 +36,32 @@ describe("joining lines end to end", () => {
     expect(constraintTargets("coincident", ids, doc)).toHaveLength(4);
   });
 });
+
+describe("B-splines in a sketch", () => {
+  it("are made from clicked control points (degree 3, less with fewer), and close on their first point", async () => {
+    const { addSpline, entityPointIds, emptyDoc: empty } = await import("@/lib/sketch");
+    const four = addSpline(empty(), [{ x: 0, y: 0 }, { x: 10, y: 10 }, { x: 20, y: 0 }, { x: 30, y: 10 }], { auto: false, construction: false })!;
+    const spline = four.doc.entities[0];
+    expect(spline).toMatchObject({ kind: "bspline", degree: 3, start: "p1", end: "p4", control_points: ["p1", "p2", "p3", "p4"] });
+    expect(entityPointIds(spline)).toEqual(["p1", "p4", "p2", "p3"]);
+    const two = addSpline(empty(), [{ x: 0, y: 0 }, { x: 10, y: 0 }], { auto: false, construction: false })!;
+    expect(two.doc.entities[0].degree).toBe(1);
+    expect(addSpline(empty(), [{ x: 0, y: 0 }], { auto: false, construction: false })).toBeNull();
+    const ring = addSpline(empty(), [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 0, pointId: "p1" }], { auto: false, construction: false })!;
+    expect(ring.doc.entities[0]).toMatchObject({ start: "p1", end: "p1", control_points: ["p1", "p2", "p3", "p1"] });
+  });
+  it("are drawn by the SDK's samples, and make a loop the SDK offers", async () => {
+    const { addSpline, addLine, emptyDoc: empty, findLoops, splinePath, solvedPoints } = await import("@/lib/sketch");
+    let doc = addSpline(empty(), [{ x: 0, y: 0 }, { x: 10, y: 10 }, { x: 20, y: 0 }], { auto: false, construction: false })!.doc;
+    doc = addLine(doc, "p3", { x: 0, y: 0, pointId: "p1" }, { auto: false, construction: false })!.doc;
+    const samples: [number, number][] = [[0, 0], [5, 4], [10, 5], [15, 4], [20, 0]];
+    const solve = { ok: true, status: "underconstrained" as const, dof: 6, residual: 0, points: {}, scalars: {}, entities: {}, diagnostics: [], unusable: [],
+      profiles: [{ index: 0, id: "s1", kind: "edge_loop", closed: true, entity_ids: ["s1", "l1"], reversed: [false, false] }],
+      curves: { s1: { points: samples, normals: samples.map(() => [0, 1] as [number, number]), curvatures: samples.map(() => 0.1) } } };
+    expect(splinePath(doc.entities[0], solvedPoints(doc, solve), solve)).toEqual(samples);
+    expect(splinePath(doc.entities[0], solvedPoints(doc, null), null)).toEqual([[0, 0], [10, 10], [20, 0]]); // control polygon until solved
+    const [loop] = findLoops(doc, solve);
+    expect(loop.index).toBe(0);
+    expect(Math.abs(loop.area)).toBeGreaterThan(50);
+  });
+});

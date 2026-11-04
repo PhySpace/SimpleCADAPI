@@ -26,7 +26,9 @@ _ID = re.compile(r"[a-z][a-z0-9_]{0,30}")
 _SUB = ("start", "end", "center")
 PLANES = ("XY", "XZ", "YZ")
 PLANE_NORMALS = {"XY": "+z", "XZ": "-y", "YZ": "+x"}
-ENTITY_KINDS = {"line": ("start", "end"), "circle": ("center",), "arc": ("start", "end", "center")}
+ENTITY_KINDS = {"line": ("start", "end"), "circle": ("center",), "arc": ("start", "end", "center"), "bspline": ("start", "end")}
+"""A B-spline also lists its ``control_points`` (point ids, the first and the last are its start and end) and a ``degree``."""
+_MAX_DEGREE = 5
 
 # kind -> (target parameter names in the SDK function, unit of its value or None, extra keyword parameters)
 CONSTRAINTS: dict[str, tuple[tuple[str, ...], str | None, tuple[str, ...]]] = {
@@ -131,13 +133,27 @@ def validate(doc: Mapping[str, Any]) -> dict[str, Any]:
     for raw in doc.get("entities") or []:
         kind = raw.get("kind")
         if kind not in ENTITY_KINDS:
-            raise SketchError(f"unknown entity kind {kind!r} (line, circle, arc)")
+            raise SketchError(f"unknown entity kind {kind!r} (line, circle, arc, bspline)")
         entity: dict[str, Any] = {"id": new_id(raw.get("id"), "entity"), "kind": kind, "construction": bool(raw.get("construction", False))}
         for role in ENTITY_KINDS[kind]:
             ref = str(raw.get(role))
             if ref not in point_ids:
                 raise SketchError(f"{entity['id']}: {role} {ref!r} is not a point of the sketch")
             entity[role] = ref
+        if kind == "bspline":
+            poles = [str(p) for p in raw.get("control_points") or []]
+            missing = [p for p in poles if p not in point_ids]
+            if missing:
+                raise SketchError(f"{entity['id']}: control point {missing[0]!r} is not a point of the sketch")
+            degree = raw.get("degree", 3)
+            if isinstance(degree, bool) or not isinstance(degree, int) or not 1 <= degree <= _MAX_DEGREE:
+                raise SketchError(f"{entity['id']}: the degree is a whole number from 1 to {_MAX_DEGREE}")
+            if len(poles) < degree + 1:
+                raise SketchError(f"{entity['id']}: a degree {degree} B-spline needs at least {degree + 1} control points")
+            if poles[0] != entity["start"] or poles[-1] != entity["end"]:
+                raise SketchError(f"{entity['id']}: the first and the last control points are its start and end")
+            entity["control_points"] = poles
+            entity["degree"] = degree
         if kind == "circle":
             radius = _number(raw.get("radius"), f"{entity['id']} radius")
             if radius <= 0:
@@ -207,6 +223,12 @@ def _calls(doc: Mapping[str, Any], *, var_for: Mapping[str, str] | None = None) 
         extra = ", construction=True" if entity["construction"] else ""
         if entity["kind"] == "line":
             lines.append(f'_sketch = scad.add_line_rsketch(sketch=_sketch, entity_id={_ref(entity["id"])}, start={_ref(entity["start"])}, end={_ref(entity["end"])}{extra})')
+        elif entity["kind"] == "bspline":
+            poles = ", ".join(_ref(p) for p in entity["control_points"])
+            lines.append(
+                f'_sketch = scad.add_bspline_rsketch(sketch=_sketch, entity_id={_ref(entity["id"])}, start={_ref(entity["start"])}, end={_ref(entity["end"])}, '
+                f'control_points=[{poles}], degree={entity["degree"]}{extra})'
+            )
         elif entity["kind"] == "circle":
             lines.append(f'_sketch = scad.add_circle_rsketch(sketch=_sketch, entity_id={_ref(entity["id"])}, center={_ref(entity["center"])}, radius={_num(entity["radius"])}{extra})')
         else:
@@ -283,6 +305,7 @@ def solve(doc: Mapping[str, Any]) -> dict[str, Any]:
     result = scad.inspect_sketch_rsketchresult(sketch=sketch, strict=False)
     data = result.to_dict()
     listed = scad.inspect_sketch_rsketchprofiles(sketch=sketch, strict=False)
+    curves = _bspline_samples(data.get("solved_entities") or {})
     crossings = scad.inspect_sketch_rsketchcrossings(sketch=sketch)
     return {
         "status": data.get("status"),
@@ -295,7 +318,36 @@ def solve(doc: Mapping[str, Any]) -> dict[str, Any]:
         "profiles": listed["profiles"],
         "unusable": listed["unusable"],
         "crossings": crossings,
+        "curves": curves,
     }
+
+
+def _bspline_samples(solved: Mapping[str, Any], count: int = 64) -> dict[str, Any]:
+    """Each solved B-spline drawn and combed by the SDK: ``{id: {points: [[u, v]...], normals, curvatures}}`` in sketch coordinates."""
+    import simplecadapi as scad
+
+    out: dict[str, Any] = {}
+    for entity_id, item in solved.items():
+        if not isinstance(item, Mapping) or item.get("kind") != "bspline":
+            continue
+        try:
+            edge = scad.make_spline_redge(
+                control_points=[(float(x), float(y), 0.0) for x, y in item["control_points"]],
+                degree=int(item["degree"]),
+                knots=item.get("knots"),
+                multiplicities=item.get("multiplicities"),
+                weights=item.get("weights"),
+                periodic=bool(item.get("periodic")),
+            )
+            comb = scad.sample_curve_rcurvature(edge=edge, count=count)
+        except Exception:  # noqa: BLE001 - a curve the kernel cannot build is drawn by its control polygon
+            continue
+        out[entity_id] = {
+            "points": [[p[0], p[1]] for p in comb["points"]],
+            "normals": [[n[0], n[1]] for n in comb["normals"]],
+            "curvatures": list(comb["curvatures"]),
+        }
+    return out
 
 
 # ---- the SDK's sketch edit operations, through the document ----------------------------------------------------------------------
@@ -340,6 +392,12 @@ def from_sketch(sketch: Any, like: Mapping[str, Any] | None = None) -> dict[str,
             entity[role] = item[role]
         if item["kind"] == "circle":
             entity["radius"] = float(item["radius"])
+        if item["kind"] == "bspline":
+            refs = [c.get("point_id") if isinstance(c, Mapping) else None for c in item.get("control_points") or []]
+            if None in refs or item.get("weights") or item.get("periodic"):
+                raise SketchError(f"{item['id']}: a B-spline with literal, weighted or periodic control points is code, not a document")
+            entity["control_points"] = refs
+            entity["degree"] = int(item["degree"])
         entities.append(entity)
     constraints: list[dict[str, Any]] = []
     for item in data["constraints"]:

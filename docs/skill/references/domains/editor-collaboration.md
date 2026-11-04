@@ -261,6 +261,12 @@ sca sketch op CELL extend --args '{"entity": "h", "end": "end"}'
   point to the entity that made it (`point_on`); a piece keeps the horizontal/vertical constraint of its line; dimensions that
   no longer hold are removed (they appear in `removed_constraints`). New ids are the lowest free `p<n>`, `l<n>`, `a<n>` and
   `c_<kind>_<n>`. `--dry-run` prints without writing.
+- A sketch document holds lines, circles, arcs and B-splines. A B-spline entity is
+  `{"id": "s1", "kind": "bspline", "start": "p1", "end": "p4", "control_points": ["p1", "p2", "p3", "p4"], "degree": 3}`
+  (control points are point ids, the first and last are its start and end; a closed one starts and ends on the same point);
+  it becomes `scad.add_bspline_rsketch(..., control_points=[...], degree=3)`. `solve` returns each solved B-spline as the SDK
+  samples it (`curves`: points, normals, curvatures; the editor draws the curve and its curvature comb from them), and the
+  crossings trim would cut at (`crossings`). trim/extend do not cut B-splines.
 - Errors name ids (`there is no entity 'x'`, `nothing is ahead of the end of h`); fix the call, do not retry it unchanged.
 - Everything a command writes is an ordinary cell; `sca cell` still works on it (see the `# gui:` rules above).
 

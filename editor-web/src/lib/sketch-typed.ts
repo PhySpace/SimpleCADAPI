@@ -3,8 +3,8 @@
 
 import type { Spot } from "@/lib/sketch";
 
-export type TypedTool = "point" | "line" | "circle" | "arc";
-export type TypedDraft = { tool: "line"; from: Spot } | { tool: "circle"; center: Spot } | { tool: "arc"; center: Spot; start?: Spot } | null;
+export type TypedTool = "point" | "line" | "circle" | "arc" | "spline";
+export type TypedDraft = { tool: "line"; from: Spot } | { tool: "circle"; center: Spot } | { tool: "arc"; center: Spot; start?: Spot } | { tool: "spline"; points: Spot[] } | null;
 export type TypedField = { name: string; label: string; unit: "mm" | "deg" };
 /** What a typed click keeps as a driving dimension of the entity it makes (a typed length stays that length). */
 export type TypedDims = { length?: number; radius?: number };
@@ -16,7 +16,7 @@ const XY: TypedField[] = [
 
 /** The fields the next click of `tool` asks for, given its draft; null when the tool places nothing. */
 export function typedFields(tool: string, draft: TypedDraft): TypedField[] | null {
-  if (tool === "point") return XY;
+  if (tool === "point" || tool === "spline") return XY;
   if (tool === "line") return draft?.tool === "line" ? [{ name: "length", label: "Length", unit: "mm" }, { name: "angle", label: "Angle", unit: "deg" }] : XY;
   if (tool === "circle") return draft?.tool === "circle" ? [{ name: "radius", label: "Radius", unit: "mm" }] : XY;
   if (tool === "arc") {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
-import {
+import { splinePath,
   CONSTRAINT_INFO,
   arcSweep,
   circleRadius,
@@ -231,6 +231,10 @@ export function SketchOverlay({
   };
 
   const entityPath = (e: SketchDoc["entities"][number]): string => {
+    if (e.kind === "bspline") {
+      const path = splinePath(e, pts, result);
+      return path.length > 1 ? polyline(path) : "";
+    }
     if (e.kind === "line") {
       const a = pts.get(e.start ?? "");
       const b = pts.get(e.end ?? "");
@@ -315,6 +319,19 @@ export function SketchOverlay({
     );
     const cur: P = [cursor.x, cursor.y];
     if (draft.tool === "line") return both(line(spotPos(draft.from), cur));
+    if (draft.tool === "spline") {
+      // the control polygon so far, to the cursor; the curve is the SDK's once it is made (Enter)
+      const poles = [...draft.points.map(spotPos), cur];
+      return (
+        <>
+          {both(polyline(poles), { opacity: 0.7 })}
+          {poles.slice(0, -1).map((p, i) => {
+            const s = project(p[0], p[1]);
+            return s ? <rect key={`pole${i}`} x={s[0] - 3.5} y={s[1] - 3.5} width={7} height={7} fill={HALO} stroke={FOCUS} strokeWidth={1.6} /> : null;
+          })}
+        </>
+      );
+    }
     const centre = spotPos(draft.center);
     if (draft.tool === "circle") {
       const r = Math.hypot(cur[0] - centre[0], cur[1] - centre[1]);
@@ -539,6 +556,27 @@ export function SketchOverlay({
               data-role={isOuter ? "outer" : isInner ? "hole" : "loop"}
               pointerEvents="none"
             />
+          );
+        })}
+        {doc.entities.map((e) => {
+          if (e.kind !== "bspline") return null;
+          const active = selection.includes(e.id) || hover?.id === e.id;
+          const poles = (e.control_points ?? []).map((id) => pts.get(id)).filter((p): p is P => Boolean(p));
+          const comb = result?.curves?.[e.id];
+          // the control polygon always (its points are the handles); the curvature comb while the spline is picked
+          // the longest tooth is a quarter of the spline's extent, whatever its curvature
+          const scale = comb ? (0.25 * Math.max(...poles.map((p) => Math.hypot(p[0] - poles[0][0], p[1] - poles[0][1])), 1)) / Math.max(...comb.curvatures, 1e-9) : 0;
+          const tips = comb ? comb.points.map((p, i): P => [p[0] - comb.normals[i][0] * comb.curvatures[i] * scale, p[1] - comb.normals[i][1] * comb.curvatures[i] * scale]) : [];
+          return (
+            <g key={`poles-${e.id}`} fill="none" pointerEvents="none" data-control-polygon={e.id}>
+              <path d={polyline(poles)} stroke={MUTED} strokeWidth={1} strokeDasharray="3 3" opacity={active ? 0.9 : 0.5} />
+              {active && comb && (
+                <g data-curvature-comb={e.id}>
+                  <path d={comb.points.map((p, i) => polyline([p, tips[i]])).join(" ")} stroke={NAME} strokeWidth={1} opacity={0.75} />
+                  <path d={polyline(tips)} stroke={NAME} strokeWidth={1.4} opacity={0.9} />
+                </g>
+              )}
+            </g>
           );
         })}
         {doc.entities.map((e) => {
