@@ -28,6 +28,7 @@ void bind_ops_geometry(py::module_& m);
 void bind_ops_features(py::module_& m);
 void bind_sketch(py::module_& m);
 void bind_surface(py::module_& m);
+void bind_surface_editing(py::module_& m);
 void bind_std(py::module_& m);
 void bind_reactive(py::module_& m);
 void bind_io(py::module_& m);

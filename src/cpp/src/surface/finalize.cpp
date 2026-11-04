@@ -37,7 +37,8 @@ OpRecord to_op_record(OperationRecord record, std::optional<TopoDelta> delta = s
   static const std::set<std::string, std::less<>> kOrderedInputOps = {
       "make_ruled_surface_rface", "make_gordon_surface_rface", "make_surface_patch_rface",     "trim_surface_rface",
       "make_loft_rshell",         "sew_faces_rshell",          "make_solid_from_shell_rsolid", "fill_holes_rshell"};
-  if (Recorder* recorder = current_recorder(); recorder != nullptr && kOrderedInputOps.count(out.op) != 0) {
+  const bool ordered = record.ordered_inputs || kOrderedInputOps.count(out.op) != 0;
+  if (Recorder* recorder = current_recorder(); recorder != nullptr && ordered) {
     std::vector<Shape> shapes;
     for (const OpInput& input : out.inputs)
       shapes.push_back(input.shape);
@@ -270,6 +271,34 @@ Solid finalize_surface_output(Solid result, SolidifiedOutput output) {
   carry_face_provenance(finalized.faces(), output.source.faces(), std::nullopt, true, false);
   apply_prefix_tag(finalized, output.tag_prefix);
   return finalized;
+}
+
+namespace {
+
+template <class T>
+T finalize_edit(T result, EditOutput output) {
+  attach_lineage_from_source(output.source, result, LineageDerivation::Continuation, output.record.op, "complete");
+  result.set_runtime(kCoverageKey, "complete");
+  if (output.record.labels.empty())
+    output.record.labels = {"derived", "edit", "surface", std::string(kind_name(result.kind()))};
+  output.record.ordered_inputs = true;
+  std::optional<TopoDelta> delta;
+  if (!output.delta.entries.empty())
+    delta = std::move(output.delta);
+  T finalized = finalize_derived<T>(std::move(result),
+                                    FinalizeSpec{.record = to_op_record(std::move(output.record), std::move(delta))});
+  apply_prefix_tag(finalized, output.tag_prefix);
+  return finalized;
+}
+
+}  // namespace
+
+Face finalize_surface_output(Face result, EditOutput output) {
+  return finalize_edit(std::move(result), std::move(output));
+}
+
+Edge finalize_surface_output(Edge result, EditOutput output) {
+  return finalize_edit(std::move(result), std::move(output));
 }
 
 std::vector<Wire> finalize_surface_output(std::vector<Wire> result, BoundariesOutput output) {
