@@ -503,3 +503,229 @@ def test_crossings_are_where_trim_would_cut_and_never_an_existing_point():
     guide = scad.add_point_rsketch(scad.add_point_rsketch(guide, "c", 5, -5), "d", 5, 5)
     guide = scad.add_line_rsketch(guide, "v", "c", "d", construction=True)
     assert scad.inspect_sketch_rsketchcrossings(guide) == []
+
+
+# ---- B-splines ------------------------------------------------------------------------------------------------------------
+
+
+def arch(points=None, entities=(), constraints=()):
+    """A cubic Bezier arch a (0, 0) -> d (6, 0) over b (2, 2), c (4, 2): x = 6t, y = 6t(1 - t), top (3, 1.5)."""
+    sketch = build({"a": (0, 0), "b": (2, 2), "c": (4, 2), "d": (6, 0), **(points or {})}, [])
+    sketch = scad.add_bspline_rsketch(sketch, "sp", "a", "d", control_points=["a", "b", "c", "d"], degree=3)
+    for kind, eid, *args in entities:
+        sketch = getattr(scad, f"add_{kind}_rsketch")(sketch, eid, *args)
+    for function, args, kwargs in constraints:
+        sketch = function(sketch, *args, **kwargs)
+    return sketch
+
+
+def spline_of(sketch, eid):
+    return next(e for e in entities_of(sketch, "bspline") if e["id"] == eid)
+
+
+def poles_of(sketch, eid):
+    return [c["point_id"] for c in spline_of(sketch, eid)["control_points"]]
+
+
+def on_curve(sketch, eid, xy, tol=1e-6):
+    """True when (x, y) lies on the solved B-spline *eid* (its kernel edge)."""
+    solved = scad.inspect_sketch_rsketchresult(sketch, strict=False).to_dict()["solved_entities"][eid]
+    edge = scad.make_spline_redge(
+        control_points=[(x, y, 0.0) for x, y in solved["control_points"]],
+        degree=solved["degree"],
+        knots=solved["knots"],
+        multiplicities=solved["multiplicities"],
+        weights=solved["weights"],
+    )
+    vertex = scad.make_point_rvertex(xy[0], xy[1], 0.0)
+    from simplecadapi._cpp.occt.BRepExtrema import BRepExtrema_DistShapeShape
+
+    return BRepExtrema_DistShapeShape(edge.wrapped, vertex.wrapped).Value() < tol
+
+
+def test_a_bspline_crossed_by_a_line_keeps_the_far_piece_as_a_new_bspline():
+    sketch = arch({"v1": (4, -5), "v2": (4, 5)}, [("line", "v", "v1", "v2")])
+    after = scad.trim_rsketch(sketch, "sp", (5.0, 1.0))
+    diff = scad.diff_sketch_rsketchdiff(sketch, after)
+    assert diff["removed"] == ["b", "c", "d", "sp"] and diff["created"] == ["p1", "p2", "p3", "s1"]
+    assert poles_of(after, "s1") == ["a", "p2", "p3", "p1"]
+    piece = spline_of(after, "s1")
+    assert piece["start"] == "a" and piece["end"] == "p1" and piece["degree"] == 3
+    assert points_of(after)["p1"] == pytest.approx((4.0, 4.0 / 3.0))
+    tie = constraints_of(after, "point_on")
+    assert [(t["entity_id"], t["kind"]) for t in tie[0]["targets"]] == [("p1", "point"), ("v", "line")]
+    # the piece is the arch from t = 0 to t = 2/3: its middle is the arch's point at t = 1/3
+    assert on_curve(after, "s1", (2.0, 6 * (1 / 3) * (2 / 3)))
+    assert_solves(after)
+
+
+def test_a_line_crossed_by_a_bspline_is_cut_there_and_tied_to_it():
+    sketch = arch({"h1": (-1, 1), "h2": (7, 1)}, [("line", "h", "h1", "h2")])
+    crossings = scad.inspect_sketch_rsketchcrossings(sketch)
+    expected = sorted(6 * (1 + s * math.sqrt(1 / 3)) / 2 for s in (-1, 1))  # 6t(1 - t) = 1
+    assert sorted(c["at"][0] for c in crossings) == pytest.approx(expected)
+    assert all(c["entities"] == ["sp", "h"] for c in crossings)
+    after = scad.trim_rsketch(sketch, "h", (3.0, 1.0))  # the middle goes
+    assert x_spans(after) == [(-1.0, round(expected[0], 6)), (round(expected[1], 6), 7.0)]
+    ties = constraints_of(after, "point_on")
+    assert {t["targets"][1]["entity_id"] for t in ties} == {"sp"} and len(ties) == 2
+    solved = scad.inspect_sketch_rsketchresult(after, strict=False)
+    assert solved.status == "underconstrained"
+    for tie in ties:
+        assert on_curve(after, "sp", solved.solved_points[tie["targets"][0]["entity_id"]])
+
+
+def test_a_bspline_cut_by_a_circle_and_by_another_bspline():
+    sketch = arch({"o": (6, 0)}, [("circle", "ring", "o", 2.0)])
+    by_circle = scad.trim_rsketch(sketch, "sp", (5.5, 0.5))
+    end = points_of(by_circle)[spline_of(by_circle, "s1")["end"]]
+    assert math.hypot(end[0] - 6.0, end[1]) == pytest.approx(2.0)
+    assert [e["id"] for e in entities_of(by_circle, "circle")] == ["ring"]
+    # a circle is cut by the arch too: the arch enters it once and ends inside, so trim needs two cuts
+    with pytest.raises(ValueError, match="'ring' is crossed once"):
+        scad.trim_rsketch(sketch, "ring", (8.0, 0.0))
+    twin = arch({"e": (0, 3), "f": (3, -2), "g": (5, -2), "h": (8, 3)})
+    twin = scad.add_bspline_rsketch(twin, "low", "e", "h", control_points=["e", "f", "g", "h"], degree=3)
+    crossings = scad.inspect_sketch_rsketchcrossings(twin)
+    assert len(crossings) == 2 and all(c["entities"] == ["sp", "low"] for c in crossings)
+    after = scad.trim_rsketch(twin, "sp", (3.0, 1.5))
+    assert [e["id"] for e in entities_of(after, "bspline")] == ["s1", "s2", "low"]
+    assert spline_of(after, "s1")["start"] == "a" and spline_of(after, "s2")["end"] == "d"
+    assert {t["targets"][1]["entity_id"] for t in constraints_of(after, "point_on")} == {"low"}
+    assert_solves(after)
+
+
+def test_a_tangent_touch_is_one_cut():
+    sketch = arch({"h1": (-1, 1.5), "h2": (7, 1.5)}, [("line", "h", "h1", "h2")])
+    assert [c["at"] for c in scad.inspect_sketch_rsketchcrossings(sketch)] == [pytest.approx([3.0, 1.5])]
+    after = scad.trim_rsketch(sketch, "h", (5.0, 1.5))
+    assert x_spans(after) == [(-1.0, 3.0)]
+
+
+def closed_loop(periodic=False, line_to=15):
+    sketch = build({"q0": (0, 0), "q1": (10, 0), "q2": (10, 10), "q3": (0, 10), "v1": (5, -5), "v2": (5, line_to)}, [("line", "v", "v1", "v2")])
+    poles = ["q0", "q1", "q2", "q3"] + ([] if periodic else ["q0"])
+    return scad.add_bspline_rsketch(sketch, "loop", "q0", "q0", control_points=poles, degree=3, periodic=periodic)
+
+
+def test_a_closed_bspline_needs_two_cuts_and_keeps_the_rest_as_one_piece():
+    sketch = closed_loop()
+    with pytest.raises(ValueError, match="'loop' is crossed once: a closed B-spline needs two cuts"):
+        scad.trim_rsketch(closed_loop(line_to=5), "loop", (9.0, 9.0))
+    right = scad.trim_rsketch(sketch, "loop", (1.0, 1.0))  # the left half (the one over the seam q0) goes
+    assert [e["id"] for e in entities_of(right, "bspline")] == ["s1"]
+    assert "q0" not in points_of(right) and "q1" not in points_of(right)
+    ends = sorted(points_of(right)[spline_of(right, "s1")[k]][1] for k in ("start", "end"))
+    assert all(points_of(right)[spline_of(right, "s1")[k]][0] == pytest.approx(5.0) for k in ("start", "end"))
+    left = scad.trim_rsketch(sketch, "loop", (9.0, 9.0))  # the right half goes; the seam is inside the piece kept
+    assert "q0" in poles_of(left, "s1")[1:-1]
+    assert sorted(points_of(left)[spline_of(left, "s1")[k]][1] for k in ("start", "end")) == pytest.approx(ends)
+    assert len(constraints_of(left, "point_on")) == 2
+    assert_solves(left)
+    # a periodic one is cut the same way; its pieces are clamped
+    periodic = scad.trim_rsketch(closed_loop(periodic=True), "loop", (8.0, 5.0))
+    assert spline_of(periodic, "s1")["periodic"] is False
+    assert_solves(periodic)
+
+
+def test_constraints_on_the_bspline_ends_stay_with_the_piece_that_keeps_the_end():
+    sketch = arch(
+        {"z": (-4, -4), "v1": (4, -5), "v2": (4, 5)},
+        [("line", "lead", "z", "a"), ("line", "v", "v1", "v2")],
+        [
+            (scad.constrain_tangent_rsketch, ("lead", "sp"), {"at_a": "end", "at_b": "start", "constraint_id": "tan"}),
+            (scad.constrain_fix_rsketch, ("c",), {"constraint_id": "fixc"}),
+            (scad.constrain_fix_rsketch, ("sp.start",), {"constraint_id": "fixa"}),
+            (scad.constrain_length_rsketch, ("sp", 9.0), {"constraint_id": "long", "driving": False}),
+        ],
+    )
+    after = scad.trim_rsketch(sketch, "sp", (5.0, 1.0))
+    diff = scad.diff_sketch_rsketchdiff(sketch, after)
+    assert diff["changed_constraints"] == ["tan", "fixa"]
+    assert diff["removed_constraints"] == ["fixc", "long"]  # c is no control point any more; the length was the whole curve's
+    tangent = constraints_of(after, "tangent")[0]
+    assert [t["entity_id"] for t in tangent["targets"]] == ["lead", "s1"] and tangent["metadata"]["at_b"] == "start"
+    assert constraints_of(after, "fix")[0]["targets"][0]["entity_id"] == "a"
+    assert_solves(after)
+
+
+def test_a_bspline_end_extends_to_the_line_ahead():
+    sketch = arch({"w1": (9, -10), "w2": (9, 10)}, [("line", "w", "w1", "w2")])
+    after = scad.extend_rsketch(sketch, "sp", "end")
+    assert points_of(after)["d"][0] == pytest.approx(9.0)
+    poles = poles_of(after, "sp")
+    assert poles[:2] == ["a", "b"] and poles[-1] == "d"
+    assert spline_of(after, "sp")["multiplicities"][1:-1] == [3]  # still a cubic Bezier chain
+    assert on_curve(after, "sp", (3.0, 1.5))  # the old part of the curve is unchanged
+    assert constraints_of(after, "point_on")[0]["targets"][1]["entity_id"] == "w"
+    assert_solves(after)
+    with pytest.raises(ValueError, match="nothing is ahead of the start of 'sp'"):
+        scad.extend_rsketch(sketch, "sp", "start")
+    with pytest.raises(ValueError, match="'loop' is a closed B-spline"):
+        scad.extend_rsketch(closed_loop(), "loop", "end")
+
+
+def test_a_line_extends_to_a_bspline():
+    sketch = arch({"l1": (3, -3), "l2": (3, -1)}, [("line", "l", "l1", "l2")])
+    after = scad.extend_rsketch(sketch, "l", "end", to="sp")
+    assert points_of(after)["l2"] == pytest.approx((3.0, 1.5))
+    assert constraints_of(after, "point_on")[0]["targets"][1]["kind"] == "bspline"
+    assert_solves(after)
+
+
+def test_bspline_trim_and_extend_are_replayed_from_model_json():
+    with scad.GraphSession() as session:
+        sketch = scad.make_sketch_rsketch(name="wave")
+        for pid, xy in {"a": (0, 0), "b": (2, 2), "c": (4, 2), "d": (6, 0), "v1": (4, -5), "v2": (4, 5), "w1": (-2, 1), "w2": (-2, -6)}.items():
+            sketch = scad.add_point_rsketch(sketch, pid, *xy)
+        sketch = scad.add_bspline_rsketch(sketch, "sp", "a", "d", control_points=["a", "b", "c", "d"], degree=3)
+        sketch = scad.add_line_rsketch(sketch, "v", "v1", "v2")
+        sketch = scad.add_line_rsketch(sketch, "w", "w1", "w2")
+        sketch = scad.trim_rsketch(sketch, "sp", (5.0, 1.0))  # the arch now ends on v at (4, 4/3)
+        sketch = scad.trim_rsketch(sketch, "v", (4.0, 3.0))  # v now ends on the arch
+        sketch = scad.extend_rsketch(sketch, "s1", "start", to="w")
+        wire = scad.make_wire_from_sketch_rwire(sketch, profile=0)
+        session.capture_result(value=wire)
+    payload = json.loads(export_graph_json(session.graph))
+    ops = [node["op"] for node in payload["nodes"]]
+    assert ops.count("trim_rsketch") == 2 and ops.count("extend_rsketch") == 1
+    rebuilt = replay_graph(import_graph_json(json.dumps(payload)))
+
+    def length(shape):
+        props = GProp_GProps()
+        BRepGProp.LinearProperties_s(shape.wrapped, props)
+        return props.Mass()
+
+    assert len(scad.ql.edges().resolve(rebuilt[0])) == len(scad.ql.edges().resolve(wire)) == 2  # the extended arch and what is left of v
+    assert length(rebuilt[0]) == pytest.approx(length(wire), rel=1e-9)
+
+
+def test_the_editor_document_round_trips_a_bspline_trim_and_extend():
+    from simplecadapi.editor import sketch_doc as S
+
+    doc = {
+        "plane": "XY",
+        "points": [{"id": f"p{i}", "x": x, "y": y} for i, (x, y) in enumerate([(0, 0), (10, 10), (20, -10), (30, 0), (15, -10), (15, 10), (40, -20), (40, 20)])],
+        "entities": [
+            {"id": "s1", "kind": "bspline", "start": "p0", "end": "p3", "control_points": ["p0", "p1", "p2", "p3"], "degree": 3},
+            {"id": "l1", "kind": "line", "start": "p4", "end": "p5"},
+            {"id": "w", "kind": "line", "start": "p6", "end": "p7"},
+        ],
+        "constraints": [],
+    }
+    trimmed = S.apply_edit(doc, "trim", {"entity": "s1", "at": [25, -1], "against": ["l1"]})
+    piece = next(e for e in trimmed["sketch"]["entities"] if e["kind"] == "bspline")
+    assert piece["start"] == "p0" and "knots" not in piece  # one Bezier span: the uniform knots
+    assert trimmed["removed"] == ["p1", "p2", "p3", "s1"]
+    assert S.solve(S.validate(trimmed["sketch"]))["status"] == "underconstrained"
+    extended = S.apply_edit(trimmed["sketch"], "extend", {"entity": piece["id"], "end": "end", "to": "w"})
+    grown = next(e for e in extended["sketch"]["entities"] if e["kind"] == "bspline")
+    assert grown["knots"][0] == 0.0 and grown["knots"][-1] == 1.0 and sum(grown["multiplicities"]) == len(grown["control_points"]) + 4
+    clean = S.validate(extended["sketch"])
+    assert S.from_sketch(S.to_sketch(clean), clean)["entities"] == clean["entities"]
+    solved = S.solve(clean)
+    assert solved["status"] == "underconstrained"
+    end = next(p for p in clean["points"] if p["id"] == grown["end"])
+    assert end["x"] == pytest.approx(40.0)
+    with pytest.raises(S.SketchError, match="must add up"):
+        S.validate({**clean, "entities": [{**grown, "multiplicities": [*grown["multiplicities"][:-1], 3]}, *clean["entities"][1:]]})

@@ -11,7 +11,7 @@ export { PLANES, planeCoords, type Frame, type Plane, type PlaneSpec } from "@/l
 export type SPoint = { id: string; x: number; y: number };
 export type EntityKind = "line" | "circle" | "arc" | "bspline";
 /** A B-spline lists its control points (point ids; the first is its start, the last its end) and its degree. */
-export type SEntity = { id: string; kind: EntityKind; start?: string; end?: string; center?: string; radius?: number; control_points?: string[]; degree?: number; construction?: boolean };
+export type SEntity = { id: string; kind: EntityKind; start?: string; end?: string; center?: string; radius?: number; control_points?: string[]; degree?: number; knots?: number[]; multiplicities?: number[]; construction?: boolean };
 
 export type ConstraintKind =
   | "fix" | "coincident" | "point_on" | "horizontal" | "vertical" | "points_horizontal" | "points_vertical"
