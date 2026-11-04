@@ -1015,6 +1015,17 @@ class SketchEditor {
       hit_at = {at_end ? extended->LastParameter() : extended->FirstParameter(), aim->second};
     const SplineHandle result = at_end ? sketch_detail::segment2(extended, extended->FirstParameter(), hit_at->first)
                                        : sketch_detail::segment2(extended, hit_at->first, extended->LastParameter());
+    // a cubic Bezier chain stays one (the solver moves its poles and keeps end tangents only on such a chain)
+    const SketchBSpline definition = subject.bspline();
+    const std::vector<double> weights = definition.weights.value_or(std::vector<double>{});
+    const bool bezier_chain =
+        definition.degree == 3 && !definition.periodic &&
+        std::all_of(weights.begin(), weights.end(), [](double w) { return std::abs(w - 1.0) <= 1e-12; }) &&
+        std::all_of(definition.multiplicities.begin() + 1, definition.multiplicities.end() - 1,
+                    [](int m) { return m == 3; });
+    if (bezier_chain && result->Degree() == 3 && !result->IsRational())
+      for (int i = 2; i < result->NbKnots(); ++i)
+        result->IncreaseMultiplicity(i, 3);
     Spline2 shape = sketch_detail::spline2_of(result);
     return {at_end ? shape.poles.back() : shape.poles.front(), hit_at->second, std::move(shape)};
   }

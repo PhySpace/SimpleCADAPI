@@ -27,7 +27,8 @@ _SUB = ("start", "end", "center")
 PLANES = ("XY", "XZ", "YZ")
 PLANE_NORMALS = {"XY": "+z", "XZ": "-y", "YZ": "+x"}
 ENTITY_KINDS = {"line": ("start", "end"), "circle": ("center",), "arc": ("start", "end", "center"), "bspline": ("start", "end")}
-"""A B-spline also lists its ``control_points`` (point ids, the first and the last are its start and end) and a ``degree``."""
+"""A B-spline also lists its ``control_points`` (point ids, the first and the last are its start and end) and a ``degree``, and,
+when they are not the uniform clamped ones (a trimmed or extended B-spline), its distinct ``knots`` and their ``multiplicities``."""
 _MAX_DEGREE = 5
 
 # kind -> (target parameter names in the SDK function, unit of its value or None, extra keyword parameters)
@@ -154,6 +155,9 @@ def validate(doc: Mapping[str, Any]) -> dict[str, Any]:
                 raise SketchError(f"{entity['id']}: the first and the last control points are its start and end")
             entity["control_points"] = poles
             entity["degree"] = degree
+            knots = _knot_vector(raw, len(poles), degree, entity["id"])
+            if knots is not None:
+                entity["knots"], entity["multiplicities"] = knots
         if kind == "circle":
             radius = _number(raw.get("radius"), f"{entity['id']} radius")
             if radius <= 0:
@@ -210,6 +214,33 @@ def validate(doc: Mapping[str, Any]) -> dict[str, Any]:
 # ---- code ---------------------------------------------------------------------------------------------------------------------
 
 
+def _uniform_knots(count: int, degree: int) -> tuple[list[float], list[int]]:
+    """The knots ``add_bspline_rsketch`` gives *count* control points when it is given none (uniform, clamped)."""
+    spans = count - degree
+    return [i / spans for i in range(spans + 1)], [degree + 1] + [1] * (spans - 1) + [degree + 1]
+
+
+def _same_knots(a: tuple[list[float], list[int]], b: tuple[list[float], list[int]]) -> bool:
+    return a[1] == b[1] and len(a[0]) == len(b[0]) and all(abs(x - y) <= 1e-12 for x, y in zip(a[0], b[0]))
+
+
+def _knot_vector(raw: Mapping[str, Any], count: int, degree: int, eid: str) -> tuple[list[float], list[int]] | None:
+    """The validated ``knots`` / ``multiplicities`` of a document B-spline, or None when it has none (the uniform ones)."""
+    if raw.get("knots") is None and raw.get("multiplicities") is None:
+        return None
+    knots, mults = raw.get("knots"), raw.get("multiplicities")
+    if not isinstance(knots, (list, tuple)) or not isinstance(mults, (list, tuple)) or len(knots) != len(mults) or len(knots) < 2:
+        raise SketchError(f"{eid}: knots and multiplicities are two lists of the same length (two or more)")
+    values = [_number(k, f"{eid} knot") for k in knots]
+    if any(b <= a for a, b in zip(values, values[1:])):
+        raise SketchError(f"{eid}: the knots must increase")
+    if any(isinstance(m, bool) or not isinstance(m, int) or not 1 <= m <= degree + 1 for m in mults):
+        raise SketchError(f"{eid}: a multiplicity is a whole number from 1 to {degree + 1}")
+    if sum(mults) != count + degree + 1:
+        raise SketchError(f"{eid}: the multiplicities must add up to {count + degree + 1} ({count} control points, degree {degree})")
+    return values, [int(m) for m in mults]
+
+
 def _ref(target: str) -> str:
     return json.dumps(target)
 
@@ -225,6 +256,8 @@ def _calls(doc: Mapping[str, Any], *, var_for: Mapping[str, str] | None = None) 
             lines.append(f'_sketch = scad.add_line_rsketch(sketch=_sketch, entity_id={_ref(entity["id"])}, start={_ref(entity["start"])}, end={_ref(entity["end"])}{extra})')
         elif entity["kind"] == "bspline":
             poles = ", ".join(_ref(p) for p in entity["control_points"])
+            if entity.get("knots") is not None:  # repr keeps every digit of a knot (they are validated finite floats)
+                extra = f', knots=[{", ".join(repr(float(k)) for k in entity["knots"])}], multiplicities={[int(m) for m in entity["multiplicities"]]}' + extra
             lines.append(
                 f'_sketch = scad.add_bspline_rsketch(sketch=_sketch, entity_id={_ref(entity["id"])}, start={_ref(entity["start"])}, end={_ref(entity["end"])}, '
                 f'control_points=[{poles}], degree={entity["degree"]}{extra})'
@@ -398,6 +431,10 @@ def from_sketch(sketch: Any, like: Mapping[str, Any] | None = None) -> dict[str,
                 raise SketchError(f"{item['id']}: a B-spline with literal, weighted or periodic control points is code, not a document")
             entity["control_points"] = refs
             entity["degree"] = int(item["degree"])
+            knots = [float(k) for k in item.get("knots") or []]
+            mults = [int(m) for m in item.get("multiplicities") or []]
+            if not _same_knots((knots, mults), _uniform_knots(len(refs), entity["degree"])):
+                entity["knots"], entity["multiplicities"] = knots, mults
         entities.append(entity)
     constraints: list[dict[str, Any]] = []
     for item in data["constraints"]:

@@ -302,3 +302,187 @@ TEST_CASE("diff: created, removed and changed") {
   CHECK(diff_sketch_rsketchdiff(after, before).removed == std::vector<std::string>{"z"});
   CHECK(diff_sketch_rsketchdiff(before, after).to_value().find("created")->as_array().size() == 1);
 }
+
+// ---- B-splines ----------------------------------------------------------------------------------------------------
+
+namespace {
+
+// A cubic Bezier arch (0, 0) -> (6, 0) through b (2, 2) and c (4, 2); it peaks at (3, 1.5).
+Sketch arch(std::vector<std::pair<std::string, SketchPoint2>> more = {}) {
+  std::vector<std::pair<std::string, SketchPoint2>> points{{"a", {0, 0}}, {"b", {2, 2}}, {"c", {4, 2}}, {"d", {6, 0}}};
+  points.insert(points.end(), more.begin(), more.end());
+  return add_bspline_rsketch(with_points(points), "sp", "a", "d", {"a", "b", "c", "d"}, 3);
+}
+
+std::vector<std::string> poles_of(const Sketch& s, const std::string& spline) {
+  std::vector<std::string> out;
+  for (const SketchPole& pole : s.entities().at(spline).bspline().poles)
+    out.push_back(pole.point_id);
+  return out;
+}
+
+const SketchConstraint* constraint_of(const Sketch& s, const std::string& kind, const std::string& first) {
+  for (const SketchConstraint& c : s.constraints())
+    if (c.kind == kind && c.targets.at(0).entity_id == first)
+      return &c;
+  return nullptr;
+}
+
+SketchSolveResult loose_solve(const Sketch& s) {
+  SketchSolveRequest request;
+  request.strict = false;
+  return inspect_sketch_rsketchresult(s, request);
+}
+
+std::string status_of(const Sketch& s) {
+  return loose_solve(s).status;
+}
+
+}  // namespace
+
+TEST_CASE("trim: a B-spline crossed by a line keeps the piece away from the click as a new B-spline") {
+  Sketch s = arch({{"v1", {4, -5}}, {"v2", {4, 5}}});
+  s = add_line_rsketch(s, "v", "v1", "v2");
+  const Sketch after = trim_rsketch(s, "sp", SketchPosition(5.0, 1.0));
+  const SketchDiff diff = diff_sketch_rsketchdiff(s, after);
+  CHECK(diff.removed == std::vector<std::string>{"b", "c", "d", "sp"});  // the inner poles moved: new points
+  CHECK(diff.created == std::vector<std::string>{"p1", "p2", "p3", "s1"});
+  CHECK(ids_of(after, "bspline") == std::vector<std::string>{"s1"});
+  CHECK(poles_of(after, "s1") == std::vector<std::string>{"a", "p2", "p3", "p1"});
+  CHECK(xy_of(after, "p1").first == doctest::Approx(4.0));
+  CHECK(xy_of(after, "p1").second == doctest::Approx(4.0 / 3.0));  // x = 6t, y = 6t(1 - t) on the arch
+  const SketchConstraint* tie = constraint_of(after, "point_on", "p1");
+  REQUIRE(tie != nullptr);
+  CHECK(tie->targets[1].entity_id == "v");
+  CHECK(status_of(after) == "underconstrained");
+}
+
+TEST_CASE("trim: a line crossed by a B-spline is cut there and its cut end is kept on the B-spline") {
+  Sketch s = arch({{"h1", {-1, 1}}, {"h2", {7, 1}}});
+  s = add_line_rsketch(s, "h", "h1", "h2");
+  const Sketch after = trim_rsketch(s, "h", SketchPosition(6.5, 1.0));
+  REQUIRE(ids_of(after, "line") == std::vector<std::string>{"l1"});
+  CHECK(span(after, "l1").first == doctest::Approx(-1.0));
+  const double x = span(after, "l1").second;
+  CHECK(x > 4.0);
+  CHECK(x < 6.0);
+  const SketchConstraint* tie = constraint_of(after, "point_on", "p1");
+  REQUIRE(tie != nullptr);
+  CHECK(tie->targets[1].entity_id == "sp");
+  CHECK(tie->targets[1].kind == "bspline");
+  // the solver keeps the point on the B-spline: drag-free solve leaves it where it is
+  const SketchSolveResult solved = loose_solve(after);
+  CHECK(solved.status == "underconstrained");
+  CHECK(near(solved.solved_points.at("p1"), x, 1.0));
+}
+
+TEST_CASE("trim: a tangent touch is one cut; a B-spline cut by a circle and by another B-spline") {
+  Sketch s = arch({{"h1", {-1, 1.5}}, {"h2", {7, 1.5}}});
+  s = add_line_rsketch(s, "h", "h1", "h2");
+  const Sketch touched = trim_rsketch(s, "h", SketchPosition(5.0, 1.5));
+  CHECK(span(touched, "l1").second == doctest::Approx(3.0));
+  Sketch t = arch({{"o", {6, 0}}, {"e", {0, 3}}, {"f", {3, -2}}, {"g", {5, -2}}, {"h", {8, 3}}});
+  t = add_circle_rsketch(t, "ring", "o", 2.0);
+  t = add_bspline_rsketch(t, "low", "e", "h", {"e", "f", "g", "h"}, 3);
+  const Sketch by_circle = trim_rsketch(t, "sp", SketchPosition(5.5, 0.5), std::vector<SketchTarget>{"ring"});
+  REQUIRE(ids_of(by_circle, "bspline") == std::vector<std::string>{"s1", "low"});
+  const SketchPoint2 cut = xy_of(by_circle, by_circle.entities().at("s1").point_id("end"));
+  CHECK(std::hypot(cut.first - 6.0, cut.second) == doctest::Approx(2.0));
+  const Sketch by_spline = trim_rsketch(t, "sp", SketchPosition(3.0, 1.5), std::vector<SketchTarget>{"low"});
+  CHECK(ids_of(by_spline, "bspline") == std::vector<std::string>{"s1", "s2", "low"});
+  CHECK(by_spline.entities().at("s1").point_id("start") == "a");
+  CHECK(by_spline.entities().at("s2").point_id("end") == "d");
+  CHECK(status_of(by_spline) == "underconstrained");
+}
+
+TEST_CASE("trim: a closed B-spline needs two cuts; the piece over its seam keeps the seam point") {
+  Sketch s = with_points({{"q0", {0, 0}},
+                          {"q1", {10, 0}},
+                          {"q2", {10, 10}},
+                          {"q3", {0, 10}},
+                          {"v1", {5, -5}},
+                          {"v2", {5, 15}},
+                          {"w1", {20, -5}},
+                          {"w2", {20, 5}}});
+  s = add_bspline_rsketch(s, "loop", "q0", "q0", {"q0", "q1", "q2", "q3", "q0"}, 3);
+  const Sketch once = add_line_rsketch(s, "w", "w1", "w2");
+  CHECK(ids_of(trim_rsketch(once, "loop", SketchPosition(5.0, 5.0)), "bspline").empty());  // nothing crosses it
+  Sketch half = add_line_rsketch(s, "v", "v1", "v2");
+  const Sketch right = trim_rsketch(half, "loop", SketchPosition(9.0, 9.0));
+  REQUIRE(ids_of(right, "bspline") == std::vector<std::string>{"s1"});
+  const std::vector<std::string> poles = poles_of(right, "s1");
+  CHECK(std::find(poles.begin(), poles.end(), "q0") != poles.end());  // the seam is an inner control point now
+  CHECK(!right.entities().contains("q1"));
+  CHECK(status_of(right) == "underconstrained");
+  // one crossing only: a line that ends inside the loop
+  Sketch stub = with_points(
+      {{"q0", {0, 0}}, {"q1", {10, 0}}, {"q2", {10, 10}}, {"q3", {0, 10}}, {"v1", {5, -5}}, {"v2", {5, 5}}});
+  stub = add_bspline_rsketch(stub, "loop", "q0", "q0", {"q0", "q1", "q2", "q3", "q0"}, 3);
+  stub = add_line_rsketch(stub, "v", "v1", "v2");
+  CHECK_THROWS_WITH_AS((void)trim_rsketch(stub, "loop", SketchPosition(9.0, 9.0)),
+                       doctest::Contains("a closed B-spline needs two cuts"), Error);
+}
+
+TEST_CASE("trim: constraints on a B-spline's ends stay with the piece that keeps the end") {
+  Sketch s = arch({{"z", {-4, -4}}, {"v1", {4, -5}}, {"v2", {4, 5}}});
+  s = add_line_rsketch(s, "lead", "z", "a");
+  s = add_line_rsketch(s, "v", "v1", "v2");
+  s = constrain_tangent_rsketch(s, "lead", "sp", std::string("end"), std::string("start"), "external", "tan");
+  s = constrain_fix_rsketch(s, "c", "fixc");
+  s = constrain_fix_rsketch(s, "sp.start", "fixa");
+  const Sketch after = trim_rsketch(s, "sp", SketchPosition(5.0, 1.0));
+  const SketchDiff diff = diff_sketch_rsketchdiff(s, after);
+  CHECK(diff.changed_constraints == std::vector<std::string>{"tan", "fixa"});
+  CHECK(diff.removed_constraints == std::vector<std::string>{"fixc"});  // c is gone
+  const SketchConstraint* tangent = constraint_of(after, "tangent", "lead");
+  REQUIRE(tangent != nullptr);
+  CHECK(tangent->targets[1].entity_id == "s1");
+  CHECK(constraint_of(after, "fix", "a") != nullptr);
+  CHECK(status_of(after) != "conflicting");
+}
+
+TEST_CASE("extend: a B-spline end grows to the line ahead, a line grows to a B-spline") {
+  Sketch s = arch({{"w1", {9, -10}}, {"w2", {9, 10}}});
+  s = add_line_rsketch(s, "w", "w1", "w2");
+  const Sketch after = extend_rsketch(s, "sp", "end");
+  CHECK(xy_of(after, "d").first == doctest::Approx(9.0));
+  const std::vector<std::string> poles = poles_of(after, "sp");
+  CHECK(poles.front() == "a");
+  CHECK(poles.back() == "d");
+  CHECK(poles[1] == "b");  // the poles the extension leaves alone keep their points
+  const SketchConstraint* tie = constraint_of(after, "point_on", "d");
+  REQUIRE(tie != nullptr);
+  CHECK(tie->targets[1].entity_id == "w");
+  CHECK(status_of(after) == "underconstrained");
+  // the first part of the curve is unchanged: (3, 1.5) is still on it
+  const SketchSolveResult solved = loose_solve(after);
+  const Value& entity = solved.solved_entities.at("sp");
+  CHECK(entity.find("control_points")->as_array().size() == poles.size());
+  CHECK_THROWS_WITH_AS((void)extend_rsketch(s, "sp", "start"),
+                       doctest::Contains("nothing is ahead of the start of 'sp'"), Error);
+
+  Sketch t = arch({{"l1", {3, -3}}, {"l2", {3, -1}}});
+  t = add_line_rsketch(t, "l", "l1", "l2");
+  const Sketch reached = extend_rsketch(t, "l", "end", SketchTarget("sp"));
+  CHECK(near(xy_of(reached, "l2"), 3.0, 1.5));
+  CHECK(constraint_of(reached, "point_on", "l2")->targets[1].entity_id == "sp");
+}
+
+TEST_CASE("crossings: B-splines and ellipses are listed") {
+  Sketch s = arch({{"h1", {-1, 1}}, {"h2", {7, 1}}, {"o", {3, 0}}, {"m", {7, 0}}, {"n", {3, -1}}});
+  s = add_line_rsketch(s, "h", "h1", "h2");
+  s = add_ellipse_rsketch(s, "el", "o", "m", "n");
+  const Value crossings = inspect_sketch_rsketchcrossings(s);
+  int spline_line = 0;
+  int ellipse = 0;
+  int touch = 0;
+  for (const Value& item : crossings.as_array()) {
+    const auto& ids = item.find("entities")->as_array();
+    spline_line += ids.at(0).as_string() == "sp" && ids.at(1).as_string() == "h";
+    ellipse += ids.at(0).as_string() == "sp" && ids.at(1).as_string() == "el";
+    touch += ids.at(0).as_string() == "h" && ids.at(1).as_string() == "el";
+  }
+  CHECK(spline_line == 2);
+  CHECK(ellipse == 2);  // the arch leaves the ellipse and comes back in
+  CHECK(touch == 1);    // the line touches its top
+}
