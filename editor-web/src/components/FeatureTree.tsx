@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { plainLabel } from "@/lib/commands";
-import type { Catalog, FeatureRow, FeatureState, Spec } from "@/lib/features";
+import { candidateLabel, fetchRefStatus, refState, refTone, type Catalog, type FeatureRow, type FeatureState, type RefStatus, type Spec } from "@/lib/features";
 import type { SketchInfo } from "@/lib/sketch-scene";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +44,50 @@ function statusColor(feature: FeatureRow): string {
   return "bg-muted-foreground";
 }
 
+const TONE: Record<"pass" | "warn" | "fail", string> = { pass: "text-pass", warn: "text-amber-600", fail: "text-fail" };
+
+/** The references of a failing feature's selections: their state (green / amber / red) and, for a split or a lost one,
+ * the candidates; choosing one asks the server to write it into the reference (`piece=`, or a new reference). */
+export function ReferenceHealth({ cell, version, busy, onRepair }: { cell: string; version: string; busy: boolean; onRepair: (slot: string, index: number, choice: number) => void }) {
+  const [status, setStatus] = useState<RefStatus | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetchRefStatus(cell).then(
+      (found) => live && (setStatus(found), setFailure(null)),
+      (error: Error) => live && (setStatus(null), setFailure(error.message)),
+    );
+    return () => void (live = false);
+  }, [cell, version]);
+  if (failure) return <p className="mt-1 pl-[22px] text-[11px] text-muted-foreground">references: {failure}</p>;
+  if (!status || status.badge === null) return null;
+  return (
+    <div className="mt-1 space-y-1 pl-[22px] text-[11px]" data-testid={`refs-${cell}`}>
+      {Object.entries(status.slots).flatMap(([slot, rows]) =>
+        rows.map((row, index) => {
+          const state = refState(row);
+          return (
+            <div key={`${slot}-${index}`}>
+              <span className={cn("font-medium", TONE[refTone(state)])}>{slot} {index + 1}: {state}</span>
+              {state === "lost" && row.reason && <span className="text-muted-foreground"> ({row.reason}{row.lost_at ? ` at ${row.lost_at}` : ""})</span>}
+              {(state === "split" || state === "lost") && row.candidates.length > 0 && (
+                <div className="mt-0.5 flex flex-wrap gap-1">
+                  {row.candidates.map((candidate, choice) => (
+                    <Button key={choice} type="button" size="sm" variant="outline" className="h-6 px-1.5" disabled={busy}
+                      title={state === "split" ? "Use this piece" : "Accept this look-alike"} onClick={() => onRepair(slot, index, choice)}>
+                      {state === "split" ? `piece ${choice + 1}` : "use"}: {candidateLabel(candidate)}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        }),
+      )}
+    </div>
+  );
+}
+
 /** The sketches of the notebook as the tree shows them: visibility (an eye), selection and the hover shared with the viewport. */
 export type TreeSketches = {
   infos: readonly SketchInfo[];
@@ -67,9 +111,12 @@ export function FeatureTree({
   onUseProduct,
   onUndo,
   onRedo,
+  onRepairRef,
   sketches,
 }: {
   sketches?: TreeSketches;
+  /** Write a choice into a reference of a feature's selection (`ref_repair`); without it, no repair buttons. */
+  onRepairRef?: (cell: string, slot: string, index: number, choice: number) => void;
   catalog: Catalog | null;
   state: FeatureState;
   busy: boolean;
@@ -196,6 +243,9 @@ export function FeatureTree({
                     </Button>
                   </div>
                   {problem && <p className="mt-1 whitespace-pre-wrap break-words pl-[22px] text-[11px] text-fail">{problem}</p>}
+                  {problem && onRepairRef && spec?.slots.some((slot) => slot.kind === "select") && (
+                    <ReferenceHealth cell={feature.cell} version={`${feature.status}:${problem}`} busy={busy} onRepair={(slot, index, choice) => onRepairRef(feature.cell, slot, index, choice)} />
+                  )}
                 </li>
               );
             })}

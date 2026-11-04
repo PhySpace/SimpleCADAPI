@@ -96,6 +96,7 @@ export type FeatureCommand =
   | { op: "delete"; cell: string }
   | { op: "use_as_product"; body: string }
   | { op: "set_connectors"; connectors: { id: string; origin: number[]; x_axis: number[]; y_axis: number[] }[] }
+  | { op: "ref_repair"; cell: string; slot: string; index: number; choice: number }
   | { op: "undo" }
   | { op: "redo" };
 
@@ -125,6 +126,52 @@ export async function featureCommand(command: FeatureCommand): Promise<CommandRe
   const body = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
   if (!response.ok || !body || body.ok === false) throw new Error(body?.error ?? `${response.status} ${response.statusText}`);
   return body as CommandResult;
+}
+
+// -- stable references (scad.ref) of a feature's selections ------------------------------------------------------------
+
+/** A piece of a split reference, or a look-alike of a lost one (the server's `Candidate.describe()`). */
+export type RefCandidate = { topo_id: string; kind: string; geom_type: string; center: number[]; size: number; score: number };
+export type RefState = "ok" | "merged" | "split" | "lost";
+/** How one reference resolves in the body its feature reads (the server's `Resolution.describe()` plus its code). */
+export type RefRow = {
+  code: string;
+  status: RefState;
+  reason?: string | null;
+  lost_at?: string | null;
+  chosen?: number;
+  error?: string;
+  candidates: RefCandidate[];
+};
+export type RefStatus = { ok: true; cell: string; body: string; slots: Record<string, RefRow[]>; badge: RefState | null };
+
+/** The state a person sees: a split whose piece was chosen runs, so it is ok. */
+export function refState(row: Pick<RefRow, "status" | "chosen">): RefState {
+  return row.status === "split" && typeof row.chosen === "number" ? "ok" : row.status;
+}
+
+/** Green, amber, red (design: ok / merged green, split amber, lost red). */
+export function refTone(state: RefState): "pass" | "warn" | "fail" {
+  return state === "lost" ? "fail" : state === "split" ? "warn" : "pass";
+}
+
+/** What a candidate button says: its kind, where it is (mm) and its size. */
+export function candidateLabel(candidate: RefCandidate): string {
+  const at = candidate.center.map((v) => (Math.abs(v) < 5e-5 ? "0" : String(Math.round(v * 10) / 10))).join(", ");
+  const unit = candidate.kind === "edge" ? "mm" : "mm²";
+  return `${candidate.geom_type.toLowerCase()} at (${at}), ${Math.round(candidate.size * 10) / 10} ${unit}`;
+}
+
+/** How the references of a feature resolve now (asks the kernel). */
+export async function fetchRefStatus(cell: string): Promise<RefStatus> {
+  const response = await fetch("/api/features", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ op: "ref_status", cell }),
+  });
+  const body = (await response.json().catch(() => null)) as (RefStatus & { error?: string }) | { ok: false; error?: string } | null;
+  if (!response.ok || !body || body.ok === false) throw new Error((body as { error?: string } | null)?.error ?? `${response.status} ${response.statusText}`);
+  return body as RefStatus;
 }
 
 /** The line a person reads from one cell error: its "What happened" line, else the first line (the error may be a

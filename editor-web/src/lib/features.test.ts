@@ -311,3 +311,22 @@ describe("a colour slot", () => {
     expect(formToValues(spec, { color: "nope" }).errors.color).toBe("a colour as #rrggbb");
   });
 });
+
+describe("stable references of a feature", () => {
+  it("a chosen piece runs, so it reads ok; split is amber, lost red", async () => {
+    const { refState, refTone } = await import("@/lib/features");
+    expect(refState({ status: "split", chosen: 1 })).toBe("ok");
+    expect(refState({ status: "split" })).toBe("split");
+    expect(refTone("split")).toBe("warn");
+    expect(refTone("lost")).toBe("fail");
+    expect(refTone("merged")).toBe("pass");
+  });
+
+  it("a candidate says what it is, where, and how big", async () => {
+    const { candidateLabel } = await import("@/lib/features");
+    expect(candidateLabel({ topo_id: "face_face_2", kind: "face", geom_type: "PLANE", center: [-11, 1e-17, 20], size: 360.04, score: 0 })).toBe(
+      "plane at (-11, 0, 20), 360 mm²",
+    );
+    expect(candidateLabel({ topo_id: "", kind: "edge", geom_type: "LINE", center: [0, 10.04, 20], size: 40, score: 0 })).toBe("line at (0, 10, 20), 40 mm");
+  });
+});
