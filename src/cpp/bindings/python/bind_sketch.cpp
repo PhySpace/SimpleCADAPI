@@ -628,6 +628,11 @@ void bind_entity_operators(py::module_& m) {
         py::arg("center"), py::kw_only(), py::arg("construction") = false);
   m.def("trim_rsketch", &trim_rsketch, py::arg("sketch"), py::arg("entity"), py::arg("at"), py::kw_only(),
         py::arg("against") = py::none());
+  m.def("insert_spline_anchor_rsketch", &insert_spline_anchor_rsketch, py::arg("sketch"), py::arg("spline"),
+        py::arg("at"));
+  m.def("remove_spline_anchor_rsketch", &remove_spline_anchor_rsketch, py::arg("sketch"), py::arg("spline"),
+        py::arg("anchor"));
+  m.def("convert_spline_to_anchors_rsketch", &convert_spline_to_anchors_rsketch, py::arg("sketch"), py::arg("spline"));
   m.def(
       "extend_rsketch",
       [](const Sketch& sketch, const SketchTarget& entity, const Choice<EndTag>& end,

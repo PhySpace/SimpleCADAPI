@@ -16,6 +16,8 @@ import { AssemblyPanel } from "@/components/AssemblyPanel";
 import { ConnectorGizmos, type Gizmo } from "@/components/ConnectorGizmos";
 import { WorkplanePatches } from "@/components/WorkplanePatches";
 import { TagSplits, parseTagSplits, type TagSplit } from "@/components/TagSplits";
+import { WorkplanePlacePanel, WorkplanePlacer, type PlaceBase, type PlaceMode } from "@/components/WorkplanePlacer";
+import { NAMED_FRAMES, ZERO_PLACE, cleanValues, faceFrame, type PlaceFrame, type PlaceValues } from "@/lib/workplane-place";
 import { parseWorkplanes, resolvePlane, workplanePlane, workplaneRequest, type WorkplaneFrame } from "@/lib/workplanes";
 import { fitDistanceMm } from "@/lib/sketch-view";
 import { viewPose } from "@/lib/sketch-plane";
@@ -49,13 +51,14 @@ import { Boxes, Cable } from "lucide-react";
 import { Viewport, type PickResult, type SelectionMode } from "@/scene/Viewport";
 import type { SceneView } from "@/scene/scene-view";
 
-const MODES: { mode: SelectionMode; label: string }[] = [
-  { mode: "component", label: "comp" },
-  { mode: "solid", label: "solid" },
-  { mode: "face", label: "face" },
-  { mode: "edge", label: "edge" },
-  { mode: "vertex", label: "vert" },
-  { mode: "sketch", label: "sketch" },
+/** The pick intents and their keys: 1 vertex, 2 edge, 3 face, 4 solid (Plasticity's order), 5 component, 6 sketch. */
+const MODES: { mode: SelectionMode; label: string; key: string }[] = [
+  { mode: "component", label: "comp", key: "5" },
+  { mode: "solid", label: "solid", key: "4" },
+  { mode: "face", label: "face", key: "3" },
+  { mode: "edge", label: "edge", key: "2" },
+  { mode: "vertex", label: "vert", key: "1" },
+  { mode: "sketch", label: "sketch", key: "6" },
 ];
 
 /** Editor application: left = notebook (cells, workspace), middle = the live
@@ -103,6 +106,10 @@ export function App() {
   // The notebook's workplanes as the kernel reported them, and the one Space made (or chose) last: new sketches go on it.
   const [workplanes, setWorkplanes] = useState<WorkplaneFrame[]>([]);
   const [tagSplits, setTagSplits] = useState<TagSplit[]>([]);
+  // A workplane being placed by hand (Space): its base, the numbers the handles write, move or turn, its name.
+  const [placing, setPlacing] = useState<{ base: string; values: PlaceValues; mode: PlaceMode; name: string; face: { item: SelectionItem; frame: PlaceFrame } | null; error: string | null } | null>(null);
+  const placingRef = useRef(placing);
+  placingRef.current = placing;
   const [activeWorkplane, setActiveWorkplane] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("solid");
   const [sceneVersion, setSceneVersion] = useState(0);
@@ -116,6 +123,8 @@ export function App() {
   const gui = useFeatures();
   const refreshFeatures = gui.refresh;
   const [dialog, setDialog] = useState<DialogRequest | null>(null);
+  const dialogRef = useRef(dialog);
+  dialogRef.current = dialog;
   const [guiBusy, setGuiBusy] = useState(false);
   const [guiError, setGuiError] = useState<string | null>(null);
   const modeBeforeDialog = useRef<SelectionMode | null>(null);
@@ -157,6 +166,14 @@ export function App() {
     [currentPath],
   );
   const [pickedSketches, setPickedSketches] = useState<string[]>([]);
+  // Sketches are drawn while they are what a click picks, while one is picked or edited, and while a form takes a
+  // sketch profile; otherwise they would only clutter the model.
+  const dialogTakesProfile = !!dialog?.spec.slots.some((slot) => slot.kind === "profile");
+  const sketchesShown = selectionMode === "sketch" || pickedSketches.length > 0 || sketchSession !== null || dialogTakesProfile;
+  const shownSketches = useMemo(
+    () => (sketchesShown ? hiddenSketches : new Set(sketchList.map((info) => info.name))),
+    [sketchesShown, hiddenSketches, sketchList],
+  );
   const [hoverSketch, setHoverSketch] = useState<string | null>(null);
   const [pushArrow, setPushArrow] = useState<{ sketch: string; direction: Vec3; distance: number } | null>(null);
   const [barNote, setBarNote] = useState<string | null>(null);
@@ -448,6 +465,8 @@ export function App() {
   leftTabRef.current = leftTab;
   const selectComponent = asm.setSelected;
   const handlePick = useCallback((result: PickResult) => {
+    if (placingRef.current) return; // a click on the handles is not a pick
+    if (dialogRef.current?.spec.id === "hole") return; // a click places the hole (HolePlacer), it picks nothing
     if (choosingRef.current) {
       void pickSketchFace(result);
       return;
@@ -712,6 +731,93 @@ export function App() {
     }
   }, [gui.run, log.push]);
 
+  // -- placing a workplane by hand ----------------------------------------------------------------------------------
+
+  /** The bases a workplane can be placed on: the datum planes, every workplane of the notebook, and the picked face. */
+  const placeBases = useMemo<PlaceBase[]>(() => {
+    const out: PlaceBase[] = (["XY", "XZ", "YZ"] as const).map((name) => ({ value: name, label: name, frame: NAMED_FRAMES[name] }));
+    for (const wp of workplanes) out.push({ value: wp.name, label: wp.name, frame: { origin: wp.origin, x_axis: wp.x_axis, y_axis: wp.y_axis, normal: wp.normal } });
+    if (placing?.face) out.push({ value: "face", label: "picked face", frame: placing.face.frame });
+    return out;
+  }, [workplanes, placing?.face]);
+  const placeBase = placeBases.find((item) => item.value === placing?.base) ?? placeBases[0];
+
+  /** Start placing: on the picked flat face, else on the active workplane (one after another builds a 3D frame of
+   * planes), else on XY. */
+  const startPlacing = useCallback(() => {
+    const items = selectionRef.current;
+    const face = items.length === 1 && items[0].kind === "face" ? items[0] : null;
+    const frame = face ? faceFrame(face.properties) : null;
+    if (face && !frame) {
+      setBarNote("That face is not flat: a workplane lies on a plane. Pick a flat face, or nothing to place one on the active workplane.");
+      return;
+    }
+    const taken = gui.state?.taken ?? [];
+    let name = "wp";
+    for (let n = 2; taken.includes(name); n++) name = `wp_${n}`;
+    const base = face ? "face" : activeWorkplaneRef.current && workplanesRef.current.some((wp) => wp.name === activeWorkplaneRef.current) ? activeWorkplaneRef.current : "XY";
+    setBarNote(null);
+    setPlacing({ base, values: ZERO_PLACE, mode: "translate", name, face: face && frame ? { item: face, frame } : null, error: null });
+  }, [gui.state?.taken]);
+
+  const createPlaced = useCallback(async () => {
+    const current = placingRef.current;
+    if (!current) return;
+    setGuiBusy(true);
+    try {
+      const values = cleanValues(current.values);
+      const command: FeatureCommand = {
+        op: "add",
+        spec: "workplane",
+        name: current.name,
+        values: {
+          method: "offset",
+          base: current.base,
+          move: values.move,
+          rx: values.rx,
+          ry: values.ry,
+          rz: values.rz,
+          ...(current.base === "face" && current.face ? { x_dir: current.face.frame.x_axis } : {}),
+        },
+        ...(current.base === "face" && current.face ? { selections: { face: [pickedPayload(current.face.item)] } } : {}),
+      };
+      const result = await gui.run(command);
+      assertCellRan(result);
+      log.push("ok", `add ${result.name}`);
+      setPlacing(null);
+      setPicked([]);
+      turnedTo.current = `stay:${result.name}`; // the camera stays where the person placed it from
+      setActiveWorkplane(result.name);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setPlacing((p) => (p ? { ...p, error: message } : p));
+    } finally {
+      setGuiBusy(false);
+    }
+  }, [gui.run, log.push]);
+
+  // While placing: G move, R turn, Enter create, Esc cancel (not while typing in a field, except the fields' own Enter).
+  useEffect(() => {
+    if (!placing) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      const typing = !!target?.closest("input, textarea, select, [contenteditable=true], .cm-editor");
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setPlacing(null);
+      } else if (event.key === "Enter" && !typing) {
+        event.preventDefault();
+        void createPlaced();
+      } else if (!typing && (event.key === "g" || event.key === "r")) {
+        event.preventDefault();
+        setPlacing((p) => (p ? { ...p, mode: event.key === "g" ? "translate" : "rotate" } : p));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [placing !== null, createPlaced]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // The camera turns to the active workplane (straight at it, the model in view) when its frame arrives or changes.
   const turnedTo = useRef<string | null>(null);
   const turnToWorkplane = useCallback((wp: WorkplaneFrame) => {
@@ -732,31 +838,54 @@ export function App() {
     if (!wp || sketchingRef.current) return;
     const key = JSON.stringify(wp);
     if (turnedTo.current === key) return;
+    const stay = turnedTo.current === `stay:${wp.name}`; // placed by hand, in this view: keep the view
     turnedTo.current = key;
-    turnToWorkplane(wp);
+    if (!stay) turnToWorkplane(wp);
   }, [workplanes, activeWorkplane, turnToWorkplane]);
   useEffect(() => {
     // a workplane that is gone (its cell deleted, another notebook) is no longer active
     if (activeWorkplane && workplanes.length && !workplanes.some((wp) => wp.name === activeWorkplane)) setActiveWorkplane(null);
   }, [workplanes, activeWorkplane]);
 
+  // 1..6 switch what a click picks (see MODES), unless a text field has the focus or a sketch is being drawn (its keys
+  // are its tools and typed numbers).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.repeat || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (sketchingRef.current) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable=true], .cm-editor, [role=dialog]")) return;
+      const found = MODES.find((item) => item.key === event.key);
+      if (!found) return;
+      event.preventDefault();
+      setSelectionMode(found.mode);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // Space: a workplane from the selection; with nothing selected, look at the active workplane again.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== " " || event.repeat || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (sketchingRef.current) return; // space pans the sketch view
+      if (sketchingRef.current || placingRef.current) return; // space pans the sketch view
       const target = event.target as HTMLElement | null;
       if (target?.closest("input, textarea, select, button, [contenteditable=true], .cm-editor, [role=dialog]")) return;
       event.preventDefault();
-      if (selectionRef.current.length) void workplaneFromSelection();
-      else {
+      if (event.shiftKey) {
+        // Shift+Space: look straight at the active workplane again
         const wp = workplanesRef.current.find((item) => item.name === activeWorkplaneRef.current);
         if (wp) turnToWorkplane(wp);
+        return;
       }
+      const items = selectionRef.current;
+      // one flat face, or nothing: place a workplane with the handles; the other picks name their constructor
+      if (items.length === 0 || (items.length === 1 && items[0].kind === "face")) startPlacing();
+      else void workplaneFromSelection();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [workplaneFromSelection, turnToWorkplane]);
+  }, [workplaneFromSelection, turnToWorkplane, startPlacing]);
 
   const handleEditFeatureRef = useRef<(feature: FeatureRow, spec: Spec) => void>(() => undefined);
   const editSelectedSketch = useCallback(() => {
@@ -777,6 +906,15 @@ export function App() {
     () => [
       // The assembly layout is not a dialog: it is its own panel (registered below), so its spec is left out of the generic list.
       ...commandsFromSpecs((gui.catalog?.specs ?? []).filter((spec) => spec.id !== "assembly" && spec.id !== "workplane"), openSpec, FEATURE_ICONS),
+      {
+        id: "workplane_place",
+        label: "Workplane",
+        group: "Datums",
+        keywords: ["workplane", "datum", "plane", "offset", "rotate", "move", "space"],
+        description: "Place a workplane with handles (Space): on the picked flat face, else on the active workplane, else on XY; move and turn it, then sketch on it.",
+        icon: FEATURE_ICONS.workplane_from_selection,
+        run: () => startPlacing(),
+      },
       {
         id: "workplane_from_selection",
         label: "Workplane from selection",
@@ -1046,7 +1184,7 @@ export function App() {
           <ResizablePanel defaultSize={55} minSize={30} className="min-w-0 overflow-hidden">
             <div className="flex h-full flex-col">
               <div inert={sketching} className={cn("flex h-9 shrink-0 items-center gap-1 border-b-2 border-border px-2", sketching && "opacity-40")}>
-                {MODES.map(({ mode, label }) => (
+                {MODES.map(({ mode, label, key }) => (
                   <button
                     key={mode}
                     type="button"
@@ -1057,8 +1195,10 @@ export function App() {
                         : "border-transparent text-muted-foreground hover:border-input hover:text-foreground",
                     )}
                     onClick={() => setSelectionMode(mode)}
+                    title={`${label} (${key})`}
                   >
                     {label}
+                    <span className="ml-1 opacity-50">{key}</span>
                   </button>
                 ))}
                 <span className="flex-1" />
@@ -1086,7 +1226,7 @@ export function App() {
                   viewRef={viewRef}
                   infos={sketchList}
                   shapes={sketchShapes}
-                  hidden={hiddenSketches}
+                  hidden={shownSketches}
                   editing={sketchSession?.mode === "edit" ? sketchSession.name : null}
                   selected={pickedSketches}
                   hover={hoverSketch}
@@ -1096,7 +1236,34 @@ export function App() {
                   onHover={setHoverSketch}
                 />
                 {viewRef.current && workplanes.length > 0 && <WorkplanePatches view={viewRef.current} workplanes={workplanes} active={activeWorkplane} />}
-                {!sketching && viewRef.current && <TagSplits view={viewRef.current} splits={tagSplits} sceneVersion={sceneVersion} />}
+                {!sketching && !placing && viewRef.current && <TagSplits view={viewRef.current} splits={tagSplits} sceneVersion={sceneVersion} />}
+                {placing && viewRef.current && placeBase && (
+                  <>
+                    <WorkplanePlacer
+                      view={viewRef.current}
+                      base={placeBase.frame}
+                      values={placing.values}
+                      mode={placing.mode}
+                      half={20}
+                      onChange={(values) => setPlacing((p) => (p ? { ...p, values } : p))}
+                    />
+                    <WorkplanePlacePanel
+                      bases={placeBases}
+                      base={placeBase.value}
+                      values={placing.values}
+                      mode={placing.mode}
+                      name={placing.name}
+                      busy={guiBusy}
+                      error={placing.error}
+                      onBase={(base) => setPlacing((p) => (p ? { ...p, base } : p))}
+                      onMode={(mode) => setPlacing((p) => (p ? { ...p, mode } : p))}
+                      onValues={(values) => setPlacing((p) => (p ? { ...p, values } : p))}
+                      onName={(name) => setPlacing((p) => (p ? { ...p, name } : p))}
+                      onCreate={() => void createPlaced()}
+                      onCancel={() => setPlacing(null)}
+                    />
+                  </>
+                )}
                 {!sketching && viewRef.current && gizmos.length > 0 && (
                   <ConnectorGizmos view={viewRef.current} gizmos={gizmos} components={asm.doc.components} highlighted={gizmoHighlight} onPick={pickGizmo} armed={!!asm.target} />
                 )}
@@ -1142,6 +1309,7 @@ export function App() {
           onSelectionMode={setSelectionMode}
           onSubmit={submitFeature}
           onClose={closeDialog}
+          view={viewRef.current}
         />
         <LoadingMask active={loading !== null} message={loading ?? ""} theme={theme.resolved} />
       </div>

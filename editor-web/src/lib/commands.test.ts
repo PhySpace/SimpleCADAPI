@@ -9,7 +9,7 @@ const commands = [
   make("fillet", "Fillet", "Features", ["round"], "Round the picked edges."),
   make("chamfer", "Chamfer", "Features", ["bevel"], "Bevel the picked edges."),
   make("linear_pattern", "Linear pattern", "Pattern", ["array"], "Copies along a direction"),
-  make("loft_rects", "Loft rectangles", "Profiles", [], "A solid between rectangles"),
+  make("op.loft_rsolid", "Loft → solid", "Solids", [], "A solid through profiles"),
 ];
 
 describe("searchCommands", () => {
@@ -33,7 +33,7 @@ describe("searchCommands", () => {
 });
 
 describe("registry helpers", () => {
-  it("lists groups in the order of the data", () => expect(commandGroups(commands)).toEqual(["Primitives", "Features", "Pattern", "Profiles"]));
+  it("lists groups in the order of the data", () => expect(commandGroups(commands)).toEqual(["Primitives", "Features", "Pattern", "Solids"]));
   it("keeps recents unique, newest first, bounded", () => {
     expect(pushRecent(["a", "b"], "b")).toEqual(["b", "a"]);
     expect(pushRecent(Array.from({ length: 12 }, (_, i) => `x${i}`), "n")).toHaveLength(12);

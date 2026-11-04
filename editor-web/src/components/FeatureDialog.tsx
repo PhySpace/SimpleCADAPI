@@ -44,6 +44,8 @@ import {
 } from "@/lib/features";
 import type { SelectionItem } from "@/lib/selection";
 import type { SelectionMode } from "@/scene/Viewport";
+import type { SceneView } from "@/scene/scene-view";
+import { HolePlacer, type HoleDraft } from "@/components/HolePlacer";
 
 /** The icon of each way a new solid meets the body (colour stays reserved for meaning, so the icons carry no ink). */
 const OPERATION_ICONS: Record<string, LucideIcon> = { join: SquarePlus, cut: Scissors, intersect: Combine, new: Box };
@@ -71,6 +73,7 @@ export function FeatureDialog({
   onSelectionMode,
   onSubmit,
   onClose,
+  view,
 }: {
   request: DialogRequest | null;
   state: FeatureState;
@@ -80,6 +83,8 @@ export function FeatureDialog({
   /** Runs the command; rejects with the server's message, shown inline. */
   onSubmit: (command: FeatureCommand) => Promise<void>;
   onClose: () => void;
+  /** The viewport, for the forms that place things in it with the pointer (a hole). */
+  view?: SceneView | null;
 }) {
   return (
     <Dialog open={request !== null} modal={false} onOpenChange={(open) => !open && onClose()}>
@@ -93,6 +98,7 @@ export function FeatureDialog({
           onSelectionMode={onSelectionMode}
           onSubmit={onSubmit}
           onClose={onClose}
+          view={view ?? null}
         />
       )}
     </Dialog>
@@ -107,6 +113,7 @@ function FeatureForm({
   onSelectionMode,
   onSubmit,
   onClose,
+  view,
 }: {
   request: DialogRequest;
   state: FeatureState;
@@ -115,6 +122,7 @@ function FeatureForm({
   onSelectionMode: (mode: SelectionMode) => void;
   onSubmit: (command: FeatureCommand) => Promise<void>;
   onClose: () => void;
+  view: SceneView | null;
 }) {
   const { spec, edit } = request;
   const editing = Boolean(edit);
@@ -309,6 +317,30 @@ function FeatureForm({
     setServerError(null);
   };
 
+  // A hole is placed with the pointer: its ghost follows the model under the pointer, a click puts the start point there
+  // (and, for "along the face's normal", the direction into the material).
+  const number = (value: unknown, fallback: number) => (Number.isFinite(Number(value)) && value !== "" ? Number(value) : fallback);
+  const position = Array.isArray(form.position) && form.position.length === 3 && form.position.every((v) => v !== "" && Number.isFinite(Number(v))) ? (form.position.map(Number) as Vec3) : null;
+  const holeDraft: HoleDraft | null =
+    spec.id === "hole"
+      ? {
+          position,
+          direction: String(form.direction ?? "-z"),
+          vector: [number(form.dx, 0), number(form.dy, 0), number(form.dz, -1)],
+          diameter: number(form.diameter, 6),
+          depth: number(form.depth, 10),
+        }
+      : null;
+  const placeHole = (point: Vec3, normal: Vec3) => {
+    setForm((previous) => ({
+      ...previous,
+      position: point.map((c) => String(round4(c))),
+      ...(previous.direction === "face" ? { dx: String(round4(-normal[0])), dy: String(round4(-normal[1])), dz: String(round4(-normal[2])) } : {}),
+    }));
+    setNote(`Start point placed at (${point.map((c) => round4(c)).join(", ")}).`);
+    setServerError(null);
+  };
+
   // A hole opened from a selected face takes its start point and direction from it as soon as the face is described.
   const faceUsed = useRef(false);
   useEffect(() => {
@@ -334,6 +366,7 @@ function FeatureForm({
   return (
     <DialogContent
       aria-describedby={undefined}
+      data-hole-placer={holeDraft && view ? "on" : undefined}
       onOpenAutoFocus={(event) => event.preventDefault()}
       onKeyDown={(event) => {
         if (event.key === "Enter" && !(event.target instanceof HTMLTextAreaElement) && !(event.target instanceof HTMLButtonElement)) {
@@ -404,6 +437,7 @@ function FeatureForm({
           {busy ? "working…" : editing ? "apply" : "add"}
         </Button>
       </DialogFooter>
+      {holeDraft && view && <HolePlacer view={view} draft={holeDraft} onPlace={placeHole} />}
     </DialogContent>
   );
 }

@@ -106,6 +106,8 @@ class FeatureService:
             if head.role != "datum":  # a workplane on a body's face is not built from the body: the body stays open
                 consumed.update(loaded & set(bodies))
             produces = F.BY_ID[gui["spec"]].produces if gui else "solid"
+            if gui and gui["spec"] == "sketch":  # a sketch makes a face or a wire, as its document says
+                produces = sketch_doc.output_of(gui.get("values", {}).get("sketch") or {})
             part_of = head.slug[: -len("_parts")] if head.slug.endswith("_parts") and head.slug[: -len("_parts")] in assembly_slugs else None
             made = defined if head.role in _ROLES_WITH_BODIES and not part_of else []
             for name in made:
@@ -136,7 +138,7 @@ class FeatureService:
         profiles = []
         for feature in features:
             gui = feature["gui"]
-            if gui and gui["spec"] == "sketch" and feature["makes"]:
+            if gui and gui["spec"] == "sketch" and feature["makes"] and sketch_doc.output_of(gui["values"].get("sketch") or {}) == "face":
                 plane = (gui["values"].get("sketch") or {}).get("plane", "XY")
                 profiles.append(
                     {
@@ -233,11 +235,12 @@ class FeatureService:
             params_anchor = self._params_anchor(cells)
             feature_anchor = request.get("after") or self._feature_anchor(snap, cells)
             if rendered.params:
-                steps.append(self._create(params_anchor, "\n".join(rendered.params), run=False))
+                # run now: the feature cell below reads these names, and a cell never run defines nothing (NameError)
+                steps.append(self._create(params_anchor, "\n".join(rendered.params), run=True))
                 if feature_anchor == params_anchor:  # the params cell sits where the feature goes: keep params first
                     feature_anchor = steps[-1]["id"]
             for code in rendered.before:
-                before = self._create(feature_anchor, code, run=False)
+                before = self._create(feature_anchor, code, run=True)
                 steps.append(before)
                 feature_anchor = before["id"]
             made = self._create(feature_anchor, rendered.feature, run=True)

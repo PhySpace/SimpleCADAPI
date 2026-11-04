@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+from collections import Counter
 from functools import lru_cache
 from typing import Any
 
@@ -58,6 +59,10 @@ _GROUPS = {
     "placement": "Product",
     "material": "Product",
 }
+
+
+_MAKES = {"edge": "curve (edge)", "wire": "wire", "face": "face", "shell": "surface", "solid": "solid", "solids": "solids"}
+"""How a label names what an operation makes, where two operations share a name."""
 
 
 def _label(name: str) -> str:
@@ -225,7 +230,13 @@ def operation_specs() -> tuple[Any, ...]:
         spec = _spec_for(op, features)
         if spec is not None:
             out.append(spec)
-    return tuple(out)
+    # Operations that differ only in what they make (loft_rsolid / loft_rshell, make_circle_redge / _rwire / _rface)
+    # would read as one: their labels say what each makes.
+    count = Counter(spec.label for spec in out)
+    return tuple(
+        dataclasses.replace(spec, label=f"{spec.label} → {_MAKES.get(spec.produces, spec.produces)}") if count[spec.label] > 1 else spec
+        for spec in out
+    )
 
 
 __all__ = ["PREFIX", "operation_specs"]

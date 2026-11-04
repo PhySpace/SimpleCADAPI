@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LatestSolver,
   addArc,
-  addSpline,
   addCircle,
   addConstraint,
   addLine,
@@ -43,8 +42,10 @@ import {
   type Hit,
   type SConstraint,
   type SketchDoc,
+  type SketchOutput,
   type SolveResult,
   type Spot,
+  wireProfiles,
 } from "@/lib/sketch";
 import {
   applyEdit,
@@ -62,17 +63,20 @@ import {
   pushHistory,
   remapChoice,
   trimRequest,
+  convertSplineRequest,
+  insertAnchorRequest,
+  removeAnchorRequest,
   type Corner,
   type CornerOp,
   type EditRequest,
   type End,
 } from "@/lib/sketch-edit";
 import { typedFields, typedTarget, type TypedDims } from "@/lib/sketch-typed";
+import { addPenSpline, anchorRoles, handlePoints, isAnchorSpline, isSmooth, mirrorHandle, shownHandles, smoothAnchors } from "@/lib/sketch-anchors";
 
 /** How near the pointer (screen pixels) must be to a point or a curve to snap to it or pick it. */
 const PICK_PX = 16;
 const DRAW_TOOLS = new Set(["point", "line", "circle", "arc", "spline"]);
-const FIRST = "\u0000first"; // a spline's closing click: "the first control point"
 
 export type Tool = "select" | "point" | "line" | "circle" | "arc" | "spline" | "delete" | "trim" | "extend" | "fillet" | "chamfer";
 /** The corner value box (fillet radius / chamfer distance) open at a corner. */
@@ -80,8 +84,20 @@ export type CornerBox = { op: CornerOp; corner: Corner; text: string; bad: boole
 /** What the last SDK edit (trim, extend) said: its notes, or the error (which names ids). Shown in the status area. */
 export type EditNote = { tone: "ok" | "fail"; text: string };
 const EDIT_TOOLS: ReadonlySet<Tool> = new Set<Tool>(["trim", "extend", "fillet", "chamfer"]);
-export type Draft = { tool: "line"; from: Spot } | { tool: "circle"; center: Spot } | { tool: "arc"; center: Spot; start?: Spot } | { tool: "spline"; points: Spot[] } | null;
-export type Drag = { ids: string[]; origin: Record<string, [number, number]>; start: [number, number]; positions: Record<string, [number, number]>; releasing?: boolean };
+/** The spline draft is a pen path: its anchors and, for each, the out-handle a drag pulled out (an offset; null: none). */
+export type SplineDraft = { tool: "spline"; points: Spot[]; handles: ([number, number] | null)[] };
+export type Draft = { tool: "line"; from: Spot } | { tool: "circle"; center: Spot } | { tool: "arc"; center: Spot; start?: Spot } | SplineDraft | null;
+/** A drag of points.  `lead` is the point that snaps (an anchor; its handles follow it); `mirror` keeps a smooth anchor smooth
+ * while one of its handles is dragged: the opposite handle turns with it and keeps its own length. */
+export type Drag = {
+  ids: string[];
+  origin: Record<string, [number, number]>;
+  start: [number, number];
+  positions: Record<string, [number, number]>;
+  releasing?: boolean;
+  lead?: string;
+  mirror?: { other: string; anchor: [number, number]; length: number };
+};
 export type ValueBox = { kind: ConstraintKind; targets: string[]; constraintId?: string; text: string; bad: boolean };
 
 /** One pointer event in the sketch's terms: its screen position (px, local to the overlay), the plane position under
@@ -127,6 +143,11 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   const history = useRef<SketchDoc[]>([]);
   const future = useRef<SketchDoc[]>([]);
   const press = useRef<{ hit: Hit; sx: number; sy: number; world: [number, number]; shift: boolean; wasSelected: boolean } | null>(null);
+  /** The press of the pen tool: the anchor it placed (or the first one, when it closes the path), where it is, and where the
+   * press began on screen (a drag from there pulls out the anchor's handles). */
+  const pen = useRef<{ index: number; at: [number, number]; sx: number; sy: number; closing: boolean } | null>(null);
+  /** The last click of the select tool (a second one at the same place soon after is a double-click). */
+  const lastClick = useRef<{ t: number; sx: number; sy: number } | null>(null);
   const choiceReady = useRef(initial.points.length === 0);
 
   // -- document changes (history) --------------------------------------------------------------------------------------
@@ -219,23 +240,58 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loopKey, result === null]);
   useEffect(() => {
-    if (drag || !result) return;
-    const outer = loops.find((l) => l.key === choice.outer);
+    if (drag || !result || docRef.current.output === "wire") return;
     const { profile, inner } = choiceToIndices(choice, loops);
     const d = docRef.current;
     if (d.profile !== profile || d.inner.length !== inner.length || d.inner.some((v, i) => v !== inner[i])) commit({ ...d, profile, inner }, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [choice, loopKey, drag, doc.profile, doc.inner]);
+  }, [choice, loopKey, drag, doc.profile, doc.inner, doc.output]);
+
+  // A wire is made of one profile, a closed loop or an open chain, followed across edits by its key like a loop.  Unchosen,
+  // it is the first open chain (a path is what a wire is usually for), else the first profile.
+  const wires = useMemo(() => wireProfiles(result), [result]);
+  const wireList = wires.map((w) => `${w.key}:${w.index}`).join("|");
+  const [wireKey, setWireKey] = useState<string | null>(null);
+  const wireReady = useRef(false);
+  useEffect(() => {
+    if (drag || !result || doc.output !== "wire") return;
+    let key = wireKey;
+    if (!wireReady.current) {
+      wireReady.current = true;
+      key = wires.find((w) => w.index === docRef.current.profile)?.key ?? null;
+    }
+    if (!key || !wires.some((w) => w.key === key)) key = (wires.find((w) => !w.closed) ?? wires[0])?.key ?? null;
+    if (key !== wireKey) setWireKey(key);
+    const index = wires.find((w) => w.key === key)?.index ?? 0;
+    const d = docRef.current;
+    if (d.profile !== index || d.inner.length) commit({ ...d, profile: index, inner: [] }, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wireList, doc.output, drag, wireKey, doc.profile]);
+  const wire = doc.output === "wire" ? (wires.find((w) => w.key === wireKey) ?? null) : null;
+  /** Face or wire: what the sketch cell makes (switching back to a face picks the chosen loop again). */
+  const setOutput = useCallback((output: SketchOutput) => {
+    const d = docRef.current;
+    if ((d.output ?? "face") === output) return;
+    const { output: _old, ...rest } = d;
+    commit(output === "wire" ? { ...rest, output: "wire" } : rest);
+  }, [commit]);
+
+  // -- anchors and handles of B-splines in anchor form ---------------------------------------------------------------------
+  const roles = useMemo(() => anchorRoles(doc), [doc]);
+  /** The handles drawn and picked: those of the anchor-form splines in the selection; the others are hidden. */
+  const shown = useMemo(() => shownHandles(doc, selection, roles), [doc, selection, roles]);
+  const hidden = useMemo(() => new Set([...handlePoints(roles)].filter((id) => !shown.has(id))), [roles, shown]);
 
   // -- snapping -----------------------------------------------------------------------------------------------------------------
   /** Where curves of the sketch cross and no point is yet (the SDK's answer for the last solve): shown, and snapped to. */
   const crossings = useMemo(() => (result?.crossings ?? []).map((c) => c.at), [result]);
   const snapTargets = useMemo(() => {
     const all = new Map(pts);
+    for (const id of handlePoints(roles)) all.delete(id); // a handle is not a place to draw to
     modelPoints.forEach((p, i) => all.set(`m:${i}`, p));
     crossings.forEach((p, i) => all.set(`x:${i}`, p));
     return all;
-  }, [pts, modelPoints, crossings]);
+  }, [pts, modelPoints, crossings, roles]);
 
   const spotAt = useCallback(
     (world: [number, number], info: Pick<PointerInfo, "scale" | "alt">): Spot => {
@@ -282,13 +338,6 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     setBox(null);
   }, [box, commit]);
 
-  const deleteSelection = useCallback(() => {
-    if (!selection.length) return;
-    commit(removeItems(docRef.current, selection));
-    setSelection([]);
-    setHover(null);
-  }, [selection, commit]);
-
   const toggleConstruction = useCallback(() => {
     const entities = selection.filter((id) => entityMap(docRef.current).has(id));
     if (entities.length) {
@@ -318,7 +367,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   /** Send one edit to the server (which runs the SDK function) and adopt the document it returns: undoable as one step,
    * re-solved by the live solve, the created entities flashed.  A failure is shown, never swallowed. */
   const runEdit = useCallback(
-    async (request: EditRequest) => {
+    async (request: EditRequest, select?: (next: SketchDoc, created: string[]) => string[]) => {
       setEditBusy(true);
       setEditNote(null);
       try {
@@ -328,7 +377,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
         // the live solve writes the indices back.
         setChoice(remapChoice(loopsRef.current, choiceRef.current, findLoops(next, resultRef.current)));
         commit(next);
-        setSelection([]);
+        setSelection(select ? select(next, created) : []);
         setHover(null);
         setHoverEnd(null);
         setCornerHover(null);
@@ -354,6 +403,67 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     [commit],
   );
   useEffect(() => () => void (flashTimer.current !== null && window.clearTimeout(flashTimer.current)), []);
+
+  /** Delete items.  The anchor of a spline in anchor form is not deleted with its spline: the SDK removes it and merges the
+   * spans beside it (one edit per anchor).  An end anchor or a handle stays, with a word on what to do instead. */
+  const deleteItems = useCallback(
+    async (ids: readonly string[]) => {
+      const now = anchorRoles(docRef.current);
+      const anchors = ids.filter((id) => now.get(id)?.kind === "anchor" && !now.get(id)?.end);
+      const kept = ids.filter((id) => now.has(id) && !anchors.includes(id));
+      const rest = ids.filter((id) => !now.has(id));
+      if (rest.length) commit(removeItems(docRef.current, rest));
+      setSelection([]);
+      setHover(null);
+      if (kept.length) {
+        const role = now.get(kept[0])!;
+        setEditNote({
+          tone: "fail",
+          text:
+            role.kind === "handle"
+              ? `${kept[0]} is a handle of ${role.spline}: a handle is not deleted (drag it, or remove its anchor ${role.anchor})`
+              : `${kept[0]} is an end of ${role.spline}: an end anchor cannot be removed (trim the spline, or select the curve to delete it)`,
+        });
+      }
+      for (const id of anchors) {
+        const role = anchorRoles(docRef.current).get(id);
+        if (role?.kind === "anchor") await runEdit(removeAnchorRequest(docRef.current, role.spline, id), () => [role.spline]);
+      }
+    },
+    [commit, runEdit],
+  );
+  const deleteSelection = useCallback(() => {
+    if (selection.length) void deleteItems(selection);
+  }, [selection, deleteItems]);
+
+  /** Insert an anchor on an anchor-form spline where it was clicked (the SDK splits the span; the curve stays): the new anchor
+   * is selected, so its handles show. */
+  const insertAnchor = useCallback(
+    (spline: string, at: [number, number]) =>
+      void runEdit(insertAnchorRequest(docRef.current, spline, at), (next, created) => {
+        const made = anchorRoles(next);
+        const anchor = created.find((id) => made.get(id)?.kind === "anchor");
+        return anchor ? [anchor] : [spline];
+      }),
+    [runEdit],
+  );
+  /** The selected B-spline that has control points rather than anchors (the one a convert would change), or null. */
+  const convertTarget = useMemo(() => {
+    const picked = doc.entities.filter((e) => e.kind === "bspline" && selection.includes(e.id));
+    return picked.length === 1 && !isAnchorSpline(picked[0]) ? picked[0].id : null;
+  }, [doc.entities, selection]);
+  const convertSpline = useCallback((spline: string) => void runEdit(convertSplineRequest(docRef.current, spline), () => [spline]), [runEdit]);
+  /** S: the selected anchors become smooth (their two handles turn into one line, each keeping its length). */
+  const smoothSelection = useCallback(() => {
+    const anchors = selection.filter((id) => roles.get(id)?.kind === "anchor");
+    const moved = smoothAnchors(docRef.current, anchors, ptsRef.current, roles);
+    if (!Object.keys(moved).length) {
+      setEditNote({ tone: "fail", text: "smooth: select an anchor that has two handles (click a spline drawn with the spline tool, then one of its anchors)" });
+      return;
+    }
+    const d = docRef.current;
+    commit({ ...d, points: d.points.map((p) => (moved[p.id] ? { ...p, x: moved[p.id][0], y: moved[p.id][1] } : p)) });
+  }, [selection, roles, commit]);
 
   /** Open the value box of a corner (fillet radius / chamfer distance) with the offered default. */
   const openCorner = useCallback((op: CornerOp, corner: Corner) => {
@@ -431,19 +541,17 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       return;
     }
     if (tool === "spline") {
-      const points = draft?.tool === "spline" ? draft.points : [];
+      const path: SplineDraft = draft?.tool === "spline" ? draft : { tool: "spline", points: [], handles: [] };
       const near = (a: Spot) => (a.pointId !== undefined && a.pointId === spot.pointId) || Math.hypot(a.x - spot.x, a.y - spot.y) <= pickTolerance.current;
-      if (points.length >= 3 && near(points[0])) {
-        // back on the first control point: a closed spline (it starts and ends on one point)
-        const first = points[0];
-        finishSpline([...points, first.pointId ? first : { ...first, pointId: FIRST }]);
+      if (path.points.length >= 2 && near(path.points[0])) {
+        finishSpline(path, true); // back on the first anchor: a closed path (it starts and ends on one point)
         return;
       }
-      if (points.length >= 2 && near(points[points.length - 1])) {
-        finishSpline(points); // the last point clicked again (a double click): done
+      if (path.points.length >= 2 && near(path.points[path.points.length - 1])) {
+        finishSpline(path, false); // the last anchor clicked again (a double click): done
         return;
       }
-      setDraft({ tool: "spline", points: [...points, spot] });
+      setDraft({ tool: "spline", points: [...path.points, spot], handles: [...path.handles, null] });
       return;
     }
     if (tool === "arc") {
@@ -466,15 +574,11 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       }
     }
   };
-  /** Make the B-spline of the clicked control points (Enter, or a click back on the first point closes it). */
-  const finishSpline = (points: Spot[]): void => {
+  /** Make the anchor-form B-spline of the pen path (Enter, a second click on the last anchor; `closed`: back on the first). */
+  const finishSpline = (path: SplineDraft, closed: boolean): void => {
     setDraft(null);
-    // a closing click names the first spot with FIRST: it becomes that spot's point once the first point exists
-    let doc = docRef.current;
-    const first = ensurePoint(doc, points[0]);
-    doc = first.doc;
-    const spots = points.map((spot, i) => (i === 0 ? { ...spot, pointId: first.id } : spot.pointId === FIRST ? { ...spot, pointId: first.id } : spot));
-    const made = addSpline(doc, spots, { auto, construction });
+    const at = (spot: Spot): [number, number] => (spot.pointId ? (ptsRef.current.get(spot.pointId) ?? [spot.x, spot.y]) : [spot.x, spot.y]);
+    const made = addPenSpline(docRef.current, path.points.map((spot, i) => ({ spot, handle: path.handles[i] })), closed, { auto, construction }, at);
     if (made) commit(made.doc);
   };
   /** Snap distance of the last press (sketch units): how near a click must be to a draft's point to mean it. */
@@ -529,7 +633,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     if (tool === "fillet" || tool === "chamfer") {
       if (editBusy || cornerBox) return "handled";
       const op: CornerOp = tool === "fillet" ? "fillet_corner" : "chamfer_corner";
-      const hit = hitTest(d, result, world, tol);
+      const hit = hitTest(d, result, world, tol, hidden);
       if (!hit) return "handled";
       if (hit.kind === "point") {
         const corner = cornerAt(d, hit.id);
@@ -556,12 +660,21 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       return "handled";
     }
     if (tool === "select" || tool === "delete") {
-      const hit = hitTest(d, result, world, tol);
+      const hit = hitTest(d, result, world, tol, hidden);
       if (tool === "delete") {
-        if (hit) {
-          commit(removeItems(d, [hit.id]));
-          setHover(null);
-        }
+        if (hit) void deleteItems([hit.id]);
+        return "handled";
+      }
+      // A double-click on a B-spline adds an anchor there (a spline with control points says how to get anchors).
+      const now = performance.now();
+      const before = lastClick.current;
+      lastClick.current = { t: now, sx: info.sx, sy: info.sy };
+      const spline = hit?.kind === "entity" ? d.entities.find((e) => e.id === hit.id && e.kind === "bspline") : undefined;
+      if (spline && before && now - before.t < 400 && Math.hypot(info.sx - before.sx, info.sy - before.sy) < 6) {
+        lastClick.current = null;
+        if (editBusy) return "handled";
+        if (isAnchorSpline(spline)) insertAnchor(spline.id, world);
+        else setEditNote({ tone: "fail", text: `${spline.id} has control points, not anchors: convert it first (K, or the button by the curve; the shape stays)` });
         return "handled";
       }
       if (hit) {
@@ -572,6 +685,11 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
         return "press";
       }
       const loop = loopAt(loops, world);
+      if (loop && d.output === "wire") {
+        setWireKey(loop.key); // a closed loop as the wire
+        setSelection([]);
+        return "handled";
+      }
       if (loop) {
         setChoice((c) => pickLoop(c, loop.key, shiftKey));
         if (!shiftKey) setSelection([]);
@@ -579,6 +697,27 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       }
       if (!shiftKey) setSelection([]);
       return "handled";
+    }
+    if (tool === "spline") {
+      // The pen: a press places an anchor (or finishes / closes the path, as a click does); a drag from it pulls out handles.
+      const spot = spotAt(world, info);
+      const current = draftRef.current;
+      const path: SplineDraft = current?.tool === "spline" ? current : { tool: "spline", points: [], handles: [] };
+      const near = (a: Spot) => (a.pointId !== undefined && a.pointId === spot.pointId) || Math.hypot(a.x - spot.x, a.y - spot.y) <= tol;
+      const at = (a: Spot): [number, number] => (a.pointId ? (pts.get(a.pointId) ?? [a.x, a.y]) : [a.x, a.y]);
+      if (path.points.length >= 2 && near(path.points[0])) {
+        pen.current = { index: 0, at: at(path.points[0]), sx: info.sx, sy: info.sy, closing: true };
+        return "press";
+      }
+      if (path.points.length >= 2 && near(path.points[path.points.length - 1])) {
+        finishSpline(path, false);
+        return "handled";
+      }
+      const next: SplineDraft = { tool: "spline", points: [...path.points, spot], handles: [...path.handles, null] };
+      draftRef.current = next; // a drag may move before the next render
+      setDraft(next);
+      pen.current = { index: path.points.length, at: at(spot), sx: info.sx, sy: info.sy, closing: false };
+      return "press";
     }
     place(spotAt(world, info));
     return "handled";
@@ -595,19 +734,41 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       const p = press.current;
       if (Math.hypot(info.sx - p.sx, info.sy - p.sy) > 4 && !p.shift) {
         const d = docRef.current;
-        const ids = dragPoints(d, p.hit.id);
+        let ids = dragPoints(d, p.hit.id);
+        const role = p.hit.kind === "point" ? roles.get(p.hit.id) : undefined;
+        let lead: string | undefined;
+        let mirror: Drag["mirror"];
+        if (role?.kind === "anchor") {
+          // an anchor carries its handles (a fixed handle stays)
+          ids = [p.hit.id, ...role.handles.filter((h) => !isFixed(d, h))];
+          lead = p.hit.id;
+        } else if (role?.kind === "handle" && role.other && !isFixed(d, role.other)) {
+          // a handle of a smooth anchor turns the opposite handle with it
+          const a = pts.get(role.anchor);
+          const h = pts.get(p.hit.id);
+          const o = pts.get(role.other);
+          if (a && h && o && isSmooth(a, h, o)) mirror = { other: role.other, anchor: a, length: Math.hypot(o[0] - a[0], o[1] - a[1]) };
+        }
         if (ids.length && !ids.some((id) => isFixed(d, id))) {
           const origin: Record<string, [number, number]> = {};
           for (const id of ids) origin[id] = pts.get(id) ?? [0, 0];
-          setDrag({ ids, origin, start: p.world, positions: origin });
+          setDrag({ ids, origin, start: p.world, positions: origin, lead, mirror });
         }
       }
     }
     if (drag && !drag.releasing) {
       const positions: Record<string, [number, number]> = {};
-      if (drag.ids.length === 1) {
+      if (drag.ids.length === 1 || drag.lead) {
+        // the lead point snaps; the points it carries move by as much
+        const lead = drag.lead ?? drag.ids[0];
         const s = snap(world, snapTargets, { grid: snapOn && !info.alt ? gridStep(info.scale) : null, tol: snapOn ? tol : 0, skip: new Set(drag.ids) });
-        positions[drag.ids[0]] = [s.x, s.y];
+        positions[lead] = [s.x, s.y];
+        const dx = s.x - drag.origin[lead][0];
+        const dy = s.y - drag.origin[lead][1];
+        for (const id of drag.ids) if (id !== lead) positions[id] = [drag.origin[id][0] + dx, drag.origin[id][1] + dy];
+        // Alt while dragging a handle breaks the anchor into a corner: the opposite handle stays where it was
+        const turned = drag.mirror && !info.alt ? mirrorHandle(drag.mirror.anchor, positions[lead], drag.mirror.length) : null;
+        if (drag.mirror && turned) positions[drag.mirror.other] = turned;
       } else {
         const dx = world[0] - drag.start[0];
         const dy = world[1] - drag.start[1];
@@ -616,11 +777,23 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       setDrag({ ...drag, positions });
       return;
     }
+    const path = draftRef.current;
+    if (pen.current && path?.tool === "spline") {
+      // pulling out the handles of the anchor just placed (or of the first anchor, when the press closes the path)
+      const p = pen.current;
+      if (Math.hypot(info.sx - p.sx, info.sy - p.sy) > 4) {
+        const handles = [...path.handles];
+        handles[p.index] = [world[0] - p.at[0], world[1] - p.at[1]];
+        const next: SplineDraft = { ...path, handles };
+        draftRef.current = next;
+        setDraft(next);
+      }
+    }
     if (tool === "select") {
-      setHover(hitTest(docRef.current, result, world, tol));
+      setHover(hitTest(docRef.current, result, world, tol, hidden));
       setCursor({ x: world[0], y: world[1] });
     } else if (tool === "fillet" || tool === "chamfer") {
-      const hit = cornerBox ? null : hitTest(docRef.current, result, world, tol);
+      const hit = cornerBox ? null : hitTest(docRef.current, result, world, tol, hidden);
       setHover(hit);
       if (hit?.kind === "point") setCornerHover(cornerAt(docRef.current, hit.id));
       else if (hit && pendingLine && hit.id !== pendingLine) setCornerHover(cornerOfLines(docRef.current, pendingLine, hit.id));
@@ -640,6 +813,12 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   const pointerUp = async () => {
     const p = press.current;
     press.current = null;
+    const penPress = pen.current;
+    pen.current = null;
+    if (penPress?.closing && draftRef.current?.tool === "spline") {
+      finishSpline(draftRef.current, true);
+      return;
+    }
     if (drag && !drag.releasing) {
       // Final solve with the temporary fixes, then drop them and keep the solved coordinates.
       setDrag({ ...drag, releasing: true });
@@ -673,10 +852,14 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     if ((/^[0-9.\-=]$/.test(event.key) || event.key === "Tab") && DRAW_TOOLS.has(tool) && openEntry(event.key === "Tab" ? undefined : event.key)) return "handled";
     const shortcuts: Record<string, Tool> = { v: "select", p: "point", l: "line", c: "circle", a: "arc", b: "spline", d: "delete", t: "trim", e: "extend", r: "fillet", h: "chamfer" };
     if (k === "enter" && draft?.tool === "spline") {
-      if (draft.points.length >= 2) finishSpline(draft.points);
+      if (draft.points.length >= 2) finishSpline(draft, false);
       return "handled";
     }
-    if (shortcuts[k]) chooseTool(shortcuts[k]);
+    if (k === "s" && tool === "select") smoothSelection();
+    else if (k === "k" && tool === "select") {
+      if (convertTarget) convertSpline(convertTarget);
+      else setEditNote({ tone: "fail", text: "convert: select one B-spline that has control points (a spline drawn with the spline tool already has anchors)" });
+    } else if (shortcuts[k]) chooseTool(shortcuts[k]);
     else if (k === "j") openProject();
     else if (k === "x") toggleConstruction();
     else if (k === "delete" || k === "backspace") deleteSelection();
@@ -732,13 +915,19 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   const typed = DRAW_TOOLS.has(tool) ? " Or type numbers (Tab between fields, Enter places)." : "";
   const hint =
     (tool === "select"
-      ? "Click or shift-click to select; drag a point or a line to move it; click inside a loop for the profile, shift-click for a hole."
+      ? shown.size
+        ? "Drag an anchor (its handles follow) or a handle (its length is that side's pull); a smooth anchor keeps its handles in line: hold Alt while dragging for a corner, S smooths it again. Double-click the curve to add an anchor; Delete removes the selected anchor."
+        : convertTarget
+          ? `${convertTarget} has control points, not anchors: K (or the button by the curve) converts it, keeping its shape.`
+          : "Click or shift-click to select; drag a point or a line to move it; click inside a loop for the profile, shift-click for a hole. Click a spline to show its handles."
       : tool === "line"
         ? draft ? "Click the next point; clicking an existing point ends the chain; Esc ends." : "Click the first point."
         : tool === "circle"
           ? draft ? "Click a point on the circle." : "Click the centre."
           : tool === "spline"
-            ? draft ? "Click the next control point. Finish: Enter, or click the last point again (double-click); click the first point to close it. Esc drops it." : "Click the first control point."
+            ? draft
+              ? "Click the next anchor; press and drag to pull out its handles. Finish: Enter, the last anchor again (double-click) or the button; the first anchor closes it. Esc drops it."
+              : "Click the first anchor; press and drag to pull out its handles (a click alone makes a smooth curve through the anchors)."
           : tool === "arc"
             ? draft ? (draft.tool === "arc" && draft.start ? "Click the end (counter-clockwise from start)." : "Click the start point (sets the radius).") : "Click the centre."
             : tool === "delete"
@@ -756,7 +945,9 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   return {
     cornerHover, pendingLine, cornerBox, setCornerBox, submitCorner, projectOpen, setProjectOpen, openProject, projectSketch, projectFrom,
     doc, commit, undo, redo, edits, editNote, editBusy, flash, hoverEnd, runEdit, tool, chooseTool, selection, highlight, setHighlight, draft, cursor, hover, drag, box, setBox, result, error, auto, setAuto, snapOn,
-    setSnapOn, construction, choice, pts, loops, applicable, blamed, fresh, crossings, finishSplineDraft: () => draft?.tool === "spline" && draft.points.length >= 2 && finishSpline(draft.points), entry, setEntry, entryFields, submitEntry, failing, highlighted, fixedPoints, solved, badge, diagnostics, outer, hint, extents,
+    setSnapOn, construction, choice, pts, loops, applicable, blamed, fresh, crossings, finishSplineDraft: () => draft?.tool === "spline" && draft.points.length >= 2 && finishSpline(draft, false), entry,
+    wires, wire, setWireKey, setOutput,
+    roles, shown, hidden, convertTarget, convertSpline, insertAnchor, smoothSelection, pressingPen: () => pen.current !== null, setEntry, entryFields, submitEntry, failing, highlighted, fixedPoints, solved, badge, diagnostics, outer, hint, extents,
     openBox, applyConstraint, submitBox, deleteSelection, toggleConstruction, pointerDown, pointerMove, pointerUp, pointerLeave, key,
   };
 }

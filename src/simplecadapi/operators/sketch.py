@@ -39,6 +39,9 @@ from simplecadapi._cpp import (
     make_wire_from_sketch_rwire,
     project_rsketch,
     trim_rsketch,
+    insert_spline_anchor_rsketch,
+    remove_spline_anchor_rsketch,
+    convert_spline_to_anchors_rsketch,
     # (defined by the module itself)
     constrain_angle_rsketch,
     constrain_coincident_rsketch,
@@ -125,4 +128,7 @@ __all__ = [
     "make_wire_from_sketch_rwire",
     "project_rsketch",
     "trim_rsketch",
+    "insert_spline_anchor_rsketch",
+    "remove_spline_anchor_rsketch",
+    "convert_spline_to_anchors_rsketch",
 ]

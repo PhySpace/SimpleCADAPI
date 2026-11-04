@@ -201,7 +201,9 @@ def _configure_features(subparsers: argparse._SubParsersAction) -> None:
         description="A sketch feature is a document (plane, points, entities, constraints) inside a cell.  `op` applies one edit "
         "operation to it (a pure function of the document: ids are deterministic and the answer lists what was created, removed "
         "and dropped) and writes the result back; `--dry-run` only prints it.  Operations: trim {entity, at:[x,y], against?}, "
-        "extend {entity, end:start|end, to?}; each is the SDK function of the same name (scad.trim_rsketch, scad.extend_rsketch), which "
+        "extend {entity, end:start|end, to?}, fillet_corner, chamfer_corner, project, insert_spline_anchor {spline, at:[x,y]}, "
+        "remove_spline_anchor {spline, anchor}, convert_spline_to_anchors {spline}; each is the SDK function of the same name "
+        "(scad.trim_rsketch, scad.insert_spline_anchor_rsketch, ...), which "
         "an agent can equally call in a notebook cell.",
     )
     ssub = sketch.add_subparsers(dest="sketch_command", required=True)

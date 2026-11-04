@@ -132,6 +132,9 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
     "fillet_corner_rsketch": {"status": "replayable", "op": "fillet_corner_rsketch"},
     "chamfer_corner_rsketch": {"status": "replayable", "op": "chamfer_corner_rsketch"},
     "project_rsketch": {"status": "replayable", "op": "project_rsketch"},
+    "insert_spline_anchor_rsketch": {"status": "replayable", "op": "insert_spline_anchor_rsketch"},
+    "remove_spline_anchor_rsketch": {"status": "replayable", "op": "remove_spline_anchor_rsketch"},
+    "convert_spline_to_anchors_rsketch": {"status": "replayable", "op": "convert_spline_to_anchors_rsketch"},
     "diff_sketch_rsketchdiff": {
         "status": "diagnostic",
         "reason": "Compares two sketches for inspection only; the edit that made the difference is the recorded node.",
@@ -617,6 +620,9 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "fillet_corner_rsketch",
     "chamfer_corner_rsketch",
     "project_rsketch",
+    "insert_spline_anchor_rsketch",
+    "remove_spline_anchor_rsketch",
+    "convert_spline_to_anchors_rsketch",
     "make_constrain_coincident_rsketch",
     "make_constrain_point_on_rsketch",
     "make_constrain_horizontal_rsketch",
@@ -758,6 +764,9 @@ _CANONICAL_2_1_ONLY_OPS = {
     "fillet_corner_rsketch",
     "chamfer_corner_rsketch",
     "project_rsketch",
+    "insert_spline_anchor_rsketch",
+    "remove_spline_anchor_rsketch",
+    "convert_spline_to_anchors_rsketch",
     "make_workplane_rworkplane",
     "make_workplane_from_face_rworkplane",
     "make_workplane_from_points_rworkplane",
@@ -3233,6 +3242,21 @@ def _execute_graph(
                                 str(params["end"]),
                                 to=cast(Any, params.get("to")),
                             )
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name in {"insert_spline_anchor_rsketch", "remove_spline_anchor_rsketch", "convert_spline_to_anchors_rsketch"}:
+                        extra = {"insert_spline_anchor_rsketch": ("at",), "remove_spline_anchor_rsketch": ("anchor",)}.get(op_name, ())
+                        ctx.require_params(node.node_id, op_name, params, ("spline", *extra))
+                        sketch_outputs = _input_outputs(ctx, outputs, node, 0)
+                        if sketch_outputs:
+                            anchor_args: list[Any] = [str(params["spline"])]
+                            if op_name == "insert_spline_anchor_rsketch":
+                                at = params["at"]
+                                anchor_args.append(at if isinstance(at, str) else tuple(at))
+                            elif op_name == "remove_spline_anchor_rsketch":
+                                anchor_args.append(str(params["anchor"]))
+                            result = getattr(ops, op_name)(cast(Sketch, sketch_outputs[0]), *anchor_args)
                             _store_outputs(node, result)
                         continue
 

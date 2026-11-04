@@ -406,7 +406,12 @@ function SketchEditorView({
     if (nameError) return nameError;
     if (editor.error) return editor.error;
     if (!editor.fresh) return "solving the sketch…";
-    if (editor.loops.length === 0) {
+    if (editor.doc.output === "wire") {
+      if (!editor.wire) {
+        const why = editor.result?.unusable?.[0];
+        return why ? `no profile for the wire: ${why}` : "draw a chain of lines, arcs or splines (or a closed loop): the wire needs a profile";
+      }
+    } else if (editor.loops.length === 0) {
       const why = editor.result?.unusable?.[0];
       return why ? `no closed profile: ${why}` : "close a loop of lines or draw a circle: the face needs a profile";
     }
@@ -462,10 +467,11 @@ function SketchEditorView({
           />
           <span className="whitespace-nowrap text-[10px] uppercase tracking-[0.08em] text-muted-foreground">on {planeLabel(plane)}</span>
           <StatusBadge editor={editor} compact />
+          <OutputChoice editor={editor} />
           <Button type="button" size="sm" variant={editing ? "default" : "outline"} className="h-7 gap-1 px-2" data-testid="sketch-finish" aria-label="Finish the sketch" title="Finish: add the sketch to the notebook" disabled={busy} onClick={() => void finish()}>
             <Check /> {busy ? "working…" : "finish"}
           </Button>
-          {!editing && (
+          {!editing && editor.doc.output !== "wire" && (
             <Button type="button" size="sm" className="h-7 gap-1 px-2" data-testid="sketch-finish-extrude" aria-label="Finish the sketch and extrude it" title="Finish, then extrude the sketch (the most common next step)" disabled={busy} onClick={() => void finish(true)}>
               <Rocket /> finish and extrude
             </Button>
@@ -507,5 +513,40 @@ function SketchEditorView({
         )}
       </div>
     </div>
+  );
+}
+
+/** Face or wire: what the sketch becomes, and for a wire which profile (a closed loop or an open chain, as the SDK lists them;
+ * a click inside a loop picks it too). */
+function OutputChoice({ editor }: { editor: ReturnType<typeof useSketchEditor> }) {
+  const wire = editor.doc.output === "wire";
+  const tab = "h-7 px-2 text-[10px] font-bold uppercase tracking-[0.08em] aria-pressed:bg-primary aria-pressed:text-primary-foreground hover:bg-accent aria-pressed:hover:bg-primary";
+  return (
+    <span className="flex items-center gap-1" data-testid="sketch-output">
+      <span className="flex border-2 border-input" role="group" aria-label="What the sketch makes">
+        <button type="button" className={tab} aria-pressed={!wire} data-output="face" title="Face (closed profile): what extrude, revolve and cut take" onClick={() => editor.setOutput("face")}>
+          face
+        </button>
+        <button type="button" className={tab} aria-pressed={wire} data-output="wire" title="Wire (path / profile curve): an open chain or a closed loop, for a sweep path or a loft section" onClick={() => editor.setOutput("wire")}>
+          wire
+        </button>
+      </span>
+      {wire && editor.wires.length > 0 && (
+        <select
+          aria-label="Profile of the wire"
+          data-testid="sketch-wire-profile"
+          className="h-7 max-w-44 border-2 border-input bg-background px-1 text-[11px]"
+          value={editor.wire?.key ?? ""}
+          onChange={(event) => editor.setWireKey(event.target.value)}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
+          {editor.wires.map((w) => (
+            <option key={w.key} value={w.key}>
+              {w.index}: {w.closed ? "loop" : "chain"} {w.entities.join(", ")}
+            </option>
+          ))}
+        </select>
+      )}
+    </span>
   );
 }

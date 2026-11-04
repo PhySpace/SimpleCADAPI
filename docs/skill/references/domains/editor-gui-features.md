@@ -55,9 +55,25 @@ HOLE_DIAMETER = scad.var(name="hole_diameter", default=6.0, unit="mm", comment="
   ("name a face": pick the faces, type the tag). A colour slot is the `color` kind of the catalog
   (`simplecadapi.types.Color`); the picker's `#rrggbb` is written as linear RGB. A person's face name is a tag: read it
   with `scad.ql.tag(...)`, never invent another naming scheme.
-- Workplanes: with a selection, Space (or the command "Workplane from selection") writes a `workplane` feature
+- Placing a workplane by hand: Space with nothing selected (or one flat face; the command "Workplane") shows a draft plane
+  with move arrows and turn rings on its base (the picked face, else the active workplane, else XY; the panel lists XY,
+  XZ, YZ and every workplane). Drag (1 mm / 5 degree steps, Shift for free) or type the six numbers; G move, R turn,
+  Enter creates, Esc cancels. The cell is `wp = scad.make_workplane_offset_rworkplane(<base>, offset=(...), rx=..., ry=...,
+  rz=...)` (on a face: `make_workplane_from_face_rworkplane(face, x_dir=...)` as the base), the numbers in its params cell.
+  Each new plane becomes the active one and the next Space starts on it: a chain of planes in space, each sketched on and
+  promoted to a wire (below) to loft or sweep between. Shift+Space looks straight at the active workplane.
+- A hole is placed with the pointer: while its form is open a ghost of the hole (its diameter and depth) follows the model
+  under the pointer, along the surface's normal there by default ("along the picked face's normal"), and a click writes
+  the start point and direction into the form. Nothing is computed by the kernel until Add.
+- Pick intents have keys: 1 vertex, 2 edge, 3 face, 4 solid, 5 component, 6 sketch. Sketches are drawn only while sketches
+  are what a click picks (or one is picked, edited, or a form takes a sketch profile).
+- There are no shape-specific shortcuts ("extrude a rectangle", "loft two circles"): a profile is a sketch, and loft, sweep
+  and the rest are the SDK operations themselves (`op.loft_rsolid`, `op.sweep_rsolid` ...). Operations that differ only in
+  what they make are labelled with it ("Loft → solid", "Loft → surface"). Older cells written by those shortcuts still run;
+  the editor shows them as code features.
+- Workplanes from picks: with any other selection, Space (or the command "Workplane from selection") writes a `workplane` feature
   (`# ---- feature: wp (datum) ----`, `wp = scad.make_workplane_*_rworkplane(...)` with the picks resolved inline, offset
-  and flip in the params cell). One flat face -> on it; a face and an edge -> x along the edge; two parallel faces ->
+  and flip in the params cell). (The command alone on one flat face -> on it.) A face and an edge -> x along the edge; two parallel faces ->
   the midplane; three vertices (in pick order) -> through them; one edge -> through it, turned by an angle. The new
   workplane becomes the active one (the camera turns to it, it is drawn blue); a new sketch goes on it, and the plane
   chooser lists every workplane variable. Each workplane variable of the notebook (GUI or code) is drawn as a small
@@ -85,6 +101,7 @@ sca feature rm base | sca feature undo | sca feature redo
 sca sketch ls | get CELL | put CELL -f doc.json | solve CELL
 sca sketch op CELL trim --args '{"entity": "h", "at": [8, 0]}' [--dry-run]
 sca sketch op CELL extend --args '{"entity": "h", "end": "end"}'
+sca sketch op CELL insert_spline_anchor --args '{"spline": "s1", "at": [12, 8]}'   # also remove_spline_anchor, convert_spline_to_anchors
 ```
 
 - The edits are the SDK's own operations, not editor features: `sca sketch op CELL trim ...` calls `scad.trim_rsketch` on the
@@ -103,5 +120,16 @@ sca sketch op CELL extend --args '{"entity": "h", "end": "end"}'
   crossings trim would cut at (`crossings`, B-splines included). trim cuts B-splines (and lines/arcs/circles at B-splines),
   extend lengthens a B-spline or a line onto one; a trimmed or extended B-spline has non-uniform knots, so its document entity
   also carries `"knots"` (distinct, increasing) and `"multiplicities"` (they add up to control points + degree + 1).
+- The spline tool (B) is a pen: a click places an anchor, press-and-drag pulls out its two handles; the curve is a B-spline in
+  anchor form (`"knots": [0, 1, ..], "multiplicities": [4, 3, .., 4]`, control points `[A0, out0, in1, A1, ..]`; see
+  `sketch-and-features.md`, "B-splines with anchors"). Picking the spline shows its handles: dragging an anchor carries its
+  handles, dragging a handle keeps a smooth anchor smooth (Alt while dragging: a corner; S smooths again), a double-click on
+  the curve inserts an anchor and Delete removes the picked anchor (the SDK edits above). A B-spline with control points
+  (older documents) shows its control polygon and a "convert to anchors" button (K).
+- A sketch document may say `"output": "wire"`: the cell then ends in
+  `name = scad.make_wire_from_sketch_rwire(sketch=_sketch, profile=<i>, ...)` (a closed loop or an open chain from
+  `inspect_sketch_rsketchprofiles`, whose `closed` says which) and the notebook lists it as a wire, so `op.sweep_rsolid`
+  (path) and `op.loft_rsolid` (sections) take it; face sketches stay the profiles extrude/revolve/cut take. The editor's
+  sketch bar has the face / wire switch and the profile list.
 - Errors name ids (`there is no entity 'x'`, `nothing is ahead of the end of h`); fix the call, do not retry it unchanged.
 - Everything a command writes is an ordinary cell; `sca cell` still works on it (see the `# gui:` rules above).

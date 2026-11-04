@@ -57,7 +57,6 @@ _DIR_OPTIONS = [
     {"value": "-normal", "label": "against the normal of the sketch plane"},
 ]
 _PLANE_NORMALS = {"XY": (0.0, 0.0, 1.0), "XZ": (0.0, 1.0, 0.0), "YZ": (1.0, 0.0, 0.0)}
-_PLANE_OPTIONS = [{"value": key, "label": key} for key in _PLANE_NORMALS]
 
 
 class FeatureError(ValueError):
@@ -389,85 +388,12 @@ def _cone(c: Context) -> list[str]:
     ]
 
 
-def _extrude_rect(c: Context) -> list[str]:
-    return [
-        f"_profile = scad.make_rectangle_rface(width={c.var('width')}, height={c.var('height')}, center={c.point('center')}, normal={c.normal('plane')})",
-        f"{c.out} = scad.extrude_rsolid(",
-        f"    profile=_profile, direction={c.normal('plane')}, distance={c.var('distance')},",
-        f"    start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, side_faces_tag={c.tag('side')},",
-        ")",
-    ]
 
 
-def _extrude_circle(c: Context) -> list[str]:
-    return [
-        f"_profile = scad.make_circle_rface(center={c.point('center')}, radius={c.var('radius')}, normal={c.normal('plane')})",
-        f"{c.out} = scad.extrude_rsolid(",
-        f"    profile=_profile, direction={c.normal('plane')}, distance={c.var('distance')},",
-        f"    start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, side_faces_tag={c.tag('side')},",
-        ")",
-    ]
 
 
-def _points(values: Mapping[str, Any]) -> list[tuple[float, float]]:
-    return [(float(x), float(y)) for x, y in values["points"]]
 
 
-def _extrude_polygon(c: Context) -> list[str]:
-    pts = ", ".join(f"({_num(x)}, {_num(y)}, 0.0)" for x, y in _points(c.values))
-    return [
-        f"_outline = scad.make_polyline_rwire(points=[{pts}], closed=True)",
-        "_profile = scad.make_face_from_wire_rface(wire=_outline, normal=(0.0, 0.0, 1.0))",
-        f"{c.out} = scad.extrude_rsolid(",
-        f"    profile=_profile, direction=(0.0, 0.0, 1.0), distance={c.var('distance')},",
-        f"    start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, side_faces_tag={c.tag('side')},",
-        ")",
-    ]
-
-
-def _revolve(c: Context) -> list[str]:
-    return [
-        "# the section sits in the XZ plane, beside the Z axis, and turns about it",
-        f"_profile = scad.make_rectangle_rface(width={c.var('width')}, height={c.var('height')},",
-        f"    center=({c.var('offset')} + {c.var('width')} / 2, 0.0, {c.var('height')} / 2), normal=(0.0, 1.0, 0.0))",
-        f"{c.out} = scad.revolve_rsolid(profile=_profile, axis=(0.0, 0.0, 1.0), angle={c.var('angle')}, origin=(0.0, 0.0, 0.0),",
-        # a full turn has no start or end face to name; those tags are written only for a partial turn
-        "    " + (f"start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, " if c.values["angle"] < 360 else "") + f"side_faces_tag={c.tag('side')})",
-    ]
-
-
-def _loft_circles(c: Context) -> list[str]:
-    return [
-        "_bottom = scad.make_circle_rwire(center=(0.0, 0.0, 0.0), radius=" + c.var("bottom_radius") + ", normal=(0.0, 0.0, 1.0))",
-        "_top = scad.make_circle_rwire(center=(0.0, 0.0, " + c.var("height") + "), radius=" + c.var("top_radius") + ", normal=(0.0, 0.0, 1.0))",
-        f"{c.out} = scad.loft_rsolid(profiles=[_bottom, _top], ruled={c.var('ruled')},",
-        f"    start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, side_faces_tag={c.tag('side')})",
-    ]
-
-
-def _loft_rects(c: Context) -> list[str]:
-    return [
-        f"_bottom = scad.make_rectangle_rwire(width={c.var('bottom_width')}, height={c.var('bottom_height')}, center=(0.0, 0.0, 0.0), normal=(0.0, 0.0, 1.0))",
-        f"_top = scad.make_rectangle_rwire(width={c.var('top_width')}, height={c.var('top_height')}, center=(0.0, 0.0, {c.var('height')}), normal=(0.0, 0.0, 1.0))",
-        f"{c.out} = scad.loft_rsolid(profiles=[_bottom, _top], ruled={c.var('ruled')},",
-        f"    start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, side_faces_tag={c.tag('side')})",
-    ]
-
-
-def _sweep(c: Context) -> list[str]:
-    pts = [(float(x), float(y), float(z)) for x, y, z in c.values["path"]]
-    path = ", ".join(f"({_num(x)}, {_num(y)}, {_num(z)})" for x, y, z in pts)
-    return [
-        f"_path = scad.make_polyline_rwire(points=[{path}], closed=False)",
-        "# the circle stands on the first point, square to the first segment",
-        f"_a, _b = {pts[0]!r}, {pts[1]!r}",
-        "_dir = tuple(_q - _p for _p, _q in zip(_a, _b))",
-        "_len = sum(_d * _d for _d in _dir) ** 0.5",
-        "_dir = tuple(_d / _len for _d in _dir)",
-        f"_profile = scad.make_circle_rface(center=_a, radius={c.var('radius')}, normal=_dir)",
-        f"{c.out} = scad.sweep_rsolid(profile=_profile, path=_path, is_frenet=False,",
-        f"    start_face_tag={c.tag('start')}, end_face_tag={c.tag('end')}, side_faces_tag={c.tag('side')})",
-    ]
 
 
 def _sketch(c: Context) -> list[str]:
@@ -642,14 +568,22 @@ _WORKPLANE_METHODS = [
     {"value": "midplane", "label": "halfway between two parallel faces"},
     {"value": "points", "label": "through three vertices"},
     {"value": "axis", "label": "through an edge, turned about it"},
+    {"value": "offset", "label": "moved and turned from a plane, a workplane or a face"},
 ]
+_NAMED_PLANES = ("XY", "XZ", "YZ")
+_OFFSET = {"method": ["offset"]}
 _ON_FACE = {"method": ["face", "face_edge"]}
 
 
 def _workplane(c: Context) -> list[str]:
-    """A workplane from picked geometry: one recorded SDK constructor per way of picking (see make_workplane_*)."""
+    """A workplane from picked geometry: one recorded SDK constructor per way of picking (see make_workplane_*), or one
+    placed by hand on a plane, a workplane or a face (``make_workplane_offset_rworkplane``: the editor's handles)."""
     method = c.choice("method")
-    c.body("body")
+    base = str(c.values.get("base") or "XY")
+    if method != "offset" or base == "face":
+        if not c.values.get("body"):
+            raise FeatureError("this workplane is made from the model's geometry: there is no body yet")
+        c.body("body")
     lines: list[str] = []
 
     def pick(slot: str) -> str:
@@ -658,7 +592,20 @@ def _workplane(c: Context) -> list[str]:
         lines.append(f"{name} = {name}.resolve({{BODY}})[0]")
         return name
 
-    if method in ("face", "face_edge"):
+    if method == "offset":
+        if base in _NAMED_PLANES:
+            on = repr(base)
+        elif base == "face":
+            # the face's frame with the x direction the handles were drawn with, so the plane made is the one shown
+            x_dir = f", x_dir={c.point('x_dir')}" if c.values.get("x_dir") else ""
+            on = f"scad.make_workplane_from_face_rworkplane({pick('face')}{x_dir})"
+        elif _NAME.fullmatch(base):
+            on = c.body_named(base)
+        else:
+            raise FeatureError(f"Base: {base!r} is not XY, XZ, YZ, a picked face or a workplane of this notebook")
+        call = (f"scad.make_workplane_offset_rworkplane({on}, offset={c.point('move')}, "
+                f"rx={c.var('rx')}, ry={c.var('ry')}, rz={c.var('rz')})")
+    elif method in ("face", "face_edge"):
         face = pick("face")
         x_edge = f", x_edge={pick('edge')}" if method == "face_edge" else ""
         call = f"scad.make_workplane_from_face_rworkplane({face}{x_edge}, offset={c.var('offset')}, flip={c.var('flip')})"
@@ -674,7 +621,6 @@ def _workplane(c: Context) -> list[str]:
 
 
 _AXIS = lambda name, label, default="+z": _enum(name, label, _AXIS_OPTIONS, default)  # noqa: E731
-_PLANE = lambda: _enum("plane", "Sketch plane", _PLANE_OPTIONS, "XY", help="The profile lies in this plane and is pushed along its normal.")  # noqa: E731
 _PROFILE = lambda: Slot("profile", "Sketch profile", "profile", help="A sketch made earlier.")  # noqa: E731
 _BODY = lambda: _body("body", "Body", "The body this feature works on (default: the last one made).")  # noqa: E731
 
@@ -690,27 +636,7 @@ SPECS: tuple[Spec, ...] = (
     Spec("cone", "Cone / frustum", "Primitives", "build", "solid", "A cone, or a frustum when the top radius is above zero.",
          (_length("bottom_radius", "Bottom radius", 15.0), Slot("top_radius", "Top radius", "length", default=0.0, unit="mm", min=0.0),
           _length("height", "Height", 25.0), _point("origin", "Bottom face centre"), _AXIS("axis", "Axis")), _cone),
-    Spec("extrude_rect", "Extrude rectangle", "Profiles", "build", "solid", "A rectangle pushed along the normal of its plane.",
-         (_PLANE(), _length("width", "Width", 40.0), _length("height", "Height", 20.0), _point("center", "Centre"), _signed("distance", "Distance", 10.0, min=0.001)), _extrude_rect),
-    Spec("extrude_circle", "Extrude circle", "Profiles", "build", "solid", "A circle pushed along the normal of its plane.",
-         (_PLANE(), _length("radius", "Radius", 12.0), _point("center", "Centre"), _signed("distance", "Distance", 10.0, min=0.001)), _extrude_circle),
-    Spec("extrude_polygon", "Extrude polygon", "Profiles", "build", "solid", "A closed polygon in the XY plane pushed up the Z axis.",
-         (Slot("points", "Corners (x, y per line)", "points2d", default=[[0, 0], [40, 0], [40, 20], [20, 30], [0, 20]], unit="mm"),
-          _signed("distance", "Distance", 10.0, min=0.001)), _extrude_polygon),
-    Spec("revolve", "Revolve", "Profiles", "build", "solid", "A rectangle beside the Z axis, turned about it.",
-         (_length("width", "Section width", 10.0), _length("height", "Section height", 25.0),
-          Slot("offset", "Distance from the axis", "length", default=10.0, unit="mm", min=0.0),
-          Slot("angle", "Angle", "angle", default=360.0, unit="deg", min=1.0, max=360.0)), _revolve),
-    Spec("loft_circles", "Loft circles", "Profiles", "build", "solid", "A solid between two circles, one above the other.",
-         (_length("bottom_radius", "Bottom radius", 15.0), _length("top_radius", "Top radius", 8.0), _length("height", "Height", 25.0),
-          Slot("ruled", "Straight sides", "bool", default=False)), _loft_circles),
-    Spec("loft_rects", "Loft rectangles", "Profiles", "build", "solid", "A solid between two rectangles, one above the other.",
-         (_length("bottom_width", "Bottom width", 30.0), _length("bottom_height", "Bottom height", 20.0),
-          _length("top_width", "Top width", 15.0), _length("top_height", "Top height", 10.0), _length("height", "Height", 25.0),
-          Slot("ruled", "Straight sides", "bool", default=True)), _loft_rects),
-    Spec("sweep_circle", "Sweep circle along a path", "Profiles", "build", "solid", "A circle swept along a polyline.",
-         (_length("radius", "Radius", 4.0), Slot("path", "Path points (x, y, z per line)", "points3d", default=[[0, 0, 0], [0, 0, 30], [30, 0, 60]], unit="mm")), _sweep),
-    Spec("sketch", "Sketch", "Sketch", "build, profile=sketch", "face", "A constrained 2D sketch on a plane, made into a face.",
+    Spec("sketch", "Sketch", "Sketch", "build, profile=sketch", "face", "A constrained 2D sketch on a plane, made into a face (a closed profile) or a wire (a profile or an open path).",
          (Slot("sketch", "Sketch", "sketch", default={"plane": "XY", "points": [], "entities": [], "constraints": [], "profile": 0}),), _sketch),
     Spec("extrude_sketch", "Extrude sketch", "Sketch", "build", "solid", "Push a sketch face along a direction.",
          (_PROFILE(), _enum("direction", "Direction", _DIR_OPTIONS, "normal"), _signed("distance", "Distance", 10.0, min=0.001)), _extrude_sketch),
@@ -730,7 +656,7 @@ SPECS: tuple[Spec, ...] = (
          (_body("base", "First body"), _body("other", "Second body")), _intersect),
     Spec("hole", "Hole", "Features", "subtract", "solid", "A round hole from a point on a surface, in a direction, to a depth.",
          (_BODY(), _point("position", "Start point (on the surface)", help="Pick a face to fill the point and direction."),
-          _enum("direction", "Direction into the material", _HOLE_DIRECTIONS, "-z", help="An axis, the normal of the face you picked (into the material), or any vector."),
+          _enum("direction", "Direction into the material", _HOLE_DIRECTIONS, "face", help="An axis, the normal of the face you picked (into the material), or any vector."),
           *(Slot(name, label, "float", default=default, min=-1000.0, max=1000.0, show_when=_HOLE_VECTOR)
             for name, label, default in (("dx", "Direction x", 0.0), ("dy", "Direction y", 0.0), ("dz", "Direction z", -1.0))),
           _length("diameter", "Diameter", 6.0), _length("depth", "Depth", 10.0)), _hole),
@@ -760,9 +686,12 @@ SPECS: tuple[Spec, ...] = (
          (_BODY(), Slot("factor", "Factor", "float", default=1.5, min=0.01, max=100.0), _point("origin", "Centre")), _scale),
     Spec("workplane", "Workplane", "Datums", "datum", "workplane",
          "A workplane from picked geometry: on a planar face (x along an edge if one is picked, an offset along the normal), "
-         "halfway between two parallel faces, through three vertices, or through an edge turned about it. Sketch on it, "
+         "halfway between two parallel faces, through three vertices, or through an edge turned about it; or placed by hand "
+         "(moved and turned with the handles) on XY / XZ / YZ, another workplane or a face. Sketch on it, "
          "or place features in it with `with wp:`.",
-         (_BODY(), _enum("method", "From", _WORKPLANE_METHODS, "face"),
+         (dataclasses.replace(_BODY(), optional=True), _enum("method", "From", _WORKPLANE_METHODS, "face"),
+          Slot("base", "Base", "text", default="XY", show_when=_OFFSET,
+               help="XY, XZ or YZ, the name of a workplane of the notebook, or face (the picked face)."),
           Slot("face", "Face", "select", entity="face", single=True, optional=True,
                show_when={"method": ["face", "face_edge", "midplane", "axis"]},
                help="A planar face (for an axis: the face the plane starts from)."),
@@ -776,7 +705,12 @@ SPECS: tuple[Spec, ...] = (
           _signed("offset", "Offset along the normal", 0.0, show_when=_ON_FACE),
           Slot("flip", "Flip the normal", "bool", default=False, show_when=_ON_FACE),
           Slot("angle", "Angle about the edge", "angle", default=0.0, unit="deg", min=-360.0, max=360.0,
-               show_when={"method": ["axis"]})), _workplane),
+               show_when={"method": ["axis"]}),
+          Slot("x_dir", "x direction on the face", "point", default=None, unit=None, optional=True, show_when=_OFFSET),
+          dataclasses.replace(_point("move", "Move", help="The origin's offset along the base's own x, y and normal (mm)."),
+                              show_when=_OFFSET),
+          *(Slot(axis, f"Turn about {label}", "angle", default=0.0, unit="deg", min=-360.0, max=360.0, show_when=_OFFSET)
+            for axis, label in (("rx", "x"), ("ry", "y"), ("rz", "the normal")))), _workplane),
 )
 
 _COMBINE_OPTIONS = [
@@ -785,7 +719,7 @@ _COMBINE_OPTIONS = [
     {"value": "intersect", "label": "Intersect"},
     {"value": "new", "label": "New body"},
 ]
-_COMBINABLE = frozenset({"box", "cylinder", "sphere", "cone", "extrude_rect", "extrude_circle", "extrude_polygon", "revolve", "loft_circles", "loft_rects", "sweep_circle", "extrude_sketch", "revolve_sketch", "extrude_face"})
+_COMBINABLE = frozenset({"box", "cylinder", "sphere", "cone", "extrude_sketch", "revolve_sketch", "extrude_face"})
 _COMBINE_ROLE = {"new": "build", "join": "add", "cut": "subtract", "intersect": "intersect"}
 
 
@@ -851,7 +785,7 @@ def catalog() -> dict[str, Any]:
 
 
 def default_slug(spec_id: str, taken: set[str]) -> str:
-    base = {"extrude_rect": "block", "extrude_circle": "disc", "extrude_polygon": "profile_solid", "workplane": "wp"}.get(spec_id, spec_id)
+    base = {"workplane": "wp"}.get(spec_id, spec_id)
     if base.startswith("op."):  # an SDK operation: what it makes (make_spur_gear_rsolid -> spur_gear)
         base = re.sub(r"^(make|add|create)_", "", base[3:].rsplit("_r", 1)[0]) or "shape"
     candidate, number = base, 1
@@ -908,8 +842,9 @@ def check_values(spec: Spec, values: Mapping[str, Any], bodies: Mapping[str, str
                 raise FeatureError(f"{slot.label}: three numbers (x, y, z)")
             clean[slot.name] = [_checked_number(Slot(slot.name, slot.label, "float", min=slot.min, max=slot.max), part) for part in raw]
         elif slot.kind in ("body", "profile"):
-            if slot.optional and clean.get("operation", "new") == "new":
-                continue  # nothing to combine with
+            combining = any(other.name == "operation" for other in spec.slots)
+            if slot.optional and ((combining and clean.get("operation", "new") == "new") or (not combining and raw is None)):
+                continue  # nothing to combine with (or, for an optional body, none given)
             if raw is None and slot.optional:
                 raise FeatureError("there is no body to combine with: choose 'New body' to start one")
             name = str(raw)
@@ -1171,7 +1106,7 @@ def render_feature(
         feature="\n".join(feature_lines),
         before=ctx.before,
         reads=ctx.reads,
-        produces=spec.produces,
+        produces=sketch_doc.output_of(clean["sketch"]) if spec.id == "sketch" else spec.produces,
         gui=gui,
     )
 

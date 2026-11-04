@@ -1,14 +1,15 @@
 """The sketch document a 2D canvas edits, the cell code it becomes, and the solve a canvas asks for while a point is dragged.
 
 A document is plain data: a plane, points (their coordinates are solver seeds), entities (line, circle, arc) that name
-points, constraints that name entities or points, and which profile of the solved sketch becomes the face::
+points, constraints that name entities or points, and which profile of the solved sketch becomes the face (or, with
+``"output": "wire"``, the wire: a closed loop or an open chain, for a sweep path or a loft section)::
 
     {"plane": "XY",
      "points": [{"id": "a", "x": 0, "y": 0}, ...],
      "entities": [{"id": "l0", "kind": "line", "start": "a", "end": "b", "construction": false}, ...],
      "constraints": [{"id": "c1", "kind": "horizontal", "targets": ["l0"]},
                      {"id": "c2", "kind": "length", "targets": ["l0"], "value": 40.0}, ...],
-     "profile": 0, "inner": [], "fully_constrained": true}
+     "profile": 0, "inner": [], "fully_constrained": true, "output": "face"}
 
 :func:`validate` checks it (every id that reaches code matches a fixed pattern, every number is finite), :func:`render` writes
 the sketch cell (dimensions become ``scad.var`` sliders in the params cell), and :func:`solve` runs the SDK's solver without
@@ -30,7 +31,11 @@ PLANES = ("XY", "XZ", "YZ")
 PLANE_NORMALS = {"XY": "+z", "XZ": "-y", "YZ": "+x"}
 ENTITY_KINDS = {"line": ("start", "end"), "circle": ("center",), "arc": ("start", "end", "center"), "bspline": ("start", "end")}
 """A B-spline also lists its ``control_points`` (point ids, the first and the last are its start and end) and a ``degree``, and,
-when they are not the uniform clamped ones (a trimmed or extended B-spline), its distinct ``knots`` and their ``multiplicities``."""
+when they are not the uniform clamped ones (a trimmed or extended B-spline), its distinct ``knots`` and their ``multiplicities``.
+The editor draws B-splines in anchor form (degree 3, inner multiplicities 3: ``[A0, out0, in1, A1, ...]``, anchors on the curve
+with a handle on each side); ``insert_spline_anchor``, ``remove_spline_anchor`` and ``convert_spline_to_anchors`` edit that form."""
+OUTPUTS = ("face", "wire")
+"""What the sketch cell makes of its profile: a face (``make_face_from_sketch_rface``) or a wire (``make_wire_from_sketch_rwire``)."""
 _MAX_DEGREE = 5
 
 # kind -> (target parameter names in the SDK function, unit of its value or None, extra keyword parameters)
@@ -227,7 +232,10 @@ def validate(doc: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(raw_profile, bool) or not isinstance(profile, int) or profile < 0:
         raise SketchError("the profile must be a whole number from zero")
     inner = [int(i) for i in doc.get("inner") or [] if isinstance(i, int) and not isinstance(i, bool) and i >= 0 and i != profile]
-    return {
+    output = doc.get("output") or "face"
+    if output not in OUTPUTS:
+        raise SketchError("the output of a sketch is a face or a wire")
+    clean = {
         "plane": plane,
         "points": points,
         "entities": entities,
@@ -236,6 +244,14 @@ def validate(doc: Mapping[str, Any]) -> dict[str, Any]:
         "inner": inner,
         "fully_constrained": bool(doc.get("fully_constrained", False)),
     }
+    if output == "wire":  # a face sketch keeps the document it always had
+        clean["output"] = "wire"
+    return clean
+
+
+def output_of(doc: Mapping[str, Any]) -> str:
+    """What the sketch document makes: ``"face"`` or ``"wire"``."""
+    return "wire" if doc.get("output") == "wire" else "face"
 
 
 # ---- code ---------------------------------------------------------------------------------------------------------------------
@@ -312,7 +328,7 @@ def _calls(doc: Mapping[str, Any], *, var_for: Mapping[str, str] | None = None) 
 
 
 def render(slug: str, doc: Mapping[str, Any]) -> tuple[list[str], list[str]]:
-    """(lines of the params cell body, lines of the feature cell body) for a validated *doc*; the face is bound to *slug*."""
+    """(lines of the params cell body, lines of the feature cell body) for a validated *doc*; the face (or wire) is bound to *slug*."""
     params: list[str] = []
     var_for: dict[str, str] = {}
     for constraint in doc["constraints"]:
@@ -335,10 +351,14 @@ def render(slug: str, doc: Mapping[str, Any]) -> tuple[list[str], list[str]]:
         )
         var_for[constraint["id"]] = name
     inner = f"[{', '.join(str(i) for i in doc['inner'])}]"
+    if output_of(doc) == "wire":  # a closed loop or an open chain: a sweep path, a loft section
+        make = f"{slug} = scad.make_wire_from_sketch_rwire(sketch=_sketch, profile={doc['profile']}, require_fully_constrained={bool(doc['fully_constrained'])})"
+    else:
+        make = f"{slug} = scad.make_face_from_sketch_rface(sketch=_sketch, profile={doc['profile']}, inner_profiles={inner}, require_fully_constrained={bool(doc['fully_constrained'])})"
     lines = [
         f"_sketch = scad.make_sketch_rsketch(name={json.dumps(slug)}, plane={_plane_literal(doc['plane'])})",
         *_calls(doc, var_for=var_for),
-        f"{slug} = scad.make_face_from_sketch_rface(sketch=_sketch, profile={doc['profile']}, inner_profiles={inner}, require_fully_constrained={bool(doc['fully_constrained'])})",
+        make,
     ]
     return params, lines
 
@@ -415,7 +435,9 @@ def _bspline_samples(solved: Mapping[str, Any], count: int = 64) -> dict[str, An
 # only how a GUI holds a sketch.  These adapters turn a document into an SDK ``Sketch``, call the operation by its SDK name and
 # turn the result back into a document: there is no geometry here.
 
-EDIT_OPERATIONS = frozenset({"trim", "extend", "fillet_corner", "chamfer_corner", "project"})  # the SDK's ``<name>_rsketch`` functions that edit a sketch (add more as the SDK gains them)
+EDIT_OPERATIONS = frozenset(
+    {"trim", "extend", "fillet_corner", "chamfer_corner", "project", "insert_spline_anchor", "remove_spline_anchor", "convert_spline_to_anchors"}
+)  # the SDK's ``<name>_rsketch`` functions that edit a sketch (add more as the SDK gains them)
 
 
 def to_sketch(doc: Mapping[str, Any]) -> Any:
@@ -435,7 +457,7 @@ def _target(item: Mapping[str, Any]) -> str:
 
 
 def from_sketch(sketch: Any, like: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    """The document of an SDK ``Sketch`` (the plane, profile choice and constrained flag are taken from *like*)."""
+    """The document of an SDK ``Sketch`` (the plane, the constrained flag and the output are taken from *like*)."""
     data = sketch.to_dict()
     points: list[dict[str, Any]] = []
     entities: list[dict[str, Any]] = []
@@ -484,6 +506,7 @@ def from_sketch(sketch: Any, like: Mapping[str, Any] | None = None) -> dict[str,
             "profile": 0,
             "inner": [],
             "fully_constrained": base.get("fully_constrained", False),
+            "output": base.get("output", "face"),
         }
     )
 
@@ -529,4 +552,4 @@ __all__ = [
     "apply_edit",
     "from_sketch",
     "to_sketch",
-"CONSTRAINTS", "ENTITY_KINDS", "PLANES", "PLANE_NORMALS", "SketchError", "plane_frame", "plane_normal", "plane_workplane", "render", "solve", "validate", "validate_plane"]
+"CONSTRAINTS", "ENTITY_KINDS", "OUTPUTS", "PLANES", "PLANE_NORMALS", "SketchError", "plane_frame", "plane_normal", "output_of", "plane_workplane", "render", "solve", "validate", "validate_plane"]

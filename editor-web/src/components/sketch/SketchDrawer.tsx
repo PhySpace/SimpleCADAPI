@@ -117,7 +117,15 @@ export function SketchDrawer({ editor, plane, wide }: { editor: SketchEditor; pl
         </ul>
         <div className={HEAD}>profile</div>
         <div className="px-2 py-1.5 text-[11px] text-muted-foreground" data-testid="profile-info">
-          {loops.length === 0 ? (
+          {doc.output === "wire" ? (
+            editor.wire ? (
+              <>
+                wire of profile <span className="text-name">{editor.wire.index}</span> ({editor.wire.closed ? "closed loop" : "open chain"}: {editor.wire.entities.join(", ")}). Choose another at the top, or click inside a loop.
+              </>
+            ) : (
+              "Draw a chain of lines, arcs or splines, or a closed loop: the wire is made of one."
+            )
+          ) : loops.length === 0 ? (
             "Close a loop of lines, or draw a circle."
           ) : (
             <>

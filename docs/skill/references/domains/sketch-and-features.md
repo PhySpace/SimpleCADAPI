@@ -68,7 +68,9 @@ Read the exact page under `references/docs/api/` for every API used:
   solve keeps the branch nearest the initial geometry).
 - Editing: `trim_rsketch`, `extend_rsketch` (see "Trim and extend" below),
   `fillet_corner_rsketch`, `chamfer_corner_rsketch` (see "Fillet and chamfer a
-  corner"), `project_rsketch` (see "Relating sketches: project").
+  corner"), `project_rsketch` (see "Relating sketches: project"),
+  `insert_spline_anchor_rsketch`, `remove_spline_anchor_rsketch`,
+  `convert_spline_to_anchors_rsketch` (see "B-splines with anchors").
 - Promotion: `make_wire_from_sketch_rwire`, `make_face_from_sketch_rface`.
 - Diagnostics: `inspect_sketch_rsketchresult` (non-recording),
   `diff_sketch_rsketchdiff` (non-recording report of what an edit changed).
@@ -135,6 +137,32 @@ print(scad.diff_sketch_rsketchdiff(before, sketch))
 - Read `diff_sketch_rsketchdiff(before, after)` instead of diffing
   `Sketch.to_dict()` yourself; the last edit's notes are in
   `sketch.get_metadata("last_edit")`.
+
+## B-splines with anchors
+
+A cubic B-spline whose inner knots have multiplicity 3 is a chain of Bezier spans:
+control points `[A0, out0, in1, A1, out1, in2, A2, ...]`, the anchors `A<i>` on the
+curve, each with an in-handle and an out-handle (a pen tool's curve; the editor's
+spline tool draws this form, knots `0..n`, multiplicities `[4, 3, ..., 3, 4]`). Every
+control point is a sketch point and the solver moves all of them, so moving an anchor
+or a handle is moving a point; the two handles of an anchor are independent (their
+lengths are the pull on each side; in one line the anchor is smooth). Trim and extend
+keep the form.
+
+```python
+sketch = scad.insert_spline_anchor_rsketch(sketch, "s1", (12.0, 8.0))  # curve unchanged: new p<n> anchor + 2 handles
+sketch = scad.remove_spline_anchor_rsketch(sketch, "s1", "p2")         # merge the spans beside an inner anchor
+sketch = scad.convert_spline_to_anchors_rsketch(sketch, "s7")          # a control-point B-spline -> anchor form
+```
+
+- Insert splits the span at the curve point nearest `at` (de Casteljau): the curve
+  stays, the span's two handles get shorter (same ids; a dimension or fix on them is
+  dropped, see `last_edit` notes) and the new anchor and its handles are new points.
+- Remove keeps the outer handles' ids and directions and fits their lengths to the
+  old curve (remove after insert gives the curve back); a handle a constraint holds
+  stays put. End anchors and handles are refused by name.
+- Convert is exact for degree <= 3 without weights, else approximated within 1e-4
+  (the notes say how close); periodic splines are refused.
 
 ## Fillet and chamfer a corner
 

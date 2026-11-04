@@ -167,9 +167,10 @@ def test_bad_values_are_refused_with_a_message_and_never_reach_the_source(spec_i
 
 
 def test_names_are_checked_and_made_unique():
-    taken = {"base", "BASE", "block"}
-    assert F.default_slug("box", taken) == "box"
-    assert F.default_slug("extrude_rect", taken) == "block_2"
+    taken = {"base", "BASE", "box", "wp"}
+    assert F.default_slug("box", taken) == "box_2"
+    assert F.default_slug("workplane", taken) == "wp_2"
+    assert F.default_slug("op.loft_rsolid", taken) == "loft"
     with pytest.raises(F.FeatureError):
         F.check_slug("Base", taken)
     with pytest.raises(F.FeatureError, match="already used"):

@@ -6,7 +6,7 @@
 import { entityMap, normalizeDoc, type Choice, type Loop, type SketchDoc } from "@/lib/sketch";
 import type { FeatureRow } from "@/lib/features";
 
-export type EditOp = "trim" | "extend" | "fillet_corner" | "chamfer_corner" | "project";
+export type EditOp = "trim" | "extend" | "fillet_corner" | "chamfer_corner" | "project" | "insert_spline_anchor" | "remove_spline_anchor" | "convert_spline_to_anchors";
 export type End = "start" | "end";
 
 export type TrimArgs = { entity: string; at: [number, number] };
@@ -14,7 +14,10 @@ export type ExtendArgs = { entity: string; end: End };
 export type FilletArgs = { a: string; b: string; radius: number };
 export type ChamferArgs = { a: string; b: string; distance: number };
 export type ProjectArgs = { from_sketch: string };
-export type EditArgs = TrimArgs | ExtendArgs | FilletArgs | ChamferArgs | ProjectArgs;
+export type InsertAnchorArgs = { spline: string; at: [number, number] };
+export type RemoveAnchorArgs = { spline: string; anchor: string };
+export type ConvertSplineArgs = { spline: string };
+export type EditArgs = TrimArgs | ExtendArgs | FilletArgs | ChamferArgs | ProjectArgs | InsertAnchorArgs | RemoveAnchorArgs | ConvertSplineArgs;
 
 /** The server's answer to a sketch edit (the fields the editor uses). */
 export type EditResponse = {
@@ -51,6 +54,17 @@ export function extendRequest(doc: SketchDoc, pts: ReadonlyMap<string, [number, 
   const end = nearerEnd(doc, pts, entity, click);
   return end ? { sketch: doc, op: "extend", args: { entity, end } } : null;
 }
+
+// -- anchors of a B-spline (insert_spline_anchor / remove_spline_anchor / convert_spline_to_anchors) ----------------------
+
+/** Insert an anchor where the click is on an anchor-form spline: the SDK splits the span there, the curve stays. */
+export const insertAnchorRequest = (doc: SketchDoc, spline: string, at: readonly [number, number]): EditRequest => ({ sketch: doc, op: "insert_spline_anchor", args: { spline, at: [at[0], at[1]] } });
+
+/** Remove an inner anchor (and its handles) of an anchor-form spline: the SDK merges the two spans beside it. */
+export const removeAnchorRequest = (doc: SketchDoc, spline: string, anchor: string): EditRequest => ({ sketch: doc, op: "remove_spline_anchor", args: { spline, anchor } });
+
+/** Write a control-point B-spline in anchor form (the SDK keeps the curve). */
+export const convertSplineRequest = (doc: SketchDoc, spline: string): EditRequest => ({ sketch: doc, op: "convert_spline_to_anchors", args: { spline } });
 
 // -- corners (fillet_corner / chamfer_corner) ---------------------------------------------------------------------------
 

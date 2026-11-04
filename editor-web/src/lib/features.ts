@@ -617,9 +617,6 @@ export function holeFromFace(item: { properties: Record<string, unknown> | null;
 }
 
 const NAME_BASE: Record<string, string> = {
-  extrude_rect: "block",
-  extrude_circle: "disc",
-  extrude_polygon: "profile_solid",
   extrude_sketch: "extrusion",
   revolve_sketch: "revolution",
   cut_sketch: "pocket",

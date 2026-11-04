@@ -392,6 +392,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [constrain_symmetric_rsketch](constrain_symmetric_rsketch.md) *(from operators/sketch.py)* `top-level`
 - [constrain_tangent_rsketch](constrain_tangent_rsketch.md) *(from operators/sketch.py)* `top-level`
 - [constrain_vertical_rsketch](constrain_vertical_rsketch.md) *(from operators/sketch.py)* `top-level`
+- [convert_spline_to_anchors_rsketch](convert_spline_to_anchors_rsketch.md) *(from operators/sketch.py)* `top-level`
 - [convert_to_bspline_redge](convert_to_bspline_redge.md) *(from operators/geometry.py)* `top-level`
 - [convert_to_bspline_rface](convert_to_bspline_rface.md) *(from operators/geometry.py)* `top-level`
 - [diff_sketch_rsketchdiff](diff_sketch_rsketchdiff.md) *(from operators/sketch.py)* `top-level`
@@ -410,6 +411,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [ground_component_rassembly](ground_component_rassembly.md) *(from operators/product.py)* `top-level`
 - [identity_placement_rplacement](identity_placement_rplacement.md) *(from operators/product.py)* `top-level`
 - [insert_curve_knot_redge](insert_curve_knot_redge.md) *(from operators/geometry.py)* `top-level`
+- [insert_spline_anchor_rsketch](insert_spline_anchor_rsketch.md) *(from operators/sketch.py)* `top-level`
 - [insert_surface_knot_rface](insert_surface_knot_rface.md) *(from operators/geometry.py)* `top-level`
 - [inspect_assembly_constraints_rconstraintreport](inspect_assembly_constraints_rconstraintreport.md) *(from operators/product.py)* `top-level`
 - [inspect_body_overlaps_rlist](inspect_body_overlaps_rlist.md) *(from operators/product.py)* `top-level`
@@ -455,6 +457,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [ref.vertex](ref.vertex.md) *(from ref.py)* `submodule:ref`
 - [ref.vertices](ref.vertices.md) *(from ref.py)* `submodule:ref`
 - [register_property_resolver](register_property_resolver.md) *(from ql.py)* `submodule:ql`
+- [remove_spline_anchor_rsketch](remove_spline_anchor_rsketch.md) *(from operators/sketch.py)* `top-level`
 - [render_screenshot_rpath](render_screenshot_rpath.md) *(from operators/features.py)* `top-level`
 - [sample_curve_rcurvature](sample_curve_rcurvature.md) *(from operators/geometry.py)* `top-level`
 - [sample_surface_risocurves](sample_surface_risocurves.md) *(from operators/geometry.py)* `top-level`

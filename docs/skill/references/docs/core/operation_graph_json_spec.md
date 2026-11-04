@@ -913,6 +913,7 @@ fields when their target expression is unitless.
   `load_brep_region_rshell`、`load_brep_region_rsolid`、
   `make_solid_from_shell_rsolid`、`trim_rsketch`、`extend_rsketch`、
   `fillet_corner_rsketch`、`chamfer_corner_rsketch`、`project_rsketch`、
+  `insert_spline_anchor_rsketch`、`remove_spline_anchor_rsketch`、`convert_spline_to_anchors_rsketch`、
   `explode_rassembly` 或曲线/曲面编辑操作（`convert_to_bspline_*`、`set_*_poles_*`、
   `move_*_poles_*`、`set_*_weights_*`、`insert_*_knot_*`、`elevate_*_degree_*`、`rebuild_*`）。
 - 为兼容早期 `2.0` model payload，importer 将缺失的
@@ -1020,6 +1021,9 @@ New canonical profile nodes use the `make_*_r*` names listed in `canonical_contr
 - `fillet_corner_rsketch`
 - `chamfer_corner_rsketch`
 - `project_rsketch`
+- `insert_spline_anchor_rsketch`
+- `remove_spline_anchor_rsketch`
+- `convert_spline_to_anchors_rsketch`
 - `make_constrain_coincident_rsketch`
 - `make_constrain_point_on_rsketch`
 - `make_constrain_horizontal_rsketch`
@@ -1357,6 +1361,13 @@ Notes:
 - Outputs: 1 updated `Sketch`
 - Params: `sketch_id`, `source_kind`, `source` (source sketch id, or the number of shapes), `entities` (source entity ids or `null`; sketch sources only), `construction`
 - Projected ids are `proj_<source sketch id>_<n>` (`proj_shape_<n>` for shapes); the target sketch's `projections` metadata lists `{source, entity, projected}`.
+
+#### `insert_spline_anchor_rsketch` / `remove_spline_anchor_rsketch` / `convert_spline_to_anchors_rsketch`
+
+- Inputs: 1 `Sketch`
+- Outputs: 1 updated `Sketch`
+- Params: `sketch_id`, `spline` (B-spline id); insert: `at` (`[x, y]` or a point id); remove: `anchor` (point id)
+- The edit is made on the solved geometry and picks its own ids (`p<n>`), so replay is deterministic.
 
 #### `explode_rassembly`
 

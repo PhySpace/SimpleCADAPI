@@ -39,7 +39,12 @@ export type SketchDoc = {
   profile: number;
   inner: number[];
   fully_constrained: boolean;
+  /** What the sketch cell makes of its profile: a face (the default, left out) or a wire (a closed loop or an open chain:
+   * a sweep path, a loft section). */
+  output?: SketchOutput;
 };
+
+export type SketchOutput = "face" | "wire";
 
 export type Diagnostic = { constraint_id: string | null; severity: string; code: string; message: string; residual: number | null };
 /** One profile of the SDK's ``inspect_sketch_rsketchprofiles``: a free circle, or a loop / chain of edges in walking order. */
@@ -115,7 +120,16 @@ export function normalizeDoc(raw: unknown): SketchDoc {
     profile: Number.isInteger(source.profile) && (source.profile as number) >= 0 ? (source.profile as number) : 0,
     inner: list<number>(source.inner).filter((i) => Number.isInteger(i) && i >= 0),
     fully_constrained: Boolean(source.fully_constrained),
+    ...(source.output === "wire" ? { output: "wire" as const } : {}),
   };
+}
+
+/** A profile the SDK offers, as a wire can be made of it: closed loops and open chains alike, identified across edits by the
+ * sorted ids of its entities (the same key a loop has). */
+export type WireProfile = { index: number; key: string; closed: boolean; entities: string[] };
+
+export function wireProfiles(solve: SolveResult | null): WireProfile[] {
+  return (solve?.profiles ?? []).filter((p) => p.entity_ids.length > 0).map((p) => ({ index: p.index, key: [...p.entity_ids].sort().join("+"), closed: p.closed, entities: p.entity_ids }));
 }
 
 /** The JSON the server takes (a plain deep copy; the round trip normalizeDoc(docToJson(d)) is the identity). */
@@ -671,11 +685,13 @@ export function entityDistance(doc: SketchDoc, e: SEntity, pos: readonly [number
 
 export type Hit = { kind: "point" | "entity"; id: string };
 
-/** What is under a position: points first, then the nearest entity within `tol` (world units). */
-export function hitTest(doc: SketchDoc, solve: SolveResult | null, pos: readonly [number, number], tol: number): Hit | null {
+/** What is under a position: points first (except those in `skip`: handles that are not shown), then the nearest entity
+ * within `tol` (world units). */
+export function hitTest(doc: SketchDoc, solve: SolveResult | null, pos: readonly [number, number], tol: number, skip?: ReadonlySet<string>): Hit | null {
   const pts = solvedPoints(doc, solve);
   let best: { id: string; d: number } | null = null;
   for (const [id, p] of pts) {
+    if (skip?.has(id)) continue;
     const d = Math.hypot(p[0] - pos[0], p[1] - pos[1]);
     if (d <= tol && (!best || d < best.d)) best = { id, d };
   }

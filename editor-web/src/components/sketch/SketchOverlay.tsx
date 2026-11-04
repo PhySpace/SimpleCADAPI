@@ -16,6 +16,7 @@ import { splinePath,
 import { planeToWorld, rayPlane, type PlaneSpec } from "@/lib/sketch-plane";
 import { cameraSignature, planeToScreen, scaleAt, screenRay, screenToPlane, type Viewer } from "@/lib/sketch-view";
 import { CORNER_WORD, isProjected } from "@/lib/sketch-edit";
+import { bezierPath, isAnchorSpline, penPoles } from "@/lib/sketch-anchors";
 import type { PointerInfo, SketchEditor } from "@/lib/useSketchEditor";
 import type { SceneView } from "@/scene/scene-view";
 
@@ -218,6 +219,8 @@ export function SketchOverlay({
   // Fillet and chamfer: the corner under the cursor (or the one being valued) shows its point and both lines.
   const corner = editor.cornerBox?.corner ?? editor.cornerHover;
   const cornerLines = new Set<string>(corner ? [corner.a, corner.b] : editor.pendingLine ? [editor.pendingLine] : []);
+  // A wire sketch: the entities of the chosen profile are drawn as the wire.
+  const wireIds = new Set(editor.wire?.entities ?? []);
   const strokeOf = (id: string, construct?: boolean) => {
     if (editor.flash.has(id)) return NAME;
     if (cutting && hover?.id === id) return FAIL;
@@ -227,6 +230,7 @@ export function SketchOverlay({
     if (selection.includes(id)) return FOCUS;
     if (hover?.id === id) return FOCUS;
     if (construct) return MUTED;
+    if (wireIds.has(id)) return NAME;
     return solved ? PASS : INK;
   };
 
@@ -320,14 +324,33 @@ export function SketchOverlay({
     const cur: P = [cursor.x, cursor.y];
     if (draft.tool === "line") return both(line(spotPos(draft.from), cur));
     if (draft.tool === "spline") {
-      // the control polygon so far, to the cursor; the curve is the SDK's once it is made (Enter)
-      const poles = [...draft.points.map(spotPos), cur];
+      // the pen path so far and on to the cursor (while a press pulls out handles, the cursor is the handle's tip); the curve
+      // is the SDK's once the path is made
+      const anchors = draft.points.map(spotPos);
+      const pressing = editor.pressingPen();
+      const at = pressing ? anchors : [...anchors, cur];
+      const handles = pressing ? draft.handles : [...draft.handles, null];
+      const path = at.length > 1 ? bezierPath(penPoles(at, handles, false)) : [];
       return (
         <>
-          {both(polyline(poles), { opacity: 0.7 })}
-          {poles.slice(0, -1).map((p, i) => {
+          {path.length > 1 && both(polyline(path))}
+          {draft.handles.map((h, i) => {
+            if (!h) return null;
+            const a = anchors[i];
+            const ends: P[] = [[a[0] - h[0], a[1] - h[1]], [a[0] + h[0], a[1] + h[1]]];
+            return (
+              <g key={`handle${i}`} fill="none">
+                <path d={polyline([ends[0], a, ends[1]])} stroke={FOCUS} strokeWidth={1} opacity={0.8} />
+                {ends.map((e, j) => {
+                  const s = project(e[0], e[1]);
+                  return s ? <rect key={j} x={s[0] - 3} y={s[1] - 3} width={6} height={6} transform={`rotate(45 ${s[0]} ${s[1]})`} fill={HALO} stroke={FOCUS} strokeWidth={1.4} /> : null;
+                })}
+              </g>
+            );
+          })}
+          {anchors.map((p, i) => {
             const s = project(p[0], p[1]);
-            return s ? <rect key={`pole${i}`} x={s[0] - 3.5} y={s[1] - 3.5} width={7} height={7} fill={HALO} stroke={FOCUS} strokeWidth={1.6} /> : null;
+            return s ? <circle key={`anchor${i}`} cx={s[0]} cy={s[1]} r={4} fill={HALO} stroke={FOCUS} strokeWidth={1.8} /> : null;
           })}
         </>
       );
@@ -546,8 +569,9 @@ export function SketchOverlay({
           </text>
         )}
         {loops.map((loop) => {
-          const isOuter = loop.key === choice.outer;
-          const isInner = choice.inner.includes(loop.key);
+          const wireMode = doc.output === "wire"; // a wire sketch fills the loop it makes the wire of, and has no holes
+          const isOuter = wireMode ? loop.key === editor.wire?.key : loop.key === choice.outer;
+          const isInner = !wireMode && choice.inner.includes(loop.key);
           return (
             <path
               key={loop.key}
@@ -563,16 +587,21 @@ export function SketchOverlay({
         })}
         {doc.entities.map((e) => {
           if (e.kind !== "bspline") return null;
-          const active = selection.includes(e.id) || hover?.id === e.id;
-          const poles = (e.control_points ?? []).map((id) => pts.get(id)).filter((p): p is P => Boolean(p));
+          const anchored = isAnchorSpline(e);
+          const ids = e.control_points ?? [];
+          const showing = anchored && ids.some((id) => editor.shown.has(id));
+          const active = selection.includes(e.id) || hover?.id === e.id || showing;
+          const poles = ids.map((id) => pts.get(id)).filter((p): p is P => Boolean(p));
           const comb = result?.curves?.[e.id];
-          // the control polygon always (its points are the handles); the curvature comb while the spline is picked
-          // the longest tooth is a quarter of the spline's extent, whatever its curvature
+          // A spline in anchor form shows the handles of its anchors while it is picked (anchor to handle, each side); another
+          // B-spline its control polygon always (its points are what moves it).  The curvature comb shows while it is picked;
+          // the longest tooth is a quarter of the spline's extent, whatever its curvature.
+          const arms = showing && poles.length === ids.length ? ids.map((_, i) => i).filter((i) => i % 3 !== 0).map((i) => polyline([poles[i % 3 === 1 ? i - 1 : i + 1], poles[i]])).join(" ") : "";
           const scale = comb ? (0.25 * Math.max(...poles.map((p) => Math.hypot(p[0] - poles[0][0], p[1] - poles[0][1])), 1)) / Math.max(...comb.curvatures, 1e-9) : 0;
           const tips = comb ? comb.points.map((p, i): P => [p[0] - comb.normals[i][0] * comb.curvatures[i] * scale, p[1] - comb.normals[i][1] * comb.curvatures[i] * scale]) : [];
           return (
-            <g key={`poles-${e.id}`} fill="none" pointerEvents="none" data-control-polygon={e.id}>
-              <path d={polyline(poles)} stroke={MUTED} strokeWidth={1} strokeDasharray="3 3" opacity={active ? 0.9 : 0.5} />
+            <g key={`poles-${e.id}`} fill="none" pointerEvents="none" data-control-polygon={anchored ? undefined : e.id} data-handles={showing ? e.id : undefined}>
+              {anchored ? arms && <path d={arms} stroke={FOCUS} strokeWidth={1.2} opacity={0.85} /> : <path d={polyline(poles)} stroke={MUTED} strokeWidth={1} strokeDasharray="3 3" opacity={active ? 0.9 : 0.5} />}
               {active && comb && (
                 <g data-curvature-comb={e.id}>
                   <path d={comb.points.map((p, i) => polyline([p, tips[i]])).join(" ")} stroke={NAME} strokeWidth={1} opacity={0.75} />
@@ -585,17 +614,18 @@ export function SketchOverlay({
         {doc.entities.map((e) => {
           const d = entityPath(e);
           if (!d) return null;
-          const picked = selection.includes(e.id) || hover?.id === e.id || editor.flash.has(e.id) || cornerLines.has(e.id);
+          const picked = selection.includes(e.id) || hover?.id === e.id || editor.flash.has(e.id) || cornerLines.has(e.id) || wireIds.has(e.id);
           const projected = isProjected(e.id); // fixed reference copies of another sketch: muted, dotted
           const dash = projected ? "1.5 4" : e.construction ? "6 4" : undefined;
           return (
-            <g key={e.id} fill="none" strokeLinecap="round" strokeLinejoin="round" data-entity={e.id} data-projected={projected || undefined} data-flash={editor.flash.has(e.id) || undefined}>
+            <g key={e.id} fill="none" strokeLinecap="round" strokeLinejoin="round" data-entity={e.id} data-projected={projected || undefined} data-flash={editor.flash.has(e.id) || undefined} data-wire={wireIds.has(e.id) || undefined}>
               <path d={d} stroke={HALO} strokeWidth={picked ? 6.5 : 5} opacity={0.85} strokeDasharray={dash} />
               <path d={d} stroke={strokeOf(e.id, e.construction)} strokeWidth={picked ? 3 : projected ? 2.6 : 2.2} strokeDasharray={dash} />
             </g>
           );
         })}
         {doc.points.map((p) => {
+          if (editor.hidden.has(p.id)) return null; // the handle of a spline that is not picked
           const at = pts.get(p.id) ?? [p.x, p.y];
           const s = project(at[0], at[1]);
           if (!s) return null;
@@ -603,6 +633,11 @@ export function SketchOverlay({
           const picked = selection.includes(p.id) || hover?.id === p.id;
           const projected = isProjected(p.id);
           const color = editor.flash.has(p.id) ? NAME : editor.failing.has(p.id) ? FAIL : editor.highlighted.has(p.id) ? NAME : picked || corner?.point === p.id ? FOCUS : projected ? MUTED : fixed || solved ? PASS : INK;
+          if (editor.shown.has(p.id)) {
+            // a handle: a small hollow diamond, filled while picked
+            const r = picked ? 5 : 4;
+            return <rect key={p.id} x={s[0] - r} y={s[1] - r} width={2 * r} height={2 * r} transform={`rotate(45 ${s[0]} ${s[1]})`} fill={picked ? FOCUS : HALO} stroke={fixed ? PASS : FOCUS} strokeWidth={1.6} data-point={p.id} data-handle />;
+          }
           if (projected) {
             return <rect key={p.id} x={s[0] - 4} y={s[1] - 4} width={8} height={8} transform={`rotate(45 ${s[0]} ${s[1]})`} fill={HALO} stroke={color} strokeWidth={2} data-point={p.id} data-projected />;
           }
@@ -638,6 +673,26 @@ export function SketchOverlay({
             onClick={() => editor.finishSplineDraft()}
           >
             finish spline (Enter)
+          </button>
+        );
+      })()}
+      {editor.convertTarget && (() => {
+        // a B-spline with control points: one click writes it in anchor form (the SDK keeps the curve)
+        const e = doc.entities.find((item) => item.id === editor.convertTarget);
+        const end = pts.get(e?.end ?? "");
+        const s = end ? project(end[0], end[1]) : null;
+        if (!s) return null;
+        return (
+          <button
+            type="button"
+            data-testid="convert-spline"
+            title="Write this B-spline as anchors with a handle on each side, keeping its shape (SDK convert_spline_to_anchors_rsketch)"
+            className="absolute z-20 border-2 border-primary bg-popover px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] shadow-[3px_3px_0_var(--shadow-hard)] hover:bg-accent"
+            style={{ left: Math.min(Math.max(s[0] + 14, 4), size.w - 170), top: Math.min(Math.max(s[1] - 34, 4), size.h - 30) }}
+            onPointerDown={(ev) => ev.stopPropagation()}
+            onClick={() => editor.convertSpline(editor.convertTarget!)}
+          >
+            convert to anchors (K)
           </button>
         );
       })()}

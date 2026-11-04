@@ -150,6 +150,7 @@ class Sketch {
   friend class SketchEditor;      // trim / extend rewrite the document in src/sketch/edit.cpp
   friend class SketchCorner;      // fillet / chamfer of a corner (src/sketch/corner.cpp)
   friend class SketchProjection;  // project_rsketch (src/sketch/project.cpp)
+  friend class SketchAnchors;     // insert / remove a B-spline anchor (src/sketch/anchors.cpp)
   void add_entity(SketchEntity entity);
   SketchPoint2 entity_xy(const std::string& point_id) const;
 

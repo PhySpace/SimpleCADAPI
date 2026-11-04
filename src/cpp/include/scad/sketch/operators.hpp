@@ -171,6 +171,27 @@ Sketch trim_rsketch(const Sketch& sketch, const SketchTarget& entity, const Sket
 Sketch extend_rsketch(const Sketch& sketch, const SketchTarget& entity, const std::string& end,
                       const std::optional<SketchTarget>& to = std::nullopt);
 
+// A B-spline in anchor form -- cubic, inner knots of multiplicity 3, every control point a sketch point -- is a chain
+// of Bezier spans: control points [A0, out0, in1, A1, out1, in2, A2, ...], anchors on the curve with an in- and an
+// out-handle each (a pen tool's curve).  These three edit that structure on the solved geometry.
+//
+// Insert an anchor at the curve point nearest `at` without changing the curve (de Casteljau split of that span): the
+// span's two handles get shorter (they keep their ids; a dimension or fix on them is dropped) and the new anchor and
+// its two handles are new points p<n>.  Refused at an existing anchor and for a B-spline that is not in anchor form.
+Sketch insert_spline_anchor_rsketch(const Sketch& sketch, const SketchTarget& spline, const SketchPosition& at);
+
+// Remove the inner anchor `anchor` (a point id) and its two handles: the spans on either side become one, whose outer
+// handles keep their ids and directions and get the lengths that fit the old curve best (a handle a constraint or
+// another entity holds keeps its place).  The removed points go unless another entity uses them, and constraints on the
+// removed points go with them.  An end anchor cannot be removed.
+Sketch remove_spline_anchor_rsketch(const Sketch& sketch, const SketchTarget& spline, const SketchTarget& anchor);
+
+// Write an open B-spline in anchor form: exactly (same curve) for degree <= 3 without weights, else approximated
+// within 1e-4.  The end points keep their ids, inner control points that do not move keep theirs, the others are new
+// points p<n>; control points no entity uses any more go, with their constraints.  A spline already in anchor form is
+// left as it is.
+Sketch convert_spline_to_anchors_rsketch(const Sketch& sketch, const SketchTarget& spline);
+
 // Round the corner where the lines `a` and `b` meet (they must share an end point) with an arc of `radius`.  The sketch
 // is solved first.  Both lines are shortened to the tangent points; the arc runs counter-clockwise from its start to
 // its end around its centre and is tied to each line with a tangent constraint (at_b = the arc end that touches the
