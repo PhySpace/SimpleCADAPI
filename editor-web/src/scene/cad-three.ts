@@ -33,12 +33,23 @@ export const DEFAULT_BASE_COLOR: [number, number, number, 1] = [0.72, 0.75, 0.78
 
 export type Resolution = { width: number; height: number };
 
+/** The colour and opacity a node is drawn in: its own (`properties.color` / `properties.opacity`, a body colour set with
+ * set_body_appearance_rpart, or the material colour in a preview), else the material tint, else the default grey. */
+export function nodeColor(node: Pick<SceneNode, 'material_id' | 'properties'>): readonly [number, number, number, number] {
+  const own = node.properties?.color;
+  const opacity = node.properties?.opacity;
+  const alpha = typeof opacity === 'number' && Number.isFinite(opacity) ? Math.min(1, Math.max(0, opacity)) : 1;
+  if (Array.isArray(own) && own.length === 3 && own.every((c) => typeof c === 'number' && Number.isFinite(c))) return [own[0], own[1], own[2], alpha];
+  const base = node.material_id ? [0.68, 0.78, 0.88] : DEFAULT_BASE_COLOR;
+  return [base[0], base[1], base[2], alpha];
+}
+
 export function materialFor(node: SceneNode): THREE.MeshStandardMaterial {
-  const color = node.material_id ? [0.68, 0.78, 0.88, 1] as const : DEFAULT_BASE_COLOR;
+  const color = nodeColor(node);
   // Faces are pushed back in depth: edge lines lie exactly ON the surface, and
   // without the offset the face triangles win the depth fight per-pixel —
   // edges render as broken dashed fragments (classic CAD z-fighting).
-  return new THREE.MeshStandardMaterial({ color: new THREE.Color(color[0], color[1], color[2]), metalness: 0.08, roughness: 0.52, side: THREE.FrontSide, transparent: color[3] < 1, opacity: color[3], polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  return new THREE.MeshStandardMaterial({ color: new THREE.Color(color[0], color[1], color[2]), metalness: 0.08, roughness: 0.52, side: THREE.FrontSide, transparent: color[3] < 1, opacity: color[3], depthWrite: color[3] >= 1, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
 }
 
 export function edgeMaterial(resolution: Resolution): LineMaterial {

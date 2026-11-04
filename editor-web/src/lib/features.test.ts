@@ -285,3 +285,29 @@ describe("a grid of points (a control net)", () => {
     expect(parseGrid("0,0,0; 1,0,0\n0,1,0; 1,1,0; 2,1,0")).toEqual({ error: "row 2 has 3 points, row 1 has 2" });
   });
 });
+
+describe("a colour slot", () => {
+  it("shows an SDK colour (linear RGB) as #rrggbb and reads it back", async () => {
+    const { colorHex, hexColor } = await import("@/lib/features");
+    expect(colorHex([1, 0, 0])).toBe("#ff0000");
+    expect(colorHex(null)).toBe("");
+    expect(colorHex([0.5, 0.5])).toBe("");
+    expect(hexColor("#ff0000")).toEqual([1, 0, 0]);
+    expect(hexColor("#808080")?.[0]).toBeCloseTo(0.2159, 4); // sRGB 128 is linear 0.2159
+    expect(hexColor("red")).toBeNull();
+    const back = hexColor(colorHex([0.9, 0.2, 0.1]))!;
+    back.forEach((c, i) => expect(c).toBeCloseTo([0.9, 0.2, 0.1][i], 2));
+  });
+
+  it("sends a picked colour, leaves out an empty optional one and refuses bad text", async () => {
+    const { formToValues, initialForm } = await import("@/lib/features");
+    const spec = {
+      id: "op.set_body_appearance_rpart", label: "Set body appearance", group: "Product", role: "build", produces: "part", description: "",
+      slots: [{ name: "color", label: "Color", kind: "color" as const, optional: true }],
+    } as unknown as Parameters<typeof formToValues>[0];
+    expect(initialForm(spec)).toEqual({ color: "" });
+    expect(formToValues(spec, { color: "" })).toEqual({ values: {}, errors: {} });
+    expect(formToValues(spec, { color: "#ff0000" }).values).toEqual({ color: [1, 0, 0] });
+    expect(formToValues(spec, { color: "nope" }).errors.color).toBe("a colour as #rrggbb");
+  });
+});

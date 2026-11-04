@@ -40,7 +40,7 @@ color=(0.2, 0.4, 0.8))`` paints a one-body part. Recorded and replayed like
 
 ### color
 
-- **Description**: Display colour as RGB floats in [0.0, 1.0], e.g. ``(0.8, 0.2, 0.2)``. ``None`` keeps the body's colour.
+- **Description**: Display colour as RGB floats in [0.0, 1.0], e.g. ``(0.8, 0.2, 0.2)``; linear RGB, as ``Material.color``, OpenCASCADE (so STEP) and three.js read it (the editor's colour picker converts its sRGB ``#rrggbb``). ``None`` keeps the body's colour.
 
 ### opacity
 

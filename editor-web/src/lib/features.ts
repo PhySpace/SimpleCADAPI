@@ -6,7 +6,7 @@ import { axisName } from "@/lib/sketch-plane";
 
 // -- contract -------------------------------------------------------------------------------------------------------
 
-export type SlotKind = "length" | "angle" | "float" | "count" | "bool" | "enum" | "point" | "body" | "select" | "points2d" | "points3d" | "profile" | "sketch" | "value" | "text" | "grid";
+export type SlotKind = "length" | "angle" | "float" | "count" | "bool" | "enum" | "point" | "body" | "select" | "points2d" | "points3d" | "profile" | "sketch" | "value" | "text" | "grid" | "color";
 
 export type SlotOption = { value: string; label: string };
 
@@ -263,6 +263,9 @@ export function initialForm(spec: Spec, bodyDefaults: Record<string, string> = {
       case "grid":
         form[slot.name] = gridText(given);
         break;
+      case "color":
+        form[slot.name] = colorHex(given);
+        break;
       default:
         form[slot.name] = numberText(given);
     }
@@ -312,6 +315,14 @@ export function formToValues(spec: Spec, form: RawForm): { values: Record<string
         else values[slot.name] = parsed.grid;
         break;
       }
+      case "color": {
+        const text = typeof raw === "string" ? raw.trim() : "";
+        const rgb = text ? hexColor(text) : null;
+        if (rgb) values[slot.name] = rgb;
+        else if (text) errors[slot.name] = "a colour as #rrggbb";
+        else if (!slot.optional) errors[slot.name] = "choose a colour";
+        break;
+      }
       case "text":
         if (typeof raw === "string" && raw.trim()) values[slot.name] = raw;
         else if (!slot.optional) errors[slot.name] = "enter a value";
@@ -352,6 +363,27 @@ export function formToValues(spec: Spec, form: RawForm): { values: Record<string
     }
   }
   return { values, errors };
+}
+
+// -- colours ---------------------------------------------------------------------------------------------------------
+// An SDK colour (Material.color, a body colour) is linear RGB in [0, 1], as OpenCASCADE (Quantity_TOC_RGB, so STEP) and
+// three.js (its working colour space) read it.  A colour picker speaks sRGB "#rrggbb": the form converts both ways.
+
+const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const toSrgb = (c: number) => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
+
+/** "#rrggbb" (sRGB) for an SDK colour (linear RGB in [0, 1]); "" for anything else (no colour). */
+export function colorHex(color: unknown): string {
+  if (!Array.isArray(color) || color.length !== 3 || !color.every((c) => typeof c === "number" && Number.isFinite(c))) return "";
+  return "#" + (color as number[]).map((c) => Math.round(toSrgb(Math.min(1, Math.max(0, c))) * 255).toString(16).padStart(2, "0")).join("");
+}
+
+/** The SDK colour (linear RGB in [0, 1], four decimals) of "#rrggbb", or null when the text is not one. */
+export function hexColor(text: string): [number, number, number] | null {
+  const match = /^#?([0-9a-f]{6})$/i.exec(text.trim());
+  if (!match) return null;
+  const hex = match[1];
+  return [0, 2, 4].map((i) => Math.round(toLinear(parseInt(hex.slice(i, i + 2), 16) / 255) * 1e4) / 1e4) as [number, number, number];
 }
 
 /** The name a person typed, or null when it is acceptable (empty means "use the suggestion"). */
