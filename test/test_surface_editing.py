@@ -164,6 +164,19 @@ def test_tags_and_references_follow_a_face_and_its_edges_through_edits():
         assert len(ql.edges().where(ql.tag("user.curve")).resolve(curve)) == 1
 
 
+def test_tags_of_the_face_and_its_edges_follow_without_a_recording_session_too():
+    face = scad.make_bezier_surface_rface(GRID)
+    (rim,) = ql.edges().where(ql.prop("geom.center.x", "<=", 1e-6)).resolve(face)
+    face = scad.apply_tag_rselection(scad.apply_tag_rselection(face, [rim], "user.rim"), [face], "user.skin")
+    edited = scad.elevate_surface_degree_rface(scad.move_surface_poles_rface(face, {(1, 1): (1, 1, 2)}), 3, 3)
+    assert len(ql.faces().where(ql.tag("user.skin")).resolve(edited)) == 1
+    (tagged,) = ql.edges().where(ql.tag("user.rim")).resolve(edited)
+    assert tagged.get_center().x == pytest.approx(0.0)
+    # a tag_prefix names the result of the operation it is given to (as everywhere in the SDK)
+    named = scad.insert_surface_knot_rface(face, "U", 0.5, tag_prefix="skin")
+    assert "skin.face" in named._list_tags()
+
+
 def test_a_face_picked_from_a_solid_is_converted_edited_and_replayed():
     with scad.GraphSession() as session:
         box = scad.make_box_rsolid(10, 10, 10)

@@ -912,8 +912,9 @@ fields when their target expression is unitless.
 - importer 仍识别冻结的 `2.0` contract，但 `2.0` graph 不得使用
   `load_brep_region_rshell`、`load_brep_region_rsolid`、
   `make_solid_from_shell_rsolid`、`trim_rsketch`、`extend_rsketch`、
-  `fillet_corner_rsketch`、`chamfer_corner_rsketch`、`project_rsketch` 或
-  `explode_rassembly`。
+  `fillet_corner_rsketch`、`chamfer_corner_rsketch`、`project_rsketch`、
+  `explode_rassembly` 或曲线/曲面编辑操作（`convert_to_bspline_*`、`set_*_poles_*`、
+  `move_*_poles_*`、`set_*_weights_*`、`insert_*_knot_*`、`elevate_*_degree_*`、`rebuild_*`）。
 - 为兼容早期 `2.0` model payload，importer 将缺失的
   `canonical_contract` 视为最小 legacy `{"contract_version": "2.0"}`；
   新导出的 model payload 仍必须显式包含完整 contract。
@@ -1063,6 +1064,20 @@ New canonical profile nodes use the `make_*_r*` names listed in `canonical_contr
 - `make_gordon_surface_rface`
 - `make_surface_patch_rface`
 - `trim_surface_rface`
+- `convert_to_bspline_redge`
+- `convert_to_bspline_rface`
+- `set_curve_poles_redge`
+- `move_curve_poles_redge`
+- `set_curve_weights_redge`
+- `insert_curve_knot_redge`
+- `elevate_curve_degree_redge`
+- `set_surface_poles_rface`
+- `move_surface_poles_rface`
+- `set_surface_weights_rface`
+- `insert_surface_knot_rface`
+- `elevate_surface_degree_rface`
+- `rebuild_curve_redge`
+- `rebuild_surface_rface`
 - `make_loft_rshell`
 - `sew_faces_rshell`
 - `make_solid_from_shell_rsolid`
@@ -1349,6 +1364,19 @@ Notes:
 - Outputs: 1 `Assembly` (a display copy: only component placements differ)
 - Params: `assembly_id`, `factor`, `center`, `axis` (3-vectors or `null`), `directions` (component id to 3-vector), `weights` (component id to number)
 - `factor` is recorded as a symbolic parameter when it was a `Var` / `Expr`. Constraints are not re-solved; solving the result moves the components back.
+
+#### Curve and surface edits (`*_redge` / `*_rface`)
+
+`convert_to_bspline_redge`, `convert_to_bspline_rface`, `set_curve_poles_redge`, `move_curve_poles_redge`,
+`set_curve_weights_redge`, `insert_curve_knot_redge`, `elevate_curve_degree_redge`, `set_surface_poles_rface`,
+`move_surface_poles_rface`, `set_surface_weights_rface`, `insert_surface_knot_rface`, `elevate_surface_degree_rface`,
+`rebuild_curve_redge`, `rebuild_surface_rface`.
+
+- Inputs: 1 `Edge` (`*_redge`) or 1 `Face` (`*_rface`), named by `params.input_refs` (a pick from a solid becomes a selection node first)
+- Outputs: 1 new `Edge` / `Face` (the input is not changed)
+- Params (besides `input_refs` and `tag_prefix`): `poles` (list of points / grid of rows along U), `moves` (`[[index, point], ...]` for a curve, `[[row, column, point], ...]` for a surface; indices 0-based), `weights` (list / grid), `parameter`, `multiplicity`, `direction` (`"U"` / `"V"`), `degree`, `u_degree` / `v_degree` (`null` = unchanged for `elevate_surface_degree_rface`), `pole_count` / `u_pole_count` / `v_pole_count` (`null` = from `tolerance`), `tolerance`. Points are in the node's `context` coordinate system.
+- `topo_delta`: the face and its edges (an edge: itself) are `MODIFIED`, derivation `continuation`, each with its input entity as parent, so tags and references follow.
+- `inspect_curve_rcurvedata`, `inspect_surface_rsurfacedata`, `sample_curve_rcurvature`, `sample_surface_risocurves` are diagnostic: no node.
 
 #### `make_constrain_*_rsketch`
 

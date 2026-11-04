@@ -6,6 +6,18 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+### Added
+- Editing existing curves and surfaces as recorded operations (the SDK half of NURBS control-point editing):
+  `inspect_curve_rcurvedata` / `inspect_surface_rsurfacedata` read degree, poles, weights, knots and trimming;
+  `set_*_poles`, `move_*_poles`, `set_*_weights`, `insert_*_knot`, `elevate_*_degree` (curves `_redge`, surfaces
+  `_rface`), `convert_to_bspline_redge/rface` (the explicit step for lines, circles, planes, cylinders) and
+  `rebuild_curve_redge/rface` return a new shape, record a topology delta (tags and references follow the face and
+  its edges) and replay from model JSON. A trimmed face keeps its trimming. `sample_curve_rcurvature` and
+  `sample_surface_risocurves` give an editor a curvature comb and clipped isocurves.
+
+### Fixed
+- A stable reference into a face or shell body (no solid) resolves; it raised `cannot resolve QL selector scope`.
+
 ## 2.2.7 — 2026-10-30
 
 ### Fixed

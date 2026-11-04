@@ -277,16 +277,12 @@ namespace {
 
 template <class T>
 T finalize_edit(T result, EditOutput output) {
-  attach_lineage_from_source(output.source, result, LineageDerivation::Continuation, output.record.op, "complete");
   result.set_runtime(kCoverageKey, "complete");
   if (output.record.labels.empty())
     output.record.labels = {"derived", "edit", "surface", std::string(kind_name(result.kind()))};
   output.record.ordered_inputs = true;
-  std::optional<TopoDelta> delta;
-  if (!output.delta.entries.empty())
-    delta = std::move(output.delta);
-  T finalized = finalize_derived<T>(std::move(result),
-                                    FinalizeSpec{.record = to_op_record(std::move(output.record), std::move(delta))});
+  T finalized = finalize_tracked<T>(std::move(result), std::move(output.delta), std::move(output.entries),
+                                    FinalizeSpec{.record = to_op_record(std::move(output.record))});
   apply_prefix_tag(finalized, output.tag_prefix);
   return finalized;
 }

@@ -24,13 +24,14 @@ T finish(const T& source, const std::string& op, Value params, const TagPrefix& 
   }
   if (single.IsNull())
     throw ValueError(std::string("the rebuild produced no ") + what);
-  TopoDelta delta = modification_delta(history, source.wrapped(), single, "continuation");
+  ModificationHistory traced = modification_history(history, source.wrapped(), single, "continuation");
   params.set("tag_prefix", tag_prefix ? Value(*tag_prefix) : Value());
   detail::OperationRecord record{.op = op, .params = std::move(params), .inputs = {{source, what}}};
-  return detail::finalize_surface_output(
-      T(single),
-      detail::EditOutput{
-          .record = std::move(record), .tag_prefix = tag_prefix, .source = source, .delta = std::move(delta)});
+  return detail::finalize_surface_output(T(single), detail::EditOutput{.record = std::move(record),
+                                                                       .tag_prefix = tag_prefix,
+                                                                       .source = source,
+                                                                       .delta = std::move(traced.delta),
+                                                                       .entries = std::move(traced.entries)});
 }
 
 }  // namespace

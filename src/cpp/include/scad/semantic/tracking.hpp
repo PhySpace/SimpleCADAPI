@@ -161,6 +161,17 @@ TrackedResult tracked_shell(const Solid& solid, const std::vector<Face>& faces_t
 TopoDelta modification_delta(const BRepTools_History& history, const TopoDS_Shape& input, const TopoDS_Shape& result,
                              std::string_view modified_derivation, bool generated_faces_continue = false);
 
+// The same, with the per-entity entries the tag projection reads (finalize_tracked): for a modification whose result
+// is finished through the tracked pipeline (the curve / surface edits), so tags of sub-entities follow without a
+// recorder too.
+struct ModificationHistory {
+  TopoDelta delta;
+  DeltaEntries entries;
+};
+ModificationHistory modification_history(const BRepTools_History& history, const TopoDS_Shape& input,
+                                         const TopoDS_Shape& result, std::string_view modified_derivation,
+                                         bool generated_faces_continue = false);
+
 // ---------------------------------------------------------------------------
 // Booleans (operators: cut_rsolid, union_rsolid, intersect_rsolid)
 // ---------------------------------------------------------------------------
