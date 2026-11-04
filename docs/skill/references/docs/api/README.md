@@ -425,6 +425,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [render_screenshot_rpath](render_screenshot_rpath.md) *(from operators/features.py)* `top-level`
 - [scale_rsolid](scale_rsolid.md) *(from operators/transform.py)* `top-level`
 - [select](select.md) *(from ql.py)* `submodule:ql`
+- [set_body_appearance_rpart](set_body_appearance_rpart.md) *(from operators/product.py)* `top-level`
 - [set_public_connector_rassembly](set_public_connector_rassembly.md) *(from operators/product.py)* `top-level`
 - [sew_faces_rshell](sew_faces_rshell.md) *(from operators/geometry.py)* `top-level`
 - [shells](shells.md) *(from ql.py)* `submodule:ql`
