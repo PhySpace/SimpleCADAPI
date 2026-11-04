@@ -1,15 +1,35 @@
 // trim_rsketch, extend_rsketch, diff_sketch_rsketchdiff and inspect_sketch_rsketchcrossings.
 //
 // Both edits work on the *solved* geometry: the sketch is solved first, every point is moved to where the solver put
-// it, and the cuts are computed on those coordinates.  Lines, circles and arcs are the entities that can be cut or
-// extended and that can cut; ellipses and B-splines are neither (they are skipped as cutters and refused as subjects).
-// An arc runs counter-clockwise from `start` to `end` around `center`.
+// it, and the cuts are computed on those coordinates.  Lines, circles, arcs and B-splines can be cut; lines and
+// B-splines can be extended; lines, circles, arcs, B-splines and ellipses cut (an ellipse is never a subject: the
+// sketch has no elliptic arc).  An arc runs counter-clockwise from `start` to `end` around `center`.
+//
+// Line / circle / arc pairs meet in closed form (`line_params`, `angle_params`); a pair with a B-spline or an ellipse
+// meets through OCCT (`edit_curves.hpp`, Geom2dAPI_InterCurveCurve), a tangent touch being one cut.  A B-spline is cut
+// on its own parameter: each kept piece is a new B-spline (OCCT Segment), its first and last control points are its
+// end points and its inner control points are sketch points (an original control point is reused where the piece
+// keeps it unchanged, the others are new).  A closed B-spline (periodic, or starting and ending on one point) needs
+// two cuts, like a circle.  A B-spline end is extended curvature-continuously (GeomLib::ExtendCurveToPoint) towards
+// where its end tangent meets the next entity, then cut at the first crossing.
+//
+// Constraints: a constraint on an end point stays with that point (so with the piece that keeps that end); a tangent
+// constraint at a B-spline end (at_a / at_b) moves to the piece that keeps that end; any other constraint naming the
+// cut entity goes, and so does every constraint on an original control point no entity uses any more (that point is
+// removed).
 #include <algorithm>
 #include <cmath>
 #include <map>
 #include <set>
 #include <tuple>
 
+#include <Geom2d_Circle.hxx>
+#include <Geom2d_Ellipse.hxx>
+#include <Geom2d_Line.hxx>
+#include <Geom2d_TrimmedCurve.hxx>
+#include <gp_Ax2d.hxx>
+
+#include "edit_curves.hpp"
 #include "finalize.hpp"
 #include "scad/core/error.hpp"
 #include "scad/core/vec.hpp"
@@ -19,7 +39,11 @@ namespace scad {
 
 namespace {
 
+using sketch_detail::Crossing2;
 using sketch_detail::finalize_sketch_object;
+using sketch_detail::Spline2;
+using CurveHandle = opencascade::handle<Geom2d_Curve>;
+using SplineHandle = opencascade::handle<Geom2d_BSplineCurve>;
 
 // Two positions closer than this (sketch units) are the same place: a crossing this close to an end is not a cut, and
 // a cut this close to an existing point reuses it.
@@ -38,8 +62,19 @@ bool finite(double v) {
   return std::isfinite(v);
 }
 
-bool curve_kind(const std::string& kind) {
+// The kinds that meet in closed form.
+bool closed_form(const std::string& kind) {
   return kind == kLineKind || kind == kCircleKind || kind == kArcKind;
+}
+
+// The kinds that can be cut.
+bool trimmable(const std::string& kind) {
+  return closed_form(kind) || kind == kBSplineKind;
+}
+
+// The kinds that cut (and that crossings lists).
+bool cutting(const std::string& kind) {
+  return trimmable(kind) || kind == kEllipseKind;
 }
 
 std::string id_of(const SketchTarget& target) {
@@ -78,7 +113,89 @@ struct Geometry {
     const double sweep = wrap(end - start);
     return {start, sweep == 0.0 ? kTwoPi : sweep};
   }
+
+  std::map<std::string, std::vector<Pt>, std::less<>> poles;  // B-splines: the solved control points
+
+  Spline2 spline_of(const SketchEntity& entity) const {
+    const SketchBSpline definition = entity.bspline();
+    Spline2 out;
+    out.degree = definition.degree;
+    out.poles = poles.at(entity.id);
+    out.knots = definition.knots;
+    out.multiplicities = definition.multiplicities;
+    if (definition.weights)
+      out.weights = *definition.weights;
+    out.periodic = definition.periodic;
+    return out;
+  }
+
+  SplineHandle spline(const SketchEntity& entity) const { return sketch_detail::make_spline2(spline_of(entity)); }
+
+  // The OCCT curve of a line, circle, arc, ellipse or B-spline.  `bounded`: a line is its segment and an arc its
+  // span (both a hair longer, so a crossing on an end is found); else they are the whole line / circle.
+  CurveHandle curve(const SketchEntity& entity, bool bounded) const {
+    if (entity.kind == kBSplineKind)
+      return spline(entity);
+    if (entity.kind == kLineKind) {
+      const Pt p1 = at(entity, "start");
+      const Pt p2 = at(entity, "end");
+      const double len = std::hypot(p2.first - p1.first, p2.second - p1.second);
+      const opencascade::handle<Geom2d_Line> line =
+          new Geom2d_Line(gp_Pnt2d(p1.first, p1.second), gp_Dir2d(p2.first - p1.first, p2.second - p1.second));
+      if (!bounded)
+        return line;
+      return new Geom2d_TrimmedCurve(line, -kTol, len + kTol);
+    }
+    if (entity.kind == kEllipseKind) {
+      const Pt c = at(entity, "center");
+      Pt major = at(entity, "major");
+      Pt minor = at(entity, "minor");
+      double a = std::hypot(major.first - c.first, major.second - c.second);
+      double b = std::hypot(minor.first - c.first, minor.second - c.second);
+      if (b > a) {
+        std::swap(major, minor);
+        std::swap(a, b);
+      }
+      const gp_Ax2d axis(gp_Pnt2d(c.first, c.second), gp_Dir2d(major.first - c.first, major.second - c.second));
+      return new Geom2d_Ellipse(axis, a, b);
+    }
+    const Circ circle = circle_of(entity);
+    const opencascade::handle<Geom2d_Circle> full = new Geom2d_Circle(
+        gp_Ax2d(gp_Pnt2d(circle.center.first, circle.center.second), gp_Dir2d(1.0, 0.0)), circle.radius);
+    if (entity.kind == kCircleKind || !bounded)
+      return full;
+    const auto [start, sweep] = arc_span(entity);
+    const double tol = kTol / circle.radius;
+    if (sweep + 2.0 * tol >= kTwoPi)
+      return full;
+    return new Geom2d_TrimmedCurve(full, start - tol, start + sweep + tol);
+  }
 };
+
+// Where `a` (its whole line / circle unless `bounded`) meets `b` (bounded), with the parameter on each.
+std::vector<Crossing2> curve_hits(const Geometry& g, const SketchEntity& a, bool bounded, const SketchEntity& b) {
+  const auto degenerate = [&](const SketchEntity& e) {
+    if (e.kind == kLineKind) {
+      const Pt p1 = g.at(e, "start");
+      const Pt p2 = g.at(e, "end");
+      return std::hypot(p2.first - p1.first, p2.second - p1.second) < kTol;
+    }
+    if (e.kind == kCircleKind || e.kind == kArcKind)
+      return g.circle_of(e).radius < kTol;
+    if (e.kind == kEllipseKind) {
+      const Pt c = g.at(e, "center");
+      for (const char* role : {"major", "minor"}) {
+        const Pt p = g.at(e, role);
+        if (std::hypot(p.first - c.first, p.second - c.second) < kTol)
+          return true;
+      }
+    }
+    return false;
+  };
+  if (degenerate(a) || degenerate(b))
+    return {};
+  return sketch_detail::intersect2(g.curve(a, bounded), g.curve(b, true), kTol);
+}
 
 bool on_arc(double angle, double start, double sweep, double tol) {
   const double d = wrap(angle - start);
@@ -114,6 +231,12 @@ std::vector<double> line_params(const Geometry& g, const SketchEntity& a, const 
   const double dx = p2.first - p1.first;
   const double dy = p2.second - p1.second;
   const double len = std::hypot(dx, dy);
+  if (!closed_form(b.kind)) {
+    std::vector<double> found;
+    for (const Crossing2& hit : curve_hits(g, a, false, b))
+      found.push_back(((hit.at.first - p1.first) * dx + (hit.at.second - p1.second) * dy) / (len * len));
+    return found;
+  }
   if (b.kind == kLineKind) {
     const Pt p3 = g.at(b, "start");
     const Pt p4 = g.at(b, "end");
@@ -145,7 +268,10 @@ std::vector<double> line_params(const Geometry& g, const SketchEntity& a, const 
 std::vector<double> angle_params(const Geometry& g, const SketchEntity& a, const SketchEntity& b) {
   const Circ circle = g.circle_of(a);
   std::vector<Pt> hits;
-  if (b.kind == kLineKind) {
+  if (!closed_form(b.kind)) {
+    for (const Crossing2& hit : curve_hits(g, a, false, b))
+      hits.push_back(hit.at);
+  } else if (b.kind == kLineKind) {
     const Pt p1 = g.at(b, "start");
     const Pt p2 = g.at(b, "end");
     const double dx = p2.first - p1.first;
@@ -246,6 +372,11 @@ class SketchEditor {
         const double r = solved.solved_scalars.at("circle:" + id + ":radius");
         geo_.radii[id] = r;
         entity.data.set("radius", Value(r));
+      } else if (entity.kind == kBSplineKind) {
+        std::vector<Pt>& poles = geo_.poles[id];
+        const std::size_t count = entity.data.find("control_points")->as_array().size();
+        for (std::size_t i = 0; i < count; ++i)
+          poles.push_back(solved.solved_points.at("bspline:" + id + ":pole:" + std::to_string(i)));
       }
     }
     for (const SketchConstraint& constraint : work_.constraints_)
@@ -258,7 +389,7 @@ class SketchEditor {
   Value crossings() const {
     std::vector<const SketchEntity*> curves;
     for (const auto& [id, entity] : work_.entities_)
-      if (curve_kind(entity.kind) && !entity.construction)
+      if (cutting(entity.kind) && !entity.construction)
         curves.push_back(&entity);
     Value::Array out;
     std::vector<Pt> seen;
@@ -278,6 +409,11 @@ class SketchEditor {
       for (std::size_t j = i + 1; j < curves.size(); ++j) {
         const SketchEntity& a = *curves[i];
         const SketchEntity& b = *curves[j];
+        if (!closed_form(a.kind) || !closed_form(b.kind)) {
+          for (const Crossing2& hit : curve_hits(geo_, a, true, b))
+            keep(hit.at, a, b);
+          continue;
+        }
         if (a.kind == kLineKind) {
           const Pt p1 = geo_.at(a, "start");
           const Pt p2 = geo_.at(a, "end");
@@ -358,6 +494,8 @@ class SketchEditor {
         if (constraint.targets.size() == 1 && constraint.targets[0].entity_id == id &&
             (constraint.kind == "horizontal" || constraint.kind == "vertical"))
           plan.inherit.push_back(constraint.kind);
+    } else if (subject.kind == kBSplineKind) {
+      trim_spline(plan, subject, click, others);
     } else {
       trim_round(plan, subject, click, others);
     }
@@ -370,8 +508,8 @@ class SketchEditor {
       throw ValueError("end must be 'start' or 'end', got '" + end + "'");
     const SketchEntity subject = subject_of(entity_target, "extended");
     const std::string& id = subject.id;
-    if (subject.kind != kLineKind)
-      throw ValueError("'" + id + "' is a " + subject.kind + ": only a line can be extended");
+    if (subject.kind != kLineKind && subject.kind != kBSplineKind)
+      throw ValueError("'" + id + "' is a " + subject.kind + ": only a line or a B-spline can be extended");
     std::vector<SketchEntity> pool;
     if (to) {
       const std::string to_id = id_of(*to);
@@ -380,51 +518,75 @@ class SketchEditor {
         throw ValueError("there is no entity '" + to_id + "' to extend to");
       if (to_id == id)
         throw ValueError("'" + id + "' cannot be extended to itself");
-      if (!curve_kind(target->kind))
-        throw ValueError("'" + to_id + "' is a " + target->kind + ": a line extends to a line, circle or arc");
+      if (!cutting(target->kind))
+        throw ValueError("'" + to_id + "' is a " + target->kind +
+                         ": an entity extends to a line, circle, arc, ellipse or B-spline");
       pool.push_back(*target);
     } else {
       pool = cutters(subject, std::nullopt);
     }
-    const Pt p1 = geo_.at(subject, "start");
-    const Pt p2 = geo_.at(subject, "end");
-    const double dx = p2.first - p1.first;
-    const double dy = p2.second - p1.second;
-    const double len = std::hypot(dx, dy);
-    require_extent(id, len);
-    const bool forward = end == "end";
-    std::optional<std::pair<double, std::string>> best;
-    for (const SketchEntity& other : pool)
-      for (const double t : line_params(geo_, subject, other)) {
-        const bool ahead = forward ? (t - 1.0) * len > kTol : (-t) * len > kTol;
-        if (!ahead)
-          continue;
-        if (!best || (forward ? t < best->first : t > best->first))
-          best = {t, other.id};
-      }
-    if (!best)
-      throw ValueError("nothing is ahead of the " + end + " of '" + id + "'" +
-                       (to ? " on '" + id_of(*to) + "'" : std::string()));
+    const auto nothing_ahead = [&] {
+      return ValueError("nothing is ahead of the " + end + " of '" + id + "'" +
+                        (to ? " on '" + id_of(*to) + "'" : std::string()));
+    };
+    Pt reached;
+    std::string cutter;
+    std::optional<Spline2> reshaped;  // a B-spline's new shape
+    if (subject.kind == kBSplineKind) {
+      std::tie(reached, cutter, reshaped) = extend_spline(subject, end == "end", pool);
+      if (cutter.empty())
+        throw nothing_ahead();
+    } else {
+      const Pt p1 = geo_.at(subject, "start");
+      const Pt p2 = geo_.at(subject, "end");
+      const double dx = p2.first - p1.first;
+      const double dy = p2.second - p1.second;
+      const double len = std::hypot(dx, dy);
+      require_extent(id, len);
+      const bool forward = end == "end";
+      std::optional<std::pair<double, std::string>> best;
+      for (const SketchEntity& other : pool)
+        for (const double t : line_params(geo_, subject, other)) {
+          const bool ahead = forward ? (t - 1.0) * len > kTol : (-t) * len > kTol;
+          if (!ahead)
+            continue;
+          if (!best || (forward ? t < best->first : t > best->first))
+            best = {t, other.id};
+        }
+      if (!best)
+        throw nothing_ahead();
+      reached = {p1.first + best->first * dx, p1.second + best->first * dy};
+      cutter = best->second;
+    }
     const std::string moved = subject.point_id(end);
     for (const auto& [other_id, other] : work_.entities_)
       if (other_id != id && uses_point(other, moved))
         throw ValueError("the " + end + " of '" + id + "' (point '" + moved + "') is shared with '" + other_id +
                          "': extending it would move that entity too");
-    const double t = best->first;
     SketchEntity& point = work_.entities_.at(moved);
-    point.data.set("x", Value(p1.first + t * dx));
-    point.data.set("y", Value(p1.second + t * dy));
+    point.data.set("x", Value(reached.first));
+    point.data.set("y", Value(reached.second));
     point.scalars.erase("x");  // the position now comes from the cutter, not from a parameter
     point.scalars.erase("y");
-    // dimensions that no longer hold
+    geo_.points[moved] = reached;
+    // dimensions that no longer hold (and, for a B-spline, its tangent at the moved end and a fix of its shape)
+    const std::string at_key[2] = {"at_a", "at_b"};
     std::vector<SketchConstraint> kept;
     for (SketchConstraint& constraint : work_.constraints_) {
       bool stale = false;
-      for (const SketchRef& target : constraint.targets) {
+      for (std::size_t i = 0; i < constraint.targets.size(); ++i) {
+        const SketchRef& target = constraint.targets[i];
         if (constraint.kind == "length" && target.entity_id == id)
           stale = true;
         if ((constraint.value.has_value() || constraint.kind == "fix") && target_point(target) == moved)
           stale = true;
+        if (reshaped && target.entity_id == id && constraint.kind == "fix")
+          stale = true;
+        if (reshaped && target.entity_id == id && constraint.kind == "tangent" && i < 2) {
+          const Value* selector = constraint.metadata.find(at_key[i]);
+          if (selector != nullptr && selector->is_string() && selector->as_string() == end)
+            stale = true;
+        }
       }
       if (stale)
         notes_.push_back("constraint '" + constraint.id + "' (" + constraint.kind +
@@ -433,7 +595,9 @@ class SketchEditor {
         kept.push_back(std::move(constraint));
     }
     work_.constraints_ = std::move(kept);
-    add_point_on(moved, {best->second});
+    if (reshaped)
+      reshape_spline(subject, *reshaped);
+    add_point_on(moved, {cutter});
     return finish("extend_rsketch");
   }
 
@@ -444,6 +608,7 @@ class SketchEditor {
     std::vector<SketchEntity> pieces;
     std::vector<std::pair<std::string, std::vector<std::string>>> ties;  // (point, the entities that cut there)
     std::vector<std::string> inherit;                                    // horizontal / vertical, per line piece
+    std::map<std::string, std::string> keeps_end;  // B-spline: "start" / "end" -> the piece that keeps that end
   };
 
   SketchEntity subject_of(const SketchTarget& target, const char* verb) const {
@@ -451,8 +616,9 @@ class SketchEditor {
     const SketchEntity* entity = work_.entities_.find(id);
     if (entity == nullptr)
       throw ValueError("there is no entity '" + id + "' in the sketch");
-    if (!curve_kind(entity->kind))
-      throw ValueError("'" + id + "' is a " + entity->kind + ": only lines, circles and arcs can be " + verb);
+    if (!trimmable(entity->kind))
+      throw ValueError("'" + id + "' is a " + entity->kind + ": only lines, circles and arcs can be " + verb +
+                       " (and B-splines)");
     return *entity;
   }
 
@@ -484,15 +650,16 @@ class SketchEditor {
           throw ValueError("against names '" + id + "', which is not an entity of the sketch");
         if (id == subject.id)
           throw ValueError("against names '" + id + "', the entity being cut");
-        if (!curve_kind(entity->kind))
-          throw ValueError("against names '" + id + "', a " + entity->kind + ": only lines, circles and arcs cut");
+        if (!cutting(entity->kind))
+          throw ValueError("against names '" + id + "', a " + entity->kind +
+                           ": only lines, circles, arcs, ellipses and B-splines cut");
         if (seen.insert(id).second)
           out.push_back(*entity);
       }
       return out;
     }
     for (const auto& [id, entity] : work_.entities_)
-      if (id != subject.id && curve_kind(entity.kind) && !entity.construction)
+      if (id != subject.id && cutting(entity.kind) && !entity.construction)
         out.push_back(entity);
     return out;
   }
@@ -622,6 +789,288 @@ class SketchEditor {
     }
   }
 
+  // ---- B-splines
+
+  // The control point ids of `spline`, a new shape of (a part of) `original`: `start` and `end` first and last, and
+  // in between an original control point where the pole has not moved (each at most once, see `taken`), else a new
+  // point (appended to `new_points`).
+  Value::Array pole_ids(std::vector<SketchEntity>& new_points, const SketchEntity& original, const Spline2& spline,
+                        const std::string& start, const std::string& end, std::set<std::string>& taken) {
+    const bool closed = original.point_id("start") == original.point_id("end");
+    std::vector<std::string> candidates;
+    for (const SketchPole& pole : original.bspline().poles) {
+      const bool own_end = pole.point_id == original.point_id("start") || pole.point_id == original.point_id("end");
+      if (pole.is_point() && (closed || !own_end))
+        candidates.push_back(pole.point_id);
+    }
+    Value::Array out;
+    for (std::size_t i = 0; i < spline.poles.size(); ++i) {
+      std::string id;
+      if (i == 0) {
+        id = start;
+      } else if (i + 1 == spline.poles.size()) {
+        id = end;
+      } else {
+        const Pt& p = spline.poles[i];
+        for (const std::string& candidate : candidates) {
+          const Pt q = geo_.points.at(candidate);
+          if (candidate != start && candidate != end && taken.count(candidate) == 0 &&
+              std::hypot(p.first - q.first, p.second - q.second) < kTol) {
+            id = candidate;
+            break;
+          }
+        }
+        if (id.empty()) {
+          SketchEntity point;
+          point.id = free_id("p");
+          point.kind = std::string(kPointKind);
+          point.data.set("x", Value(p.first));
+          point.data.set("y", Value(p.second));
+          geo_.points[point.id] = p;
+          new_points.push_back(point);
+          id = point.id;
+        }
+        taken.insert(id);
+      }
+      Value pole = Value::object();
+      pole.set("point_id", id);
+      out.push_back(std::move(pole));
+    }
+    return out;
+  }
+
+  static void set_spline_data(SketchEntity& entity, const std::string& start, const std::string& end,
+                              Value::Array poles, const Spline2& spline) {
+    entity.data.set("start", start);
+    entity.data.set("end", end);
+    entity.data.set("control_points", Value(std::move(poles)));
+    entity.data.set("degree", spline.degree);
+    Value::Array knots;
+    for (const double knot : spline.knots)
+      knots.emplace_back(knot);
+    entity.data.set("knots", Value(std::move(knots)));
+    Value::Array mults;
+    for (const int mult : spline.multiplicities)
+      mults.emplace_back(mult);
+    entity.data.set("multiplicities", Value(std::move(mults)));
+    if (spline.weights.empty()) {
+      entity.data.set("weights", Value());
+    } else {
+      Value::Array weights;
+      for (const double weight : spline.weights)
+        weights.emplace_back(weight);
+      entity.data.set("weights", Value(std::move(weights)));
+    }
+    entity.data.set("periodic", false);
+  }
+
+  void add_spline_piece(Plan& plan, const SketchEntity& subject, const SplineHandle& curve, const std::string& start,
+                        const std::string& end, std::set<std::string>& taken) {
+    const Spline2 spline = sketch_detail::spline2_of(curve);
+    Value::Array poles = pole_ids(plan.points, subject, spline, start, end, taken);
+    SketchEntity piece;
+    piece.id = free_id("s");
+    piece.kind = std::string(kBSplineKind);
+    piece.construction = subject.construction;
+    set_spline_data(piece, start, end, std::move(poles), spline);
+    plan.pieces.push_back(std::move(piece));
+  }
+
+  // The B-spline half of trim.
+  void trim_spline(Plan& plan, const SketchEntity& subject, const Pt& click, const std::vector<SketchEntity>& others) {
+    const std::string& id = subject.id;
+    const SplineHandle curve = geo_.spline(subject);
+    const bool periodic = curve->IsPeriodic();
+    const bool closed = periodic || subject.point_id("start") == subject.point_id("end");
+    const double u0 = curve->FirstParameter();
+    const double u1 = curve->LastParameter();
+    const double period = u1 - u0;
+    const double res = std::max(sketch_detail::parameter_resolution(curve, kTol), 1e-12);
+    const Pt first = sketch_detail::value_at(curve, u0);
+    const Pt last = sketch_detail::value_at(curve, u1);
+    const auto apart = [](const Pt& a, const Pt& b) {
+      return std::hypot(a.first - b.first, a.second - b.second) > kTol;
+    };
+    std::vector<std::pair<double, std::string>> raw;
+    for (const SketchEntity& other : others)
+      for (const Crossing2& hit : curve_hits(geo_, subject, true, other)) {
+        if (closed)
+          raw.emplace_back(u1 - hit.on_a <= res ? u0 : hit.on_a, other.id);  // the seam is u0
+        else if (apart(hit.at, first) && apart(hit.at, last))
+          raw.emplace_back(hit.on_a, other.id);
+      }
+    std::vector<Cut> cuts = merge_cuts(raw, res);
+    if (closed && cuts.size() > 1 && cuts.front().at + period - cuts.back().at < res) {
+      for (const std::string& cutter : cuts.back().cutters)
+        cuts.front().cutters.push_back(cutter);
+      cuts.pop_back();
+    }
+    const double u_at = sketch_detail::nearest_parameter(curve, click);
+    const auto cut_point = [&](double u) {
+      const Pt p = sketch_detail::value_at(curve, u);
+      return point_at(plan, p.first, p.second);
+    };
+    std::set<std::string> taken;
+    if (!closed) {
+      const Cut* before = nullptr;
+      const Cut* after = nullptr;
+      for (const Cut& cut : cuts) {
+        if (cut.at <= u_at)
+          before = &cut;
+        else if (after == nullptr)
+          after = &cut;
+      }
+      if (before == nullptr && after == nullptr) {
+        notes_.push_back(id + " had nothing crossing it: removed whole");
+        return;
+      }
+      const std::string before_point = before != nullptr ? cut_point(before->at) : std::string();
+      const std::string after_point = after != nullptr ? cut_point(after->at) : std::string();
+      if (before != nullptr) {
+        add_spline_piece(plan, subject, sketch_detail::segment2(curve, u0, before->at), subject.point_id("start"),
+                         before_point, taken);
+        plan.keeps_end["start"] = plan.pieces.back().id;
+        plan.ties.emplace_back(before_point, before->cutters);
+      }
+      if (after != nullptr) {
+        add_spline_piece(plan, subject, sketch_detail::segment2(curve, after->at, u1), after_point,
+                         subject.point_id("end"), taken);
+        plan.keeps_end["end"] = plan.pieces.back().id;
+        plan.ties.emplace_back(after_point, after->cutters);
+      }
+      return;
+    }
+    if (cuts.empty()) {
+      notes_.push_back(id + " had nothing crossing it: removed whole");
+      return;
+    }
+    if (cuts.size() == 1)
+      throw ValueError("'" + id + "' is crossed once: a closed B-spline needs two cuts to leave a piece");
+    std::size_t holder = cuts.size() - 1;
+    for (std::size_t i = 0; i < cuts.size(); ++i)
+      if (cuts[i].at <= u_at)
+        holder = i;
+    std::vector<std::string> points;
+    for (const Cut& cut : cuts)
+      points.push_back(cut_point(cut.at));
+    for (std::size_t i = 0; i < cuts.size(); ++i) {
+      if (i == holder)
+        continue;
+      const std::size_t next = (i + 1) % cuts.size();
+      const double a = cuts[i].at;
+      const double b = cuts[next].at;
+      SplineHandle piece;
+      if (next != 0)
+        piece = sketch_detail::segment2(curve, a, b);
+      else if (periodic)
+        piece = sketch_detail::segment2(curve, a, b + period);
+      else if (b - u0 <= res)
+        piece = sketch_detail::segment2(curve, a, u1);  // the last cut is on the seam
+      else
+        piece = sketch_detail::join2(sketch_detail::segment2(curve, a, u1), sketch_detail::segment2(curve, u0, b));
+      add_spline_piece(plan, subject, piece, points[i], points[next], taken);
+      plan.ties.emplace_back(points[i], cuts[i].cutters);
+      plan.ties.emplace_back(points[next], cuts[next].cutters);
+    }
+  }
+
+  // Extend a B-spline from its end (`at_end`) or start: (where it now ends, the entity it reaches, its new shape);
+  // an empty entity id when nothing is ahead.
+  std::tuple<Pt, std::string, std::optional<Spline2>> extend_spline(const SketchEntity& subject, bool at_end,
+                                                                    const std::vector<SketchEntity>& pool) const {
+    const std::string& id = subject.id;
+    const SplineHandle curve = geo_.spline(subject);
+    if (curve->IsPeriodic() || subject.point_id("start") == subject.point_id("end"))
+      throw ValueError("'" + id + "' is a closed B-spline: it has no free end to extend");
+    const double u_end = at_end ? curve->LastParameter() : curve->FirstParameter();
+    gp_Pnt2d tip;
+    gp_Vec2d tangent;
+    curve->D1(u_end, tip, tangent);
+    if (tangent.Magnitude() < 1e-12)
+      throw ValueError("the " + std::string(at_end ? "end" : "start") + " of '" + id + "' has no direction");
+    if (!at_end)
+      tangent.Reverse();
+    // where the end tangent meets the next entity: the extension is aimed there
+    const opencascade::handle<Geom2d_Line> ray = new Geom2d_Line(tip, gp_Dir2d(tangent));
+    std::optional<std::pair<double, std::string>> aim;
+    for (const SketchEntity& other : pool)
+      for (const Crossing2& hit : sketch_detail::intersect2(ray, geo_.curve(other, true), kTol))
+        if (hit.on_a > kTol && (!aim || hit.on_a < aim->first))
+          aim = {hit.on_a, other.id};
+    if (!aim)
+      return {Pt{}, std::string(), std::nullopt};
+    const gp_Pnt2d target = tip.Translated(gp_Vec2d(gp_Dir2d(tangent)) * aim->first);
+    const SplineHandle extended = sketch_detail::extend2(curve, at_end, {target.X(), target.Y()});
+    // the original end on the extended curve, then the first crossing past it
+    const double u_join = sketch_detail::nearest_parameter(extended, {tip.X(), tip.Y()});
+    const double res = std::max(sketch_detail::parameter_resolution(extended, kTol), 1e-12);
+    std::optional<std::pair<double, std::string>> hit_at;
+    for (const SketchEntity& other : pool)
+      for (const Crossing2& hit : sketch_detail::intersect2(extended, geo_.curve(other, true), kTol)) {
+        const double ahead = at_end ? hit.on_a - u_join : u_join - hit.on_a;
+        if (ahead > res && (!hit_at || ahead < (at_end ? hit_at->first - u_join : u_join - hit_at->first)))
+          hit_at = {hit.on_a, other.id};
+      }
+    if (!hit_at)
+      hit_at = {at_end ? extended->LastParameter() : extended->FirstParameter(), aim->second};
+    const SplineHandle result = at_end ? sketch_detail::segment2(extended, extended->FirstParameter(), hit_at->first)
+                                       : sketch_detail::segment2(extended, hit_at->first, extended->LastParameter());
+    Spline2 shape = sketch_detail::spline2_of(result);
+    return {at_end ? shape.poles.back() : shape.poles.front(), hit_at->second, std::move(shape)};
+  }
+
+  // Give the B-spline `subject` the shape `spline` (its end points keep their ids).
+  void reshape_spline(const SketchEntity& subject, const Spline2& spline) {
+    std::vector<SketchEntity> new_points;
+    std::set<std::string> taken;
+    const std::string start = subject.point_id("start");
+    const std::string end = subject.point_id("end");
+    Value::Array poles = pole_ids(new_points, subject, spline, start, end, taken);
+    set_spline_data(work_.entities_.at(subject.id), start, end, std::move(poles), spline);
+    OrderedMap<SketchEntity> rebuilt;
+    for (auto& [entity_id, entity] : work_.entities_) {
+      if (entity_id == subject.id)
+        for (const SketchEntity& point : new_points)
+          rebuilt.set(point.id, point);
+      rebuilt.set(entity_id, std::move(entity));
+    }
+    work_.entities_ = std::move(rebuilt);
+    drop_unused_poles(subject);
+  }
+
+  // The inner control points of `original` that no entity uses any more go, with the constraints on them.
+  void drop_unused_poles(const SketchEntity& original) {
+    if (original.kind != kBSplineKind)
+      return;
+    std::set<std::string> gone;
+    for (const SketchPole& pole : original.bspline().poles) {
+      if (!pole.is_point() || pole.point_id == original.point_id("start") ||
+          pole.point_id == original.point_id("end") || !work_.entities_.contains(pole.point_id))
+        continue;
+      bool used = false;
+      for (const auto& [entity_id, entity] : work_.entities_)
+        used = used || uses_point(entity, pole.point_id);
+      if (!used)
+        gone.insert(pole.point_id);
+    }
+    if (gone.empty())
+      return;
+    std::vector<SketchConstraint> kept;
+    for (SketchConstraint& constraint : work_.constraints_) {
+      const bool names_gone = std::any_of(
+          constraint.targets.begin(), constraint.targets.end(),
+          [&](const SketchRef& t) { return gone.count(t.entity_id) != 0 || gone.count(target_point(t)) != 0; });
+      if (!names_gone)
+        kept.push_back(std::move(constraint));
+    }
+    work_.constraints_ = std::move(kept);
+    OrderedMap<SketchEntity> pruned;
+    for (auto& [entity_id, entity] : work_.entities_)
+      if (gone.count(entity_id) == 0)
+        pruned.set(entity_id, std::move(entity));
+    work_.entities_ = std::move(pruned);
+  }
+
   // The point a constraint target designates ("" when it is not a point).
   std::string target_point(const SketchRef& ref) const {
     if (ref.kind != kPointKind)
@@ -662,6 +1111,8 @@ class SketchEditor {
         if (target.kind == kPointKind && target.entity_id == id && target.subentity != "geometry" &&
             subject.data.find(target.subentity) != nullptr)
           target = SketchRef{target.sketch_id, subject.point_id(target.subentity), std::string(kPointKind), "geometry"};
+      if (constraint.kind == "tangent" && !plan.keeps_end.empty())
+        carry_tangent(constraint, id, plan.keeps_end);
       const bool names_subject = std::any_of(constraint.targets.begin(), constraint.targets.end(),
                                              [&](const SketchRef& t) { return t.entity_id == id; });
       if (!names_subject)
@@ -692,10 +1143,15 @@ class SketchEditor {
 
     // points only the removed entity used (and no constraint names) would be orphans left behind by this edit
     std::set<std::string> used;
-    for (const auto& [entity_id, entity] : work_.entities_)
+    for (const auto& [entity_id, entity] : work_.entities_) {
       for (const char* role : {"start", "end", "center", "major", "minor"})
         if (const Value* value = entity.data.find(role); value != nullptr && value->is_string())
           used.insert(value->as_string());
+      if (entity.kind == kBSplineKind)
+        for (const SketchPole& pole : entity.bspline().poles)
+          if (pole.is_point())
+            used.insert(pole.point_id);
+    }
     for (const SketchConstraint& constraint : work_.constraints_)
       for (const SketchRef& target : constraint.targets) {
         used.insert(target.entity_id);
@@ -714,6 +1170,26 @@ class SketchEditor {
         pruned.set(entity_id, std::move(entity));
     }
     work_.entities_ = std::move(pruned);
+    drop_unused_poles(subject);
+  }
+
+  // A tangent at an end of the cut B-spline (at_a / at_b) moves to the piece that keeps that end.
+  static void carry_tangent(SketchConstraint& constraint, const std::string& id,
+                            const std::map<std::string, std::string>& keeps_end) {
+    const char* keys[2] = {"at_a", "at_b"};
+    std::vector<SketchRef> targets = constraint.targets;
+    for (std::size_t i = 0; i < targets.size() && i < 2; ++i) {
+      if (targets[i].entity_id != id)
+        continue;
+      const Value* selector = constraint.metadata.find(keys[i]);
+      if (selector == nullptr || !selector->is_string())
+        return;
+      const auto piece = keeps_end.find(selector->as_string());
+      if (piece == keeps_end.end())
+        return;
+      targets[i].entity_id = piece->second;
+    }
+    constraint.targets = std::move(targets);
   }
 
   Sketch finish(const char* operation) {
