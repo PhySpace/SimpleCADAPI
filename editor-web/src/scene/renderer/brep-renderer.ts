@@ -673,7 +673,7 @@ export class BRepRenderer {
     this.files = {};
     const nodes: SceneNode[] = [];
     const built = this.previewBuilt;
-    const material = (part: PreviewPart) => part && materialFor({ material_id: null } as SceneNode);
+    const material = (node: SceneNode) => materialFor(node);
     const buildPart = (part: PreviewPart) => {
       const faces = new THREE.BufferGeometry();
       faces.setAttribute('position', new THREE.BufferAttribute(part.positions, 3));
@@ -731,7 +731,9 @@ export class BRepRenderer {
       const node = {
         node_id: item.nodeId, parent_node_id: null, display_name: item.displayName, node_kind: 'part', definition_id: item.definitionId,
         definition_kind: 'single_solid', component_id: null, instance_id: null, transform: item.transform, geometry_asset_id: null,
-        entity_asset_id: null, material_id: null, properties: {},
+        entity_asset_id: null, material_id: null,
+        // the preview's display colour and opacity (a body colour, else the material's)
+        properties: { ...(item.color ? { color: item.color } : {}), ...(item.opacity !== undefined ? { opacity: item.opacity } : {}) },
       } as SceneNode;
       nodes.push(node);
       this.previewSidecars.set(item.nodeId, geometry.sidecar);
@@ -743,7 +745,7 @@ export class BRepRenderer {
       object.userData.definitionId = item.definitionId;
       const group = new THREE.Group();
       group.name = item.displayName;
-      const faces = new THREE.Mesh(geometry.faces, material(part));
+      const faces = new THREE.Mesh(geometry.faces, material(node));
       faces.layers.set(FACE_LAYER);
       group.add(faces);
       // the invisible indexed line set is what edge picking hits; the visual hangs off it

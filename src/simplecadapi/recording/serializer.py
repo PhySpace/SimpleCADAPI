@@ -285,6 +285,10 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
         "status": "replayable",
         "op": "make_assign_material_rpart",
     },
+    "set_body_appearance_rpart": {
+        "status": "replayable",
+        "op": "make_set_body_appearance_rpart",
+    },
     "make_assembly_rassembly": {
         "status": "replayable",
         "op": "make_assembly_rassembly",
@@ -638,6 +642,7 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "make_identity_placement_rplacement",
     "make_part_rpart",
     "make_assign_material_rpart",
+    "make_set_body_appearance_rpart",
     "make_assembly_rassembly",
     "reference_definition",
     "make_add_component_rassembly",
@@ -3298,6 +3303,22 @@ def _execute_graph(
                             result = ops.assign_material_rpart(
                                 cast(Part, part_outputs[0]),
                                 cast(Material, material_outputs[0]),
+                            )
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "make_set_body_appearance_rpart":
+                        ctx.require_params(node.node_id, op_name, params, ("body_id",))
+                        part_outputs = _input_outputs(ctx, outputs, node, 0)
+                        if part_outputs:
+                            color = params.get("color")
+                            result = ops.set_body_appearance_rpart(
+                                cast(Part, part_outputs[0]),
+                                str(params["body_id"]),
+                                color=cast(Any, tuple(color)) if color is not None else None,
+                                opacity=cast(Optional[float], params.get("opacity")),
+                                name=cast(Optional[str], params.get("name")),
+                                reset=bool(params.get("reset", False)),
                             )
                             _store_outputs(node, result)
                         continue

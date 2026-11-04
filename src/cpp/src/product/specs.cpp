@@ -46,6 +46,14 @@ void add_structure(Specs& s) {
           "Failed to assign the material to the Part.",
           {"The part input is not a Part.", "The material input is not a Material."},
           {"Create parts with make_part_rpart(...).", "Create materials with make_material_rmaterial(...)."}});
+  add(s, {"set_body_appearance_rpart",
+          "Failed to set the appearance of the body.",
+          {"The part input is not a Part.", "The part has no body with that body_id.",
+           "The color is not three numbers in the [0.0, 1.0] range, or the opacity is outside [0.0, 1.0].",
+           "The name is empty."},
+          {"Use an id from part.body_ids() (a one-body Part has the body 'body').",
+           "Pass color as an RGB tuple of floats between 0.0 and 1.0, e.g. (0.8, 0.2, 0.2).",
+           "Leave an argument out (None) to keep what the body has; pass reset=True to clear the appearance."}});
   add(s, {"make_assembly_rassembly",
           "Failed to create the assembly.",
           {"The assembly_id is empty or uses unsupported characters.",

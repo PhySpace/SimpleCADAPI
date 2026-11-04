@@ -325,7 +325,7 @@ def _compile_part(root_id: str, part: Part, transform: Placement, source: SceneS
     definition_id = f"definition/{root_id}/part/{_encode(part.part_id)}"
     normalized = _normalized_part(part)
     if definition_id not in definitions:
-        appearance_id = _appearance(part.material, root_id, appearances)
+        appearance_id = _appearance(part.material, root_id, appearances, body=part.bodies[0])
         definitions[definition_id] = {"definition_id": definition_id, "kind": "part", "name": part.name, "source": _product_definition_source(root_id, part, source), "sdk_metadata": _metadata(part)}
         renderables[definition_id] = _make_renderable(definition_id, part.body, options, appearances, appearance_id=appearance_id)
         products[definition_id] = normalized
@@ -624,8 +624,11 @@ def _ocp_version() -> str:
     return str(occt.__version__)
 
 
-def _appearance(material: Material | None, root_id: str, appearances: dict[str, dict[str, Any]]) -> str:
-    draft = {"alpha_mode": "opaque", "base_color": [*(material.color if material and material.color else (0.72, 0.75, 0.78)), 1], "double_sided": False, "edge_color": [0.08, 0.09, 0.1, 1], "metallic": 0, "name": material.name if material else None, "roughness": 0.55, "sdk_metadata": {}, "source": {"kind": "product_material", "root_id": root_id, "material_id": material.material_id} if material else None}
+def _appearance(material: Material | None, root_id: str, appearances: dict[str, dict[str, Any]], *, body: Any = None) -> str:
+    # A body colour (set_body_appearance_rpart) overrides the material colour.  Scene 1.0 is opaque only: a body
+    # opacity is not written here (the live preview and the package scene carry it).
+    color = body.color if body is not None and body.color is not None else (material.color if material and material.color else (0.72, 0.75, 0.78))
+    draft = {"alpha_mode": "opaque", "base_color": [*color, 1], "double_sided": False, "edge_color": [0.08, 0.09, 0.1, 1], "metallic": 0, "name": material.name if material else None, "roughness": 0.55, "sdk_metadata": {}, "source": {"kind": "product_material", "root_id": root_id, "material_id": material.material_id} if material else None}
     appearance_id = "appearance/evaluated/" + hashlib.sha256(canonical_json_bytes(draft)).hexdigest()
     appearances.setdefault(appearance_id, {"appearance_id": appearance_id, **draft})
     return appearance_id

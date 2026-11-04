@@ -59,7 +59,7 @@ def test_the_catalog_lists_every_operation_with_typed_slots():
     assert len(ids) == len(set(ids)) >= 24
     for spec in data["specs"]:
         assert spec["slots"], spec["id"]
-        assert {slot["kind"] for slot in spec["slots"]} <= {"length", "angle", "float", "count", "bool", "enum", "point", "body", "select", "points2d", "points3d", "profile", "sketch", "assembly", "value", "text", "grid"}  # value, text, grid: forms made from the SDK catalog
+        assert {slot["kind"] for slot in spec["slots"]} <= {"length", "angle", "float", "count", "bool", "enum", "point", "body", "select", "points2d", "points3d", "profile", "sketch", "assembly", "value", "text", "grid", "color"}  # value, text, grid, color: forms made from the SDK catalog
 
 
 @pytest.mark.parametrize("spec", F.SPECS, ids=lambda s: s.id)

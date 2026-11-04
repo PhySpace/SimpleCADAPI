@@ -218,6 +218,18 @@ class AssemblyBuilder {
         color_tool_->SetColor(label, Quantity_Color((*d.color)[0], (*d.color)[1], (*d.color)[2], Quantity_TOC_RGB),
                               XCAFDoc_ColorSurf);
       }
+      for (const StepBody& body : d.bodies) {
+        const TDF_Label sub = shape_tool_->AddSubShape(label, body.shape);
+        if (sub.IsNull())
+          throw ValueError("a body of definition '" + d.id + "' is not a solid of its shape");
+        if (!body.name.empty())
+          set_name(sub, body.name);
+        if (body.color) {
+          color_tool_->SetColor(sub,
+                                Quantity_Color((*body.color)[0], (*body.color)[1], (*body.color)[2], Quantity_TOC_RGB),
+                                XCAFDoc_ColorSurf);
+        }
+      }
     } else {
       for (const StepComponent& c : d.components) {
         require_rigid(c.placement, "component '" + c.id + "' of '" + d.id + "'");
@@ -318,6 +330,19 @@ class SchemaScope {
   int prior_;
 };
 
+// Sub-shape names on (the names of the bodies of a multi-body part), restored afterwards.
+class SubshapeNamesScope {
+ public:
+  SubshapeNamesScope() : prior_(Interface_Static::IVal(kKey)) { Interface_Static::SetIVal(kKey, 1); }
+  ~SubshapeNamesScope() { Interface_Static::SetIVal(kKey, prior_); }
+  SubshapeNamesScope(const SubshapeNamesScope&) = delete;
+  SubshapeNamesScope& operator=(const SubshapeNamesScope&) = delete;
+
+ private:
+  static constexpr const char* kKey = "write.stepcaf.subshapes.name";
+  int prior_;
+};
+
 }  // namespace
 
 Bytes step_assembly_bytes(const std::vector<StepDefinition>& definitions, std::string_view root_id,
@@ -335,6 +360,7 @@ Bytes step_assembly_bytes(const std::vector<StepDefinition>& definitions, std::s
       writer.SetMaterialMode(Standard_True);
       writer.SetPropsMode(Standard_True);
       const SchemaScope schema(options.schema);
+      const SubshapeNamesScope subshape_names;
       if (!writer.Transfer(root))
         throw RuntimeError("STEPCAF transfer failed: " + messages.text());
       if (options.metadata_properties)

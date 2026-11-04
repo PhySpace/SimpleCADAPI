@@ -494,5 +494,6 @@
 "vertices": "simplecadapi.ql",
 "vertices_of": "simplecadapi.kernel.ocp_topology",
 "volume": "simplecadapi.kernel.ocp_properties",
-"wires": "simplecadapi.ql"
+"wires": "simplecadapi.ql",
+"set_body_appearance_rpart": "simplecadapi.operators.product"
 }

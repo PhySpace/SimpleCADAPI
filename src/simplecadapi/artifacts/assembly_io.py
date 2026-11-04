@@ -42,6 +42,7 @@ from .part_definition import (
     PartDefinition,
     mark_part_definition_validated,
     take_validated_part_body,
+    with_definition_appearance,
 )
 from .part_io import encode_part_definition, load_part_definition, read_part_bodies
 from .references import ConnectorInterface, PartRef
@@ -761,7 +762,8 @@ def materialize_definition(
                 validate_artifact_blobs(node.to_dict(), node.blobs)
                 body = read_part_bodies(node)
                 mark_part_definition_validated(node)
-            multi = isinstance(body, tuple)  # the Body values of a multi-body part
+            body = with_definition_appearance(node, body)  # body colours, opacity and names, when any
+            multi = isinstance(body, tuple)  # the Body values of a multi-body part (or of a one-body part with an appearance)
             value: Part | Assembly = Part(
                 part_id=node.definition_id,
                 name=node.metadata.get("name"),

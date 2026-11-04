@@ -96,6 +96,8 @@ def _slot(param: C.Param, features: Any) -> Any | None:
         default = None if optional and not param.has_default else _default_number(param)
         if param.has_default and param.default is None:
             default = None
+        if param.name == "opacity":  # a fraction: 0 (clear) to 1 (opaque)
+            return Slot(param.name, label, slot_kind, default=default, min=0.0, max=1.0, step=0.05, optional=optional)
         return Slot(param.name, label, slot_kind, default=default, unit=unit, min=minimum, optional=optional)
     if kind in _VECTOR_KINDS and not param.many:
         default = list(param.default) if isinstance(param.default, (list, tuple)) and len(param.default) == 3 else ([0.0, 0.0, 1.0] if kind == "direction3" else [0.0, 0.0, 0.0])
@@ -117,6 +119,12 @@ def _slot(param: C.Param, features: Any) -> Any | None:
         if optional:
             return None if param.name != "name" else Slot(param.name, label, "text", default=None, optional=True)
         return Slot(param.name, label, "text", default=str(param.default) if param.has_default else "")
+    if kind == "color":  # a display colour: RGB in [0, 1]
+        default = [float(v) for v in param.default] if isinstance(param.default, (list, tuple)) and len(param.default) == 3 else None
+        return Slot(param.name, label, "color", default=default, optional=optional)
+    if kind == "shape" and param.many and "ShapeSelector" in param.type:
+        # shapes of the scope, or a ql selection of them (apply_tag_rselection's targets): faces picked in the viewport
+        return Slot(param.name, label, "select", entity="face")
     if kind == "query" or (kind in ("edge", "face") and param.many and param.name in ("edges", "faces", "faces_to_remove")):
         entity = "edge" if "edge" in param.name or kind == "edge" else "face"
         return Slot(param.name, label, "select", entity=entity)
@@ -178,7 +186,7 @@ def _builder(op: C.Operation):
             if slot.name in ("operation", "target"):
                 continue
             value = c.values.get(slot.name)
-            if value is None:
+            if value is None and slot.kind != "select":  # a selection is picked, not a value (its recipe is in c)
                 continue
             if slot.kind in ("length", "angle", "float", "count"):
                 expr = c.var(slot.name)
@@ -188,6 +196,8 @@ def _builder(op: C.Operation):
                 expr = "[" + ", ".join("(" + ", ".join(repr(float(v)) for v in row) + ")" for row in value) + "]"
             elif slot.kind == "grid":
                 expr = "[" + ", ".join("[" + ", ".join("(" + ", ".join(repr(float(v)) for v in p) + ")" for p in row) + "]" for row in value) + "]"
+            elif slot.kind == "color":
+                expr = "(" + ", ".join(repr(round(float(v), 4)) for v in value) + ")"
             elif slot.kind in ("bool", "enum", "text"):
                 expr = json.dumps(value) if slot.kind != "bool" else repr(bool(value))
             elif slot.kind == "select":

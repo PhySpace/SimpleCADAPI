@@ -621,6 +621,26 @@ function SlotWidget({
       );
     case "text":
       return <Input value={typeof raw === "string" ? raw : ""} aria-invalid={invalid} onChange={(event) => set(slot.name, event.target.value)} />;
+    case "color": {
+      const hex = typeof raw === "string" ? raw : "";
+      return (
+        <div className="flex items-center gap-2" data-testid={`color-${slot.name}`}>
+          <input
+            type="color"
+            aria-label={slot.label}
+            className="h-7 w-10 cursor-pointer border-2 border-input bg-transparent p-0"
+            value={hex || "#b8bfc6"}
+            onChange={(event) => set(slot.name, event.target.value)}
+          />
+          <span className="text-[12px] text-muted-foreground">{hex ? hex : slot.optional ? "unchanged" : "none"}</span>
+          {hex && slot.optional && (
+            <Button type="button" size="sm" variant="outline" className="h-6 px-2" onClick={() => set(slot.name, "")}>
+              clear
+            </Button>
+          )}
+        </div>
+      );
+    }
     case "profile": {
       const profiles = state.profiles ?? [];
       const chosen = typeof raw === "string" ? findProfile(state, raw) : undefined;

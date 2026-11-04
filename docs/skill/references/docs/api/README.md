@@ -439,6 +439,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [sample_surface_risocurves](sample_surface_risocurves.md) *(from operators/geometry.py)* `top-level`
 - [scale_rsolid](scale_rsolid.md) *(from operators/transform.py)* `top-level`
 - [select](select.md) *(from ql.py)* `submodule:ql`
+- [set_body_appearance_rpart](set_body_appearance_rpart.md) *(from operators/product.py)* `top-level`
 - [set_curve_poles_redge](set_curve_poles_redge.md) *(from operators/geometry.py)* `top-level`
 - [set_curve_weights_redge](set_curve_weights_redge.md) *(from operators/geometry.py)* `top-level`
 - [set_public_connector_rassembly](set_public_connector_rassembly.md) *(from operators/product.py)* `top-level`

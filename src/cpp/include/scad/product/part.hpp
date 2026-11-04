@@ -21,21 +21,36 @@
 namespace scad::product {
 
 // One named solid of a Part.  The body id is a stable identifier within its Part ("base", "lid").
+//
+// A body may carry a display colour (RGB in [0, 1], like Material::color) and an opacity in [0, 1].  They are an
+// appearance only: the material colour is the default, a body colour overrides it for display (preview, package
+// scene, STEP surface colour).  Mass and density never read them.
 class Body {
  public:
-  // ValueError for a malformed id or an empty name.
-  Body(std::string body_id, Solid solid, OptionalString name = {});
+  // ValueError for a malformed id, an empty name, a colour outside [0, 1] or an opacity outside [0, 1].
+  Body(std::string body_id, Solid solid, OptionalString name = {}, std::optional<Vec3> color = {},
+       OptionalDouble opacity = {});
 
   const std::string& body_id() const noexcept { return body_id_; }
   const Solid& solid() const noexcept { return solid_; }
   const OptionalString& name() const noexcept { return name_; }
+  const std::optional<Vec3>& color() const noexcept { return color_; }
+  const OptionalDouble& opacity() const noexcept { return opacity_; }
+  // True when the body has a colour or an opacity of its own.
+  bool has_appearance() const noexcept { return color_.has_value() || opacity_.has_value(); }
 
-  Value to_dict() const;  // {"body_id", "name"} (the solid is geometry, not a dict field)
+  // A copy with another display name, colour and opacity (same id and solid).
+  Body with_appearance(OptionalString name, std::optional<Vec3> color, OptionalDouble opacity) const;
+
+  // {"body_id", "name"}, plus "color" / "opacity" when set (the solid is geometry, not a dict field).
+  Value to_dict() const;
 
  private:
   std::string body_id_;
   Solid solid_;
   OptionalString name_;
+  std::optional<Vec3> color_;
+  OptionalDouble opacity_;
 };
 
 // The body id of a Part made from one Solid.
@@ -64,6 +79,8 @@ class Part : public SemanticValue {
   const std::vector<Connector>& connectors() const noexcept { return connectors_; }
 
   Part with_material(const Material& material) const;
+  // The Part with `body` in place of the body of the same id.  KeyError for an unknown id.
+  Part with_body(const Body& body) const;
   // ValueError when the Part already has a connector with that id.
   Part with_connector(const Connector& connector) const;
 

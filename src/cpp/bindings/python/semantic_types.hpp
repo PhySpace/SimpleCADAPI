@@ -19,6 +19,7 @@
 //   PointVec3 / DirectionVec  a position / a direction read as a plain Vec3 (no expressions)
 //   PlainQuantity<Tag>        a meaning above read as a plain double (no expressions)
 //   Count       a whole number of things
+//   Color       a display colour, RGB components in [0, 1]                                3 x float
 //   Choice<Tag> text with fixed choices; Tag::name is the Literal[...] that lists them
 //
 // Plain `Scalar` stays for numbers without a unit (a factor, a tolerance); plain `Scalar3` for anything else.  A tag is
@@ -73,6 +74,9 @@ struct VectorTag {
 };
 struct CountTag {
   static constexpr auto name = pybind11::detail::const_name("simplecadapi.types.Count");
+};
+struct ColorTag {
+  static constexpr auto name = pybind11::detail::const_name("simplecadapi.types.Color");
 };
 
 using Length = Renamed<Scalar, LengthTag>;

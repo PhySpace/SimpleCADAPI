@@ -621,6 +621,11 @@ struct TagTargetsName {
       "simplecadapi._cpp._native.ShapeSelector | collections.abc.Sequence[simplecadapi._cpp._native.AnyShape]");
 };
 
+// The result of apply_tag_rselection: the scope's shape, as the class it is.
+struct TaggedShapeName {
+  static constexpr auto name = py::detail::const_name("simplecadapi._cpp._native.AnyShape");
+};
+
 // The str enums by their values (members of the Python enums are str too).
 struct TopologyPropagationName {
   static constexpr auto name = py::detail::const_name("typing.Literal['local', 'downward']");
@@ -661,8 +666,8 @@ void bind_operators(py::module_& m) {
             {"Pass a valid scope and a non-empty ShapeSelector or shape sequence.",
              "Use a normalized tag string such as 'role.mounting_surface' or 'group.fasteners'.",
              "Ensure every explicit target belongs to the assignment scope."}};
-        return shape_to_py(guarded(
-            spec, [&] { return apply_tag_rselection(scope, targets_from_py(targets), tag, topology, lineage); }));
+        return scad::pybind::AnyOf<TaggedShapeName>{shape_to_py(guarded(
+            spec, [&] { return apply_tag_rselection(scope, targets_from_py(targets), tag, topology, lineage); }))};
       },
       py::arg("scope"), py::arg("targets"), py::arg("tag"),
       py::arg("topology_propagation") = TopologyPropagation::Local,

@@ -37,6 +37,10 @@ export type PreviewNode = {
   definitionId: string;
   displayName: string;
   transform: PreviewTransform;
+  /** The display colour (linear RGB in [0, 1]): the body's colour, else its material's; absent: the default. */
+  color?: [number, number, number];
+  /** The body's display opacity in [0, 1]; absent: opaque. */
+  opacity?: number;
 };
 
 /** `parts` holds exactly the parts the nodes draw; `missing` names the ones the frame left out that the cache lacks. */
@@ -60,7 +64,7 @@ type HeaderPart = {
 type Header = {
   schema: string;
   parts: HeaderPart[];
-  nodes: { node_id: string; part: string; definition_id: string; display_name: string; transform: PreviewTransform }[];
+  nodes: { node_id: string; part: string; definition_id: string; display_name: string; transform: PreviewTransform; color?: [number, number, number]; opacity?: number }[];
 };
 
 const MAGIC = "SCAPREV1";
@@ -101,6 +105,8 @@ export function parsePreview(buffer: ArrayBuffer, cache: ReadonlyMap<string, Pre
     definitionId: node.definition_id,
     displayName: node.display_name,
     transform: node.transform,
+    ...(node.color ? { color: node.color } : {}),
+    ...(node.opacity !== undefined ? { opacity: node.opacity } : {}),
   }));
   const parts = new Map<string, PreviewPart>();
   const missing: string[] = [];

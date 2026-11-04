@@ -332,6 +332,7 @@ class TestCoverageMatrix(unittest.TestCase):
             "make_identity_placement_rplacement",
             "make_part_rpart",
             "make_assign_material_rpart",
+            "make_set_body_appearance_rpart",
             "make_assembly_rassembly",
             "make_add_component_rassembly",
             "reference_definition",

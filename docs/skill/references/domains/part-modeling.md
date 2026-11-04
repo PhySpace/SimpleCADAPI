@@ -120,6 +120,25 @@ consult their own documentation before the first call.
 - The preview draws one node per body (`node/<part>/body:<id>`); STEP export
   writes one product holding every body.
 
+## Colours and names for people
+
+- A body's display colour, opacity and name are one recorded operation:
+  `part = scad.set_body_appearance_rpart(part, "lid", color=(0.9, 0.3, 0.2), opacity=0.6, name="Lid")`
+  (a one-body part: leave `body_id` out, it is `"body"`). Colours are RGB floats
+  in [0, 1], linear like `Material.color`. `None` keeps a value, `reset=True`
+  clears all three first. Read back with `part.get_body("lid").color` / `.opacity` / `.name`.
+- The material colour is the default; a body colour overrides it for display
+  only (preview, package scene, STEP surface colour of that solid). Mass and
+  density never read it. STEP writes the colour and the body name, not the opacity.
+- Name a face, an edge or a vertex with a tag; there is no second naming system:
+  `block = scad.apply_tag_rselection(block, scad.ql.faces().where(...), "lid_seat")`
+  (or `tag_prefix=` / `*_tag=` arguments of the operation that makes it). The
+  name follows the face through later features (tags resolve through the
+  recorded history) and is selected with `scad.ql.tag("lid_seat")`. The package
+  keeps every tag on its entity; only `interface.*` tags are public names that
+  consumers may rely on (`scadpkg-format.md`), so name a face other tools read
+  `interface.<name>`.
+
 ## Validation gates
 
 - After each major step print small QL-derived facts: selected face count, top

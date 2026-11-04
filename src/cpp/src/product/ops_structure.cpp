@@ -172,6 +172,32 @@ PartPtr assign_material_rpart(const Part& part, const Material& material) {
   });
 }
 
+PartPtr set_body_appearance_rpart(const Part& part, const std::string& body_id, const std::optional<Vec3>& color,
+                                  const OptionalDouble& opacity, const OptionalString& name, bool reset) {
+  return guard_operation("set_body_appearance_rpart", [&] {
+    const Body& body = part.get_body(body_id);
+    const Body updated = body.with_appearance(name ? name : (reset ? OptionalString{} : body.name()),
+                                              color ? color : (reset ? std::optional<Vec3>{} : body.color()),
+                                              opacity ? opacity : (reset ? OptionalDouble{} : body.opacity()));
+    auto result = std::make_shared<const Part>(part.with_body(updated));
+    record_value(
+        [&] {
+          Value params = Value::object();
+          params.set("part_id", part.part_id());
+          params.set("body_id", updated.body_id());
+          params.set("color", color ? to_array(*updated.color()) : Value());
+          params.set("opacity", opacity ? Value(*updated.opacity()) : Value());
+          params.set("name", name ? Value(*updated.name()) : Value());
+          params.set("reset", reset);
+          OpRecord record = op_record("make_set_body_appearance_rpart", std::move(params));
+          record.semantic_delta = semantic_modified("Part", part.part_id(), updated.to_dict());
+          return record;
+        },
+        result, part);
+    return result;
+  });
+}
+
 AssemblyPtr make_assembly_rassembly(const std::string& assembly_id, const OptionalString& name) {
   return guard_operation("make_assembly_rassembly", [&] {
     auto assembly = std::make_shared<const Assembly>(assembly_id, name);

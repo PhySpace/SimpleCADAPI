@@ -587,6 +587,7 @@ _PRODUCT_OPS = (
     "make_vertex_connector_rconnector",
     "make_placement_connector_rconnector",
     "add_connector_rpart",
+    "set_body_appearance_rpart",
     "set_public_connector_rassembly",
     "make_connector_ref_rconnectorref",
     "make_scalar_limit_rscalarlimit",
