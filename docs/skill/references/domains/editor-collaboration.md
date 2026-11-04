@@ -230,6 +230,11 @@ HOLE_DIAMETER = scad.var(name="hole_diameter", default=6.0, unit="mm", comment="
   form is made from the operation's signature (`sca ops NAME`), and the cell is one plain call
   (`gear = scad.std.gear.make_spur_gear_rsolid(n_teeth=GEAR_N_TEETH, ...)`) with its numbers in the params cell.
   `sca feature add op.<operation> --values '{...}'` does the same from the command line.
+- Colours and names are SDK operations too, so the forms offer them: `op.set_body_appearance_rpart` (a colour picker,
+  an opacity slider in [0, 1], a body name; the viewer draws each body in its colour) and `op.apply_tag_rselection`
+  ("name a face": pick the faces, type the tag). A colour slot is the `color` kind of the catalog
+  (`simplecadapi.types.Color`); the picker's `#rrggbb` is written as linear RGB. A person's face name is a tag: read it
+  with `scad.ql.tag(...)`, never invent another naming scheme.
 - Unattended: the buttons are not available; write the cells yourself (see `discipline/notebook-cell-design.md`).
 
 ## The same operations from the command line

@@ -91,6 +91,8 @@ it as a blocker in the report and do the strongest supported work.
 - `references/SDK_OVERVIEW.md`: package map. `references/ql-playbook.md` and `references/ql-recipes.md`: selection.
 - `references/scadpkg-format.md`: the `.scadpkg` consumer spec.
 - `references/docs/api/`, `references/docs/stdlib/`, `references/docs/core/`: exact signatures. `sca ops [NAME] [--json]`
-  lists every operation with what each parameter means (`length`, `angle`, `point3`, `direction3`, ... read from the
-  signature types in `simplecadapi.types`; `simplecadapi.catalog` in code).
+  lists every operation with what each parameter means (`length`, `angle`, `point3`, `direction3`, `color`, ... read
+  from the signature types in `simplecadapi.types`; `simplecadapi.catalog` in code).
+- Colours and names for people: a body's colour, opacity and name are `set_body_appearance_rpart`; a face or edge name is
+  a tag (`apply_tag_rselection`, `ql.tag`). See "Colours and names for people" in `references/domains/part-modeling.md`.
 - Maintainers: the contract these pages follow is `skill-design.md` in the repository's `docs/` folder.

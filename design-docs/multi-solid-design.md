@@ -131,7 +131,13 @@ Body(body_id: identifier, solid: Solid, name: str | None = None)
 - **Order.** Bodies keep the order they are given in, which is the order of the dict. Order is part of the product:
   it decides the STEP solid order and the order of the scene nodes.
 - **Names.** `name` is an optional display name.
-- **Colour** (stage 2). An optional `color` on Body, an appearance only, exported as the STEP colour of that solid.
+- **Colour** (implemented, `feat/body-appearance`). Optional `color` (linear RGB in [0, 1]) and `opacity` on Body, an
+  appearance only, set with the recorded op `set_body_appearance_rpart(part, body_id="body", *, color=None,
+  opacity=None, name=None, reset=False)`. The material colour is the default; a body colour overrides it for display.
+  It reaches the preview (node `color`/`opacity`), `scene/compiler.py` (`base_color`), the package scene (node
+  `properties.color`/`opacity`), the definition (optional `appearance` block, profiles 2 and 3; absent when unused, so
+  bytes are unchanged), STEP (the part colour for a one-body part; a named, coloured XCAF sub-shape per body of a
+  multi-body part, with `write.stepcaf.subshapes.name` on), the cell cache and replay.
 - **Material** (stage 3). The part material applies to every body. A per-body material override follows
   SolidWorks' rule: the body material wins, and bodies without one inherit the part's. Mass already reads density per
   body (`measure_part_mass_rmassreport`), so stage 3 only changes where the density comes from.

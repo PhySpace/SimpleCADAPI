@@ -519,6 +519,45 @@ that surfaced it is in brackets.
   recorded form).
 - **Fix direction:** one canonical form at the next graph schema version.
 
+## 36. A colour's colour space was never written down [body appearance]
+
+- **Symptom:** `Material.color=(0.9, 0.2, 0.1)` came out of STEP as `COLOUR_RGB(0.955, 0.485, 0.349)`, and the old
+  editor ignored material colours (a fixed tint per `material_id`).
+- **Root cause:** the STEP writer hands the numbers to OCCT as `Quantity_TOC_RGB` (linear RGB), which STEP stores as
+  sRGB; nothing said which space the SDK means, and the reader (`import_step`) gives linear values back, so a round trip
+  is consistent while a person who typed sRGB numbers sees a lighter colour.
+- **Status:** documented, not changed: an SDK colour (`simplecadapi.types.Color`, `Material.color`, a body colour) is
+  linear RGB in [0, 1], as OCCT and three.js (its working space) read it. The editor's picker converts its sRGB
+  `#rrggbb`. Changing to sRGB would move every existing STEP colour.
+- **Fix direction:** if sRGB is wanted (what people type), switch the writer and reader to `Quantity_TOC_sRGB` together
+  and say so in the type.
+
+## 37. `apply_tag_rselection` returned an untyped `object` [body appearance]
+
+- **Symptom:** the only operation in `sca ops` whose result kind was `object`; the editor could not tell what the
+  "name a face" form makes.
+- **Status:** fixed: the binding names the result `AnyShape`.
+
+## 38. The generic op form dropped picked selections [body appearance]
+
+- **Symptom:** `op.fillet_rsolid` (and every `op.*` with a `select` slot) wrote the call without its edges/faces.
+- **Root cause:** the builder skipped every slot without a value; a selection is picked, not a value.
+- **Status:** fixed (`editor/op_specs.py`); `test_a_picked_selection_is_passed_to_the_operation` covers every such op.
+
+## 39. Person-facing face names and package names are two tiers of one tag system [body appearance]
+
+- **Symptom:** a face named `lid_seat` in the editor is kept on its entity in the package, but only `interface.*` tags
+  enter the package's public `name_index`.
+- **Status:** by design (no second naming system); the skill says to name a face other tools read `interface.<name>`.
+- **Fix direction:** if people need public names without the prefix, a `public=True` on the tag op rather than a new
+  naming scheme.
+
+## 40. A one-body Part pickles its default body as a bare Solid [body appearance]
+
+- **Symptom:** a one-body Part whose body has a name or colour lost them through pickle (the cell cache).
+- **Root cause:** `_glue/values.py` rebuilt a one-body Part from `Part.body` (the Solid), not its `Body`.
+- **Status:** fixed: such a Part is rebuilt from `bodies`; a plain one-body Part keeps the old reduction (same bytes).
+
 ## Heuristics
 
 - Run every notebook three times: fresh, all cached, `--no-cache`. The three

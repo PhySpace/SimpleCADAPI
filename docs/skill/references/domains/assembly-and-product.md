@@ -32,6 +32,12 @@ deliver `.scadpkg` packages.
   and optional material (`make_part_rpart`, `assign_material_rpart`,
   `make_material_rmaterial`). In an assembly a multi-body part is one component;
   its bodies are never placed or jointed separately.
+- Display colour: `Material.color` is the default for every body of a part;
+  `set_body_appearance_rpart(part, body_id, color=..., opacity=..., name=...)`
+  overrides it per body for display (preview, package scene node
+  `properties.color`, STEP surface colour). It is recorded and replayed, and a
+  part definition stores it in an optional `appearance` block (a part without
+  one keeps its bytes). Assembly components keep the colours of their parts.
 - `Assembly` holds component instances with placements
   (`make_assembly_rassembly`, `add_component_rassembly`,
   `place_component_rassembly`, `make_placement_rplacement`,
