@@ -190,6 +190,9 @@ TEST_CASE("the feature of a node id is its namespace") {
   CHECK(node_feature("cellA_node_0000002a") == "cellA");
   CHECK(node_feature("my_cell_node_00000001") == "my_cell");
   CHECK(node_feature("node_00000001").empty());
+  // A feature cell's namespace is "<slug>.<code digest>": the feature is the slug, whatever the code.
+  CHECK(node_feature("base.c1a2b3c4_node_00000001") == "base");
+  CHECK(node_feature("base.c1a2b3c4_2_n_00000003") == "base");
   CHECK(node_feature("n_00000008").empty());
 }
 

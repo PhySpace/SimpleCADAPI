@@ -377,13 +377,17 @@ Value to_value(const ResolvedRef& resolved) {
 // ---- stable anchors ----------------------------------------------------------------------------------------------
 
 std::string node_feature(std::string_view node_id) {
-  // "<feature>_<prefix>_<counter>": drop the counter, then the prefix.
+  // "<namespace>_<prefix>_<counter>": drop the counter, then the prefix.  A feature cell's namespace is
+  // "<slug>.<code digest>" (simplecadapi.runtime.cells): the feature is the slug, so it outlives edits of the code.
   const std::size_t counter = node_id.rfind('_');
   if (counter == std::string_view::npos || counter == 0)
     return {};
   const std::string_view base = node_id.substr(0, counter);
   const std::size_t prefix = base.rfind('_');
-  return prefix == std::string_view::npos ? std::string{} : std::string(base.substr(0, prefix));
+  if (prefix == std::string_view::npos)
+    return {};
+  const std::string_view space = base.substr(0, prefix);
+  return std::string(space.substr(0, space.find('.')));
 }
 
 namespace {

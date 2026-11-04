@@ -34,6 +34,8 @@ harden_console_streams((sys.stdout, sys.stderr))
 install_mapping_proxy_pickle()
 
 from . import math, ql, std, surface
+from . import ref
+from .ref import ElementRef, ElementRefError
 
 # Features that read OpenCASCADE shapes load on first use.
 _LAZY_SUBMODULES = ("exporter", "inspect", "translator")
@@ -716,6 +718,10 @@ __all__ = [
     "list_tags",
     "select_edges_by_tag",
     "select_faces_by_tag",
+    # Stable references (scad.ref)
+    "ref",
+    "ElementRef",
+    "ElementRefError",
     # Boolean operations
     "boolean_rsolidlist",
     "cut_rsolid",

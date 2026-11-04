@@ -2105,8 +2105,9 @@ def _resolve_feature_selection(
     selection_query = params.get("selection_query")
     if isinstance(selection_query, dict):
         scope = _resolve_selector_scope(selection_query, solid, outputs)
-        resolved = list(selector_from_dict(selection_query).resolve(scope))
-        return resolved
+        if not (selected_refs and _references_need_history(selection_query, scope)):
+            resolved = list(selector_from_dict(selection_query).resolve(scope))
+            return resolved
 
     if selected_refs:
         resolved = resolve_refs(solid, selected_refs)
@@ -2416,6 +2417,27 @@ def _semantic_view_origin(
     )
 
 
+def _selector_uses_references(payload: Any) -> bool:
+    """Whether a serialized selector holds a ``ql.ref`` predicate (a stable reference, ``simplecadapi.ref``)."""
+    if isinstance(payload, dict):
+        if payload.get("kind") == "ref" and isinstance(payload.get("data"), dict) and "ref" in payload["data"]:
+            return True
+        return any(_selector_uses_references(item) for item in payload.values())
+    if isinstance(payload, list):
+        return any(_selector_uses_references(item) for item in payload)
+    return False
+
+
+def _references_need_history(selector: Any, scope: Any) -> bool:
+    """A selector with stable references, replayed on a shape without recorded history (replay runs no session).
+
+    A reference resolves through the history of the shape it is resolved in; a replay rebuilds the very graph the
+    payload recorded, so the entities the reference resolved to then (the recorded evidence) are the answer.
+    """
+    getter = getattr(scope, "_get_runtime", None)
+    return _selector_uses_references(selector) and (getter is None or getter("graph.node", None) is None)
+
+
 def _resolve_tag_binding_targets(
     scope: AnyShape, binding: TagBinding
 ) -> List[AnyShape]:
@@ -2424,6 +2446,9 @@ def _resolve_tag_binding_targets(
     if binding.target.kind == TagTargetKind.SELECTION_QUERY:
         if binding.target.selector is None:
             raise ValueError("selection_query tag target is missing its selector")
+        recorded = binding.evidence.data.get("selected_refs")
+        if _references_need_history(binding.target.selector, scope) and isinstance(recorded, list):
+            return _resolve_explicit_refs(scope, recorded)
         return cast(
             List[AnyShape],
             selector_from_dict(binding.target.selector).resolve(scope),
@@ -2432,9 +2457,12 @@ def _resolve_tag_binding_targets(
         raise ValueError(
             f"tag target kind '{binding.target.kind.value}' is not replayable"
         )
+    return _resolve_explicit_refs(scope, binding.target.refs)
 
+
+def _resolve_explicit_refs(scope: AnyShape, refs: Sequence[Dict[str, Any]]) -> List[AnyShape]:
     resolved: List[AnyShape] = []
-    for ref in binding.target.refs:
+    for ref in refs:
         topo_id = str(ref.get("topo_id", ""))
         kind = str(ref.get("kind", "")).lower()
         if not topo_id or not kind:

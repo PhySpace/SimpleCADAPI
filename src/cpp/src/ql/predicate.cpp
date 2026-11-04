@@ -50,6 +50,10 @@ struct PropertyNode {
 struct GeomTypeNode {  // curve_type / surface_type payloads: the kernel type, not a looked-up property
   std::string expected;
 };
+struct RefNode {  // ql.ref: resolved in the scope of the run (reference.hpp)
+  Value record;
+  std::string key;  // the record's text: one resolution per reference per run
+};
 enum class Logic : unsigned char { And, Or, Not };
 struct LogicNode {
   Logic logic = Logic::And;
@@ -57,7 +61,8 @@ struct LogicNode {
 
 struct Node {
   std::uint32_t span = 1;
-  std::variant<TagNode, OperationNode, RoleNode, SourceNode, MetaNode, PropertyNode, GeomTypeNode, LogicNode> payload;
+  std::variant<TagNode, OperationNode, RoleNode, SourceNode, MetaNode, PropertyNode, GeomTypeNode, RefNode, LogicNode>
+      payload;
 };
 using Program = std::vector<Node>;
 
@@ -80,6 +85,7 @@ const std::vector<KindSchema>& schemas() {
       {"property_compare", {"path", "op", "value"}, {}},
       {"curve_type", {"value"}, {}},
       {"surface_type", {"value"}, {}},
+      {"ref", {"ref"}, {}},
       {"and", {}, {}},
       {"or", {}, {}},
       {"not", {}, {}},
@@ -195,6 +201,11 @@ Node compile_leaf(const std::string& kind, const Value& data) {
   } else if (kind == "property_compare") {
     std::string op_text = str_of(get("op"));
     node.payload = PropertyNode{PropertyPath(str_of(get("path"))), parse_compare_op(op_text), op_text, *get("value")};
+  } else if (kind == "ref") {
+    const Value& record = *get("ref");
+    if (!record.is_object())
+      throw ValueError("predicate 'ref' needs a reference record (an object)");
+    node.payload = RefNode{record, py_str(record)};
   } else {  // curve_type / surface_type: a type name compared with geom.type
     node.payload = GeomTypeNode{text::upper(str_of(get("value")))};
   }
@@ -296,6 +307,8 @@ struct Evaluator {
     const auto type = geom_type(shape);
     return type.has_value() && *type == n.expected;
   }
+
+  bool operator()(const RefNode& n) const { return ctx.referenced(shape, n.key, n.record); }
 
   bool operator()(const LogicNode& n) const {
     const std::size_t end = at + program[at].span;
