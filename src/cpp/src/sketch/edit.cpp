@@ -894,9 +894,12 @@ class SketchEditor {
     std::vector<std::pair<double, std::string>> raw;
     for (const SketchEntity& other : others)
       for (const Crossing2& hit : curve_hits(geo_, subject, true, other)) {
-        if (closed)
-          raw.emplace_back(u1 - hit.on_a <= res ? u0 : hit.on_a, other.id);  // the seam is u0
-        else if (apart(hit.at, first) && apart(hit.at, last))
+        if (closed) {
+          double u = hit.on_a;
+          if (periodic)
+            u = u0 + std::fmod(std::fmod(u - u0, period) + period, period);
+          raw.emplace_back(u1 - u <= res ? u0 : u, other.id);  // the seam is u0
+        } else if (apart(hit.at, first) && apart(hit.at, last))
           raw.emplace_back(hit.on_a, other.id);
       }
     std::vector<Cut> cuts = merge_cuts(raw, res);
