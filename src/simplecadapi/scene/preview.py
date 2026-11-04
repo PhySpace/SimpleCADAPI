@@ -36,6 +36,7 @@ import numpy as np
 
 from .._internal.mesh import DEFAULT_ANGULAR_TOLERANCE, DEFAULT_LINEAR_TOLERANCE, cached_mesh
 from simplecadapi._cpp import Assembly, Part, Solid
+from ..product.bodies import body_display_color
 from ..product.placement import Placement, identity_placement
 from .compiler import (
     _curve_geometry,
@@ -85,6 +86,10 @@ class PreviewNode:
     definition_id: str
     display_name: str
     placement: Placement  # CAD space, millimetres, relative to the product
+    color: tuple[float, float, float] | None = None
+    """The display colour (RGB in [0, 1]): the body's colour, else the material's; ``None`` is the viewer's default."""
+    opacity: float | None = None
+    """The body's display opacity in [0, 1]; ``None`` is opaque."""
 
 
 @dataclass
@@ -279,6 +284,7 @@ def compile_preview(
             parts[preview.key] = preview
             solids.setdefault(preview.key, body)
             definitions.setdefault(preview.key, part.part_id)
+            only = part.bodies[0]
             nodes.append(
                 PreviewNode(
                     node_id="node/" + "/".join(path),
@@ -286,6 +292,8 @@ def compile_preview(
                     definition_id=part.part_id,
                     display_name=name,
                     placement=placement,
+                    color=body_display_color(part, only),
+                    opacity=only.opacity,
                 )
             )
             return
@@ -305,6 +313,8 @@ def compile_preview(
                     definition_id=part.part_id,
                     display_name=f"{name} / {item.name or item.body_id}",
                     placement=placement,
+                    color=body_display_color(part, item),
+                    opacity=item.opacity,
                 )
             )
 
@@ -399,6 +409,9 @@ def encode_preview(scene: PreviewScene, omit: Collection[str] = ()) -> bytes:
                     "y_axis": list(node.placement.y_axis),
                     "z_axis": list(node.placement.z_axis),
                 },
+                # the display colour and opacity, only when known (a viewer draws its default otherwise)
+                **({"color": [float(c) for c in node.color]} if node.color is not None else {}),
+                **({"opacity": float(node.opacity)} if node.opacity is not None else {}),
             }
             for node in scene.nodes
         ],

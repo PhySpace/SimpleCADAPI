@@ -39,7 +39,7 @@ from ..artifacts.feature_graph import (
     encode_feature_graph_artifact,
 )
 from ..artifacts.geometry_interface import geometry_interface_fingerprint
-from ..artifacts.part_definition import BodyRef, PartDefinition, mark_part_definition_validated
+from ..artifacts.part_definition import BodyAppearance, BodyRef, PartDefinition, mark_part_definition_validated
 from ..artifacts.references import (
     BlobRef,
     ConnectorInterface,
@@ -248,6 +248,11 @@ def _part_definition(
         metadata={"name": part.name},
         blobs=blobs,
         bodies=body_refs,
+        appearance=tuple(
+            row
+            for item in part.bodies
+            if (row := BodyAppearance.of_body(item, with_name=not part.multi_body)) is not None
+        ),
     )
     validate_artifact_blobs(definition.to_dict(), definition.blobs)
     if not part.multi_body:  # a multi-body part has no connectors yet

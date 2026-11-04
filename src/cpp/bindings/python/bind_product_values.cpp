@@ -425,17 +425,33 @@ void bind_constraints(py::module_& m) {
 void bind_part(py::module_& m) {
   using namespace sp;
   py::class_<Body, py::smart_holder>(m, "Body", "One named solid of a Part; a multi-body Part keeps several apart.")
-      .def(py::init([](const py::object& body_id, const py::object& solid, const py::object& name) {
+      .def(py::init([](const py::object& body_id, const py::object& solid, const py::object& name,
+                       const py::object& color, const py::object& opacity) {
+             std::optional<double> opacity_value;
+             if (!opacity.is_none())
+               opacity_value = number(opacity, "opacity");
              return std::make_shared<Body>(text(body_id, "body_id"), typed<Solid>(solid, "solid must be a Solid"),
-                                           optional_name(name));
+                                           optional_name(name), optional_vec3(color, "color"), opacity_value);
            }),
-           py::arg("body_id"), py::arg("solid"), py::arg("name") = py::none())
+           py::arg("body_id"), py::arg("solid"), py::arg("name") = py::none(), py::arg("color") = py::none(),
+           py::arg("opacity") = py::none())
       .def_property_readonly("body_id", &Body::body_id)
       .def_property_readonly("solid", &Body::solid)
       .def_property_readonly("name", [](const Body& self) { return optional_object(self.name()); })
+      .def_property_readonly(
+          "color", [](const Body& self) -> py::object { return self.color() ? py::cast(*self.color()) : py::none(); },
+          "The display colour of this body (RGB in [0, 1]), or None to show the material colour.")
+      .def_property_readonly(
+          "opacity", [](const Body& self) { return optional_float(self.opacity()); },
+          "The display opacity of this body in [0, 1], or None (opaque).")
       .def("to_dict", [](const Body& self) { return self.to_dict(); })
       .def("__repr__", [](const Body& self) {
-        return "Body(body_id=" + str_repr(self.body_id()) + ", name=" + opt_str_repr(self.name()) + ")";
+        std::string out = "Body(body_id=" + str_repr(self.body_id()) + ", name=" + opt_str_repr(self.name());
+        if (self.color())
+          out += ", color=" + tuple_repr(*self.color());
+        if (self.opacity())
+          out += ", opacity=" + opt_float_repr(self.opacity());
+        return out + ")";
       });
 
   py::class_<Part, py::smart_holder> cls(

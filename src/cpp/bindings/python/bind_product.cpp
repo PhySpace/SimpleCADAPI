@@ -27,7 +27,7 @@ SCAD_SIGNATURE_NAME(TextOrNone, const_name("str | None"));
 SCAD_SIGNATURE_NAME(Number, const_name("float | Expr"));
 SCAD_SIGNATURE_NAME(NumberOrNone, const_name("float | Expr | None"));
 SCAD_SIGNATURE_NAME(Bool, const_name("bool"));
-SCAD_SIGNATURE_NAME(Color, const_name("collections.abc.Sequence[float] | None"));
+SCAD_SIGNATURE_NAME(Color, scad::pybind::ColorTag::name + kOrNone);
 SCAD_SIGNATURE_NAME(Length, scad::pybind::LengthTag::name);
 SCAD_SIGNATURE_NAME(LengthOrNone, scad::pybind::LengthTag::name + kOrNone);
 SCAD_SIGNATURE_NAME(AngleOrNone, scad::pybind::AngleTag::name + kOrNone);
@@ -165,9 +165,9 @@ void bind_structure(py::module_& m) {
             return sp::make_part_rpart(text(part_id, "part_id"), pieces, optional_name(name));
           }
           if (is_pieces(body))
-            return sp::make_part_rpart(text(part_id, "part_id"),
-                                       typed<Solid>(py::reinterpret_borrow<py::object>(body.value[py::int_(0)]), "body"),
-                                       optional_name(name));
+            return sp::make_part_rpart(
+                text(part_id, "part_id"),
+                typed<Solid>(py::reinterpret_borrow<py::object>(body.value[py::int_(0)]), "body"), optional_name(name));
           return sp::make_part_rpart(text(part_id, "part_id"), typed<Solid>(body, "body must be a Solid"),
                                      optional_name(name));
         });
@@ -183,6 +183,20 @@ void bind_structure(py::module_& m) {
         });
       },
       py::arg("part"), py::arg("material"), "Assign a Material to a Part and return the updated Part.");
+  m.def(
+      "set_body_appearance_rpart",
+      [](const PartArg& part, const TextArg& body_id, const ColorArg& color, const NumberOrNoneArg& opacity,
+         const NameArg& name, const BoolArg& reset) {
+        return guard_operation("set_body_appearance_rpart", [&] {
+          return sp::set_body_appearance_rpart(
+              part_arg(part), text(body_id, "body_id"), optional_vec3(color, "color"),
+              opacity.is_none() ? sp::OptionalDouble{} : sp::OptionalDouble{number(opacity, "opacity")},
+              optional_name(name), truthy(reset));
+        });
+      },
+      py::arg("part"), py::arg("body_id") = sp::kDefaultBodyId, py::kw_only(), py::arg("color") = py::none(),
+      py::arg("opacity") = py::none(), py::arg("name") = py::none(), py::arg("reset") = false,
+      "Set the display colour, opacity and display name of one body of a Part and return the updated Part.");
 
   m.def(
       "make_assembly_rassembly",

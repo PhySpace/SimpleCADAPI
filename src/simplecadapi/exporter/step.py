@@ -97,6 +97,23 @@ def _native_definitions(root_value: Part | Assembly, units: Any) -> list[dict[st
                 }
                 if material.color is not None:
                     entry["color"] = tuple(float(c) for c in material.color)
+            if not value.multi_body:
+                own = value.bodies[0].color  # a body colour overrides the material colour
+                if own is not None:
+                    entry["color"] = tuple(float(c) for c in own)
+            else:
+                # each body with a name or a colour of its own is a named / coloured solid of the product's shape
+                shape = entry["shape"]
+                solids = shape.solids()
+                entry["bodies"] = [
+                    {
+                        "shape": solid,
+                        "name": body.name,
+                        "color": None if body.color is None else tuple(float(c) for c in body.color),
+                    }
+                    for body, solid in zip(value.bodies, solids)
+                    if body.name is not None or body.color is not None
+                ]
             out[key] = entry
             return definition_id
         entry = {

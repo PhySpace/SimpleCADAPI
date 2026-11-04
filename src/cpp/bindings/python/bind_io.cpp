@@ -389,6 +389,20 @@ std::vector<io::StepDefinition> definitions_from(const py::sequence& items) {
       const Vec3 c = vec3_from(d["color"]);
       def.color = std::array<double, 3>{c.x, c.y, c.z};
     }
+    if (d.contains("bodies")) {
+      for (const py::handle bh : d["bodies"]) {
+        const py::dict b = py::reinterpret_borrow<py::dict>(bh);
+        io::StepBody body;
+        body.shape = b["shape"].cast<const Shape&>().wrapped();
+        if (b.contains("name") && !b["name"].is_none())
+          body.name = b["name"].cast<std::string>();
+        if (b.contains("color") && !b["color"].is_none()) {
+          const Vec3 c = vec3_from(b["color"]);
+          body.color = std::array<double, 3>{c.x, c.y, c.z};
+        }
+        def.bodies.push_back(std::move(body));
+      }
+    }
     if (d.contains("material") && !d["material"].is_none()) {
       const py::dict m = d["material"].cast<py::dict>();
       io::StepMaterial material;

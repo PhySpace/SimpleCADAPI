@@ -42,6 +42,12 @@ PartPtr make_part_rpart(const std::string& part_id, const Solid& body, const Opt
 // A Part of several named bodies, kept apart (no boolean between them), in this order.
 PartPtr make_part_rpart(const std::string& part_id, const std::vector<Body>& bodies, const OptionalString& name = {});
 PartPtr assign_material_rpart(const Part& part, const Material& material);
+// The Part with the display colour, opacity and display name of one body set.  An argument left empty keeps what
+// the body has; `reset` first clears all three (the body then shows the material colour, opaque, under its id).
+// The colour overrides the material colour for display only.  KeyError for an unknown body id.
+PartPtr set_body_appearance_rpart(const Part& part, const std::string& body_id = kDefaultBodyId,
+                                  const std::optional<Vec3>& color = {}, const OptionalDouble& opacity = {},
+                                  const OptionalString& name = {}, bool reset = false);
 
 // ---- connectors -------------------------------------------------------------------------------------
 // Z follows the face normal, the origin is the face center; `flip` negates Z.

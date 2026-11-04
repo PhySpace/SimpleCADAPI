@@ -602,6 +602,23 @@ def _node_id(path: tuple[str, ...]) -> str:
     return "node/" + "/".join(path)
 
 
+def _appearance_properties(definition: PartDefinition, body_id: str | None) -> dict[str, Any]:
+    """``color`` / ``opacity`` of a body that has its own (``body_id`` None: the body of a one-body part), else ``{}``.
+
+    A viewer draws a node with ``properties.color`` in that colour; without one, the material's (``material_id``).
+    """
+
+    for row in definition.appearance:
+        if body_id is None or row.body_id == body_id:
+            out: dict[str, Any] = {}
+            if row.color is not None:
+                out["color"] = list(row.color)
+            if row.opacity is not None:
+                out["opacity"] = row.opacity
+            return out
+    return {}
+
+
 def _build_nodes(
     root: Definition,
     definitions: Mapping[str, Definition],
@@ -650,6 +667,8 @@ def _build_nodes(
                 "properties": {
                     "content_hash": definition.content_hash,
                     "revision": definition.revision,
+                    # a one-body part's body colour / opacity (set_body_appearance_rpart), when it has one
+                    **(_appearance_properties(definition, None) if is_part and not definition.bodies else {}),
                 },
             }
         )
@@ -670,7 +689,7 @@ def _build_nodes(
                     "geometry_asset_id": geometry_id,
                     "entity_asset_id": entity_id,
                     "material_id": part_node["material_id"],
-                    "properties": {"body_id": body_id},
+                    "properties": {"body_id": body_id, **_appearance_properties(definition, body_id)},
                 }
             )
         if isinstance(definition, AssemblyDefinition):

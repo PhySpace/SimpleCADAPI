@@ -13,6 +13,7 @@ the meaning from there.  Each alias is the type a caller may pass (``Annotated``
 - ``Point2``: a position ``(x, y)`` in a sketch plane (lengths).
 - ``Plane``: a sketch plane, ``"XY"`` / ``"XZ"`` / ``"YZ"`` or ``{"origin": Point3, "x_axis": Direction3, "y_axis": Direction3}``.
 - ``SketchProfile``: a closed profile of a sketch, by index or by id.
+- ``Color``: a display colour ``(r, g, b)``, each component a float in [0, 1] (``Material.color``, a body colour).
 
 A plain ``float | Expr`` is a number without a unit (a factor, a tolerance).
 """
@@ -35,6 +36,7 @@ Count = Annotated[int, "count"]
 Point2 = Annotated[Sequence[_Number], "point2"]
 Plane = Annotated[Union[Literal["XY", "XZ", "YZ"], Mapping[str, Sequence[_Number]]], "plane"]
 SketchProfile = Annotated[Union[int, str], "sketch_profile"]
+Color = Annotated[Sequence[float], "color"]
 
 MEANINGS: dict[str, str] = {
     "Length": "length",
@@ -46,7 +48,8 @@ MEANINGS: dict[str, str] = {
     "Point2": "point2",
     "Plane": "plane",
     "SketchProfile": "sketch_profile",
+    "Color": "color",
 }
 """The type names a signature may carry, and the meaning each stands for (what :mod:`simplecadapi.catalog` reads)."""
 
-__all__ = ["Angle", "Count", "Direction3", "Length", "MEANINGS", "Plane", "Point2", "Point3", "SketchProfile", "Vector3"]
+__all__ = ["Angle", "Color", "Count", "Direction3", "Length", "MEANINGS", "Plane", "Point2", "Point3", "SketchProfile", "Vector3"]

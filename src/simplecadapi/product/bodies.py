@@ -27,6 +27,32 @@ _DENSITY_TO_KG_MM3 = {
 }
 
 
+def body_display_color(part: Part, body: Any) -> tuple[float, float, float] | None:
+    """The colour a viewer shows *body* of *part* in: the body's own colour, else the Part's material colour, else
+    ``None`` (the viewer's default grey).
+
+    A body colour (``set_body_appearance_rpart``) overrides the material colour for display only.
+    """
+
+    if body.color is not None:
+        return tuple(float(c) for c in body.color)  # type: ignore[return-value]
+    material = part.material
+    if material is not None and material.color is not None:
+        return tuple(float(c) for c in material.color)  # type: ignore[return-value]
+    return None
+
+
+def body_appearance_fields(body: Any) -> dict[str, Any]:
+    """The appearance a body sets itself, as plain data: ``color`` (RGB list) and ``opacity`` when set, else ``{}``."""
+
+    out: dict[str, Any] = {}
+    if body.color is not None:
+        out["color"] = [float(c) for c in body.color]
+    if body.opacity is not None:
+        out["opacity"] = float(body.opacity)
+    return out
+
+
 def part_shape(part: Part) -> Solid | Compound:
     """The Solid of a one-body Part, or a Compound of every body of a multi-body Part (in body order).
 

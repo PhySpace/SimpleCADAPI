@@ -10,7 +10,7 @@ functions with the same annotations.  The catalog parses both, so a GUI, an agen
     [('radius', 'length'), ('height', 'length'), ('bottom_face_center', 'point3'), ('axis', 'direction3')]
 
 A parameter's ``kind`` is one of: the meanings of :mod:`simplecadapi.types` (``length``, ``angle``, ``point3``,
-``direction3``, ``vector3``, ``count``, ``point2``, ``plane``, ``sketch_profile``), ``number`` (a unitless ``float | Expr``), ``int``, ``bool``, ``text``, ``path``
+``direction3``, ``vector3``, ``count``, ``point2``, ``plane``, ``sketch_profile``, ``color``), ``number`` (a unitless ``float | Expr``), ``int``, ``bool``, ``text``, ``path``
 (``str | os.PathLike``), ``enum`` (``Literal[...]``, with ``choices``), a value type (``solid``, ``face``, ``wire``,
 ``edge``, ``vertex``, ``shell``, ``shape``, ``sketch``, ``part``, ``assembly``, ``scalar_limit``, ...), ``query`` (a
 ``ql`` selection), ``points`` / ``numbers`` (sequences), ``grid`` (rows of points), ``<kind>_map`` (``dict[str, <kind>]``: a value per id),

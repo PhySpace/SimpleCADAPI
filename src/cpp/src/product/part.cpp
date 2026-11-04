@@ -46,17 +46,56 @@ std::string joined_ids(const std::vector<Body>& bodies) {
   return out;
 }
 
+std::optional<Vec3> checked_color(const std::optional<Vec3>& color) {
+  if (!color)
+    return color;
+  const Vec3 rgb = finite_vec3(*color, "color");
+  for (double c : {rgb.x, rgb.y, rgb.z}) {
+    if (c < 0.0 || c > 1.0)
+      throw ValueError("color components must be in [0.0, 1.0]");
+  }
+  return rgb;
+}
+
+OptionalDouble checked_opacity(OptionalDouble opacity) {
+  opacity = optional_float(opacity, "opacity");
+  if (opacity && (*opacity < 0.0 || *opacity > 1.0))
+    throw ValueError("opacity must be in [0.0, 1.0]");
+  return opacity;
+}
+
 }  // namespace
 
-Body::Body(std::string body_id, Solid solid, OptionalString name)
-    : body_id_(validate_identifier(body_id, "body_id")), solid_(std::move(solid)), name_(clean_name(name)) {}
+Body::Body(std::string body_id, Solid solid, OptionalString name, std::optional<Vec3> color, OptionalDouble opacity)
+    : body_id_(validate_identifier(body_id, "body_id")),
+      solid_(std::move(solid)),
+      name_(clean_name(name)),
+      color_(checked_color(color)),
+      opacity_(checked_opacity(opacity)) {}
+
+Body Body::with_appearance(OptionalString name, std::optional<Vec3> color, OptionalDouble opacity) const {
+  return Body(body_id_, solid_, std::move(name), color, opacity);
+}
 
 Value Body::to_dict() const {
   Value out = Value::object();
   out.set("body_id", body_id_);
   out.set("name", name_ ? Value(*name_) : Value());
+  if (color_)  // a body without an appearance keeps the dict it always had
+    out.set("color", to_array(*color_));
+  if (opacity_)
+    out.set("opacity", *opacity_);
   return out;
 }
+
+namespace {
+
+// A one-body Part writes its body in to_dict only when the body says more than its solid.
+bool plain_default_body(const Body& body) {
+  return body.body_id() == kDefaultBodyId && !body.name() && !body.has_appearance();
+}
+
+}  // namespace
 
 Part::Part(std::string part_id, Solid body, OptionalString name, std::optional<Material> material,
            std::vector<Connector> connectors)
@@ -105,6 +144,22 @@ Part Part::with_material(const Material& material) const {
   return result;
 }
 
+Part Part::with_body(const Body& body) const {
+  std::vector<Body> bodies = bodies_;
+  bool found = false;
+  for (Body& item : bodies) {
+    if (item.body_id() == body.body_id()) {
+      item = body;
+      found = true;
+    }
+  }
+  if (!found)
+    throw LookupError("part has no body_id '" + body.body_id() + "'");
+  Part result(part_id_, std::move(bodies), name_, material_, connectors_);
+  result.inherit_metadata(*this);
+  return result;
+}
+
 Part Part::with_connector(const Connector& connector) const {
   const std::vector<std::string> ids = connector_ids();
   if (std::find(ids.begin(), ids.end(), connector.connector_id()) != ids.end()) {
@@ -143,7 +198,8 @@ Value Part::to_dict() const {
   for (const Connector& connector : connectors_)
     rows.push_back(connector.to_dict());
   out.set("connectors", std::move(rows));
-  if (bodies_.size() > 1) {  // a one-body Part keeps the dict it always had
+  // a one-body Part keeps the dict it always had, unless its body has a name or an appearance
+  if (bodies_.size() > 1 || !plain_default_body(bodies_.front())) {
     Value bodies = Value::array();
     for (const Body& body : bodies_)
       bodies.push_back(body.to_dict());

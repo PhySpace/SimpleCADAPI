@@ -54,6 +54,14 @@ struct StepComponent {
   Value metadata = Value::object();  // occurrence record (written as comment + property item)
 };
 
+// One solid of a part's shape that carries its own name or colour (a body of a multi-body part): written as an XCAF
+// sub-shape label of the part.  `shape` must be a sub-shape of the part's shape.
+struct StepBody {
+  TopoDS_Shape shape;
+  std::string name;                            // empty: no name
+  std::optional<std::array<double, 3>> color;  // linear RGB in [0, 1], the surface colour of this solid
+};
+
 struct StepDefinition {
   std::string id;
   std::string kind = "single_solid";  // "single_solid" or "assembly": part of the metadata record's name
@@ -61,6 +69,7 @@ struct StepDefinition {
   TopoDS_Shape shape;  // a part's body; null for an assembly
   std::vector<StepComponent> components;
   std::optional<std::array<double, 3>> color;  // linear RGB in [0, 1], applied as the surface colour
+  std::vector<StepBody> bodies;                // named or coloured solids of the part's shape
   std::optional<StepMaterial> material;
   Value metadata = Value::object();  // definition record
 };
