@@ -58,6 +58,7 @@ Stage and role pages of the long workflows:
 | `domains/drawing-inspection-evidence.md` | a section view of the drawing must be verified against the rebuilt model, a DIM ledger row needs its `measurement_contract`, or the roundtrip evidence (annotations, reviews, coverage) is built or checked. |
 | `domains/drawing-inspection.md` | a vector-PDF engineering drawing must be parsed into tiered evidence, or a rebuilt model is read back for the roundtrip. |
 | `domains/editor-collaboration.md` | a person has the code-first editor open (`sca edit`) and you edit the same notebooks (a selection, a cell reference or a tuned value arrives). |
+| `domains/editor-gui-features.md` | a person made features with the editor's buttons (`# gui:` cells, `scad.ref` selections, workplanes, canvas sketches), or you run the same operations with `sca feature` / `sca sketch`. |
 | `domains/engineering-drawing.md` | a validated part or product needs a GB-standard drawing sheet (DXF + PNG). |
 | `domains/export-and-translation.md` | a validated `.scadpkg` must be delivered as STEP, STL, OBJ, MJCF or an editable external CAD document. |
 | `domains/part-modeling.md` | the deliverable is one physical single-solid part, or an existing part source needs a geometry edit (Role 4 of `workflows/single-part-modeling.md`). |

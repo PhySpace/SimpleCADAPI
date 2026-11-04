@@ -6,6 +6,9 @@
 // (a property resolver registered from Python is called back from there).
 #include "bindings.hpp"
 
+#include <TopAbs_ShapeEnum.hxx>
+#include <TopExp_Explorer.hxx>
+
 #include <optional>
 #include <string>
 #include <vector>
@@ -103,6 +106,72 @@ py::list solids_to_py(const std::vector<Solid>& solids) {
   py::list out;
   for (const Solid& solid : solids)
     out.append(py::cast(solid));
+  return out;
+}
+
+// A blend (fillet, chamfer) on the pieces of a split cut, the list `cut_rsolid` returns: each piece gets the picked
+// edges that lie on it, a piece with none is kept as it is, and the result is the pieces in their order.  A selector is
+// resolved on every piece without its cardinality, which is then checked against the edges found on all of them.
+template <class Blend>
+py::list blend_pieces(const py::object& pieces_arg, const py::object& edges, const char* op, const Blend& blend) {
+  std::vector<Solid> pieces;
+  for (const py::handle item : pieces_arg) {
+    if (!py::isinstance<Solid>(item))
+      throw TypeError(std::string(op) +
+                      ": solid must be a Solid, or the list of Solid pieces of a cut that split a body");
+    pieces.push_back(item.cast<Solid>());
+  }
+  if (pieces.empty())
+    throw ValueError(std::string(op) + ": no solid to work on (an empty list of pieces)");
+  std::vector<std::vector<Edge>> per(pieces.size());
+  std::size_t total = 0;
+  if (py::isinstance<ql::ShapeSelector>(edges)) {
+    py::dict data = edges.attr("to_dict")();
+    const py::object card = data.attr("pop")("cardinality", py::none());
+    const ql::ShapeSelector open = edges.get_type().attr("from_dict")(data).cast<ql::ShapeSelector>();
+    for (std::size_t i = 0; i < pieces.size(); ++i) {
+      for (const Shape& shape : open.resolve(pieces[i]))
+        per[i].emplace_back(shape);
+      total += per[i].size();
+    }
+    if (!card.is_none()) {
+      const py::dict bound = card.cast<py::dict>();
+      const auto read = [&bound](const char* key) -> std::optional<std::size_t> {
+        return bound.contains(key) && !bound[key].is_none() ? std::optional(bound[key].cast<std::size_t>())
+                                                            : std::nullopt;
+      };
+      const auto exactly = read("exactly");
+      const auto least = read("at_least");
+      const auto most = read("at_most");
+      if ((exactly && total != *exactly) || (least && total < *least) || (most && total > *most)) {
+        throw ValueError(std::string(op) + ": the edge selector expected " + py::str(card).cast<std::string>() +
+                         " edge(s) on the pieces of the split body, found " + std::to_string(total));
+      }
+    }
+  } else {
+    for (const py::handle item : edges) {
+      if (!py::isinstance<Edge>(item))
+        throw TypeError(std::string(op) + ": expected an Edge or a QL selector");
+      const Edge edge = item.cast<Edge>();
+      bool placed = false;
+      for (std::size_t i = 0; i < pieces.size() && !placed; ++i) {
+        for (TopExp_Explorer it(pieces[i].wrapped(), TopAbs_EDGE); it.More() && !placed; it.Next()) {
+          if (it.Current().IsSame(edge.wrapped())) {
+            per[i].push_back(edge);
+            placed = true;
+          }
+        }
+      }
+      if (!placed)
+        throw ValueError(std::string(op) + ": an edge is not on any piece of the split body");
+      ++total;
+    }
+  }
+  if (total == 0)
+    throw ValueError(std::string(op) + ": no edge to work on in any piece of the split body");
+  py::list out;
+  for (std::size_t i = 0; i < pieces.size(); ++i)
+    out.append(per[i].empty() ? py::cast(pieces[i]) : py::cast(blend(pieces[i], EdgeSelection(per[i]))));
   return out;
 }
 
@@ -211,11 +280,19 @@ void bind_extrusion(py::module_& m) {
 void bind_blends(py::module_& m) {
   m.def(
       "fillet_rsolid",
-      [](const Solid& solid, const EdgesOrQuery& edges, const Length& radius, OptionalString result_tag,
-         OptionalString generated_faces_tag) {
-        const EdgeSelection selection = selection_from<Edge>(edges);
+      [](const AnyOf<SolidOrPiecesTag>& solid, const EdgesOrQuery& edges, const Length& radius,
+         OptionalString result_tag, OptionalString generated_faces_tag) -> AnyOf<SolidOrPiecesTag> {
         const BlendTags tags{std::move(result_tag), std::move(generated_faces_tag)};
-        return unlocked(selection.is_selector(), [&] { return fillet_rsolid(solid, selection, radius, tags); });
+        if (!py::isinstance<Solid>(solid.value)) {
+          return {
+              blend_pieces(solid.value, edges, "fillet_rsolid", [&](const Solid& piece, const EdgeSelection& picked) {
+                return fillet_rsolid(piece, picked, radius, tags);
+              })};
+        }
+        const Solid body = solid.value.cast<Solid>();
+        const EdgeSelection selection = selection_from<Edge>(edges);
+        return {
+            py::cast(unlocked(selection.is_selector(), [&] { return fillet_rsolid(body, selection, radius, tags); }))};
       },
       py::arg("solid"), py::arg("edges"), py::arg("radius"), py::kw_only(), py::arg("result_tag") = py::none(),
       py::arg("generated_faces_tag") = py::none(),
@@ -223,14 +300,22 @@ void bind_blends(py::module_& m) {
 
   m.def(
       "chamfer_rsolid",
-      [](const Solid& solid, const EdgesOrQuery& edges, const Length& distance,
+      [](const AnyOf<SolidOrPiecesTag>& solid, const EdgesOrQuery& edges, const Length& distance,
          std::optional<PlainQuantity<scad::pybind::AngleTag>> angle, std::optional<DirectionVec> reference_direction,
-         OptionalString result_tag, OptionalString generated_faces_tag) {
-        const EdgeSelection selection = selection_from<Edge>(edges);
+         OptionalString result_tag, OptionalString generated_faces_tag) -> AnyOf<SolidOrPiecesTag> {
         const ChamferOptions options{angle ? std::optional<double>(*angle) : std::nullopt,
                                      reference_direction ? std::optional<Vec3>(*reference_direction) : std::nullopt,
                                      {std::move(result_tag), std::move(generated_faces_tag)}};
-        return unlocked(selection.is_selector(), [&] { return chamfer_rsolid(solid, selection, distance, options); });
+        if (!py::isinstance<Solid>(solid.value)) {
+          return {
+              blend_pieces(solid.value, edges, "chamfer_rsolid", [&](const Solid& piece, const EdgeSelection& picked) {
+                return chamfer_rsolid(piece, picked, distance, options);
+              })};
+        }
+        const Solid body = solid.value.cast<Solid>();
+        const EdgeSelection selection = selection_from<Edge>(edges);
+        return {py::cast(
+            unlocked(selection.is_selector(), [&] { return chamfer_rsolid(body, selection, distance, options); }))};
       },
       py::arg("solid"), py::arg("edges"), py::arg("distance"), py::kw_only(), py::arg("angle") = py::none(),
       py::arg("reference_direction") = py::none(), py::arg("result_tag") = py::none(),

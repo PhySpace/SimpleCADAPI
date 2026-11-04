@@ -14,6 +14,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
 import simplecadapi as scad
 from simplecadapi.artifacts import materialize_definition
 from simplecadapi.exporter.step import export_product_package_to_step
@@ -332,3 +334,22 @@ class TestProfileThree(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_a_fillet_or_chamfer_on_the_pieces_of_a_split_body_blends_each_piece():
+    """A cut that splits a body gives its pieces; the blends take them, each piece gets the edges on it."""
+    with scad.GraphSession(graph_id="blend-pieces"):
+        pieces = scad.cut_rsolid(scad.make_box_rsolid(40.0, 10.0, 10.0), scad.make_box_rsolid(2.0, 20.0, 20.0))
+        assert isinstance(pieces, list) and len(pieces) == 2
+        top = scad.ql.edges().where(scad.ql.prop("geom.center.z", ">=", 9.9))
+        rounded = scad.fillet_rsolid(pieces, top.exactly(8), 1.0)
+        assert len(rounded) == 2 and all(r.get_volume() < p.get_volume() for r, p in zip(rounded, pieces))
+        bevelled = scad.chamfer_rsolid(pieces, top, 0.5)
+        assert len(bevelled) == 2 and all(b.get_volume() < p.get_volume() for b, p in zip(bevelled, pieces))
+        # edges of one piece only: the other piece is kept as it is
+        left = [e for e in top.resolve(pieces[0])]
+        one = scad.fillet_rsolid(pieces, left, 1.0)
+        assert one[1].get_volume() == pytest.approx(pieces[1].get_volume()) and one[0].get_volume() < pieces[0].get_volume()
+        with pytest.raises(ValueError, match="expected .*exactly.*5.*found 8"):
+            scad.fillet_rsolid(pieces, top.exactly(5), 1.0)
+        assert isinstance(scad.fillet_rsolid(scad.make_box_rsolid(10.0, 10.0, 10.0), top, 1.0), scad.Solid)  # a Solid stays a Solid

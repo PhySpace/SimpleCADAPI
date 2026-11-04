@@ -503,7 +503,10 @@ export function SketchOverlay({
     const s = project(cursor.x, cursor.y);
     if (!s) return null;
     return cursor.pointId ? (
-      <circle cx={s[0]} cy={s[1]} r={8} fill="none" stroke={FOCUS} strokeWidth={2} />
+      <g data-snap-mark>
+        <circle cx={s[0]} cy={s[1]} r={14} fill={FOCUS} fillOpacity={0.15} stroke={HALO} strokeWidth={5} opacity={0.85} />
+        <circle cx={s[0]} cy={s[1]} r={14} fill="none" stroke={FOCUS} strokeWidth={2.5} />
+      </g>
     ) : (
       <path d={`M${s[0] - 6} ${s[1]}H${s[0] + 6}M${s[0]} ${s[1] - 6}V${s[1] + 6}`} stroke={FOCUS} strokeWidth={1.5} />
     );

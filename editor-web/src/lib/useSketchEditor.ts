@@ -69,6 +69,8 @@ import {
 } from "@/lib/sketch-edit";
 import { typedFields, typedTarget, type TypedDims } from "@/lib/sketch-typed";
 
+/** How near the pointer (screen pixels) must be to a point or a curve to snap to it or pick it. */
+const PICK_PX = 16;
 const DRAW_TOOLS = new Set(["point", "line", "circle", "arc", "spline"]);
 const FIRST = "\u0000first"; // a spline's closing click: "the first control point"
 
@@ -237,7 +239,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
 
   const spotAt = useCallback(
     (world: [number, number], info: Pick<PointerInfo, "scale" | "alt">): Spot => {
-      const s = snap(world, snapTargets, { grid: snapOn && !info.alt ? gridStep(info.scale) : null, tol: 9 / info.scale });
+      const s = snap(world, snapTargets, { grid: snapOn && !info.alt ? gridStep(info.scale) : null, tol: PICK_PX / info.scale });
       return { x: s.x, y: s.y, pointId: s.pointId?.startsWith("m:") || s.pointId?.startsWith("x:") ? undefined : s.pointId };
     },
     [snapTargets, snapOn],
@@ -510,7 +512,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     if (!world) return "handled";
     const d = docRef.current;
     const opts = { auto, construction };
-    const tol = 9 / info.scale;
+    const tol = PICK_PX / info.scale;
     pickTolerance.current = tol;
     if (tool === "trim" || tool === "extend") {
       if (editBusy) return "handled";
@@ -588,7 +590,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       setHover(null);
       return;
     }
-    const tol = 9 / info.scale;
+    const tol = PICK_PX / info.scale;
     if (press.current && !drag) {
       const p = press.current;
       if (Math.hypot(info.sx - p.sx, info.sy - p.sy) > 4 && !p.shift) {
