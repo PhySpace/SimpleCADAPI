@@ -67,6 +67,12 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [make_vertex_connector_rconnector](make_vertex_connector_rconnector.md) *(from operators/product.py)* `top-level`
 - [make_wire_from_edges_rwire](make_wire_from_edges_rwire.md) *(from operators/geometry.py)* `top-level`
 - [make_wire_from_sketch_rwire](make_wire_from_sketch_rwire.md) *(from operators/sketch.py)* `top-level`
+- [make_workplane_from_axis_rworkplane](make_workplane_from_axis_rworkplane.md) *(from operators/geometry.py)* `top-level`
+- [make_workplane_from_face_rworkplane](make_workplane_from_face_rworkplane.md) *(from operators/geometry.py)* `top-level`
+- [make_workplane_from_points_rworkplane](make_workplane_from_points_rworkplane.md) *(from operators/geometry.py)* `top-level`
+- [make_workplane_midplane_rworkplane](make_workplane_midplane_rworkplane.md) *(from operators/geometry.py)* `top-level`
+- [make_workplane_normal_to_curve_rworkplane](make_workplane_normal_to_curve_rworkplane.md) *(from operators/geometry.py)* `top-level`
+- [make_workplane_rworkplane](make_workplane_rworkplane.md) *(from operators/geometry.py)* `top-level`
 
 ## Transforms
 
