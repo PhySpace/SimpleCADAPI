@@ -392,4 +392,50 @@ Workplane make_workplane_normal_to_curve_rworkplane(const EdgeOrWire& curve, con
   });
 }
 
+Workplane make_workplane_offset_rworkplane(const Workplane& base, const Scalar3& offset, const Scalar& rx,
+                                           const Scalar& ry, const Scalar& rz, const std::optional<std::string>& base_plane) {
+  static constexpr const char* kOp = "make_workplane_offset_rworkplane";
+  static const ErrorSpec kSpec{kOp,
+                               "Failed to place a workplane relative to its base.",
+                               {"The offset or an angle is not a finite number."},
+                               {"Pass offset as (dx, dy, dz) along the base's x, y and normal, and the angles in degrees."}};
+  return guarded(kSpec, [&] {
+    const CoordinateSystem& frame_in = base.cs();
+    const Vec3 bx = frame_in.x_axis();
+    const Vec3 by = frame_in.y_axis();
+    const Vec3 bz = frame_in.z_axis();
+    const Vec3 d = evaluate_point(offset, "offset");
+    const Vec3 origin = frame_in.origin() + bx * d.x + by * d.y + bz * d.z;
+    // intrinsic turns about the base's axes: x first, then the y it left, then the z
+    Vec3 x = bx, y = by, z = bz;
+    const auto turn = [&](const Vec3& about, double degrees) {
+      const double radians = degrees * kPi / 180.0;
+      const Vec3 k = about / about.norm();
+      x = rotate_about(x, k, radians);
+      y = rotate_about(y, k, radians);
+      z = rotate_about(z, k, radians);
+    };
+    turn(x, evaluate_scalar(rx, "rx"));
+    turn(y, evaluate_scalar(ry, "ry"));
+    turn(z, evaluate_scalar(rz, "rz"));
+    Workplane workplane = frame(origin, z, x, "x direction");
+    if (Recorder* recorder = current_recorder()) {
+      OpParams params(kOp, workplane_labels());
+      params.point("offset", offset).scalar("rx", rx).scalar("ry", ry).scalar("rz", rz);
+      OpRecord record = params.take();
+      record.params.set("base_plane", base_plane ? Value(*base_plane) : Value());
+      record.params.set("base", base.plane_value());
+      record.params.set("frame", workplane.plane_value());
+      std::vector<ValueLineage> inputs;
+      if (!base_plane) {
+        if (auto lineage = value_lineage_of(base))
+          inputs.push_back(std::move(*lineage));
+      }
+      if (const auto lineage = recorder->record_value_op(record, inputs))
+        attach_value_lineage(workplane, *lineage, record.op);
+    }
+    return workplane;
+  });
+}
+
 }  // namespace scad

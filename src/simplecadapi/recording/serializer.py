@@ -119,6 +119,7 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
     "make_workplane_from_axis_rworkplane": {"status": "replayable", "op": "make_workplane_from_axis_rworkplane"},
     "make_workplane_midplane_rworkplane": {"status": "replayable", "op": "make_workplane_midplane_rworkplane"},
     "make_workplane_normal_to_curve_rworkplane": {"status": "replayable", "op": "make_workplane_normal_to_curve_rworkplane"},
+    "make_workplane_offset_rworkplane": {"status": "replayable", "op": "make_workplane_offset_rworkplane"},
     "make_sketch_rsketch": {"status": "replayable", "op": "make_sketch_rsketch"},
     "add_point_rsketch": {"status": "replayable", "op": "add_point_rsketch"},
     "add_line_rsketch": {"status": "replayable", "op": "add_line_rsketch"},
@@ -603,6 +604,7 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "make_workplane_from_axis_rworkplane",
     "make_workplane_midplane_rworkplane",
     "make_workplane_normal_to_curve_rworkplane",
+    "make_workplane_offset_rworkplane",
     "make_sketch_rsketch",
     "add_point_rsketch",
     "add_line_rsketch",
@@ -762,6 +764,7 @@ _CANONICAL_2_1_ONLY_OPS = {
     "make_workplane_from_axis_rworkplane",
     "make_workplane_midplane_rworkplane",
     "make_workplane_normal_to_curve_rworkplane",
+    "make_workplane_offset_rworkplane",
     "explode_rassembly",
     "convert_to_bspline_redge",
     "convert_to_bspline_rface",
@@ -2394,6 +2397,7 @@ _WORKPLANE_OPS = frozenset(
         "make_workplane_from_axis_rworkplane",
         "make_workplane_midplane_rworkplane",
         "make_workplane_normal_to_curve_rworkplane",
+    "make_workplane_offset_rworkplane",
     }
 )
 """The workplane constructors: a Workplane value made from numbers or from ordered geometry inputs."""
@@ -2413,6 +2417,11 @@ def _replay_workplane(
     if op_name == "make_workplane_rworkplane":
         ctx.require_params(node.node_id, op_name, params, ("origin", "normal", "x_dir"))
         return fn(tuple(params["origin"]), tuple(params["normal"]), tuple(params["x_dir"]))
+    if op_name == "make_workplane_offset_rworkplane":
+        # placed on a replayed workplane (it follows that one), else on the named plane or the recorded base frame
+        base = _input_workplane(outputs, node) or params.get("base_plane") or params.get("base")
+        ctx.require_params(node.node_id, op_name, params, ("offset", "rx", "ry", "rz"))
+        return fn(base, tuple(params["offset"]), params["rx"], params["ry"], params["rz"])
     if not isinstance(params.get("input_refs"), list):
         # Made from geometry no recorder could name: the frame it made is all there is.
         ctx.require_params(node.node_id, op_name, params, ("frame",))

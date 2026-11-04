@@ -194,7 +194,8 @@ void register_primitives(reactive::ExecutorRegistry& registry) {
 void register_workplanes(reactive::ExecutorRegistry& registry) {
   for (const char* operation : {"make_workplane_rworkplane", "make_workplane_from_face_rworkplane",
                                 "make_workplane_from_points_rworkplane", "make_workplane_from_axis_rworkplane",
-                                "make_workplane_midplane_rworkplane", "make_workplane_normal_to_curve_rworkplane"}) {
+                                "make_workplane_midplane_rworkplane", "make_workplane_normal_to_curve_rworkplane",
+                                "make_workplane_offset_rworkplane"}) {
     registry.add(operation, [](Params, Inputs, const ScalarValues&) { return std::vector<Shape>{}; });
   }
 }

@@ -72,6 +72,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [make_workplane_from_points_rworkplane](make_workplane_from_points_rworkplane.md) *(from operators/geometry.py)* `top-level`
 - [make_workplane_midplane_rworkplane](make_workplane_midplane_rworkplane.md) *(from operators/geometry.py)* `top-level`
 - [make_workplane_normal_to_curve_rworkplane](make_workplane_normal_to_curve_rworkplane.md) *(from operators/geometry.py)* `top-level`
+- [make_workplane_offset_rworkplane](make_workplane_offset_rworkplane.md) *(from operators/geometry.py)* `top-level`
 - [make_workplane_rworkplane](make_workplane_rworkplane.md) *(from operators/geometry.py)* `top-level`
 
 ## Transforms

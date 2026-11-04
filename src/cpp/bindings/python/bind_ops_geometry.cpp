@@ -14,6 +14,7 @@
 #include <gp_Pnt.hxx>
 
 #include "scad/ops/geometry/geometry.hpp"
+#include "scad/ops/geometry/plane.hpp"
 #include "scad/ops/geometry/workplanes.hpp"
 #include "scad/reactive/registry.hpp"
 
@@ -368,6 +369,10 @@ struct PointOrVertexTag {
 struct EdgeOrWireTag {
   static constexpr auto name = py::detail::const_name("Edge | Wire");
 };
+// The base of a placed workplane: a workplane value or a named plane (or a plane mapping), as sketches take.
+struct WorkplaneOrPlaneNameTag {
+  static constexpr auto name = py::detail::const_name("simplecadapi.types.Plane");
+};
 
 PointOrVertex point_or_vertex(const AnyOf<PointOrVertexTag>& point, const char* name) {
   if (py::isinstance<Vertex>(point.value))
@@ -433,6 +438,21 @@ void bind_workplanes(py::module_& m) {
       },
       py::arg("curve"), py::arg("at") = 0.0, py::kw_only(), py::arg("x_dir") = py::none(),
       "Create a workplane normal to a curve at a fraction of its length (a sweep profile's plane).");
+  m.def(
+      "make_workplane_offset_rworkplane",
+      [](const AnyOf<WorkplaneOrPlaneNameTag>& base, const Vector3& offset, const Angle& rx, const Angle& ry,
+         const Angle& rz) {
+        if (py::isinstance<Workplane>(base.value))
+          return make_workplane_offset_rworkplane(base.value.cast<const Workplane&>(), offset, rx, ry, rz);
+        const Value given = scad::pybind::value_from_python(base.value);
+        const PlaneFrame plane = sketch_plane_in_current_coordinates(given);
+        const Workplane named = Workplane::from_frame(CoordinateSystem(plane.origin, plane.x_axis, plane.y_axis));
+        return make_workplane_offset_rworkplane(named, offset, rx, ry, rz,
+                                                given.is_string() ? std::optional(given.as_string()) : std::nullopt);
+      },
+      py::arg("base") = "XY", py::arg("offset") = std::make_tuple(0.0, 0.0, 0.0), py::arg("rx") = 0.0,
+      py::arg("ry") = 0.0, py::arg("rz") = 0.0,
+      "Create a workplane moved and turned relative to a workplane or a named plane (the editor's handles).");
 }
 
 void bind_brep_region(py::module_& m) {

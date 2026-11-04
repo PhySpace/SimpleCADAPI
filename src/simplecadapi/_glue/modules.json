@@ -293,6 +293,7 @@
 "make_workplane_from_points_rworkplane": "simplecadapi.operators.geometry",
 "make_workplane_from_axis_rworkplane": "simplecadapi.operators.geometry",
 "make_workplane_midplane_rworkplane": "simplecadapi.operators.geometry",
+"make_workplane_offset_rworkplane": "simplecadapi.operators.geometry",
 "make_workplane_normal_to_curve_rworkplane": "simplecadapi.operators.geometry",
 "make_bspline_edge": "simplecadapi.kernel.ocp_curves",
 "make_circle_edge": "simplecadapi.kernel.ocp_curves",

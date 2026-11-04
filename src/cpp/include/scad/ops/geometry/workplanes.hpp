@@ -12,6 +12,7 @@
 #pragma once
 
 #include <optional>
+#include <string>
 #include <variant>
 
 #include "scad/core/coordinate_system.hpp"
@@ -62,5 +63,15 @@ Workplane make_workplane_midplane_rworkplane(const Face& face_a, const Face& fac
 // outside [0, 1] or an x direction along the tangent.
 Workplane make_workplane_normal_to_curve_rworkplane(const EdgeOrWire& curve, const Scalar& at = Scalar(0.0),
                                                     const std::optional<Scalar3>& x_dir = std::nullopt);
+
+// A workplane placed relative to another: moved by `offset` (along the base's own x, y and normal) and turned by
+// `rx`, `ry`, `rz` degrees about the base's own axes, in that order (each about the axis as the previous turns left
+// it: R = Rx(rx) Ry(ry) Rz(rz) in the base's frame).  The base is a workplane value, recorded as this node's input so
+// the new plane follows it, or a named plane (`base_plane` "XY" | "XZ" | "YZ", as sketches read them).  The editor's
+// move and turn handles write exactly these numbers.
+Workplane make_workplane_offset_rworkplane(const Workplane& base, const Scalar3& offset = scalar3(0, 0, 0),
+                                           const Scalar& rx = Scalar(0.0), const Scalar& ry = Scalar(0.0),
+                                           const Scalar& rz = Scalar(0.0),
+                                           const std::optional<std::string>& base_plane = std::nullopt);
 
 }  // namespace scad

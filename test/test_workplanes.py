@@ -298,3 +298,18 @@ def test_a_workplane_on_a_body_leaves_it_the_open_body_of_a_part_notebook(tmp_pa
     run = run_notebook(path)
     assert isinstance(run.values["wp"], scad.Workplane)
     assert abs(run.product.bodies[0].solid.get_volume() - 1000.0) < 1e-6
+
+
+def test_a_workplane_is_placed_on_a_base_by_an_offset_and_turns_about_its_axes():
+    with scad.GraphSession(graph_id="placed") as session:
+        tilted = scad.make_workplane_offset_rworkplane("XY", offset=(0.0, 0.0, 20.0), rx=90.0)
+        assert tuple(tilted.origin) == pytest.approx((0.0, 0.0, 20.0))
+        assert tuple(tilted.normal) == pytest.approx((0.0, -1.0, 0.0), abs=1e-12)
+        # placed on a workplane: offsets and turns are in its frame, and the base is the node's input
+        lid = scad.make_workplane_offset_rworkplane(tilted, offset=(0.0, 0.0, 5.0), rz=90.0)
+        assert tuple(lid.origin) == pytest.approx((0.0, -5.0, 20.0), abs=1e-12)
+        assert tuple(lid.x_dir) == pytest.approx((0.0, 0.0, 1.0), abs=1e-12)
+        nodes = session.graph.to_dict()["nodes"]
+        assert nodes[-1]["inputs"] == [nodes[-2]["node_id"]]
+        side = scad.make_workplane_offset_rworkplane("XZ")  # named planes read as sketches read them
+        assert tuple(side.normal) == pytest.approx((0.0, -1.0, 0.0), abs=1e-12)
