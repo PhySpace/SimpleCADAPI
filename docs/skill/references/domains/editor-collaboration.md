@@ -259,14 +259,16 @@ sca sketch op CELL extend --args '{"entity": "h", "end": "end"}'
   says what changed (`created`, `removed`, `changed` entities and `created_constraints`, `removed_constraints`,
   `changed_constraints`). `trim` cuts an entity at the crossings around the point `at` on the solved geometry and ties each cut
   point to the entity that made it (`point_on`); a piece keeps the horizontal/vertical constraint of its line; dimensions that
-  no longer hold are removed (they appear in `removed_constraints`). New ids are the lowest free `p<n>`, `l<n>`, `a<n>` and
-  `c_<kind>_<n>`. `--dry-run` prints without writing.
+  no longer hold are removed (they appear in `removed_constraints`). New ids are the lowest free `p<n>`, `l<n>`, `a<n>`, `s<n>`
+  and `c_<kind>_<n>`. `--dry-run` prints without writing.
 - A sketch document holds lines, circles, arcs and B-splines. A B-spline entity is
   `{"id": "s1", "kind": "bspline", "start": "p1", "end": "p4", "control_points": ["p1", "p2", "p3", "p4"], "degree": 3}`
   (control points are point ids, the first and last are its start and end; a closed one starts and ends on the same point);
   it becomes `scad.add_bspline_rsketch(..., control_points=[...], degree=3)`. `solve` returns each solved B-spline as the SDK
   samples it (`curves`: points, normals, curvatures; the editor draws the curve and its curvature comb from them), and the
-  crossings trim would cut at (`crossings`). trim/extend do not cut B-splines.
+  crossings trim would cut at (`crossings`, B-splines included). trim cuts B-splines (and lines/arcs/circles at B-splines),
+  extend lengthens a B-spline or a line onto one; a trimmed or extended B-spline has non-uniform knots, so its document entity
+  also carries `"knots"` (distinct, increasing) and `"multiplicities"` (they add up to control points + degree + 1).
 - Errors name ids (`there is no entity 'x'`, `nothing is ahead of the end of h`); fix the call, do not retry it unchanged.
 - Everything a command writes is an ordinary cell; `sca cell` still works on it (see the `# gui:` rules above).
 

@@ -1230,12 +1230,12 @@ Sketch trim_rsketch(const Sketch& sketch, const SketchTarget& entity, const Sket
   static const ErrorSpec kSpec{
       "trim_rsketch",
       "Failed to trim the sketch entity.",
-      {"The entity id does not exist, or is not a line, circle or arc.",
+      {"The entity id does not exist, or is not a line, circle, arc or B-spline.",
        "'at' is not a finite point (x, y) or the id of a point of the sketch.",
        "The sketch constraints are conflicting, so there is no geometry to cut.",
-       "A circle is crossed only once: it needs two cuts to leave an arc.",
+       "A circle or closed B-spline is crossed only once: it needs two cuts to leave a piece.",
        "'against' names an entity that does not exist or cannot cut."},
-      {"Pass an existing line / circle / arc id and a point (x, y) on the part to remove.",
+      {"Pass an existing line / circle / arc / B-spline id and a point (x, y) on the part to remove.",
        "Inspect the sketch with inspect_sketch_rsketchresult(..., strict=False) and fix the constraints first.",
        "Use against=[...] to name the entities that cut, or add the missing crossing entity."}};
   return guarded(kSpec, [&] {
@@ -1264,13 +1264,13 @@ Sketch extend_rsketch(const Sketch& sketch, const SketchTarget& entity, const st
                       const std::optional<SketchTarget>& to) {
   static const ErrorSpec kSpec{
       "extend_rsketch",
-      "Failed to extend the sketch line.",
-      {"The entity id does not exist or is not a line.", "'end' is not 'start' or 'end'.",
-       "Nothing (or not the entity named by 'to') lies ahead of that end of the line.",
+      "Failed to extend the sketch line or B-spline.",
+      {"The entity id does not exist or is not a line or an open B-spline.", "'end' is not 'start' or 'end'.",
+       "Nothing (or not the entity named by 'to') lies ahead of that end (along its end tangent).",
        "The end point is shared with another entity, which would move too.",
        "The sketch constraints are conflicting, so there is no geometry to extend."},
-      {"Pass an existing line id and end='start' or end='end'.",
-       "Name the target with to=<id>, or draw the entity the line should reach.",
+      {"Pass an existing line or B-spline id and end='start' or end='end'.",
+       "Name the target with to=<id>, or draw the entity the line or B-spline should reach.",
        "Split the shared point first (give the line its own end point) or extend the other entity instead."}};
   return guarded(kSpec, [&] {
     Sketch updated = SketchEditor(sketch).extend(entity, end, to);

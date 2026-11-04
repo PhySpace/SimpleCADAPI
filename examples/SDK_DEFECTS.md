@@ -579,6 +579,51 @@ that surfaced it is in brackets.
 - **Root cause:** `_glue/values.py` rebuilt a one-body Part from `Part.body` (the Solid), not its `Body`.
 - **Status:** fixed: such a Part is rebuilt from `bodies`; a plain one-body Part keeps the old reduction (same bytes).
 
+## 43. A sketch point could not be kept on a B-spline or an ellipse [sketch B-spline trim]
+
+- **Symptom:** `constrain_point_on_rsketch(point, spline)` was refused, so a trim had no way to keep a cut point on a
+  B-spline or ellipse cutter.
+- **Status:** fixed: the solver keeps a point on a non-periodic B-spline (a foot-parameter unknown, de Boor on the knot
+  span of the point's starting foot) and on an ellipse (focal-distance sum). Limits: the span is chosen when the system
+  is built, so a point dragged far along the curve in one solve follows that span's polynomial until the next solve;
+  periodic B-splines and degrees above 7 (the solver's 20-unknown equation support) are refused.
+
+## 44. Trim's orphan check did not see B-spline control points [sketch B-spline trim]
+
+- **Symptom:** trimming a line whose end point was also an inner control point of a B-spline removed that point.
+- **Root cause:** the "still used" set only read the `start` / `end` / `center` / `major` / `minor` roles.
+- **Status:** fixed: control point refs count as uses.
+
+## 45. The editor document dropped a B-spline's knots [sketch B-spline trim]
+
+- **Symptom:** a B-spline with non-uniform knots came back from `from_sketch` with only `control_points` and `degree`,
+  so `to_sketch` rebuilt it with uniform knots: a different curve.
+- **Status:** fixed: the document carries `knots` / `multiplicities` when they are not the uniform clamped ones (every
+  trimmed or extended B-spline). Weighted and periodic B-splines are still code only.
+
+## 46. Tangency on a B-spline needs a cubic Bezier chain [sketch B-spline trim]
+
+- **Symptom:** a tangent at a B-spline end is refused unless the spline is cubic with C0 (multiplicity 3) inner knots;
+  an extension adds a C2 knot.
+- **Status:** worked around: extending a Bezier chain raises the new knot to multiplicity 3 (same curve), so the
+  piece keeps its end tangents. The solver still moves such poles freely, so the extension is C2 only until a pole is
+  dragged.
+- **Fix direction:** tangent equations from the end derivative of any clamped spline (first two poles and the knots).
+
+## 47. A trimmed B-spline is less constrained than the original [sketch B-spline trim]
+
+- **Symptom:** each piece has new inner control points (free sketch points) where the cut moved them, and the
+  constraints on the original inner control points that are gone are removed; a fully constrained sketch becomes
+  under-constrained after a B-spline trim.
+- **Status:** by design for now (a pole that moved is a new point, the diff lists every removal).
+- **Fix direction:** an option to fix the new inner control points, or a "shape fixed" B-spline whose poles are literals.
+
+## 48. extend_rsketch aims a B-spline along its end tangent [sketch B-spline trim]
+
+- **Symptom:** a target the curve would reach only by bending is "nothing ahead": the extension is aimed at where the
+  end tangent meets the next entity (GeomLib extends towards a point), then cut at the first crossing.
+- **Fix direction:** search along the curvature-continuous extension itself (extend by a length, intersect, repeat).
+
 ## Heuristics
 
 - Run every notebook three times: fresh, all cached, `--no-cache`. The three
