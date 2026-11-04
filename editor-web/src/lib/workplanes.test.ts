@@ -56,3 +56,15 @@ describe("workplanes", () => {
     expect(workplaneRequest([v(1), v(2)])).toBeNull();
   });
 });
+
+import { selectionContext, whenFor } from "@/lib/commands";
+
+describe("the workplane command", () => {
+  const when = whenFor("workplane_from_selection")!;
+  const ctx = (...kinds: string[]) => selectionContext(kinds.map((kind) => ({ kind, geometry: kind === "face" ? { type: "plane" } : null })));
+  it("is offered for the selections Space understands, and only those", () => {
+    for (const ok of [["face"], ["face", "edge"], ["face", "face"], ["vertex", "vertex", "vertex"], ["edge"]]) expect(when(ctx(...ok))).toBe(true);
+    for (const no of [[], ["solid"], ["edge", "edge"], ["vertex"], ["face", "vertex"]]) expect(when(ctx(...no))).toBe(false);
+    expect(when(selectionContext([{ kind: "face", geometry: { type: "cylinder" } }]))).toBe(false);
+  });
+});
