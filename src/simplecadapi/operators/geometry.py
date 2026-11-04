@@ -8,6 +8,7 @@ is behind it):
   * ``bind_ops_features.cpp`` -> ``src/cpp/src/ops/features``
   * ``bind_ops_geometry.cpp`` -> ``src/cpp/src/ops/geometry``
   * ``bind_surface.cpp`` -> ``src/cpp/src/surface``
+  * ``bind_surface_editing.cpp`` -> ``src/cpp/src/surface/editing``
 
 Names that carry Python-side behaviour (recording wrappers, typing aliases) come from
 ``simplecadapi/_native/glue.py``.
@@ -52,6 +53,25 @@ from simplecadapi._cpp import (
     make_three_point_arc_redge,
     make_three_point_arc_rwire,
     make_wire_from_edges_rwire,
+    # bind_surface_editing.cpp
+    convert_to_bspline_redge,
+    convert_to_bspline_rface,
+    elevate_curve_degree_redge,
+    elevate_surface_degree_rface,
+    insert_curve_knot_redge,
+    insert_surface_knot_rface,
+    inspect_curve_rcurvedata,
+    inspect_surface_rsurfacedata,
+    move_curve_poles_redge,
+    move_surface_poles_rface,
+    rebuild_curve_redge,
+    rebuild_surface_rface,
+    sample_curve_rcurvature,
+    sample_surface_risocurves,
+    set_curve_poles_redge,
+    set_curve_weights_redge,
+    set_surface_poles_rface,
+    set_surface_weights_rface,
     # bind_surface.cpp
     SurfaceBoundary,
     SurfaceFillingSettings,
@@ -78,9 +98,17 @@ _load_brep_region_rshape = _glue._load_brep_region_rshape
 __all__ = [
     "SurfaceBoundary",
     "SurfaceFillingSettings",
+    "convert_to_bspline_redge",
+    "convert_to_bspline_rface",
+    "elevate_curve_degree_redge",
+    "elevate_surface_degree_rface",
     "fill_holes_rshell",
     "fit_point_grid_rface",
     "free_boundaries_rwirelist",
+    "insert_curve_knot_redge",
+    "insert_surface_knot_rface",
+    "inspect_curve_rcurvedata",
+    "inspect_surface_rsurfacedata",
     "load_brep_region_rshell",
     "load_brep_region_rsolid",
     "loft_rshell",
@@ -121,7 +149,17 @@ __all__ = [
     "make_three_point_arc_redge",
     "make_three_point_arc_rwire",
     "make_wire_from_edges_rwire",
+    "move_curve_poles_redge",
+    "move_surface_poles_rface",
     "raise_loft_failure_if_diagnosed",
+    "rebuild_curve_redge",
+    "rebuild_surface_rface",
+    "sample_curve_rcurvature",
+    "sample_surface_risocurves",
+    "set_curve_poles_redge",
+    "set_curve_weights_redge",
+    "set_surface_poles_rface",
+    "set_surface_weights_rface",
     "sew_faces_rshell",
     "trim_surface_rface",
 ]

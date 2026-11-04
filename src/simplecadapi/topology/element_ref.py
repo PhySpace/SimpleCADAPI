@@ -209,7 +209,13 @@ def _bodies_of(shape: Any, entities: List[Any]) -> List[Optional[int]]:
 
     if not entities:
         return []
-    solids = ql.solids().resolve(shape) if type(shape).__name__ != "Solid" else [shape]
+    shape_kind = type(shape).__name__
+    if shape_kind == "Solid":
+        solids = [shape]
+    elif shape_kind == "Compound":
+        solids = ql.solids().resolve(shape)
+    else:  # a Face, Shell, Wire or Edge holds no solid: its entities belong to no body
+        return [None for _ in entities]
     out: List[Optional[int]] = []
     for entity in entities:
         kind = type(entity).__name__

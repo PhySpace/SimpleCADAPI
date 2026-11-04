@@ -519,6 +519,27 @@ that surfaced it is in brackets.
   recorded form).
 - **Fix direction:** one canonical form at the next graph schema version.
 
+## 36. A reference into a face, shell or edge body could not resolve [nurbs editing]
+
+- **Symptom:** `element_ref.resolve(anchor, face)` on a bare Face (a surface body, not a solid) raised
+  `TypeError: cannot resolve QL selector scope for target_kind=solid`.
+- **Root cause:** `_bodies_of` (`topology/element_ref.py`) asked `ql.solids()` of every non-Solid shape to find the
+  body of each resolved entity; a Face or Shell has no solid scope at all.
+- **Status:** fixed: only a Solid or a Compound is searched for bodies; the entities of a Face / Shell / Wire / Edge
+  report body `None`. Test: `test_surface_editing.py::test_tags_and_references_follow_a_face_and_its_edges_through_edits`.
+
+## 37. Curve / surface edits existed only as unrecorded in-place mutation [nurbs editing]
+
+- **Symptom:** a control-point edit had to go through `simplecadapi._cpp.occt` (`Geom_BSplineSurface.SetPole` ...)
+  on the handle the shape shares, mutating it in place: not recorded, not replayable, and every other shape sharing
+  that geometry changed with it (design-docs/nurbs-editing-capability.md).
+- **Status:** fixed for the core edits: `set/move_*_poles`, `set_*_weights`, `insert_*_knot`, `elevate_*_degree`,
+  `convert_to_bspline_*`, `rebuild_*` are recorded operations returning a new shape on an edited copy of the geometry
+  (`src/cpp/src/surface/editing`). The private OCCT setters are still reachable and still mutate shared geometry;
+  they should be hidden from the compat layer once nothing internal uses them.
+- **Open:** a face that is part of a shell or solid is edited alone (the result is a free face); propagating an edit to
+  the neighbouring faces of a body (keeping the shell closed) needs a whole-body rebuild op.
+
 ## Heuristics
 
 - Run every notebook three times: fresh, all cached, `--no-cache`. The three
