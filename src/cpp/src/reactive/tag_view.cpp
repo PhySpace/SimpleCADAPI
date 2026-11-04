@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <map>
 #include <mutex>
 #include <unordered_set>
 
@@ -60,6 +61,46 @@ void carry(std::vector<CarriedTag>& into, CarriedTag tag) {
                                  [&](const CarriedTag& t) { return t.binding.binding_id == tag.binding.binding_id; });
   if (same == into.end())
     into.push_back(std::move(tag));
+}
+
+// Which piece of a split the witness's entity is (the operation numbered them when it was recorded), if it is one.
+std::optional<int> piece_of(const TopoEntry& entry) {
+  const Value* piece = member(entry.metadata, "piece");
+  const Value* pieces = member(entry.metadata, "pieces");
+  if (piece == nullptr || pieces == nullptr || !piece->is_number() || !pieces->is_number() || pieces->as_double() < 2)
+    return std::nullopt;
+  return static_cast<int>(piece->as_double());
+}
+
+// The binding a piece carries: the same assignment under the piece's tag, with an id of its own (bindings are told
+// apart by id), derived from the original, the operation and the piece so a replay names it alike.
+TagBinding piece_binding(const TagBinding& binding, const std::string& node_id, int piece) {
+  TagBinding out = binding;
+  out.tag = Symbol(split_tag_name(binding.tag.str(), piece));
+  out.binding_id =
+      BindingId("tag_binding_" + uuid5_url_hex("simplecad:split-tag:" + std::string(binding.binding_id.str()) + ":" +
+                                               node_id + ":" + std::to_string(piece)));
+  return out;
+}
+
+void note_split(const TagView& view, std::map<std::pair<std::string, std::string>, TagSplit>& splits,
+                const CarriedTag& tag, const TopoRef& parent, const TopoEntry& entry, const OperationNode& node,
+                const std::string& piece_tag) {
+  (void)view;
+  TagSplit& split = splits[{std::string(tag.binding.binding_id.str()), parent.node_id + '\x1f' + parent.topo_id}];
+  if (split.node_id.empty()) {
+    split.tag = tag.binding.tag.str();
+    split.node_id = node.node_id;
+    split.op = node.op;
+    split.source_topo_id = parent.topo_id;
+  }
+  const int piece = *piece_of(entry);
+  if (split.into.size() <= static_cast<std::size_t>(piece)) {
+    split.into.resize(static_cast<std::size_t>(piece) + 1);
+    split.pieces.resize(static_cast<std::size_t>(piece) + 1);
+  }
+  split.into[static_cast<std::size_t>(piece)] = piece_tag;
+  split.pieces[static_cast<std::size_t>(piece)] = entry.ref;
 }
 
 // The entities a tag assignment targets, as keys of its own output (slot 0).
@@ -163,6 +204,8 @@ TagView build_view(const OperationNode& node,
     return out;
   };
 
+  // The splits of this node, by (binding, entity it was), in the order they are met.
+  std::map<std::pair<std::string, std::string>, TagSplit> splits;
   for (const TopoEntry& entry : node.topo_delta->entries) {
     if (entry.event == TopoEvent::Deleted)
       continue;
@@ -174,6 +217,7 @@ TagView build_view(const OperationNode& node,
     if (entry.event == TopoEvent::Generated)
       continue;
     const std::string key = tag_view_key(entry.ref.output_slot, entry.ref.kind, entry.ref.topo_id);
+    const std::optional<int> piece = piece_of(entry);
     for (const TopoRef& parent : entry.parent_refs) {
       for (const CarriedTag* tag : carried_by(parent)) {
         if (parent.kind != entry.ref.kind || !lineage_policy_allows(tag->binding.propagation(), *derivation))
@@ -181,10 +225,16 @@ TagView build_view(const OperationNode& node,
         CarriedTag next = *tag;
         next.derivation = *derivation;
         next.op = node.op;
+        if (piece) {
+          next.binding = piece_binding(tag->binding, node.node_id, *piece);
+          note_split(view, splits, *tag, parent, entry, node, next.binding.tag.str());
+        }
         carry(view[key], std::move(next));
       }
     }
   }
+  for (auto& [_, split] : splits)
+    view.splits.push_back(std::move(split));
   return view;
 }
 
@@ -205,6 +255,30 @@ std::vector<TagLineageWitness> provider(const Shape& entity) {
 }
 
 }  // namespace
+
+std::string split_tag_name(std::string_view tag, int piece) {
+  return std::string(tag) + ".split" + std::to_string(piece + 1);
+}
+
+std::vector<TagSplit> tag_splits(const NodePtr& node) {
+  std::vector<TagSplit> out;
+  if (!node)
+    return out;
+  tag_view(node);  // builds (and caches) the views of the whole closure
+  Cache& c = cache();
+  for (const NodePtr& item : upstream_closure({node})) {
+    std::shared_ptr<const TagView> view;
+    {
+      const std::lock_guard<std::mutex> lock(c.mutex);
+      if (const auto found = c.views.find(item.get()); found != c.views.end() && found->second.first.lock() == item)
+        view = found->second.second;
+    }
+    if (!view)
+      view = tag_view(item);
+    out.insert(out.end(), view->splits.begin(), view->splits.end());
+  }
+  return out;
+}
 
 std::string tag_view_key(int output_slot, Kind kind, const std::string& recorded_topo_id) {
   return std::to_string(output_slot) + '\x1f' + std::string(kind_name(kind)) + '\x1f' + recorded_topo_id;

@@ -82,7 +82,8 @@ def test_a_reference_reads_as_code_and_parses_back():
         ("scad.ref.edge('base', 'make_box_rsolid', role='x', piece=-1)", "piece"),
         ("scad.ref.face('base', 'make_box_rsolid', role=__import__('os').name)", "literal values only"),
         ("scad.ref.face('base', 'make_box_rsolid', role='box.top', guard=('PLANE', (0, 0), 1))", "guard"),
-        ("scad.ref.solid('base', 'make_box_rsolid', role='box')", "not a reference"),
+        ("scad.ref.solid('base', 'make_box_rsolid', role='box')", "a solid has no kernel role"),
+        ("scad.ref.shell('base', 'make_box_rsolid', topo='shell_0')", "not a reference"),
     ],
 )
 def test_a_malformed_reference_is_refused(text, message):

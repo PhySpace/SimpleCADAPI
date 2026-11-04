@@ -126,6 +126,8 @@ def _execute(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         "notebook": str(run.config.path),
         "cells": [
             {"name": cell.name, "key": cell.key, "status": cell.status}
+            | ({"tag_splits": [{"tag": r["tag"], "into": r["into"], "op": r["op"]} for r in cell.tag_splits]}
+               if cell.tag_splits else {})
             for cell in run.cells
         ],
     }

@@ -161,7 +161,13 @@ ResolvedRef resolve_by_history(const NodePtr& target, const ElementAnchor& ancho
 
   for (std::size_t order = start + 1; order < closure.size(); ++order) {
     const OperationNode& node = *closure[order];
-    // The members this node consumed: entities of the outputs of its inputs.
+    // The members this node consumed: entities of the outputs of its inputs it was given (one piece of a split body
+    // is one output of the split; the other pieces go elsewhere).
+    std::set<std::pair<std::string, int>> bound;
+    for (const InputBinding& binding : node.bindings) {
+      if (!binding.external())
+        bound.emplace(binding.node_id, binding.output_slot);
+    }
     std::vector<TopoRef> consumed;
     std::unordered_set<std::string> seen_inputs;
     for (const NodePtr& input : node.inputs) {
@@ -170,8 +176,11 @@ ResolvedRef resolve_by_history(const NodePtr& target, const ElementAnchor& ancho
       const auto found = members.by_node.find(input->node_id);
       if (found == members.by_node.end())
         continue;
-      for (const std::string& key : found->second)
-        consumed.push_back(members.by_key.at(key));
+      for (const std::string& key : found->second) {
+        const TopoRef& member = members.by_key.at(key);
+        if (bound.empty() || bound.count({input->node_id, member.output_slot}) != 0)
+          consumed.push_back(member);
+      }
     }
     if (consumed.empty())
       continue;
@@ -299,6 +308,16 @@ ResolvedRef resolve_by_history(const NodePtr& target, const ElementAnchor& ancho
     } else {
       out.lost_at = target->node_id;
       out.reason = "not_in_target";
+    }
+    // The lineage reached the target node, in another of its outputs (another piece of a split body): not lost, only
+    // not in this one.
+    for (const std::string& key : members.by_node[target->node_id]) {
+      const TopoRef& ref = members.by_key.at(key);
+      if (ref.output_slot != target_slot && (mode == FollowMode::Derived || ref.kind == anchor.kind)) {
+        out.lost_at = target->node_id;
+        out.reason = "other_output";
+        break;
+      }
     }
     return out;
   }
@@ -563,10 +582,10 @@ StableAnchor stabilize(const NodePtr& within, const ElementAnchor& picked) {
   return out;
 }
 
-std::optional<ElementAnchor> locate(const NodePtr& within, const StableAnchor& anchor) {
-  const NodePtr node = pick_by_stable_key(within, anchor.node);
-  if (!node)
-    return std::nullopt;
+namespace {
+
+// The entity `anchor` names in `node` (a node with the anchor's key).
+std::optional<ElementAnchor> anchor_in(const NodePtr& node, const StableAnchor& anchor) {
   if (anchor.role.empty())
     return ElementAnchor{node->node_id, anchor.output_slot, anchor.kind, anchor.topo_id};
   std::vector<ElementAnchor> all = anchors_for_role(node, anchor.role);
@@ -575,6 +594,29 @@ std::optional<ElementAnchor> locate(const NodePtr& within, const StableAnchor& a
   if (anchor.role_ordinal < 0 || static_cast<std::size_t>(anchor.role_ordinal) >= all.size())
     return std::nullopt;
   return all[static_cast<std::size_t>(anchor.role_ordinal)];
+}
+
+}  // namespace
+
+std::optional<ElementAnchor> locate(const NodePtr& within, const StableAnchor& anchor) {
+  if (const NodePtr node = pick_by_stable_key(within, anchor.node))
+    return anchor_in(node, anchor);
+  // Several nodes share the key and the parameters do not tell them apart (a reference made before a second box of
+  // the cell existed).  The history can: the one whose entity still reaches `within` is the one meant (a cut's tool
+  // box is consumed by the cut, its body continues).  One survivor is the answer; none or several stay ambiguous.
+  std::optional<ElementAnchor> alive;
+  for (const NodePtr& candidate : find_by_stable_key(within, anchor.node)) {
+    const std::optional<ElementAnchor> found = anchor_in(candidate, anchor);
+    if (!found)
+      continue;
+    const ResolvedRef resolved = resolve_by_history(within, *found, 0);
+    if (resolved.status == RefStatus::Lost && resolved.reason != "other_output")
+      continue;
+    if (alive)
+      return std::nullopt;
+    alive = found;
+  }
+  return alive;
 }
 
 Value to_value(const StableAnchor& anchor) {

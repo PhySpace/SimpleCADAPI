@@ -15,6 +15,7 @@ import { sideStyle, useModeTransition } from "@/lib/useModeTransition";
 import { AssemblyPanel } from "@/components/AssemblyPanel";
 import { ConnectorGizmos, type Gizmo } from "@/components/ConnectorGizmos";
 import { WorkplanePatches } from "@/components/WorkplanePatches";
+import { TagSplits, parseTagSplits, type TagSplit } from "@/components/TagSplits";
 import { parseWorkplanes, resolvePlane, workplanePlane, workplaneRequest, type WorkplaneFrame } from "@/lib/workplanes";
 import { fitDistanceMm } from "@/lib/sketch-view";
 import { viewPose } from "@/lib/sketch-plane";
@@ -101,6 +102,7 @@ export function App() {
   const [picked, setPicked] = useState<Omit<SelectionItem, "variable">[]>([]);
   // The notebook's workplanes as the kernel reported them, and the one Space made (or chose) last: new sketches go on it.
   const [workplanes, setWorkplanes] = useState<WorkplaneFrame[]>([]);
+  const [tagSplits, setTagSplits] = useState<TagSplit[]>([]);
   const [activeWorkplane, setActiveWorkplane] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("solid");
   const [sceneVersion, setSceneVersion] = useState(0);
@@ -307,6 +309,7 @@ export function App() {
     });
     socket.on("notebook.features", (envelope) => setFeatures((envelope["features"] as NotebookFeature[]) ?? []));
     socket.on("workplanes", (envelope) => setWorkplanes(parseWorkplanes(envelope["workplanes"])));
+    socket.on("tag_splits", (envelope) => setTagSplits(parseTagSplits(envelope["splits"])));
 
     socket.on("preview", (envelope) => {
       setLoading(null);
@@ -1093,6 +1096,7 @@ export function App() {
                   onHover={setHoverSketch}
                 />
                 {viewRef.current && workplanes.length > 0 && <WorkplanePatches view={viewRef.current} workplanes={workplanes} active={activeWorkplane} />}
+                {!sketching && viewRef.current && <TagSplits view={viewRef.current} splits={tagSplits} sceneVersion={sceneVersion} />}
                 {!sketching && viewRef.current && gizmos.length > 0 && (
                   <ConnectorGizmos view={viewRef.current} gizmos={gizmos} components={asm.doc.components} highlighted={gizmoHighlight} onPick={pickGizmo} armed={!!asm.target} />
                 )}

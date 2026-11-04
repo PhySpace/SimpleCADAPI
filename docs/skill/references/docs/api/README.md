@@ -419,6 +419,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [inspect_surface_rsurfacedata](inspect_surface_rsurfacedata.md) *(from operators/geometry.py)* `top-level`
 - [key](key.md) *(from ql.py)* `submodule:ql`
 - [linear_pattern_rsolidlist](linear_pattern_rsolidlist.md) *(from operators/transform.py)* `top-level`
+- [list_tag_splits](list_tag_splits.md) *(from operators/selection.py)* `top-level`
 - [load_brep_region_rshell](load_brep_region_rshell.md) *(from operators/geometry.py)* `top-level`
 - [load_brep_region_rsolid](load_brep_region_rsolid.md) *(from operators/geometry.py)* `top-level`
 - [measure_constraint_residual_rconstraintresidual](measure_constraint_residual_rconstraintresidual.md) *(from operators/product.py)* `top-level`

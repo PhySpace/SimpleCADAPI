@@ -2,6 +2,7 @@
 #include "scad/reactive/tag_view.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <map>
 #include <set>
 #include <cstdio>
@@ -14,6 +15,8 @@
 #include "internal.hpp"
 #include "scad/core/coordinate_system.hpp"
 #include "scad/core/error.hpp"
+#include "scad/kernel/properties.hpp"
+#include "scad/reactive/element_ref.hpp"
 #include "scad/reactive/digest.hpp"
 #include "scad/reactive/geo_selection.hpp"
 #include "scad/reactive/lineage.hpp"
@@ -324,6 +327,109 @@ struct RefResolver {
   }
 };
 
+// The pieces an operation split an entity into, numbered.  An entity of the inputs that continues as several entities
+// of its kind (a face cut in two by a slot, a solid by a through cut) gives each of them "piece" (0-based) and "pieces"
+// in its witness's metadata, in a geometric order that does not depend on OCCT's numbering: by centre, then size (the
+// order a split reference lists its candidates in).  Tag lineage names the pieces after it (<tag>.split1 ..), so the
+// number is a recorded fact of the operation, not something a later reader re-derives.
+void number_pieces(TopoDelta& delta, const std::vector<Shape>& outputs) {
+  std::map<std::string, std::vector<std::size_t>> children;  // parent key -> entries continuing it
+  for (std::size_t i = 0; i < delta.entries.size(); ++i) {
+    const TopoEntry& entry = delta.entries[i];
+    if (entry.event == TopoEvent::Deleted || entry.event == TopoEvent::Generated)
+      continue;
+    const TopoRef* parent = nullptr;
+    int same_kind = 0;
+    for (const TopoRef& candidate : entry.parent_refs) {
+      if (candidate.kind == entry.ref.kind) {
+        parent = &candidate;
+        ++same_kind;
+      }
+    }
+    if (same_kind != 1)
+      continue;  // a merge (or no parent of its kind) continues no single entity
+    children[ref_key(*parent)].push_back(i);
+  }
+  for (const auto& [parent, indices] : children) {
+    if (indices.size() < 2)
+      continue;
+    struct Piece {
+      std::size_t entry;
+      std::tuple<double, double, double, double> key;
+    };
+    std::vector<Piece> pieces;
+    for (const std::size_t i : indices) {
+      const TopoRef& ref = delta.entries[i].ref;
+      if (ref.output_slot < 0 || static_cast<std::size_t>(ref.output_slot) >= outputs.size())
+        return;  // an entity this node does not output: leave the split unnumbered rather than half-numbered
+      Shape sub = outputs[static_cast<std::size_t>(ref.output_slot)];
+      try {
+        sub = subshapes_by_recorded_id(sub, ref.kind, {ref.topo_id}).front();
+      } catch (const ValueError&) {
+        return;
+      }
+      const auto round6 = [](double v) { return std::round(v * 1e6) / 1e6; };
+      const Vec3 c = kernel::center_of_mass(sub.wrapped());
+      double size = 0.0;
+      if (ref.kind == Kind::Face || ref.kind == Kind::Shell)
+        size = kernel::surface_area(sub.wrapped());
+      else if (ref.kind == Kind::Edge || ref.kind == Kind::Wire)
+        size = kernel::linear_length(sub.wrapped());
+      else if (ref.kind == Kind::Solid)
+        size = kernel::volume(sub.wrapped());
+      pieces.push_back({i, {round6(c.x), round6(c.y), round6(c.z), round6(size)}});
+    }
+    std::stable_sort(pieces.begin(), pieces.end(), [](const Piece& a, const Piece& b) { return a.key < b.key; });
+    for (std::size_t n = 0; n < pieces.size(); ++n) {
+      Value& metadata = delta.entries[pieces[n].entry].metadata;
+      if (!metadata.is_object())
+        metadata = Value::object();
+      metadata.set("piece", static_cast<std::int64_t>(n));
+      metadata.set("pieces", static_cast<std::int64_t>(pieces.size()));
+    }
+  }
+}
+
+// An operation that takes one solid and gives one solid back (a fillet, a shell, a move) makes that solid's
+// continuation: the kernel's history speaks of faces and edges only, so the solid itself is continued here, as the one
+// thing the operation can have made of it.  Booleans and splits say what became of their solids themselves.
+void continue_single_solid(TopoDelta& delta, const std::string& graph_id, const std::string& node_id,
+                           const std::vector<Shape>& outputs, const std::vector<OpInput>& inputs) {
+  if (delta.entries.empty() || outputs.size() != 1 || outputs.front().kind() != Kind::Solid)
+    return;
+  const OpInput* solid = nullptr;
+  for (const OpInput& input : inputs) {
+    if (input.shape.kind() != Kind::Solid)
+      continue;
+    if (solid != nullptr)
+      return;  // several solids: not this rule's to say
+    solid = &input;
+  }
+  if (solid == nullptr)
+    return;
+  for (const TopoEntry& entry : delta.entries) {
+    if (entry.ref.kind == Kind::Solid)
+      return;
+  }
+  const std::optional<TopoRef> source = topo_ref_of(solid->shape);
+  if (!source)
+    return;
+  TopoRef parent = *source;
+  parent.topo_id = "solid_" + parent.topo_id;
+  TopoEntry entry;
+  entry.ref = TopoRef{graph_id, node_id, 0, Kind::Solid, "solid_" + outputs.front().topo_id()};
+  entry.event = TopoEvent::Modified;
+  entry.origin_role = solid->role.empty() ? std::string("body") : solid->role;
+  entry.parent_refs = {parent};
+  entry.metadata = Value::object();
+  entry.metadata.set("derivation", "continuation");
+  entry.metadata.set("coverage", "complete");
+  entry.metadata.set("status", "proven");
+  entry.metadata.set("evidence_kind", "operation_rule");
+  entry.metadata.set("source_kind", "SOLID");
+  delta.entries.push_back(std::move(entry));
+}
+
 TopoDelta resolve_recorded_delta(const TopoDelta& raw, const std::string& graph_id, const std::string& node_id,
                                  const std::vector<Shape>& outputs, const std::vector<OpInput>& inputs,
                                  const OperationGraph& graph) {
@@ -365,6 +471,8 @@ TopoDelta resolve_recorded_delta(const TopoDelta& raw, const std::string& graph_
   }
   out.section_edges = refs.resolve_many(raw.section_edges, false);
   out.raw_event = raw.raw_event;
+  number_pieces(out, outputs);
+  continue_single_solid(out, graph_id, node_id, outputs, inputs);
   return out;
 }
 

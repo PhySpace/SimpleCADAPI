@@ -50,7 +50,7 @@ later. A body of a Part is named with ``set_body_appearance_rpart(part, body_id,
 
 ### (default ``"continuation_fragment"``
 
-- **Description**: kept on continued faces and on the fragments of a split face).
+- **Description**: kept on continued faces; the pieces of a split face carry ``<tag>.split1`` .. ``<tag>.split<n>`` instead, see ``list_tag_splits``).
 
 ## Returns
 

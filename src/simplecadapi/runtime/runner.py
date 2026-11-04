@@ -32,6 +32,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Literal, TypeVar
 
+from simplecadapi._glue.pieces import tag_splits
 from ..artifacts.assembly_io import attached_definition
 from ..artifacts.canonical import validate_logical_id
 from ..build.definition import Definition
@@ -90,6 +91,9 @@ class CellReport:
     key: str
     """The cell's key: the namespace of its ids (see :mod:`.cells`)."""
     status: CellStatus
+    tag_splits: tuple[dict, ...] = ()
+    """The tagged entities this cell's operations split (``scad.list_tag_splits`` rows): each piece carries
+    ``<tag>.split<i>`` and the tag names none of them.  Reported whether the cell ran or was restored."""
 
 
 @dataclass(frozen=True)
@@ -341,6 +345,9 @@ def _run(
                 "cached"
                 if cell.cell_id in restored
                 else "ran" if cell.cell_id in progress.ran else "skipped"
+            ),
+            tag_splits=tuple(
+                tag_splits((values[name] for name in cell.defs if name in values), cells.key(cell.cell_id))
             ),
         )
         for cell in ordered

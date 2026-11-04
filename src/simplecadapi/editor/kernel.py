@@ -596,6 +596,13 @@ class MarimoKernel:
             "    print('SCA-WORKPLANES', _wjson.dumps(_workplanes()))\n"
             "except Exception:\n"
             "    pass\n"
+            # the tagged entities the model's operations split, with the entities of their pieces (a diagnostic)
+            "try:\n"
+            "    from simplecadapi.runtime.live import live_tag_splits as _splits\n"
+            "    import json as _sjson\n"
+            "    print('SCA-TAGSPLITS', _sjson.dumps(_splits()))\n"
+            "except Exception:\n"
+            "    pass\n"
         )
 
     @staticmethod
@@ -605,6 +612,11 @@ class MarimoKernel:
             if line.startswith("SCA-WORKPLANES "):
                 try:
                     out["workplanes"] = json.loads(line[len("SCA-WORKPLANES "):])
+                except ValueError:
+                    pass
+            elif line.startswith("SCA-TAGSPLITS "):
+                try:
+                    out["tag_splits"] = json.loads(line[len("SCA-TAGSPLITS "):])
                 except ValueError:
                     pass
         return out

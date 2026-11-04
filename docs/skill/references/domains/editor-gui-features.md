@@ -65,6 +65,10 @@ HOLE_DIAMETER = scad.var(name="hole_diameter", default=6.0, unit="mm", comment="
 - A sketch on a workplane has `plane={"workplane": "wp", origin, x_axis, y_axis}` in its `# gui:` document and
   `plane=wp` in its code: the frame in the document is only for drawing before the cell runs; the cell follows `wp`.
   A workplane cell reads the body without consuming it (the body stays the open body / product).
+- A split tag is shown, not hidden: when an operation splits a tagged entity (its pieces carry `<tag>.split1` ..), the
+  viewport highlights each piece in its own colour and a notice names the tag, the operation and the pieces' tags
+  (hide the highlight or dismiss it there). `sca snapshot` lists the same as `tag_splits`. Read it as a question:
+  was the split meant? If later code needs a piece, tag it after the split.
 - Unattended: the buttons are not available; write the cells yourself (see `discipline/notebook-cell-design.md`).
 
 ## The same operations from the command line

@@ -581,14 +581,17 @@ def with_signature(function: Any) -> Any:
 
     name = getattr(function, "__name__", "")
     if name.endswith(_OP_SUFFIXES) or name in _SHAPE_FUNCTIONS:
-        from .pieces import SPLITS, TAKES_PIECES, Pieces, apply_to_pieces
+        from .pieces import SPLITS, TAKES_PIECES, Pieces, apply_to_pieces, run_on_pieces
 
         @functools.wraps(function)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             # the pieces of a split body: one operation per piece, unless the operation takes them together
-            if name not in TAKES_PIECES and any(isinstance(a, Pieces) for a in (*args, *kwargs.values())):
-                return apply_to_pieces(name, function, args, kwargs)
-            result = function(*args, **kwargs)
+            if any(isinstance(a, Pieces) for a in (*args, *kwargs.values())):
+                if name not in TAKES_PIECES:
+                    return apply_to_pieces(name, function, args, kwargs)
+                result = run_on_pieces(function, args, kwargs)
+            else:
+                result = function(*args, **kwargs)
             return Pieces(result) if name in SPLITS and isinstance(result, list) else result
 
     else:

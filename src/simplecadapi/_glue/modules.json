@@ -201,6 +201,7 @@
 "evaluate_scalar": "simplecadapi.params.expr",
 "evaluate_value": "simplecadapi.params.expr",
 "explain_tag": "simplecadapi.operators.selection",
+"list_tag_splits": "simplecadapi.operators.selection",
 "explode_rassembly": "simplecadapi.operators.product",
 "expression_uses_units": "simplecadapi.params.units",
 "extend_rsketch": "simplecadapi.operators.sketch",

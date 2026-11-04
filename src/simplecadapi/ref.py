@@ -34,6 +34,7 @@ reference without it was made under version 1).
 from __future__ import annotations
 
 import ast
+import contextvars
 import dataclasses
 import math
 from dataclasses import dataclass
@@ -49,14 +50,14 @@ _native = _cpp._native if hasattr(_cpp, "_native") else None
 NAMING: int = int(_er.NAMING_VERSION.rsplit("/", 1)[-1])
 """The naming version references are made under now (``scad-naming/<NAMING>``)."""
 
-Kind = Literal["face", "edge", "vertex"]
+Kind = Literal["face", "edge", "vertex", "solid"]
 Follow = Literal["identity", "derived"]
 Guard = Union[Tuple[str, Tuple[float, float, float], float], Tuple[str, Tuple[float, float, float], float, Tuple[float, float, float]]]
 """``(geometry type, centre, size)`` or ``(geometry type, centre, size, normal)``: what the entity looked like when it
-was picked (size: area of a face, length of an edge).  It never chooses between history results; it checks a
+was picked (size: area of a face, length of an edge, volume of a solid).  It never chooses between history results; it checks a
 positional anchor and ranks look-alikes of a lost reference."""
 
-_KINDS = ("face", "edge", "vertex")
+_KINDS = ("face", "edge", "vertex", "solid")
 _RECORD_VERSION = 1
 
 
@@ -137,7 +138,7 @@ def _check_between(between: Any) -> tuple:
 
 @dataclass(frozen=True)
 class ElementRef:
-    """A stable reference to one face, edge or vertex; ``repr()`` is the code that makes it.
+    """A stable reference to one face, edge, vertex or solid; ``repr()`` is the code that makes it.
 
     Fields: ``kind``; ``feature`` and ``op`` (where the entity was born); then exactly one of ``role`` (its kernel
     role, with ``ordinal`` saying which of the entities with that role), ``topo`` (its position in that output, for an
@@ -166,9 +167,11 @@ class ElementRef:
 
     def __post_init__(self) -> None:
         if self.kind not in _KINDS:
-            raise ValueError(f"a reference names a face, an edge or a vertex, not {self.kind!r}")
+            raise ValueError(f"a reference names a face, an edge, a vertex or a solid, not {self.kind!r}")
         if sum(x is not None for x in (self.role, self.topo, self.between)) != 1:
             raise ValueError("a reference names its entity by role=, by topo= or (an edge) by between=, exactly one of them")
+        if self.kind == "solid" and self.topo is None:
+            raise ValueError("a solid has no kernel role: a solid reference names it by topo= (its place in the output)")
         if self.between is not None:
             if self.kind != "edge":
                 raise ValueError("between= names an edge by the two faces it lies between")
@@ -277,15 +280,49 @@ class ElementRef:
 
     # -- resolving ---------------------------------------------------------------------------------------------------
     def resolve(self, shape: Any) -> Resolution:
-        """Follow the reference to the entities of *shape*; never raises for a split or a lost reference."""
+        """Follow the reference to the entities of *shape*; never raises for a split or a lost reference.
+
+        *shape* may be the pieces of a split body (``scad.Pieces``, a list of solids): the reference is resolved in each,
+        and ``bodies`` says which piece each entity lies in.
+        """
+        if isinstance(shape, (list, tuple)):
+            return self._resolve_in_pieces(list(shape))
         if self.between is not None:
             return self._resolve_between(shape)
         resolved = _er.resolve(self.anchor(), shape, follow=self.follow, guard=self._guard_dict())
         if resolved.version_changed and self.guard is not None and resolved.status in ("ok", "merged"):
             # Made under other naming rules: the answer stands only if it still looks like what was picked.
-            if any(entity._geom_type() != self.guard[0] for entity in resolved.entities):
+            if any(_er._geom_type(entity) != self.guard[0] for entity in resolved.entities):
                 return Resolution("lost", [], [], list(resolved.hops), None, "version_changed", self._lookalikes(shape), [], True)
         return resolved
+
+    def _resolve_in_pieces(self, pieces: list) -> Resolution:
+        found: list = []
+        bodies: list = []
+        hops: list = []
+        merged = changed = False
+        missing: Optional[Resolution] = None
+        for index, piece in enumerate(pieces):
+            resolved = self.resolve(piece)
+            changed = changed or resolved.version_changed
+            if resolved.status == "lost":
+                if missing is None or missing.reason == "other_output":
+                    missing = resolved
+                continue
+            merged = merged or resolved.status == "merged"
+            hops = hops or list(resolved.hops)
+            found.extend(resolved.entities)
+            bodies.extend(index for _ in resolved.entities)
+        if not found:
+            if missing is None:
+                return Resolution("lost", [], [], [], None, "no_pieces", [], [], changed)
+            return dataclasses.replace(missing, reason="not_in_pieces" if missing.reason == "other_output" else missing.reason)
+        if len(found) == 1:
+            return Resolution("merged" if merged else "ok", found, [], hops, None, None, [], bodies, changed)
+        candidates = _er._geometric_order([_er._candidate(e, str(getattr(e, "topo_id", ""))) for e in found])
+        order = {id(c.entity): i for i, c in enumerate(candidates)}
+        ranked = sorted(zip(found, bodies), key=lambda pair: order[id(pair[0])])
+        return Resolution("split", [e for e, _ in ranked], [], hops, None, None, candidates, [b for _, b in ranked], changed)
 
     def _resolve_between(self, shape: Any) -> Resolution:
         """The edges of *shape* that lie between (a piece of) each of the two faces."""
@@ -464,6 +501,34 @@ def vertex(
                  piece=piece, guard=guard, digest=digest, naming=naming)
 
 
+def solid(
+    feature: str,
+    op: str,
+    *,
+    topo: str = "solid_0",
+    occurrence: int = 0,
+    slot: int = 0,
+    piece: Optional[int] = None,
+    guard: Optional[Guard] = None,
+    digest: Optional[str] = None,
+    naming: int = 1,
+) -> ElementRef:
+    """A reference to a solid (a body) born in *feature* by *op*.
+
+    A solid has no kernel role: it is named by its position in the output of the operation that made it (``slot``: a
+    cut that splits a body outputs its pieces in order, by centre then size) and checked by its ``guard``
+    (``("SOLID", centre, volume)``).  Through later operations it is followed like a face: a fillet, a shell or a move
+    continues it, a union merges it, a cut that splits it splits it (``piece`` then says which piece is meant).  Resolve
+    it in a solid, or in the pieces of a split body (a list of solids).
+
+    Examples:
+        >>> left = scad.ref.solid("slot", "make_cut_rsolid_list", slot=0, guard=("SOLID", (-10.5, 0, 5), 1900))
+        >>> left.one(pieces)            # the solid of the pieces it names
+    """
+    return _make("solid", feature, op, topo=topo, occurrence=occurrence, slot=slot, piece=piece, guard=guard,
+                 digest=digest, naming=naming)
+
+
 def of(entity: Any, shape: Any, *, follow: Follow = "identity", guard: bool = True) -> ElementRef:
     """The stable reference of *entity*, a face, edge or vertex of *shape* (or of a shape *shape* descends from).
 
@@ -497,7 +562,7 @@ def _born(entity: Any, shape: Any, *, follow: str = "identity", fingerprint: Any
     anchor = _er.stable_anchor_of(entity, shape)
     kind = str(anchor["kind"]).lower()
     if kind not in _KINDS:
-        raise ValueError(f"a reference names a face, an edge or a vertex, not a {kind}")
+        raise ValueError(f"a reference names a face, an edge, a vertex or a solid, not a {kind}")
     shared = len(_cpp._native._stable_candidates(node, anchor)) > 1
     role = anchor.get("role") or None
     return ElementRef(
@@ -599,7 +664,7 @@ def _selector(kind: str, refs: Sequence[ElementRef]) -> Any:
     wrong = [r for r in refs if r.kind != kind]
     if wrong:
         raise ValueError(f"{kind}s(...) takes {kind} references; {wrong[0].code()} is a {wrong[0].kind}")
-    factory = {"face": _ql.faces, "edge": _ql.edges, "vertex": _ql.vertices}[kind]
+    factory = {"face": _ql.faces, "edge": _ql.edges, "vertex": _ql.vertices, "solid": _ql.solids}[kind]
     predicates = [predicate(r) for r in refs]
     return factory().where(predicates[0] if len(predicates) == 1 else _ql.or_(*predicates))
 
@@ -633,10 +698,15 @@ def vertices(*refs: Union[ElementRef, Sequence[ElementRef]]) -> Any:
     return _selector("vertex", _flatten(refs))
 
 
+def solids(*refs: Union[ElementRef, Sequence[ElementRef]]) -> Any:
+    """The selection of the solids the references name (see :func:`faces`)."""
+    return _selector("solid", _flatten(refs))
+
+
 # ---- reading the spelling back --------------------------------------------------------------------------------------
 
-_FACTORIES = {"face": "face", "edge": "edge", "vertex": "vertex"}
-_SELECTIONS = {"faces": "face", "edges": "edge", "vertices": "vertex"}
+_FACTORIES = {"face": "face", "edge": "edge", "vertex": "vertex", "solid": "solid"}
+_SELECTIONS = {"faces": "face", "edges": "edge", "vertices": "vertex", "solids": "solid"}
 
 
 def _call_name(node: ast.expr) -> Optional[str]:
@@ -701,7 +771,7 @@ def parse_selection(node: ast.expr) -> Tuple[str, list[ElementRef]]:
 
 def selection_code(kind: str, refs: Sequence[ElementRef], prefix: str = "scad.ref") -> str:
     """The code of a selection: one reference on one line, several one per line."""
-    plural = {"face": "faces", "edge": "edges", "vertex": "vertices"}[kind]
+    plural = {"face": "faces", "edge": "edges", "vertex": "vertices", "solid": "solids"}[kind]
     if len(refs) == 1:
         return f"{prefix}.{plural}({refs[0].code(prefix)})"
     inner = "".join(f"\n    {r.code(prefix)}," for r in refs)
@@ -711,8 +781,19 @@ def selection_code(kind: str, refs: Sequence[ElementRef], prefix: str = "scad.re
 # ---- the resolver ql.ref asks ---------------------------------------------------------------------------------------
 
 
+IN_PIECES: contextvars.ContextVar[bool] = contextvars.ContextVar("scad_ref_in_pieces", default=False)
+"""Set while an operation runs on the pieces of a split body one piece at a time (``simplecadapi._glue.pieces``)."""
+
+
 def _resolve_record(scope: Any, record: Mapping[str, Any]) -> list:
-    return ElementRef.from_dict(record).all(scope)
+    reference = ElementRef.from_dict(record)
+    if IN_PIECES.get():
+        resolved = reference.resolve(scope)
+        if resolved.status == "lost" and resolved.reason in ("other_output", "not_in_target"):
+            # Alive in another piece of the split body this scope is one piece of: nothing of it here.  The operation
+            # over the pieces checks what the selection found on all of them together.
+            return []
+    return reference.all(scope)
 
 
 _ql._set_reference_resolver(_resolve_record)
@@ -738,6 +819,8 @@ __all__ = [
     "predicate",
     "resolve",
     "selection_code",
+    "solid",
+    "solids",
     "vertex",
     "vertices",
 ]

@@ -14,7 +14,7 @@ class ElementRef(kind: str, feature: str = '', op: str = '', role: Optional[str]
 
 ## Description
 
-A stable reference to one face, edge or vertex; ``repr()`` is the code that makes it.
+A stable reference to one face, edge, vertex or solid; ``repr()`` is the code that makes it.
 
 Fields: ``kind``; ``feature`` and ``op`` (where the entity was born); then exactly one of ``role`` (its kernel
 role, with ``ordinal`` saying which of the entities with that role), ``topo`` (its position in that output, for an

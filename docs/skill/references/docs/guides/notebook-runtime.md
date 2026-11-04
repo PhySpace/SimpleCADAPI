@@ -143,7 +143,9 @@ sca run bracket.py --no-cache             # run every cell
 `--set` values are Python literals, else strings; the option may repeat. The
 report lists the definition id, kind, revision, `content_hash`, and every
 cell's status: `ran`, `cached` (restored from the cell cache), or `skipped`
-(replaced by an override).
+(replaced by an override). A cell whose operations split a tagged entity also
+lists `tag_splits` (`{tag, into, op}`: the pieces carry `<tag>.split1` ..), ran or
+restored; a cell that runs prints a `TagSplitWarning` at its place in the file.
 
 From Python:
 

@@ -43,13 +43,35 @@ struct CarriedTag {
   std::string op;              // the op of the last step that carried it
 };
 
-// "<slot>\x1f<kind>\x1f<recorded topo id>" -> the bindings carried to that entity.
-using TagView = std::unordered_map<std::string, std::vector<CarriedTag>>;
+// A tagged entity an operation split into pieces.  A tag follows its entity as a reference does: one entity keeps the
+// tag, several do not.  The pieces carry "<tag>.split1" .. "<tag>.split<n>" instead, numbered as the operation
+// recorded them (the "piece" of their witnesses: by centre, then size), and the split is reported so whoever reads the
+// model can see it happened and name the pieces it wants by tags of its own.
+struct TagSplit {
+  std::string tag;                // the tag the entity had
+  std::vector<std::string> into;  // the tags the pieces carry, in piece order
+  std::vector<TopoRef> pieces;    // the pieces in the node's output, in piece order
+  std::string node_id;            // the operation that split it
+  std::string op;
+  std::string source_topo_id;  // the entity it was (recorded form, in the operation's input)
+};
+
+// "<slot>\x1f<kind>\x1f<recorded topo id>" -> the bindings carried to that entity; `splits`: the tagged entities this
+// node split.
+struct TagView : std::unordered_map<std::string, std::vector<CarriedTag>> {
+  std::vector<TagSplit> splits;
+};
+
+// The tag a piece of a split entity carries: "<tag>.split<piece + 1>".
+std::string split_tag_name(std::string_view tag, int piece);
 
 std::string tag_view_key(int output_slot, Kind kind, const std::string& recorded_topo_id);
 
 // The view of `node` (memoised).  Never null for a non-null node.
 std::shared_ptr<const TagView> tag_view(const NodePtr& node);
+
+// The tagged entities split by `node` and by every node upstream of it, upstream first.
+std::vector<TagSplit> tag_splits(const NodePtr& node);
 
 // The lineage witnesses the history carries to `entity`, a sub-shape of a recorded output (empty otherwise).
 std::vector<TagLineageWitness> history_witnesses(const Shape& entity);

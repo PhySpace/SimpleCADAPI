@@ -308,6 +308,7 @@ from simplecadapi._cpp import (
     apply_tag,
     apply_tag_rselection,
     explain_tag,
+    list_tag_splits,
     list_tags,
     select_edges_by_tag,
     select_faces_by_tag,
@@ -462,7 +463,7 @@ __description__ = "Simplified OpenCASCADE-native CAD modeling Python API"
 
 # Convenience aliases
 Workplane = SimpleWorkplane
-from ._glue.pieces import Pieces  # noqa: E402  (the pieces of a split body)
+from ._glue.pieces import Pieces, TagSplitWarning  # noqa: E402  (the pieces of a split body; a split tag)
 
 # Creation-function aliases
 create_angle_arc = make_angle_arc_redge
@@ -536,6 +537,7 @@ __all__ = [
     # Core classes
     "CoordinateSystem",
     "Pieces",
+    "TagSplitWarning",
     "SimpleWorkplane",
     "Workplane",
     "Vertex",
@@ -729,6 +731,7 @@ __all__ = [
     "apply_tag",
     "apply_tag_rselection",
     "explain_tag",
+    "list_tag_splits",
     "list_tags",
     "select_edges_by_tag",
     "select_faces_by_tag",

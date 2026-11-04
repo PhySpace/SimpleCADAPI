@@ -169,6 +169,11 @@ with scad.GraphSession(namespace="base"):        # in a notebook: the cell's "# 
 - Outcomes: `ok`; `merged` (one face that absorbed others: a coplanar union; it runs); `split` (several pieces, listed in
   a geometric order, until `piece=i` says which); `lost` (where and why; with a guard, the closest look-alikes).
   `ref.choose(i, part)` writes a choice back: a piece, or a new reference at a look-alike.
+- A **solid** (a body) has a reference too: `scad.ref.of(piece, piece)` gives `scad.ref.solid("slot", "make_cut_rsolid_list",
+  slot=1, guard=("SOLID", centre, volume))`, its place in the output of the op that made it. A fillet, shell or move
+  continues it, a union merges it, a cut that splits it splits it. Resolve it in a solid or in the pieces of a split
+  body (`r.one(pieces)`); `scad.ref.solids(r)` is the selection. Over pieces, a face or edge reference selects on the
+  piece it lies on (`scad.fillet_rsolid(pieces, scad.ref.edges(rim), 1.0)` blends that piece only).
 
 Write the printed code into the cell that uses it (not the query that found it): it reads as what it means and the
 editor reads it back. When a reference fails, read the error, do not widen anything:

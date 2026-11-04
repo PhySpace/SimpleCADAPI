@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import os
 import time
+import warnings
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -34,6 +35,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from simplecadapi._glue.pieces import TagSplitWarning, split_message, tag_splits
 from simplecadapi._glue.session import GraphSession
 from ..recording.source_mapping import cell_sources
 from ._marimo import (
@@ -351,8 +353,23 @@ def _cell_recording(
         _running.reset(token)
     # Reached only when the body succeeded; failures propagate untouched.
     _check_bound(session, cell, glbls)
+    _warn_tag_splits(scope, cell, glbls)
     # The cell cache writes the nodes of the session beside the cell's entry.
     _sessions[cell.cell_id] = session
+
+
+def _warn_tag_splits(scope: NotebookScope, cell: CellImpl, glbls: MutableGlobals) -> None:
+    """Warn, in the cell's output and at the cell's place in the notebook, about the tagged entities its operations
+    split (see TagSplitWarning)."""
+
+    key = scope.cells.key(cell.cell_id)
+    rows = tag_splits((glbls[name] for name in cell.defs if name in glbls), key)
+    if not rows:
+        return
+    placement = scope.cells.place(key)
+    line = placement.line_offset + 1 if placement is not None else 1
+    for row in rows:
+        warnings.warn_explicit(TagSplitWarning(split_message(row)), TagSplitWarning, str(scope.config.path), line)
 
 
 def _check_bound(session: GraphSession, cell: CellImpl, glbls: MutableGlobals) -> None:

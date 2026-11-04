@@ -465,10 +465,11 @@ def test_an_n_ary_cut_composes_its_steps():
         r = er.resolve(anchor, cut)
         assert r.status == "split"
         assert sorted(round(f.get_area(), 2) for f in r.entities) == [80.0, round(640 - 13 * math.pi, 2)]
-        assert sorted(round(f.get_area(), 2) for f in ql.faces().where(ql.tag("user.top")).resolve(cut)) == [
-            80.0,
-            round(640 - 13 * math.pi, 2),
-        ]
+        # the tag follows its face as the reference does: split, it names the pieces <tag>.split1, .split2
+        assert ql.faces().where(ql.tag("user.top")).resolve(cut) == []
+        pieces = {name: ql.faces().where(ql.tag(name)).exactly(1).resolve(cut)[0] for name in ("user.top.split1", "user.top.split2")}
+        assert sorted(round(f.get_area(), 2) for f in pieces.values()) == [80.0, round(640 - 13 * math.pi, 2)]
+        assert [c.center for c in r.candidates] == [tuple(f.get_center()) for f in (pieces["user.top.split1"], pieces["user.top.split2"])]
 
 
 def test_a_tag_survives_pickling_with_its_history():

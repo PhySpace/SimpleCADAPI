@@ -61,7 +61,7 @@ class Candidate:
     kind: str
     geom_type: str
     center: tuple
-    size: float  # area of a face, length of an edge
+    size: float  # area of a face, length of an edge, volume of a solid
     score: float = 0.0  # lost only: distance to the guard, smaller is closer
 
     def describe(self) -> Dict[str, Any]:
@@ -165,7 +165,13 @@ def anchors_for_role(shape: Any, role: str) -> List[Dict[str, Any]]:
 
 
 def _size(entity: Any) -> float:
+    if type(entity).__name__ == "Solid":
+        return float(entity.get_volume())
     return float(entity.get_area()) if hasattr(entity, "get_area") else float(entity.get_length())
+
+
+def _geom_type(entity: Any) -> str:
+    return "SOLID" if type(entity).__name__ == "Solid" else entity._geom_type()
 
 
 def guard_of(entity: Any) -> Dict[str, Any]:
@@ -174,7 +180,7 @@ def guard_of(entity: Any) -> Dict[str, Any]:
     c = entity.get_center()
     guard: Dict[str, Any] = {
         "kind": type(entity).__name__.lower(),
-        "geom_type": entity._geom_type(),
+        "geom_type": _geom_type(entity),
         "center": [c.x, c.y, c.z],
         "size": _size(entity),
     }
@@ -190,7 +196,7 @@ def _candidate(entity: Any, topo_id: str, score: float = 0.0) -> Candidate:
         entity=entity,
         topo_id=topo_id,
         kind=type(entity).__name__.lower(),
-        geom_type=entity._geom_type(),
+        geom_type=_geom_type(entity),
         center=(c.x, c.y, c.z),
         size=_size(entity),
         score=score,
@@ -205,7 +211,7 @@ def _geometric_order(candidates: List[Candidate]) -> List[Candidate]:
 def _ranked_lookalikes(shape: Any, guard: Dict[str, Any], kind: str, limit: int = 5) -> List[Candidate]:
     from .. import ql
 
-    factory = {"face": ql.faces, "edge": ql.edges}.get(kind)
+    factory = {"face": ql.faces, "edge": ql.edges, "solid": ql.solids}.get(kind)
     if factory is None:
         return []
     out: List[Candidate] = []
@@ -215,7 +221,7 @@ def _ranked_lookalikes(shape: Any, guard: Dict[str, Any], kind: str, limit: int 
         distance = math.dist((c.x, c.y, c.z), guard["center"])
         size = _size(entity)
         score = distance + abs(size - guard["size"]) / max(guard["size"], 1e-9)
-        if entity._geom_type() != guard.get("geom_type"):
+        if _geom_type(entity) != guard.get("geom_type"):
             score += 1000.0
         if "normal" in guard and hasattr(entity, "get_normal_at"):
             n = entity.get_normal_at()
@@ -243,6 +249,11 @@ def _bodies_of(shape: Any, entities: List[Any]) -> List[Optional[int]]:
         kind = type(entity).__name__
         found = None
         for index, solid in enumerate(solids):
+            if kind == "Solid":
+                if solid == entity:
+                    found = index
+                    break
+                continue
             members = ql.faces().resolve(solid) if kind == "Face" else ql.edges().resolve(solid)
             if any(member == entity for member in members):
                 found = index

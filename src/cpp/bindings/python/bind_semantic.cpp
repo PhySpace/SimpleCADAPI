@@ -12,6 +12,7 @@
 #include "scad/core/error.hpp"
 #include "scad/ql/selector.hpp"
 #include "scad/semantic/finalize.hpp"
+#include "scad/reactive/tag_view.hpp"
 #include "scad/semantic/selection.hpp"
 #include "scad/topo/tag_factories.hpp"
 
@@ -682,6 +683,36 @@ void bind_operators(py::module_& m) {
       [](const Shape& shape, const std::string& tag, TagScope scope) { return explain_tag(shape, tag, scope); },
       py::arg("shape"), py::arg("tag"), py::arg("scope") = TagScope::Effective,
       "Explain every visible binding that produces a tag token.");
+  m.def(
+      "list_tag_splits",
+      [](const Shape& shape) {
+        py::list out;
+        const auto opaque = shape.root().graph_node();
+        if (!opaque)
+          return out;
+        for (const reactive::TagSplit& split :
+             reactive::tag_splits(std::static_pointer_cast<const reactive::OperationNode>(opaque))) {
+          py::list pieces;
+          for (const TopoRef& piece : split.pieces) {
+            py::dict item;
+            item["output_slot"] = piece.output_slot;
+            item["kind"] = std::string(kind_name(piece.kind));
+            item["topo_id"] = piece.topo_id;
+            pieces.append(item);
+          }
+          py::dict row;
+          row["tag"] = split.tag;
+          row["into"] = split.into;
+          row["node_id"] = split.node_id;
+          row["op"] = split.op;
+          row["source_topo_id"] = split.source_topo_id;
+          row["pieces"] = pieces;
+          out.append(row);
+        }
+        return out;
+      },
+      py::arg("shape"),
+      "The tagged entities the operations behind a shape split into pieces (each piece carries <tag>.split<i>).");
   m.def(
       "select_faces_by_tag",
       [](const Solid& solid, const std::string& tag, TagScope scope) { return select_faces_by_tag(solid, tag, scope); },

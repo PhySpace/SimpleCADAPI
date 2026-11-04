@@ -251,8 +251,11 @@ TEST_CASE("a stable anchor names the node by feature, op and occurrence upstream
   // The value form round-trips.
   CHECK(stable_anchor_from_value(to_value(stable)).node.params_digest == stable.node.params_digest);
 
-  // Same key, same parameters: ambiguous, so nothing is located (never the first one).
+  // Same key, and the parameters do not tell them apart: the history does.  Only the plate's box face continues to the
+  // cut (the inserted box's does not), so that one is located: by what happened, never by being first.
   StableAnchor blind = stable;
   blind.node.params_digest = "0000000000000000";
-  CHECK_FALSE(locate(cut2, blind));
+  const auto by_history = locate(cut2, blind);
+  REQUIRE(by_history);
+  CHECK(by_history->node_id == "c_node_00000002");
 }

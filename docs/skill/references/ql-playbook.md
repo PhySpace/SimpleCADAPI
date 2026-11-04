@@ -55,8 +55,11 @@ around it as shown.
    (`apply_tag_rselection`, an op-kwarg tag such as `top_face_tag=`) is a
    graph node; `ql.tag(...)` on a later shape finds the entities the tagged
    ones became, through each operation's kernel history, as the tag's
-   lineage policy allows (default `continuation_fragment`: a face cut in two
-   keeps the tag on both pieces). Verified per family in
+   lineage policy allows. A tag follows its entity as a reference does: an
+   entity an operation **splits** keeps it on no piece; the pieces carry
+   `<tag>.split1` .. (by centre, then size), reported by `TagSplitWarning`,
+   `sca run` (`tag_splits`), `scad.list_tag_splits(shape)` and the editor's
+   highlight. Tag the pieces later code needs. Verified per family in
    `test/test_element_ref_history.py` (audit). For one particular entity,
    prefer a reference (rule 6) over a tag made only to find it again:
 
@@ -68,22 +71,19 @@ around it as shown.
    | `origin_role("body"/"tool")` | parent argument of a boolean | single-step only | no |
    | `output_role("<slot>")` | `extrusion.end`, `box.top`, `fillet.patch` | single-step only | own op only |
 
-   "Single-step" means the metadata describes the last operation that touched
-   the shape; the next tracked operation overwrites it. A tag ends where the
-   history says the entity ends: a face a cut removes, a face a feature
-   replaces by a generated one (a fillet's patch is a new face, not the
-   edge), or an operation that records no history. `scad.explain_tag(face,
-   tag)` shows the binding and the lineage that carried it. The `lineage`
-   scope is the carried part alone; `effective` (the default) includes it.
+   "Single-step": the next tracked operation overwrites it. A tag ends where the history says
+   the entity ends (a face a cut removes, one a fillet's patch replaces, an op without history).
+   `scad.explain_tag(face, tag)` shows the binding and what carried it; scope `lineage` is
+   the carried part alone, `effective` (default) includes it.
 
 6. **A rule is a query; a particular entity is a reference.** `ql` picks
-   whatever matches a rule; `scad.ref` means *this* face or edge and stays it
-   through booleans, blends, copies and edits, e.g.
-   `scad.ref.faces(scad.ref.face("base", "make_box_rsolid", role="box.top"))`
-   or `scad.ref.edge("base", "make_box_rsolid", between=("box.front", "box.top"))`
-   (`scad.ref.of(face, part)` makes one; `scad.ql.ref(r)` uses one in a query).
-   A split or lost reference raises `ElementRefError` with the candidates;
-   never fall back to a geometric window. See `ql-recipes.md` (stable reference).
+   whatever matches a rule; `scad.ref` means *this* face, edge or solid through booleans,
+   blends, copies and edits, e.g.
+   `scad.ref.faces(scad.ref.face("base", "make_box_rsolid", role="box.top"))` or
+   `scad.ref.edge("base", "make_box_rsolid", between=("box.front", "box.top"))`
+   (`scad.ref.of(face, part)` makes one, of a solid too; `scad.ql.ref(r)` uses one in a query).
+   A split or lost reference raises `ElementRefError` with the candidates; never fall back to a
+   geometric window. See `ql-recipes.md` (stable reference).
 
 ## The selection loop (card before cardinality)
 

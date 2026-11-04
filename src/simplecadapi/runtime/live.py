@@ -224,6 +224,52 @@ def live_workplanes() -> list[dict[str, Any]]:
     return workplane_frames(values)
 
 
+def scene_tag_splits(scene: PreviewScene) -> list[dict[str, Any]]:
+    """The tag splits behind the solids of *scene*, with the entities of each piece (``scad.list_tag_splits``).
+
+    One row per split: ``tag``, ``into`` (the pieces' tags), ``op``, and ``pieces``: per entity that carries a piece's
+    tag, ``piece`` (its index in ``into``), ``node_id`` (the scene node drawing it) and ``entity_id``.  The editor
+    highlights the pieces and says what was split, so whoever looks can judge whether the split was meant.
+    """
+
+    from .._cpp import list_tag_splits, ql
+
+    rows: dict[tuple, dict[str, Any]] = {}
+    for key, solid in scene.solids.items():
+        try:
+            splits = list_tag_splits(solid)
+        except Exception:  # noqa: BLE001 - a diagnostic never breaks the preview
+            continue
+        if not splits:
+            continue
+        definition, body = scene.definitions[key], scene.bodies.get(key)
+        prefix = f"entity/{definition}/" if body is None else f"entity/{definition}/body:{body}/"
+        nodes = [node.node_id for node in scene.nodes if node.part_key == key]
+        entities = [("solid", solid)] + [("face", f) for f in ql.faces().resolve(solid)] + [
+            ("edge", e) for e in ql.edges().resolve(solid)
+        ]
+        tagged = [(kind, entity, set(entity._list_tags())) for kind, entity in entities]
+        for split in splits:
+            row = rows.setdefault(
+                (split["node_id"], split["tag"], split["source_topo_id"]),
+                {"tag": split["tag"], "into": list(split["into"]), "op": split["op"], "pieces": []},
+            )
+            for index, name in enumerate(split["into"]):
+                for kind, entity, tags in tagged:
+                    if name in tags:
+                        for node_id in nodes:
+                            row["pieces"].append(
+                                {"piece": index, "node_id": node_id, "entity_id": f"{prefix}{kind}/{entity.topo_id}"}
+                            )
+    return list(rows.values())
+
+
+def live_tag_splits() -> list[dict[str, Any]]:
+    """:func:`scene_tag_splits` of the scene last previewed in this kernel (empty before the first preview)."""
+
+    return scene_tag_splits(_last_preview) if _last_preview is not None else []
+
+
 def preview_entity_info(entity_id: str) -> dict[str, Any] | None:
     """The properties of one entity of the scene last previewed (see :func:`entity_info`)."""
 
@@ -251,7 +297,9 @@ def publish_live(url: str, *, step: str = "", timeout: float = 60.0) -> LivePack
 
 
 __all__ = [
+    "live_tag_splits",
     "live_workplanes",
+    "scene_tag_splits",
     "workplane_frames",
     "LivePackage",
     "LiveUnavailableError",

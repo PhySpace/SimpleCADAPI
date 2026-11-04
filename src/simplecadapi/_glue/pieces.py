@@ -21,6 +21,57 @@ SPLITS = frozenset({"cut_rsolid", "fillet_rsolid", "chamfer_rsolid"})
 """Operations whose list result is the pieces of one body."""
 
 
+class TagSplitWarning(UserWarning):
+    """An operation split a tagged entity: the tag went to none of the pieces, each carries ``<tag>.split<i>``.
+
+    A diagnostic, not a failure: a tag follows its entity as a reference does, and a split is where that ends.  Look at
+    the pieces (the editor highlights them), and tag the ones you mean after the split if later code needs them.
+    """
+
+
+def tag_splits(values: Any, namespace: str) -> list[dict]:
+    """The tag splits the operations of one cell (node ids ``<namespace>_...``) made, in the shapes *values* hold."""
+
+    from simplecadapi._cpp import Solid, list_tag_splits
+
+    shapes: list = []
+
+    def collect(value: Any) -> None:
+        if isinstance(value, Solid):
+            shapes.append(value)
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                collect(item)
+        elif type(value).__name__ == "Part":
+            for body in value.bodies:
+                collect(body.solid)
+
+    for value in values:
+        collect(value)
+    seen: set = set()
+    out: list[dict] = []
+    for shape in shapes:
+        try:
+            rows = list_tag_splits(shape)
+        except Exception:  # noqa: BLE001 - a diagnostic never fails the cell
+            continue
+        for row in rows:
+            if not row["node_id"].startswith(namespace + "_"):
+                continue
+            key = (row["node_id"], row["tag"], row["source_topo_id"])
+            if key not in seen:
+                seen.add(key)
+                out.append(row)
+    return out
+
+
+def split_message(row: dict) -> str:
+    into = ", ".join(row["into"])
+    return (f"{row['op']} split the entity tagged {row['tag']!r} into {len(row['into'])} pieces; "
+            f"they carry {into} and {row['tag']!r} names none of them. Tag the pieces you mean after this operation "
+            f"if later code selects them (scad.list_tag_splits(shape) lists the splits).")
+
+
 class Pieces(list):
     """The solids one body was split into, in a stable order (``cut_rsolid``: by centroid)."""
 
@@ -59,6 +110,21 @@ def apply_to_pieces(name: str, function: Callable[..., Any], args: tuple, kwargs
     selectors = {("arg", i): _open(a) for i, a in enumerate(args) if _is_selector(a)}
     selectors.update({("kw", k): _open(v) for k, v in kwargs.items() if _is_selector(v)})
     found = {slot: 0 for slot in selectors}
+    from ..ref import IN_PIECES
+
+    token = IN_PIECES.set(True)
+    try:
+        out = _each_piece(function, pieces, side, key, args, kwargs, selectors, found)
+    finally:
+        IN_PIECES.reset(token)
+    for slot, (_, cardinality) in selectors.items():
+        if found[slot] == 0:
+            raise ValueError(f"{name}: the selection found nothing on any piece of the split body")
+        _check(name, cardinality, found[slot])
+    return out
+
+
+def _each_piece(function, pieces, side, key, args, kwargs, selectors, found) -> Pieces:
     out = Pieces()
     for piece in pieces:
         call_args, call_kwargs = list(args), dict(kwargs)
@@ -84,9 +150,18 @@ def apply_to_pieces(name: str, function: Callable[..., Any], args: tuple, kwargs
             out.extend(result)
         else:
             out.append(result)
-    for slot, (_, cardinality) in selectors.items():
-        _check(name, cardinality, found[slot])
     return out
 
 
-__all__ = ["Pieces", "SPLITS", "TAKES_PIECES", "apply_to_pieces"]
+def run_on_pieces(function: Callable[..., Any], args: tuple, kwargs: dict) -> Any:
+    """Run an operation that takes the pieces together (:data:`TAKES_PIECES`), its selectors resolved per piece."""
+    from ..ref import IN_PIECES
+
+    token = IN_PIECES.set(True)
+    try:
+        return function(*args, **kwargs)
+    finally:
+        IN_PIECES.reset(token)
+
+
+__all__ = ["Pieces", "SPLITS", "TAKES_PIECES", "TagSplitWarning", "apply_to_pieces", "run_on_pieces", "split_message", "tag_splits"]
