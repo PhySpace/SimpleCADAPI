@@ -579,6 +579,59 @@ that surfaced it is in brackets.
 - **Root cause:** `_glue/values.py` rebuilt a one-body Part from `Part.body` (the Solid), not its `Body`.
 - **Status:** fixed: such a Part is rebuilt from `bodies`; a plain one-body Part keeps the old reduction (same bytes).
 
+## 43. A workplane was a context manager, not a value [workplanes]
+
+- **Symptom:** `pickle.dumps(scad.Workplane(...))` failed, so a cell defining one made the cell cache fall back; it could
+  not be copied, could not be the plane of a sketch (`plane=` took only names and frozen mappings), and a sketch "on a
+  face" carried copied numbers that did not follow the face.
+- **Root cause:** `scad::Workplane` was a non-copyable RAII scope with no metadata/runtime, so it had no graph lineage.
+- **Status:** fixed: it is a value (copy, re-enter, pickle with its lineage), `make_workplane_*_rworkplane` record it,
+  `make_sketch_rsketch(plane=wp)` takes it, and replay rebuilds its frame from the recorded inputs.
+
+## 44. A QL-picked face is recorded as an exact-geometry selector [workplanes]
+
+- **Symptom:** export a model whose workplane (or fillet, shell ...) uses a face picked with `ql`, change the box's
+  height in the model JSON, replay: `make_select_rface` fails with "geo selector did not match a stable face candidate".
+- **Root cause:** the selection node stores `geo_exact` (bbox, centre, area), not the query or the tag that picked it.
+- **Status:** open. The notebook re-runs the query, so a notebook follows; model-JSON replay follows a moved face only
+  when the face comes straight from an operation's output (test_workplanes uses a rectangle face).
+
+## 45. A Sketch cannot be pickled [workplanes]
+
+- **Symptom:** `pickle.dumps(scad.make_sketch_rsketch("s"))` raises; a cell that leaves a Sketch in a public variable
+  is restored as a stub and the notebook runs again without the cache.
+- **Root cause:** the native `Sketch` has no pickle support (the editor's sketch cells keep it in `_sketch`, so they are
+  not hit).
+- **Status:** open.
+
+## 46. `with wp:` names its workplane in the node context, not as an input edge [workplanes]
+
+- **Symptom:** none for replay (the serializer orders such a node after the workplane's and uses the replayed frame),
+  but the reactive engine's impact queries and `upstream_closure` do not see that a box made inside `with wp:` depends
+  on the workplane.
+- **Root cause:** an input edge would put a non-shape value among the inputs of every shape operation and their
+  executors; the link is `context["workplane"] = {node_id, output_slot}` instead.
+- **Status:** by design for now; a sketch on `plane=wp` does have the edge.
+
+## 47. A cell reading a body consumed it, so a datum cell removed the implicit product [workplanes]
+
+- **Symptom:** in a `kind = "part"` notebook, a cell `wp = make_workplane_from_face_rworkplane(<face of base>)` made
+  "no top-level Part" (base was no longer an open body), and the editor dropped its PRODUCT badge.
+- **Root cause:** `find_product` / `open_bodies` and the editor snapshot count every read as a consumption.
+- **Status:** fixed for cells whose values are all workplanes (`runtime.projection.product_reads`, role `datum` in the
+  snapshot). Other read-only cells (a measurement that keeps a name) still consume.
+
+## 48. `extract_recipe` read only the first picked-selection recipe of a cell [workplanes]
+
+- **Symptom:** editing a GUI feature with two picked slots (face and edge) kept the face's lines inside the edge's recipe,
+  which re-bound `_face` to a query after it had been resolved.
+- **Status:** fixed: each slot's recipe starts at the comment nearest above its line.
+
+## 49. `get_center()` of a round shape is not its centre [workplanes]
+
+- **Symptom:** `make_cylinder_rsolid(2, 3).get_center()` is `(2, 0, 1.5)`: a point of the seam, not the axis.
+- **Status:** open; tests use the bounding box (`_bounds()`) for centres.
+
 ## Heuristics
 
 - Run every notebook three times: fresh, all cached, `--no-cache`. The three
