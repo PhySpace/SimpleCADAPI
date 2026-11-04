@@ -358,6 +358,100 @@ class FeatureService:
             self._record(steps)
             return self._result(snap["product"]["cell"], steps, name)
 
+    def ref_status(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        """How the references of a feature resolve now: per selection slot, ``Resolution.describe()`` of each.
+
+        ``badge`` is the feature's worst: ``ok`` (green), ``merged`` (green, with a note), ``split`` (amber: choose a
+        piece), ``lost`` (red: accept a look-alike or pick again); ``None`` when the feature has no references.
+        """
+        with self._lock:
+            self._sync()
+            snap = self.snapshot()
+            feature = self._feature(snap, request.get("cell"))
+            body, slots = self._references(feature)
+            report: dict[str, list[dict[str, Any]]] = {}
+            for slot, refs in slots.items():
+                report[slot] = list(self._kernel_call("reference_status", body, [r.to_dict() for r in refs]))  # type: ignore[arg-type]
+            order = {"ok": 0, "merged": 1, "split": 2, "lost": 3}
+            worst = None
+            for rows in report.values():
+                for row in rows:
+                    status = "ok" if row.get("chosen") is not None else str(row.get("status"))
+                    if worst is None or order.get(status, 3) > order.get(worst, 3):
+                        worst = status
+            return {"ok": True, "cell": feature["cell"], "body": body, "slots": report, "badge": worst}
+
+    def ref_repair(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        """Write the person's choice into one reference: ``{cell, slot, index, choice}``.
+
+        *choice* indexes the candidates :meth:`ref_status` listed for that reference: a piece of a split (``piece=``) or
+        a look-alike of a lost reference (a new reference made there, in the kernel).  The cell's code is rewritten.
+        """
+        with self._lock:
+            self._sync()
+            snap = self.snapshot()
+            feature = self._feature(snap, request.get("cell"))
+            body, slots = self._references(feature)
+            slot = str(request.get("slot", ""))
+            refs = list(slots.get(slot) or [])
+            try:
+                index, choice = int(request.get("index", 0)), int(request["choice"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise GuiError("index and choice: whole numbers") from exc
+            if not 0 <= index < len(refs):
+                raise GuiError(f"{slot!r} has no reference {index}")
+            chosen = self._kernel_call("reference_choose", body, refs[index].to_dict(), choice)
+            refs[index] = F._ref.ElementRef.from_dict(chosen["record"])  # type: ignore[index]
+            cell = self._cell(feature["cell"])
+            steps = [self._edit(feature["cell"], cell["code"], F.replace_refs(cell["code"], slot, refs), run=True)]
+            self._record(steps)
+            return self._result(feature["cell"], steps, feature["slug"])
+
+    def _references(self, feature: Mapping[str, Any]) -> tuple[str, dict[str, list[Any]]]:
+        """(the body the feature's selections resolve in, the references of each selection slot)."""
+        gui = feature.get("gui")
+        if not gui:
+            raise GuiError("this feature was written as code; its references are in the notebook")
+        spec = F.BY_ID[gui["spec"]]
+        values = gui.get("values") or {}
+        body = next((v for v in (values.get(spec.body_slot), values.get("body")) if isinstance(v, str)), "")
+        code = self._cell(feature["cell"])["code"]
+        slots = {slot.name: F.extract_refs(code, slot.name) for slot in spec.slots if slot.kind == "select"}
+        return body, {name: refs for name, refs in slots.items() if refs}
+
+    def _kernel_call(self, function: str, *args: Any) -> Any:
+        kernel = getattr(self.state, "kernel", None)
+        if kernel is None:
+            raise GuiError("the notebook's kernel is not running")
+        try:
+            return kernel.references(function, *args)
+        except Exception as exc:  # noqa: BLE001 - the kernel's words are the message
+            raise GuiError(str(exc)) from exc
+
+    def _name_picks(self, picked: dict[str, list]) -> dict[str, list]:
+        """Each picked entity with its stable reference (``ref``: a record), named in the kernel from the value it
+        was drawn from.  An entity the kernel cannot name keeps no ``ref`` (its slot falls back to the older recipe)."""
+        ids = [str(item.get("entity_id")) for items in picked.values() for item in items if isinstance(item, Mapping) and item.get("entity_id")]
+        kernel = getattr(self.state, "kernel", None)
+        named: dict[str, Any] = {}
+        if ids and kernel is not None:
+            try:
+                answers = kernel.references("entity_refs", ids)
+            except Exception:  # noqa: BLE001 - no kernel answer: the older recipe
+                answers = []
+            named = {entity_id: answer.get("record") for entity_id, answer in zip(ids, answers or []) if isinstance(answer, Mapping)}
+        out: dict[str, list] = {}
+        for slot, items in picked.items():
+            rows = []
+            for item in items:
+                row = {k: v for k, v in dict(item).items() if k != "ref"} if isinstance(item, Mapping) else item
+                record = named.get(str(row.get("entity_id"))) if isinstance(row, dict) else None
+                if record:
+                    row["ref"] = record
+                rows.append(row)
+            out[slot] = rows
+        return out
+
     def undo(self) -> dict[str, Any]:
         with self._lock:
             self._sync()
@@ -415,7 +509,7 @@ class FeatureService:
 
     def _render(self, spec_id, slug, values, bodies, selections, snap, keep=None) -> F.Rendered:
         known = {f["slug"] for f in snap["features"]}
-        picked = {k: list(v) for k, v in dict(selections or {}).items() if isinstance(v, (list, tuple))}
+        picked = self._name_picks({k: list(v) for k, v in dict(selections or {}).items() if isinstance(v, (list, tuple))})
         notebook = getattr(self.state, "notebook", None)
         workspace = getattr(self.state, "workspace", None)
         env = {

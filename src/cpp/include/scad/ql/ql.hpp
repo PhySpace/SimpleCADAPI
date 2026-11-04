@@ -7,5 +7,6 @@
 #include "scad/ql/predicate.hpp"
 #include "scad/ql/property.hpp"
 #include "scad/ql/query.hpp"
+#include "scad/ql/reference.hpp"
 #include "scad/ql/scope.hpp"
 #include "scad/ql/selector.hpp"

@@ -983,6 +983,7 @@ export function App() {
                   onEdit={handleEditFeature}
                   onDelete={(feature) => void runFeature({ op: "delete", cell: feature.cell })}
                   onUseProduct={(body) => void runFeature({ op: "use_as_product", body })}
+                  onRepairRef={(cell, slot, index, choice) => void runFeature({ op: "ref_repair", cell, slot, index, choice })}
                   onUndo={undo}
                   onRedo={redo}
                   sketches={treeSketches}

@@ -110,7 +110,8 @@ struct StableAnchor {
   std::string naming{kNamingVersion};  // the naming version it was made under
 };
 
-// The feature (namespace) part of a node id: "cellA_node_0000002a" -> "cellA", "node_00000001" -> "".
+// The feature (namespace) part of a node id: "cellA_node_0000002a" -> "cellA", "node_00000001" -> "", and a feature
+// cell's "base.c1a2b3c4_node_00000001" -> "base" (the slug; the code digest after the dot is left out).
 std::string node_feature(std::string_view node_id);
 
 // The stable key of `node` (computed from its own upstream closure).

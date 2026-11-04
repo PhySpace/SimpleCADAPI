@@ -57,7 +57,8 @@ around it as shown.
    ones became, through each operation's kernel history, as the tag's
    lineage policy allows (default `continuation_fragment`: a face cut in two
    keeps the tag on both pieces). Verified per family in
-   `test/test_element_ref_history.py` (audit):
+   `test/test_element_ref_history.py` (audit). For one particular entity,
+   prefer a reference (rule 6) over a tag made only to find it again:
 
    | Channel | Example | Survives boolean | Survives fillet/chamfer, shell, copies, patterns, transform/scale/offset/draft |
    | --- | --- | --- | --- |
@@ -74,6 +75,15 @@ around it as shown.
    edge), or an operation that records no history. `scad.explain_tag(face,
    tag)` shows the binding and the lineage that carried it. The `lineage`
    scope is the carried part alone; `effective` (the default) includes it.
+
+6. **A rule is a query; a particular entity is a reference.** `ql` picks
+   whatever matches a rule; `scad.ref` means *this* face or edge and stays it
+   through booleans, blends, copies and edits, e.g.
+   `scad.ref.faces(scad.ref.face("base", "make_box_rsolid", role="box.top"))`
+   or `scad.ref.edge("base", "make_box_rsolid", between=("box.front", "box.top"))`
+   (`scad.ref.of(face, part)` makes one; `scad.ql.ref(r)` uses one in a query).
+   A split or lost reference raises `ElementRefError` with the candidates;
+   never fall back to a geometric window. See `ql-recipes.md` (stable reference).
 
 ## The selection loop (card before cardinality)
 

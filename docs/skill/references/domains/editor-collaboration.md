@@ -216,10 +216,23 @@ HOLE_DIAMETER = scad.var(name="hole_diameter", default=6.0, unit="mm", comment="
   or the form, not the call.
 - GUI commands carry the code they were made from: if you edited the cell in between, the command is refused (409), it
   does not overwrite you. The same holds for the person's undo of a GUI command.
-- Selections in a GUI cell are written inline, resolved against the body the cell receives: the face tags the box, cylinder
-  or extrude was given (`<slug>.top`, `<slug>.side` ... they survive booleans, not fillets or chamfers) first, the picked
-  geometry second, with the count checked (`.exactly(n)`). If the model moved so that nothing matches, the cell fails and
-  the feature turns red: ask the person to pick again, never widen the selector until it matches.
+- Selections in a GUI cell are stable references, one statement per selection slot, written from the person's picks
+  (the editor names each picked entity in the kernel with `scad.ref.of`):
+
+  ```python
+  _edges = scad.ref.edges(scad.ref.edge('base', 'make_box_rsolid', between=('box.front', 'box.top'), guard=('LINE', (20, 0, 20), 30)))
+  round = scad.fillet_rsolid(solid=base, edges=_edges, radius=ROUND_RADIUS)
+  ```
+
+  Read them as data (feature, operation, role; see `ql-playbook.md` rule 6). They survive booleans, blends and edits of
+  the referenced feature. When one no longer names exactly one entity the feature fails with `ElementRefError` and the
+  Features tab shows it amber (split: the pieces) or red (lost: where, why, the look-alikes); the person's click writes
+  the choice into the literal (`piece=1`, or a new reference). Never replace a failing reference by a geometric window
+  or "fix" it by guessing a piece: ask the person; the editor's `ref_status` / `ref_repair` commands (the
+  editor API, `POST /api/features {"op": "ref_status", "cell": ...}`) report and write them. You may write such a statement yourself; keep it one
+  `scad.ref.<faces|edges>(...)` call so the form still reads it. An older cell with a tag-or-geometry recipe block
+  (`_x_by_tag`, `_x_by_geometry`) still runs and its form keeps the block; a pick the kernel cannot name (a body
+  without recorded history, `sca feature add` with geometry only) is still written that way.
 - A blank notebook (`sca new NAME --kind blank`) has no cells and a `kind = "part"` header: no product cell is written,
   the runtime makes the Part from the open bodies (see `docs/guides/notebook-runtime.md`; a solid made with "New body"
   is one more body of the same Part, not an assembly), so every new feature previews
@@ -255,7 +268,7 @@ An agent does not click: `sca feature` and `sca sketch` do what the buttons do, 
 sca feature specs [SPEC]             # operations and their typed slots (lengths mm, angles deg, bodies by name)
 sca feature ls                       # features, bodies, tip, product, defaults
 sca feature add box --name base --values '{"width": 40, "height": 30, "depth": 20}'
-sca feature add fillet --values '{"radius": 2}' --selections '{"edges": [{"kind": "edge", "properties": {...}, "geometry": {...}}]}'
+sca feature add fillet --values '{"radius": 2}' --selections '{"edges": [{"kind": "edge", "entity_id": "entity/..."}]}'  # named by the kernel; geometry-only items keep the older recipe
 sca feature edit base --values '{"width": 50}'      # a GUI feature; a code feature is refused
 sca feature rm base | sca feature undo | sca feature redo
 sca sketch ls | get CELL | put CELL -f doc.json | solve CELL

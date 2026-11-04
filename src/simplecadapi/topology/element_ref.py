@@ -1,4 +1,4 @@
-"""Element references resolved through recorded operation history (spike; private, not exported).
+"""Element references resolved through recorded operation history (the engine behind :mod:`simplecadapi.ref`).
 
 An *anchor* names a sub-shape by where it was born.  Two forms:
 
@@ -22,6 +22,9 @@ went:
 :func:`require` is what a feature uses: it returns the entities for ``ok`` / ``merged`` and raises
 :class:`ElementRefError` (carrying the candidates) for ``split`` unless the caller picked a piece, and for ``lost``.
 Nothing is ever chosen silently.  See ``design-docs/stable-refs-design.md``.
+
+The public face is :mod:`simplecadapi.ref` (``scad.ref.of`` / ``scad.ref.face(...)`` / ``ql.ref``); this module
+works on anchor dicts.
 """
 
 from __future__ import annotations
@@ -38,6 +41,7 @@ __all__ = [
     "NAMING_VERSION",
     "Candidate",
     "ElementRefError",
+    "Resolution",
     "ResolvedRef",
     "anchor_of",
     "anchors_for_role",
@@ -72,7 +76,14 @@ class Candidate:
 
 
 @dataclass(frozen=True)
-class ResolvedRef:
+class Resolution:
+    """How a reference resolved in a shape: ``ok`` / ``split`` / ``merged`` / ``lost``, the entities, and why.
+
+    ``candidates`` are the pieces of a split (in a geometric order: centre, then size) or, for a lost reference with
+    a guard, up to five look-alikes ranked by their distance to the guard; ``bodies`` says which solid of the shape
+    each entity lies in.
+    """
+
     status: str
     entities: List[Any]
     targets: List[Dict[str, Any]]
@@ -98,10 +109,16 @@ class ResolvedRef:
         }
 
 
-class ElementRefError(ValueError):
-    """A reference that does not name exactly one entity: ``split`` (choose a piece) or ``lost``."""
+ResolvedRef = Resolution  # the spike's name
 
-    def __init__(self, resolved: ResolvedRef):
+
+class ElementRefError(ValueError):
+    """A reference that does not name exactly one entity: ``split`` (choose a piece) or ``lost``.
+
+    ``status`` and ``candidates`` say which and what to choose from; ``resolved`` is the whole :class:`Resolution`.
+    """
+
+    def __init__(self, resolved: Resolution):
         self.resolved = resolved
         self.status = resolved.status
         self.candidates = resolved.candidates
@@ -111,7 +128,12 @@ class ElementRefError(ValueError):
             text = f"the referenced entity is lost ({resolved.reason} at {resolved.lost_at})"
             if resolved.candidates:
                 text += f"; {len(resolved.candidates)} look-alike candidate(s)"
+        if resolved.version_changed:
+            text += " (the reference was made under another naming version)"
         super().__init__(text)
+
+    def __reduce__(self):
+        return (type(self), (self.resolved,))
 
 
 def _node_of(shape: Any) -> Any:
@@ -236,7 +258,7 @@ def resolve(
     follow: str = "identity",
     output_slot: Optional[int] = None,
     guard: Optional[Dict[str, Any]] = None,
-) -> ResolvedRef:
+) -> Resolution:
     """Follow *anchor* (raw or stable) through recorded history to the entities of *shape* (a later output).
 
     *shape* names its node and output slot itself (a body of a multi-body result is its own slot).
@@ -254,7 +276,7 @@ def resolve(
             lookalikes = _ranked_lookalikes(shape, guard, str(anchor["kind"]).lower()) if guard else []
             reason = "anchor_ambiguous" if ambiguous else "anchor_missing"
             changed = anchor.get("naming", "") != NAMING_VERSION
-            return ResolvedRef("lost", [], [], [], None, reason, lookalikes, [], changed)
+            return Resolution("lost", [], [], [], None, reason, lookalikes, [], changed)
     data = _native._resolve_by_history(node, raw, output_slot, follow)
     targets = list(data["targets"])
     entities: List[Any] = []
@@ -274,7 +296,7 @@ def resolve(
         candidates = _ranked_lookalikes(shape, guard, kind) if guard else []
     else:
         candidates = []
-    return ResolvedRef(
+    return Resolution(
         status=status,
         entities=entities,
         targets=targets,

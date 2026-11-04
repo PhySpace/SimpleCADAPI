@@ -677,6 +677,41 @@ that surfaced it is in brackets.
 - **Symptom:** `make_cylinder_rsolid(2, 3).get_center()` is `(2, 0, 1.5)`: a point of the seam, not the axis.
 - **Status:** open; tests use the bounding box (`_bounds()`) for centres.
 
+## 56. Recording a pick re-stamps the picked entity of the value it was picked from [public refs]
+
+- **Symptom:** in the editor, a shell feature picked the top face of `base`; a groove feature cut `base` afterwards, and
+  the top face's history through the cut named the *shell's* selection node as its parent, a node not upstream of the
+  groove: the reference into `base` was `lost(no_history)` at the cut.
+- **Root cause:** `Session::record_geo_selection_nodes` records the selection with the picked handle as its output, and
+  the handle shares its entity state with the source value, so the entity's `topo_ref` now names the selection node.
+  Every later operation on the source value records that node as the parent.
+- **Status:** worked around in the resolver (`element_ref.cpp` `through_foreign_identity`: a parent named by a
+  registered selection/tag node outside the walk stands for the entity of its source);
+  `test_a_pick_made_by_a_later_cell_does_not_hide_the_history_of_the_value_it_read`.  The tag view
+  (`tag_view.cpp`) reads the same parents and is not worked around.
+- **Fix direction:** a selection node's output should be a copy of the handle (its own entity state), never the
+  source's entity.
+
+## 57. Booleans record no history for the edges of their inputs [public refs]
+
+- **Symptom:** a box edge picked before a cut was `lost(no_history)` at the cut; fillets after any boolean could not
+  use an edge reference anchored on the edge itself.
+- **Root cause:** `tracking_booleans.cpp` asks OCCT's history for the faces of every input only (edges: only the
+  section edges, as generated).
+- **Status:** designed around: `scad.ref.of(edge, shape)` names an edge by the two faces it lies between
+  (`between=("box.front", "box.top")`), which every operation does track, and it reads better.  Edges of a seam (one
+  face) still anchor on themselves.
+- **Fix direction:** query edge history in booleans too (goldens of every boolean change; review them one by one).
+
+## 58. A notebook cell's node namespace was the hash of its code [public refs]
+
+- **Symptom:** a stable reference names its node by the feature (the node id's namespace); a notebook cell's namespace
+  was `c<sha256(code)[:8]>`, so a GUI edit of the referenced feature (its `# gui:` line changes) moved every node to a
+  new namespace and every reference into it was `lost(anchor_missing)`.
+- **Status:** fixed: a feature cell's key is `<slug>.c<digest>` (`runtime/cells.py`) and `node_feature` drops what follows
+  the dot.  A plain cell (no `# ---- feature:` header) still has a code-hash feature, so references into hand-written
+  cells break when the cell's code changes; give such a cell a feature header.
+
 ## Heuristics
 
 - Run every notebook three times: fresh, all cached, `--no-cache`. The three

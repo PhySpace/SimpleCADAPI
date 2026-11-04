@@ -13,6 +13,7 @@
 
 #include "internal.hpp"
 #include "scad/reactive/digest.hpp"
+#include "scad/reactive/node_registry.hpp"
 #include "scad/core/error.hpp"
 
 namespace scad::reactive {
@@ -109,6 +110,22 @@ std::string param_text(const Value& params, const char* key) {
   return text_field(params, key);
 }
 
+// A witness's parent named by a selection or tag node that is not upstream of the walk: a later cell picked an entity
+// of a value it read, and recording the pick re-stamped that shared entity (SDK_DEFECTS 56), so an operation made on
+// the value afterwards names the pick as the parent.  The entity it stands for is the one of the pick's source.
+TopoRef through_foreign_identity(TopoRef ref) {
+  for (int hop = 0; hop < 16; ++hop) {
+    const NodePtr node = find_registered_node(ref.graph_id, ref.node_id);
+    if (!node || has_history(*node) || !identity_op(node->op) || node->inputs.empty())
+      break;
+    const Value* slot = node->params.is_object() ? node->params.find("source_output_slot") : nullptr;
+    ref.graph_id = node->inputs.front()->graph_id;
+    ref.node_id = node->inputs.front()->node_id;
+    ref.output_slot = slot != nullptr && slot->is_number() ? static_cast<int>(slot->as_double()) : 0;
+  }
+  return ref;
+}
+
 void sort_unique(std::vector<TopoRef>& refs) {
   std::sort(refs.begin(), refs.end(), [](const TopoRef& a, const TopoRef& b) { return member_key(a) < member_key(b); });
   refs.erase(std::unique(refs.begin(), refs.end(),
@@ -198,7 +215,9 @@ ResolvedRef resolve_by_history(const NodePtr& target, const ElementAnchor& ancho
     for (const TopoRef& ref : consumed)
       consumed_keys.emplace(members.canonical(member_key(ref)), member_key(ref));
     const auto lookup = [&](const TopoRef& ref) -> std::string {
-      const auto found = consumed_keys.find(members.canonical(member_key(ref)));
+      auto found = consumed_keys.find(members.canonical(member_key(ref)));
+      if (found == consumed_keys.end() && !members.has(ref))
+        found = consumed_keys.find(members.canonical(member_key(through_foreign_identity(ref))));
       return found == consumed_keys.end() ? std::string{} : found->first;
     };
     std::set<std::string> mentioned, continued, deleted;
@@ -377,13 +396,17 @@ Value to_value(const ResolvedRef& resolved) {
 // ---- stable anchors ----------------------------------------------------------------------------------------------
 
 std::string node_feature(std::string_view node_id) {
-  // "<feature>_<prefix>_<counter>": drop the counter, then the prefix.
+  // "<namespace>_<prefix>_<counter>": drop the counter, then the prefix.  A feature cell's namespace is
+  // "<slug>.<code digest>" (simplecadapi.runtime.cells): the feature is the slug, so it outlives edits of the code.
   const std::size_t counter = node_id.rfind('_');
   if (counter == std::string_view::npos || counter == 0)
     return {};
   const std::string_view base = node_id.substr(0, counter);
   const std::size_t prefix = base.rfind('_');
-  return prefix == std::string_view::npos ? std::string{} : std::string(base.substr(0, prefix));
+  if (prefix == std::string_view::npos)
+    return {};
+  const std::string_view space = base.substr(0, prefix);
+  return std::string(space.substr(0, space.find('.')));
 }
 
 namespace {

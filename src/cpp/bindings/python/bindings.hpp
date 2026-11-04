@@ -49,6 +49,12 @@ struct PyVec3 {
 // Installs the module's exception translator and the General handler.
 void register_exceptions(py::module_& m);
 
+// A Python exception raised by a Python callback that C++ called on its way through a C++ operation (a ql reference
+// resolver inside fillet_rsolid): operations wrap what they catch, so it crosses them as a scad::MessageError (which
+// they pass through unchanged) and the translator raises the original Python exception again, with its attributes.
+// Call from a catch of py::error_already_set, with the GIL held.
+[[noreturn]] void rethrow_python_through_cpp(py::error_already_set& error);
+
 // Python value -> scad::Value (None, bool, int, float, str, list/tuple, dict).
 Value value_from_python(const py::handle& obj);
 py::object value_to_python(const Value& value);

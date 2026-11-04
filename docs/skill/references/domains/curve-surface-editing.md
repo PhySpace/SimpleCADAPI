@@ -55,7 +55,7 @@ boundary invalid (folds the surface over itself) fails with the operation's erro
 ## Tags and references
 
 Every edit records its history: the face and its boundary edges are `modified` (continuation). A tag assigned with
-`apply_tag_rselection` on the face or on one of its edges, and a stable reference (`topology.element_ref`), follow the
+`apply_tag_rselection` on the face or on one of its edges, and a stable reference (`scad.ref`), follow the
 entity through any chain of edits (with or without a `GraphSession`), and `ql.tag(...)` finds it on the result.
 `tag_prefix=` only names the result of the operation it is passed to (`<prefix>.face` / `<prefix>.edge`), as for every
 other operation: name the entities that must keep their name with `apply_tag_rselection`.
