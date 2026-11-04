@@ -20,6 +20,7 @@ PYBIND11_MODULE(_native, m, py::mod_gil_not_used()) {
   bind_ops_features(m);
   bind_sketch(m);
   bind_surface(m);
+  bind_surface_editing(m);  // after bind_surface: adds its names to the `surface` namespace
   bind_std(m);
   bind_product(m);
   bind_canonical(m);

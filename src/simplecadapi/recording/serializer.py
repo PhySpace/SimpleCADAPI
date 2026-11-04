@@ -506,6 +506,36 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
         "op": "make_cylindrical_surface_rface",
     },
     "trim_surface_rface": {"status": "replayable", "op": "trim_surface_rface"},
+    "convert_to_bspline_redge": {"status": "replayable", "op": "convert_to_bspline_redge"},
+    "convert_to_bspline_rface": {"status": "replayable", "op": "convert_to_bspline_rface"},
+    "set_curve_poles_redge": {"status": "replayable", "op": "set_curve_poles_redge"},
+    "move_curve_poles_redge": {"status": "replayable", "op": "move_curve_poles_redge"},
+    "set_curve_weights_redge": {"status": "replayable", "op": "set_curve_weights_redge"},
+    "insert_curve_knot_redge": {"status": "replayable", "op": "insert_curve_knot_redge"},
+    "elevate_curve_degree_redge": {"status": "replayable", "op": "elevate_curve_degree_redge"},
+    "set_surface_poles_rface": {"status": "replayable", "op": "set_surface_poles_rface"},
+    "move_surface_poles_rface": {"status": "replayable", "op": "move_surface_poles_rface"},
+    "set_surface_weights_rface": {"status": "replayable", "op": "set_surface_weights_rface"},
+    "insert_surface_knot_rface": {"status": "replayable", "op": "insert_surface_knot_rface"},
+    "elevate_surface_degree_rface": {"status": "replayable", "op": "elevate_surface_degree_rface"},
+    "rebuild_curve_redge": {"status": "replayable", "op": "rebuild_curve_redge"},
+    "rebuild_surface_rface": {"status": "replayable", "op": "rebuild_surface_rface"},
+    "inspect_curve_rcurvedata": {
+        "status": "diagnostic",
+        "reason": "Reads the NURBS data of an edge for inspection only; an edit that uses it is the recorded node.",
+    },
+    "inspect_surface_rsurfacedata": {
+        "status": "diagnostic",
+        "reason": "Reads the NURBS data of a face for inspection only; an edit that uses it is the recorded node.",
+    },
+    "sample_curve_rcurvature": {
+        "status": "diagnostic",
+        "reason": "Samples curvature along an edge for display (a curvature comb); nothing to replay.",
+    },
+    "sample_surface_risocurves": {
+        "status": "diagnostic",
+        "reason": "Samples isocurves of a face for display; nothing to replay.",
+    },
     "sew_faces_rshell": {"status": "replayable", "op": "sew_faces_rshell"},
     "make_solid_from_shell_rsolid": {
         "status": "replayable",
@@ -665,6 +695,20 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "make_gordon_surface_rface",
     "make_surface_patch_rface",
     "trim_surface_rface",
+    "convert_to_bspline_redge",
+    "convert_to_bspline_rface",
+    "set_curve_poles_redge",
+    "move_curve_poles_redge",
+    "set_curve_weights_redge",
+    "insert_curve_knot_redge",
+    "elevate_curve_degree_redge",
+    "set_surface_poles_rface",
+    "move_surface_poles_rface",
+    "set_surface_weights_rface",
+    "insert_surface_knot_rface",
+    "elevate_surface_degree_rface",
+    "rebuild_curve_redge",
+    "rebuild_surface_rface",
     "make_loft_rshell",
     "sew_faces_rshell",
     "make_solid_from_shell_rsolid",
@@ -695,6 +739,20 @@ _CANONICAL_2_1_ONLY_OPS = {
     "chamfer_corner_rsketch",
     "project_rsketch",
     "explode_rassembly",
+    "convert_to_bspline_redge",
+    "convert_to_bspline_rface",
+    "set_curve_poles_redge",
+    "move_curve_poles_redge",
+    "set_curve_weights_redge",
+    "insert_curve_knot_redge",
+    "elevate_curve_degree_redge",
+    "set_surface_poles_rface",
+    "move_surface_poles_rface",
+    "set_surface_weights_rface",
+    "insert_surface_knot_rface",
+    "elevate_surface_degree_rface",
+    "rebuild_curve_redge",
+    "rebuild_surface_rface",
 }
 CANONICAL_CORE_OP_SET_2_0: Tuple[str, ...] = tuple(
     op for op in CANONICAL_CORE_OP_SET if op not in _CANONICAL_2_1_ONLY_OPS
@@ -2216,6 +2274,91 @@ def _ordered_input_shapes(
             )
         resolved.append(cast(AnyShape, shape))
     return resolved
+
+
+_SHAPE_EDIT_OPS = frozenset(
+    {
+        "convert_to_bspline_redge",
+        "convert_to_bspline_rface",
+        "set_curve_poles_redge",
+        "move_curve_poles_redge",
+        "set_curve_weights_redge",
+        "insert_curve_knot_redge",
+        "elevate_curve_degree_redge",
+        "set_surface_poles_rface",
+        "move_surface_poles_rface",
+        "set_surface_weights_rface",
+        "insert_surface_knot_rface",
+        "elevate_surface_degree_rface",
+        "rebuild_curve_redge",
+        "rebuild_surface_rface",
+    }
+)
+"""The curve / surface edits: one ordered Edge or Face input, recorded parameters, a new shape of the same kind."""
+
+
+def _optional_int(value: Any) -> Optional[int]:
+    return None if value is None else int(value)
+
+
+def _replay_shape_edit(
+    ctx: _ReplayContext,
+    graph: OperationGraph,
+    outputs: Dict[str, List[Any]],
+    node: Any,
+    params: Dict[str, Any],
+) -> AnyShape:
+    op_name = node.op
+    ordered = _ordered_input_shapes(ctx, graph, outputs, node, params)
+    kind = Edge if op_name.endswith("_redge") else Face
+    if len(ordered) != 1 or not isinstance(ordered[0], kind):
+        ctx.fail(
+            f"Graph node '{node.node_id}' ({op_name}) requires exactly one {kind.__name__} input"
+        )
+    source = ordered[0]
+    tag_prefix = cast(Optional[str], params.get("tag_prefix"))
+    fn = getattr(ops, op_name)
+    required = {
+        "set_curve_poles_redge": ("poles",),
+        "move_curve_poles_redge": ("moves",),
+        "set_curve_weights_redge": ("weights",),
+        "insert_curve_knot_redge": ("parameter", "multiplicity"),
+        "elevate_curve_degree_redge": ("degree",),
+        "set_surface_poles_rface": ("poles",),
+        "move_surface_poles_rface": ("moves",),
+        "set_surface_weights_rface": ("weights",),
+        "insert_surface_knot_rface": ("direction", "parameter", "multiplicity"),
+        "elevate_surface_degree_rface": ("u_degree", "v_degree"),
+        "rebuild_curve_redge": ("degree", "pole_count", "tolerance"),
+        "rebuild_surface_rface": ("u_degree", "v_degree", "u_pole_count", "v_pole_count", "tolerance"),
+    }.get(op_name, ())
+    ctx.require_params(node.node_id, op_name, params, required)
+    if op_name.startswith("convert_to_bspline_"):
+        return fn(source, tag_prefix=tag_prefix)
+    if op_name in ("set_curve_poles_redge", "set_surface_poles_rface"):
+        return fn(source, params["poles"], tag_prefix=tag_prefix)
+    if op_name in ("set_curve_weights_redge", "set_surface_weights_rface"):
+        return fn(source, params["weights"], tag_prefix=tag_prefix)
+    if op_name == "move_curve_poles_redge":
+        moves = {int(index): tuple(point) for index, point in params["moves"]}
+        return fn(source, moves, tag_prefix=tag_prefix)
+    if op_name == "move_surface_poles_rface":
+        moves = {(int(row), int(column)): tuple(point) for row, column, point in params["moves"]}
+        return fn(source, moves, tag_prefix=tag_prefix)
+    if op_name == "insert_curve_knot_redge":
+        return fn(source, float(params["parameter"]), int(params["multiplicity"]), tag_prefix=tag_prefix)
+    if op_name == "insert_surface_knot_rface":
+        return fn(source, str(params["direction"]), float(params["parameter"]), int(params["multiplicity"]),
+                  tag_prefix=tag_prefix)
+    if op_name == "elevate_curve_degree_redge":
+        return fn(source, int(params["degree"]), tag_prefix=tag_prefix)
+    if op_name == "elevate_surface_degree_rface":
+        return fn(source, _optional_int(params["u_degree"]), _optional_int(params["v_degree"]), tag_prefix=tag_prefix)
+    if op_name == "rebuild_curve_redge":
+        return fn(source, int(params["degree"]), _optional_int(params["pole_count"]),
+                  tolerance=float(params["tolerance"]), tag_prefix=tag_prefix)
+    return fn(source, int(params["u_degree"]), int(params["v_degree"]), _optional_int(params["u_pole_count"]),
+              _optional_int(params["v_pole_count"]), tolerance=float(params["tolerance"]), tag_prefix=tag_prefix)
 
 
 def _feature_input_shapes(ctx, graph, outputs, node, params):
@@ -3752,6 +3895,10 @@ def _execute_graph(
                             tag_prefix=cast(Optional[str], params.get("tag_prefix")),
                         )
                         _store_outputs(node, result)
+                        continue
+
+                    if op_name in _SHAPE_EDIT_OPS:
+                        _store_outputs(node, _replay_shape_edit(ctx, graph, outputs, node, params))
                         continue
 
                     if op_name == "trim_surface_rface":

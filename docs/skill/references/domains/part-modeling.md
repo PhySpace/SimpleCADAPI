@@ -67,6 +67,7 @@ consult their own documentation before the first call.
   `make_face_from_wires_rface`, `make_surface_patch_rface`,
   `make_ruled_surface_rface`, `make_gordon_surface_rface`,
   `make_cylindrical_surface_rface`.
+- Editing an existing curve or surface (poles, weights, knots, degree, refit): `domains/curve-surface-editing.md`.
 - Features: `extrude_rsolid`, `revolve_rsolid`, `sweep_rsolid`,
   `twisted_sweep_rsolid` (supports inner-wire profiles), `helical_sweep_rsolid`,
   `loft_rsolid`, `loft_rshell`, `shell_rsolid`.

@@ -13,6 +13,12 @@ namespace scad {
 
 TopoDelta modification_delta(const BRepTools_History& history, const TopoDS_Shape& input, const TopoDS_Shape& result,
                              std::string_view modified_derivation, bool generated_faces_continue) {
+  return modification_history(history, input, result, modified_derivation, generated_faces_continue).delta;
+}
+
+ModificationHistory modification_history(const BRepTools_History& history, const TopoDS_Shape& input,
+                                         const TopoDS_Shape& result, std::string_view modified_derivation,
+                                         bool generated_faces_continue) {
   if (!tracking::history_wanted())
     return {};
   tracking::RetainedHistory source(history);
@@ -43,7 +49,8 @@ TopoDelta modification_delta(const BRepTools_History& history, const TopoDS_Shap
       }
     }
   }
-  return std::move(delta).finish().delta;
+  tracking::Finished finished = std::move(delta).finish();
+  return {std::move(finished.delta), std::move(finished.delta_entries)};
 }
 
 }  // namespace scad
