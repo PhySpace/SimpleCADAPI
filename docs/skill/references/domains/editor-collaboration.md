@@ -224,6 +224,9 @@ made in the editor: read `editor-gui-features.md`.
   autosaves too, and the editor rewrites the selection cell.
 - Edit by cell, with `sca cell`. A change that touches many cells at once makes the person's
   screen reflow and loses their place.
+- A notebook the person deletes in the workspace tab (manual or code mode) is moved to
+  `<workspace>/.sca-editor/trash/<time>-<name>.py`, not erased; the open one is closed by opening another
+  first. Look there before recreating a notebook the person says they lost.
 - New notebooks: `sca new`, not a bare file write plus a request to refresh; the editor
   lists a new file by itself either way.
 - After an edit, say which cells you changed (by reference) and what to look

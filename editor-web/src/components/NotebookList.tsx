@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ export function NotebookList({
   onOpen,
   onOpenModule,
   onCreate,
+  onDelete,
 }: {
   notebooks: NotebookRow[];
   /** Workspace-relative path of the open notebook. */
@@ -31,8 +32,13 @@ export function NotebookList({
   onOpenModule: (path: string) => void;
   /** Write a new notebook and open it; rejects with the reason it could not. */
   onCreate: (name: string, kind: "part" | "assembly") => Promise<void>;
+  /** Delete a notebook (kept in the workspace's trash); rejects with the reason it could not. */
+  onDelete?: (path: string) => Promise<void>;
 }) {
   const [adding, setAdding] = useState(false);
+  // the notebook asked to be deleted: the row shows "delete <name>? yes / no" until answered
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<{ path: string; text: string } | null>(null);
   const empty = notebooks.length === 0;
   return (
     <ScrollArea className="h-full">
@@ -52,7 +58,46 @@ export function NotebookList({
       )}
       <ul>
         {notebooks.map((row) => (
-          <li key={row.path} className="border-b border-border">
+          <li key={row.path} className="group relative border-b border-border">
+            {onDelete && confirming !== row.path && (
+              <button
+                type="button"
+                className="absolute right-2 top-2 z-10 hidden p-1 text-muted-foreground hover:text-fail group-hover:block"
+                title={`Delete ${row.name} (kept in .sca-editor/trash)`}
+                aria-label={`delete ${row.name}`}
+                onClick={() => {
+                  setDeleteError(null);
+                  setConfirming(row.path);
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {confirming === row.path && (
+              <div className="flex items-center gap-2 bg-accent px-3 py-1.5 text-[11px]" role="alertdialog">
+                <span className="flex-1">
+                  Delete <span className="font-mono">{row.name}</span>?{row.path === current ? " Another notebook opens." : ""}
+                </span>
+                <button
+                  type="button"
+                  className="border border-fail px-1.5 text-fail hover:bg-fail hover:text-white"
+                  onClick={() => {
+                    setConfirming(null);
+                    onDelete?.(row.path).catch((error) => setDeleteError({ path: row.path, text: error instanceof Error ? error.message : String(error) }));
+                  }}
+                >
+                  delete
+                </button>
+                <button type="button" className="border border-border px-1.5 hover:bg-background" onClick={() => setConfirming(null)}>
+                  keep
+                </button>
+              </div>
+            )}
+            {deleteError?.path === row.path && (
+              <p role="alert" className="px-3 pt-1 text-[11px] text-fail">
+                {deleteError.text}
+              </p>
+            )}
             <button
               type="button"
               className={cn(

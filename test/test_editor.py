@@ -1431,3 +1431,28 @@ class CellOpenAndViewportTest(unittest.TestCase):
             report, code = cli._viewport(args)
         self.assertEqual(code, 0)
         self.assertEqual(report["path"], str(directory / "viewport.png"))
+
+
+class DeleteNotebookTest(unittest.TestCase):
+    """The workspace tab deletes a notebook by moving it to .sca-editor/trash/; the only, open one is refused."""
+
+    def test_a_deleted_notebook_is_kept_in_the_trash_and_the_last_open_one_stays(self) -> None:
+        from starlette.testclient import TestClient
+
+        from simplecadapi.editor.server import create_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = create_notebook(root, "first", "part")
+            create_notebook(root, "second", "part")
+            state = WorkspaceState(root, first)
+            client = TestClient(create_app(state))
+            gone = client.post("/api/workspace/delete", json={"path": "second.py"}).json()
+            self.assertTrue(gone["ok"])
+            self.assertFalse((root / "second.py").exists())
+            self.assertTrue((root / gone["trash"]).is_file() and gone["trash"].startswith(".sca-editor/trash/"))
+            refused = client.post("/api/workspace/delete", json={"path": "first.py"})
+            self.assertEqual(refused.status_code, 400)
+            self.assertIn("only notebook", refused.json()["error"])
+            self.assertTrue(first.exists())
+            self.assertEqual(client.post("/api/workspace/delete", json={"path": "../x.py"}).status_code, 400)

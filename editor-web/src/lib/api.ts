@@ -59,6 +59,18 @@ export async function newNotebook(name: string, kind: "part" | "assembly"): Prom
   return { created: body.created };
 }
 
+/** Delete a notebook of the workspace (the server moves it to .sca-editor/trash/); rejects with the reason it could not. */
+export async function deleteNotebook(path: string): Promise<{ trash: string }> {
+  const response = await fetch("/api/workspace/delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path }),
+  });
+  const body = (await response.json().catch(() => null)) as { ok?: boolean; trash?: string; error?: string } | null;
+  if (!response.ok || !body?.ok) throw new Error(body?.error ?? `${response.status} ${response.statusText}`);
+  return { trash: body.trash ?? "" };
+}
+
 /** What the viewport shows (PNG data URL), for coding agents to look at. */
 export async function postViewport(dataUrl: string): Promise<void> {
   const blob = await (await fetch(dataUrl)).blob();

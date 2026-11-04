@@ -2227,6 +2227,54 @@ def create_app(state: WorkspaceState) -> Starlette:
         threading.Thread(target=run, name="notebook-new", daemon=True).start()
         return JSONResponse({"ok": True, "created": rel_path})
 
+    async def workspace_delete(request: Request) -> JSONResponse:
+        """Delete a notebook of the workspace: it is moved to ``.sca-editor/trash/`` (recoverable), not erased.
+
+        The open notebook is closed by opening another one first; the only notebook of the workspace is refused (there
+        would be nothing to open: create another first).
+        """
+        try:
+            message = json.loads(await request.body())
+            rel_path = str(message["path"])
+            target = state.resolve_notebook(rel_path)
+        except (KeyError, TypeError, json.JSONDecodeError):
+            return JSONResponse({"ok": False, "error": "body must be {path}"}, status_code=400)
+        except ValueError as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+        others = [entry.path for entry in scan_workspace(state.workspace) if entry.kind and entry.path != rel_path]
+        is_open = state.notebook is not None and state.notebook.resolve() == target
+        if is_open and not others:
+            return JSONResponse(
+                {"ok": False, "error": f"{rel_path} is the only notebook of the workspace: create another before deleting it"},
+                status_code=400,
+            )
+        trash = state.snapshot_dir / "trash"
+        trash.mkdir(parents=True, exist_ok=True)
+        kept = trash / f"{time.strftime('%Y%m%d-%H%M%S')}-{target.name}"
+        where = kept.relative_to(state.workspace).as_posix()
+
+        def remove() -> None:
+            target.replace(kept)
+            hub.broadcast({"type": "workspace.changed"})
+            hub.broadcast({"type": "status", "info": f"deleted {rel_path} (kept in {where})"})
+
+        if not is_open:
+            remove()
+            return JSONResponse({"ok": True, "deleted": rel_path, "trash": where})
+        # the open notebook: open another first (the kernel must not keep running on a file that is gone), then move it
+        generation = state.reserve_switch()
+        state.announce_opening(state.workspace / others[0])
+
+        def run() -> None:
+            try:
+                state.open_notebook(others[0], generation)
+                remove()
+            except Exception as exc:
+                hub.broadcast({"type": "status", "error": f"delete failed: {exc}"})
+
+        threading.Thread(target=run, name="notebook-delete", daemon=True).start()
+        return JSONResponse({"ok": True, "deleting": rel_path, "opening": others[0], "trash": where})
+
     async def studio_select(request: Request) -> JSONResponse:
         """Webui reports the viewport selection; agents read it back."""
         try:
@@ -2306,6 +2354,7 @@ def create_app(state: WorkspaceState) -> Starlette:
         Route("/api/workspace", workspace_list, methods=["GET"]),
         Route("/api/workspace/open", workspace_open, methods=["POST"]),
         Route("/api/workspace/new", workspace_new, methods=["POST"]),
+        Route("/api/workspace/delete", workspace_delete, methods=["POST"]),
         Route("/api/studio/select", studio_select, methods=["POST"]),
         Route("/api/studio/selected", studio_selected, methods=["GET"]),
         Route("/api/studio/viewport", viewport_image, methods=["POST"]),

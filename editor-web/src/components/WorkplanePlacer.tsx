@@ -158,6 +158,8 @@ export function WorkplanePlacer({
 
 /** The placer's panel: the base, move or turn, the six numbers, create and cancel. */
 export function WorkplanePlacePanel({
+  title = "Workplane",
+  createLabel = "Create",
   bases,
   base,
   values,
@@ -172,6 +174,9 @@ export function WorkplanePlacePanel({
   onCreate,
   onCancel,
 }: {
+  /** What is being placed (the panel's heading). */
+  title?: string;
+  createLabel?: string;
   bases: PlaceBase[];
   base: string;
   values: PlaceValues;
@@ -205,9 +210,9 @@ export function WorkplanePlacePanel({
     if (Number.isFinite(number)) onValues(field.set(values, number));
   };
   return (
-    <div className="pointer-events-auto absolute left-3 top-3 z-30 flex max-w-[min(440px,90%)] flex-col gap-2 border-2 border-primary bg-popover px-3 py-2 text-[11px] shadow-[4px_4px_0_var(--shadow-hard)]" data-testid="workplane-placer">
+    <div className="pointer-events-auto absolute left-3 top-3 z-30 flex max-w-[min(440px,90%)] flex-col gap-2 border-2 border-primary bg-popover px-3 py-2 text-[11px] shadow-[4px_4px_0_var(--shadow-hard)]" data-testid={title === "Workplane" ? "workplane-placer" : `${title.toLowerCase()}-placer`}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-semibold">Workplane</span>
+        <span className="font-semibold">{title}</span>
         <input
           id="workplane-place-name"
           aria-label="name"
@@ -254,7 +259,7 @@ export function WorkplanePlacePanel({
       </div>
       <div className="flex items-center gap-2">
         <button type="button" disabled={busy} className="border-2 border-primary bg-primary px-2 py-0.5 font-semibold text-primary-foreground disabled:opacity-50" onClick={onCreate}>
-          Create (Enter)
+          {createLabel} (Enter)
         </button>
         <button type="button" className="border border-border px-2 py-0.5 hover:bg-accent" onClick={onCancel}>
           Cancel (Esc)

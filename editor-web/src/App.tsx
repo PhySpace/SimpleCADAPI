@@ -22,12 +22,12 @@ import { WorkplanePlacePanel, WorkplanePlacer, type PlaceBase, type PlaceMode } 
 import { CurveDrawer } from "@/components/CurveDrawer";
 import { CurveLines, curveEnds, parseCurves, type CurveSample } from "@/components/CurveLines";
 import type { CurveDoc, DrawPlane } from "@/lib/curve3d";
-import { NAMED_FRAMES, ZERO_PLACE, cleanValues, faceFrame, type PlaceFrame, type PlaceValues } from "@/lib/workplane-place";
+import { NAMED_FRAMES, ZERO_PLACE, cleanValues, faceFrame, placedFrame, type PlaceFrame, type PlaceValues } from "@/lib/workplane-place";
 import { parseWorkplanes, resolvePlane, workplanePlane, workplaneRequest, type WorkplaneFrame } from "@/lib/workplanes";
 import { fitDistanceMm } from "@/lib/sketch-view";
 import { viewPose } from "@/lib/sketch-plane";
 import * as THREE from "three";
-import { setRef } from "@/lib/assembly";
+import { addConnectorFrame, connectorFrameFromFace, setConnectorsCommand, setRef } from "@/lib/assembly";
 import { useAssemblyEditor, useConnectorDraft } from "@/lib/useAssembly";
 import { Header } from "@/components/Header";
 import { Inspector } from "@/components/Inspector";
@@ -37,7 +37,7 @@ import { ModuleView, type ModuleState } from "@/components/ModuleView";
 import { NotebookList } from "@/components/NotebookList";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getWorkspace, newNotebook, openNotebook, postViewport, type ModuleRow, type NotebookRow } from "@/lib/api";
+import { deleteNotebook, getWorkspace, newNotebook, openNotebook, postViewport, type ModuleRow, type NotebookRow } from "@/lib/api";
 import { parsePreview, previewSummary, type PreviewPart } from "@/lib/preview";
 import { EnvelopeSocket, type Envelope } from "@/lib/envelope";
 import { emptyDoc, normalizeDoc } from "@/lib/sketch";
@@ -70,7 +70,9 @@ const MODES: { mode: SelectionMode; label: string; key: string }[] = [
  * model, right = the selection. The model is the in-memory scadpkg the kernel
  * publishes whenever the cells settle; picking in the viewport writes the
  * selection into the notebook (see `selection.set`). */
+/** The tabs of each mode; the workspace tab is in both (opening or making a notebook is not a code-only thing). */
 const MANUAL_TABS = ["features", "assembly"];
+const CODE_TABS = ["notebook", "module"];
 
 export function App() {
   const viewRef = useRef<SceneView | null>(null);
@@ -84,11 +86,14 @@ export function App() {
   const [moduleView, setModuleView] = useState<ModuleState | null>(null);
   // Two modes, never mixed on one page: manual (features, assemblies) and code (notebook, workspace).  The left tab says which.
   const [leftTab, setLeftTab] = useState("features");
-  const mode: EditorMode = MANUAL_TABS.includes(leftTab) ? "manual" : "code";
+  const [sharedMode, setSharedMode] = useState<EditorMode>("manual"); // the mode the workspace tab is shown in
+  const mode: EditorMode = MANUAL_TABS.includes(leftTab) ? "manual" : CODE_TABS.includes(leftTab) ? "code" : sharedMode;
+  if (mode !== sharedMode) setSharedMode(mode);
   const lastTab = useRef<Record<EditorMode, string>>({ manual: "features", code: "notebook" });
   lastTab.current[mode] = leftTab;
   const [modeTarget, setModeTarget] = useState<EditorMode | null>(null);
   const motion = useModeTransition((target) => {
+    setSharedMode(target as EditorMode);
     setLeftTab(lastTab.current[target as EditorMode]);
     setModeTarget(null);
   });
@@ -117,7 +122,9 @@ export function App() {
   const cellTitles = useMemo(() => new Map(cells.map((cell) => [cell.id, cell.title ?? ""])), [cells]);
   const [curves, setCurves] = useState<CurveSample[]>([]);
   // A workplane being placed by hand (Space): its base, the numbers the handles write, move or turn, its name.
-  const [placing, setPlacing] = useState<{ base: string; values: PlaceValues; mode: PlaceMode; name: string; face: { item: SelectionItem; frame: PlaceFrame } | null; error: string | null } | null>(null);
+  // A workplane, or a connector of the part, being placed by hand: its base, the numbers the handles write, move or turn,
+  // its name.
+  const [placing, setPlacing] = useState<{ kind: "workplane" | "connector"; base: string; values: PlaceValues; mode: PlaceMode; name: string; face: { item: SelectionItem; frame: PlaceFrame } | null; error: string | null } | null>(null);
   const placingRef = useRef(placing);
   placingRef.current = placing;
   // A 3D curve being drawn in the viewport (W): the plane it starts on, the error of a failed commit.
@@ -816,11 +823,12 @@ export function App() {
 
   /** The bases a workplane can be placed on: the datum planes, every workplane of the notebook, and the picked face. */
   const placeBases = useMemo<PlaceBase[]>(() => {
+    if (placing?.kind === "connector" && placing.face) return [{ value: "face", label: "picked face", frame: placing.face.frame }];
     const out: PlaceBase[] = (["XY", "XZ", "YZ"] as const).map((name) => ({ value: name, label: name, frame: NAMED_FRAMES[name] }));
     for (const wp of workplanes) out.push({ value: wp.name, label: wp.name, frame: { origin: wp.origin, x_axis: wp.x_axis, y_axis: wp.y_axis, normal: wp.normal } });
     if (placing?.face) out.push({ value: "face", label: "picked face", frame: placing.face.frame });
     return out;
-  }, [workplanes, placing?.face]);
+  }, [workplanes, placing?.face, placing?.kind]);
   const placeBase = placeBases.find((item) => item.value === placing?.base) ?? placeBases[0];
 
   /** Start placing: on the picked flat face, else on the active workplane (one after another builds a 3D frame of
@@ -838,12 +846,57 @@ export function App() {
     for (let n = 2; taken.includes(name); n++) name = `wp_${n}`;
     const base = face ? "face" : activeWorkplaneRef.current && workplanesRef.current.some((wp) => wp.name === activeWorkplaneRef.current) ? activeWorkplaneRef.current : "XY";
     setBarNote(null);
-    setPlacing({ base, values: ZERO_PLACE, mode: "translate", name, face: face && frame ? { item: face, frame } : null, error: null });
+    setPlacing({ kind: "workplane", base, values: ZERO_PLACE, mode: "translate", name, face: face && frame ? { item: face, frame } : null, error: null });
   }, [gui.state?.taken]);
+
+  /** Start placing a connector of the part on the picked flat face: its frame there, moved and turned with the handles. */
+  const startConnector = useCallback(() => {
+    const items = selectionRef.current;
+    const face = items.length === 1 && items[0].kind === "face" ? items[0] : null;
+    const frame = face ? connectorFrameFromFace(face) : null;
+    if (!face || !frame) {
+      setBarNote("A connector is placed on one flat face: pick it first (face mode).");
+      return;
+    }
+    setBarNote(null);
+    setPlacing({
+      kind: "connector",
+      base: "face",
+      values: ZERO_PLACE,
+      mode: "translate",
+      name: "",
+      face: { item: face, frame: { origin: frame.origin, x_axis: frame.x_axis, y_axis: frame.y_axis, normal: frame.z_axis } },
+      error: null,
+    });
+  }, []);
 
   const createPlaced = useCallback(async () => {
     const current = placingRef.current;
     if (!current) return;
+    if (current.kind === "connector") {
+      // the part's connectors with this one added, written into the product cell (set_connectors)
+      const base = current.face?.frame;
+      if (!base) return;
+      const made = addConnectorFrame(conn.list, placedFrame(base, cleanValues(current.values)), current.name);
+      if ("error" in made) {
+        setPlacing((p) => (p ? { ...p, error: made.error } : p));
+        return;
+      }
+      try {
+        const command = setConnectorsCommand(made.list);
+        const result = await gui.run(command);
+        if (isCellCommand(command)) assertCellRan(result);
+        conn.setList(made.list);
+        conn.setSelected(made.id);
+        log.push("ok", `connector ${made.id} added`);
+        setPlacing(null);
+        setPicked([]);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setPlacing((p) => (p ? { ...p, error: message } : p));
+      }
+      return;
+    }
     setGuiBusy(true);
     try {
       const values = cleanValues(current.values);
@@ -875,7 +928,7 @@ export function App() {
     } finally {
       setGuiBusy(false);
     }
-  }, [gui.run, log.push]);
+  }, [gui.run, log.push, conn]);
 
   // While placing: G move, R turn, Enter create, Esc cancel (not while typing in a field, except the fields' own Enter).
   useEffect(() => {
@@ -1003,7 +1056,18 @@ export function App() {
         keywords: ["workplane", "datum", "plane", "offset", "rotate", "move", "space"],
         description: "Place a workplane with handles (Space): on the picked flat face, else on the active workplane, else on XY; move and turn it, then sketch on it.",
         icon: FEATURE_ICONS.workplane_from_selection,
+        when: whenFor("workplane_place"),
         run: () => startPlacing(),
+      },
+      {
+        id: "connector_place",
+        label: "Connector",
+        group: "Product",
+        keywords: ["connector", "frame", "mate", "joint", "interface", "assembly"],
+        description: "Place a connector of this part on the picked flat face: move and turn its frame with the handles, then add it (assemblies join parts at connectors).",
+        icon: FEATURE_ICONS.workplane_from_selection,
+        when: whenFor("connector_place"),
+        run: () => startConnector(),
       },
       {
         id: "workplane_from_selection",
@@ -1039,7 +1103,7 @@ export function App() {
       },
       ...assemblyCommands(openAssembly, { assembly: Boxes, connectors: Cable }),
     ],
-    [gui.catalog, openSpec, sketchOnSelectedFace, editSelectedSketch, openAssembly, workplaneFromSelection, startPlacing, startDrawing],
+    [gui.catalog, openSpec, sketchOnSelectedFace, editSelectedSketch, openAssembly, workplaneFromSelection, startPlacing, startDrawing, startConnector],
   );
   // The stand-alone combine commands (Cut, Union, Intersect, Cut/Boss with sketch) are offered only while several bodies are open:
   // a new solid says how it meets the body in its own dialog.
@@ -1158,8 +1222,8 @@ export function App() {
   const handleCreate = async (name: string, kind: "part" | "assembly") => {
     setStatus(`creating ${name}…`);
     await newNotebook(name, kind);
-    // the server opens it: show its cells
-    setLeftTab("notebook");
+    // the server opens it: show its features (manual mode) or its cells (code mode)
+    setLeftTab(mode === "manual" ? "features" : "notebook");
   };
 
   return (
@@ -1196,6 +1260,7 @@ export function App() {
                   <>
                     <TabsTrigger value="features">features</TabsTrigger>
                     <TabsTrigger value="assembly">assembly</TabsTrigger>
+                    <TabsTrigger value="workspace">workspace</TabsTrigger>
                   </>
                 ) : (
                   <>
@@ -1229,6 +1294,7 @@ export function App() {
                   busy={guiBusy}
                   onSelectionMode={setSelectionMode}
                   onRun={runPanelCommand}
+                  onPlaceConnector={startConnector}
                 />
               </TabsContent>
               <TabsContent value="notebook" className="min-h-0">
@@ -1256,6 +1322,10 @@ export function App() {
                   onOpen={handleOpen}
                   onOpenModule={(path) => socketRef.current?.send({ type: "module.open", path })}
                   onCreate={handleCreate}
+                  onDelete={async (path) => {
+                    const { trash } = await deleteNotebook(path);
+                    log.push("ok", `deleted ${path} (kept in ${trash})`);
+                  }}
                 />
               </TabsContent>
               {moduleView && (
@@ -1352,6 +1422,8 @@ export function App() {
                       onChange={(values) => setPlacing((p) => (p ? { ...p, values } : p))}
                     />
                     <WorkplanePlacePanel
+                      title={placing.kind === "connector" ? "Connector" : "Workplane"}
+                      createLabel={placing.kind === "connector" ? "Add" : "Create"}
                       bases={placeBases}
                       base={placeBase.value}
                       values={placing.values}
@@ -1376,7 +1448,7 @@ export function App() {
                     <CommandBar commands={commands} fit={fit} hint={hint} />
                   </div>
                 )}
-                {mode === "manual" && !sketching && !dialog && leftTab !== "assembly" && loading === null && viewRef.current && (
+                {mode === "manual" && !sketching && !dialog && !placing && !drawing && leftTab !== "assembly" && loading === null && viewRef.current && (
                   <SelectionBar view={viewRef.current} commands={commands} context={context} anchorMm={anchorMm} icons={FEATURE_ICONS} notice={barNote} disabled={barDisabled} />
                 )}
                 {sketchSession && viewRef.current && (

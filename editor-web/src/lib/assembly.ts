@@ -403,6 +403,22 @@ export function addConnectorFromFace(list: readonly ConnectorFrame[], face: Pick
   return { list: [...list, { id, origin: frame.origin, x_axis: frame.x_axis, y_axis: frame.y_axis, z_axis: frame.z_axis }], id };
 }
 
+/** The list with a connector at `frame` (placed with the handles), named `name` or after the side its z faces. */
+export function addConnectorFrame(
+  list: readonly ConnectorFrame[],
+  frame: { origin: Vec3; x_axis: Vec3; y_axis: Vec3 },
+  name?: string,
+): { list: ConnectorFrame[]; id: string } | { error: string } {
+  const z = cross(frame.x_axis, frame.y_axis);
+  const wanted = name?.trim();
+  if (wanted) {
+    if (!CONNECTOR_PATTERN.test(wanted)) return { error: `"${wanted}" is not a connector name: letters, digits, _ . : - (up to 61 characters)` };
+    if (list.some((c) => c.id === wanted)) return { error: `"${wanted}" is already a connector of this part` };
+  }
+  const id = wanted || uniqueId(sideName(z), list.map((c) => c.id));
+  return { list: [...list, { id, origin: frame.origin, x_axis: frame.x_axis, y_axis: frame.y_axis, z_axis: z }], id };
+}
+
 export const removeConnector = (list: readonly ConnectorFrame[], id: string): ConnectorFrame[] => list.filter((c) => c.id !== id);
 
 /** Rotate `v` about the unit axis `k` by `degrees` (Rodrigues). */

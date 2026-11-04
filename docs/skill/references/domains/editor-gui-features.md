@@ -69,6 +69,10 @@ HOLE_DIAMETER = scad.var(name="hole_diameter", default=6.0, unit="mm", comment="
   workplane), one snapped to a vertex is `scad.ref.vertex(...).one(base).get_coordinates()` (it follows the model), others
   are numbers; the curves become one `make_wire_from_edges_rwire([...])`, a value sweep/loft forms take. Every wire or
   edge value of the notebook is drawn in the viewport from the kernel's samples (`runtime/live_curves.py`).
+- Connectors of the part are placed like workplanes: pick one flat face, then "Connector" (selection bar, command bar,
+  or the assembly tab's "on picked face"): a frame with move arrows and turn rings sits on the face; name it and Add.
+  It is written into the product cell (`add_connector_rpart(...)`, `# gui-connectors:`); the assembly tab lists, edits
+  and deletes the part's connectors.
 - A hole is placed with the pointer: while its form is open a ghost of the hole (its diameter and depth) follows the model
   under the pointer, along the surface's normal there by default ("along the picked face's normal"), and a click writes
   the start point and direction into the form. Nothing is computed by the kernel until Add.

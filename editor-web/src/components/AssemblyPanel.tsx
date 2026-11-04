@@ -123,6 +123,7 @@ function ConnectorsSection({
   busy,
   onSelectionMode,
   onRun,
+  onPlace,
 }: {
   state: FeatureState;
   draft: ConnectorDraft;
@@ -130,23 +131,14 @@ function ConnectorsSection({
   busy: boolean;
   onSelectionMode: (mode: SelectionMode) => void;
   onRun: (command: FeatureCommand) => Promise<void>;
+  /** Place a connector on the picked face with the handles (the viewport's connector placer). */
+  onPlace: () => void;
 }) {
-  const [name, setName] = useState("");
   const [note, setNote] = useState<{ tone: "ok" | "fail"; text: string } | null>(null);
   const [working, setWorking] = useState(false);
   const faces = filterSelection(selection, "face");
   const problems = connectorProblems(draft.list);
 
-  const addFromFace = () => {
-    if (faces.length !== 1) return setNote({ tone: "fail", text: "Pick exactly one planar face in the viewport (face mode)." });
-    if (!isDescribed(faces[0])) return setNote({ tone: "fail", text: "The face details are still loading; try again in a moment." });
-    const made = addConnectorFromFace(draft.list, faces[0], name);
-    if ("error" in made) return setNote({ tone: "fail", text: made.error });
-    draft.setList(made.list);
-    draft.setSelected(made.id);
-    setName("");
-    setNote({ tone: "ok", text: `connector "${made.id}" added on the picked face: apply to write it into the part` });
-  };
   const apply = async () => {
     if (problems.length || working) return;
     setWorking(true);
@@ -177,18 +169,14 @@ function ConnectorsSection({
             <ConnectorRow key={c.id} c={c} active={draft.selected === c.id} onSelect={() => draft.setSelected(draft.selected === c.id ? null : c.id)} list={draft.list} setList={draft.setList} onSelected={draft.setSelected} />
           ))}
         </ul>
-        <div className="flex items-end gap-1.5">
-          <label className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">name (optional)</span>
-            <Input aria-label="Connector name" data-testid="connector-name" className="h-7" placeholder="top, bottom, hinge..." value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addFromFace()} />
-          </label>
-          <Button type="button" size="sm" data-testid="connector-add" disabled={faces.length === 0} title={faces.length ? "Add a connector on the picked face" : "Pick a planar face first"} onClick={addFromFace}>
-            <Plus /> from picked face{faces.length > 1 ? "s" : ""}
+        <div className="flex items-center gap-1.5">
+          <Button type="button" size="sm" data-testid="connector-place" disabled={faces.length !== 1} title={faces.length === 1 ? "Place a connector on the picked face with the handles" : "Pick one flat face first"} onClick={onPlace}>
+            <Plus /> on picked face
           </Button>
+          <span className="text-[10px] text-muted-foreground">
+            {faces.length === 1 ? "Place it with the handles, name it, add it." : faces.length === 0 ? "Pick a flat face (face mode), or use Connector on the selection bar." : `${faces.length} faces picked: pick exactly one.`}
+          </span>
         </div>
-        <span className="text-[10px] text-muted-foreground">
-          {faces.length === 1 ? "1 face picked." : faces.length === 0 ? "Pick a face in the viewport (face mode)." : `${faces.length} faces picked: pick exactly one.`}
-        </span>
         <Problems items={problems} />
         {note && (
           <p role={note.tone === "fail" ? "alert" : "status"} data-testid="connector-note" className={cn("text-[11px]", note.tone === "fail" ? "text-fail" : "text-pass")}>
@@ -588,6 +576,7 @@ export function AssemblyPanel({
   busy,
   onSelectionMode,
   onRun,
+  onPlaceConnector,
 }: {
   state: FeatureState;
   editor: AssemblyEditor;
@@ -597,10 +586,11 @@ export function AssemblyPanel({
   onSelectionMode: (mode: SelectionMode) => void;
   /** Runs the command; rejects with the server's message (shown inline). */
   onRun: (command: FeatureCommand) => Promise<void>;
+  onPlaceConnector: () => void;
 }) {
   return (
     <div className="h-full overflow-y-auto" data-testid="assembly-panel">
-      {state.product && <ConnectorsSection state={state} draft={connectors} selection={selection} busy={busy} onSelectionMode={onSelectionMode} onRun={onRun} />}
+      {state.product && <ConnectorsSection state={state} draft={connectors} selection={selection} busy={busy} onSelectionMode={onSelectionMode} onRun={onRun} onPlace={onPlaceConnector} />}
       <AssemblySection state={state} editor={editor} busy={busy} onRun={onRun} />
     </div>
   );
