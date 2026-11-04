@@ -621,6 +621,23 @@ export function SketchOverlay({
       </svg>
       {boxNode}
       {entryNode}
+      {draft?.tool === "spline" && draft.points.length >= 2 && (() => {
+        const last = spotPos(draft.points[draft.points.length - 1]);
+        const s = project(last[0], last[1]);
+        if (!s) return null;
+        return (
+          <button
+            type="button"
+            data-testid="finish-spline"
+            className="absolute z-20 border-2 border-primary bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-primary-foreground shadow-[3px_3px_0_var(--shadow-hard)]"
+            style={{ left: Math.min(Math.max(s[0] + 14, 4), size.w - 150), top: Math.min(Math.max(s[1] - 34, 4), size.h - 30) }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => editor.finishSplineDraft()}
+          >
+            finish spline (Enter)
+          </button>
+        );
+      })()}
       {cornerBoxNode}
     </div>
   );

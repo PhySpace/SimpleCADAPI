@@ -70,6 +70,7 @@ import {
 import { typedFields, typedTarget, type TypedDims } from "@/lib/sketch-typed";
 
 const DRAW_TOOLS = new Set(["point", "line", "circle", "arc", "spline"]);
+const FIRST = "\u0000first"; // a spline's closing click: "the first control point"
 
 export type Tool = "select" | "point" | "line" | "circle" | "arc" | "spline" | "delete" | "trim" | "extend" | "fillet" | "chamfer";
 /** The corner value box (fillet radius / chamfer distance) open at a corner. */
@@ -429,9 +430,15 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     }
     if (tool === "spline") {
       const points = draft?.tool === "spline" ? draft.points : [];
-      const closes = points.length >= 3 && spot.pointId !== undefined && (points[0].pointId === spot.pointId || samePlace(points[0], spot));
-      if (closes) {
-        finishSpline([...points, { ...spot, pointId: points[0].pointId ?? spot.pointId }]);
+      const near = (a: Spot) => (a.pointId !== undefined && a.pointId === spot.pointId) || Math.hypot(a.x - spot.x, a.y - spot.y) <= pickTolerance.current;
+      if (points.length >= 3 && near(points[0])) {
+        // back on the first control point: a closed spline (it starts and ends on one point)
+        const first = points[0];
+        finishSpline([...points, first.pointId ? first : { ...first, pointId: FIRST }]);
+        return;
+      }
+      if (points.length >= 2 && near(points[points.length - 1])) {
+        finishSpline(points); // the last point clicked again (a double click): done
         return;
       }
       setDraft({ tool: "spline", points: [...points, spot] });
@@ -460,10 +467,16 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   /** Make the B-spline of the clicked control points (Enter, or a click back on the first point closes it). */
   const finishSpline = (points: Spot[]): void => {
     setDraft(null);
-    const made = addSpline(docRef.current, points, { auto, construction });
+    // a closing click names the first spot with FIRST: it becomes that spot's point once the first point exists
+    let doc = docRef.current;
+    const first = ensurePoint(doc, points[0]);
+    doc = first.doc;
+    const spots = points.map((spot, i) => (i === 0 ? { ...spot, pointId: first.id } : spot.pointId === FIRST ? { ...spot, pointId: first.id } : spot));
+    const made = addSpline(doc, spots, { auto, construction });
     if (made) commit(made.doc);
   };
-  const samePlace = (a: Spot, b: Spot) => Math.hypot(a.x - b.x, a.y - b.y) < 1e-9;
+  /** Snap distance of the last press (sketch units): how near a click must be to a draft's point to mean it. */
+  const pickTolerance = useRef(0);
   /** The radius typed for the arc being drawn (its start), kept until the arc is made. */
   const arcRadius = useRef<number | undefined>(undefined);
 
@@ -498,6 +511,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     const d = docRef.current;
     const opts = { auto, construction };
     const tol = 9 / info.scale;
+    pickTolerance.current = tol;
     if (tool === "trim" || tool === "extend") {
       if (editBusy) return "handled";
       const hit = entityHit(d, result, world, tol);
@@ -722,7 +736,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
         : tool === "circle"
           ? draft ? "Click a point on the circle." : "Click the centre."
           : tool === "spline"
-            ? draft ? "Click the next control point; Enter makes the spline, a click on the first point closes it; Esc drops it." : "Click the first control point."
+            ? draft ? "Click the next control point. Finish: Enter, or click the last point again (double-click); click the first point to close it. Esc drops it." : "Click the first control point."
           : tool === "arc"
             ? draft ? (draft.tool === "arc" && draft.start ? "Click the end (counter-clockwise from start)." : "Click the start point (sets the radius).") : "Click the centre."
             : tool === "delete"
@@ -740,7 +754,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   return {
     cornerHover, pendingLine, cornerBox, setCornerBox, submitCorner, projectOpen, setProjectOpen, openProject, projectSketch, projectFrom,
     doc, commit, undo, redo, edits, editNote, editBusy, flash, hoverEnd, runEdit, tool, chooseTool, selection, highlight, setHighlight, draft, cursor, hover, drag, box, setBox, result, error, auto, setAuto, snapOn,
-    setSnapOn, construction, choice, pts, loops, applicable, blamed, fresh, crossings, entry, setEntry, entryFields, submitEntry, failing, highlighted, fixedPoints, solved, badge, diagnostics, outer, hint, extents,
+    setSnapOn, construction, choice, pts, loops, applicable, blamed, fresh, crossings, finishSplineDraft: () => draft?.tool === "spline" && draft.points.length >= 2 && finishSpline(draft.points), entry, setEntry, entryFields, submitEntry, failing, highlighted, fixedPoints, solved, badge, diagnostics, outer, hint, extents,
     openBox, applyConstraint, submitBox, deleteSelection, toggleConstruction, pointerDown, pointerMove, pointerUp, pointerLeave, key,
   };
 }
