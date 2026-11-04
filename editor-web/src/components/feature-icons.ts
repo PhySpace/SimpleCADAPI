@@ -3,6 +3,8 @@ import { ArrowDownToLine, ArrowUpFromLine, Blend, Box, CircleDot, Circle, Combin
 /** The icon of each feature operation, by spec id (an operation without one shows none). */
 export const FEATURE_ICONS: Record<string, LucideIcon> = {
   box: Box,
+  workplane: Square,
+  workplane_from_selection: Square,
   cylinder: Cylinder,
   sphere: Globe,
   cone: Triangle,

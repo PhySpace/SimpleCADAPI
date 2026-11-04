@@ -102,12 +102,14 @@ export const CONTEXT_ACTIONS: Record<ContextKind, { id: string; label: string }[
     { id: "extrude_face_join", label: "Pull face" },
     { id: "extrude_face_cut", label: "Push in" },
     { id: "sketch_on_face", label: "Sketch on this face" },
+    { id: "workplane_from_selection", label: "Workplane" },
     { id: "hole", label: "Hole here" },
     { id: "shell", label: "Shell" },
   ],
   edge: [
     { id: "fillet", label: "Fillet" },
     { id: "chamfer", label: "Chamfer" },
+    { id: "workplane_from_selection", label: "Workplane" },
   ],
   sketch: [
     { id: "extrude_sketch", label: "Extrude" },
@@ -129,6 +131,13 @@ export const CONTEXT_ACTIONS: Record<ContextKind, { id: string; label: string }[
 /** The `when` of each command id (data, not UI): what it needs selected. */
 const WHEN: Record<string, (context: SelectionContext) => boolean> = {
   sketch_on_face: (c) => c.faces === 1 && c.edges === 0 && c.sketches === 0,
+  // what workplaneRequest (lib/workplanes.ts) reads: one face (+ an edge), two faces, three vertices, or one edge
+  workplane_from_selection: (c) =>
+    c.sketches + c.solids + c.components === 0 &&
+    ((c.faces === 1 && c.planarFaces === 1 && c.edges <= 1 && c.vertices === 0) ||
+      (c.faces === 2 && c.planarFaces === 2 && c.edges === 0 && c.vertices === 0) ||
+      (c.vertices === 3 && c.faces + c.edges === 0) ||
+      (c.edges === 1 && c.faces + c.vertices === 0)),
   hole: (c) => c.faces === 1 && c.edges === 0 && c.sketches === 0,
   extrude_face: (c) => c.faces === 1 && c.planarFaces === 1 && c.edges === 0 && c.sketches === 0,
   extrude_face_join: (c) => c.faces === 1 && c.planarFaces === 1 && c.edges === 0 && c.sketches === 0,

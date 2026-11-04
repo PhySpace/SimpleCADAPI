@@ -41,6 +41,7 @@ export function SketchMode({
   faceCheck,
   faceInk,
   sketchPlanes,
+  workplanes = [],
   onPlane,
   onSubmit,
   onExit,
@@ -57,11 +58,13 @@ export function SketchMode({
   faceInk: string;
   /** The planes of the notebook's sketches: a new sketch can lie on one of them. */
   sketchPlanes: { name: string; plane: PlaneSpec }[];
+  /** The notebook's workplanes (frames as the kernel reported them): a sketch on one writes `plane=<its variable>`. */
+  workplanes?: { name: string; plane: PlaneSpec }[];
   onPlane: (plane: PlaneSpec) => void;
   onSubmit: (command: FeatureCommand, after?: SketchAfter) => Promise<void>;
   onExit: () => void;
 }) {
-  if (session.plane === null) return <PlaneChooser view={view} notice={notice} faceCheck={faceCheck} faceInk={faceInk} sketchPlanes={sketchPlanes} onPlane={onPlane} onExit={onExit} />;
+  if (session.plane === null) return <PlaneChooser view={view} notice={notice} faceCheck={faceCheck} faceInk={faceInk} sketchPlanes={sketchPlanes} workplanes={workplanes} onPlane={onPlane} onExit={onExit} />;
   return <SketchEditorView key={session.id} session={session} plane={session.plane} view={view} taken={taken} features={features} onSubmit={onSubmit} onExit={onExit} />;
 }
 
@@ -75,6 +78,7 @@ function PlaneChooser({
   faceCheck,
   faceInk,
   sketchPlanes,
+  workplanes,
   onPlane,
   onExit,
 }: {
@@ -83,6 +87,7 @@ function PlaneChooser({
   faceCheck: (result: PickResult) => Promise<FaceCheck>;
   faceInk: string;
   sketchPlanes: { name: string; plane: PlaneSpec }[];
+  workplanes: { name: string; plane: PlaneSpec }[];
   onPlane: (plane: PlaneSpec) => void;
   onExit: () => void;
 }) {
@@ -243,6 +248,11 @@ function PlaneChooser({
             {PLANES.map((plane) => (
               <Button key={plane} type="button" size="sm" variant="outline" className="h-6 px-2" data-testid={`chooser-plane-${plane}`} title={`Sketch on the ${plane} plane`} onClick={() => onPlane(plane)} onPointerEnter={() => setHover(plane)} onPointerLeave={() => setHover(null)}>
                 {plane}
+              </Button>
+            ))}
+            {workplanes.map((item) => (
+              <Button key={`wp-${item.name}`} type="button" size="sm" variant="outline" className="h-6 border-amber-500/70 px-2 font-mono" data-testid={`chooser-workplane-${item.name}`} title={`Sketch on the workplane ${item.name}`} onClick={() => onPlane(item.plane)}>
+                {item.name}
               </Button>
             ))}
             {sketchPlanes.map((item) => (

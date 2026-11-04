@@ -14,6 +14,11 @@ import { type EditorMode } from "@/components/ModeSwitch";
 import { sideStyle, useModeTransition } from "@/lib/useModeTransition";
 import { AssemblyPanel } from "@/components/AssemblyPanel";
 import { ConnectorGizmos, type Gizmo } from "@/components/ConnectorGizmos";
+import { WorkplanePatches } from "@/components/WorkplanePatches";
+import { parseWorkplanes, resolvePlane, workplanePlane, workplaneRequest, type WorkplaneFrame } from "@/lib/workplanes";
+import { fitDistanceMm } from "@/lib/sketch-view";
+import { viewPose } from "@/lib/sketch-plane";
+import * as THREE from "three";
 import { setRef } from "@/lib/assembly";
 import { useAssemblyEditor, useConnectorDraft } from "@/lib/useAssembly";
 import { Header } from "@/components/Header";
@@ -34,7 +39,7 @@ import { describeSketch, nextSketchSelection, readHidden, sketchCentre, sketchIn
 import { useSketchShapes } from "@/lib/useSketchShapes";
 import type { Vec3 } from "@/lib/sketch-plane";
 import { PALETTES } from "@/scene/theme";
-import { assertCellRan, isCellCommand, type FeatureCommand, type FeatureRow, type Spec } from "@/lib/features";
+import { assertCellRan, isCellCommand, pickedPayload, type FeatureCommand, type FeatureRow, type Spec } from "@/lib/features";
 import { useRunLog } from "@/lib/runlog";
 import { useTheme } from "@/lib/theme";
 import { selectionPayload, variableNames, type SelectionItem } from "@/lib/selection";
@@ -94,6 +99,9 @@ export function App() {
   const [cells, setCells] = useState<NotebookCell[]>([]);
   const [features, setFeatures] = useState<NotebookFeature[]>([]);
   const [picked, setPicked] = useState<Omit<SelectionItem, "variable">[]>([]);
+  // The notebook's workplanes as the kernel reported them, and the one Space made (or chose) last: new sketches go on it.
+  const [workplanes, setWorkplanes] = useState<WorkplaneFrame[]>([]);
+  const [activeWorkplane, setActiveWorkplane] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("solid");
   const [sceneVersion, setSceneVersion] = useState(0);
   // The workspace is veiled while a model is being made: the kernel starting, a
@@ -128,7 +136,11 @@ export function App() {
 
   // Sketches as objects of the scene: the notebook's sketch features (solved by the SDK, drawn in the viewport), which of them a
   // person hid (remembered per notebook), which are selected or under the pointer, and the arrow of the push a form describes.
-  const sketchList = useMemo(() => sketchInfos(gui.state.features), [gui.state.features]);
+  // A sketch on a workplane is drawn where the kernel says that workplane is now (its face may have moved).
+  const sketchList = useMemo(
+    () => sketchInfos(gui.state.features).map((info) => ({ ...info, doc: { ...info.doc, plane: resolvePlane(info.doc.plane, workplanes) } })),
+    [gui.state.features, workplanes],
+  );
   const sketchShapes = useSketchShapes(sketchList);
   const [hiddenSketches, setHiddenSketches] = useState<Set<string>>(() => new Set());
   const hiddenRef = useRef(hiddenSketches);
@@ -294,6 +306,7 @@ export function App() {
       log.push("error", `a cell changed on disk while you were editing it: kept the file's version. Your unsaved text was:\n${mine.length > 600 ? `${mine.slice(0, 600)}…` : mine}`);
     });
     socket.on("notebook.features", (envelope) => setFeatures((envelope["features"] as NotebookFeature[]) ?? []));
+    socket.on("workplanes", (envelope) => setWorkplanes(parseWorkplanes(envelope["workplanes"])));
 
     socket.on("preview", (envelope) => {
       setLoading(null);
@@ -594,8 +607,17 @@ export function App() {
     },
     [selectionMode],
   );
+  const workplanesRef = useRef(workplanes);
+  workplanesRef.current = workplanes;
+  const activeWorkplaneRef = useRef(activeWorkplane);
+  activeWorkplaneRef.current = activeWorkplane;
   const startSketch = useCallback(() => {
-    if (!sketchingRef.current) beginSketch({ mode: "new", name: "", plane: null, doc: emptyDoc() });
+    if (sketchingRef.current) return;
+    const active = workplanesRef.current.find((wp) => wp.name === activeWorkplaneRef.current);
+    if (active) {
+      const plane = workplanePlane(active); // the active workplane: the sketch cell writes plane=<it>
+      beginSketch({ mode: "new", name: "", plane, doc: emptyDoc(plane) });
+    } else beginSketch({ mode: "new", name: "", plane: null, doc: emptyDoc() });
   }, [beginSketch]);
   const endSketch = useCallback(() => {
     setSketchSession(null);
@@ -658,6 +680,81 @@ export function App() {
     beginSketch({ mode: "new", name: "", plane: resolved.frame, doc: emptyDoc(resolved.frame) });
   }, [resolveFace, startSketch, beginSketch]);
 
+  /** "Workplane from selection" (Space): the workplane cell of the constructor the selection names; it becomes the active
+   * workplane and the camera turns to it once the kernel reports its frame. */
+  const workplaneFromSelection = useCallback(async () => {
+    const request = workplaneRequest(selectionRef.current);
+    if (!request) {
+      setBarNote("A workplane needs one flat face, a face and an edge, two parallel faces, three vertices or one edge.");
+      return;
+    }
+    setBarNote(null);
+    setGuiBusy(true);
+    setGuiError(null);
+    try {
+      const selections = Object.fromEntries(Object.entries(request.selections).map(([slot, items]) => [slot, items.map(pickedPayload)]));
+      const command: FeatureCommand = { op: "add", spec: "workplane", values: { method: request.method }, selections };
+      const result = await gui.run(command);
+      assertCellRan(result);
+      log.push("ok", `add ${result.name}`);
+      setPicked([]);
+      turnedTo.current = null;
+      setActiveWorkplane(result.name);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setGuiError(message);
+      setBarNote(message);
+    } finally {
+      setGuiBusy(false);
+    }
+  }, [gui.run, log.push]);
+
+  // The camera turns to the active workplane (straight at it, the model in view) when its frame arrives or changes.
+  const turnedTo = useRef<string | null>(null);
+  const turnToWorkplane = useCallback((wp: WorkplaneFrame) => {
+    const view = viewRef.current;
+    if (!view) return;
+    const bounds = view.modelBoundsMm();
+    const extent = bounds ? Math.max(...bounds.max.map((v, i) => v - bounds.min[i])) : 60;
+    const distance = fitDistanceMm(Math.max(extent, 20) * 1.4, view.engine.camera.fov, view.engine.camera.aspect);
+    const pose = viewPose(workplanePlane(wp), wp.origin, distance);
+    void view.rig.animateTo({
+      position: new THREE.Vector3(pose.position[0] / 1000, pose.position[1] / 1000, pose.position[2] / 1000),
+      target: new THREE.Vector3(pose.target[0] / 1000, pose.target[1] / 1000, pose.target[2] / 1000),
+      up: new THREE.Vector3(...pose.up),
+    });
+  }, []);
+  useEffect(() => {
+    const wp = workplanes.find((item) => item.name === activeWorkplane);
+    if (!wp || sketchingRef.current) return;
+    const key = JSON.stringify(wp);
+    if (turnedTo.current === key) return;
+    turnedTo.current = key;
+    turnToWorkplane(wp);
+  }, [workplanes, activeWorkplane, turnToWorkplane]);
+  useEffect(() => {
+    // a workplane that is gone (its cell deleted, another notebook) is no longer active
+    if (activeWorkplane && workplanes.length && !workplanes.some((wp) => wp.name === activeWorkplane)) setActiveWorkplane(null);
+  }, [workplanes, activeWorkplane]);
+
+  // Space: a workplane from the selection; with nothing selected, look at the active workplane again.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== " " || event.repeat || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (sketchingRef.current) return; // space pans the sketch view
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, button, [contenteditable=true], .cm-editor, [role=dialog]")) return;
+      event.preventDefault();
+      if (selectionRef.current.length) void workplaneFromSelection();
+      else {
+        const wp = workplanesRef.current.find((item) => item.name === activeWorkplaneRef.current);
+        if (wp) turnToWorkplane(wp);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [workplaneFromSelection, turnToWorkplane]);
+
   const handleEditFeatureRef = useRef<(feature: FeatureRow, spec: Spec) => void>(() => undefined);
   const editSelectedSketch = useCallback(() => {
     const info = sketchListRef.current.find((item) => item.name === pickedSketchesRef.current[0]);
@@ -676,7 +773,17 @@ export function App() {
   const allCommands = useMemo<Command[]>(
     () => [
       // The assembly layout is not a dialog: it is its own panel (registered below), so its spec is left out of the generic list.
-      ...commandsFromSpecs((gui.catalog?.specs ?? []).filter((spec) => spec.id !== "assembly"), openSpec, FEATURE_ICONS),
+      ...commandsFromSpecs((gui.catalog?.specs ?? []).filter((spec) => spec.id !== "assembly" && spec.id !== "workplane"), openSpec, FEATURE_ICONS),
+      {
+        id: "workplane_from_selection",
+        label: "Workplane from selection",
+        group: "Datums",
+        keywords: ["workplane", "datum", "plane", "frame", "space", "offset", "midplane"],
+        description: "A workplane from the selection (Space): a flat face, a face and an edge, two parallel faces, three vertices or an edge. New sketches go on it.",
+        icon: FEATURE_ICONS.workplane_from_selection,
+        when: whenFor("workplane_from_selection"),
+        run: () => void workplaneFromSelection(),
+      },
       {
         id: "sketch_on_face",
         label: "Sketch on face",
@@ -701,7 +808,7 @@ export function App() {
       },
       ...assemblyCommands(openAssembly, { assembly: Boxes, connectors: Cable }),
     ],
-    [gui.catalog, openSpec, sketchOnSelectedFace, editSelectedSketch, openAssembly],
+    [gui.catalog, openSpec, sketchOnSelectedFace, editSelectedSketch, openAssembly, workplaneFromSelection],
   );
   // The stand-alone combine commands (Cut, Union, Intersect, Cut/Boss with sketch) are offered only while several bodies are open:
   // a new solid says how it meets the body in its own dialog.
@@ -984,6 +1091,7 @@ export function App() {
                   hoverEnabled={selectionMode === "sketch" && !sketching}
                   onHover={setHoverSketch}
                 />
+                {viewRef.current && workplanes.length > 0 && <WorkplanePatches view={viewRef.current} workplanes={workplanes} active={activeWorkplane} />}
                 {!sketching && viewRef.current && gizmos.length > 0 && (
                   <ConnectorGizmos view={viewRef.current} gizmos={gizmos} components={asm.doc.components} highlighted={gizmoHighlight} onPick={pickGizmo} armed={!!asm.target} />
                 )}
@@ -1005,6 +1113,7 @@ export function App() {
                     faceCheck={faceCheck}
                     faceInk={PALETTES[theme.resolved].selection}
                     sketchPlanes={sketchList.map((info) => ({ name: info.name, plane: info.doc.plane }))}
+                    workplanes={workplanes.map((wp) => ({ name: wp.name, plane: workplanePlane(wp) }))}
                     onPlane={choosePlane}
                     onSubmit={submitSketch}
                     onExit={endSketch}
