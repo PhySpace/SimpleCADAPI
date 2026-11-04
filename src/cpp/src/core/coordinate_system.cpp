@@ -65,10 +65,17 @@ std::string fixed3(const Vec3& v) {
   return buf;
 }
 
+// One active system and, for a recorded workplane, the node that made it.
+struct StackEntry {
+  const CoordinateSystem* cs;
+  FrameSource source;
+  bool has_source = false;
+};
+
 // Thread-local stack of active systems.  The bottom entry (the world frame)
 // is never popped.
-std::vector<const CoordinateSystem*>& cs_stack() {
-  thread_local std::vector<const CoordinateSystem*> stack;
+std::vector<StackEntry>& cs_stack() {
+  thread_local std::vector<StackEntry> stack;
   return stack;
 }
 
@@ -124,11 +131,18 @@ const CoordinateSystem& world_cs() {
 
 const CoordinateSystem& current_cs() {
   const auto& stack = cs_stack();
-  return stack.empty() ? world_cs() : *stack.back();
+  return stack.empty() ? world_cs() : *stack.back().cs;
+}
+
+const FrameSource* current_frame_source() {
+  const auto& stack = cs_stack();
+  if (stack.empty() || !stack.back().has_source)
+    return nullptr;
+  return &stack.back().source;
 }
 
 CoordinateSystemScope::CoordinateSystemScope(CoordinateSystem cs) : cs_(std::move(cs)) {
-  cs_stack().push_back(&cs_);
+  cs_stack().push_back(StackEntry{&cs_, {}, false});
 }
 
 CoordinateSystemScope::~CoordinateSystemScope() {
@@ -168,14 +182,59 @@ CoordinateSystem workplane_frame(const Vec3& origin, const Vec3& normal, const V
 Workplane::Workplane(const Vec3& origin, const Vec3& normal, const Vec3& x_dir)
     : cs_(workplane_frame(origin, normal, x_dir)) {}
 
+Workplane::Workplane(Exact, const CoordinateSystem& cs) : cs_(cs) {}
+
+Workplane Workplane::from_frame(const CoordinateSystem& cs) {
+  return Workplane(Exact{}, cs);
+}
+
+Workplane::Workplane(const Workplane& other)
+    : cs_(other.cs_), entered_(false), metadata_(other.metadata_), runtime_(other.runtime_) {}
+
 Workplane::~Workplane() {
   exit();
+}
+
+namespace {
+Value lookup(const Value& dict, std::string_view key, Value fallback) {
+  const Value* found = dict.find(key);
+  return found != nullptr ? *found : std::move(fallback);
+}
+Value vec_value(const Vec3& v) {
+  return Value(Value::Array{Value(v.x), Value(v.y), Value(v.z)});
+}
+}  // namespace
+
+Value Workplane::get_metadata(std::string_view key, Value fallback) const {
+  return lookup(metadata_, key, std::move(fallback));
+}
+
+Value Workplane::get_runtime(std::string_view key, Value fallback) const {
+  return lookup(runtime_, key, std::move(fallback));
+}
+
+Value Workplane::plane_value() const {
+  Value out = Value::object();
+  out.set("origin", vec_value(cs_.origin()));
+  out.set("x_axis", vec_value(cs_.x_axis()));
+  out.set("y_axis", vec_value(cs_.y_axis()));
+  return out;
 }
 
 void Workplane::enter() {
   if (entered_)
     throw RuntimeError("Workplane is already entered");
-  cs_stack().push_back(&cs_);
+  StackEntry entry{&cs_, {}, false};
+  const Value* node = runtime_.find("graph.node_id");
+  if (node != nullptr && node->is_string() && !node->as_string().empty()) {
+    entry.has_source = true;
+    entry.source.node_id = node->as_string();
+    if (const Value* graph = runtime_.find("graph.id"); graph != nullptr && graph->is_string())
+      entry.source.graph_id = graph->as_string();
+    if (const Value* slot = runtime_.find("graph.output_slot"); slot != nullptr && slot->is_int())
+      entry.source.output_slot = static_cast<int>(slot->as_int());
+  }
+  cs_stack().push_back(std::move(entry));
   entered_ = true;
 }
 

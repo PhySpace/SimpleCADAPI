@@ -14,6 +14,7 @@
 #include <gp_Pnt.hxx>
 
 #include "scad/ops/geometry/geometry.hpp"
+#include "scad/ops/geometry/workplanes.hpp"
 #include "scad/reactive/registry.hpp"
 
 namespace {
@@ -360,6 +361,80 @@ void bind_primitives(py::module_& m) {
       py::arg("center") = origin(), "Create a sphere solid.");
 }
 
+// A point of a workplane: a vertex of the model or numbers.
+struct PointOrVertexTag {
+  static constexpr auto name = py::detail::const_name("Vertex | simplecadapi.types.Point3");
+};
+struct EdgeOrWireTag {
+  static constexpr auto name = py::detail::const_name("Edge | Wire");
+};
+
+PointOrVertex point_or_vertex(const AnyOf<PointOrVertexTag>& point, const char* name) {
+  if (py::isinstance<Vertex>(point.value))
+    return point.value.cast<Vertex>();
+  if (py::isinstance<Shape>(point.value))
+    throw py::type_error(std::string(name) + " must be a Vertex or a point (x, y, z)");
+  return Scalar3(point.value.cast<Point3>());
+}
+
+EdgeOrWire edge_or_wire(const AnyOf<EdgeOrWireTag>& curve) {
+  if (py::isinstance<Edge>(curve.value))
+    return curve.value.cast<Edge>();
+  if (py::isinstance<Wire>(curve.value))
+    return curve.value.cast<Wire>();
+  throw py::type_error("curve must be an Edge or a Wire");
+}
+
+std::optional<Scalar3> optional_point(const std::optional<Point3>& point) {
+  return point ? std::optional<Scalar3>(*point) : std::nullopt;
+}
+std::optional<Scalar3> optional_direction(const std::optional<Direction3>& direction) {
+  return direction ? std::optional<Scalar3>(*direction) : std::nullopt;
+}
+
+void bind_workplanes(py::module_& m) {
+  m.def(
+      "make_workplane_rworkplane",
+      [](const Point3& origin, const Direction3& normal, const Direction3& x_dir) {
+        return make_workplane_rworkplane(origin, normal, x_dir);
+      },
+      py::arg("origin") = origin(), py::arg("normal") = unit_z(), py::arg("x_dir") = py::make_tuple(1, 0, 0),
+      "Create a recorded workplane from an origin, a normal and an x direction in the current coordinate system.");
+  m.def(
+      "make_workplane_from_face_rworkplane",
+      [](const Face& face, const std::optional<Point3>& origin, const std::optional<Edge>& x_edge,
+         const std::optional<Direction3>& x_dir, const Length& offset, bool flip) {
+        return make_workplane_from_face_rworkplane(face, optional_point(origin), x_edge, optional_direction(x_dir),
+                                                   offset, flip);
+      },
+      py::arg("face"), py::kw_only(), py::arg("origin") = py::none(), py::arg("x_edge") = py::none(),
+      py::arg("x_dir") = py::none(), py::arg("offset") = 0.0, py::arg("flip") = false,
+      "Create a workplane on a planar face (its normal, its centre or a given origin, x along an edge).");
+  m.def(
+      "make_workplane_from_points_rworkplane",
+      [](const AnyOf<PointOrVertexTag>& a, const AnyOf<PointOrVertexTag>& b, const AnyOf<PointOrVertexTag>& c) {
+        return make_workplane_from_points_rworkplane(point_or_vertex(a, "a"), point_or_vertex(b, "b"),
+                                                     point_or_vertex(c, "c"));
+      },
+      py::arg("a"), py::arg("b"), py::arg("c"), "Create a workplane through three points (origin a, x towards b).");
+  m.def(
+      "make_workplane_from_axis_rworkplane",
+      [](const Edge& axis, const Angle& angle, const std::optional<Face>& face) {
+        return make_workplane_from_axis_rworkplane(axis, angle, face);
+      },
+      py::arg("axis"), py::arg("angle") = 0.0, py::kw_only(), py::arg("face") = py::none(),
+      "Create a workplane through a straight edge or a circle's axis, turned about it by an angle.");
+  m.def("make_workplane_midplane_rworkplane", &make_workplane_midplane_rworkplane, py::arg("face_a"), py::arg("face_b"),
+        "Create the workplane halfway between two parallel planar faces.");
+  m.def(
+      "make_workplane_normal_to_curve_rworkplane",
+      [](const AnyOf<EdgeOrWireTag>& curve, const Scalar& at, const std::optional<Direction3>& x_dir) {
+        return make_workplane_normal_to_curve_rworkplane(edge_or_wire(curve), at, optional_direction(x_dir));
+      },
+      py::arg("curve"), py::arg("at") = 0.0, py::kw_only(), py::arg("x_dir") = py::none(),
+      "Create a workplane normal to a curve at a fraction of its length (a sweep profile's plane).");
+}
+
 void bind_brep_region(py::module_& m) {
   m.def(
       "load_brep_region_rsolid",
@@ -468,6 +543,7 @@ void bind_ops_geometry(py::module_& m) {
   bind_wires_and_faces(m);
   bind_primitives(m);
   bind_brep_region(m);
+  bind_workplanes(m);
   bind_aliases(m);
   bind_testing(m);
   scad::register_geometry_executors(scad::reactive::ExecutorRegistry::global());

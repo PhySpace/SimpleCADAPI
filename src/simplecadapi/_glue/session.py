@@ -464,14 +464,25 @@ def _frame(node_id: str) -> Any:
     )
 
 
-def _context() -> Dict[str, Any]:
+def _context(session: Any = None) -> Dict[str, Any]:
     cs = _n.get_current_cs()
-    return {
+    out: Dict[str, Any] = {
         "origin": tuple(float(v) for v in cs.origin),
         "x_axis": tuple(float(v) for v in cs.x_axis),
         "y_axis": tuple(float(v) for v in cs.y_axis),
         "z_axis": tuple(float(v) for v in cs.z_axis),
     }
+    # Inside `with wp:` of a recorded workplane: its node, as the C++ recorder writes it (a replay takes the frame
+    # from the replayed workplane).
+    source = _n.get_current_frame_source()
+    if source is not None and session is not None:
+        try:
+            node = session._node_of(source["graph_id"], source["node_id"])
+        except ValueError:
+            node = None
+        if node is not None:
+            out["workplane"] = {"node_id": node.node_id, "output_slot": int(source["output_slot"])}
+    return out
 
 
 def record_operation_if_active(
@@ -510,7 +521,7 @@ def record_operation_if_active(
         node_id=node_id,
         output_count=1 if outputs is None else len(output_list),  # a value op holds one output; an empty list result none
         semantic_delta=semantic_delta,
-        context=context or _context(),
+        context=context or _context(session),
         tags=tags,
         source=(source if source is not None else capture_source_provenance()),
         expressions=_n.referenced_expressions(exprs, session.expression_graph),

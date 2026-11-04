@@ -42,6 +42,7 @@ from simplecadapi._cpp import (
     Material,
     Part,
     ScalarLimit,
+    SimpleWorkplane,
     Shell,
     Sketch,
     Solid,
@@ -112,6 +113,12 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
         "status": "replayable",
         "op": "make_wire_from_edges_rwire",
     },
+    "make_workplane_rworkplane": {"status": "replayable", "op": "make_workplane_rworkplane"},
+    "make_workplane_from_face_rworkplane": {"status": "replayable", "op": "make_workplane_from_face_rworkplane"},
+    "make_workplane_from_points_rworkplane": {"status": "replayable", "op": "make_workplane_from_points_rworkplane"},
+    "make_workplane_from_axis_rworkplane": {"status": "replayable", "op": "make_workplane_from_axis_rworkplane"},
+    "make_workplane_midplane_rworkplane": {"status": "replayable", "op": "make_workplane_midplane_rworkplane"},
+    "make_workplane_normal_to_curve_rworkplane": {"status": "replayable", "op": "make_workplane_normal_to_curve_rworkplane"},
     "make_sketch_rsketch": {"status": "replayable", "op": "make_sketch_rsketch"},
     "add_point_rsketch": {"status": "replayable", "op": "add_point_rsketch"},
     "add_line_rsketch": {"status": "replayable", "op": "add_line_rsketch"},
@@ -590,6 +597,12 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "make_wire_from_edges_rwire",
     "make_face_from_wire_rface",
     "make_face_from_wires_rface",
+    "make_workplane_rworkplane",
+    "make_workplane_from_face_rworkplane",
+    "make_workplane_from_points_rworkplane",
+    "make_workplane_from_axis_rworkplane",
+    "make_workplane_midplane_rworkplane",
+    "make_workplane_normal_to_curve_rworkplane",
     "make_sketch_rsketch",
     "add_point_rsketch",
     "add_line_rsketch",
@@ -743,6 +756,12 @@ _CANONICAL_2_1_ONLY_OPS = {
     "fillet_corner_rsketch",
     "chamfer_corner_rsketch",
     "project_rsketch",
+    "make_workplane_rworkplane",
+    "make_workplane_from_face_rworkplane",
+    "make_workplane_from_points_rworkplane",
+    "make_workplane_from_axis_rworkplane",
+    "make_workplane_midplane_rworkplane",
+    "make_workplane_normal_to_curve_rworkplane",
     "explode_rassembly",
     "convert_to_bspline_redge",
     "convert_to_bspline_rface",
@@ -2366,6 +2385,136 @@ def _replay_shape_edit(
               _optional_int(params["v_pole_count"]), tolerance=float(params["tolerance"]), tag_prefix=tag_prefix)
 
 
+_WORKPLANE_OPS = frozenset(
+    {
+        "make_workplane_rworkplane",
+        "make_workplane_from_face_rworkplane",
+        "make_workplane_from_points_rworkplane",
+        "make_workplane_from_axis_rworkplane",
+        "make_workplane_midplane_rworkplane",
+        "make_workplane_normal_to_curve_rworkplane",
+    }
+)
+"""The workplane constructors: a Workplane value made from numbers or from ordered geometry inputs."""
+
+
+def _replay_workplane(
+    ctx: _ReplayContext,
+    graph: OperationGraph,
+    outputs: Dict[str, List[Any]],
+    node: Any,
+    params: Dict[str, Any],
+) -> Any:
+    """Build the workplane again from its recorded op: from the replayed geometry, so it follows a moved face."""
+
+    op_name = node.op
+    fn = getattr(ops, op_name)
+    if op_name == "make_workplane_rworkplane":
+        ctx.require_params(node.node_id, op_name, params, ("origin", "normal", "x_dir"))
+        return fn(tuple(params["origin"]), tuple(params["normal"]), tuple(params["x_dir"]))
+    if not isinstance(params.get("input_refs"), list):
+        # Made from geometry no recorder could name: the frame it made is all there is.
+        ctx.require_params(node.node_id, op_name, params, ("frame",))
+        frame = params["frame"]
+        return SimpleWorkplane._from_frame(frame["origin"], frame["x_axis"], frame["y_axis"])
+    shapes = _ordered_input_shapes(ctx, graph, outputs, node, params)
+
+    def value(name: str) -> Any:
+        item = params.get(name)
+        if isinstance(item, dict) and "input" in item:
+            index = int(item["input"])
+            if index < 0 or index >= len(shapes):
+                ctx.fail(f"Graph node '{node.node_id}' ({op_name}) parameter '{name}' names a missing input")
+            return shapes[index]
+        if isinstance(item, (list, tuple)):
+            return tuple(item)
+        return item
+
+    if op_name == "make_workplane_from_face_rworkplane":
+        return fn(
+            shapes[0],
+            origin=value("origin"),
+            x_edge=value("x_edge"),
+            x_dir=value("x_dir"),
+            offset=params.get("offset", 0.0),
+            flip=bool(params.get("flip", False)),
+        )
+    if op_name == "make_workplane_from_points_rworkplane":
+        ctx.require_params(node.node_id, op_name, params, ("a", "b", "c"))
+        return fn(value("a"), value("b"), value("c"))
+    if op_name == "make_workplane_from_axis_rworkplane":
+        return fn(shapes[0], params.get("angle", 0.0), face=value("face"))
+    if op_name == "make_workplane_midplane_rworkplane":
+        if len(shapes) != 2:
+            ctx.fail(f"Graph node '{node.node_id}' ({op_name}) requires two face inputs")
+        return fn(shapes[0], shapes[1])
+    return fn(shapes[0], params.get("at", 0.0), x_dir=value("x_dir"))
+
+
+def _input_workplane(outputs: Dict[str, List[Any]], node: Any) -> Any:
+    """The replayed Workplane among a node's inputs (a sketch made on one), or None."""
+
+    for input_node in node.inputs:
+        for item in outputs.get(input_node.node_id, ()):
+            if isinstance(item, SimpleWorkplane):
+                return item
+    return None
+
+
+def _context_workplane(outputs: Dict[str, List[Any]], context: Any) -> Any:
+    """The replayed Workplane a node's context names (the node was made inside ``with wp:``), or None."""
+
+    if not isinstance(context, dict):
+        return None
+    ref = context.get("workplane")
+    if not isinstance(ref, dict):
+        return None
+    made = outputs.get(str(ref.get("node_id", "")), [])
+    slot = int(ref.get("output_slot", 0) or 0)
+    item = made[slot] if 0 <= slot < len(made) else None
+    return item if isinstance(item, SimpleWorkplane) else None
+
+
+def _frame_ordered(order: List[Any]) -> List[Any]:
+    """*order* with every node made inside ``with wp:`` after the node that made ``wp``.
+
+    The context names the workplane node without an input edge, so the graph's own order may put the node first.
+    Kahn's algorithm over the inputs plus those links, taking the earliest node of *order* first.
+    """
+
+    import heapq
+
+    index = {node.node_id: position for position, node in enumerate(order)}
+    extra: Dict[str, str] = {}
+    for node in order:
+        context = node.context if isinstance(node.context, dict) else {}
+        ref = context.get("workplane")
+        source = str(ref.get("node_id", "")) if isinstance(ref, dict) else ""
+        if source in index and index[source] > index[node.node_id]:
+            extra[node.node_id] = source
+    if not extra:
+        return order
+    deps = {node.node_id: {item.node_id for item in node.inputs if item.node_id in index} for node in order}
+    for node_id, source in extra.items():
+        deps[node_id].add(source)
+    users: Dict[str, List[str]] = {}
+    for node_id, sources in deps.items():
+        for source in sources:
+            users.setdefault(source, []).append(node_id)
+    remaining = {node_id: len(sources) for node_id, sources in deps.items()}
+    heap = [index[node_id] for node_id, count in remaining.items() if count == 0]
+    heapq.heapify(heap)
+    out: List[Any] = []
+    while heap:
+        node = order[heapq.heappop(heap)]
+        out.append(node)
+        for user in users.get(node.node_id, ()):
+            remaining[user] -= 1
+            if remaining[user] == 0:
+                heapq.heappush(heap, index[user])
+    return out if len(out) == len(order) else order
+
+
 def _feature_input_shapes(ctx, graph, outputs, node, params):
     # New features preserve order and output slots, including repeated inputs.
     # Older graphs only carried distinct upstream nodes.
@@ -2689,7 +2838,7 @@ def _execute_graph(
     if graph.node_count == 0:
         return []
 
-    topo_order = graph.topological_order()
+    topo_order = _frame_ordered(list(graph.topological_order()))
 
     # Store per-node outputs
     outputs: Dict[str, List[Any]] = {}
@@ -2731,8 +2880,11 @@ def _execute_graph(
         for node in topo_order:
             op_name = node.op
             params = node.params
+            context_workplane = _context_workplane(outputs, node.context)
             context_manager = (
-                use_coordinate_system(node.context)
+                use_coordinate_system(context_workplane.cs)
+                if context_workplane is not None
+                else use_coordinate_system(node.context)
                 if isinstance(node.context, dict)
                 else nullcontext()
             )
@@ -3917,6 +4069,27 @@ def _execute_graph(
                         )
                         _store_outputs(node, result)
                         continue
+
+                    if op_name in _WORKPLANE_OPS:
+                        _store_outputs(node, _replay_workplane(ctx, graph, outputs, node, params))
+                        continue
+
+                    if op_name == "make_sketch_rsketch":
+                        plane = params.get("plane")
+                        workplane = (
+                            _input_workplane(outputs, node)
+                            if isinstance(plane, dict) and plane.get("workplane") is True
+                            else None
+                        )
+                        if workplane is not None:
+                            ctx.require_params(node.node_id, op_name, params, ("sketch_id",))
+                            _store_outputs(
+                                node,
+                                ops.make_sketch_rsketch(
+                                    params.get("name"), plane=workplane, sketch_id=str(params["sketch_id"])
+                                ),
+                            )
+                            continue
 
                     if op_name in _SHAPE_EDIT_OPS:
                         _store_outputs(node, _replay_shape_edit(ctx, graph, outputs, node, params))

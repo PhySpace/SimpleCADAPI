@@ -718,7 +718,18 @@ NodePtr Session::record_impl(const OpRecord& record, const std::vector<Shape>& o
         graph_.graph_id(), node_id);
   }
   spec.tags.insert(record.labels.begin(), record.labels.end());
-  spec.context = context_snapshot(cs);
+  Value context = context_snapshot(cs);
+  // Inside `with wp:` of a recorded workplane, the context names its node: a replay takes the frame from
+  // the replayed workplane (it may have moved with the geometry it was made from), not from these numbers.
+  if (const FrameSource* source = current_frame_source()) {
+    if (const NodePtr workplane = active_node_for(Lineage{source->graph_id, source->node_id, source->output_slot})) {
+      Value ref = Value::object();
+      ref.set("node_id", workplane->node_id);
+      ref.set("output_slot", static_cast<std::int64_t>(source->output_slot));
+      context.set("workplane", std::move(ref));
+    }
+  }
+  spec.context = std::move(context);
   if (options_.source_provider)
     spec.source = options_.source_provider();
   spec.expressions = referenced_expressions(spec.param_exprs, expressions_);

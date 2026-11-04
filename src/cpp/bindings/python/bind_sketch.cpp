@@ -133,7 +133,7 @@ using scad::pybind::Choice;
 using scad::pybind::Length;
 
 // The names the signatures show.
-struct PlaneTag {  // read by make_sketch_rsketch: a named plane or {"origin", "x_axis", "y_axis"}
+struct PlaneTag {  // read by make_sketch_rsketch: a named plane, {"origin", "x_axis", "y_axis"} or a Workplane
   static constexpr auto name = py::detail::const_name("simplecadapi.types.Plane");
 };
 struct EndTag {
@@ -597,6 +597,8 @@ void bind_entity_operators(py::module_& m) {
       "make_sketch_rsketch",
       [](const std::optional<std::string>& name, const AnyOf<PlaneTag>& plane,
          const std::optional<std::string>& sketch_id) {
+        if (py::isinstance<Workplane>(plane.value))
+          return make_sketch_rsketch(name, plane.value.cast<const Workplane&>(), sketch_id);
         return make_sketch_rsketch(name, value_from_python(plane.value), sketch_id);
       },
       py::arg("name") = py::none(), py::kw_only(), py::arg("plane") = "XY", py::arg("sketch_id") = py::none());

@@ -11,7 +11,8 @@ the meaning from there.  Each alias is the type a caller may pass (``Annotated``
 - ``Vector3``: an offset; direction and length both matter.
 - ``Count``: a whole number of things (copies, teeth, segments).
 - ``Point2``: a position ``(x, y)`` in a sketch plane (lengths).
-- ``Plane``: a sketch plane, ``"XY"`` / ``"XZ"`` / ``"YZ"`` or ``{"origin": Point3, "x_axis": Direction3, "y_axis": Direction3}``.
+- ``Plane``: a sketch plane, ``"XY"`` / ``"XZ"`` / ``"YZ"``, ``{"origin": Point3, "x_axis": Direction3, "y_axis": Direction3}``,
+  or a ``Workplane`` value (``make_workplane_*_rworkplane`` / ``SimpleWorkplane``), whose frame is used as it is.
 - ``SketchProfile``: a closed profile of a sketch, by index or by id.
 - ``Color``: a display colour ``(r, g, b)``, each component a float in [0, 1] (``Material.color``, a body colour).
 
@@ -23,7 +24,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Annotated, Literal, Union
 
-from simplecadapi._cpp import Expr
+from simplecadapi._cpp import Expr, SimpleWorkplane
 
 _Number = Union[float, Expr]
 
@@ -34,7 +35,7 @@ Direction3 = Annotated[Sequence[_Number], "direction3"]
 Vector3 = Annotated[Sequence[_Number], "vector3"]
 Count = Annotated[int, "count"]
 Point2 = Annotated[Sequence[_Number], "point2"]
-Plane = Annotated[Union[Literal["XY", "XZ", "YZ"], Mapping[str, Sequence[_Number]]], "plane"]
+Plane = Annotated[Union[Literal["XY", "XZ", "YZ"], Mapping[str, Sequence[_Number]], SimpleWorkplane], "plane"]
 SketchProfile = Annotated[Union[int, str], "sketch_profile"]
 Color = Annotated[Sequence[float], "color"]
 
