@@ -49,8 +49,10 @@ sequences, and returns a single `Solid`.
 ## Returns
 
 Solid: The cut result solid, when the result is one piece.
-list[Solid]: The pieces, when the cut split the body (``on_split="pieces"``).
-Pass them on as bodies: ``make_part_rpart(part_id=..., body=pieces)`` makes the
+list[Solid]: The pieces (a ``scad.Pieces``), when the cut split the body
+(``on_split="pieces"``). Operations that take one shape run on every piece
+(``cut_rsolid(pieces, tool)``, ``translate_shape(pieces, ...)``) and return
+``Pieces``; a selector's cardinality is checked over all pieces. Pass them on as bodies: ``make_part_rpart(part_id=..., body=pieces)`` makes the
 bodies ``body_1 .. body_n``, ``bodies={"bar": pieces}`` makes ``bar_1 .. bar_n``.
 
 ## Raises

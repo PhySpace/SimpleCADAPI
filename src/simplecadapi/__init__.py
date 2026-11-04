@@ -462,6 +462,7 @@ __description__ = "Simplified OpenCASCADE-native CAD modeling Python API"
 
 # Convenience aliases
 Workplane = SimpleWorkplane
+from ._glue.pieces import Pieces  # noqa: E402  (the pieces of a split body)
 
 # Creation-function aliases
 create_angle_arc = make_angle_arc_redge
@@ -534,6 +535,7 @@ __all__ = [
     "exporter",
     # Core classes
     "CoordinateSystem",
+    "Pieces",
     "SimpleWorkplane",
     "Workplane",
     "Vertex",

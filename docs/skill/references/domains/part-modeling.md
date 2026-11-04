@@ -97,6 +97,13 @@ consult their own documentation before the first call.
   `make_part_rpart(part_id=..., body=pieces)` gives `body_1 .. body_n`,
   `bodies={"bar": pieces}` gives `bar_1 .. bar_n`. A body is one closed volume:
   OCCT and STEP have no valid "one solid with several lumps".
+- The pieces are a `scad.Pieces` (a list) and keep flowing: an operation that
+  takes one shape (`translate_shape`, `shell_rsolid`, a further `cut_rsolid(pieces, tool)`,
+  fillet, chamfer ...) runs on every piece and returns `Pieces` in the same order.
+  A selector is resolved per piece without its cardinality; a piece it finds
+  nothing on is kept unchanged, and `.exactly(n)` is checked over all pieces.
+  `union_rsolid(pieces)` joins them. A plain list passed to `cut_rsolid` is still
+  base-then-tools.
 
 ## Multi-body parts
 

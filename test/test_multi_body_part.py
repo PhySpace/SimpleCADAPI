@@ -353,3 +353,24 @@ def test_a_fillet_or_chamfer_on_the_pieces_of_a_split_body_blends_each_piece():
         with pytest.raises(ValueError, match="expected .*exactly.*5.*found 8"):
             scad.fillet_rsolid(pieces, top.exactly(5), 1.0)
         assert isinstance(scad.fillet_rsolid(scad.make_box_rsolid(10.0, 10.0, 10.0), top, 1.0), scad.Solid)  # a Solid stays a Solid
+
+
+def test_an_operation_on_the_pieces_of_a_split_body_applies_to_every_piece():
+    """Pieces flow on: a one-shape operation runs per piece, a selection is checked over all of them."""
+    with scad.GraphSession(graph_id="op-pieces"):
+        pieces = scad.cut_rsolid(scad.make_box_rsolid(40.0, 10.0, 10.0), scad.make_box_rsolid(2.0, 20.0, 20.0))
+        assert isinstance(pieces, scad.Pieces)
+        moved = scad.translate_shape(shape=pieces, vector=(0.0, 0.0, 5.0))
+        assert isinstance(moved, scad.Pieces) and [round(m.get_center().z, 6) for m in moved] == [10.0, 10.0]
+        drilled = scad.cut_rsolid(pieces, scad.make_cylinder_rsolid(1.0, 30.0, (10.0, 0.0, -5.0)))
+        assert len(drilled) == 2 and drilled[1].get_volume() < pieces[1].get_volume()
+        assert drilled[0].get_volume() == pytest.approx(pieces[0].get_volume())
+        tops = scad.ql.faces().where(scad.ql.prop("geom.center.z", ">=", 9.9))
+        assert len(scad.shell_rsolid(pieces, tops.exactly(2), 1.0)) == 2
+        with pytest.raises(ValueError, match="found 2"):
+            scad.shell_rsolid(pieces, tops.exactly(1), 1.0)
+        assert [b.body_id for b in scad.make_part_rpart(part_id="x", body=moved).bodies] == ["body_1", "body_2"]
+        assert isinstance(pickle.loads(pickle.dumps(pieces)), scad.Pieces)
+        # a plain list is still a list of tools: a - b - c
+        box = scad.make_box_rsolid(10.0, 10.0, 10.0)
+        assert isinstance(scad.cut_rsolid([box, scad.make_box_rsolid(2.0, 2.0, 20.0)]), scad.Solid)

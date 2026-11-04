@@ -557,6 +557,9 @@ def signature_of(obj: Any) -> Any:
 
 
 _WITH_SIGNATURE: Dict[int, Any] = {}
+_OP_SUFFIXES = ("_rsolid", "_rsolidlist", "_rshell", "_rface", "_rpart", "_rworkplane")
+_SHAPE_FUNCTIONS = frozenset({"translate_shape", "rotate_shape", "mirror_shape", "scale_shape"})
+"""Operations that may receive the pieces of a split body (see :mod:`.pieces`)."""
 
 
 def with_signature(function: Any) -> Any:
@@ -576,9 +579,23 @@ def with_signature(function: Any) -> Any:
     if signature is None:
         return function
 
-    @functools.wraps(function)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        return function(*args, **kwargs)
+    name = getattr(function, "__name__", "")
+    if name.endswith(_OP_SUFFIXES) or name in _SHAPE_FUNCTIONS:
+        from .pieces import SPLITS, TAKES_PIECES, Pieces, apply_to_pieces
+
+        @functools.wraps(function)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            # the pieces of a split body: one operation per piece, unless the operation takes them together
+            if name not in TAKES_PIECES and any(isinstance(a, Pieces) for a in (*args, *kwargs.values())):
+                return apply_to_pieces(name, function, args, kwargs)
+            result = function(*args, **kwargs)
+            return Pieces(result) if name in SPLITS and isinstance(result, list) else result
+
+    else:
+
+        @functools.wraps(function)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            return function(*args, **kwargs)
 
     wrapper.__signature__ = signature  # type: ignore[attr-defined]
     _WITH_SIGNATURE[id(function)] = wrapper

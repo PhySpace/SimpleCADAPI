@@ -56,7 +56,8 @@ from ._marimo import (
 from .children import notebook_digest
 from .config import NotebookConfig
 from .names import names_tag
-from .stubs import register_scalar_stubs  # noqa: F401  (registers on import)
+from .._glue.pieces import Pieces
+from .stubs import PiecesStub, register_scalar_stubs  # noqa: F401  (registers on import)
 from .deps import (
     CellSource,
     ancestors,
@@ -525,6 +526,11 @@ class CellCache(CachedLifecycle):
                     glbls[name] = None
                     glbls[f"_cell_{cell.cell_id}_{name[1:]}"] = None
         live = glbls
+        if attempt is not None and not attempt.hit:
+            # marimo stores a list as a plain list: the pieces of a split body go in a stub that keeps what they are
+            pieces = {lookup: PiecesStub(value) for _, lookup in attempt.contextual_defs() if isinstance(value := glbls.get(lookup), Pieces)}
+            if pieces:
+                glbls = {**glbls, **pieces}
         entry_key = self._entry_key(cell)  # (marimo forgets the attempt when it tears the cell down)
         super().teardown(cell, glbls, run_result)
         if run_result.exception is None:
