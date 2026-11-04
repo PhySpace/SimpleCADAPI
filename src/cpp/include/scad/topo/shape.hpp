@@ -122,7 +122,8 @@ class Shape {
   const std::vector<TagBinding>& local_bindings() const;
   void add_binding(TagBinding binding);
   // The lineage witnesses of this entity: those stored on it, then those the history-witness provider derives
-  // from the recorded graph (tags carried through the operations' deltas; see set_history_witness_provider).
+  // from the recorded graph (tags carried through the operations' deltas; see set_history_witness_provider), each
+  // fact once: a derived witness equal to a stored one (a restored snapshot of it) is not repeated.
   std::vector<TagLineageWitness> lineage_witnesses() const;
   // Only the witnesses stored on the entity (add_lineage_witness, a restored snapshot).
   const std::vector<TagLineageWitness>& stored_lineage_witnesses() const;

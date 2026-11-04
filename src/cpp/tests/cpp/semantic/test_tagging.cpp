@@ -370,3 +370,35 @@ TEST_CASE("copy_semantic_state_from leaves graph and mesh attachments behind") {
   CHECK(b.get_runtime("mesh.default").is_null());
   CHECK(b.get_runtime("semantic.lineage.coverage").as_string() == "complete");
 }
+
+namespace {
+// A history-witness provider that derives one fixed witness for every entity (stands in for the tag view).
+TagLineageWitness g_derived;
+std::vector<TagLineageWitness> derive_one(const Shape& entity) {
+  TagLineageWitness witness = g_derived;
+  witness.target_topo_id = entity.topo_id();
+  return {witness};
+}
+}  // namespace
+
+TEST_CASE("a derived witness equal to a stored one is one witness") {
+  // A value written out (pickle, cell cache) stores what its history derived; restored with its graph node, the
+  // history derives the same witness again.  Reading must not count it twice (snapshots would differ).
+  Solid source = box_solid(1, 1, 1);
+  Solid result = box_solid(2, 2, 2);
+  const TagBinding binding = user_tag_binding("role.datum");
+  g_derived.binding = binding;
+  g_derived.derivation = LineageDerivation::Continuation;
+  g_derived.source_topo_id = source.topo_id();
+  g_derived.evidence = topology_change();
+  set_history_witness_provider(&derive_one);
+  CHECK(result.lineage_witnesses().size() == 1);
+  result.add_tag_lineage(binding, LineageDerivation::Continuation, source.topo_id(), topology_change());
+  CHECK(result.stored_lineage_witnesses().size() == 1);
+  CHECK(result.lineage_witnesses().size() == 1);
+  // Another derivation of the same binding is another fact.
+  g_derived.derivation = LineageDerivation::Fragment;
+  CHECK(result.lineage_witnesses().size() == 2);
+  set_history_witness_provider(nullptr);
+  CHECK(result.lineage_witnesses().size() == 1);
+}
