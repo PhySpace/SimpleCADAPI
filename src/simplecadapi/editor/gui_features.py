@@ -123,7 +123,7 @@ class FeatureService:
                     "gui": {"spec": gui["spec"], "values": gui.get("values", {}), "picked": gui.get("picked", {})} if gui else None,
                     "makes": made,
                     "part_of": part_of,
-                    "reads": sorted(loaded & set(bodies) - set(made)),
+                    "reads": sorted(loaded & (set(bodies) | {w["name"] for w in workplanes}) - set(made)),
                     "status": cell.get("status"),
                     "errors": cell.get("errors") or [],
                 }
