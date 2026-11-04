@@ -127,7 +127,11 @@ function createEdgeMaterial(color: string): LineMaterial {
     shader.uniforms.edgeDepthBias = { value: EDGE_DEPTH_BIAS };
     shader.vertexShader = shader.vertexShader
       .replace('void main() {', 'uniform float edgeDepthBias;\nvoid main() {')
-      .replace('gl_Position = clip;', 'float biasedView = -clip.w + edgeDepthBias;\n\t\t\tclip.z = (projectionMatrix[2][2] * biasedView + projectionMatrix[3][2]) / -biasedView * clip.w;\n\t\t\tgl_Position = clip;');
+      .replace(
+        'gl_Position = clip;',
+        // perspective: the view depth is -clip.w; orthographic (the sketch canvas): clip.w is 1 and depth is linear in view z
+        'if (projectionMatrix[2][3] == -1.0) {\n\t\t\t\tfloat biasedView = -clip.w + edgeDepthBias;\n\t\t\t\tclip.z = (projectionMatrix[2][2] * biasedView + projectionMatrix[3][2]) / -biasedView * clip.w;\n\t\t\t} else {\n\t\t\t\tclip.z += projectionMatrix[2][2] * edgeDepthBias * clip.w;\n\t\t\t}\n\t\t\tgl_Position = clip;',
+      );
   };
   material.customProgramCacheKey = () => 'edge-depth-bias';
   material.userData.role = 'edge'; // setTheme recolors these, and only these
@@ -403,6 +407,8 @@ export class BRepRenderer {
     this.camera.layers.set(EDGE_LAYER);
     this.camera.layers.enable(OVERLAY_LAYER);
     this.renderer.setRenderTarget(this.faceRT);
+    // never clear here: the faces (and their depth) are already in faceRT, with or without the occlusion pass
+    this.renderer.autoClear = false;
     this.renderer.render(this.threeScene, this.camera);
     this.camera.layers.set(FACE_LAYER);
 
