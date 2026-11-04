@@ -512,6 +512,10 @@ def test_tags_and_references_resolve_on_values_restored_from_the_cell_cache(tmp_
             anchor = er.stable_anchor_of(top[0], out)
         lineage.save(Path({root!r}), "cellA", session)
         Path({root!r}, "value.pkl").write_bytes(pickle.dumps(out))
+        from simplecadapi.artifacts.topology_snapshot import encode_topology_snapshot
+        Path({root!r}, "snapshot.json").write_bytes(encode_topology_snapshot(out))
+        fresh = [len(f._tag_lineage) for f in ql.faces().where(ql.tag("user.top")).resolve(out)]
+        Path({root!r}, "lineage.json").write_text(json.dumps(fresh))
         Path({root!r}, "anchor.json").write_text(json.dumps(anchor))
         """
     )
@@ -526,8 +530,14 @@ def test_tags_and_references_resolve_on_values_restored_from_the_cell_cache(tmp_
         out = pickle.loads(Path({root!r}, "value.pkl").read_bytes())
         tagged = ql.faces().where(ql.tag("user.top")).resolve(out)
         r = er.resolve(json.loads(Path({root!r}, "anchor.json").read_text()), out)
-        print(json.dumps({{"tagged": [f.get_area() for f in tagged], "status": r.status,
-                          "areas": [f.get_area() for f in r.entities]}}))
+        # The restored value carries the witnesses its history derived (stored in the pickle) and derives them
+        # again from its restored node: one fact, one witness, so it snapshots to the very bytes of the fresh one.
+        from simplecadapi.artifacts.topology_snapshot import encode_topology_snapshot
+        same = encode_topology_snapshot(out) == Path({root!r}, "snapshot.json").read_bytes()
+        lineage_counts = [len(f._tag_lineage) for f in tagged]
+        assert lineage_counts == json.loads(Path({root!r}, "lineage.json").read_text()), lineage_counts
+        print(json.dumps({{"tagged": [f.get_area() for f in tagged], "status": r.status, "same_snapshot": same,
+                          "lineage": lineage_counts, "areas": [f.get_area() for f in r.entities]}}))
         """
     )
     for code in (build, restore):
@@ -535,6 +545,7 @@ def test_tags_and_references_resolve_on_values_restored_from_the_cell_cache(tmp_
         assert done.returncode == 0, done.stderr[-1500:]
     result = json.loads(done.stdout.strip().splitlines()[-1])
     assert result["status"] == "ok"
+    assert result["same_snapshot"]
     assert result["tagged"] == pytest.approx([800 - 9 * math.pi])
     assert result["areas"] == pytest.approx([800 - 9 * math.pi])
 

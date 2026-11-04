@@ -305,8 +305,14 @@ std::vector<TagLineageWitness> Shape::history_lineage_witnesses() const {
 
 std::vector<TagLineageWitness> Shape::lineage_witnesses() const {
   std::vector<TagLineageWitness> out = stored_lineage_witnesses();
-  for (TagLineageWitness& witness : history_lineage_witnesses())
-    out.push_back(std::move(witness));
+  const std::size_t stored = out.size();
+  for (TagLineageWitness& witness : history_lineage_witnesses()) {
+    // A value written out (pickle, cell cache, .scadbrep) stores the witnesses its history derived; restored with
+    // its graph node, the history derives them again.  One fact, one witness.
+    const auto end = out.begin() + static_cast<std::ptrdiff_t>(stored);
+    if (std::none_of(out.begin(), end, [&](const TagLineageWitness& w) { return same_witness(w, witness); }))
+      out.push_back(std::move(witness));
+  }
   return out;
 }
 
