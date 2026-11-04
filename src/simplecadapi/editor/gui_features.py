@@ -81,6 +81,7 @@ class FeatureService:
         product: dict[str, Any] | None = None
         params_cells: dict[str, str] = {}
         assembly_slugs: set[str] = set()
+        workplanes: list[dict[str, Any]] = []
         for cell in cells:
             gui = F.parse_gui(str(cell.get("code", "")))
             heads = features_in_cell(str(cell.get("code", "")), "")
@@ -109,6 +110,9 @@ class FeatureService:
             for name in made:
                 bodies[name] = produces
                 order.append(name)
+            if head.role == "datum" and produces == "workplane":
+                made = sorted(defined)
+                workplanes.extend({"name": name, "cell": cell["id"], "slug": head.slug} for name in made)
             features.append(
                 {
                     "cell": cell["id"],
@@ -137,7 +141,7 @@ class FeatureService:
                     {
                         "name": feature["makes"][0],
                         "plane": plane,
-                        "plane_label": plane if isinstance(plane, str) else "face",
+                        "plane_label": plane if isinstance(plane, str) else (sketch_doc.plane_workplane(plane) or "face"),
                         "normal": sketch_doc.PLANE_NORMALS.get(plane, "normal") if isinstance(plane, str) else "normal",
                         "normal_vec": sketch_doc.plane_normal(plane),
                     }
@@ -151,6 +155,7 @@ class FeatureService:
             "open": open_bodies,
             "tip": open_bodies[-1] if open_bodies else None,
             "profiles": profiles,
+            "workplanes": workplanes,
             "assembly": next(
                 (
                     {"cell": f["cell"], "slug": f["slug"], "doc": (f["gui"]["values"] or {}).get("assembly")}

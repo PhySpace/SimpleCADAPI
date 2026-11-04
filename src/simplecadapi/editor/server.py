@@ -121,6 +121,7 @@ class WorkspaceState:
         "params.values",
         "preview",
         "selection",
+        "workplanes",
     )
 
     def __init__(self, workspace: Path, notebook: Path | None = None) -> None:
@@ -131,6 +132,7 @@ class WorkspaceState:
         self.port = 0
         self.lock = threading.Lock()
         self.latest: dict[str, dict] = {}
+        self._workplanes: list[dict] | None = None  # the frames last sent (see _push_workplanes)
         self.latest_package_bytes: bytes | None = None  # a full package, made on demand (export)
         # The latest preview (replaced as a whole, so a reader on another thread never sees half of one) and the
         # parts of it by key: a page is sent only the parts it lacks.
@@ -266,6 +268,7 @@ class WorkspaceState:
             if not self._begin_switch(notebook, generation):
                 return
             restored = self._restore(notebook, generation)
+        self._workplanes = None  # a new notebook: its workplanes are sent on its first settle, whatever they are
         kernel = MarimoKernel(
             notebook,
             server_port=self.port,
@@ -1137,6 +1140,7 @@ class WorkspaceState:
             result = kernel.publish_preview(self.preview_url, step=self.notebook.stem if self.notebook else "")
             published = time.perf_counter()
             self.push_cells()
+            self._push_workplanes(result.get("workplanes"))
             if os.environ.get("SCA_EDITOR_TRACE"):
                 print(
                     f"[sca edit] settle: kernel call {(published - signed) * 1000:.0f} ms "
@@ -1164,6 +1168,13 @@ class WorkspaceState:
             if message != self._last_publish_error:
                 self._last_publish_error = message
                 self.hub.broadcast({"type": "status", "error": message[-300:]})
+
+    def _push_workplanes(self, workplanes: Any) -> None:
+        """The notebook's workplanes and their frames, as the kernel computed them: sent when they change."""
+        if not isinstance(workplanes, list) or workplanes == self._workplanes:
+            return
+        self._workplanes = workplanes
+        self.emit({"type": "workplanes", "workplanes": workplanes})
 
     def _begin_run(self) -> None:
         """Cells are about to run because someone asked for it: report afresh.

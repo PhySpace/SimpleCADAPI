@@ -465,6 +465,9 @@ def _sweep(c: Context) -> list[str]:
 def _sketch(c: Context) -> list[str]:
     params, lines = sketch_doc.render(c.slug, c.values["sketch"])
     c.raw_params(params)
+    workplane = sketch_doc.plane_workplane(c.values["sketch"]["plane"])
+    if workplane is not None:
+        c.body_named(workplane)  # drawn on a workplane variable of the notebook
     return lines
 
 
@@ -625,6 +628,43 @@ def _scale(c: Context) -> list[str]:
     return [f"{c.slug} = scad.scale_rsolid(solid={c.body('body')}, factors=({factor}, {factor}, {factor}), center={c.point('origin')})"]
 
 
+_WORKPLANE_METHODS = [
+    {"value": "face", "label": "on a face"},
+    {"value": "face_edge", "label": "on a face, x along an edge"},
+    {"value": "midplane", "label": "halfway between two parallel faces"},
+    {"value": "points", "label": "through three vertices"},
+    {"value": "axis", "label": "through an edge, turned about it"},
+]
+_ON_FACE = {"method": ["face", "face_edge"]}
+
+
+def _workplane(c: Context) -> list[str]:
+    """A workplane from picked geometry: one recorded SDK constructor per way of picking (see make_workplane_*)."""
+    method = c.choice("method")
+    c.body("body")
+    lines: list[str] = []
+
+    def pick(slot: str) -> str:
+        lines.extend(c.recipe(slot, "tip"))
+        name = c.selection(slot)
+        lines.append(f"{name} = {name}.resolve({{BODY}})[0]")
+        return name
+
+    if method in ("face", "face_edge"):
+        face = pick("face")
+        x_edge = f", x_edge={pick('edge')}" if method == "face_edge" else ""
+        call = f"scad.make_workplane_from_face_rworkplane({face}{x_edge}, offset={c.var('offset')}, flip={c.var('flip')})"
+    elif method == "midplane":
+        call = f"scad.make_workplane_midplane_rworkplane({pick('face')}, {pick('face_b')})"
+    elif method == "points":
+        call = f"scad.make_workplane_from_points_rworkplane({pick('point_a')}, {pick('point_b')}, {pick('point_c')})"
+    else:
+        edge = pick("edge")
+        face = f", face={pick('face')}" if "face" in c._recipes else ""
+        call = f"scad.make_workplane_from_axis_rworkplane({edge}, {c.var('angle')}{face})"
+    return [*lines, f"{c.slug} = {call}"]
+
+
 _AXIS = lambda name, label, default="+z": _enum(name, label, _AXIS_OPTIONS, default)  # noqa: E731
 _PLANE = lambda: _enum("plane", "Sketch plane", _PLANE_OPTIONS, "XY", help="The profile lies in this plane and is pushed along its normal.")  # noqa: E731
 _PROFILE = lambda: Slot("profile", "Sketch profile", "profile", help="A sketch made earlier.")  # noqa: E731
@@ -710,6 +750,25 @@ SPECS: tuple[Spec, ...] = (
          (_BODY(), Slot("angle", "Angle", "angle", default=45.0, unit="deg", min=-360.0, max=360.0), _AXIS("axis", "Axis"), _point("origin", "Axis point")), _rotate),
     Spec("scale", "Scale", "Transform", "build", "solid", "Scale a body uniformly about a point.",
          (_BODY(), Slot("factor", "Factor", "float", default=1.5, min=0.01, max=100.0), _point("origin", "Centre")), _scale),
+    Spec("workplane", "Workplane", "Datums", "datum", "workplane",
+         "A workplane from picked geometry: on a planar face (x along an edge if one is picked, an offset along the normal), "
+         "halfway between two parallel faces, through three vertices, or through an edge turned about it. Sketch on it, "
+         "or place features in it with `with wp:`.",
+         (_BODY(), _enum("method", "From", _WORKPLANE_METHODS, "face"),
+          Slot("face", "Face", "select", entity="face", single=True, optional=True,
+               show_when={"method": ["face", "face_edge", "midplane", "axis"]},
+               help="A planar face (for an axis: the face the plane starts from)."),
+          Slot("face_b", "Second face", "select", entity="face", single=True, optional=True, show_when={"method": ["midplane"]},
+               help="A face parallel to the first."),
+          Slot("edge", "Edge", "select", entity="edge", single=True, optional=True, show_when={"method": ["face_edge", "axis"]},
+               help="x runs along it (on a face); the axis the plane turns about (through an edge)."),
+          Slot("point_a", "Origin vertex", "select", entity="vertex", single=True, optional=True, show_when={"method": ["points"]}),
+          Slot("point_b", "x towards vertex", "select", entity="vertex", single=True, optional=True, show_when={"method": ["points"]}),
+          Slot("point_c", "Third vertex", "select", entity="vertex", single=True, optional=True, show_when={"method": ["points"]}),
+          _signed("offset", "Offset along the normal", 0.0, show_when=_ON_FACE),
+          Slot("flip", "Flip the normal", "bool", default=False, show_when=_ON_FACE),
+          Slot("angle", "Angle about the edge", "angle", default=0.0, unit="deg", min=-360.0, max=360.0,
+               show_when={"method": ["axis"]})), _workplane),
 )
 
 _COMBINE_OPTIONS = [
@@ -784,7 +843,7 @@ def catalog() -> dict[str, Any]:
 
 
 def default_slug(spec_id: str, taken: set[str]) -> str:
-    base = {"extrude_rect": "block", "extrude_circle": "disc", "extrude_polygon": "profile_solid"}.get(spec_id, spec_id)
+    base = {"extrude_rect": "block", "extrude_circle": "disc", "extrude_polygon": "profile_solid", "workplane": "wp"}.get(spec_id, spec_id)
     if base.startswith("op."):  # an SDK operation: what it makes (make_spur_gear_rsolid -> spur_gear)
         base = re.sub(r"^(make|add|create)_", "", base[3:].rsplit("_r", 1)[0]) or "shape"
     candidate, number = base, 1
@@ -919,7 +978,7 @@ def check_values(spec: Spec, values: Mapping[str, Any], bodies: Mapping[str, str
 
 def selection_recipe(slot: Slot, items: Sequence[Mapping[str, Any]], known_slugs: set[str]) -> list[str]:
     """Source lines of a recipe that selects the picked *items* inside the feature cell (bound to ``_<slot>``)."""
-    factory = {"face": "faces", "edge": "edges"}[slot.entity or "face"]
+    factory = {"face": "faces", "edge": "edges", "vertex": "vertices"}[slot.entity or "face"]
     picked = [item for item in items if item.get("kind") == slot.entity]
     if not picked:
         raise FeatureError(f"{slot.label}: pick at least one {slot.entity} in the viewport")
@@ -956,13 +1015,30 @@ def selection_recipe(slot: Slot, items: Sequence[Mapping[str, Any]], known_slugs
 def extract_recipe(code: str, slot: str) -> list[str] | None:
     """The recipe lines of a selection slot in an existing feature cell, so an edit can keep what was picked."""
     lines = code.splitlines()
-    start = next((i for i, line in enumerate(lines) if line.startswith("# ") and "picked in the viewport" in line), None)
-    if start is None:
-        return None
-    for end in range(start + 1, len(lines)):
-        if lines[end].startswith(f"_{slot} = "):
-            return [re.sub(r"(_\w+_source = ).*", r"\1{BODY}", line) for line in lines[start : end + 1]]
+    start = None
+    for index, line in enumerate(lines):
+        if line.startswith("# ") and "picked in the viewport" in line:
+            start = index  # the recipe of a slot starts at the comment closest above its line (a cell may hold several)
+        elif start is not None and line.startswith(f"_{slot} = "):
+            return [re.sub(r"(_\w+_source = ).*", r"\1{BODY}", text) for text in lines[start : index + 1]]
     return None
+
+
+_REQUIRED_PICKS = {
+    "face": ("face",),
+    "face_edge": ("face", "edge"),
+    "midplane": ("face", "face_b"),
+    "points": ("point_a", "point_b", "point_c"),
+    "axis": ("edge",),
+}
+"""The picks each way of making a workplane needs (the others are optional or hidden)."""
+
+
+def _required_pick(spec: Spec, slot: Slot, clean: Mapping[str, Any]) -> bool:
+    """Whether an optional selection slot must still be picked: a workplane's method names the picks it needs."""
+    if spec.id == "workplane":
+        return slot.name in _REQUIRED_PICKS.get(str(clean.get("method")), ())
+    return False
 
 
 def render_feature(
@@ -990,6 +1066,8 @@ def render_feature(
                 recipes[slot.name] = selection_recipe(slot, selections[slot.name], known_slugs or set())
             elif keep_recipes and keep_recipes.get(slot.name):
                 recipes[slot.name] = list(keep_recipes[slot.name])
+            elif slot.optional and not _required_pick(spec, slot, clean):
+                continue
             else:
                 raise FeatureError(f"{slot.label}: pick at least one {slot.entity} in the viewport")
     ctx = Context(spec, slug, clean, bodies, recipes, env)

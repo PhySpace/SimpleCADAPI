@@ -589,10 +589,28 @@ class MarimoKernel:
             "    print('SCA-PREVIEWED', _p['nodes'], _p['parts'], _p['bytes'], _p.get('compile_ms', 0), _p.get('encode_ms', 0), _p.get('post_ms', 0))\n"
             "except Exception as _e:\n"
             "    print('SCA-PREVIEW-ERROR', type(_e).__name__ + ':', str(_e).splitlines()[0] if str(_e) else '')\n"
+            # the workplanes ride along, product or not (a notebook mid-edit has workplanes before it has a product)
+            "try:\n"
+            "    from simplecadapi.runtime.live import live_workplanes as _workplanes\n"
+            "    import json as _wjson\n"
+            "    print('SCA-WORKPLANES', _wjson.dumps(_workplanes()))\n"
+            "except Exception:\n"
+            "    pass\n"
         )
 
     @staticmethod
     def _preview_result(result: dict) -> dict:
+        out = MarimoKernel._preview_outcome(result)
+        for line in (result.get("log") or "").splitlines():
+            if line.startswith("SCA-WORKPLANES "):
+                try:
+                    out["workplanes"] = json.loads(line[len("SCA-WORKPLANES "):])
+                except ValueError:
+                    pass
+        return out
+
+    @staticmethod
+    def _preview_outcome(result: dict) -> dict:
         for line in (result.get("log") or "").splitlines():
             if line.startswith("SCA-PREVIEWED "):
                 _, nodes, parts, size, *times = line.split(" ")
