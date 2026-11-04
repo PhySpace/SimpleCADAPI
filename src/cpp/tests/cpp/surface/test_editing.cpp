@@ -4,10 +4,12 @@
 
 #include <cmath>
 #include <functional>
+#include <optional>
 
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <BRepPrimAPI_MakeCylinder.hxx>
 #include <BRepTools.hxx>
 #include <BRep_Tool.hxx>
 #include <GeomAPI_Interpolate.hxx>
@@ -222,6 +224,22 @@ TEST_CASE("analytic geometry is refused with the conversion named; the conversio
   const Face nurbs = convert_to_bspline_rface(side);
   CHECK(inspect_surface_rsurfacedata(nurbs).find("type")->as_string() == "bspline");
   CHECK(valid(elevate_surface_degree_rface(nurbs, 3, 3)));
+}
+
+TEST_CASE("a converted cylinder side is a periodic, untrimmed B-spline face that edits keep valid") {
+  const Solid cylinder(BRepPrimAPI_MakeCylinder(5.0, 10.0).Solid());
+  std::optional<Face> side;
+  for (const Face& face : cylinder.faces())
+    if (inspect_surface_rsurfacedata(face).find("type")->as_string() == "cylinder")
+      side = face;
+  REQUIRE(side);
+  const Face nurbs = convert_to_bspline_rface(*side);
+  const Value data = inspect_surface_rsurfacedata(nurbs);
+  CHECK(data.find("u_periodic")->as_bool());
+  CHECK_FALSE(data.find("trimmed")->as_bool());
+  const Face bulged = move_surface_poles_rface(nurbs, {{{0, 1}, {20, 0, 10}}});
+  CHECK(valid(bulged));
+  CHECK(bulged.area() > nurbs.area());
 }
 
 TEST_CASE("bad arguments fail with the operation's error and say what fits") {

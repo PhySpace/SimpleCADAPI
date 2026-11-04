@@ -1,12 +1,13 @@
 // convert_to_bspline_redge / convert_to_bspline_rface: the explicit step that turns analytic geometry into the
 // B-splines the edits work on (BRepBuilderAPI_NurbsConvert), and inspect_curve_rcurvedata /
 // inspect_surface_rsurfacedata, which report what an edit would work on.
+#include <cmath>
+
 #include <BRepBuilderAPI_NurbsConvert.hxx>
 #include <BRepTools.hxx>
 #include <BRepTools_History.hxx>
 #include <BRep_Tool.hxx>
 #include <Geom2d_Curve.hxx>
-#include <Geom2d_Line.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopTools_ListOfShape.hxx>
@@ -43,8 +44,10 @@ TopoDS_Shape first_of(const TopoDS_Shape& shape, TopAbs_ShapeEnum type) {
   return it.Current();
 }
 
-// A face is trimmed when its boundary is not the natural boundary of its surface's domain: inner loops, (u, v)
-// bounds inside the domain, or an outer loop edge that is not an iso line.
+// A face is trimmed when its boundary is not the natural boundary of its surface's domain: more than one loop, (u, v)
+// bounds inside the domain, or a loop edge that does not run along one side of the domain (u or v constant at a
+// domain bound; a seam of a periodic surface is such a side too).  Judged on samples of the pcurves, so a side that a
+// converter turned into a 2D B-spline still counts as a side.
 bool is_trimmed(const TopoDS_Face& face, const Handle(Geom_Surface) & surface) {
   int wires = 0;
   for (TopExp_Explorer it(face, TopAbs_WIRE); it.More(); it.Next())
@@ -60,11 +63,17 @@ bool is_trimmed(const TopoDS_Face& face, const Handle(Geom_Surface) & surface) {
   for (TopExp_Explorer it(face, TopAbs_EDGE); it.More(); it.Next()) {
     double first = 0, last = 0;
     const Handle(Geom2d_Curve) pcurve = BRep_Tool::CurveOnSurface(TopoDS::Edge(it.Current()), face, first, last);
-    const Handle(Geom2d_Line) line = Handle(Geom2d_Line)::DownCast(pcurve);
-    if (line.IsNull())
+    if (pcurve.IsNull())
       return true;
-    const gp_Dir2d d = line->Direction();
-    if (std::abs(d.X()) > kTol && std::abs(d.Y()) > kTol)
+    bool on[4] = {true, true, true, true};  // u = u1, u = u2, v = v1, v = v2 at every sample
+    for (int i = 0; i <= 8; ++i) {
+      const gp_Pnt2d uv = pcurve->Value(first + (last - first) * i / 8.0);
+      on[0] = on[0] && std::abs(uv.X() - u1) <= kTol;
+      on[1] = on[1] && std::abs(uv.X() - u2) <= kTol;
+      on[2] = on[2] && std::abs(uv.Y() - v1) <= kTol;
+      on[3] = on[3] && std::abs(uv.Y() - v2) <= kTol;
+    }
+    if (!(on[0] || on[1] || on[2] || on[3]))
       return true;
   }
   return false;
