@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 
 import { SceneLabel } from "@/components/scene/SceneLabel";
+import type { CurveEnd } from "@/lib/curve3d";
 import type { Vec3 } from "@/lib/sketch-plane";
 import { cn } from "@/lib/utils";
 import { LineMaterial, LineSegments2, LineSegmentsGeometry } from "@/scene/fat-lines";
@@ -23,9 +24,17 @@ export function parseCurves(raw: unknown): CurveSample[] {
   );
 }
 
-/** The ends of the curves' edges: where a new path can join one (snap targets). */
-export function curveEnds(curves: readonly CurveSample[]): { at: Vec3; label: string }[] {
-  return curves.flatMap((curve) => curve.edges.flatMap((edge, i) => [{ at: edge[0], label: `${curve.name} ${i}` }, { at: edge[edge.length - 1], label: `${curve.name} ${i}` }]));
+/** The ends of the curves' edges: where a new path can join one (snap targets).  The two ends of a curve that is one
+ * edge say which they are (`endOf`): a point drawn there is kept at it. */
+export function curveEnds(curves: readonly CurveSample[]): { at: Vec3; label: string; endOf?: CurveEnd }[] {
+  return curves.flatMap((curve) =>
+    curve.kind === "edge" && curve.edges.length === 1
+      ? [
+          { at: curve.edges[0][0], label: `${curve.name} start`, endOf: { curve: curve.name, end: "start" as const } },
+          { at: curve.edges[0][curve.edges[0].length - 1], label: `${curve.name} end`, endOf: { curve: curve.name, end: "end" as const } },
+        ]
+      : curve.edges.flatMap((edge, i) => [{ at: edge[0], label: `${curve.name} ${i}` }, { at: edge[edge.length - 1], label: `${curve.name} ${i}` }]),
+  );
 }
 
 /** The curve whose drawn line passes within `reach` pixels of a screen point (the nearest), or null. */

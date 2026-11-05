@@ -299,7 +299,7 @@
   "Draft planar, cylindrical or conical faces by a signed angle in degrees.": "按带符号的角度（度）对平面、圆柱面或圆锥面拔模。",
   "Drag an anchor (its handles follow) or a handle: each side has its own direction and pull. Hold Shift while dragging a handle to put the other one in line (smooth); S smooths the selected anchors. Shift+A: anchor mode (add/remove anchors by clicking); Delete removes the selected anchor.": "拖动锚点（控制柄跟随）或控制柄：两侧各有自己的方向和力度。拖动控制柄时按住 Shift 让另一侧与之共线（光滑）；S 让选中的锚点变光滑。Shift+A：锚点模式（点击添加/删除锚点）；Delete 删除选中的锚点。",
   "Draw a chain of lines, arcs or splines, or a closed loop: the wire is made of one.": "画一条由直线、圆弧或样条组成的链，或一个闭环：线框由其中一条构成。",
-  "Draw a path in space (W): lines, arcs and splines on workplanes, snapped to the model; it becomes a wire to sweep along or loft through.": "在空间中绘制路径（W）：在工作平面上画直线、圆弧和样条，并吸附到模型；生成的线框可用于扫掠或放样。",
+  "Draw curves in space (W): lines, arcs and splines on workplanes, snapped to the model; each is an edge, one after another joined end to end (pick several to sweep along them, or to make a surface).": "在空间中绘制曲线（W）：在工作平面上画直线、圆弧和样条，可吸附到模型；每条都是一个 edge，首尾相接（选中多条可以沿它们扫掠，或者构造曲面）。",
   "Drive angle degrees": "驱动角度（度）",
   "Drive depth": "驱动深度",
   "Drive distance": "驱动距离",

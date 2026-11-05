@@ -64,11 +64,15 @@ HOLE_DIAMETER = scad.var(name="hole_diameter", default=6.0, unit="mm", comment="
   promoted to a wire (below) to loft or sweep between. Shift+Space looks straight at the active workplane.
 - 3D curves (W, or the command "3D curve"): lines (L), three-point arcs (A) and splines (S) one after another through points
   on the drawing plane (the active workplane, else XY; Tab changes it between points), snapped to the model's vertices
-  and edge midpoints, the workplanes' origins, the points of other curves and the plane's grid. Enter makes a `curve`
-  feature (`# ---- feature: path (datum) ----`): a point drawn on a workplane is `wp.point(u, v)` (it follows the
-  workplane), one snapped to a vertex is `scad.ref.vertex(...).one(base).get_coordinates()` (it follows the model), others
-  are numbers; the curves become one `make_wire_from_edges_rwire([...])`, a value sweep/loft forms take. Every wire or
-  edge value of the notebook is drawn in the viewport from the kernel's samples (`runtime/live_curves.py`).
+  and edge midpoints, the workplanes' origins, the ends of other curves and the plane's grid. Enter makes one `curve`
+  feature per line, arc or spline (`path`, `path_2` ...; `# ---- feature: path (datum) ----`), each an **edge**: a point
+  drawn on a workplane is `wp.point(u, v)` (it follows the workplane), one snapped to a vertex is
+  `scad.ref.vertex(...).one(base).get_coordinates()` (it follows the model), one at an end of another curve (the next
+  curve of the path, or a snapped end) is `path.get_end_vertex().get_coordinates()` (it follows that curve), others are
+  numbers. A wire is made where one is needed, from the curves picked (`make_wire_from_edges_rwire([path, path_2])`); an
+  older curve cell of several segments is still one wire. The kernel reports every top-level value's kind, so a curve
+  or face written as code is a value, not a body. Every wire or edge value is drawn in the viewport from the kernel's
+  samples (`runtime/live_curves.py`) and picked with the "sketch / curve" selection mode.
 - Connectors of the part are placed like workplanes: pick one flat face, then "Connector" (selection bar, command bar,
   or the assembly tab's "on picked face"): a frame with move arrows and turn rings sits on the face; name it and Add.
   It is written into the product cell (`add_connector_rpart(...)`, `# gui-connectors:`); the assembly tab lists, edits

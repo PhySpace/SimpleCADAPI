@@ -71,3 +71,27 @@ def test_a_cell_that_only_draws_a_curve_through_the_body_leaves_it_the_product()
         path = scad.make_wire_from_edges_rwire([scad.make_segment_redge((0, 0, 0), (0, 0, 20))])
     values = {"base": base, "path": path}
     assert "base" not in product_reads([Cell({"base"}, set()), Cell({"path"}, {"base"})], values)
+
+
+def test_one_curve_is_an_edge_and_the_next_starts_where_it_ends():
+    """A curve the editor draws is one edge; the next one of a path starts at its end through ``end_of``, so it follows
+    when the first is changed, and the two make a wire where one is needed."""
+    first = {"points": [{"id": "p1", "at": [0, 0, 0]}, {"id": "p2", "at": [10, 0, 0]}], "curves": [{"id": "c1", "kind": "line", "points": ["p1", "p2"]}]}
+    second = {
+        "points": [{"id": "p1", "end_of": {"curve": "path", "end": "end"}, "at": [10, 0, 0]}, {"id": "p2", "at": [10, 10, 5]}, {"id": "p3", "at": [0, 20, 5]}],
+        "curves": [{"id": "c1", "kind": "spline", "points": ["p1", "p2", "p3"]}],
+    }
+    assert curve_doc.output_of(first) == "edge" and curve_doc.output_of(_doc()) == "wire"
+    one = F.render_feature("curve", "path", {"curve": first}, bodies={})
+    two = F.render_feature("curve", "path_2", {"curve": second}, bodies={"path": "edge"})
+    assert "path_2" not in one.reads and two.reads == ["path"]
+    assert "_p1 = path.get_end_vertex().get_coordinates()" in two.feature
+    scope = _run("\n".join(one.feature.splitlines()[1:]))
+    assert isinstance(scope["path"], scad.Edge)
+    scope = _run("\n".join(two.feature.splitlines()[1:]), path=scope["path"])
+    start = scope["path_2"].get_start_vertex().get_coordinates()
+    assert isinstance(scope["path_2"], scad.Edge) and tuple(round(c, 6) for c in start) == (10.0, 0.0, 0.0)
+    wire = scad.make_wire_from_edges_rwire([scope["path"], scope["path_2"]])
+    assert len(scad.ql.edges().resolve(wire)) == 2
+    with pytest.raises(curve_doc.CurveError, match="one of them"):
+        curve_doc.validate({**second, "points": [{**second["points"][0], "on": "wp", "uv": [0, 0]}, *second["points"][1:]]})

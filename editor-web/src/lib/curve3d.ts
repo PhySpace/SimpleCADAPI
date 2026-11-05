@@ -1,14 +1,20 @@
-/** Drawing a 3D curve in the viewport: the document the `curve` feature takes (points in space, on workplanes or at model
- * vertices; lines, arcs and splines that follow one another), what the pointer snaps to, and the shape drawn while
- * drawing.  Pure: no React, no three.js.  World coordinates are CAD mm, Z up. */
+/** Drawing a 3D curve in the viewport: the document the `curve` feature takes (points in space, on workplanes, at model
+ * vertices or at the ends of other curves; lines, arcs and splines that follow one another), what the pointer snaps to,
+ * and the shape drawn while drawing.  A path drawn in one go becomes one curve feature per line, arc or spline (each an
+ * edge), each starting at the end of the one before (see splitPath).  Pure: no React, no three.js.  World coordinates are
+ * CAD mm, Z up. */
 
 import { add, cross, dot, length, scale, sub, unit, type Vec3 } from "@/lib/sketch-plane";
 
 export type CurveKind = "line" | "arc" | "spline";
 
+/** Where another curve of the notebook starts or ends (a point there follows it). */
+export type CurveEnd = { curve: string; end: "start" | "end" };
+
 /** A point of the document: `at` (world mm) always (a hint for vertices and workplane points), `on` + `uv` for a point
- * drawn on a workplane variable, `entity_id` for one snapped to a model vertex (the server names it by its reference). */
-export type CurvePoint = { id: string; at: Vec3; on?: string; uv?: [number, number]; entity_id?: string };
+ * drawn on a workplane variable, `entity_id` for one snapped to a model vertex (the server names it by its reference),
+ * `end_of` for one at an end of another curve. */
+export type CurvePoint = { id: string; at: Vec3; on?: string; uv?: [number, number]; entity_id?: string; end_of?: CurveEnd };
 export type CurveSegment = { id: string; kind: CurveKind; points: string[] };
 export type CurveDoc = { points: CurvePoint[]; curves: CurveSegment[] };
 
@@ -24,6 +30,8 @@ export type SnapCandidate = {
   pointId?: string;
   /** For a workplane's origin: the workplane, so the point is kept on it. */
   workplane?: string;
+  /** For an end of another curve: which, so the point is kept at it. */
+  endOf?: CurveEnd;
   label: string;
   priority: number;
 };
@@ -160,6 +168,7 @@ export function pointFor(doc: CurveDoc, plane: DrawPlane, at: Vec3, snap: SnapCa
   let point: CurvePoint = { id, at };
   if (snap?.kind === "vertex" && snap.entityId) point = { id, at, entity_id: snap.entityId };
   else if (snap?.kind === "origin" && snap.workplane) point = { id, at, on: snap.workplane, uv: [0, 0] };
+  else if (snap?.endOf) point = { id, at, end_of: snap.endOf };
   else if (plane.workplane && (!snap || snap.kind === "grid")) point = { id, at, on: plane.name, uv: planeUV(plane, at) };
   return { doc: { ...doc, points: [...doc.points, point] }, id };
 }
@@ -180,4 +189,22 @@ export function dropLast(doc: CurveDoc): CurveDoc {
   const first = doc.curves[0]?.points[0];
   if (curves.length === 0 && first) used.add(first);
   return { points: doc.points.filter((p) => used.has(p.id)), curves };
+}
+
+/** The documents of a path drawn in one go, one per line, arc or spline (each feature is one edge), named `names` in order:
+ * a curve that starts where the one before it ends starts at its end (`end_of`), and a path closed on its first point
+ * ends at the first curve's start, so the curves stay joined when one of them changes. */
+export function splitPath(doc: CurveDoc, names: readonly string[]): CurveDoc[] {
+  const first = doc.curves[0]?.points[0];
+  return doc.curves.map((curve, index) => {
+    const previous = doc.curves[index - 1];
+    const points = curve.points.map((id, at) => {
+      const point = doc.points.find((p) => p.id === id) as CurvePoint;
+      if (at === 0 && previous && previous.points.at(-1) === id) return { id, at: point.at, end_of: { curve: names[index - 1], end: "end" as const } };
+      if (at === curve.points.length - 1 && index > 0 && id === first) return { id, at: point.at, end_of: { curve: names[0], end: "start" as const } };
+      return point;
+    });
+    const unique = points.filter((point, at) => points.findIndex((p) => p.id === point.id) === at);
+    return { points: unique, curves: [{ ...curve, id: "c1" }] };
+  });
 }

@@ -28,7 +28,7 @@ import { describePartial, parsePartial, samePartial, type PartialModel } from "@
 import { WorkplanePlacePanel, WorkplanePlacer, type PlaceBase, type PlaceMode } from "@/components/WorkplanePlacer";
 import { CurveDrawer } from "@/components/CurveDrawer";
 import { CurveLines, curveEnds, parseCurves, type CurveSample } from "@/components/CurveLines";
-import type { CurveDoc, DrawPlane } from "@/lib/curve3d";
+import { splitPath, type CurveDoc, type DrawPlane } from "@/lib/curve3d";
 import { NAMED_FRAMES, ZERO_PLACE, cleanValues, faceFrame, placedFrame, type PlaceFrame, type PlaceValues } from "@/lib/workplane-place";
 import { parseWorkplanes, resolvePlane, workplanePlane, workplaneRequest, type WorkplaneFrame } from "@/lib/workplanes";
 import { fitDistanceMm } from "@/lib/sketch-view";
@@ -54,7 +54,7 @@ import { describeSketch, nextSketchSelection, readHidden, sketchCentre, sketchIn
 import { useSketchShapes } from "@/lib/useSketchShapes";
 import type { Vec3 } from "@/lib/sketch-plane";
 import { PALETTES } from "@/scene/theme";
-import { assertCellRan, cellFailure, isCellCommand, pickedPayload, type FeatureCommand, type FeatureRow, type SelectionPayload, type Spec } from "@/lib/features";
+import { assertCellRan, cellFailure, isCellCommand, pickedPayload, suggestName, type FeatureCommand, type FeatureRow, type SelectionPayload, type Spec } from "@/lib/features";
 import { useRunLog } from "@/lib/runlog";
 import { useTheme } from "@/lib/theme";
 import { selectionPayload, variableNames, type SelectionItem } from "@/lib/selection";
@@ -999,22 +999,31 @@ export function App() {
     setPicked([]);
     setDrawing({ plane: active && workplanesRef.current.some((wp) => wp.name === active) ? active : "XY", error: null });
   }, [noNotebook]);
+  /** The path drawn becomes one curve feature per line, arc or spline (each an edge: path, path_2 ...), each starting at
+   * the end of the one before; all of them or none (a failing one takes back the ones added before it). */
   const commitCurve = useCallback(
     async (doc: CurveDoc, name: string) => {
       setGuiBusy(true);
+      const names: string[] = [];
+      while (names.length < doc.curves.length) names.push(names.length ? suggestName(name, [...gui.state.taken, ...names]) : name);
+      let added = 0;
       try {
-        const result = await gui.run({ op: "add", spec: "curve", name, values: { curve: doc } });
-        assertCellRan(result);
-        log.push("ok", `add ${result.name}`);
+        for (const [index, part] of splitPath(doc, names).entries()) {
+          const result = await gui.run({ op: "add", spec: "curve", name: names[index], values: { curve: part } });
+          added += 1;
+          assertCellRan(result);
+          log.push("ok", `add ${result.name}`);
+        }
         setDrawing(null);
       } catch (error) {
+        for (; added > 0; added -= 1) await gui.run({ op: "undo" }).catch(() => undefined);
         const message = error instanceof Error ? error.message : String(error);
         setDrawing((d) => (d ? { ...d, error: message } : d));
       } finally {
         setGuiBusy(false);
       }
     },
-    [gui.run, log.push],
+    [gui.run, gui.state.taken, log.push],
   );
   // W: draw a 3D curve (not while typing, sketching or placing a workplane).
   useEffect(() => {
@@ -1258,8 +1267,8 @@ export function App() {
         label: "3D curve",
         group: "Sketch",
         keywords: ["curve", "wire", "path", "3d", "polyline", "spline", "arc", "rail", "sweep"],
-        description: "Draw a path in space (W): lines, arcs and splines on workplanes, snapped to the model; it becomes a wire to sweep along or loft through.",
-        icon: FEATURE_ICONS.sketch,
+        description: "Draw curves in space (W): lines, arcs and splines on workplanes, snapped to the model; each is an edge, one after another joined end to end (pick several to sweep along them, or to make a surface).",
+        icon: FEATURE_ICONS.curve,
         run: () => startDrawing(),
       },
       {

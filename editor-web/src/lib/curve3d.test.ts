@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { addSegment, arcPoints, dropLast, gridStep, onGrid, pathEnd, pickSnap, pointFor, rayOnPlane, type CurveDoc, type DrawPlane, type SnapCandidate } from "./curve3d";
+import { addSegment, arcPoints, dropLast, gridStep, onGrid, pathEnd, pickSnap, pointFor, rayOnPlane, splitPath, type CurveDoc, type DrawPlane, type SnapCandidate } from "./curve3d";
 
 const XY: DrawPlane = { name: "XY", workplane: false, origin: [0, 0, 0], x_axis: [1, 0, 0], y_axis: [0, 1, 0], normal: [0, 0, 1] };
 const WP: DrawPlane = { name: "wp", workplane: true, origin: [0, 0, 10], x_axis: [1, 0, 0], y_axis: [0, 0, 1], normal: [0, -1, 0] };
@@ -36,5 +36,32 @@ describe("drawing a 3D curve", () => {
     expect(doc.points[1].entity_id).toBe("entity/p/vertex/vertex_2");
     expect(pathEnd(doc)).toBe("p2");
     expect(dropLast(doc)).toEqual({ points: [doc.points[0]], curves: [] });
+  });
+});
+
+describe("a path drawn in one go becomes one curve per segment", () => {
+  const doc: CurveDoc = {
+    points: [
+      { id: "p1", at: [0, 0, 0] },
+      { id: "p2", at: [10, 0, 0] },
+      { id: "p3", at: [10, 5, 0] },
+      { id: "p4", at: [0, 10, 0] },
+    ],
+    curves: [
+      { id: "c1", kind: "line", points: ["p1", "p2"] },
+      { id: "c2", kind: "arc", points: ["p2", "p3", "p4"] },
+      { id: "c3", kind: "line", points: ["p4", "p1"] },
+    ],
+  };
+
+  it("starts each at the end of the one before, and closes on the first's start", () => {
+    const [a, b, c] = splitPath(doc, ["path", "path_2", "path_3"]);
+    expect(a).toEqual({ points: [doc.points[0], doc.points[1]], curves: [{ id: "c1", kind: "line", points: ["p1", "p2"] }] });
+    expect(b.points[0]).toEqual({ id: "p2", at: [10, 0, 0], end_of: { curve: "path", end: "end" } });
+    expect(b.curves).toEqual([{ id: "c1", kind: "arc", points: ["p2", "p3", "p4"] }]);
+    expect(c.points).toEqual([
+      { id: "p4", at: [0, 10, 0], end_of: { curve: "path_2", end: "end" } },
+      { id: "p1", at: [0, 0, 0], end_of: { curve: "path", end: "start" } },
+    ]);
   });
 });

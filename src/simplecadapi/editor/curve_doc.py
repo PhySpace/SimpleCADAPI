@@ -6,15 +6,19 @@ document is plain data::
 
     {"points": [{"id": "p1", "at": [0, 0, 0]},                                  # world mm
                 {"id": "p2", "on": "wp_2", "uv": [10, 5]},                       # on a workplane variable: follows it
-                {"id": "p3", "vertex": {<scad.ref record>}, "at": [20, 0, 10]}],  # a vertex of the model: follows it
+                {"id": "p3", "vertex": {<scad.ref record>}, "at": [20, 0, 10]},  # a vertex of the model: follows it
+                {"id": "p7", "end_of": {"curve": "path", "end": "end"}, "at": [..]}],  # where another curve ends: follows it
      "curves": [{"id": "c1", "kind": "line", "points": ["p1", "p2"]},
                 {"id": "c2", "kind": "arc", "points": ["p2", "p4", "p3"]},       # start, a point on it, end
                 {"id": "c3", "kind": "spline", "points": ["p3", "p5", "p6"]}]}   # through the points
 
-The curves follow one another (each starts where the last ended) and become one wire.  :func:`render` writes the cell:
-one name per point (a vertex resolves through its stable reference in the body, a workplane point through
-``wp.point(u, v)``), one SDK edge per curve, and ``make_wire_from_edges_rwire`` joining them.  Nothing here is
-geometry: the code is the SDK's, the document only says which points and curves.
+A curve the editor draws now is one line, arc or spline: :func:`render` binds the feature's name to that SDK **edge**.  A
+path of several is several features, each starting at the end of the one before (``end_of``); a wire is made where one
+is needed, from the curves picked.  A document of several curves that follow one another (each starts where the last
+ended: how the editor drew paths before) is still one wire, ``make_wire_from_edges_rwire`` of its edges.  The cell has one
+name per point (a vertex resolves through its stable reference in the body, a workplane point through
+``wp.point(u, v)``, the end of another curve through its vertex).  Nothing here is geometry: the code is the SDK's, the
+document only says which points and curves.
 """
 
 from __future__ import annotations
@@ -75,10 +79,15 @@ def validate(doc: Mapping[str, Any]) -> dict[str, Any]:
             if reference.kind != "vertex":
                 raise CurveError(f"point {pid!r}: a point is snapped to a vertex, not a {reference.kind}")
             point["vertex"] = reference.to_dict()
-        if raw.get("at") is not None or ("on" not in point and "vertex" not in point):
+        if raw.get("end_of") is not None:
+            end_of = raw["end_of"]
+            if not isinstance(end_of, Mapping) or not _NAME.fullmatch(str(end_of.get("curve", ""))) or end_of.get("end") not in ("start", "end"):
+                raise CurveError(f"point {pid!r}: end_of names a curve and its end (start or end)")
+            point["end_of"] = {"curve": str(end_of["curve"]), "end": str(end_of["end"])}
+        if raw.get("at") is not None or ("on" not in point and "vertex" not in point and "end_of" not in point):
             point["at"] = _vector(raw.get("at"), 3, f"point {pid!r}")
-        if "on" in point and "vertex" in point:
-            raise CurveError(f"point {pid!r} is either on a workplane or at a vertex, not both")
+        if sum(key in point for key in ("on", "vertex", "end_of")) > 1:
+            raise CurveError(f"point {pid!r} is on a workplane, at a vertex or at the end of a curve: one of them")
         points.append(point)
     curves: list[dict[str, Any]] = []
     for raw in doc.get("curves") or []:
@@ -107,6 +116,16 @@ def workplanes_of(doc: Mapping[str, Any]) -> list[str]:
     return sorted({p["on"] for p in doc.get("points") or [] if p.get("on")})
 
 
+def curves_of(doc: Mapping[str, Any]) -> list[str]:
+    """The other curves the document's points sit at the ends of (the cell reads them)."""
+    return sorted({p["end_of"]["curve"] for p in doc.get("points") or [] if p.get("end_of")})
+
+
+def output_of(doc: Mapping[str, Any]) -> str:
+    """What the cell makes: an ``edge`` for one curve, a ``wire`` for several following one another."""
+    return "edge" if len(doc.get("curves") or []) == 1 else "wire"
+
+
 def needs_body(doc: Mapping[str, Any]) -> bool:
     """Whether a point is at a vertex of the model (resolved in the body)."""
     return any(p.get("vertex") for p in doc.get("points") or [])
@@ -129,6 +148,9 @@ def render(slug: str, doc: Mapping[str, Any], body: str | None) -> list[str]:
                 raise CurveError(f"point {point['id']!r} is at a vertex of the model, and there is no body to find it in")
             code = _ref.ElementRef.from_dict(point["vertex"]).code()
             lines.append(f"{name} = {code}.one({body}).get_coordinates()")
+        elif point.get("end_of"):
+            end = point["end_of"]
+            lines.append(f"{name} = {end['curve']}.get_{end['end']}_vertex().get_coordinates()")
         elif point.get("on"):
             u, v = point["uv"]
             lines.append(f"{name} = {point['on']}.point({u!r}, {v!r})")
@@ -143,10 +165,13 @@ def render(slug: str, doc: Mapping[str, Any], body: str | None) -> list[str]:
             edges.append(f"scad.make_three_point_arc_redge({names[0]}, {names[1]}, {names[2]})")
         else:
             edges.append(f"scad.make_interpolated_spline_redge(points=[{', '.join(names)}])")
+    if len(edges) == 1:
+        lines.append(f"{slug} = {edges[0]}")
+        return lines
     lines.append(f"{slug} = scad.make_wire_from_edges_rwire([")
     lines.extend(f"    {edge}," for edge in edges)
     lines.append("])")
     return lines
 
 
-__all__ = ["KINDS", "CurveError", "needs_body", "render", "validate", "workplanes_of"]
+__all__ = ["KINDS", "CurveError", "curves_of", "needs_body", "output_of", "render", "validate", "workplanes_of"]

@@ -21,7 +21,7 @@ from ..runtime.config import read_notebook_config
 from ..runtime.workspace import features_in_cell
 from . import assembly_doc
 from . import features as F
-from . import sketch_doc
+from . import curve_doc, sketch_doc
 
 _PARAMS_HEADER = re.compile(r"^#\s*-{3,}\s*params\b[^\n]*", re.MULTILINE)
 _PARAMS_FOR = re.compile(r"^#\s*-{3,}\s*params:\s*(?P<slug>[a-z][a-z0-9_]*)\s*-{3,}\s*$")
@@ -108,6 +108,8 @@ class FeatureService:
             produces = F.BY_ID[gui["spec"]].produces if gui else "solid"
             if gui and gui["spec"] == "sketch":  # a sketch makes a face or a wire, as its document says
                 produces = sketch_doc.output_of(gui.get("values", {}).get("sketch") or {})
+            if gui and gui["spec"] == "curve":  # one curve is an edge, an older path of several a wire
+                produces = curve_doc.output_of(gui.get("values", {}).get("curve") or {})
             part_of = head.slug[: -len("_parts")] if head.slug.endswith("_parts") and head.slug[: -len("_parts")] in assembly_slugs else None
             # a datum that is not a workplane (a 3D curve) is a value later features take (a sweep path), not a body
             makes_value = head.role == "datum" and produces not in ("workplane",)
@@ -115,7 +117,7 @@ class FeatureService:
             # a cell written as code does not say what it makes: the kernel does (a path is a wire, not a body)
             kinds = getattr(self.state, "value_kinds", None) or {}
             for name in made:
-                bodies[name] = produces if gui else kinds.get(name, produces)
+                bodies[name] = kinds.get(name, produces)
                 order.append(name)
             if head.role == "datum" and produces == "workplane":
                 made = sorted(defined)

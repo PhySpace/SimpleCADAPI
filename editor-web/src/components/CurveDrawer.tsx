@@ -16,6 +16,7 @@ import {
   rayOnPlane,
   segmentPoints,
   type CurveDoc,
+  type CurveEnd,
   type CurveKind,
   type DrawPlane,
   type SnapCandidate,
@@ -116,7 +117,7 @@ export function CurveDrawer({
   view: SceneView;
   planes: DrawPlane[];
   /** The points of the notebook's other 3D curves (snap targets: a new path can start where one ends). */
-  others?: { at: Vec3; label: string }[];
+  others?: { at: Vec3; label: string; endOf?: CurveEnd }[];
   plane: string;
   busy: boolean;
   error: string | null;
@@ -158,7 +159,8 @@ export function CurveDrawer({
       targets.forEach(offer);
       for (const point of current.points) offer({ kind: "point", at: point.at, pointId: point.id, label: point.id, priority: 0 });
       for (const p of planes) if (p.workplane) offer({ kind: "origin", at: p.origin, label: `${p.name} origin`, priority: 1, workplane: p.name });
-      for (const other of others) offer({ kind: "point", at: other.at, label: other.label, priority: 1 });
+      // an end of another curve is kept as one (the new curve follows it): it wins over a point of the same place
+      for (const other of others) offer({ kind: "point", at: other.at, label: other.label, priority: other.endOf ? 0.5 : 1, ...(other.endOf ? { endOf: other.endOf } : {}) });
       const raycaster = new THREE.Raycaster();
       rayThrough(raycaster, new THREE.Vector2((pointer[0] / rect.width) * 2 - 1, -(pointer[1] / rect.height) * 2 + 1), engine.camera);
       const o = raycaster.ray.origin;

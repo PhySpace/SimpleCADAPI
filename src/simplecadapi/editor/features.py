@@ -406,10 +406,13 @@ def _sketch(c: Context) -> list[str]:
 
 
 def _curve(c: Context) -> list[str]:
-    """A 3D path: points in space, on workplanes, at model vertices; lines, arcs and splines joined into one wire."""
+    """A 3D curve: one line, arc or spline (an edge) through points in space, on workplanes, at model vertices or at the
+    ends of other curves; an older document of several curves is one wire."""
     doc = c.values["curve"]
     for workplane in curve_doc.workplanes_of(doc):
         c.body_named(workplane)
+    for other in curve_doc.curves_of(doc):
+        c.body_named(other)
     body = None
     if curve_doc.needs_body(doc):
         if not c.values.get("body"):
