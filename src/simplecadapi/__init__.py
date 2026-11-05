@@ -185,6 +185,7 @@ from simplecadapi._cpp import (
     cut_rsolid_list,
     draft_rsolid,
     inset_face_rsolid,
+    press_pull_rsolid,
     extrude_rsolid,
     extrude_taper_rsolid,
     extrude_until_rsolid,
@@ -729,6 +730,7 @@ __all__ = [
     # 3D operations
     "draft_rsolid",
     "inset_face_rsolid",
+    "press_pull_rsolid",
     "extrude_rsolid",
     "extrude_taper_rsolid",
     "extrude_until_rsolid",

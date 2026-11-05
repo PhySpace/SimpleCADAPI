@@ -536,6 +536,10 @@ def _chamfer(c: Context) -> list[str]:
     return [*c.recipe("edges", "tip"), f"{c.slug} = scad.chamfer_rsolid(solid={c.body('body')}, edges={c.selection('edges')}, distance={c.var('distance')})"]
 
 
+def _press_pull(c: Context) -> list[str]:
+    return [*c.recipe("face", "tip"), f"{c.slug} = scad.press_pull_rsolid(solid={c.body('body')}, face={c.selection('face')}, distance={c.var('distance')})"]
+
+
 def _inset_face(c: Context) -> list[str]:
     return [*c.recipe("face", "tip"), f"{c.slug} = scad.inset_face_rsolid(solid={c.body('body')}, face={c.selection('face')}, distance={c.var('distance')})"]
 
@@ -683,6 +687,10 @@ SPECS: tuple[Spec, ...] = (
     Spec("extrude_face", "Extrude face", "Features", "build", "solid", "Push a flat face of the body out (or into it) along its normal, without a sketch.",
          (_BODY(), Slot("face", "Face", "select", entity="face", single=True, help="Pick one flat face of the body."),
           _enum("direction", "Direction", _FACE_DIRECTIONS, "normal"), _signed("distance", "Distance", 10.0, min=0.001)), _extrude_face),
+    Spec("press_pull", "Press / pull", "Features", "modifier", "solid",
+         "Pull a flat face out along its normal (a positive distance) or press it in (a negative one): its prism is joined or cut.",
+         (_BODY(), Slot("face", "Face", "select", entity="face", single=True, help="Pick one flat face of the body."),
+          _signed("distance", "Distance", 5.0)), _press_pull),
     Spec("inset_face", "Inset face", "Features", "modifier", "solid",
          "Imprint the outline of a flat face moved inside it: the face splits into an inner face (pull it out or push it in next) and the ring around it.",
          (_BODY(), Slot("face", "Face", "select", entity="face", single=True, help="Pick one flat face of the body."),

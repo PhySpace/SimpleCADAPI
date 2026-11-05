@@ -472,6 +472,11 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
     "extrude_until_rsolid": {"status": "replayable", "op": "make_extrude_until_rsolid"},
     "draft_rsolid": {"status": "replayable", "op": "make_draft_rsolid"},
     "inset_face_rsolid": {"status": "replayable", "op": "make_inset_face_rsolid"},
+    "press_pull_rsolid": {
+        "status": "expanded_macro",
+        "op": "make_extrude_rsolid",
+        "reason": "Recorded as make_extrude_rsolid of the face, then make_union_rsolid (pull) or make_cut_rsolid (press).",
+    },
     "mirror_shape": {"status": "replayable", "op": "make_mirror_rshape"},
     "extrude_rsolid": {"status": "replayable", "op": "make_extrude_rsolid"},
     "revolve_rsolid": {"status": "replayable", "op": "make_revolve_rsolid"},

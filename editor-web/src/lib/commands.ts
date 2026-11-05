@@ -100,8 +100,7 @@ export function contextKind(context: SelectionContext): ContextKind | null {
 /** The contextual actions of each kind, in order: the command id and the short word shown on the button. */
 export const CONTEXT_ACTIONS: Record<ContextKind, { id: string; label: string }[]> = {
   face: [
-    { id: "extrude_face_join", label: "Pull face" },
-    { id: "extrude_face_cut", label: "Push in" },
+    { id: "press_pull", label: "Press / pull" },
     { id: "inset_face", label: "Inset" },
     { id: "sketch_on_face", label: "Sketch on this face" },
     { id: "workplane_place", label: "Workplane" },
@@ -148,6 +147,7 @@ const WHEN: Record<string, (context: SelectionContext) => boolean> = {
   extrude_face_join: (c) => c.faces === 1 && c.planarFaces === 1 && c.edges === 0 && c.sketches === 0,
   extrude_face_cut: (c) => c.faces === 1 && c.planarFaces === 1 && c.edges === 0 && c.sketches === 0,
   shell: (c) => c.faces >= 1 && c.edges === 0 && c.sketches === 0,
+  press_pull: (c) => c.faces === 1 && c.planarFaces === 1 && c.edges === 0 && c.sketches === 0,
   inset_face: (c) => c.faces === 1 && c.planarFaces === 1 && c.edges === 0 && c.sketches === 0,
   fillet: (c) => c.edges >= 1 && c.sketches === 0,
   chamfer: (c) => c.edges >= 1 && c.sketches === 0,
@@ -238,6 +238,7 @@ const SYNONYMS: Record<string, string[]> = {
   chamfer: ["bevel", "edge"],
   shell: ["hollow", "thin", "wall"],
   inset_face: ["offset", "outline", "loop", "imprint", "step", "boss", "inset"],
+  press_pull: ["pull", "push", "press", "extrude", "pad", "pocket", "drag"],
   linear_pattern: ["array", "copies", "repeat", "row"],
   radial_pattern: ["array", "circular", "polar", "copies", "repeat"],
   mirror: ["flip", "symmetry", "reflect"],

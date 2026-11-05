@@ -4,6 +4,7 @@
 #include <string_view>
 #include <vector>
 
+#include "scad/ops/features/support.hpp"
 #include "scad/ops/features/tags.hpp"
 #include "scad/ops/geometry/types.hpp"
 #include "scad/topo/shape.hpp"
@@ -16,6 +17,11 @@ namespace scad {
 // measured gap), neither wire nor face, a rejected kernel build.
 Solid extrude_rsolid(const Shape& profile, const Scalar3& direction, const Scalar& distance,
                      const SweepTags& tags = {});
+
+// Press or pull one planar face of `solid` along its outward normal by a signed `distance`: positive pulls it out
+// (the prism of the face joined), negative presses it in (the prism cut), zero leaves the solid.  Recorded as its
+// steps (make_extrude_rsolid, then make_union_rsolid or make_cut_rsolid).
+Solid press_pull_rsolid(const Solid& solid, const FaceSelection& face, const Scalar& distance);
 
 // A planar face extruded by `vector` with `taper` degrees of draft (positive shrinks the outer
 // loop; inner loops go the other way when `flip_inner`).  Recorded as make_extrude_taper_rsolid.

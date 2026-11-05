@@ -66,3 +66,28 @@ def test_what_it_refuses():
         s.inset_face_rsolid(box, ql.faces(), 1)
     with pytest.raises(ValueError, match="planar"):
         s.inset_face_rsolid(s.make_cylinder_rsolid(5, 10), ql.faces().where(ql.prop("geom.type", "==", "CYLINDER")).exactly(1), 1)
+
+
+def test_press_pull_pulls_out_presses_in_and_leaves_zero_alone():
+    box = s.make_box_rsolid(40, 30, 20)
+    assert s.press_pull_rsolid(box, TOP, 5).get_volume() == pytest.approx(24000 + 1200 * 5)
+    assert s.press_pull_rsolid(box, TOP, -5).get_volume() == pytest.approx(24000 - 1200 * 5)
+    assert s.press_pull_rsolid(box, TOP, 0).get_volume() == pytest.approx(24000)
+    with pytest.raises(ValueError, match="exactly one"):
+        s.press_pull_rsolid(box, ql.faces(), 5)
+
+
+def test_inset_then_press_pull_makes_a_boss_or_a_pocket_named_by_the_extrusion():
+    with GraphSession() as session:
+        stepped = s.inset_face_rsolid(s.make_box_rsolid(40, 30, 20), TOP, 3)
+        inner = s.ref.faces(s.ref.face("", "make_inset_face_rsolid", role="inset.inner"))
+        boss = s.press_pull_rsolid(stepped, inner, 10)
+        pocket = s.press_pull_rsolid(stepped, inner, -4)
+        assert boss.get_volume() == pytest.approx(24000 + 816 * 10)
+        assert pocket.get_volume() == pytest.approx(24000 - 816 * 4)
+        cap = max(boss._iter_faces(), key=lambda face: face.get_center().z)
+        assert s.ref.of(cap, boss).role == "extrusion.end"
+        session.capture_result(value=boss)
+    assert [node.op for node in session.graph.nodes][-2:] == ["make_extrude_rsolid", "make_cut_rsolid"]
+    replayed = s.replay_model_json(s.export_model_json(session))[0]
+    assert replayed.get_volume() == pytest.approx(24000 + 816 * 10)

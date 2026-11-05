@@ -447,6 +447,15 @@ void bind_derived(py::module_& m) {
       "Draft planar, cylindrical or conical faces by a signed angle in degrees about a neutral plane.");
 
   m.def(
+      "press_pull_rsolid",
+      [](const Solid& solid, const FacesOrQuery& face, const Length& distance) {
+        const FaceSelection selection = selection_from<Face>(face);
+        return unlocked(selection.is_selector(), [&] { return press_pull_rsolid(solid, selection, distance); });
+      },
+      py::arg("solid"), py::arg("face"), py::arg("distance"),
+      "Pull one planar face out along its outward normal (positive distance) or press it in (negative).");
+
+  m.def(
       "inset_face_rsolid",
       [](const Solid& solid, const FacesOrQuery& face, const Length& distance) {
         const FaceSelection selection = selection_from<Face>(face);

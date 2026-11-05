@@ -267,6 +267,42 @@ export class SceneView {
     return out;
   }
 
+  /** A face of the model as the viewport draws it: its area-weighted centroid (mm, world) and outward normal, from its
+   * triangles (null when the node or face is not on screen).  Immediate: no kernel round trip. */
+  faceFrameMm(nodeId: string, entityId: string): { centroid: [number, number, number]; normal: [number, number, number] } | null {
+    const object = this.engine.nodeObject(nodeId);
+    const node = this.engine.nodes.find((item) => item.node_id === nodeId);
+    const group = this.engine.sidecarFor(node)?.face_groups.find((item: FaceGroup) => item.entity_id === entityId);
+    let mesh: THREE.Mesh | null = null;
+    object?.traverse((child) => {
+      if (!mesh && child instanceof THREE.Mesh && child.name === 'cad-faces') mesh = child;
+    });
+    if (!group || !mesh) return null;
+    const faces = mesh as THREE.Mesh;
+    faces.updateWorldMatrix(true, false);
+    const position = faces.geometry.getAttribute('position');
+    const index = faces.geometry.index;
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    const centroid = new THREE.Vector3(), normal = new THREE.Vector3(), cross = new THREE.Vector3();
+    let area = 0;
+    for (let i = group.first_index; i + 2 < group.first_index + group.index_count; i += 3) {
+      const at = (k: number) => (index ? index.getX(k) : k);
+      a.fromBufferAttribute(position, at(i)).applyMatrix4(faces.matrixWorld);
+      b.fromBufferAttribute(position, at(i + 1)).applyMatrix4(faces.matrixWorld);
+      c.fromBufferAttribute(position, at(i + 2)).applyMatrix4(faces.matrixWorld);
+      cross.subVectors(b, a).cross(c.clone().sub(a));
+      const twice = cross.length();
+      if (twice === 0) continue;
+      area += twice;
+      normal.add(cross);
+      centroid.addScaledVector(a.clone().add(b).add(c), twice / 3);
+    }
+    if (area === 0) return null;
+    centroid.divideScalar(area).multiplyScalar(1000);
+    normal.normalize();
+    return { centroid: [centroid.x, centroid.y, centroid.z], normal: [normal.x, normal.y, normal.z] };
+  }
+
   /** The model's bounding box in the world frame, mm ([min, max]), or null for an empty scene. */
   modelBoundsMm(): { min: [number, number, number]; max: [number, number, number] } | null {
     this.engine.modelRoot.updateMatrixWorld(true);

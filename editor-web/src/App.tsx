@@ -20,6 +20,7 @@ import { TagSplits, parseTagSplits, type TagSplit } from "@/components/TagSplits
 import { NewNotebookPrompt } from "@/components/NewNotebookPrompt";
 import { FloatingPanels } from "@/components/FloatingPanels";
 import { OperationPanel } from "@/components/OperationPanel";
+import { PressPullHandle } from "@/components/PressPullHandle";
 import { featureParams, quickStart } from "@/lib/operation-session";
 import { createSettler, SETTLE_MS } from "@/lib/settle";
 import { PartialNotice } from "@/components/PartialModel";
@@ -625,7 +626,8 @@ export function App() {
 
   // -- an operation in progress (lib/operation-session.ts): added at once, its numbers tuned live by the selection ----------
 
-  type OpSession = { slug: string; cell: string | null; title: string; specId: string; anchorMm: Vec3 | null; editing: boolean; busy: boolean; error: string | null };
+  /** `handle`: a press / pull's arrow, on the picked face (mm, world) along its outward normal. */
+  type OpSession = { slug: string; cell: string | null; title: string; specId: string; anchorMm: Vec3 | null; editing: boolean; busy: boolean; error: string | null; handle: { origin: Vec3; normal: Vec3 } | null };
   const [session, setSession] = useState<OpSession | null>(null);
   const sessionRef = useRef(session);
   sessionRef.current = session;
@@ -633,6 +635,8 @@ export function App() {
   const paramsRef = useRef<ParamMeta[]>([]);
   const sessionSettler = useRef(createSettler<ParamValue>(SETTLE_MS, (values) => socketRef.current?.send({ type: "param.set", values })));
   const sessionParams = useMemo(() => (session ? featureParams(params, session.slug) : []), [params, session]);
+  /** The distance a press / pull's arrow drags. */
+  const sessionDistance = sessionParams.find((param) => param.id.endsWith("_DISTANCE"));
   /** The numbers changed in the session (the server's `modified` may not have come back yet when Enter is pressed). */
   const sessionTouched = useRef(new Set<string>());
   /** The numbers of the session the notebook source does not have yet. */
@@ -673,7 +677,10 @@ export function App() {
       const start = quickStart(request.spec, gui.state, selectionRef.current, request.prefill);
       if (!start) return false;
       const title = t(plainLabel(request.spec.id, request.spec.label));
-      setSession({ slug: start.name, cell: null, title, specId: request.spec.id, anchorMm: anchorRef.current, editing: false, busy: true, error: null });
+      const picked = request.spec.id === "press_pull" ? selectionRef.current.find((item) => item.kind === "face") : undefined;
+      const frame = picked?.entityId ? (viewRef.current?.faceFrameMm(picked.nodeId, picked.entityId) ?? null) : null;
+      const handle = frame ? { origin: frame.centroid, normal: frame.normal } : null;
+      setSession({ slug: start.name, cell: null, title, specId: request.spec.id, anchorMm: frame?.centroid ?? anchorRef.current, editing: false, busy: true, error: null, handle });
       setDialog(null);
       gui
         .run(start.command)
@@ -694,7 +701,7 @@ export function App() {
   /** Tune the numbers of a feature of the tree in place (Esc gives them back). */
   const editInPlace = useCallback((feature: FeatureRow, spec: Spec): boolean => {
     if (!featureParams(paramsRef.current, feature.slug).length) return false;
-    setSession({ slug: feature.slug, cell: feature.cell, title: t(plainLabel(spec.id, spec.label)), specId: spec.id, anchorMm: anchorRef.current, editing: true, busy: false, error: null });
+    setSession({ slug: feature.slug, cell: feature.cell, title: t(plainLabel(spec.id, spec.label)), specId: spec.id, anchorMm: anchorRef.current, editing: true, busy: false, error: null, handle: null });
     return true;
   }, []);
 
@@ -1585,6 +1592,19 @@ export function App() {
                   <div inert={sketching} className={cn(sketching && "opacity-40")}>
                     <CommandBar commands={commands} fit={fit} hint={hint} belowTop={floating && !taskOpen} />
                   </div>
+                )}
+                {session?.handle && viewRef.current && sessionDistance && (
+                  <PressPullHandle
+                    view={viewRef.current}
+                    origin={session.handle.origin}
+                    normal={session.handle.normal}
+                    distance={Number(sessionDistance.value)}
+                    onChange={(distance, done) => {
+                      sessionTouched.current.add(sessionDistance.id);
+                      sessionSettler.current.push(sessionDistance.id, distance);
+                      if (done) sessionSettler.current.flush();
+                    }}
+                  />
                 )}
                 {session && viewRef.current && (
                   <OperationPanel

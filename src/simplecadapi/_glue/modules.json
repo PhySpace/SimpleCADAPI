@@ -197,6 +197,7 @@
 "distance": "simplecadapi.kernel.ocp_properties",
 "draft_rsolid": "simplecadapi.operators.features",
 "inset_face_rsolid": "simplecadapi.operators.features",
+"press_pull_rsolid": "simplecadapi.operators.features",
 "edges": "simplecadapi.ql",
 "edges_of": "simplecadapi.kernel.ocp_topology",
 "evaluate_scalar": "simplecadapi.params.expr",

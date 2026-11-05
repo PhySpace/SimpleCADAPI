@@ -73,8 +73,9 @@ consult their own documentation before the first call.
   `loft_rsolid`, `loft_rshell`, `shell_rsolid`.
 - Detail: `fillet_rsolid`, `chamfer_rsolid`.
 - Face loops: `inset_face_rsolid(solid, face, distance)` imprints a planar face's loops moved inside it (the
-  shape is unchanged; the face splits into roles `inset.inner` and `inset.ring`). Pull or push the inner face
-  next (`extrude_rsolid(profile=inner, ...)` joined or cut) to build steps, bosses and walls without a sketch.
+  shape is unchanged; the face splits into roles `inset.inner` and `inset.ring`).
+  `press_pull_rsolid(solid, face, distance)` pulls a planar face out (positive) or presses it in (negative);
+  inset then press/pull builds steps, bosses, pockets and walls without a sketch.
 
 ## Boolean discipline
 

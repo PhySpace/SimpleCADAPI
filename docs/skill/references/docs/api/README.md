@@ -442,6 +442,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [placement_frame_mm](placement_frame_mm.md) *(from product/placement.py)* `submodule:product/placement`
 - [placement_from_canonical](placement_from_canonical.md) *(from product/placement.py)* `submodule:product/placement`
 - [placement_ticks](placement_ticks.md) *(from product/placement.py)* `submodule:product/placement`
+- [press_pull_rsolid](press_pull_rsolid.md) *(from operators/features.py)* `top-level`
 - [project_rsketch](project_rsketch.md) *(from operators/sketch.py)* `top-level`
 - [prop](prop.md) *(from ql.py)* `submodule:ql`
 - [ql.ref](ql.ref.md) *(from ql.py)* `submodule:ql`
