@@ -17,11 +17,12 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
-import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
-import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { MeshStandardNodeMaterial, PMREMGenerator, RenderPipeline, WebGPURenderer } from 'three/webgpu';
+import { float, mix, mrt, normalView, output, pass, vec4 } from 'three/tsl';
+import { ao } from 'three/addons/tsl/display/GTAONode.js';
+import { LineMaterial, LineSegments2, LineSegmentsGeometry } from '../fat-lines';
+import { pointSprites, setPointSpriteColor } from '../point-sprites';
 import { strFromU8 } from 'fflate';
 import { DEFAULT_BASE_COLOR, CAD_EDGE_LINE_WIDTH, cadPointToGltf, disposeObject, materialFor, placementMatrix } from '../cad-three';
 import { PALETTES, type SceneTheme, type ScenePalette } from '../theme';
@@ -37,6 +38,22 @@ import type { Entity, EntitySidecar, FaceGroup, SceneManifest, SceneNode, Vec3 }
 export const FACE_LAYER = 0;
 export const EDGE_LAYER = 1;
 export const OVERLAY_LAYER = 2;
+
+/** A render-list entry, as the renderer's sort functions see it. */
+type RenderItem = Parameters<NonNullable<Parameters<WebGPURenderer['setOpaqueSort']>[0]>>[0];
+
+/** 1 for what draws over the faces (an object on the edge or overlay layer), 0 for the faces: the scene is one pass, and
+ * a line that writes no depth must come after the faces it is drawn on, or the faces drawn later cover it. */
+function afterFaces(item: RenderItem): number {
+  return (item.object?.layers.mask ?? 0) & ~(1 << FACE_LAYER) ? 1 : 0;
+}
+
+/** The renderer's own order (group, render order, then depth: front to back, or back to front when `back`), after the id. */
+function painterOrder(a: RenderItem, b: RenderItem, back: boolean): number {
+  const n = (value: number | null) => value ?? 0;
+  const depth = back ? n(b.z) - n(a.z) : n(a.z) - n(b.z);
+  return n(a.groupOrder) - n(b.groupOrder) || n(a.renderOrder) - n(b.renderOrder) || depth || n(a.id) - n(b.id);
+}
 
 export type CameraState = {
   position: Vec3;
@@ -122,19 +139,15 @@ function disposeMaterials(root: THREE.Object3D): void {
 }
 
 function createEdgeMaterial(color: string): LineMaterial {
-  const material = new LineMaterial({ color, linewidth: CAD_EDGE_LINE_WIDTH, worldUnits: false, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.edgeDepthBias = { value: EDGE_DEPTH_BIAS };
-    shader.vertexShader = shader.vertexShader
-      .replace('void main() {', 'uniform float edgeDepthBias;\nvoid main() {')
-      .replace(
-        'gl_Position = clip;',
-        // perspective: the view depth is -clip.w; orthographic (the sketch canvas): clip.w is 1 and depth is linear in view z
-        'if (projectionMatrix[2][3] == -1.0) {\n\t\t\t\tfloat biasedView = -clip.w + edgeDepthBias;\n\t\t\t\tclip.z = (projectionMatrix[2][2] * biasedView + projectionMatrix[3][2]) / -biasedView * clip.w;\n\t\t\t} else {\n\t\t\t\tclip.z += projectionMatrix[2][2] * edgeDepthBias * clip.w;\n\t\t\t}\n\t\t\tgl_Position = clip;',
-      );
-  };
-  material.customProgramCacheKey = () => 'edge-depth-bias';
+  const material = new LineMaterial({ color, linewidth: CAD_EDGE_LINE_WIDTH, worldUnits: false, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, edgeDepthBias: EDGE_DEPTH_BIAS });
   material.userData.role = 'edge'; // setTheme recolors these, and only these
+  return material;
+}
+
+/** The ambient-occlusion mask a material writes (the scene pass's `aoMask` target): faces 1 (they are occluded), every
+ * other material keeps the pass default 0, so edges, highlights and annotations keep their colour. */
+export function occludedByAO<M extends THREE.Material>(material: M): M {
+  (material as unknown as { mrtNode: unknown }).mrtNode = mrt({ aoMask: float(1) });
   return material;
 }
 
@@ -142,7 +155,11 @@ export class BRepRenderer {
   readonly host: HTMLElement;
   readonly threeScene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
-  readonly renderer: THREE.WebGLRenderer;
+  readonly renderer: WebGPURenderer;
+  /** Resolves once the GPU device is ready (WebGPU, or WebGL 2 where WebGPU is missing); nothing renders before. */
+  readonly ready: Promise<void>;
+  /** The backend in use: 'WebGPU' or 'WebGL2' (the renderer's fallback). */
+  backend = 'WebGPU';
   readonly controls: TrackballControls;
   readonly modelRoot = new THREE.Group();
 
@@ -155,19 +172,16 @@ export class BRepRenderer {
   private edgeCache = new Map<string, THREE.Object3D>();
   private entityCache = new Map<string, EntitySidecar>();
   private nodeObjects = new Map<string, THREE.Group>();
-  private faceRT: THREE.WebGLRenderTarget | null = null;
-  private beautyRT: THREE.WebGLRenderTarget | null = null;
-  private ssaoPass: GTAOPass | null = null;
+  private pipeline: RenderPipeline | null = null;
+  private aoNode: ReturnType<typeof ao> | null = null;
+  private plainOutput: ReturnType<typeof vec4> | null = null;
+  private occludedOutput: ReturnType<typeof vec4> | null = null;
   private ssaoEnabled: boolean;
   private orthoRestoreSsao = true;
   private rendererClearColor: THREE.Color;
   private palette: ScenePalette;
   /** The gizmo's per-axis parts, kept to recolor on a theme change. */
   private gizmoAxes: { materials: THREE.MeshBasicMaterial[]; tail: THREE.MeshBasicMaterial; canvas: HTMLCanvasElement; texture: THREE.CanvasTexture; label: string }[] = [];
-  private blitScene: THREE.Scene | null = null;
-  private blitCamera: THREE.OrthographicCamera | null = null;
-  private copyMaterial: THREE.MeshBasicMaterial | null = null;
-  private presentMaterial: THREE.MeshBasicMaterial | null = null;
   private edgesVisible = true;
   private seamsVisible: boolean;
   private observer: ResizeObserver;
@@ -195,7 +209,9 @@ export class BRepRenderer {
       else perspective();
     };
     this.camera.position.set(2.4, 2.1, 3.0);
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    // WebGPU, falling back to WebGL 2 by itself where the browser has no WebGPU (`?webgl` in the page URL forces it)
+    const forceWebGL = typeof location !== 'undefined' && new URLSearchParams(location.search).has('webgl');
+    this.renderer = new WebGPURenderer({ antialias: true, alpha: false, forceWebGL });
     // Background comes from the renderer clear color, NOT scene.background:
     // a Color scene.background force-clears the framebuffer on EVERY
     // renderer.render() (even autoClear=false), which would wipe the
@@ -263,12 +279,18 @@ export class BRepRenderer {
     this.modelRoot.rotation.x = Math.PI / 2;
     this.threeScene.add(this.modelRoot);
     this.buildGizmo();
-    this.setupLighting();
-    this.setupPostprocessing();
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(host);
     this.resize();
-    this.renderer.setAnimationLoop(() => this.render());
+    this.ready = this.renderer.init().then(() => {
+      if (this.disposed) return;
+      const backend = (this.renderer as unknown as { backend: { isWebGPUBackend?: boolean } }).backend;
+      this.backend = backend.isWebGPUBackend ? 'WebGPU' : 'WebGL2';
+      this.setupLighting();
+      this.setupPostprocessing();
+      this.needsRender = true;
+      this.renderer.setAnimationLoop(() => this.render());
+    });
   }
 
   private loopRunning = true;
@@ -288,7 +310,9 @@ export class BRepRenderer {
     if (running === this.loopRunning) return;
     this.loopRunning = running;
     if (running) {
-      this.renderer.setAnimationLoop(() => this.render());
+      void this.ready.then(() => {
+        if (this.loopRunning) void this.renderer.setAnimationLoop(() => this.render());
+      });
     } else {
       this.renderer.setAnimationLoop(null);
     }
@@ -301,7 +325,7 @@ export class BRepRenderer {
   private setupLighting(): void {
     // Image-based studio lighting instead of hand-placed fill lights; one
     // directional key stays for crisp specular definition on flats.
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    const pmrem = new PMREMGenerator(this.renderer);
     this.threeScene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     this.threeScene.environmentIntensity = 0.7;
     pmrem.dispose();
@@ -311,55 +335,47 @@ export class BRepRenderer {
   }
 
   private setupPostprocessing(): void {
-    // Manual pipeline instead of EffectComposer, so edges can composite AFTER
-    // the AO blend:
-    //   1. faces (layer 0) render into faceRT — this carries the face depth
-    //   2. GTAO blends beauty*ao into beautyRT; a copy brings it back onto
-    //      faceRT, keeping faceRT's depth attachment intact
-    //   3. edges (layer 1) + overlays (layer 2) render into faceRT with plain
-    //      depth testing — after AO, hence constant color, correctly occluded
-    //   4. faceRT presents to screen through tone mapping
-    const size = this.resolution();
-    const pixelRatio = this.renderer.getPixelRatio();
-    const width = Math.max(size.width * pixelRatio, 1);
-    const height = Math.max(size.height * pixelRatio, 1);
-    const options: THREE.RenderTargetOptions = { type: THREE.HalfFloatType, samples: 4 };
-    this.faceRT = new THREE.WebGLRenderTarget(width, height, options);
-    this.beautyRT = new THREE.WebGLRenderTarget(width, height, options);
-    if (this.ssaoEnabled) {
-      const ssaoPass = new GTAOPass(this.threeScene, this.camera, width, height);
-      ssaoPass.output = GTAOPass.OUTPUT.Default;
-      ssaoPass.blendIntensity = 0.65;
-      this.tuneSSAO(ssaoPass, 0.01);
-      this.ssaoPass = ssaoPass;
-    }
-    this.blitScene = new THREE.Scene();
-    this.blitCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    this.copyMaterial = new THREE.MeshBasicMaterial({ map: this.beautyRT.texture, toneMapped: false, depthTest: false, depthWrite: false });
-    this.presentMaterial = new THREE.MeshBasicMaterial({ map: this.faceRT.texture, toneMapped: true, depthTest: false, depthWrite: false });
-    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.copyMaterial);
-    quad.frustumCulled = false;
-    this.blitScene.add(quad);
-  }
-
-  /** Draws one material over the whole current render target. */
-  private blit(material: THREE.Material): void {
-    const quad = this.blitScene!.children[0] as THREE.Mesh;
-    quad.material = material;
-    this.renderer.render(this.blitScene!, this.blitCamera!);
+    // The scene pass draws faces, edges and overlays together, multisampled (one depth buffer: edges and annotations
+    // are occluded by the faces in front of them), with the colour and an AO mask that only face materials set
+    // (occludedByAO).  GTAO cannot read a multisampled depth buffer, so it runs on a single-sampled pass of the opaque
+    // faces alone (depth and view normals); the output darkens the masked pixels only, so edges, highlights and
+    // annotations keep their colour.  Tone mapping comes last (the pipeline's output).
+    this.camera.layers.enable(EDGE_LAYER);
+    this.camera.layers.enable(OVERLAY_LAYER);
+    this.renderer.setOpaqueSort((a, b) => afterFaces(a) - afterFaces(b) || painterOrder(a, b, false));
+    this.renderer.setTransparentSort((a, b) => afterFaces(a) - afterFaces(b) || painterOrder(a, b, true));
+    const scenePass = pass(this.threeScene, this.camera, { samples: 4 });
+    scenePass.setMRT(mrt({ output, aoMask: float(0) }));
+    const color = scenePass.getTextureNode('output');
+    const mask = scenePass.getTextureNode('aoMask').x;
+    const facePass = pass(this.threeScene, this.camera, { samples: 0 });
+    const faceLayers = new THREE.Layers();
+    faceLayers.set(FACE_LAYER);
+    facePass.setLayers(faceLayers);
+    facePass.transparent = false;
+    facePass.setMRT(mrt({ output: normalView }));
+    const aoNode = ao(facePass.getTextureNode('depth'), facePass.getTextureNode('output'), this.camera);
+    this.aoNode = aoNode;
+    this.tuneSSAO(0.01);
+    const occlusion = aoNode.getTextureNode().x;
+    const blendIntensity = 0.65;
+    const shade = mix(float(1), occlusion, mask.mul(blendIntensity));
+    this.plainOutput = vec4(color.rgb, color.a);
+    this.occludedOutput = vec4(color.rgb.mul(shade), color.a);
+    this.pipeline = new RenderPipeline(this.renderer);
+    this.pipeline.outputNode = this.ssaoEnabled ? this.occludedOutput : this.plainOutput;
   }
 
   /** GTAO works in world units — retune the radius to the model's scale. */
-  private tuneSSAO(pass: GTAOPass, modelRadius: number): void {
-    pass.updateGtaoMaterial({
-      radius: Math.max(modelRadius * 0.14, 0.002),
-      distanceExponent: 1.0,
-      thickness: 1.0,
-      scale: 1.0,
-      samples: 16,
-      distanceFallOff: 1.0,
-      screenSpaceRadius: false,
-    });
+  private tuneSSAO(modelRadius: number): void {
+    const node = this.aoNode;
+    if (!node) return;
+    node.radius.value = Math.max(modelRadius * 0.14, 0.002);
+    node.distanceExponent.value = 1.0;
+    node.thickness.value = 1.0;
+    node.scale.value = 1.0;
+    node.samples.value = 16;
+    node.distanceFallOff.value = 1.0;
   }
 
   private lastCameraPos = new THREE.Vector3();
@@ -376,46 +392,14 @@ export class BRepRenderer {
   }
 
   private render(): void {
-    if (!this.faceRT || !this.blitScene) return;
+    if (!this.pipeline) return;
     this.controls.update();
     // Camera pose change (damping, user input) or an explicit invalidation
-    // triggers the expensive SSAO chain; an idle scene skips it entirely.
+    // triggers the expensive pipeline; an idle scene skips it entirely.
     if (!this.cameraMoved() && !this.needsRender) return;
     this.needsRender = false;
-    const previousTarget = this.renderer.getRenderTarget();
-    const previousAutoClear = this.renderer.autoClear;
-
-    // 1. faces + background (layer 0) — carries the face depth buffer
-    this.camera.layers.set(FACE_LAYER);
-    this.renderer.setRenderTarget(this.faceRT);
-    this.renderer.clear();
-    this.renderer.render(this.threeScene, this.camera);
-
-    // 2. ambient occlusion on faces only
-    if (this.ssaoPass && this.ssaoEnabled && this.beautyRT) {
-      this.ssaoPass.render(this.renderer, this.beautyRT, this.faceRT, 0, false);
-      // 2b. bring the AO'ed color back onto faceRT; its depth survives because
-      // the copy quad does not write depth
-      this.renderer.setRenderTarget(this.faceRT);
-      this.renderer.autoClear = false;
-      this.copyMaterial!.map = this.beautyRT.texture;
-      this.blit(this.copyMaterial!);
-    }
-
-    // 3. edges + annotation overlays, composited after AO with plain depth
-    // testing against the face depth — constant color, correctly occluded
-    this.camera.layers.set(EDGE_LAYER);
-    this.camera.layers.enable(OVERLAY_LAYER);
-    this.renderer.setRenderTarget(this.faceRT);
-    // never clear here: the faces (and their depth) are already in faceRT, with or without the occlusion pass
-    this.renderer.autoClear = false;
-    this.renderer.render(this.threeScene, this.camera);
-    this.camera.layers.set(FACE_LAYER);
-
-    // 4. present through tone mapping
-    this.renderer.setRenderTarget(previousTarget);
-    this.renderer.autoClear = previousAutoClear;
-    this.blit(this.presentMaterial!);
+    this.renderer.setRenderTarget(null);
+    this.pipeline.render();
     this.renderGizmo();
   }
 
@@ -497,10 +481,16 @@ export class BRepRenderer {
     });
   }
 
-  private vertexMaterial(): THREE.PointsMaterial {
-    const material = new THREE.PointsMaterial({ color: this.palette.vertex, size: 7, sizeAttenuation: false, depthWrite: false, transparent: true, opacity: 0.48 });
-    material.userData.role = 'vertex';
-    return material;
+  /** The vertex cloud of a part: the points stay for picking (they draw nothing: WebGPU points are one pixel wide), a
+   * sized sprite child shows them. */
+  private vertexCloud(geometry: THREE.BufferGeometry): THREE.Points {
+    const pick = new THREE.PointsMaterial({ visible: false });
+    const points = new THREE.Points(geometry, pick);
+    const sprite = pointSprites(geometry.getAttribute('position') as THREE.BufferAttribute, { color: this.palette.vertex, size: 7, opacity: 0.48 });
+    sprite.userData.role = 'vertex';
+    sprite.layers.set(EDGE_LAYER);
+    points.add(sprite);
+    return points;
   }
 
   private paintGizmoLabel(axis: { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture; label: string }, color: string): void {
@@ -532,7 +522,7 @@ export class BRepRenderer {
       const material = (object as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
       if (!material || Array.isArray(material)) return;
       if (material.userData.role === 'edge') (material as LineMaterial).color.set(this.palette.edge);
-      else if (material.userData.role === 'vertex') (material as THREE.PointsMaterial).color.set(this.palette.vertex);
+      if (object.userData.role === 'vertex' && object instanceof THREE.Sprite) setPointSpriteColor(object, this.palette.vertex);
     });
     this.gizmoAxes.forEach((axis, index) => {
       const color = this.palette.axes[index];
@@ -558,7 +548,18 @@ export class BRepRenderer {
     this.renderer.setScissorTest(true);
     this.renderer.setViewport(size.x - side - margin, margin, side, side);
     this.renderer.setScissor(size.x - side - margin, margin, side, side);
-    this.renderer.clearDepth();
+    // With tone mapping or an output colour space to convert to, the renderer draws into a frame-buffer target that
+    // outlives the frame and composites it over the canvas: clear it to transparent, or every earlier gizmo pose stays.
+    // (Drawn straight to the canvas, only the depth is cleared: the colour is the scene.)
+    if (this.renderer.needsFrameBufferTarget) {
+      const clearColor = this.renderer.getClearColor(new THREE.Color());
+      const clearAlpha = this.renderer.getClearAlpha();
+      this.renderer.setClearColor(0x000000, 0);
+      this.renderer.clear(true, true, false);
+      this.renderer.setClearColor(clearColor, clearAlpha);
+    } else {
+      this.renderer.clearDepth();
+    }
     this.renderer.render(this.gizmoScene, this.gizmoCamera);
     this.renderer.setScissorTest(false);
     this.renderer.setViewport(0, 0, size.x, size.y);
@@ -653,7 +654,7 @@ export class BRepRenderer {
     geometry.setAttribute('normal', new THREE.Float32BufferAttribute(payload.normals.flat(), 3));
     geometry.setIndex(payload.indices);
     const [r, g, b] = DEFAULT_BASE_COLOR;
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: new THREE.Color(r, g, b), metalness: 0.08, roughness: 0.52, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
+    const mesh = new THREE.Mesh(geometry, occludedByAO(new MeshStandardNodeMaterial({ color: new THREE.Color(r, g, b), metalness: 0.08, roughness: 0.52, side: THREE.FrontSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 })));
     mesh.name = 'live-faces';
     mesh.layers.set(FACE_LAYER);
     group.add(mesh);
@@ -765,7 +766,7 @@ export class BRepRenderer {
       }
       group.add(pickEdges);
       if (geometry.vertices) {
-        const points = new THREE.Points(geometry.vertices, this.vertexMaterial());
+        const points = this.vertexCloud(geometry.vertices);
         points.visible = false;
         points.userData.pickRole = 'vertex';
         points.userData.pickable = true;
@@ -837,7 +838,7 @@ export class BRepRenderer {
         });
         const vertexGeometry = new THREE.BufferGeometry();
         vertexGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const vertexPoints = new THREE.Points(vertexGeometry, this.vertexMaterial());
+        const vertexPoints = this.vertexCloud(vertexGeometry);
         vertexPoints.visible = false;
         vertexPoints.userData.pickRole = 'vertex';
         vertexPoints.userData.pickable = true;
@@ -974,13 +975,17 @@ export class BRepRenderer {
   }
 
   setSSAO(enabled: boolean): void {
-    if (!this.ssaoPass || this.ssaoEnabled === enabled) return;
+    if (this.ssaoEnabled === enabled) return;
     this.ssaoEnabled = enabled;
-    this.ssaoPass.enabled = enabled;
+    if (this.pipeline && this.occludedOutput && this.plainOutput) {
+      this.pipeline.outputNode = enabled ? this.occludedOutput : this.plainOutput;
+      this.pipeline.needsUpdate = true;
+    }
+    this.invalidate();
   }
 
   get ssaoOn(): boolean {
-    return this.ssaoEnabled && this.ssaoPass !== null;
+    return this.ssaoEnabled && this.aoNode !== null;
   }
 
   setVertexCloudsVisible(visible: boolean): void {
@@ -1055,7 +1060,7 @@ export class BRepRenderer {
     trackball._zoomStart.copy(trackball._zoomEnd);
     trackball._panStart.copy(trackball._panEnd);
     this.controls.update();
-    if (this.ssaoPass) this.tuneSSAO(this.ssaoPass, radius);
+    this.tuneSSAO(radius);
   }
 
   getCameraState(): CameraState {
@@ -1089,21 +1094,11 @@ export class BRepRenderer {
     this.controls.handleResize();
     this.camera.aspect = width / Math.max(height, 1);
     this.camera.updateProjectionMatrix();
-    const pixelRatio = this.renderer.getPixelRatio();
-    const deviceWidth = Math.max(Math.round(width * pixelRatio), 1);
-    const deviceHeight = Math.max(Math.round(height * pixelRatio), 1);
-    this.faceRT?.setSize(deviceWidth, deviceHeight);
-    this.beautyRT?.setSize(deviceWidth, deviceHeight);
-    this.ssaoPass?.setSize(deviceWidth, deviceHeight);
     // The scene may load before the host has its final layout; re-frame once.
     if (this.pendingFrame && this.modelRoot.children.length) {
       this.pendingFrame = false;
       this.frame();
     }
-    const resolution = this.resolution();
-    this.modelRoot.traverse((object) => {
-      if (object instanceof LineSegments2) object.material.resolution.set(resolution.width, resolution.height);
-    });
     // setSize cleared the canvas.
     this.needsRender = true;
   }
@@ -1124,15 +1119,8 @@ export class BRepRenderer {
       (mesh.material as THREE.Material | undefined)?.dispose?.();
     });
     this.controls.dispose();
-    this.faceRT?.dispose();
-    this.beautyRT?.dispose();
-    this.ssaoPass?.dispose?.();
-    if (this.blitScene) {
-      const quad = this.blitScene.children[0] as THREE.Mesh | undefined;
-      quad?.geometry.dispose();
-      this.copyMaterial?.dispose();
-      this.presentMaterial?.dispose();
-    }
+    this.pipeline?.dispose();
+    this.aoNode?.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

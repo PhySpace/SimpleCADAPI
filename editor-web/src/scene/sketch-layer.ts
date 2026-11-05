@@ -10,9 +10,7 @@
 // Units: the scene's world is the CAD frame in metres, Z up; sketch points are in mm in the sketch's plane frame.
 
 import * as THREE from 'three';
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
-import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial, LineSegments2, LineSegmentsGeometry } from './fat-lines';
 import { planeToWorld, planeNormal, type PlaneSpec, type Vec3 } from '../lib/sketch-plane';
 import { worldToScreen } from '../lib/sketch-view';
 import { hitSketches, type Pickable, type SketchShape } from '../lib/sketch-scene';

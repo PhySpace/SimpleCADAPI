@@ -2,9 +2,9 @@
 // viewer and the reverse-engineering mode load scenes through one code path.
 
 import * as THREE from 'three';
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
-import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
+import { float, mrt } from 'three/tsl';
+import { LineMaterial, LineSegments2, LineSegmentsGeometry } from './fat-lines';
 import type { SceneNode, Transform, Vec3 } from './scene2';
 
 export const CAD_TO_GLTF = new THREE.Matrix4().set(0.001, 0, 0, 0, 0, 0, 0.001, 0, 0, -0.001, 0, 0, 0, 0, 0, 1);
@@ -44,12 +44,15 @@ export function nodeColor(node: Pick<SceneNode, 'material_id' | 'properties'>): 
   return [base[0], base[1], base[2], alpha];
 }
 
-export function materialFor(node: SceneNode): THREE.MeshStandardMaterial {
+export function materialFor(node: SceneNode): MeshStandardNodeMaterial {
   const color = nodeColor(node);
   // Faces are pushed back in depth: edge lines lie exactly ON the surface, and
   // without the offset the face triangles win the depth fight per-pixel —
   // edges render as broken dashed fragments (classic CAD z-fighting).
-  return new THREE.MeshStandardMaterial({ color: new THREE.Color(color[0], color[1], color[2]), metalness: 0.08, roughness: 0.52, side: THREE.FrontSide, transparent: color[3] < 1, opacity: color[3], depthWrite: color[3] >= 1, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  const material = new MeshStandardNodeMaterial({ color: new THREE.Color(color[0], color[1], color[2]), metalness: 0.08, roughness: 0.52, side: THREE.FrontSide, transparent: color[3] < 1, opacity: color[3], depthWrite: color[3] >= 1, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  // faces are what ambient occlusion darkens: they set the scene pass's AO mask (see BRepRenderer.setupPostprocessing)
+  material.mrtNode = mrt({ aoMask: float(1) });
+  return material;
 }
 
 export function edgeMaterial(resolution: Resolution): LineMaterial {
@@ -57,7 +60,7 @@ export function edgeMaterial(resolution: Resolution): LineMaterial {
   // a surface seen edge-on and parts of its quad sit genuinely behind the
   // local surface depth — a constant bias loses there, a slope-scaled pull
   // (mirror of the faces' +1 push) wins at every viewing angle.
-  const material = new LineMaterial({ color: CAD_EDGE_COLOR, linewidth: CAD_EDGE_LINE_WIDTH, worldUnits: false, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const material = new LineMaterial({ color: CAD_EDGE_COLOR, linewidth: CAD_EDGE_LINE_WIDTH, worldUnits: false, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, edgeDepthBias: 0.0004 });
   material.resolution.set(Math.max(resolution.width, 1), Math.max(resolution.height, 1));
   return material;
 }

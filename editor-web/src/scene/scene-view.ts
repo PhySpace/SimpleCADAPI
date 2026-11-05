@@ -6,9 +6,8 @@
 
 import type { SceneTheme } from './theme';
 import * as THREE from 'three';
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
-import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial, LineSegments2, LineSegmentsGeometry } from './fat-lines';
+import { pointSprites } from './point-sprites';
 import { bindClickSelection } from './components/click-selection';
 import { disposeObject } from './cad-three';
 import { CameraRig } from './camera-rig';
@@ -327,10 +326,11 @@ export class SceneView {
         material.resolution.set(this.engine.domElement.clientWidth, this.engine.domElement.clientHeight);
         overlays.push(this.attachOverlay(source, new LineSegments2(lineGeometry, material)));
       } else if (source instanceof THREE.Points) {
-        const geometry = source.geometry.clone();
+        // the picked vertex as a 16 px dot (a sprite: WebGPU points are one pixel wide)
         const vertexIndex = source.userData.vertexEntityIds.indexOf(entityId!);
-        geometry.setDrawRange(vertexIndex, 1);
-        overlays.push(this.attachOverlay(source, new THREE.Points(geometry, new THREE.PointsMaterial({ color, size: 16, sizeAttenuation: false, transparent: true, opacity: 1, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }))));
+        const position = source.geometry.getAttribute('position');
+        const one = new THREE.BufferAttribute(new Float32Array([position.getX(vertexIndex), position.getY(vertexIndex), position.getZ(vertexIndex)]), 3);
+        overlays.push(this.attachOverlay(source, pointSprites(one, { color, size: 16 })));
       } else {
         const geometry = source.geometry.clone();
         if (range) geometry.setDrawRange(range.first_index, range.index_count);

@@ -23,6 +23,7 @@ import {
 import type { Vec3 } from "@/lib/sketch-plane";
 import { rayThrough } from "@/scene/camera-projection";
 import { OVERLAY_LAYER } from "@/scene/renderer/brep-renderer";
+import { pointSprites } from "@/scene/point-sprites";
 import type { SceneView } from "@/scene/scene-view";
 
 const EMPTY: CurveDoc = { points: [], curves: [] };
@@ -319,13 +320,13 @@ export function CurveDrawer({
       const draft = [at(start), ...pending.map(at), hover.at];
       group.add(line(segmentPoints(tool === "arc" && draft.length === 3 ? "arc" : tool === "spline" ? "spline" : "line", draft), DRAFT, true));
     }
-    const marks = new THREE.Points(
-      new THREE.BufferGeometry().setFromPoints(doc.points.map((p) => world(p.at))),
-      new THREE.PointsMaterial({ color: PATH, size: 7, sizeAttenuation: false, depthTest: false }),
-    );
-    marks.renderOrder = 31;
-    marks.layers.enable(OVERLAY_LAYER);
-    group.add(marks);
+    if (doc.points.length) {
+      const positions = new THREE.BufferAttribute(new Float32Array(doc.points.flatMap((p) => world(p.at).toArray())), 3);
+      const marks = pointSprites(positions, { color: PATH, size: 7, depthTest: false });
+      marks.renderOrder = 31;
+      marks.layers.enable(OVERLAY_LAYER);
+      group.add(marks);
+    }
     if (plane) {
       // the drawing plane: a grid around its origin, about the model's size
       const bounds = view.modelBoundsMm();

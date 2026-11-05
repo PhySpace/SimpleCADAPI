@@ -12,7 +12,8 @@ export const isOrthographic = (camera: THREE.Camera): boolean => camera.userData
 export function applyOrthographic(camera: THREE.PerspectiveCamera, distance: number): void {
   const halfHeight = Math.max(distance, 1e-6) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   const halfWidth = halfHeight * camera.aspect;
-  camera.projectionMatrix.makeOrthographic(-halfWidth, halfWidth, halfHeight, -halfHeight, camera.near, camera.far);
+  // in the renderer's clip space (WebGPU's depth runs 0..1, WebGL's -1..1: the camera carries which)
+  camera.projectionMatrix.makeOrthographic(-halfWidth, halfWidth, halfHeight, -halfHeight, camera.near, camera.far, camera.coordinateSystem);
   camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
   camera.userData.orthoDistance = distance;
 }
