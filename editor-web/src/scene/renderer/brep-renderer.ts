@@ -32,6 +32,7 @@ import { LOD_LEVELS, cappedLevel, levelFor, mmPerPixel } from '../lod';
 import { accelerate, release } from '../bvh';
 import { fitDistance } from '../camera-fit';
 import { applyOrthographic, isOrthographic } from '../camera-projection';
+import { GroundGrid } from '../ground-grid';
 import type { Entity, EntitySidecar, FaceGroup, SceneManifest, SceneNode, Vec3 } from '../scene2';
 
 /** Render layers: faces (0, default) go through lighting + AO; edges (1) and
@@ -40,6 +41,15 @@ import type { Entity, EntitySidecar, FaceGroup, SceneManifest, SceneNode, Vec3 }
 export const FACE_LAYER = 0;
 export const EDGE_LAYER = 1;
 export const OVERLAY_LAYER = 2;
+
+/** The axis gizmo's square in the top right corner of the viewport, CSS pixels: its side and its distance from the
+ * top and right edges.  The axes and their letters stay inside its inner circle; the band around it is for the
+ * controls laid over it (components/ViewGizmo.tsx). */
+export const GIZMO_SIDE = 136;
+export const GIZMO_MARGIN = 12;
+
+/** An end of an axis of the gizmo: the view from that side of the target. */
+export type GizmoHandle = '+x' | '-x' | '+y' | '-y' | '+z' | '-z';
 
 /** A render-list entry, as the renderer's sort functions see it. */
 type RenderItem = Parameters<NonNullable<Parameters<WebGPURenderer['setOpaqueSort']>[0]>>[0];
@@ -199,7 +209,8 @@ export class BRepRenderer {
   private observer: ResizeObserver;
   private pendingFrame = true;
   private disposed = false;
-  private grid: THREE.LineSegments | null = null;
+  /** The XY grid and the axis lines (see ground-grid.ts). */
+  private ground: GroundGrid;
   /** Entity sidecars of the preview's parts, by node id (a preview has no package). */
   private previewSidecars = new Map<string, EntitySidecar>();
   /** The geometry built for each part of the preview on screen, by part key: the next preview reuses what it shares. */
@@ -220,7 +231,12 @@ export class BRepRenderer {
   private readonly gizmoTarget = new THREE.RenderTarget(1, 1, { samples: 4, type: THREE.HalfFloatType });
   /** The gizmo's corner of the view, in screen UV (top left 0, 0): x0, y0, x1, y1. */
   private readonly gizmoRect = uniform(new THREE.Vector4(0, 0, 0, 0));
-  private readonly gizmoCamera = new THREE.OrthographicCamera(-1.5, 1.5, 1.5, -1.5, 0.1, 20);
+  private readonly gizmoCamera = new THREE.OrthographicCamera(-2.2, 2.2, 2.2, -2.2, 0.1, 20);
+  /** The block at each end of the gizmo's axes (it grows under the pointer). */
+  private readonly gizmoEnds = new Map<GizmoHandle, THREE.Mesh>();
+  private gizmoHover: GizmoHandle | null = null;
+  /** Orthographic projection asked for by the user (the sketch canvas projects orthographically whatever this says). */
+  private preferOrthographic = false;
 
   constructor(host: HTMLElement, options: BRepRendererOptions = {}) {
     this.host = host;
@@ -305,6 +321,8 @@ export class BRepRenderer {
     // what the camera's up vector, the ground grid and the axis gizmo assume.
     this.modelRoot.rotation.x = Math.PI / 2;
     this.threeScene.add(this.modelRoot);
+    this.ground = new GroundGrid(this.palette, EDGE_LAYER);
+    this.threeScene.add(this.ground.object);
     this.buildGizmo();
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(host);
@@ -434,56 +452,15 @@ export class BRepRenderer {
     if (moved) this.scheduleLod();
     if (!moved && !this.needsRender) return;
     this.needsRender = false;
+    // a dolly changes an orthographic view's height
+    this.syncProjection();
+    this.ground.update(this.camera, this.controls.target);
     this.renderGizmo();
     this.renderer.setRenderTarget(null);
     this.pipeline.render();
   }
 
-  // -- ground grid + axis gizmo ---------------------------------------------------
-
-  /** A gray grid on the XY plane (z = 0), sized to the model. */
-  private updateGrid(): void {
-    if (this.grid) {
-      this.threeScene.remove(this.grid);
-      this.grid.geometry.dispose();
-      (this.grid.material as THREE.Material).dispose();
-      this.grid = null;
-    }
-    this.modelRoot.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(this.modelRoot);
-    if (box.isEmpty()) return;
-    const reach = Math.max(Math.abs(box.min.x), Math.abs(box.max.x), Math.abs(box.min.y), Math.abs(box.max.y), 0.02) * 1.5;
-    // 1-2-5 step, about eight cells from the origin to the edge
-    const raw = reach / 8;
-    const decade = Math.pow(10, Math.floor(Math.log10(raw)));
-    const step = decade * ([1, 2, 5, 10].find((factor) => factor * decade >= raw) ?? 10);
-    const count = Math.ceil(reach / step);
-    const extent = count * step;
-    const positions: number[] = [];
-    const colors: number[] = [];
-    const minor = new THREE.Color(this.palette.gridMinor);
-    const major = new THREE.Color(this.palette.gridMajor);
-    for (let index = -count; index <= count; index += 1) {
-      const color = index % 5 === 0 ? major : minor;
-      const at = index * step;
-      positions.push(at, -extent, 0, at, extent, 0, -extent, at, 0, extent, at, 0);
-      for (let vertex = 0; vertex < 4; vertex += 1) colors.push(color.r, color.g, color.b);
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    const grid = new THREE.LineSegments(
-      geometry,
-      new THREE.LineBasicMaterial({ vertexColors: true, depthWrite: false, toneMapped: false }),
-    );
-    grid.name = 'ground-grid';
-    grid.userData.pickable = false;
-    grid.layers.set(EDGE_LAYER); // composited after AO, depth-tested against the model
-    grid.renderOrder = -1;
-    this.threeScene.add(grid);
-    this.grid = grid;
-    this.needsRender = true;
-  }
+  // -- axis gizmo ---------------------------------------------------
 
   /** The three axes as blocks and letters; drawn in a corner of the canvas. */
   private buildGizmo(): void {
@@ -511,6 +488,9 @@ export class BRepRenderer {
       );
       sprite.scale.set(0.42, 0.42, 1);
       sprite.position.copy(dir).multiplyScalar(1.38);
+      const axis = labels[index].toLowerCase();
+      this.gizmoEnds.set(`+${axis}` as GizmoHandle, tip);
+      this.gizmoEnds.set(`-${axis}` as GizmoHandle, tail);
       this.gizmoAxes.push({ materials: [shaftMaterial, tipMaterial], tail: tailMaterial, canvas, texture, label: labels[index] });
       this.paintGizmoLabel(this.gizmoAxes[index], color);
       this.gizmoScene.add(shaft, tip, tail, sprite);
@@ -566,15 +546,45 @@ export class BRepRenderer {
       axis.tail.color.set(this.palette.axisTail);
       this.paintGizmoLabel(axis, color);
     });
-    this.updateGrid();
+    this.ground.setPalette(this.palette);
     this.needsRender = true;
+  }
+
+  /** The end of an axis of the gizmo at a point of its square (CSS pixels from its top left corner), or null: the
+   * nearest end within reach, the one nearer the eye when two overlap (looking down an axis). */
+  gizmoHandleAt(x: number, y: number): GizmoHandle | null {
+    this.gizmoCamera.updateMatrixWorld();
+    const eye = this.gizmoCamera.position.clone().normalize();
+    let best: { handle: GizmoHandle; score: number } | null = null;
+    for (const [handle, end] of this.gizmoEnds) {
+      // the block, and for a positive end its letter further out
+      const points = [end.position.clone()];
+      if (handle.startsWith('+')) points.push(end.position.clone().multiplyScalar(1.38));
+      for (const point of points) {
+        const ndc = point.clone().project(this.gizmoCamera);
+        const distance = Math.hypot(((ndc.x + 1) / 2) * GIZMO_SIDE - x, ((1 - ndc.y) / 2) * GIZMO_SIDE - y);
+        if (distance > 10) continue;
+        const score = distance - 6 * point.clone().normalize().dot(eye);
+        if (!best || score < best.score) best = { handle, score };
+      }
+    }
+    return best?.handle ?? null;
+  }
+
+  /** Grow the end of the gizmo under the pointer (null: none). */
+  setGizmoHover(handle: GizmoHandle | null): void {
+    if (handle === this.gizmoHover) return;
+    if (this.gizmoHover) this.gizmoEnds.get(this.gizmoHover)?.scale.setScalar(1);
+    if (handle) this.gizmoEnds.get(handle)?.scale.setScalar(1.6);
+    this.gizmoHover = handle;
+    this.invalidate();
   }
 
   /** Draw the axis gizmo into its target, for the output node to lay over the top right corner. */
   private renderGizmo(): void {
     const size = this.renderer.getSize(new THREE.Vector2());
-    const side = 108;
-    const margin = 12;
+    const side = GIZMO_SIDE;
+    const margin = GIZMO_MARGIN;
     const pixels = Math.round(side * this.renderer.getPixelRatio());
     if (this.gizmoTarget.width !== pixels) this.gizmoTarget.setSize(pixels, pixels);
     this.gizmoRect.value.set((size.x - side - margin) / size.x, margin / size.y, (size.x - margin) / size.x, (margin + side) / size.y);
@@ -660,7 +670,6 @@ export class BRepRenderer {
     // Re-frame only on the FIRST load; watched reloads (Studio live view,
     // agent artifact iterations) must keep the user's camera pose and zoom.
     if (!hadScene) this.pendingFrame = true;
-    this.updateGrid();
     this.resize();
   }
 
@@ -686,7 +695,6 @@ export class BRepRenderer {
     group.add(this.edgeLineVisual(payload.edge_positions, 'live-edges'));
     this.modelRoot.add(group);
     if (!hadScene) this.pendingFrame = true;
-    this.updateGrid();
     this.resize();
   }
 
@@ -1039,7 +1047,6 @@ private buildPreviewPart(part: PreviewPart): BuiltPart {
     this.manifest = { schema_version: '2.0', nodes } as unknown as SceneManifest;
     this.setVertexCloudsVisible(false);
     if (!hadScene) this.pendingFrame = true;
-    this.updateGrid();
     this.resize();
   }
 
@@ -1222,6 +1229,17 @@ private buildPreviewPart(part: PreviewPart): BuiltPart {
     this.invalidate();
   }
 
+  /** The projection the user chose (`orthographic`: parallel), kept while the sketch canvas projects orthographically. */
+  get orthographicPreferred(): boolean {
+    return this.preferOrthographic;
+  }
+
+  /** Choose the projection; while the sketch canvas has the camera it applies when the canvas gives it back. */
+  preferProjection(orthographic: boolean, applyNow: boolean): void {
+    this.preferOrthographic = orthographic;
+    if (applyNow) this.setOrthographic(orthographic);
+  }
+
   /** Follow the camera's distance (a dolly changes the orthographic view height); a no-op in perspective. */
   syncProjection(): void {
     if (isOrthographic(this.camera)) this.camera.updateProjectionMatrix();
@@ -1363,10 +1381,7 @@ private buildPreviewPart(part: PreviewPart): BuiltPart {
     this.observer.disconnect();
     this.renderer.setAnimationLoop(null);
     this.clearScene();
-    if (this.grid) {
-      this.grid.geometry.dispose();
-      (this.grid.material as THREE.Material).dispose();
-    }
+    this.ground.dispose();
     this.gizmoScene.traverse((object) => {
       const mesh = object as THREE.Mesh;
       mesh.geometry?.dispose?.();

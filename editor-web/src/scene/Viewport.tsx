@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
+import { ViewGizmo } from "@/components/ViewGizmo";
 import { refinePreview } from "@/lib/api";
 import { SceneView, type PickResult, type SelectionMode } from "@/scene/scene-view";
 import { PALETTES, type SceneTheme } from "@/scene/theme";
@@ -28,7 +29,10 @@ export function Viewport({
   onPick,
   onClear,
   onSketchPick,
+  sketching,
 }: {
+  /** The sketch canvas has the camera (it projects orthographically: no projection switch). */
+  sketching: boolean;
   viewRef: React.MutableRefObject<SceneView | null>;
   selectionMode: SelectionMode;
   selection: Highlight[];
@@ -48,6 +52,7 @@ export function Viewport({
   sketchPickRef.current = onSketchPick;
   const overlayRef = useRef<THREE.Object3D[]>([]);
   const [geometryVersion, setGeometryVersion] = useState(0);
+  const [mounted, setMounted] = useState<SceneView | null>(null);
   // The theme the view was created with; later changes go through setTheme.
   const themeRef = useRef(theme);
   themeRef.current = theme;
@@ -77,6 +82,7 @@ export function Viewport({
       theme: themeRef.current,
     });
     viewRef.current = view;
+    setMounted(view);
     // parts seen up close are tessellated again by the kernel (level of detail); the selection is drawn again on them
     view.engine.setLodSource(refinePreview);
     const unbindGeometry = view.engine.onGeometryChanged(() => setGeometryVersion((version) => version + 1));
@@ -87,6 +93,7 @@ export function Viewport({
       dropOverlays();
       view.dispose();
       viewRef.current = null;
+      setMounted(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -115,5 +122,10 @@ export function Viewport({
     view.engine.invalidate();
   }, [theme, viewRef]);
 
-  return <div ref={hostRef} className="h-full w-full" />;
+  return (
+    <div className="relative h-full w-full">
+      <div ref={hostRef} className="h-full w-full" />
+      {mounted && <ViewGizmo view={mounted} sketching={sketching} />}
+    </div>
+  );
 }

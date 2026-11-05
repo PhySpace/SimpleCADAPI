@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { ChevronsRight, ScanSearch } from "lucide-react";
 
+import { useSizeTransition } from "@/lib/useSizeTransition";
 import { cn } from "@/lib/utils";
 import { t } from "@/i18n";
 
@@ -27,12 +28,13 @@ function useRemembered(key: string): [boolean, (open: boolean) => void] {
 }
 
 const CARD = "pointer-events-auto border-2 border-primary bg-popover/95 shadow-[4px_4px_0_var(--shadow-hard)] backdrop-blur-sm";
-const PILL = "pointer-events-auto flex items-center gap-1.5 border-2 border-primary bg-popover/95 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] shadow-[4px_4px_0_var(--shadow-hard)] hover:bg-accent";
+/** The content of a folded card: what it is, on one line. */
+const PILL = "flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]";
 
 /** What floats over the viewport in both modes (the panels are the left column):
  *
  * - right, under the axis gizmo: the inspector of the selection, collapsible, with the partial-model notice under it;
- * - top centre: the selection kinds and "fit" (a command bar docked at the top sits under them);
+ * - top centre: the selection kinds and "fit";
  * - top left: the notice of split tags. */
 export function FloatingPanels({
   inspector,
@@ -52,29 +54,36 @@ export function FloatingPanels({
   rightNotice: ReactNode;
 }) {
   const [inspectorOpen, setInspectorOpen] = useRemembered("sca.floating.inspector");
+  const inspectorBox = useSizeTransition<HTMLDivElement>(inspectorOpen);
   return (
     <div inert={locked} className={cn("pointer-events-none absolute inset-0 z-[5]", locked && "opacity-40")} data-testid="floating-panels">
       {!task && leftNotice && <div className="pointer-events-none absolute left-2 top-14 flex w-[min(420px,45%)] flex-col">{leftNotice}</div>}
-      <div className="pointer-events-none absolute bottom-16 right-2 top-[132px] flex w-[min(300px,34%)] flex-col items-end gap-2">
-        {inspectorOpen ? (
-          <div className={cn(CARD, "relative flex max-h-[70%] w-full flex-col overflow-hidden")} data-testid="floating-inspector">
-            <div className="min-h-0 overflow-y-auto">{inspector}</div>
-            <button
-              type="button"
-              className="absolute right-0 top-0 z-10 flex h-9 w-8 items-center justify-center border-l-2 border-border bg-popover text-muted-foreground hover:text-foreground"
-              aria-label={t("Collapse the inspector")}
-              title={t("Collapse the inspector")}
-              onClick={() => setInspectorOpen(false)}
-            >
-              <ChevronsRight className="size-3.5" />
+      <div className="pointer-events-none absolute bottom-16 right-2 top-[156px] flex w-[min(300px,34%)] flex-col items-end gap-2">
+        <div
+          ref={inspectorBox}
+          className={cn(CARD, "relative flex flex-col overflow-hidden", inspectorOpen ? "max-h-[70%] w-full" : "hover:bg-accent")}
+          data-testid={inspectorOpen ? "floating-inspector" : undefined}
+        >
+          {inspectorOpen ? (
+            <div className="flex min-h-0 flex-col">
+              <div className="min-h-0 overflow-y-auto">{inspector}</div>
+              <button
+                type="button"
+                className="absolute right-0 top-0 z-10 flex h-9 w-8 items-center justify-center border-l-2 border-border bg-popover text-muted-foreground hover:text-foreground"
+                aria-label={t("Collapse the inspector")}
+                title={t("Collapse the inspector")}
+                onClick={() => setInspectorOpen(false)}
+              >
+                <ChevronsRight className="size-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button type="button" className={PILL} onClick={() => setInspectorOpen(true)} aria-label={t("Open the inspector")}>
+              <ScanSearch className="size-3.5" />
+              {t("inspector")}{selectionCount > 0 ? ` · ${selectionCount}` : ""}
             </button>
-          </div>
-        ) : (
-          <button type="button" className={PILL} onClick={() => setInspectorOpen(true)} aria-label={t("Open the inspector")}>
-            <ScanSearch className="size-3.5" />
-            {t("inspector")}{selectionCount > 0 ? ` · ${selectionCount}` : ""}
-          </button>
-        )}
+          )}
+        </div>
         {rightNotice && <div className="w-full">{rightNotice}</div>}
       </div>
       {!task && (

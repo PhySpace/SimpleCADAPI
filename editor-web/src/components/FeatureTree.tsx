@@ -1,6 +1,7 @@
 import { ArrowRight, Eye, EyeOff, Pencil, Redo2, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { CODE_FEATURE_ICON, FEATURE_ICONS } from "@/components/feature-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -166,6 +167,7 @@ export function FeatureTree({
               const productBodies = state.product ? (state.product.bodies ?? [state.product.body]) : [];
               const isProduct = feature.makes.some((name) => productBodies.includes(name));
               const canEdit = Boolean(feature.gui && spec);
+              const Icon = feature.gui ? FEATURE_ICONS[feature.gui.spec] : CODE_FEATURE_ICON;
               const sketch = sketches?.infos.find((info) => info.cell === feature.cell);
               const hiddenSketch = sketch ? sketches?.hidden.has(sketch.name) : false;
               const selectedSketch = sketch ? sketches?.selected.includes(sketch.name) : false;
@@ -187,6 +189,7 @@ export function FeatureTree({
                   <div className="flex items-center gap-2">
                     <span className={cn("inline-block h-2 w-2 shrink-0", statusColor(feature))} title={feature.status ?? "unknown"} />
                     <span className="w-5 shrink-0 text-[10px] text-muted-foreground">{feature.index}</span>
+                    {Icon ? <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden /> : <span className="size-3.5 shrink-0" />}
                     <span className="min-w-0 flex-1 truncate text-name">{feature.slug}</span>
                     {isProduct && (
                       <Badge variant="focus" title={state.product?.implicit ? t("The part is this body (made by the runtime, no cell to keep)") : t("The product cell builds from this body")}>

@@ -384,6 +384,8 @@ function CellBlock({
   const title = cell.title || cell.name;
   const hasOutput = Boolean(cell.output) || params.length > 0;
   const [copied, setCopied] = useState(false);
+  const [opened, setOpened] = useState(!folded);
+  if (!folded && !opened) setOpened(true);
   // Click: a reference an agent can find in the file. Alt/Shift+click: the
   // reference and the cell's code.
   const copyReference = (withCode: boolean) => {
@@ -463,89 +465,94 @@ function CellBlock({
         </IconButton>
       </header>
       {live && <div className="cell-running h-[2px] w-full" />}
-      {!folded && (
-        <div className="border-t-2 border-border">
-          <CodeMirror
-            value={draft ?? cell.code}
-            height="auto"
-            extensions={EXTENSIONS}
-            theme={cadTheme}
-            editable={!cell.readonly}
-            basicSetup={BASIC_SETUP}
-            onChange={handleChange}
-            onKeyDown={(event) => {
-              if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-                event.preventDefault();
-                onRun();
-              }
-            }}
-          />
-          {(cell.errors?.length ?? 0) > 0 && (
-            <div className="border-t-2 border-fail/60 bg-fail/10 px-2.5 py-1.5">
-              {cell.errors?.map((message, errorIndex) => (
-                <pre key={errorIndex} className="whitespace-pre-wrap text-[11px] text-fail">
-                  {message}
-                </pre>
-              ))}
-            </div>
-          )}
-          {hasOutput && (
-            <div className="border-t-2 border-border px-2.5 py-2">
-              {params.length > 0 && (
-                <div>
-                  <div className="grid grid-cols-2 gap-x-5 gap-y-2.5">
-                    {params.map((param) => (
-                      <ParamControl key={param.id} param={param} forwardParam={forwardParam} />
-                    ))}
-                  </div>
-                  {params.some((param) => param.modified) && (
-                    <div className="flex justify-end gap-3 pt-2">
-                      <button
-                        type="button"
-                        className="label hover:text-foreground"
-                        title={t("Drop the edited values; back to what the source says")}
-                        onClick={() =>
-                          socket?.send({ type: "param.revert", names: params.filter((p) => p.modified).map((p) => p.id) })
-                        }
-                      >
-                        {t("revert")}
-                      </button>
-                      <button
-                        type="button"
-                        className="label text-focus hover:text-foreground"
-                        title={t("Write the edited values into the notebook source")}
-                        onClick={() =>
-                          socket?.send({ type: "param.commit", names: params.filter((p) => p.modified).map((p) => p.id) })
-                        }
-                      >
-                        {t("write to source")}
-                      </button>
+      {/* the body opens and closes by its height (a grid row from 0fr to 1fr); it is made on the first unfold and kept */}
+      <div inert={folded} className={cn("grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none", folded ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}>
+        <div className="min-h-0 overflow-hidden">
+          {opened && (
+            <div className="border-t-2 border-border">
+              <CodeMirror
+                value={draft ?? cell.code}
+                height="auto"
+                extensions={EXTENSIONS}
+                theme={cadTheme}
+                editable={!cell.readonly}
+                basicSetup={BASIC_SETUP}
+                onChange={handleChange}
+                onKeyDown={(event) => {
+                  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                    event.preventDefault();
+                    onRun();
+                  }
+                }}
+              />
+              {(cell.errors?.length ?? 0) > 0 && (
+                <div className="border-t-2 border-fail/60 bg-fail/10 px-2.5 py-1.5">
+                  {cell.errors?.map((message, errorIndex) => (
+                    <pre key={errorIndex} className="whitespace-pre-wrap text-[11px] text-fail">
+                      {message}
+                    </pre>
+                  ))}
+                </div>
+              )}
+              {hasOutput && (
+                <div className="border-t-2 border-border px-2.5 py-2">
+                  {params.length > 0 && (
+                    <div>
+                      <div className="grid grid-cols-2 gap-x-5 gap-y-2.5">
+                        {params.map((param) => (
+                          <ParamControl key={param.id} param={param} forwardParam={forwardParam} />
+                        ))}
+                      </div>
+                      {params.some((param) => param.modified) && (
+                        <div className="flex justify-end gap-3 pt-2">
+                          <button
+                            type="button"
+                            className="label hover:text-foreground"
+                            title={t("Drop the edited values; back to what the source says")}
+                            onClick={() =>
+                              socket?.send({ type: "param.revert", names: params.filter((p) => p.modified).map((p) => p.id) })
+                            }
+                          >
+                            {t("revert")}
+                          </button>
+                          <button
+                            type="button"
+                            className="label text-focus hover:text-foreground"
+                            title={t("Write the edited values into the notebook source")}
+                            onClick={() =>
+                              socket?.send({ type: "param.commit", names: params.filter((p) => p.modified).map((p) => p.id) })
+                            }
+                          >
+                            {t("write to source")}
+                          </button>
+                        </div>
+                      )}
                     </div>
+                  )}
+                  {cell.output && (
+                    <pre className="max-h-44 overflow-auto whitespace-pre-wrap text-[11px] text-foreground/90">{cell.output}</pre>
                   )}
                 </div>
               )}
-              {cell.output && (
-                <pre className="max-h-44 overflow-auto whitespace-pre-wrap text-[11px] text-foreground/90">{cell.output}</pre>
+              {(cell.console?.length ?? 0) > 0 && (
+                <div className="max-h-44 overflow-auto border-t-2 border-border px-2.5 py-1">
+                  {cell.console?.map((line, lineIndex) => (
+                    <pre
+                      key={lineIndex}
+                      className={cn(
+                        "whitespace-pre-wrap text-[11px]",
+                        /error|traceback|failed/i.test(line) ? "text-fail" : "text-muted-foreground",
+                      )}
+                    >
+                      {line}
+                    </pre>
+                  ))}
+                </div>
               )}
             </div>
           )}
-          {(cell.console?.length ?? 0) > 0 && (
-            <div className="max-h-44 overflow-auto border-t-2 border-border px-2.5 py-1">
-              {cell.console?.map((line, lineIndex) => (
-                <pre
-                  key={lineIndex}
-                  className={cn(
-                    "whitespace-pre-wrap text-[11px]",
-                    /error|traceback|failed/i.test(line) ? "text-fail" : "text-muted-foreground",
-                  )}
-                >
-                  {line}
-                </pre>
-              ))}
-            </div>
-          )}
         </div>
-      )}
+      </div>
     </section>
   );
 }

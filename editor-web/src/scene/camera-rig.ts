@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import type { BRepRenderer } from './renderer';
+import type { GizmoHandle } from './renderer/brep-renderer';
 
 export type Pose = { position: THREE.Vector3; target: THREE.Vector3; up: THREE.Vector3 };
 
@@ -21,10 +22,16 @@ export class CameraRig {
   private get camera() { return this.engine.camera; }
   private get controls() { return this.engine.controls; }
 
-  /** Park the trackball (sketch mode) or give the camera back to it; the sketch looks through an orthographic projection. */
+  /** Whether the sketch canvas has the camera (the trackball is parked). */
+  get manual(): boolean {
+    return this.saved !== null;
+  }
+
+  /** Park the trackball (sketch mode) or give the camera back to it; the sketch looks through an orthographic projection,
+   * the viewport through the one the user chose. */
   setManual(on: boolean): void {
     this.cancelAnimation();
-    this.engine.setOrthographic(on);
+    this.engine.setOrthographic(on || this.engine.orthographicPreferred);
     if (on) {
       this.saved ??= { min: this.controls.minDistance, max: this.controls.maxDistance };
       this.controls.minDistance = 1e-5;
@@ -97,6 +104,58 @@ export class CameraRig {
       };
       this.animation = requestAnimationFrame(step);
     });
+  }
+
+  /** Turn about the target to look from `direction` (unit, from the target to the eye) with `up` on top, keeping the
+   * distance: the orientation is interpolated, so a half turn swings around instead of passing through the target. */
+  turnTo(direction: THREE.Vector3, up: THREE.Vector3, ms = 380): Promise<void> {
+    this.cancelAnimation();
+    const target = this.controls.target.clone();
+    const distance = this.distance();
+    const orientation = (eye: THREE.Vector3, top: THREE.Vector3) =>
+      new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(eye, new THREE.Vector3(), top));
+    const from = orientation(this.camera.position.clone().sub(target), this.camera.up);
+    const to = orientation(direction, up);
+    const start = performance.now();
+    const pose = (q: THREE.Quaternion): Pose => ({
+      position: target.clone().add(new THREE.Vector3(0, 0, 1).applyQuaternion(q).multiplyScalar(distance)),
+      target: target.clone(),
+      up: new THREE.Vector3(0, 1, 0).applyQuaternion(q),
+    });
+    return new Promise((resolve) => {
+      const step = (now: number) => {
+        const k = Math.min(1, (now - start) / Math.max(ms, 1));
+        const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+        this.set(pose(from.clone().slerp(to, e)));
+        if (k < 1) this.animation = requestAnimationFrame(step);
+        else {
+          this.animation = 0;
+          resolve();
+        }
+      };
+      this.animation = requestAnimationFrame(step);
+    });
+  }
+
+  /** Look from an end of an axis: from +Z or -Z with +Y on top, from the others with +Z on top. */
+  lookFrom(handle: GizmoHandle): Promise<void> {
+    const axis = { x: 0, y: 1, z: 2 }[handle[1] as 'x' | 'y' | 'z'];
+    const direction = new THREE.Vector3().setComponent(axis, handle[0] === '+' ? 1 : -1);
+    return this.turnTo(direction, axis === 2 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1));
+  }
+
+  /** Turn the view by 45° about the screen's vertical (`yaw`: the model turns right for +1) or horizontal axis (`pitch`:
+   * the model tips towards the viewer for +1). */
+  step(about: 'yaw' | 'pitch', sign: 1 | -1): Promise<void> {
+    this.camera.updateMatrixWorld(true);
+    const axis =
+      about === 'yaw'
+        ? new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1)
+        : new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
+    const turn = new THREE.Quaternion().setFromAxisAngle(axis.normalize(), (-sign * Math.PI) / 4);
+    const direction = this.camera.position.clone().sub(this.controls.target).normalize().applyQuaternion(turn);
+    const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1).applyQuaternion(turn);
+    return this.turnTo(direction, up);
   }
 
   /** Free (trackball-like) rotation about the target; `dx`, `dy` in radians. */

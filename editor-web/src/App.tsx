@@ -1543,6 +1543,7 @@ export function App() {
                   onPick={handlePick}
                   onClear={handleClear}
                   onSketchPick={pickSketch}
+                  sketching={sketching}
                 />
                 <SketchScene
                   viewRef={viewRef}
