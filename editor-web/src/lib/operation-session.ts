@@ -41,6 +41,9 @@ export function quickStart(
       // a pick travels by its entity id: the server has the kernel name it (its details need not have come yet)
       if (!picks.length || (slot.single && picks.length !== 1)) return null;
       selections[slot.name] = picks.map(pickedPayload);
+    } else if (slot.kind === "value") {
+      // a named value of the notebook (a sweep's path): what was picked fills it, else the dialog asks
+      if (!(slot.name in prefill) && !slot.optional) return null;
     } else if (!DIRECT.has(slot.kind)) return null;
   }
   const form = initialForm(spec, formDefaults(spec, state.defaults[spec.id] ?? {}, false), prefill);

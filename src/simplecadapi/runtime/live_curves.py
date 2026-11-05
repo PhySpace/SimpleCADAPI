@@ -1,4 +1,5 @@
-"""The curves of a running notebook, for a viewer: every top-level wire and edge value, sampled by the SDK.
+"""The curves of a running notebook, for a viewer: every top-level wire and edge value, sampled by the SDK; and the kind
+of every top-level value (:func:`live_value_kinds`).
 
 A part's preview draws its solids; a 3D path, a sweep rail or a sketch made into a wire is not a solid, so it would not
 be seen.  :func:`curve_samples` gives each such value as polylines (one per edge, world mm), sampled with the SDK's own
@@ -10,7 +11,7 @@ from __future__ import annotations
 import math
 from typing import Any, Mapping
 
-from .._cpp import Edge, Wire, ql, sample_curve_rcurvature
+from .._cpp import Compound, Edge, Face, Shell, Solid, Vertex, Wire, ql, sample_curve_rcurvature
 from ._marimo import safe_get_context
 
 _SAMPLES = 48
@@ -52,4 +53,37 @@ def live_curves() -> list[dict[str, Any]]:
     return curve_samples(values)
 
 
-__all__ = ["curve_samples", "live_curves"]
+def value_kind(value: object) -> str | None:
+    """The kind of a top-level value, as the editor's forms name kinds (``solid``, ``face``, ``wire`` ...); ``None`` for
+    a value that is not geometry or a product (a number, a function)."""
+    from .. import Workplane
+    from ..product.assembly import Assembly
+    from ..product.part import Part
+
+    for kind, types in (
+        ("solid", Solid), ("face", Face), ("shell", Shell), ("wire", Wire), ("edge", Edge), ("vertex", Vertex),
+        ("compound", Compound), ("part", Part), ("assembly", Assembly), ("workplane", Workplane),
+    ):
+        if isinstance(value, types):
+            return kind
+    if isinstance(value, (list, tuple)) and value and all(isinstance(item, Solid) for item in value):
+        return "solids"
+    return None
+
+
+def live_value_kinds() -> dict[str, str]:
+    """``{name: kind}`` of the running notebook's public top-level values that are geometry or products: what each
+    cell really made, for the cells written as code (their source does not say)."""
+    context = safe_get_context()
+    if context is None:
+        return {}
+    glbls = context.globals
+    out: dict[str, str] = {}
+    for cell in context.graph.cells.values():
+        for name in cell.defs:
+            if not name.startswith("_") and name in glbls and (kind := value_kind(glbls[name])) is not None:
+                out[name] = kind
+    return out
+
+
+__all__ = ["curve_samples", "live_curves", "live_value_kinds", "value_kind"]

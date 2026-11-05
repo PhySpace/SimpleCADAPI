@@ -66,14 +66,19 @@ export const PRESETS: Record<string, { suffix: string; label: string; descriptio
 // -- what the selection offers ----------------------------------------------------------------------------------------------------
 
 /** What is selected, counted by kind (the model's entities and the notebook's sketches). */
-export type SelectionContext = { sketches: number; solids: number; components: number; faces: number; planarFaces: number; edges: number; vertices: number };
-export type ContextKind = "sketch" | "edge" | "face" | "solid";
+/** `curves`: the notebook's 3D curves picked (wires and edges it holds as values: a path, a rail). */
+export type SelectionContext = { sketches: number; curves: number; solids: number; components: number; faces: number; planarFaces: number; edges: number; vertices: number };
+export type ContextKind = "sketch" | "curve" | "edge" | "face" | "solid";
 
-export const EMPTY_CONTEXT: SelectionContext = { sketches: 0, solids: 0, components: 0, faces: 0, planarFaces: 0, edges: 0, vertices: 0 };
+export const EMPTY_CONTEXT: SelectionContext = { sketches: 0, curves: 0, solids: 0, components: 0, faces: 0, planarFaces: 0, edges: 0, vertices: 0 };
 
 /** Count a selection; a face whose details are not known yet counts as planar (the click that uses it checks again). */
-export function selectionContext(items: readonly { kind: string; geometry?: Record<string, unknown> | null }[], sketches: readonly string[] = []): SelectionContext {
-  const out = { ...EMPTY_CONTEXT, sketches: sketches.length };
+export function selectionContext(
+  items: readonly { kind: string; geometry?: Record<string, unknown> | null }[],
+  sketches: readonly string[] = [],
+  curves: readonly string[] = [],
+): SelectionContext {
+  const out = { ...EMPTY_CONTEXT, sketches: sketches.length, curves: curves.length };
   for (const item of items) {
     if (item.kind === "solid") out.solids += 1;
     else if (item.kind === "component") out.components += 1;
@@ -88,9 +93,10 @@ export function selectionContext(items: readonly { kind: string; geometry?: Reco
   return out;
 }
 
-/** Which kind of thing the selection mainly is (sketches first, then edges, faces, bodies); null for nothing. */
+/** Which kind of thing the selection mainly is (sketches first, then curves, edges, faces, bodies); null for nothing. */
 export function contextKind(context: SelectionContext): ContextKind | null {
   if (context.sketches > 0) return "sketch";
+  if (context.curves > 0) return "curve";
   if (context.edges > 0) return "edge";
   if (context.faces > 0) return "face";
   if (context.solids > 0 || context.components > 0) return "solid";
@@ -121,7 +127,9 @@ export const CONTEXT_ACTIONS: Record<ContextKind, { id: string; label: string }[
     { id: "cut_sketch", label: "Cut" },
     { id: "boss_sketch", label: "Boss" },
     { id: "edit_sketch", label: "Edit sketch" },
+    { id: "sweep_along", label: "Sweep along the curve" },
   ],
+  curve: [{ id: "sweep_along", label: "Sweep" }],
   solid: [
     { id: "translate", label: "Move" },
     { id: "rotate", label: "Rotate" },
@@ -158,6 +166,8 @@ const WHEN: Record<string, (context: SelectionContext) => boolean> = {
   cut_sketch: (c) => c.sketches === 1,
   boss_sketch: (c) => c.sketches === 1,
   edit_sketch: (c) => c.sketches === 1,
+  // a profile swept along a path: the curve, and the sketch as the profile when one is picked with it
+  sweep_along: (c) => c.curves === 1 && c.sketches <= 1 && c.solids + c.components + c.faces + c.edges + c.vertices === 0,
   translate: (c) => (c.solids >= 1 || c.components >= 1) && c.faces + c.edges + c.sketches === 0,
   rotate: (c) => (c.solids >= 1 || c.components >= 1) && c.faces + c.edges + c.sketches === 0,
   mirror: (c) => (c.solids >= 1 || c.components >= 1) && c.faces + c.edges + c.sketches === 0,
@@ -200,6 +210,7 @@ export function selectionHint(context: SelectionContext, commands: readonly Comm
     sketch: `${context.sketches} sketch${context.sketches === 1 ? "" : "es"}`,
     edge: `${context.edges} edge${context.edges === 1 ? "" : "s"}`,
     face: `${context.faces} face${context.faces === 1 ? "" : "s"}`,
+    curve: `${context.curves} curve${context.curves === 1 ? "" : "s"}`,
     solid: `${context.solids + context.components} body`,
   }[kind];
   return `${noun} selected${list ? `: ${list}` : ""}.`;

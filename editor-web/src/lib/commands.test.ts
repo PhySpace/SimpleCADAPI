@@ -65,8 +65,15 @@ describe("what the selection offers", () => {
 
   it("counts a selection by kind, a face of unknown kind counting as flat", () => {
     const context = selectionContext([{ kind: "face", geometry: { type: "plane" } }, { kind: "face", geometry: { type: "cylinder" } }, { kind: "face" }, { kind: "edge" }, { kind: "solid" }], ["s1"]);
-    expect(context).toEqual({ sketches: 1, solids: 1, components: 0, faces: 3, planarFaces: 2, edges: 1, vertices: 0 });
+    expect(context).toEqual({ sketches: 1, curves: 0, solids: 1, components: 0, faces: 3, planarFaces: 2, edges: 1, vertices: 0 });
     expect(contextKind(selectionContext([]))).toBeNull();
+  });
+  it("offers a curve a sweep along it, and with a sketch the sketch swept along it", () => {
+    const curve = selectionContext([], [], ["rail"]);
+    expect(contextKind(curve)).toBe("curve");
+    expect(whenFor("sweep_along")?.(curve)).toBe(true);
+    expect(whenFor("sweep_along")?.(selectionContext([], ["ring"], ["rail"]))).toBe(true);
+    expect(whenFor("sweep_along")?.(selectionContext([], [], ["rail", "rail2"]))).toBe(false);
   });
   it("offers a face: sketch on it, a hole, a shell", () => {
     expect(labels(selectionContext([{ kind: "face" }]))).toEqual(["Sketch on this face", "Hole here", "Shell"]);

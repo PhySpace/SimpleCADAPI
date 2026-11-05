@@ -6,7 +6,8 @@ import { t } from "@/i18n";
 
 /** Right-hand inspector: what is selected in the viewport, each item with
  * the variable the selection cell assigns it to and its data as a tree. */
-export function Inspector({ selection, sketches = [] }: { selection: SelectionItem[]; sketches?: { name: string; rows: { label: string; value: string }[] }[] }) {
+/** `sketches`: the named values picked with the sketch selection mode, sketches and 3D curves (`kind`: the badge). */
+export function Inspector({ selection, sketches = [] }: { selection: SelectionItem[]; sketches?: { name: string; kind?: "sketch" | "curve"; rows: { label: string; value: string }[] }[] }) {
   const count = selection.length + sketches.length;
   return (
     <div className="flex h-full flex-col">
@@ -17,7 +18,7 @@ export function Inspector({ selection, sketches = [] }: { selection: SelectionIt
       <ScrollArea className="min-h-0 flex-1">
         {count === 0 ? (
           <p className="p-3 text-[11px] text-muted-foreground">
-            {t("Click a solid, face, edge, vertex or sketch in the viewport (pick the kind with the chips). Ctrl/Cmd+click adds to the selection; picked model items are written to the notebook as")}{" "}
+            {t("Click a solid, face, edge, vertex, sketch or 3D curve in the viewport (pick the kind with the chips). Ctrl/Cmd+click adds to the selection; picked model items are written to the notebook as")}{" "}
             <span className="text-name">selected_item</span>.
           </p>
         ) : (
@@ -25,7 +26,7 @@ export function Inspector({ selection, sketches = [] }: { selection: SelectionIt
             {sketches.map((sketch) => (
               <li key={`sketch:${sketch.name}`} className="border-b-2 border-border" data-testid="inspector-sketch">
                 <div className="flex items-center gap-2 px-3 py-2">
-                  <Badge variant="focus">sketch</Badge>
+                  <Badge variant="focus">{sketch.kind ?? "sketch"}</Badge>
                   <span className="min-w-0 flex-1 truncate text-name" title={sketch.name}>
                     {sketch.name}
                   </span>

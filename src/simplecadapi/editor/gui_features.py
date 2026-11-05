@@ -112,8 +112,10 @@ class FeatureService:
             # a datum that is not a workplane (a 3D curve) is a value later features take (a sweep path), not a body
             makes_value = head.role == "datum" and produces not in ("workplane",)
             made = defined if (head.role in _ROLES_WITH_BODIES or makes_value) and not part_of else []
+            # a cell written as code does not say what it makes: the kernel does (a path is a wire, not a body)
+            kinds = getattr(self.state, "value_kinds", None) or {}
             for name in made:
-                bodies[name] = produces
+                bodies[name] = produces if gui else kinds.get(name, produces)
                 order.append(name)
             if head.role == "datum" and produces == "workplane":
                 made = sorted(defined)

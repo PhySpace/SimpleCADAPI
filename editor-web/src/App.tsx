@@ -74,7 +74,7 @@ const MODES: { mode: SelectionMode; label: string; key: string }[] = [
   { mode: "face", label: "face", key: "3" },
   { mode: "edge", label: "edge", key: "2" },
   { mode: "vertex", label: "vert", key: "1" },
-  { mode: "sketch", label: "sketch", key: "6" },
+  { mode: "sketch", label: "sketch / curve", key: "6" },
 ];
 
 /** Editor application: left = notebook (cells, workspace), middle = the live
@@ -146,6 +146,8 @@ export function App() {
   const partialRef = useRef<PartialModel | null>(null);
   const cellTitles = useMemo(() => new Map(cells.map((cell) => [cell.id, cell.title ?? ""])), [cells]);
   const [curves, setCurves] = useState<CurveSample[]>([]);
+  const curvesRef = useRef(curves);
+  curvesRef.current = curves;
   // A workplane being placed by hand (Space): its base, the numbers the handles write, move or turn, its name.
   // A workplane, or a connector of the part, being placed by hand: its base, the numbers the handles write, move or turn,
   // its name.
@@ -212,6 +214,9 @@ export function App() {
     [currentPath],
   );
   const [pickedSketches, setPickedSketches] = useState<string[]>([]);
+  /** The 3D curves picked (with the sketches: the sketch selection mode picks both). */
+  const [pickedCurves, setPickedCurves] = useState<string[]>([]);
+  const [hoverCurve, setHoverCurve] = useState<string | null>(null);
   // Sketches are drawn while they are what a click picks, while one is picked or edited, and while a form takes a
   // sketch profile; otherwise they would only clutter the model.
   const dialogTakesProfile = !!dialog?.spec.slots.some((slot) => slot.kind === "profile");
@@ -336,6 +341,7 @@ export function App() {
       setSketchNotice(null);
       setHiddenSketches(new Set());
       setPickedSketches([]);
+      setPickedCurves([]);
       setHoverSketch(null);
       setPushArrow(null);
       setBarNote(null);
@@ -556,6 +562,7 @@ export function App() {
     }
     if (sketchingRef.current) return;
     setPickedSketches((previous) => (previous.length ? [] : previous));
+    setPickedCurves((previous) => (previous.length ? [] : previous));
     setBarNote(null);
     const view = viewRef.current;
     const node = view?.nodes.find((item) => item.node_id === result.nodeId);
@@ -596,6 +603,7 @@ export function App() {
     if (sketchingRef.current) return;
     setPicked((previous) => (previous.length ? [] : previous));
     setPickedSketches((previous) => (previous.length ? [] : previous));
+    setPickedCurves((previous) => (previous.length ? [] : previous));
     setBarNote(null);
   }, []);
 
@@ -606,12 +614,20 @@ export function App() {
     if (name === null) {
       if (!additive) {
         setPickedSketches((previous) => (previous.length ? [] : previous));
+    setPickedCurves((previous) => (previous.length ? [] : previous));
         setPicked((previous) => (previous.length ? [] : previous));
       }
       return;
     }
     setPicked((previous) => (previous.length ? [] : previous));
+    // a curve and a sketch share the click: a plain click picks one of either, Ctrl/Cmd adds it to the others
+    if (curvesRef.current.some((curve) => curve.name === name)) {
+      setPickedCurves((previous) => nextSketchSelection(previous, name, additive));
+      if (!additive) setPickedSketches((previous) => (previous.length ? [] : previous));
+      return;
+    }
     setPickedSketches((previous) => nextSketchSelection(previous, name, additive));
+    if (!additive) setPickedCurves((previous) => (previous.length ? [] : previous));
   }, []);
 
   // The notebook follows the selection: the server writes it as ql code into
@@ -843,6 +859,7 @@ export function App() {
       setSketchNotice(null);
       setBarNote(null);
       setPickedSketches([]);
+      setPickedCurves([]);
       if (modeBeforeSketch.current === null) modeBeforeSketch.current = selectionMode;
       setSelectionMode("face"); // a face pick chooses the sketch plane
       setPicked([]);
@@ -905,7 +922,11 @@ export function App() {
   pickedSketchesRef.current = pickedSketches;
   const sketchListRef = useRef(sketchList);
   sketchListRef.current = sketchList;
-  const context = useMemo(() => selectionContext(selection, pickedSketches), [selection, pickedSketches]);
+  const pickedCurvesRef = useRef(pickedCurves);
+  pickedCurvesRef.current = pickedCurves;
+  // a curve gone from the notebook is no longer picked
+  const livePickedCurves = useMemo(() => pickedCurves.filter((name) => curves.some((curve) => curve.name === name)), [pickedCurves, curves]);
+  const context = useMemo(() => selectionContext(selection, pickedSketches, livePickedCurves), [selection, pickedSketches, livePickedCurves]);
 
   /** "Sketch on this face": the plane chooser's own path, started from the selected face (a clear refusal for a curved one). */
   const sketchOnSelectedFace = useCallback(async () => {
@@ -1283,6 +1304,23 @@ export function App() {
         run: () => void sketchOnSelectedFace(),
       },
       {
+        id: "sweep_along",
+        label: "Sweep along a curve",
+        group: "Solids",
+        keywords: ["sweep", "path", "rail", "pipe", "curve", "wire"],
+        description: "Sweep a profile along the picked 3D curve; a sketch picked with it is the profile.",
+        icon: FEATURE_ICONS.curve,
+        when: whenFor("sweep_along"),
+        contextOnly: true,
+        run: () => {
+          const spec = gui.catalog?.specs.find((item) => item.id === "op.sweep_rsolid");
+          const path = pickedCurvesRef.current[0];
+          if (!spec || !path) return;
+          const profile = pickedSketchesRef.current[0];
+          openDialog({ spec, prefill: { path, ...(profile ? { profile } : {}) } });
+        },
+      },
+      {
         id: "edit_sketch",
         label: "Edit sketch",
         group: "Sketch",
@@ -1295,7 +1333,7 @@ export function App() {
       },
       ...assemblyCommands(openAssembly, { assembly: Boxes, connectors: Cable }),
     ],
-    [gui.catalog, openSpec, sketchOnSelectedFace, editSelectedSketch, openAssembly, workplaneFromSelection, startPlacing, startDrawing, startConnector],
+    [gui.catalog, openSpec, openDialog, sketchOnSelectedFace, editSelectedSketch, openAssembly, workplaneFromSelection, startPlacing, startDrawing, startConnector],
   );
   // The stand-alone combine commands (Cut, Union, Intersect, Cut/Boss with sketch) are offered only while several bodies are open:
   // a new solid says how it meets the body in its own dialog.
@@ -1314,10 +1352,13 @@ export function App() {
     const view = viewRef.current;
     if (!view) return null;
     const first = sketchList.find((info) => info.name === pickedSketches[0]);
-    const sketchAt = first ? sketchCentre(first.doc, sketchShapes.get(first.name)?.shape ?? null) : null;
+    // a picked curve: the middle of its drawn line
+    const curve = curves.find((item) => item.name === livePickedCurves[0]);
+    const middle = curve ? curve.edges[Math.floor(curve.edges.length / 2)] : null;
+    const sketchAt = first ? sketchCentre(first.doc, sketchShapes.get(first.name)?.shape ?? null) : middle ? middle[Math.floor(middle.length / 2)] : null;
     return selectionAnchorMm(view, selection, sketchAt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selection, pickedSketches, sketchList, sketchShapes, sceneVersion]);
+  }, [selection, pickedSketches, livePickedCurves, curves, sketchList, sketchShapes, sceneVersion]);
   anchorRef.current = anchorMm;
   paramsRef.current = params;
 
@@ -1540,7 +1581,17 @@ export function App() {
                 </button>
     </>
   );
-  const inspectorPanel = <Inspector selection={selection} sketches={inspectedSketches} />;
+  const inspectedCurves = useMemo(
+    () =>
+      livePickedCurves.flatMap((name) => {
+        const curve = curves.find((item) => item.name === name);
+        if (!curve) return [];
+        const length = curve.edges.reduce((sum, edge) => sum + edge.slice(1).reduce((s2, p, i) => s2 + Math.hypot(p[0] - edge[i][0], p[1] - edge[i][1], p[2] - edge[i][2]), 0), 0);
+        return [{ name, kind: "curve" as const, rows: [{ label: t("kind"), value: t(curve.kind) }, { label: t("edges"), value: String(curve.edges.length) }, { label: t("length"), value: `${length.toFixed(1)} mm` }] }];
+      }),
+    [livePickedCurves, curves],
+  );
+  const inspectorPanel = <Inspector selection={selection} sketches={[...inspectedSketches, ...inspectedCurves]} />;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
@@ -1624,7 +1675,9 @@ export function App() {
                 />
                 {viewRef.current && workplanes.length > 0 && <WorkplanePatches view={viewRef.current} workplanes={workplanes} active={activeWorkplane} />}
                 {needNotebook && <NewNotebookPrompt onCreate={(name) => handleCreate(name, "part")} onClose={() => setNeedNotebook(false)} />}
-                {viewRef.current && curves.length > 0 && <CurveLines view={viewRef.current} curves={curves} />}
+                {viewRef.current && curves.length > 0 && (
+                  <CurveLines view={viewRef.current} curves={curves} selected={livePickedCurves} hover={hoverCurve} hoverEnabled={selectionMode === "sketch"} onHover={setHoverCurve} />
+                )}
                 {drawing && viewRef.current && (
                   <CurveDrawer
                     view={viewRef.current}

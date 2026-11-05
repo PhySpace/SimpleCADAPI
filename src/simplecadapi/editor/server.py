@@ -137,6 +137,7 @@ class WorkspaceState:
         self._workplanes: list[dict] | None = None  # the frames last sent (see _push_workplanes)
         self._tag_splits: list[dict] | None = None  # the tag splits last sent (see _push_tag_splits)
         self._curves: list[dict] | None = None  # the curves last sent (see _push_curves)
+        self.value_kinds: dict[str, str] = {}  # what each top-level value is, as the kernel last said (solid, wire, face ...)
         # A cell failed and the model shown is the one before it: {failed, skipped, shown} (see runtime.live.preview_product)
         self.partial: dict | None = None
         self.latest_package_bytes: bytes | None = None  # a full package, made on demand (export)
@@ -277,6 +278,7 @@ class WorkspaceState:
         self._workplanes = None  # a new notebook: its workplanes are sent on its first settle, whatever they are
         self._tag_splits = None
         self._curves = None
+        self.value_kinds = {}
         self.partial = None
         kernel = MarimoKernel(
             notebook,
@@ -1149,6 +1151,8 @@ class WorkspaceState:
             signed = began
             result = kernel.publish_preview(self.preview_url, step=self.notebook.stem if self.notebook else "")
             published = time.perf_counter()
+            if isinstance(result.get("kinds"), dict):
+                self.value_kinds = {str(k): str(v) for k, v in result["kinds"].items()}
             self.push_cells()
             self._push_workplanes(result.get("workplanes"))
             self._push_curves(result.get("curves"))

@@ -36,7 +36,7 @@ export type SceneViewOptions = {
   onPick?: (result: PickResult) => void;
   /** A click that hit nothing. */
   onClear?: () => void;
-  /** A click in sketch mode: the name of the sketch under it, or null (the sketch layer answers which). */
+  /** A click in sketch mode: the name of the sketch (or 3D curve) under it, or null (the sketch and curve layers answer which). */
   onSketchPick?: (name: string | null, additive: boolean) => void;
   selectionMode?: SelectionMode;
   background?: string;
@@ -60,6 +60,9 @@ export class SceneView {
   onSketchPick: ((name: string | null, additive: boolean) => void) | null;
   /** Which sketch is under a pointer event (set by the sketch layer; null when nothing is). */
   sketchHitter: ((event: { clientX: number; clientY: number }) => string | null) | null = null;
+  /** Which of the notebook's 3D curves is under a pointer event (set by the curve layer, components/CurveLines.tsx):
+   * the sketch selection mode picks them too. */
+  curveHitter: ((event: { clientX: number; clientY: number }) => string | null) | null = null;
 
   private raycaster = new THREE.Raycaster();
   private pointer = new THREE.Vector2();
@@ -85,7 +88,7 @@ export class SceneView {
         controls: this.engine.controls,
         onClick: (event) => {
           if (this.selectionMode === 'sketch') {
-            this.onSketchPick?.(this.sketchHitter?.(event) ?? null, event.ctrlKey || event.metaKey);
+            this.onSketchPick?.(this.sketchHitter?.(event) ?? this.curveHitter?.(event) ?? null, event.ctrlKey || event.metaKey);
             return;
           }
           const result = this.pick(event);

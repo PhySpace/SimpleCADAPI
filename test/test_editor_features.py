@@ -507,3 +507,28 @@ def test_a_picked_face_is_pushed_out_or_in_along_its_normal_without_a_sketch():
         assert scope["pocket"].get_volume() == pytest.approx(volume - 4.0 * area, rel=1e-6)
         with pytest.raises(F.FeatureError, match="exactly one"):
             F.render_feature("extrude_face", "two", {**DEFAULTS["extrude_face"], "body": "base"}, bodies={"base": "solid"}, selections={"face": [picked, picked]}, known_slugs={"base"})
+
+
+def test_a_cell_written_as_code_makes_what_the_kernel_says_it_made():
+    """A code cell's source does not say whether it makes a body or a path: the kernel reports each value's kind, so a
+    wire is offered as a sweep's path and is neither a body nor the product."""
+    from types import SimpleNamespace
+
+    import simplecadapi as scad
+    from simplecadapi.editor.gui_features import FeatureService
+    from simplecadapi.runtime.live_curves import value_kind
+
+    assert value_kind(scad.make_box_rsolid(1, 1, 1)) == "solid"
+    assert value_kind(scad.make_segment_rwire(start=(0, 0, 0), end=(1, 0, 0))) == "wire"
+    assert value_kind(3.0) is None
+    cells = [
+        {"id": "c1", "code": "# ---- feature: path (datum) ----\npath = scad.make_interpolated_spline_rwire(points=[(0, 0, 0), (1, 1, 1)])"},
+        {"id": "c2", "code": "# ---- feature: base (build) ----\nbase = scad.make_box_rsolid(1, 1, 1)"},
+    ]
+    state = SimpleNamespace(cells=cells, notebook=None, workspace=None, value_kinds={"path": "wire", "base": "solid"}, config=None)
+    service = FeatureService(state)
+    service._implicit_part = lambda: True  # type: ignore[method-assign]
+    snap = service.snapshot()
+    assert snap["bodies"] == [{"name": "path", "produces": "wire"}, {"name": "base", "produces": "solid"}]
+    assert snap["open"] == ["base"] and snap["product"]["bodies"] == ["base"]
+    assert snap["defaults"]["op.sweep_rsolid"]["path"] == "path"

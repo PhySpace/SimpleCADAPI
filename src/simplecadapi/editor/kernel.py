@@ -609,6 +609,13 @@ class MarimoKernel:
             "    print('SCA-CURVES', _cjson.dumps(_curves()))\n"
             "except Exception:\n"
             "    pass\n"
+            # what each top-level value is (a cell written as code does not say: a wire, a face, a solid)
+            "try:\n"
+            "    from simplecadapi.runtime.live_curves import live_value_kinds as _kinds\n"
+            "    import json as _kjson\n"
+            "    print('SCA-KINDS', _kjson.dumps(_kinds()))\n"
+            "except Exception:\n"
+            "    pass\n"
             # the tagged entities the model's operations split, with the entities of their pieces (a diagnostic)
             "try:\n"
             "    from simplecadapi.runtime.live import live_tag_splits as _splits\n"
@@ -630,6 +637,11 @@ class MarimoKernel:
             elif line.startswith("SCA-CURVES "):
                 try:
                     out["curves"] = json.loads(line[len("SCA-CURVES "):])
+                except ValueError:
+                    pass
+            elif line.startswith("SCA-KINDS "):
+                try:
+                    out["kinds"] = json.loads(line[len("SCA-KINDS "):])
                 except ValueError:
                     pass
             elif line.startswith("SCA-TAGSPLITS "):

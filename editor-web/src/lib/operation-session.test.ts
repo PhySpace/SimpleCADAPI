@@ -83,3 +83,26 @@ describe("picks added and taken out while tuning", () => {
     expect(refLabel({ kind: "edge", op: "make_fillet_rsolid", ordinal: 2, piece: 1 })).toBe("fillet · #3 (2)");
   });
 });
+
+describe("a named value filled by what was picked", () => {
+  const SWEEP: Spec = {
+    id: "op.sweep_rsolid",
+    label: "Sweep",
+    group: "Solids",
+    role: "build",
+    produces: "solid",
+    description: "",
+    slots: [
+      { name: "profile", label: "Profile", kind: "value", accepts: ["face"] },
+      { name: "path", label: "Path", kind: "value", accepts: ["wire"] },
+      { name: "is_frenet", label: "Is frenet", kind: "bool", default: false },
+    ],
+  };
+  const state = { defaults: {}, taken: [] };
+
+  it("starts at once when the picks fill every named value, else the dialog asks", () => {
+    expect(quickStart(SWEEP, state, [], { path: "rail" })).toBeNull();
+    const start = quickStart(SWEEP, state, [], { path: "rail", profile: "ring" });
+    expect(start?.command.values).toMatchObject({ path: "rail", profile: "ring", is_frenet: false });
+  });
+});
