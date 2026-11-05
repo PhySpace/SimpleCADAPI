@@ -238,8 +238,6 @@
   "Direction z": "方向 z",
   "Dismiss": "关闭提示",
   "Distance": "距离",
-  "Dock at the bottom": "停靠到底部",
-  "Dock at the top": "停靠到顶部",
   "Draft": "拔模",
   "Draft planar, cylindrical or conical faces by a signed angle in degrees.": "按带符号的角度（度）对平面、圆柱面或圆锥面拔模。",
   "Draw a path in space (W): lines, arcs and splines on workplanes, snapped to the model; it becomes a wire to sweep along or loft through.": "在空间中绘制路径（W）：在工作平面上画直线、圆弧和样条，并吸附到模型；生成的线框可用于扫掠或放样。",

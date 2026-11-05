@@ -13,7 +13,6 @@ import { FeatureTree, type TreeSketches } from "@/components/FeatureTree";
 import { assemblyCommands, commandsFromSpecs, fitScore, plainLabel, selectionContext, selectionHint, visibleCommands, whenFor, type Command } from "@/lib/commands";
 import { ModeSwitch, type EditorMode } from "@/components/ModeSwitch";
 import { Button } from "@/components/ui/button";
-import { sideStyle, useModeTransition } from "@/lib/useModeTransition";
 import { AssemblyPanel } from "@/components/AssemblyPanel";
 import { ConnectorGizmos, type Gizmo } from "@/components/ConnectorGizmos";
 import { WorkplanePatches } from "@/components/WorkplanePatches";
@@ -66,6 +65,9 @@ import type { SceneView } from "@/scene/scene-view";
 import { t, useI18n } from "@/i18n";
 
 /** The pick intents and their keys: 1 vertex, 2 edge, 3 face, 4 solid (Plasticity's order), 5 component, 6 sketch. */
+/** How long the left column slides from one mode to the other. */
+const MODE_SLIDE_MS = 380;
+
 const MODES: { mode: SelectionMode; label: string; key: string }[] = [
   { mode: "component", label: "comp", key: "5" },
   { mode: "solid", label: "solid", key: "4" },
@@ -101,15 +103,18 @@ export function App() {
   if (mode !== sharedMode) setSharedMode(mode);
   const lastTab = useRef<Record<EditorMode, string>>({ manual: "features", code: "notebook" });
   lastTab.current[mode] = leftTab;
+  // A mode change slides the left column like the switch's thumb: the two modes' panels sit side by side on one strip
+  // (manual on the left, code on the right) and it moves to the other one; the mode is changed when it has arrived.
   const [modeTarget, setModeTarget] = useState<EditorMode | null>(null);
-  const motion = useModeTransition((target) => {
-    setSharedMode(target as EditorMode);
-    setLeftTab(lastTab.current[target as EditorMode]);
-    setModeTarget(null);
-  });
+  const moving = modeTarget !== null;
   const changeMode = (target: EditorMode) => {
+    if (moving || target === mode) return;
     setModeTarget(target);
-    motion.go(target);
+    window.setTimeout(() => {
+      setSharedMode(target);
+      setLeftTab(lastTab.current[target]);
+      setModeTarget(null);
+    }, window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : MODE_SLIDE_MS);
   };
   const [notebook, setNotebook] = useState<string | null>(null);
   const notebookRef = useRef(notebook);
@@ -1356,10 +1361,11 @@ export function App() {
   // One layout for both modes: the panels are the left column (what it shows is the mode), the selection kinds and the
   // inspector float over the viewport (see the floating layer below).
   const taskOpen = sketching || !!placing || !!drawing;
-  const browserPanel = (
-            <Tabs value={leftTab} onValueChange={setLeftTab} className="h-full min-w-0 overflow-hidden">
+  /** The left column of mode `m`: its tabs, on the tab it was left on. */
+  const panelFor = (m: EditorMode) => (
+            <Tabs value={m === mode ? leftTab : lastTab.current[m]} onValueChange={m === mode ? setLeftTab : undefined} className="h-full min-w-0 overflow-hidden">
               <TabsList>
-                {mode === "manual" ? (
+                {m === "manual" ? (
                   <>
                     <TabsTrigger value="features">{t("features")}</TabsTrigger>
                     <TabsTrigger value="assembly">{t("assembly")}</TabsTrigger>
@@ -1489,7 +1495,7 @@ export function App() {
           <ResizablePanel id="browser" defaultSize={23} minSize={16} className="min-w-0" style={{ overflow: "hidden" }}>
             <div className={cn("flex h-full flex-col", sketching && "opacity-40")} inert={sketching}>
               <div className="flex shrink-0 items-center gap-2 border-b-2 border-border px-2 py-1.5">
-                <ModeSwitch mode={modeTarget ?? mode} onChange={changeMode} disabled={sketching || motion.moving} />
+                <ModeSwitch mode={modeTarget ?? mode} onChange={changeMode} disabled={sketching || moving} />
                 <span className="flex-1" />
                 {mode === "code" &&
                   (running ? (
@@ -1510,8 +1516,17 @@ export function App() {
                     </Button>
                   ))}
               </div>
-              <div inert={motion.moving} className="min-h-0 flex-1 overflow-hidden" style={sideStyle(motion.phase, -1)}>
-                {browserPanel}
+              <div inert={moving} className="min-h-0 flex-1 overflow-hidden">
+                <div
+                  className="flex h-full w-[200%]"
+                  style={{
+                    transform: (modeTarget ?? mode) === "code" ? "translateX(-50%)" : "translateX(0)",
+                    transition: moving ? `transform ${MODE_SLIDE_MS}ms cubic-bezier(0.45, 0, 0.2, 1)` : "none",
+                  }}
+                >
+                  <div className="h-full w-1/2 min-w-0">{(mode === "manual" || moving) && panelFor("manual")}</div>
+                  <div className="h-full w-1/2 min-w-0">{(mode === "code" || moving) && panelFor("code")}</div>
+                </div>
               </div>
             </div>
           </ResizablePanel>
@@ -1589,11 +1604,10 @@ export function App() {
                 {!sketching && viewRef.current && gizmos.length > 0 && (
                   <ConnectorGizmos view={viewRef.current} gizmos={gizmos} components={asm.doc.components} highlighted={gizmoHighlight} onPick={pickGizmo} armed={!!asm.target} />
                 )}
-                {mode === "manual" && (
-                  <div inert={sketching} className={cn(sketching && "opacity-40")}>
-                    <CommandBar commands={commands} fit={fit} hint={hint} belowTop={!taskOpen} />
-                  </div>
-                )}
+                {/* mounted in both modes: it slides up from the bottom edge into manual mode and back down out of it */}
+                <div inert={sketching} className={cn(sketching && "opacity-40")}>
+                  <CommandBar commands={commands} fit={fit} hint={hint} shown={(modeTarget ?? mode) === "manual"} />
+                </div>
                 {session?.handle && viewRef.current && sessionDistance && (
                   <PressPullHandle
                     view={viewRef.current}
@@ -1641,7 +1655,7 @@ export function App() {
                     chips={modeChips}
                     selectionCount={selection.length}
                     task={taskOpen}
-                    locked={sketching || motion.moving}
+                    locked={sketching || moving}
                     leftNotice={!taskOpen && viewRef.current ? <TagSplits docked view={viewRef.current} splits={tagSplits} sceneVersion={sceneVersion} /> : null}
                     rightNotice={partial && !sketching ? <PartialNotice docked partial={partial} titles={cellTitles} /> : null}
                   />

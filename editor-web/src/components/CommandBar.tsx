@@ -1,11 +1,10 @@
-import { ChevronsDownUp, ChevronsUpDown, PanelBottom, PanelTop, Search } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { commandGroups, pushRecent, searchCommands, type Command } from "@/lib/commands";
 import { cn } from "@/lib/utils";
 import { t } from "@/i18n";
 
-const DOCK_KEY = "sca.commandbar.dock";
 const RECENT_KEY = "sca.commandbar.recent";
 const VISIBLE_ROWS = 6;
 
@@ -27,9 +26,8 @@ function writeStore(key: string, value: string) {
 
 /** A floating command bar over the viewport: category chips, a search box, a short result list.
  * `/` or Ctrl/Cmd+K focuses the search; Up/Down move, Enter runs, Esc closes the list.
- * It collapses to a pill and docks at the bottom (default) or the top. */
-export function CommandBar({ commands, fit, hint, belowTop = false }: { commands: Command[]; /** How much a command fits the selection (see fitScore): the fitting ones come first. */ fit?: (command: Command) => number; /** One line saying what the selection can do. */ hint?: string | null; /** Something floats at the top centre of the viewport (manual mode's selection kinds): docked at the top, the bar sits under it. */ belowTop?: boolean }) {
-  const [dock, setDock] = useState<"top" | "bottom">(() => readStore<"top" | "bottom">(DOCK_KEY, "bottom", (raw) => (raw === "top" || raw === "bottom" ? raw : null)));
+ * It sits at the bottom of the viewport and collapses to a pill; `shown` slides it in from below (manual mode) or out. */
+export function CommandBar({ commands, fit, hint, shown: onScreen = true }: { commands: Command[]; /** How much a command fits the selection (see fitScore): the fitting ones come first. */ fit?: (command: Command) => number; /** One line saying what the selection can do. */ hint?: string | null; /** In view (it slides in from the bottom edge and back out). */ shown?: boolean }) {
   const [collapsed, setCollapsed] = useState(false);
   const [recent, setRecent] = useState<string[]>(() => readStore<string[]>(RECENT_KEY, [], (raw) => (Array.isArray(JSON.parse(raw)) ? (JSON.parse(raw) as string[]) : null)));
   const [query, setQuery] = useState("");
@@ -122,17 +120,15 @@ export function CommandBar({ commands, fit, hint, belowTop = false }: { commands
     }
   };
 
-  const bottom = dock === "bottom";
-  const toggleDock = () => {
-    const next = bottom ? "top" : "bottom";
-    setDock(next);
-    writeStore(DOCK_KEY, next);
+  // out of view: below the viewport's bottom edge, and nothing in it takes the pointer or the keyboard
+  const slide = {
+    style: { transform: onScreen ? "translateY(0)" : "translateY(calc(100% + 1.5rem))", transition: "transform 300ms cubic-bezier(0.12, 0.85, 0.25, 1)" },
+    inert: !onScreen,
   };
-  const place = bottom ? "bottom-3" : belowTop ? "top-14" : "top-3";
 
   if (collapsed) {
     return (
-      <div className={cn("pointer-events-none absolute inset-x-0 z-20 flex justify-center", place)}>
+      <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center" {...slide}>
         <button
           type="button"
           className="pointer-events-auto flex items-center gap-1.5 border-2 border-primary bg-background px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] shadow-[4px_4px_0_var(--shadow-hard)] hover:border-focus"
@@ -147,8 +143,8 @@ export function CommandBar({ commands, fit, hint, belowTop = false }: { commands
   }
 
   return (
-    <div className={cn("pointer-events-none absolute inset-x-0 z-20 flex justify-center px-3", place)}>
-      <div ref={root} role="toolbar" aria-label={t("Command bar")} className={cn("pointer-events-auto relative w-full max-w-[720px]", bottom ? "" : "")}>
+    <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center px-3" {...slide}>
+      <div ref={root} role="toolbar" aria-label={t("Command bar")} className="pointer-events-auto relative w-full max-w-[720px]">
         {shown.length > 0 && (
           <ul
             ref={listRef}
@@ -156,7 +152,7 @@ export function CommandBar({ commands, fit, hint, belowTop = false }: { commands
             aria-label={t("Operations")}
             className={cn(
               "absolute inset-x-0 overflow-y-auto border-2 border-primary bg-popover shadow-[4px_4px_0_var(--shadow-hard)]",
-              bottom ? "bottom-full mb-1" : "top-full mt-1",
+              "bottom-full mb-1",
             )}
             style={{ maxHeight: `${VISIBLE_ROWS * 34}px` }}
           >
@@ -183,7 +179,7 @@ export function CommandBar({ commands, fit, hint, belowTop = false }: { commands
           </ul>
         )}
         {hint && (
-          <p data-testid="command-hint" className={cn("absolute inset-x-0 border-2 border-focus bg-popover px-2 py-0.5 text-[11px]", shown.length > 0 ? "hidden" : bottom ? "bottom-full mb-1" : "top-full mt-1")}>
+          <p data-testid="command-hint" className={cn("absolute inset-x-0 border-2 border-focus bg-popover px-2 py-0.5 text-[11px]", shown.length > 0 ? "hidden" : "bottom-full mb-1")}>
             {hint}
           </p>
         )}
@@ -235,9 +231,6 @@ export function CommandBar({ commands, fit, hint, belowTop = false }: { commands
               <kbd className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 border border-input px-1 text-[9px] uppercase text-muted-foreground">{t("/ or Ctrl+K")}</kbd>
             )}
           </label>
-          <button type="button" className="p-1 text-muted-foreground hover:text-foreground" aria-label={bottom ? t("Dock at the top") : t("Dock at the bottom")} title={bottom ? t("Dock at the top") : t("Dock at the bottom")} onClick={toggleDock}>
-            {bottom ? <PanelTop className="size-3.5" /> : <PanelBottom className="size-3.5" />}
-          </button>
           <button type="button" className="p-1 text-muted-foreground hover:text-foreground" aria-label={t("Collapse the command bar")} title={t("Collapse to a pill")} onClick={() => { setOpen(false); setCollapsed(true); }}>
             <ChevronsDownUp className="size-3.5" />
           </button>
