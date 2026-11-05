@@ -1058,6 +1058,8 @@ class WorkspaceState:
         """
         if not self._last_publish_error:
             return None
+        if self._last_publish_error == "empty":
+            return {"type": "status", "info": "empty notebook: add the first feature"}
         return {"type": "status", "error": self._last_publish_error[-300:]}
 
     # -- settling: the cells ran; publish what they made -----------------------
@@ -1176,6 +1178,12 @@ class WorkspaceState:
                 self._stopped = False
                 self._last_publish_error = ""
                 self.hub.broadcast({"type": "status", "info": "stopped"})
+                return
+            if not kernel.setup_errors and not any(str(cell.get("code", "")).strip() for cell in self.cells):
+                # A notebook with no cells yet (a new one) has no product, and that is where it starts, not a fault.
+                if self._last_publish_error != "empty":
+                    self._last_publish_error = "empty"
+                    self.hub.broadcast({"type": "status", "info": "empty notebook: add the first feature"})
                 return
             # A notebook mid-edit has no product yet; say so once, not per run.
             if message != self._last_publish_error:

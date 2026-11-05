@@ -102,8 +102,8 @@ through a chain of cells that each return it. *Why:* every cell that returns
 the assembly caches a full copy of it (fact 2).
 
 **C11. Make every edit step leave the names consistent.** A cell that reads a
-name nothing defines fails, and so do all cells after it. The `sca new`
-template has a params cell with `RADIUS` and `HEIGHT` and a `base` cell that
+name nothing defines fails, and so do all cells after it. The `sca new --kind sample`
+notebook has a params cell with `RADIUS` and `HEIGHT` and a `base` cell that
 reads them (the Part is implicit). Replacing the params cell
 with `sca cell put 1` while `base` still reads `RADIUS` fails with `NameError:
 name 'RADIUS' is not defined` until `base` is replaced too. Replace or delete

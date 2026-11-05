@@ -16,6 +16,7 @@ import { AssemblyPanel } from "@/components/AssemblyPanel";
 import { ConnectorGizmos, type Gizmo } from "@/components/ConnectorGizmos";
 import { WorkplanePatches } from "@/components/WorkplanePatches";
 import { TagSplits, parseTagSplits, type TagSplit } from "@/components/TagSplits";
+import { NewNotebookPrompt } from "@/components/NewNotebookPrompt";
 import { PartialNotice } from "@/components/PartialModel";
 import { describePartial, parsePartial, samePartial, type PartialModel } from "@/lib/partial";
 import { WorkplanePlacePanel, WorkplanePlacer, type PlaceBase, type PlaceMode } from "@/components/WorkplanePlacer";
@@ -102,6 +103,16 @@ export function App() {
     motion.go(target);
   };
   const [notebook, setNotebook] = useState<string | null>(null);
+  const notebookRef = useRef(notebook);
+  notebookRef.current = notebook;
+  // an operation or a drawing was started with no notebook open: ask for one first
+  const [needNotebook, setNeedNotebook] = useState(false);
+  /** True (and the person is asked to create a notebook) when none is open: every operation is written into one. */
+  const noNotebook = useCallback((): boolean => {
+    if (notebookRef.current) return false;
+    setNeedNotebook(true);
+    return true;
+  }, []);
   // The notebook the server says is open (workspace-relative): what the list
   // highlights.  It changes the moment another is asked for, not when its
   // kernel is up, and a late answer of the workspace list cannot undo it.
@@ -415,6 +426,7 @@ export function App() {
       } else if (typeof envelope["info"] === "string") {
         setStatus(envelope["info"]);
         log.push("info", envelope["info"]);
+        setLoading(null); // a notice ends a wait as well (an empty notebook has no model to wait for)
       } else if (typeof envelope["working"] === "string") {
         setStatus(envelope["working"]);
         log.push("run", envelope["working"]);
@@ -606,10 +618,11 @@ export function App() {
 
   const openDialog = useCallback(
     (request: DialogRequest) => {
+      if (noNotebook()) return;
       if (modeBeforeDialog.current === null) modeBeforeDialog.current = selectionMode;
       setDialog(request);
     },
-    [selectionMode],
+    [selectionMode, noNotebook],
   );
   const closeDialog = useCallback(() => {
     setDialog(null);
@@ -681,13 +694,13 @@ export function App() {
   const activeWorkplaneRef = useRef(activeWorkplane);
   activeWorkplaneRef.current = activeWorkplane;
   const startSketch = useCallback(() => {
-    if (sketchingRef.current) return;
+    if (sketchingRef.current || noNotebook()) return;
     const active = workplanesRef.current.find((wp) => wp.name === activeWorkplaneRef.current);
     if (active) {
       const plane = workplanePlane(active); // the active workplane: the sketch cell writes plane=<it>
       beginSketch({ mode: "new", name: "", plane, doc: emptyDoc(plane) });
     } else beginSketch({ mode: "new", name: "", plane: null, doc: emptyDoc() });
-  }, [beginSketch]);
+  }, [beginSketch, noNotebook]);
   const endSketch = useCallback(() => {
     setSketchSession(null);
     setSketchNotice(null);
@@ -799,11 +812,11 @@ export function App() {
     [gui.state?.features, curves],
   );
   const startDrawing = useCallback(() => {
-    if (sketchingRef.current || placingRef.current) return;
+    if (sketchingRef.current || placingRef.current || noNotebook()) return;
     const active = activeWorkplaneRef.current;
     setPicked([]);
     setDrawing({ plane: active && workplanesRef.current.some((wp) => wp.name === active) ? active : "XY", error: null });
-  }, []);
+  }, [noNotebook]);
   const commitCurve = useCallback(
     async (doc: CurveDoc, name: string) => {
       setGuiBusy(true);
@@ -850,6 +863,7 @@ export function App() {
   /** Start placing: on the picked flat face, else on the active workplane (one after another builds a 3D frame of
    * planes), else on XY. */
   const startPlacing = useCallback(() => {
+    if (noNotebook()) return;
     const items = selectionRef.current;
     const face = items.length === 1 && items[0].kind === "face" ? items[0] : null;
     const frame = face ? faceFrame(face.properties) : null;
@@ -863,10 +877,11 @@ export function App() {
     const base = face ? "face" : activeWorkplaneRef.current && workplanesRef.current.some((wp) => wp.name === activeWorkplaneRef.current) ? activeWorkplaneRef.current : "XY";
     setBarNote(null);
     setPlacing({ kind: "workplane", base, values: ZERO_PLACE, mode: "translate", name, face: face && frame ? { item: face, frame } : null, error: null });
-  }, [gui.state?.taken]);
+  }, [gui.state?.taken, noNotebook]);
 
   /** Start placing a connector of the part on the picked flat face: its frame there, moved and turned with the handles. */
   const startConnector = useCallback(() => {
+    if (noNotebook()) return;
     const items = selectionRef.current;
     const face = items.length === 1 && items[0].kind === "face" ? items[0] : null;
     const frame = face ? connectorFrameFromFace(face) : null;
@@ -1146,11 +1161,12 @@ export function App() {
   /** A command from the assembly panel: rejects with the server's message (shown in the panel). */
   const runPanelCommand = useCallback(
     async (command: FeatureCommand) => {
+      if (noNotebook()) throw new Error("No notebook is open: create one first.");
       const result = await gui.run(command);
       log.push("ok", command.op === "set_connectors" ? "connectors set" : `${command.op} ${result.name}`);
       if (isCellCommand(command)) assertCellRan(result);
     },
-    [gui.run, log.push],
+    [gui.run, log.push, noNotebook],
   );
 
   /** The frames the viewport draws: the selected component's connectors (all components' while a picker is armed),
@@ -1412,6 +1428,7 @@ export function App() {
                   onHover={setHoverSketch}
                 />
                 {viewRef.current && workplanes.length > 0 && <WorkplanePatches view={viewRef.current} workplanes={workplanes} active={activeWorkplane} />}
+                {needNotebook && <NewNotebookPrompt onCreate={(name) => handleCreate(name, "part")} onClose={() => setNeedNotebook(false)} />}
                 {!sketching && !placing && !drawing && viewRef.current && <TagSplits view={viewRef.current} splits={tagSplits} sceneVersion={sceneVersion} />}
                 {partial && !sketching && <PartialNotice partial={partial} titles={cellTitles} />}
                 {viewRef.current && curves.length > 0 && <CurveLines view={viewRef.current} curves={curves} />}

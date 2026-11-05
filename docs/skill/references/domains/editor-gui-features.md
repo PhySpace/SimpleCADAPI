@@ -40,7 +40,7 @@ HOLE_DIAMETER = scad.var(name="hole_diameter", default=6.0, unit="mm", comment="
   `scad.ref.<faces|edges>(...)` call so the form still reads it. An older cell with a tag-or-geometry recipe block
   (`_x_by_tag`, `_x_by_geometry`) still runs and its form keeps the block; a pick the kernel cannot name (a body
   without recorded history, `sca feature add` with geometry only) is still written that way.
-- A blank notebook (`sca new NAME --kind blank`) has no cells and a `kind = "part"` header: no product cell is written,
+- A new part notebook (`sca new NAME`, or the editor's "new") has no cells and a `kind = "part"` header: no product cell is written,
   the runtime makes the Part from the open bodies (see `docs/guides/notebook-runtime.md`; a solid made with "New body"
   is one more body of the same Part, not an assembly), so every new feature previews
   and a deleted cell cannot leave the notebook without a product. Setting connectors (or "use as product" on a body

@@ -71,7 +71,7 @@ sca cell insert --after 3 -f new.py  # add a cell (--after start|end|CELL, --nam
 sca cell rm 4
 sca cell run [CELL ...]              # run cells (default all) and what they feed
 sca cell open other.py               # have the editor open another notebook (waits for its kernel)
-sca new bracket --kind part          # a new notebook; the open editor lists it, the person's view stays
+sca new bracket --kind part          # a new, empty notebook; the open editor lists it, the person's view stays
 ```
 
 - A cell is named by its number in `sca cell ls`, its `key`, its function name, or its id.

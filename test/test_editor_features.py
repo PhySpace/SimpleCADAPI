@@ -221,7 +221,7 @@ def test_the_commands_add_edit_undo_and_redo_against_the_real_editor(tmp_path):
     from simplecadapi.editor.server import WorkspaceState, create_app
     from simplecadapi.editor.templates import create_notebook
 
-    path = create_notebook(tmp_path, "bracket", "part")
+    path = create_notebook(tmp_path, "bracket", "sample")
     state = WorkspaceState(tmp_path)
     state.port = 17732
     server = uvicorn.Server(uvicorn.Config(create_app(state), port=state.port, log_level="error"))
