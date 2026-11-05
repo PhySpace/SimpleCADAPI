@@ -290,6 +290,22 @@ export function App() {
       setPicked([]);
       setDialog(null);
       setSketchSession(null);
+      // what the server sends of a model (and replays to a new page) is the open notebook's: none of it carries over
+      setWorkplanes([]);
+      setTagSplits([]);
+      setCurves([]);
+      partialRef.current = null;
+      setPartial(null);
+      setPlacing(null);
+      setDrawing(null);
+      setActiveWorkplane(null);
+      setGuiError(null);
+      setSketchNotice(null);
+      setHiddenSketches(new Set());
+      setPickedSketches([]);
+      setHoverSketch(null);
+      setPushArrow(null);
+      setBarNote(null);
       refreshFeatures();
       setNotebook(String(envelope["notebook"] ?? ""));
       setCurrentPath((envelope["path"] as string) ?? null);
