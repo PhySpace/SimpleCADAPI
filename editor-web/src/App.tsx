@@ -264,12 +264,20 @@ export function App() {
       partCache.current = preview.parts; // the parts on screen: the next frame may leave them out
       view.loadPreview(preview);
       setStatus(previewSummary(preview.nodes));
-      if (framedNotebook.current !== name) {
+      // the first model of a notebook is framed (a notebook with no solid yet has nothing to frame)
+      if (framedNotebook.current !== name && preview.nodes.length > 0) {
         view.frame();
         framedNotebook.current = name;
       }
       setSceneVersion((version) => version + 1);
-      log.push("ok", preview.nodes.length === 1 ? t("model shown: 1 part") : t("model shown: {{count}} parts", { count: preview.nodes.length }));
+      log.push(
+        "ok",
+        preview.nodes.length === 0
+          ? t("no solid yet")
+          : preview.nodes.length === 1
+            ? t("model shown: 1 part")
+            : t("model shown: {{count}} parts", { count: preview.nodes.length }),
+      );
     } catch (error) {
       log.push("error", error instanceof Error ? error.message : t("unable to open the preview"));
     }

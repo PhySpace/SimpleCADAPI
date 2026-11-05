@@ -33,7 +33,7 @@ from ._marimo import safe_get_context
 from .cells import NotebookCells
 from .config import NotebookConfig, read_notebook_config
 from .executor import finish_kernel_cache
-from .projection import Product, ProductNotFoundError, find_product, open_bodies, product_reads, project_product
+from .projection import NoProductYetError, Product, ProductNotFoundError, find_product, open_bodies, product_reads, project_product
 from .workspace import features_in_cell
 
 PACKAGE_MEDIA_TYPE = "application/vnd.simplecad.scadpkg"
@@ -265,15 +265,19 @@ def _live_scene() -> PreviewScene:
     global _last_preview, _last_partial
     started = time.perf_counter()
     scope = live_scope()
-    product, partial = preview_product(
-        scope.config,
-        scope.cells,
-        scope.values,
-        failed=scope.failed,
-        skipped=scope.skipped,
-        lost_reads=scope.lost_reads,
-    )
-    scene = compile_preview(product)
+    try:
+        product, partial = preview_product(
+            scope.config,
+            scope.cells,
+            scope.values,
+            failed=scope.failed,
+            skipped=scope.skipped,
+            lost_reads=scope.lost_reads,
+        )
+    except NoProductYetError:
+        # no solid yet (only sketches, curves, workplanes): the model is empty, which is no fault
+        product, partial = None, None
+    scene = compile_preview(product) if product is not None else PreviewScene(parts={}, nodes=[], solids={}, definitions={})
     last_timings["compile_ms"] = round((time.perf_counter() - started) * 1000, 1)
     _last_preview, _last_partial = scene, partial
     return scene

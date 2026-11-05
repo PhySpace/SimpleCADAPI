@@ -91,6 +91,11 @@ if __name__ == "__main__":
   Write a `make_part_rpart` cell only to add connectors or a material, or to
   choose and name the bodies yourself; it then wins. The headless run and the
   editor use the same rule (`runtime/projection.py`, `find_product`).
+  A notebook with no Part, Assembly or solid yet (a new one, or only sketches,
+  curves and workplanes so far) raises `NoProductYetError` (a
+  `ProductNotFoundError`) where a product is needed (export, a headless run
+  with `product=True`); the editor previews it as an empty model, not an error.
+  A Part or Assembly with another id is still a `ProductNotFoundError`.
 - **The product** is the top-level variable whose id (`Part.part_id` or
   `Assembly.assembly_id`) equals the notebook id. An assembly built up over
   several cells (components, then constraints, then the solve) carries the

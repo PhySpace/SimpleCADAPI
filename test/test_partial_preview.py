@@ -18,7 +18,7 @@ import pytest
 import simplecadapi as scad
 from simplecadapi.runtime.config import read_notebook_config
 from simplecadapi.runtime.live import FailedCell, preview_product
-from simplecadapi.runtime.projection import ProductNotFoundError
+from simplecadapi.runtime.projection import NoProductYetError, ProductNotFoundError
 
 NOTEBOOK = '''# /// script
 # [tool.simplecadapi]
@@ -104,6 +104,20 @@ def test_the_body_the_failing_feature_was_applied_to_is_previewed_and_flagged(tm
     # nothing before the failing step makes a model: an error that names the step
     with pytest.raises(ProductNotFoundError, match="rounded failed"):
         preview_product(config, [_cell({"SIZE"})], {"SIZE": 40.0}, failed=[ROUNDED])
+
+
+def test_a_notebook_with_no_solid_yet_has_no_product_and_that_is_no_fault(tmp_path):
+    path = tmp_path / "plate.py"
+    path.write_text(NOTEBOOK)
+    config = read_notebook_config(path)
+    # only numbers so far (a sketch or a curve is no solid either): no product, said apart from a wrong one
+    with pytest.raises(NoProductYetError, match="no Part, Assembly or solid yet"):
+        preview_product(config, [_cell({"SIZE"})], {"SIZE": 40.0})
+    with scad.GraphSession(graph_id="partial-other"):
+        other = scad.Part(part_id="other", body=scad.make_box_rsolid(1.0, 1.0, 1.0))
+    with pytest.raises(ProductNotFoundError, match="other") as raised:
+        preview_product(config, [_cell({"other"})], {"other": other})
+    assert not isinstance(raised.value, NoProductYetError)
 
 
 def test_an_explicit_product_no_failed_cell_builds_on_is_whole(tmp_path):

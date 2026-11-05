@@ -54,6 +54,11 @@ class ProductNotFoundError(ValueError):
     """No top-level value, or more than one, is the notebook's product."""
 
 
+class NoProductYetError(ProductNotFoundError):
+    """The notebook makes no Part, no Assembly and no solid yet (a new notebook, or one with only sketches, curves and
+    workplanes so far).  There is no product to export, but nothing is wrong: a preview of it is empty."""
+
+
 def _product_id(value: Product) -> str:
     return value.part_id if isinstance(value, Part) else value.assembly_id
 
@@ -127,10 +132,11 @@ def find_product(
         implicit = _implicit_part(config, values, read)
         if implicit is not None:
             return implicit
-    found = ", ".join(sorted(others)) if others else "none"
+    if not others:
+        raise NoProductYetError(f"{config.path.name}: no Part, Assembly or solid yet")
     raise ProductNotFoundError(
         f"{config.path.name}: no top-level Part or Assembly has the notebook "
-        f"id {config.id!r}; Parts and Assemblies found: {found}"
+        f"id {config.id!r}; Parts and Assemblies found: {', '.join(sorted(others))}"
     )
 
 
@@ -266,4 +272,4 @@ def project_product(
         ).value
 
 
-__all__ = ["Product", "ProductNotFoundError", "find_product", "project_product"]
+__all__ = ["NoProductYetError", "Product", "ProductNotFoundError", "find_product", "project_product"]

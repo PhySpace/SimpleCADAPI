@@ -1012,15 +1012,6 @@ class PublishErrorReportingTest(unittest.TestCase):
         self.fail_kernel(state)
         return state, sent
 
-    def test_an_empty_notebook_is_where_it_starts_not_an_error(self) -> None:
-        state, sent = self.state()
-        state.cells = []  # a new notebook: no cells, so no product
-        state.settle()
-        state.settle()
-        self.assertEqual(self.told(sent), 0)
-        self.assertEqual([m["info"] for m in sent if m.get("info")], ["empty notebook: add the first feature"])
-        self.assertEqual(state.settled_error(), {"type": "status", "info": "empty notebook: add the first feature"})
-
     def fail_kernel(self, state: WorkspaceState) -> None:
         state_error = self.ERROR
         state.kernel = type(  # type: ignore[assignment]
