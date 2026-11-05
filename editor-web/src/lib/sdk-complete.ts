@@ -34,7 +34,7 @@ interface SdkIndex {
 let index: SdkIndex | null = null;
 let loading: Promise<SdkIndex | null> | null = null;
 const load = (): Promise<SdkIndex | null> =>
-  (loading ??= fetch("/api/sdk")
+  (loading ??= fetch("/api/sdk", { cache: "no-cache" })
     .then((response) => (response.ok ? (response.json() as Promise<SdkIndex>) : null))
     .then((data) => (index = data))
     .catch(() => null));

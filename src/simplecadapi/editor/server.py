@@ -2095,7 +2095,7 @@ def create_app(state: WorkspaceState) -> Starlette:
         """The operations a person can add with a button, as typed forms (see features.py)."""
         from .features import catalog
 
-        return JSONResponse(catalog(), headers={"Cache-Control": "max-age=3600"})
+        return _revalidated(request, catalog())
 
     async def features_state(request: Request) -> JSONResponse:
         """The features of the open notebook, its bodies, the product, and the defaults a form opens with."""
@@ -2189,7 +2189,7 @@ def create_app(state: WorkspaceState) -> Starlette:
         """The SDK's public API (names and parameters), for the cell editor's completion."""
         from .apiindex import build_index
 
-        return JSONResponse(build_index(), headers={"Cache-Control": "max-age=3600"})
+        return _revalidated(request, build_index())
 
     async def workspace_list(request: Request) -> JSONResponse:
         """The SimpleCAD notebooks of the workspace."""
@@ -2396,6 +2396,17 @@ def create_app(state: WorkspaceState) -> Starlette:
     if DIST_DIR.is_dir():
         app.mount("/", _WebUI(directory=DIST_DIR, html=True), name="webui")
     return app
+
+
+def _revalidated(request: Request, payload: Any) -> Response:
+    """A large JSON answer the page may keep, but must check: it is fetched again (or a 304 is answered) on every load,
+    so an editor updated in place never serves a page its old catalog (an ``max-age`` kept a changed default for an hour)."""
+    body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    tag = '"' + hashlib.sha256(body).hexdigest()[:20] + '"'
+    headers = {"Cache-Control": "no-cache", "ETag": tag}
+    if request.headers.get("if-none-match") == tag:
+        return Response(status_code=304, headers=headers)
+    return Response(body, media_type="application/json", headers=headers)
 
 
 class _WebUI(StaticFiles):

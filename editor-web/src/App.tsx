@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CellEditor, type NotebookCell, type NotebookFeature, type ParamMeta } from "@/components/CellEditor";
+import type { ParamValue } from "@/components/ParamControl";
 import { Dock } from "@/components/Dock";
 import { FeatureDialog, type DialogRequest } from "@/components/FeatureDialog";
 import { SelectionBar } from "@/components/SelectionBar";
@@ -9,7 +10,7 @@ import { SketchScene } from "@/components/SketchScene";
 import { CommandBar } from "@/components/CommandBar";
 import { FEATURE_ICONS } from "@/components/feature-icons";
 import { FeatureTree, type TreeSketches } from "@/components/FeatureTree";
-import { assemblyCommands, commandsFromSpecs, fitScore, selectionContext, selectionHint, visibleCommands, whenFor, type Command } from "@/lib/commands";
+import { assemblyCommands, commandsFromSpecs, fitScore, plainLabel, selectionContext, selectionHint, visibleCommands, whenFor, type Command } from "@/lib/commands";
 import { type EditorMode } from "@/components/ModeSwitch";
 import { sideStyle, useModeTransition } from "@/lib/useModeTransition";
 import { AssemblyPanel } from "@/components/AssemblyPanel";
@@ -18,6 +19,9 @@ import { WorkplanePatches } from "@/components/WorkplanePatches";
 import { TagSplits, parseTagSplits, type TagSplit } from "@/components/TagSplits";
 import { NewNotebookPrompt } from "@/components/NewNotebookPrompt";
 import { FloatingPanels } from "@/components/FloatingPanels";
+import { OperationPanel } from "@/components/OperationPanel";
+import { featureParams, quickStart } from "@/lib/operation-session";
+import { createSettler, SETTLE_MS } from "@/lib/settle";
 import { PartialNotice } from "@/components/PartialModel";
 import { describePartial, parsePartial, samePartial, type PartialModel } from "@/lib/partial";
 import { WorkplanePlacePanel, WorkplanePlacer, type PlaceBase, type PlaceMode } from "@/components/WorkplanePlacer";
@@ -49,7 +53,7 @@ import { describeSketch, nextSketchSelection, readHidden, sketchCentre, sketchIn
 import { useSketchShapes } from "@/lib/useSketchShapes";
 import type { Vec3 } from "@/lib/sketch-plane";
 import { PALETTES } from "@/scene/theme";
-import { assertCellRan, isCellCommand, pickedPayload, type FeatureCommand, type FeatureRow, type Spec } from "@/lib/features";
+import { assertCellRan, cellFailure, isCellCommand, pickedPayload, type FeatureCommand, type FeatureRow, type Spec } from "@/lib/features";
 import { useRunLog } from "@/lib/runlog";
 import { useTheme } from "@/lib/theme";
 import { selectionPayload, variableNames, type SelectionItem } from "@/lib/selection";
@@ -619,13 +623,90 @@ export function App() {
 
   // -- GUI features ------------------------------------------------------------------------------
 
+  // -- an operation in progress (lib/operation-session.ts): added at once, its numbers tuned live by the selection ----------
+
+  type OpSession = { slug: string; cell: string | null; title: string; specId: string; anchorMm: Vec3 | null; editing: boolean; busy: boolean; error: string | null };
+  const [session, setSession] = useState<OpSession | null>(null);
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  const anchorRef = useRef<Vec3 | null>(null);
+  const paramsRef = useRef<ParamMeta[]>([]);
+  const sessionSettler = useRef(createSettler<ParamValue>(SETTLE_MS, (values) => socketRef.current?.send({ type: "param.set", values })));
+  const sessionParams = useMemo(() => (session ? featureParams(params, session.slug) : []), [params, session]);
+  /** The numbers changed in the session (the server's `modified` may not have come back yet when Enter is pressed). */
+  const sessionTouched = useRef(new Set<string>());
+  /** The numbers of the session the notebook source does not have yet. */
+  const touchedParams = () =>
+    sessionRef.current
+      ? featureParams(paramsRef.current, sessionRef.current.slug)
+          .filter((param) => param.modified || sessionTouched.current.has(param.id))
+          .map((param) => param.id)
+      : [];
+  /** Keep: the tuned numbers are written into the notebook. */
+  const confirmSession = useCallback(() => {
+    const current = sessionRef.current;
+    if (!current || current.busy) return;
+    sessionSettler.current.flush();
+    const names = touchedParams();
+    if (names.length) socketRef.current?.send({ type: "param.commit", names });
+    sessionTouched.current.clear();
+    setSession(null);
+    log.push("ok", t("kept {{name}}", { name: current.slug }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [log.push]);
+  /** Take back: a new feature is undone, an edited one gets its numbers back. */
+  const cancelSession = useCallback(() => {
+    const current = sessionRef.current;
+    if (!current || current.busy) return;
+    const names = touchedParams();
+    sessionSettler.current.flush();
+    if (names.length) socketRef.current?.send({ type: "param.revert", names });
+    sessionTouched.current.clear();
+    setSession(null);
+    if (!current.editing) void gui.run({ op: "undo" }).then(() => log.push("info", t("took back {{name}}", { name: current.slug }))).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gui.run, log.push]);
+  /** Start `spec` on the selection with its defaults when that is all it needs (else false: the dialog opens). */
+  const tryQuick = useCallback(
+    (request: DialogRequest): boolean => {
+      if (request.edit) return false;
+      const start = quickStart(request.spec, gui.state, selectionRef.current, request.prefill);
+      if (!start) return false;
+      const title = t(plainLabel(request.spec.id, request.spec.label));
+      setSession({ slug: start.name, cell: null, title, specId: request.spec.id, anchorMm: anchorRef.current, editing: false, busy: true, error: null });
+      setDialog(null);
+      gui
+        .run(start.command)
+        .then((result) => {
+          log.push("ok", `add ${result.name}`);
+          const failure = cellFailure(result);
+          setSession((current) => (current ? { ...current, slug: result.name, cell: result.cell?.id ?? null, busy: false, error: failure } : current));
+          setPicked([]); // what was picked is the feature's now; the panel stays where it was
+        })
+        .catch((error) => {
+          setSession(null);
+          setGuiError(error instanceof Error ? error.message : String(error));
+        });
+      return true;
+    },
+    [gui.state, gui.run, log.push],
+  );
+  /** Tune the numbers of a feature of the tree in place (Esc gives them back). */
+  const editInPlace = useCallback((feature: FeatureRow, spec: Spec): boolean => {
+    if (!featureParams(paramsRef.current, feature.slug).length) return false;
+    setSession({ slug: feature.slug, cell: feature.cell, title: t(plainLabel(spec.id, spec.label)), specId: spec.id, anchorMm: anchorRef.current, editing: true, busy: false, error: null });
+    return true;
+  }, []);
+
   const openDialog = useCallback(
     (request: DialogRequest) => {
       if (noNotebook()) return;
+      if (sessionRef.current) confirmSession(); // another operation: the one in progress is kept first
+      if (tryQuick(request)) return;
       if (modeBeforeDialog.current === null) modeBeforeDialog.current = selectionMode;
       setDialog(request);
     },
-    [selectionMode, noNotebook],
+    [selectionMode, noNotebook, confirmSession, tryQuick],
   );
   const closeDialog = useCallback(() => {
     setDialog(null);
@@ -1152,7 +1233,7 @@ export function App() {
   }, [selection]);
   const fit = useMemo(() => fitScore(context), [context]);
   const hint = useMemo(() => selectionHint(context, commands), [context, commands]);
-  const anchorMm = useMemo(() => {
+  const anchorMm: Vec3 | null = useMemo(() => {
     const view = viewRef.current;
     if (!view) return null;
     const first = sketchList.find((info) => info.name === pickedSketches[0]);
@@ -1160,6 +1241,8 @@ export function App() {
     return selectionAnchorMm(view, selection, sketchAt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection, pickedSketches, sketchList, sketchShapes, sceneVersion]);
+  anchorRef.current = anchorMm;
+  paramsRef.current = params;
 
   /** A command from the assembly panel: rejects with the server's message (shown in the panel). */
   const runPanelCommand = useCallback(
@@ -1210,7 +1293,8 @@ export function App() {
       return;
     }
     if (!isSketchSpec(spec)) {
-      openDialog({ spec, edit: feature });
+      if (sessionRef.current) confirmSession();
+      if (!editInPlace(feature, spec)) openDialog({ spec, edit: feature });
       return;
     }
     const doc = normalizeDoc(feature.gui?.values?.sketch);
@@ -1502,7 +1586,32 @@ export function App() {
                     <CommandBar commands={commands} fit={fit} hint={hint} belowTop={floating && !taskOpen} />
                   </div>
                 )}
-                {mode === "manual" && !sketching && !dialog && !placing && !drawing && leftTab !== "assembly" && loading === null && viewRef.current && (
+                {session && viewRef.current && (
+                  <OperationPanel
+                    view={viewRef.current}
+                    anchorMm={session.anchorMm}
+                    title={session.editing ? `${session.title} · ${session.slug}` : session.title}
+                    params={sessionParams}
+                    error={session.error ?? (session.cell ? (partial?.failed.find((cell) => cell.cell === session.cell)?.error ?? null) : null)}
+                    busy={session.busy}
+                    editing={session.editing}
+                    onParam={(id, value, now) => {
+                      sessionTouched.current.add(id);
+                      sessionSettler.current.push(id, value);
+                      if (now) sessionSettler.current.flush();
+                    }}
+                    onConfirm={confirmSession}
+                    onCancel={cancelSession}
+                    onMore={() => {
+                      const current = sessionRef.current;
+                      const row = current?.cell ? gui.state.features.find((feature) => feature.cell === current.cell) : undefined;
+                      const spec = current ? gui.catalog?.specs.find((item) => item.id === current.specId) : undefined;
+                      confirmSession();
+                      if (row && spec) setDialog({ spec, edit: row });
+                    }}
+                  />
+                )}
+                {mode === "manual" && !session && !sketching && !dialog && !placing && !drawing && leftTab !== "assembly" && loading === null && viewRef.current && (
                   <SelectionBar view={viewRef.current} commands={commands} context={context} anchorMm={anchorMm} icons={FEATURE_ICONS} notice={barNote} disabled={barDisabled} />
                 )}
                 {floating && (
@@ -1562,6 +1671,7 @@ export function App() {
         batch={log.batch}
         status={status}
         unseenErrors={log.unseenErrors}
+        quiet={!!session}
         onClear={log.clear}
         onSeen={log.markSeen}
       />

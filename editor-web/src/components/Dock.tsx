@@ -23,6 +23,7 @@ export function Dock({
   batch,
   status,
   unseenErrors,
+  quiet = false,
   onClear,
   onSeen,
 }: {
@@ -30,6 +31,8 @@ export function Dock({
   batch: RunBatch | null;
   status: string;
   unseenErrors: number;
+  /** An error does not open the dock now: it is shown where the person is looking (an operation's panel). */
+  quiet?: boolean;
   onClear: () => void;
   onSeen: () => void;
 }) {
@@ -40,7 +43,8 @@ export function Dock({
 
   // An error opens the log; the person closes it again.
   useEffect(() => {
-    if (unseenErrors > 0) setOpen(true);
+    if (unseenErrors > 0 && !quiet) setOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unseenErrors]);
 
   useEffect(() => {

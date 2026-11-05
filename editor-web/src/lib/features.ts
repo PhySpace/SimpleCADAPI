@@ -105,7 +105,7 @@ export type CommandResult = { ok: true; name: string; cell: { id: string; status
 // -- REST -----------------------------------------------------------------------------------------------------------
 
 export async function fetchSpecs(): Promise<Catalog> {
-  const response = await fetch("/api/features/specs");
+  const response = await fetch("/api/features/specs", { cache: "no-cache" }); // revalidated: an updated editor must not serve the old catalog
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
   return (await response.json()) as Catalog;
 }
