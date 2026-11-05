@@ -77,7 +77,7 @@ export function ActionBar({
       className={cn("pointer-events-auto absolute z-20 flex max-w-[92%] flex-col gap-1", className)}
       style={{ left: at.x, top: at.y }}
     >
-      <div className="flex flex-wrap items-center gap-1 border-2 border-primary bg-popover p-1 shadow-[4px_4px_0_var(--shadow-hard)]">
+      <div className="scroll-row items-center gap-1 border-2 border-primary bg-popover p-1 shadow-[4px_4px_0_var(--shadow-hard)]">
         {title && <span className="px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{title}</span>}
         {actions.map((action) => {
           const Icon = action.icon;

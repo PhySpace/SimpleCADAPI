@@ -478,7 +478,7 @@ function SketchEditorView({
       <SketchDrawer editor={editor} plane={planeLabel(plane)} wide={wide} />
       {/* The bar and its notes take the pointer; the space between them (beside the hint) is the canvas. */}
       <div className="pointer-events-none absolute left-1/2 top-2 z-30 flex -translate-x-1/2 flex-col items-stretch gap-1">
-        <div className="pointer-events-auto flex flex-wrap items-center gap-2 border-2 border-primary bg-popover px-2 py-1 shadow-[4px_4px_0_var(--shadow-hard)]">
+        <div className="pointer-events-auto scroll-row max-w-[calc(100vw-2rem)] items-center gap-2 border-2 border-primary bg-popover px-2 py-1 shadow-[4px_4px_0_var(--shadow-hard)]">
           <Pencil className="size-3.5 shrink-0" />
           <Input
             aria-label="Sketch name"

@@ -9,7 +9,7 @@ export function Inspector({ selection, sketches = [] }: { selection: SelectionIt
   const count = selection.length + sketches.length;
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-9 shrink-0 items-center justify-between border-b-2 border-border px-3">
+      <div className="flex h-9 shrink-0 items-center justify-between border-b-2 border-border pl-3 pr-10">
         <span className="label text-foreground">selection</span>
         {count > 0 && <span className="label">{count}</span>}
       </div>

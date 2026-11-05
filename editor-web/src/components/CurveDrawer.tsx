@@ -366,7 +366,7 @@ export function CurveDrawer({
         </div>
       )}
       <div className="pointer-events-auto absolute left-3 top-3 z-30 flex max-w-[min(460px,90%)] flex-col gap-2 border-2 border-primary bg-popover px-3 py-2 text-[11px] shadow-[4px_4px_0_var(--shadow-hard)]" data-testid="curve-drawer">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="scroll-row items-center gap-2">
           <span className="font-semibold">3D curve</span>
           <input id="curve-name" aria-label="name" className="w-20 border border-input bg-background px-1 font-mono" value={name} onChange={(event) => setName(event.target.value)} />
           <span className="flex border border-input">

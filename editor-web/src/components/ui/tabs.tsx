@@ -10,7 +10,7 @@ function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive
 function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.List>) {
   return (
     <TabsPrimitive.List
-      className={cn("flex h-9 shrink-0 items-stretch overflow-x-auto overflow-y-hidden border-b-2 border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
+      className={cn("scroll-row h-9 shrink-0 items-stretch border-b-2 border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
       {...props}
     />
   );

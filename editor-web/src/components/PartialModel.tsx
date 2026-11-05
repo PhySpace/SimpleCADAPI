@@ -6,13 +6,14 @@ import { describePartial, type PartialModel } from "@/lib/partial";
 /** Says that the model in the viewport is the one before a failing step (a cell failed, so the product was not made): which
  * step failed and why, and that the steps after it did not run.  It stays while the model is partial and goes when the
  * whole model replaces it; the failing step is marked in the feature tree as well. */
-export function PartialNotice({ partial, titles }: { partial: PartialModel; titles: ReadonlyMap<string, string> }) {
+/** `docked`: laid out in a column of floating cards (manual mode) instead of pinned to the viewport's top right corner. */
+export function PartialNotice({ partial, titles, docked = false }: { partial: PartialModel; titles: ReadonlyMap<string, string>; docked?: boolean }) {
   const { title, reason, after } = useMemo(() => describePartial(partial, titles), [partial, titles]);
   const full = partial.failed.map((cell) => cell.error).filter(Boolean).join("\n");
   return (
     <div
       role="status"
-      className="pointer-events-auto absolute right-3 top-3 z-20 flex max-w-[min(380px,60%)] flex-col gap-0.5 border-2 border-fail bg-popover px-3 py-1.5 text-[11px] shadow-[4px_4px_0_var(--shadow-hard)]"
+      className={`pointer-events-auto ${docked ? "relative" : "absolute right-3 top-3 z-20 max-w-[min(380px,60%)]"} flex flex-col gap-0.5 border-2 border-fail bg-popover px-3 py-1.5 text-[11px] shadow-[4px_4px_0_var(--shadow-hard)]`}
       data-testid="partial-model"
       title={full || undefined}
     >

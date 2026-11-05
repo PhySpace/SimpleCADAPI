@@ -17,6 +17,7 @@ import { ConnectorGizmos, type Gizmo } from "@/components/ConnectorGizmos";
 import { WorkplanePatches } from "@/components/WorkplanePatches";
 import { TagSplits, parseTagSplits, type TagSplit } from "@/components/TagSplits";
 import { NewNotebookPrompt } from "@/components/NewNotebookPrompt";
+import { FloatingPanels } from "@/components/FloatingPanels";
 import { PartialNotice } from "@/components/PartialModel";
 import { describePartial, parsePartial, samePartial, type PartialModel } from "@/lib/partial";
 import { WorkplanePlacePanel, WorkplanePlacer, type PlaceBase, type PlaceMode } from "@/components/WorkplanePlacer";
@@ -1258,36 +1259,13 @@ export function App() {
     setLeftTab(mode === "manual" ? "features" : "notebook");
   };
 
-  return (
-    <div className="flex h-screen flex-col overflow-hidden">
-      <div inert={sketching} className={cn(sketching && "opacity-50")}>
-      <Header
-        notebook={notebook}
-        kind={kind}
-        kernelAlive={kernelAlive}
-        status={status}
-        themePreference={theme.preference}
-        onTheme={theme.cycle}
-        features={gui.state}
-        onUndo={undo}
-        onRedo={redo}
-        mode={modeTarget ?? mode}
-        onMode={changeMode}
-        modeLocked={sketching || motion.moving}
-        running={running}
-        onStop={handleStop}
-        onRunAll={() => {
-          setLoading("running all cells");
-          socketRef.current?.send({ type: "rerun.request" });
-        }}
-      />
-      </div>
-      <div className="relative flex min-h-0 flex-1 flex-col">
-        <ResizablePanelGroup className="min-h-0 flex-1">
-          <ResizablePanel defaultSize={23} minSize={16} className="min-w-0" style={{ overflow: "hidden" }}>
-            <div inert={sketching || motion.moving} className={cn("h-full", sketching && "opacity-40")} style={sideStyle(motion.phase, -1)}>
+  // The panels, the selection kinds and the inspector: beside the viewport in code mode, floating over it in manual
+  // mode (the viewport takes the whole window; see the floating layer below).
+  const floating = mode === "manual";
+  const taskOpen = sketching || !!placing || !!drawing;
+  const browserPanel = (
             <Tabs value={leftTab} onValueChange={setLeftTab} className="h-full min-w-0 overflow-hidden">
-              <TabsList>
+              <TabsList className={floating ? "pr-8" : undefined}>
                 {mode === "manual" ? (
                   <>
                     <TabsTrigger value="features">features</TabsTrigger>
@@ -1370,12 +1348,9 @@ export function App() {
                 </TabsContent>
               )}
             </Tabs>
-            </div>
-          </ResizablePanel>
-          <ResizableHandle />
-          <ResizablePanel defaultSize={55} minSize={30} className="min-w-0 overflow-hidden">
-            <div className="flex h-full flex-col">
-              <div inert={sketching} className={cn("flex h-9 shrink-0 items-center gap-1 border-b-2 border-border px-2", sketching && "opacity-40")}>
+  );
+  const modeChips = (
+    <>
                 {MODES.map(({ mode, label, key }) => (
                   <button
                     key={mode}
@@ -1393,8 +1368,8 @@ export function App() {
                     <span className="ml-1 opacity-50">{key}</span>
                   </button>
                 ))}
-                <span className="flex-1" />
-                <span className="label hidden xl:inline">ctrl+click: add</span>
+                {!floating && <span className="flex-1" />}
+                {!floating && <span className="label hidden xl:inline">ctrl+click: add</span>}
                 <button
                   type="button"
                   className="border-2 border-transparent px-2 py-px text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground hover:border-input hover:text-foreground"
@@ -1402,7 +1377,51 @@ export function App() {
                 >
                   fit
                 </button>
+    </>
+  );
+  const inspectorPanel = <Inspector selection={selection} sketches={inspectedSketches} />;
+
+  return (
+    <div className="flex h-screen flex-col overflow-hidden">
+      <div inert={sketching} className={cn(sketching && "opacity-50")}>
+      <Header
+        notebook={notebook}
+        kind={kind}
+        kernelAlive={kernelAlive}
+        status={status}
+        themePreference={theme.preference}
+        onTheme={theme.cycle}
+        features={gui.state}
+        onUndo={undo}
+        onRedo={redo}
+        mode={modeTarget ?? mode}
+        onMode={changeMode}
+        modeLocked={sketching || motion.moving}
+        running={running}
+        onStop={handleStop}
+        onRunAll={() => {
+          setLoading("running all cells");
+          socketRef.current?.send({ type: "rerun.request" });
+        }}
+      />
+      </div>
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <ResizablePanelGroup className="min-h-0 flex-1">
+          {!floating && (
+            <ResizablePanel id="browser" defaultSize={23} minSize={16} className="min-w-0" style={{ overflow: "hidden" }}>
+              <div inert={sketching || motion.moving} className={cn("h-full", sketching && "opacity-40")} style={sideStyle(motion.phase, -1)}>
+              {browserPanel}
               </div>
+            </ResizablePanel>
+          )}
+          {!floating && <ResizableHandle id="browser-handle" />}
+          <ResizablePanel id="viewport" defaultSize={55} minSize={30} className="min-w-0 overflow-hidden">
+            <div className="flex h-full flex-col">
+              {!floating && (
+                <div inert={sketching} className={cn("flex h-9 shrink-0 items-center gap-1 border-b-2 border-border px-2", sketching && "opacity-40")}>
+                  {modeChips}
+                </div>
+              )}
               <div className="relative min-h-0 flex-1 overflow-hidden">
                 <Viewport
                   viewRef={viewRef}
@@ -1429,8 +1448,8 @@ export function App() {
                 />
                 {viewRef.current && workplanes.length > 0 && <WorkplanePatches view={viewRef.current} workplanes={workplanes} active={activeWorkplane} />}
                 {needNotebook && <NewNotebookPrompt onCreate={(name) => handleCreate(name, "part")} onClose={() => setNeedNotebook(false)} />}
-                {!sketching && !placing && !drawing && viewRef.current && <TagSplits view={viewRef.current} splits={tagSplits} sceneVersion={sceneVersion} />}
-                {partial && !sketching && <PartialNotice partial={partial} titles={cellTitles} />}
+                {!floating && !sketching && !placing && !drawing && viewRef.current && <TagSplits view={viewRef.current} splits={tagSplits} sceneVersion={sceneVersion} />}
+                {!floating && partial && !sketching && <PartialNotice partial={partial} titles={cellTitles} />}
                 {viewRef.current && curves.length > 0 && <CurveLines view={viewRef.current} curves={curves} />}
                 {drawing && viewRef.current && (
                   <CurveDrawer
@@ -1478,11 +1497,23 @@ export function App() {
                 )}
                 {mode === "manual" && (
                   <div inert={sketching} className={cn(sketching && "opacity-40")}>
-                    <CommandBar commands={commands} fit={fit} hint={hint} />
+                    <CommandBar commands={commands} fit={fit} hint={hint} belowTop={floating && !taskOpen} />
                   </div>
                 )}
                 {mode === "manual" && !sketching && !dialog && !placing && !drawing && leftTab !== "assembly" && loading === null && viewRef.current && (
                   <SelectionBar view={viewRef.current} commands={commands} context={context} anchorMm={anchorMm} icons={FEATURE_ICONS} notice={barNote} disabled={barDisabled} />
+                )}
+                {floating && (
+                  <FloatingPanels
+                    browser={browserPanel}
+                    inspector={inspectorPanel}
+                    chips={modeChips}
+                    selectionCount={selection.length}
+                    task={taskOpen}
+                    locked={sketching || motion.moving}
+                    leftNotice={!taskOpen && viewRef.current ? <TagSplits docked view={viewRef.current} splits={tagSplits} sceneVersion={sceneVersion} /> : null}
+                    rightNotice={partial && !sketching ? <PartialNotice docked partial={partial} titles={cellTitles} /> : null}
+                  />
                 )}
                 {sketchSession && viewRef.current && (
                   <SketchMode
@@ -1503,12 +1534,14 @@ export function App() {
               </div>
             </div>
           </ResizablePanel>
-          <ResizableHandle />
-          <ResizablePanel defaultSize={22} minSize={14} className="min-w-0" style={{ overflow: "hidden" }}>
-            <div inert={sketching || motion.moving} className={cn("h-full", sketching && "opacity-40")} style={sideStyle(motion.phase, 1)}>
-              <Inspector selection={selection} sketches={inspectedSketches} />
-            </div>
-          </ResizablePanel>
+          {!floating && <ResizableHandle id="inspector-handle" />}
+          {!floating && (
+            <ResizablePanel id="inspector" defaultSize={22} minSize={14} className="min-w-0" style={{ overflow: "hidden" }}>
+              <div inert={sketching || motion.moving} className={cn("h-full", sketching && "opacity-40")} style={sideStyle(motion.phase, 1)}>
+                {inspectorPanel}
+              </div>
+            </ResizablePanel>
+          )}
         </ResizablePanelGroup>
         <FeatureDialog
           request={dialog}

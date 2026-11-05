@@ -27,7 +27,7 @@ function writeStore(key: string, value: string) {
 /** A floating command bar over the viewport: category chips, a search box, a short result list.
  * `/` or Ctrl/Cmd+K focuses the search; Up/Down move, Enter runs, Esc closes the list.
  * It collapses to a pill and docks at the bottom (default) or the top. */
-export function CommandBar({ commands, fit, hint }: { commands: Command[]; /** How much a command fits the selection (see fitScore): the fitting ones come first. */ fit?: (command: Command) => number; /** One line saying what the selection can do. */ hint?: string | null }) {
+export function CommandBar({ commands, fit, hint, belowTop = false }: { commands: Command[]; /** How much a command fits the selection (see fitScore): the fitting ones come first. */ fit?: (command: Command) => number; /** One line saying what the selection can do. */ hint?: string | null; /** Something floats at the top centre of the viewport (manual mode's selection kinds): docked at the top, the bar sits under it. */ belowTop?: boolean }) {
   const [dock, setDock] = useState<"top" | "bottom">(() => readStore<"top" | "bottom">(DOCK_KEY, "bottom", (raw) => (raw === "top" || raw === "bottom" ? raw : null)));
   const [collapsed, setCollapsed] = useState(false);
   const [recent, setRecent] = useState<string[]>(() => readStore<string[]>(RECENT_KEY, [], (raw) => (Array.isArray(JSON.parse(raw)) ? (JSON.parse(raw) as string[]) : null)));
@@ -127,7 +127,7 @@ export function CommandBar({ commands, fit, hint }: { commands: Command[]; /** H
     setDock(next);
     writeStore(DOCK_KEY, next);
   };
-  const place = bottom ? "bottom-3" : "top-3";
+  const place = bottom ? "bottom-3" : belowTop ? "top-14" : "top-3";
 
   if (collapsed) {
     return (
@@ -186,8 +186,8 @@ export function CommandBar({ commands, fit, hint }: { commands: Command[]; /** H
             {hint}
           </p>
         )}
-        <div className="flex flex-wrap items-center gap-1 border-2 border-primary bg-background p-1 shadow-[4px_4px_0_var(--shadow-hard)]">
-          <div className="flex flex-wrap items-center gap-0.5">
+        <div className="flex flex-col gap-1 border-2 border-primary bg-background p-1 shadow-[4px_4px_0_var(--shadow-hard)]">
+          <div className="scroll-row items-center gap-0.5">
             {groups.map((name) => (
               <button
                 key={name}

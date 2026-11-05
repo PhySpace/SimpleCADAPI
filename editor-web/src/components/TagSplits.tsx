@@ -26,7 +26,7 @@ export function parseTagSplits(value: unknown): TagSplit[] {
 /** Highlights the pieces of every split tag in the viewport, each piece its own colour, and says what was split, so the
  * person (or an agent reading the viewport image) can judge whether the split was meant.  Dismissed until the splits
  * change; the highlight can be turned off while the notice stays. */
-export function TagSplits({ view, splits, sceneVersion }: { view: SceneView; splits: TagSplit[]; sceneVersion: number }) {
+export function TagSplits({ view, splits, sceneVersion, docked = false }: { view: SceneView; splits: TagSplit[]; sceneVersion: number; docked?: boolean }) {
   const signature = useMemo(() => JSON.stringify(splits.map((row) => [row.tag, row.into, row.op])), [splits]);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [shown, setShown] = useState(true);
@@ -47,7 +47,7 @@ export function TagSplits({ view, splits, sceneVersion }: { view: SceneView; spl
 
   if (!open) return null;
   return (
-    <div className="pointer-events-auto absolute left-3 top-3 z-20 flex max-h-[min(50%,360px)] max-w-[min(420px,80%)] flex-col gap-1.5 border-2 border-[var(--focus)] bg-popover px-3 py-2 text-[11px] shadow-[4px_4px_0_var(--shadow-hard)]" data-testid="tag-splits">
+    <div className={`pointer-events-auto ${docked ? "relative min-h-0 max-h-[360px]" : "absolute left-3 top-3 z-20 max-h-[min(50%,360px)] max-w-[min(420px,80%)]"} flex flex-col gap-1.5 border-2 border-[var(--focus)] bg-popover px-3 py-2 text-[11px] shadow-[4px_4px_0_var(--shadow-hard)]`} data-testid="tag-splits">
       <div className="flex items-center gap-2 font-semibold">
         <Scissors className="size-3.5 text-[var(--focus)]" />
         <span>{splits.length === 1 ? "A tagged entity was split" : `${splits.length} tagged entities were split`}</span>

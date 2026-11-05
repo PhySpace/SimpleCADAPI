@@ -211,7 +211,7 @@ export function WorkplanePlacePanel({
   };
   return (
     <div className="pointer-events-auto absolute left-3 top-3 z-30 flex max-w-[min(440px,90%)] flex-col gap-2 border-2 border-primary bg-popover px-3 py-2 text-[11px] shadow-[4px_4px_0_var(--shadow-hard)]" data-testid={title === "Workplane" ? "workplane-placer" : `${title.toLowerCase()}-placer`}>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="scroll-row items-center gap-2">
         <span className="font-semibold">{title}</span>
         <input
           id="workplane-place-name"
@@ -237,7 +237,7 @@ export function WorkplanePlacePanel({
           </button>
         </span>
       </div>
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="scroll-row items-center gap-1.5">
         {fields.map((field) => (
           <label key={field.key} className="flex items-center gap-0.5">
             <span className="text-muted-foreground">{field.label}</span>
