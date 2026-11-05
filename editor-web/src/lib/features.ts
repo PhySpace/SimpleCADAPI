@@ -3,6 +3,7 @@
 
 import type { SelectionItem } from "@/lib/selection";
 import { axisName } from "@/lib/sketch-plane";
+import { t } from "@/i18n";
 
 // -- contract -------------------------------------------------------------------------------------------------------
 
@@ -437,8 +438,8 @@ export function hexColor(text: string): [number, number, number] | null {
 export function validateName(name: string, taken: readonly string[]): string | null {
   const text = name.trim();
   if (!text) return null;
-  if (!SLUG.test(text)) return "lowercase letters, digits and underscores, starting with a letter";
-  if (taken.includes(text) || taken.includes(text.toUpperCase())) return `"${text}" is already used in this notebook`;
+  if (!SLUG.test(text)) return t("lowercase letters, digits and underscores, starting with a letter");
+  if (taken.includes(text) || taken.includes(text.toUpperCase())) return t("\"{{name}}\" is already used in this notebook", { name: text });
   return null;
 }
 

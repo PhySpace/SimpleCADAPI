@@ -19,6 +19,7 @@ import { CORNER_WORD, isProjected } from "@/lib/sketch-edit";
 import { bezierPath, isAnchorSpline, penPoles } from "@/lib/sketch-anchors";
 import type { PointerInfo, SketchEditor } from "@/lib/useSketchEditor";
 import type { SceneView } from "@/scene/scene-view";
+import { t } from "@/i18n";
 
 const INK = "var(--foreground)";
 const MUTED = "var(--muted-foreground)";
@@ -395,11 +396,11 @@ export function SketchOverlay({
         style={{ left: left - 50, top: top - 14 }}
         data-testid="sketch-value-box"
       >
-        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{CONSTRAINT_INFO[box.kind].label}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{t(CONSTRAINT_INFO[box.kind].label)}</span>
         <input
           autoFocus
           data-testid="sketch-value"
-          aria-label="Dimension value"
+          aria-label={t("Dimension value")}
           aria-invalid={box.bad}
           value={box.text}
           onFocus={(e) => e.currentTarget.select()}
@@ -442,11 +443,11 @@ export function SketchOverlay({
     const word = CORNER_WORD[cb.op];
     return (
       <div className="absolute z-20 flex items-center gap-1 border-2 border-primary bg-popover p-1 shadow-[4px_4px_0_var(--shadow-hard)]" style={{ left, top }} data-testid="sketch-corner-box" data-op={cb.op}>
-        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{word.label}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{t(word.label)}</span>
         <input
           autoFocus
           data-testid="sketch-corner-value"
-          aria-label={word.label}
+          aria-label={t(word.label)}
           aria-invalid={cb.bad}
           value={cb.text}
           onFocus={(e) => e.currentTarget.select()}
@@ -490,11 +491,11 @@ export function SketchOverlay({
         <div className="flex items-center gap-1.5">
           {fields.map((field, index) => (
             <label key={field.name} className="flex items-center gap-1">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{field.label}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{t(field.label)}</span>
               <input
                 autoFocus={index === entry.focus}
                 data-testid={`typed-${field.name}`}
-                aria-label={field.label}
+                aria-label={t(field.label)}
                 aria-invalid={!!entry.error}
                 value={entry.text[field.name] ?? ""}
                 onFocus={(e) => e.currentTarget.select()}
@@ -516,7 +517,7 @@ export function SketchOverlay({
             </label>
           ))}
         </div>
-        <span className={entry.error ? "text-[10px] text-fail" : "text-[10px] text-muted-foreground"}>{entry.error ?? "Tab: next field · Enter: place · Esc: close"}</span>
+        <span className={entry.error ? "text-[10px] text-fail" : "text-[10px] text-muted-foreground"}>{entry.error ?? t("Tab: next field · Enter: place · Esc: close")}</span>
       </div>
     );
   })();
@@ -720,13 +721,13 @@ export function SketchOverlay({
           <button
             type="button"
             data-testid="convert-spline"
-            title="Write this B-spline as anchors with a handle on each side, keeping its shape (SDK convert_spline_to_anchors_rsketch)"
+            title={t("Write this B-spline as anchors with a handle on each side, keeping its shape (SDK convert_spline_to_anchors_rsketch)")}
             className="absolute z-20 border-2 border-primary bg-popover px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] shadow-[3px_3px_0_var(--shadow-hard)] hover:bg-accent"
             style={{ left: Math.min(Math.max(s[0] + 14, 4), size.w - 170), top: Math.min(Math.max(s[1] - 34, 4), size.h - 30) }}
             onPointerDown={(ev) => ev.stopPropagation()}
             onClick={() => editor.convertSpline(editor.convertTarget!)}
           >
-            convert to anchors (K)
+            {t("convert to anchors (K)")}
           </button>
         );
       })()}

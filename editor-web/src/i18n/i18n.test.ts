@@ -2,6 +2,11 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { CONSTRAINT_SHORT, TOOLS } from "@/components/sketch/sketch-ui";
+import { CONSTRAINT_INFO, statusBadge, type SolveResult } from "@/lib/sketch";
+import { CORNER_WORD } from "@/lib/sketch-edit";
+import { typedFields } from "@/lib/sketch-typed";
+
 import zhCN from "./locales/zh-CN.json";
 
 const SRC = join(import.meta.dirname, "..");
@@ -39,5 +44,24 @@ describe("translations", () => {
       return names(key) !== names(value);
     });
     expect(broken).toEqual([]);
+  });
+
+  it("translates the keys the sketch tables hold (not literals in a t call)", () => {
+    const solve = (status: string) => ({ status, dof: 2, diagnostics: [] }) as unknown as SolveResult;
+    const tableKeys = [
+      ...TOOLS.flatMap((tool) => [tool.name, tool.label]),
+      ...Object.values(CONSTRAINT_SHORT),
+      ...Object.values(CONSTRAINT_INFO).map((info) => info.label),
+      ...Object.values(CORNER_WORD).map((word) => word.label),
+      ...["point", "line", "circle", "arc", "spline"].flatMap((tool) =>
+        [null, { tool: "line", from: { x: 0, y: 0 } }, { tool: "circle", center: { x: 0, y: 0 } }, { tool: "arc", center: { x: 0, y: 0 } }, { tool: "arc", center: { x: 0, y: 0 }, start: { x: 1, y: 0 } }].flatMap(
+          (draft) => (typedFields(tool, draft as Parameters<typeof typedFields>[1]) ?? []).map((field) => field.label),
+        ),
+      ),
+      ...["solved", "underconstrained", "conflicting", "failed"].flatMap((status) => [status, statusBadge(solve(status)).label]),
+      statusBadge(null).label,
+      statusBadge(null, "bad").label,
+    ];
+    expect([...new Set(tableKeys)].filter((key) => !(key in table))).toEqual([]);
   });
 });

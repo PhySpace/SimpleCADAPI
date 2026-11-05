@@ -4,6 +4,7 @@
  * this file only samples them into polylines for drawing. */
 
 import type { FeatureRow } from "@/lib/features";
+import { t } from "@/i18n";
 import {
   splinePath,
   choiceFromDoc,
@@ -226,7 +227,7 @@ export function defaultExtrudeDistance(shape: Pick<SketchShape, "extent"> | null
 /** "outer: loop 1, holes: 1" for a sketch with several loops (null for a single loop, which needs no words). */
 export function profileSummary(doc: Pick<SketchDoc, "profile" | "inner">, loopCount: number): string | null {
   if (loopCount <= 1) return null;
-  return `outer: loop ${doc.profile + 1}, holes: ${doc.inner.length}`;
+  return t("outer: loop {{loop}}, holes: {{holes}}", { loop: doc.profile + 1, holes: doc.inner.length });
 }
 
 /** The centre of the sketch's extent in the world (mm), or the plane's origin. */
@@ -238,17 +239,17 @@ export function sketchCentre(doc: Pick<SketchDoc, "plane">, shape: Pick<SketchSh
 /** What the inspector says about a sketch. */
 export function describeSketch(info: SketchInfo, shape: SketchShape | null, solve: SolveResult | null): { label: string; value: string }[] {
   const counts = (kind: string) => info.doc.entities.filter((entity) => entity.kind === kind && !entity.construction).length;
-  const parts = [`${counts("line")} lines`, `${counts("circle")} circles`, `${counts("arc")} arcs`, `${counts("bspline")} splines`];
+  const parts = [t("{{count}} lines", { count: counts("line") }), t("{{count}} circles", { count: counts("circle") }), t("{{count}} arcs", { count: counts("arc") }), t("{{count}} splines", { count: counts("bspline") })];
   const construction = info.doc.entities.filter((entity) => entity.construction).length;
   const rows = [
-    { label: "plane", value: planeLabel(info.doc.plane) },
-    { label: "geometry", value: parts.join(", ") + (construction ? `, ${construction} construction` : "") },
-    { label: "constraints", value: String(info.doc.constraints.length) },
-    { label: "solve", value: solve ? `${solve.status}, ${solve.dof} degrees of freedom` : shape?.failed ? "failed" : "pending" },
-    { label: "profile", value: profileSummary(info.doc, shape?.loopCount ?? 0) ?? (shape && shape.loopCount > 0 ? "the closed loop" : "no closed loop yet") },
-    { label: "used by", value: info.usedBy.length ? info.usedBy.join(", ") : "nothing yet" },
+    { label: t("plane"), value: planeLabel(info.doc.plane) },
+    { label: t("geometry"), value: parts.join(", ") + (construction ? `, ${t("{{count}} construction", { count: construction })}` : "") },
+    { label: t("constraints"), value: String(info.doc.constraints.length) },
+    { label: t("solve"), value: solve ? t("{{status}}, {{dof}} degrees of freedom", { status: t(solve.status), dof: solve.dof }) : shape?.failed ? t("failed") : t("pending") },
+    { label: t("profile"), value: profileSummary(info.doc, shape?.loopCount ?? 0) ?? (shape && shape.loopCount > 0 ? t("the closed loop") : t("no closed loop yet")) },
+    { label: t("used by"), value: info.usedBy.length ? info.usedBy.join(", ") : t("nothing yet") },
   ];
-  if (shape?.extent) rows.push({ label: "size", value: `${(shape.extent.max[0] - shape.extent.min[0]).toFixed(1)} x ${(shape.extent.max[1] - shape.extent.min[1]).toFixed(1)} mm` });
+  if (shape?.extent) rows.push({ label: t("size"), value: `${(shape.extent.max[0] - shape.extent.min[0]).toFixed(1)} x ${(shape.extent.max[1] - shape.extent.min[1]).toFixed(1)} mm` });
   return rows;
 }
 

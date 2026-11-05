@@ -1,6 +1,7 @@
 import { Layers, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { t } from "@/i18n";
 import type { SketchEditor } from "@/lib/useSketchEditor";
 
 /** The popover of the project tool: the other sketch features of the notebook, with a search box.  Choosing one asks
@@ -14,11 +15,11 @@ export function SketchProject({ editor }: { editor: SketchEditor }) {
   }, [editor.projectFrom, query]);
   useEffect(() => input.current?.focus(), []);
   return (
-    <div className="pointer-events-auto absolute left-[108px] top-[205px] z-30 w-60 border-2 border-primary bg-popover shadow-[4px_4px_0_var(--shadow-hard)]" data-testid="sketch-project" role="dialog" aria-label="Project a sketch">
+    <div className="pointer-events-auto absolute left-[108px] top-[205px] z-30 w-60 border-2 border-primary bg-popover shadow-[4px_4px_0_var(--shadow-hard)]" data-testid="sketch-project" role="dialog" aria-label={t("Project a sketch")}>
       <div className="flex items-center gap-1.5 border-b-2 border-border px-2 py-1">
         <Layers className="size-3.5 shrink-0" />
-        <span className="flex-1 text-[10px] font-bold uppercase tracking-[0.12em]">project sketch</span>
-        <button type="button" aria-label="Close" className="text-muted-foreground hover:text-foreground" onClick={() => editor.setProjectOpen(false)}>
+        <span className="flex-1 text-[10px] font-bold uppercase tracking-[0.12em]">{t("project sketch")}</span>
+        <button type="button" aria-label={t("Close")} className="text-muted-foreground hover:text-foreground" onClick={() => editor.setProjectOpen(false)}>
           <X className="size-3.5" />
         </button>
       </div>
@@ -26,9 +27,9 @@ export function SketchProject({ editor }: { editor: SketchEditor }) {
         <Search className="size-3.5 text-muted-foreground" />
         <input
           ref={input}
-          aria-label="Search sketches"
+          aria-label={t("Search sketches")}
           data-testid="sketch-project-search"
-          placeholder="search sketches"
+          placeholder={t("search sketches")}
           className="h-7 flex-1 bg-transparent text-[12px] outline-none"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -52,9 +53,9 @@ export function SketchProject({ editor }: { editor: SketchEditor }) {
             </button>
           </li>
         ))}
-        {rows.length === 0 && <li className="px-2 py-2 text-[11px] text-muted-foreground">No sketch matches.</li>}
+        {rows.length === 0 && <li className="px-2 py-2 text-[11px] text-muted-foreground">{t("No sketch matches.")}</li>}
       </ul>
-      <p className="border-t border-border px-2 py-1 text-[10px] leading-tight text-muted-foreground">The sketch's lines, circles, arcs and points come in as fixed construction geometry you can snap and constrain to.</p>
+      <p className="border-t border-border px-2 py-1 text-[10px] leading-tight text-muted-foreground">{t("The sketch's lines, circles, arcs and points come in as fixed construction geometry you can snap and constrain to.")}</p>
     </div>
   );
 }

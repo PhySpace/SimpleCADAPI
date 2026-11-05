@@ -20,6 +20,7 @@ import { useSketchEditor } from "@/lib/useSketchEditor";
 import { planeSegments } from "@/lib/sketch-face";
 import { disposeObject } from "@/scene/cad-three";
 import type { PickResult, SceneView } from "@/scene/scene-view";
+import { t } from "@/i18n";
 
 /** The model's edges (the line segments the viewport draws them with) in world mm, visible ones only. */
 function modelEdges(view: SceneView): [[number, number, number], [number, number, number]][] {
@@ -196,7 +197,7 @@ function PlaneChooser({
           setFaceNote(null);
           return;
         }
-        setFaceNote(`This face is ${check.type ? `a ${check.type.toLowerCase()}` : "curved"}: a sketch needs a flat face. Pick a flat face or a plane.`);
+        setFaceNote(check.type ? t("This face is a {{type}}: a sketch needs a flat face. Pick a flat face or a plane.", { type: check.type.toLowerCase() }) : t("This face is curved: a sketch needs a flat face. Pick a flat face or a plane."));
         for (const overlay of overlays) {
           overlay.parent?.remove(overlay);
           disposeObject(overlay);
@@ -266,27 +267,27 @@ function PlaneChooser({
       <HintBanner
         testId="chooser-banner"
         icon={<Pencil className="size-3.5 shrink-0" />}
-        title="Choose the sketch plane"
-        hint="Click a face of the model, or a plane"
+        title={t("Choose the sketch plane")}
+        hint={t("Click a face of the model, or a plane")}
         notice={notice ?? faceNote}
         controls={
           <span className="flex flex-wrap items-center gap-1">
             {PLANES.map((plane) => (
-              <Button key={plane} type="button" size="sm" variant="outline" className="h-6 px-2" data-testid={`chooser-plane-${plane}`} title={`Sketch on the ${plane} plane`} onClick={() => onPlane(plane)} onPointerEnter={() => setHover(plane)} onPointerLeave={() => setHover(null)}>
+              <Button key={plane} type="button" size="sm" variant="outline" className="h-6 px-2" data-testid={`chooser-plane-${plane}`} title={t("Sketch on the {{plane}} plane", { plane })} onClick={() => onPlane(plane)} onPointerEnter={() => setHover(plane)} onPointerLeave={() => setHover(null)}>
                 {plane}
               </Button>
             ))}
             {workplanes.map((item) => (
-              <Button key={`wp-${item.name}`} type="button" size="sm" variant="outline" className="h-6 border-amber-500/70 px-2 font-mono" data-testid={`chooser-workplane-${item.name}`} title={`Sketch on the workplane ${item.name}`} onClick={() => onPlane(item.plane)}>
+              <Button key={`wp-${item.name}`} type="button" size="sm" variant="outline" className="h-6 border-amber-500/70 px-2 font-mono" data-testid={`chooser-workplane-${item.name}`} title={t("Sketch on the workplane {{name}}", { name: item.name })} onClick={() => onPlane(item.plane)}>
                 {item.name}
               </Button>
             ))}
             {sketchPlanes.map((item) => (
-              <Button key={item.name} type="button" size="sm" variant="outline" className="h-6 px-2" data-testid={`chooser-sketch-${item.name}`} title={`Sketch on the plane of ${item.name}`} onClick={() => onPlane(item.plane)}>
-                plane of {item.name}
+              <Button key={item.name} type="button" size="sm" variant="outline" className="h-6 px-2" data-testid={`chooser-sketch-${item.name}`} title={t("Sketch on the plane of {{name}}", { name: item.name })} onClick={() => onPlane(item.plane)}>
+                {t("plane of {{name}}", { name: item.name })}
               </Button>
             ))}
-            <Button type="button" size="sm" variant="ghost" className="h-6 px-2" aria-label="Cancel the sketch" onClick={onExit}>
+            <Button type="button" size="sm" variant="ghost" className="h-6 px-2" aria-label={t("Cancel the sketch")} onClick={onExit}>
               <X /> esc
             </Button>
           </span>
@@ -433,18 +434,18 @@ function SketchEditorView({
   const problem = (() => {
     if (nameError) return nameError;
     if (editor.error) return editor.error;
-    if (!editor.fresh) return "solving the sketch…";
+    if (!editor.fresh) return t("solving the sketch…");
     if (editor.doc.output === "wire") {
       if (!editor.wire) {
         const why = editor.result?.unusable?.[0];
-        return why ? `no profile for the wire: ${why}` : "draw a chain of lines, arcs or splines (or a closed loop): the wire needs a profile";
+        return why ? t("no profile for the wire: {{why}}", { why }) : t("draw a chain of lines, arcs or splines (or a closed loop): the wire needs a profile");
       }
     } else if (editor.loops.length === 0) {
       const why = editor.result?.unusable?.[0];
-      return why ? `no closed profile: ${why}` : "close a loop of lines or draw a circle: the face needs a profile";
+      return why ? t("no closed profile: {{why}}", { why }) : t("close a loop of lines or draw a circle: the face needs a profile");
     }
     const status = editor.result?.status;
-    if (status === "conflicting" || status === "failed") return "the sketch has a conflict: fix the constraints marked in red";
+    if (status === "conflicting" || status === "failed") return t("the sketch has a conflict: fix the constraints marked in red");
     return null;
   })();
 
@@ -481,7 +482,7 @@ function SketchEditorView({
         <div className="pointer-events-auto scroll-row max-w-[calc(100vw-2rem)] items-center gap-2 border-2 border-primary bg-popover px-2 py-1 shadow-[4px_4px_0_var(--shadow-hard)]">
           <Pencil className="size-3.5 shrink-0" />
           <Input
-            aria-label="Sketch name"
+            aria-label={t("Sketch name")}
             data-testid="sketch-name"
             className="h-7 w-44"
             value={editing ? (session.name || "") : name}
@@ -494,18 +495,18 @@ function SketchEditorView({
               if (event.key === "Enter") void finish();
             }}
           />
-          <span className="whitespace-nowrap text-[10px] uppercase tracking-[0.08em] text-muted-foreground">on {planeLabel(plane)}</span>
+          <span className="whitespace-nowrap text-[10px] uppercase tracking-[0.08em] text-muted-foreground">{t("on {{plane}}", { plane: planeLabel(plane) })}</span>
           <StatusBadge editor={editor} compact />
           <OutputChoice editor={editor} />
-          <Button type="button" size="sm" variant={editing ? "default" : "outline"} className="h-7 gap-1 px-2" data-testid="sketch-finish" aria-label="Finish the sketch" title="Finish: add the sketch to the notebook" disabled={busy} onClick={() => void finish()}>
-            <Check /> {busy ? "working…" : "finish"}
+          <Button type="button" size="sm" variant={editing ? "default" : "outline"} className="h-7 gap-1 px-2" data-testid="sketch-finish" aria-label={t("Finish the sketch")} title={t("Finish: add the sketch to the notebook")} disabled={busy} onClick={() => void finish()}>
+            <Check /> {busy ? t("working…") : t("finish")}
           </Button>
           {!editing && editor.doc.output !== "wire" && (
-            <Button type="button" size="sm" className="h-7 gap-1 px-2" data-testid="sketch-finish-extrude" aria-label="Finish the sketch and extrude it" title="Finish, then extrude the sketch (the most common next step)" disabled={busy} onClick={() => void finish(true)}>
-              <Rocket /> finish and extrude
+            <Button type="button" size="sm" className="h-7 gap-1 px-2" data-testid="sketch-finish-extrude" aria-label={t("Finish the sketch and extrude it")} title={t("Finish, then extrude the sketch (the most common next step)")} disabled={busy} onClick={() => void finish(true)}>
+              <Rocket /> {t("finish and extrude")}
             </Button>
           )}
-          <Button type="button" size="sm" variant="outline" className="h-7 px-2" data-testid="sketch-cancel" aria-label="Cancel the sketch" title="Cancel (Esc twice)" onClick={leave}>
+          <Button type="button" size="sm" variant="outline" className="h-7 px-2" data-testid="sketch-cancel" aria-label={t("Cancel the sketch")} title={t("Cancel (Esc twice)")} onClick={leave}>
             <X />
           </Button>
         </div>
@@ -514,7 +515,7 @@ function SketchEditorView({
             {shown}
           </p>
         )}
-        {editor.editBusy && <p className="self-center border border-border bg-popover px-2 py-0.5 text-[10px] text-muted-foreground">asking the SDK…</p>}
+        {editor.editBusy && <p className="self-center border border-border bg-popover px-2 py-0.5 text-[10px] text-muted-foreground">{t("asking the SDK…")}</p>}
         {editor.editNote && (
           <p
             role={editor.editNote.tone === "fail" ? "alert" : "status"}
@@ -526,17 +527,17 @@ function SketchEditorView({
           </p>
         )}
         <p className="pointer-events-none max-w-[420px] self-center border border-border bg-popover/90 px-2 py-1 text-center text-[10px] leading-tight text-muted-foreground">
-          {editor.hint} <span className="opacity-80">Orbit: right/middle drag or Alt+drag; pan: Shift+middle or space+drag; zoom: wheel.</span>
+          {editor.hint} <span className="opacity-80">{t("Orbit: right/middle drag or Alt+drag; pan: Shift+middle or space+drag; zoom: wheel.")}</span>
           {coords && <span className="ml-2 text-foreground">{coords}</span>}
         </p>
         {confirming && (
           <div className="pointer-events-auto flex items-center gap-2 border-2 border-focus bg-popover px-2 py-1 text-[11px]" data-testid="sketch-confirm">
-            <span className="flex-1">Discard the unsaved sketch edits?</span>
+            <span className="flex-1">{t("Discard the unsaved sketch edits?")}</span>
             <Button type="button" size="sm" variant="destructive" className="h-6 px-2" onClick={onExit}>
-              discard
+              {t("discard")}
             </Button>
             <Button type="button" size="sm" variant="outline" className="h-6 px-2" onClick={() => setConfirming(false)}>
-              keep sketching
+              {t("keep sketching")}
             </Button>
           </div>
         )}
@@ -552,17 +553,17 @@ function OutputChoice({ editor }: { editor: ReturnType<typeof useSketchEditor> }
   const tab = "h-7 px-2 text-[10px] font-bold uppercase tracking-[0.08em] aria-pressed:bg-primary aria-pressed:text-primary-foreground hover:bg-accent aria-pressed:hover:bg-primary";
   return (
     <span className="flex items-center gap-1" data-testid="sketch-output">
-      <span className="flex border-2 border-input" role="group" aria-label="What the sketch makes">
-        <button type="button" className={tab} aria-pressed={!wire} data-output="face" title="Face (closed profile): what extrude, revolve and cut take" onClick={() => editor.setOutput("face")}>
-          face
+      <span className="flex border-2 border-input" role="group" aria-label={t("What the sketch makes")}>
+        <button type="button" className={tab} aria-pressed={!wire} data-output="face" title={t("Face (closed profile): what extrude, revolve and cut take")} onClick={() => editor.setOutput("face")}>
+          {t("face")}
         </button>
-        <button type="button" className={tab} aria-pressed={wire} data-output="wire" title="Wire (path / profile curve): an open chain or a closed loop, for a sweep path or a loft section" onClick={() => editor.setOutput("wire")}>
-          wire
+        <button type="button" className={tab} aria-pressed={wire} data-output="wire" title={t("Wire (path / profile curve): an open chain or a closed loop, for a sweep path or a loft section")} onClick={() => editor.setOutput("wire")}>
+          {t("wire")}
         </button>
       </span>
       {wire && editor.wires.length > 0 && (
         <select
-          aria-label="Profile of the wire"
+          aria-label={t("Profile of the wire")}
           data-testid="sketch-wire-profile"
           className="h-7 max-w-44 border-2 border-input bg-background px-1 text-[11px]"
           value={editor.wire?.key ?? ""}
@@ -571,7 +572,7 @@ function OutputChoice({ editor }: { editor: ReturnType<typeof useSketchEditor> }
         >
           {editor.wires.map((w) => (
             <option key={w.key} value={w.key}>
-              {w.index}: {w.closed ? "loop" : "chain"} {w.entities.join(", ")}
+              {w.index}: {w.closed ? t("loop") : t("chain")} {w.entities.join(", ")}
             </option>
           ))}
         </select>

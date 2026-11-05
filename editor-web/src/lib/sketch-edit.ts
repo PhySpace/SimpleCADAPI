@@ -5,6 +5,7 @@
 
 import { entityMap, normalizeDoc, type Choice, type Loop, type SketchDoc } from "@/lib/sketch";
 import type { FeatureRow } from "@/lib/features";
+import { t } from "@/i18n";
 
 export type EditOp = "trim" | "extend" | "fillet_corner" | "chamfer_corner" | "project" | "insert_spline_anchor" | "remove_spline_anchor" | "convert_spline_to_anchors";
 export type End = "start" | "end";
@@ -71,6 +72,7 @@ export const convertSplineRequest = (doc: SketchDoc, spline: string): EditReques
 /** A corner: a point shared by exactly two lines (`a` and `b` are the line ids). */
 export type Corner = { point: string; a: string; b: string };
 export type CornerOp = "fillet_corner" | "chamfer_corner";
+/** The value box of a corner operation (`label`: an English key of the translation table). */
 export const CORNER_WORD: Record<CornerOp, { label: string; arg: "radius" | "distance" }> = {
   fillet_corner: { label: "Fillet radius", arg: "radius" },
   chamfer_corner: { label: "Chamfer distance", arg: "distance" },
@@ -174,14 +176,16 @@ export function remapChoice(previous: readonly Loop[], choice: Choice, next: rea
 /** What the person is told after an edit: the SDK's notes, else a one-line account of the diff. */
 export function describeEdit(op: EditOp, response: Pick<EditResponse, "created" | "removed" | "changed" | "notes">, projected?: { entities: number; points: number; from: string }): string {
   if (op === "project" && projected) {
-    const head = `project: ${projected.entities} entit${projected.entities === 1 ? "y" : "ies"} and ${projected.points} point${projected.points === 1 ? "" : "s"} from ${projected.from} (construction, fixed)`;
+    const entities = projected.entities === 1 ? t("1 entity") : t("{{count}} entities", { count: projected.entities });
+    const points = projected.points === 1 ? t("1 point") : t("{{count}} points", { count: projected.points });
+    const head = t("project: {{entities}} and {{points}} from {{from}} (construction, fixed)", { entities, points, from: projected.from });
     return response.notes.length ? `${head}. ${response.notes.join(" ")}` : head;
   }
   const parts: string[] = [];
-  if (response.created.length) parts.push(`created ${response.created.join(", ")}`);
-  if (response.removed.length) parts.push(`removed ${response.removed.join(", ")}`);
-  if (response.changed.length) parts.push(`changed ${response.changed.join(", ")}`);
-  const head = `${op}: ${parts.length ? parts.join("; ") : "nothing changed"}`;
+  if (response.created.length) parts.push(t("created {{ids}}", { ids: response.created.join(", ") }));
+  if (response.removed.length) parts.push(t("removed {{ids}}", { ids: response.removed.join(", ") }));
+  if (response.changed.length) parts.push(t("changed {{ids}}", { ids: response.changed.join(", ") }));
+  const head = `${op}: ${parts.length ? parts.join("; ") : t("nothing changed")}`;
   return response.notes.length ? `${head}. ${response.notes.join(" ")}` : head;
 }
 

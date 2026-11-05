@@ -71,6 +71,7 @@ import {
   type EditRequest,
   type End,
 } from "@/lib/sketch-edit";
+import { t } from "@/i18n";
 import { typedFields, typedTarget, type TypedDims } from "@/lib/sketch-typed";
 import { edgeSnap, type Segment } from "@/lib/sketch-face";
 import { addPenSpline, anchorAction, anchorRoles, curveAt, handlePoints, isAnchorSpline, mirrorHandle, shownHandles, smoothAnchors, type AnchorAction } from "@/lib/sketch-anchors";
@@ -374,7 +375,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   const chooseTool = useCallback((next: Tool) => {
     // The SDK edits are not offered in the middle of a draft (finish or cancel it first).
     if (EDIT_TOOLS.has(next) && draftRef.current) {
-      setEditNote({ tone: "fail", text: `${next} is not available while a draft is in progress: finish it or press Esc first` });
+      setEditNote({ tone: "fail", text: t("{{tool}} is not available while a draft is in progress: finish it or press Esc first", { tool: t(next) }) });
       return;
     }
     setEditNote(null);
@@ -448,8 +449,8 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
           tone: "fail",
           text:
             role.kind === "handle"
-              ? `${kept[0]} is a handle of ${role.spline}: a handle is not deleted (drag it, or remove its anchor ${role.anchor})`
-              : `${kept[0]} is an end of ${role.spline}: an end anchor cannot be removed (trim the spline, or select the curve to delete it)`,
+              ? t("{{point}} is a handle of {{spline}}: a handle is not deleted (drag it, or remove its anchor {{anchor}})", { point: kept[0], spline: role.spline, anchor: role.anchor })
+              : t("{{point}} is an end of {{spline}}: an end anchor cannot be removed (trim the spline, or select the curve to delete it)", { point: kept[0], spline: role.spline }),
         });
       }
       for (const id of anchors) {
@@ -500,11 +501,11 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     const picked = selection.map((id) => roles.get(id)?.spline ?? id).find((id) => d.entities.some((e) => e.id === id && e.kind === "bspline"));
     const spline = d.entities.find((e) => e.id === picked);
     if (!spline) {
-      setEditNote({ tone: "fail", text: "anchor mode: pick a B-spline first (click its curve), then Shift+A" });
+      setEditNote({ tone: "fail", text: t("anchor mode: pick a B-spline first (click its curve), then Shift+A") });
       return;
     }
     if (!isAnchorSpline(spline)) {
-      setEditNote({ tone: "fail", text: `anchor mode: ${spline.id} has control points, not anchors: convert it first (K; the shape stays)` });
+      setEditNote({ tone: "fail", text: t("anchor mode: {{spline}} has control points, not anchors: convert it first (K; the shape stays)", { spline: spline.id }) });
       return;
     }
     setTool("select");
@@ -525,7 +526,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     const anchors = selection.filter((id) => roles.get(id)?.kind === "anchor");
     const moved = smoothAnchors(docRef.current, anchors, ptsRef.current, roles);
     if (!Object.keys(moved).length) {
-      setEditNote({ tone: "fail", text: "smooth: select an anchor that has two handles (click a spline drawn with the spline tool, then one of its anchors)" });
+      setEditNote({ tone: "fail", text: t("smooth: select an anchor that has two handles (click a spline drawn with the spline tool, then one of its anchors)") });
       return;
     }
     const d = docRef.current;
@@ -554,11 +555,11 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
   /** The project popover: refuses with a word when the notebook has no other sketch. */
   const openProject = useCallback(() => {
     if (draftRef.current) {
-      setEditNote({ tone: "fail", text: "project is not available while a draft is in progress: finish it or press Esc first" });
+      setEditNote({ tone: "fail", text: t("project is not available while a draft is in progress: finish it or press Esc first") });
       return;
     }
     if (projectFrom.length === 0) {
-      setEditNote({ tone: "fail", text: "project: there is no other sketch in this notebook to project from; finish and add another sketch first" });
+      setEditNote({ tone: "fail", text: t("project: there is no other sketch in this notebook to project from; finish and add another sketch first") });
       return;
     }
     setEditNote(null);
@@ -693,7 +694,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       else {
         const request = extendRequest(d, pts, hit.id, world);
         if (request) void runEdit(request);
-        else setEditNote({ tone: "fail", text: `extend: ${hit.id} has no end to extend (a circle is closed); pick a line or an arc` });
+        else setEditNote({ tone: "fail", text: t("extend: {{id}} has no end to extend (a circle is closed); pick a line or an arc", { id: hit.id }) });
       }
       return "handled";
     }
@@ -705,12 +706,12 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       if (hit.kind === "point") {
         const corner = cornerAt(d, hit.id);
         if (corner) openCorner(op, corner);
-        else setEditNote({ tone: "fail", text: `${tool}: ${hit.id} is not a corner (a corner is a point shared by exactly two lines)` });
+        else setEditNote({ tone: "fail", text: t("{{tool}}: {{id}} is not a corner (a corner is a point shared by exactly two lines)", { tool: t(tool), id: hit.id }) });
         return "handled";
       }
       const line = d.entities.find((e) => e.id === hit.id);
       if (!line || line.kind !== "line") {
-        setEditNote({ tone: "fail", text: `${tool}: ${hit.id} is not a line; click a corner point or two lines in turn` });
+        setEditNote({ tone: "fail", text: t("{{tool}}: {{id}} is not a line; click a corner point or two lines in turn", { tool: t(tool), id: hit.id }) });
         return "handled";
       }
       setEditNote(null);
@@ -721,7 +722,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
       const corner = cornerOfLines(d, pendingLine, hit.id);
       if (corner) openCorner(op, corner);
       else {
-        setEditNote({ tone: "fail", text: `${tool}: ${pendingLine} and ${hit.id} do not meet at a corner of exactly two lines` });
+        setEditNote({ tone: "fail", text: t("{{tool}}: {{a}} and {{b}} do not meet at a corner of exactly two lines", { tool: t(tool), a: pendingLine, b: hit.id }) });
         setPendingLine(hit.id);
       }
       return "handled";
@@ -751,7 +752,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
         lastClick.current = null;
         if (editBusy) return "handled";
         if (isAnchorSpline(spline)) insertAnchor(spline.id, world);
-        else setEditNote({ tone: "fail", text: `${spline.id} has control points, not anchors: convert it first (K, or the button by the curve; the shape stays)` });
+        else setEditNote({ tone: "fail", text: t("{{spline}} has control points, not anchors: convert it first (K, or the button by the curve; the shape stays)", { spline: spline.id }) });
         return "handled";
       }
       if (hit) {
@@ -951,7 +952,7 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     else if (k === "s" && tool === "select") smoothSelection();
     else if (k === "k" && tool === "select") {
       if (convertTarget) convertSpline(convertTarget);
-      else setEditNote({ tone: "fail", text: "convert: select one B-spline that has control points (a spline drawn with the spline tool already has anchors)" });
+      else setEditNote({ tone: "fail", text: t("convert: select one B-spline that has control points (a spline drawn with the spline tool already has anchors)") });
     } else if (shortcuts[k]) chooseTool(shortcuts[k]);
     else if (k === "j") openProject();
     else if (k === "x") toggleConstruction();
@@ -1008,37 +1009,37 @@ export function useSketchEditor(initial: SketchDoc, modelPoints: readonly [numbe
     return { min: [Math.min(...list.map((p) => p[0])), Math.min(...list.map((p) => p[1]))], max: [Math.max(...list.map((p) => p[0])), Math.max(...list.map((p) => p[1]))] };
   }, [pts, result]);
 
-  const typed = DRAW_TOOLS.has(tool) ? " Or type numbers (Tab between fields, Enter places)." : "";
+  const typed = DRAW_TOOLS.has(tool) ? ` ${t("Or type numbers (Tab between fields, Enter places).")}` : "";
   const hint =
     (tool === "select" && anchorMode
-      ? "ANCHOR MODE: click a spline's curve to add an anchor (the curve stays), click an inner anchor to remove it. Esc or Shift+A leaves."
+      ? t("ANCHOR MODE: click a spline's curve to add an anchor (the curve stays), click an inner anchor to remove it. Esc or Shift+A leaves.")
       : tool === "select"
       ? shown.size
-        ? "Drag an anchor (its handles follow) or a handle: each side has its own direction and pull. Hold Shift while dragging a handle to put the other one in line (smooth); S smooths the selected anchors. Shift+A: anchor mode (add/remove anchors by clicking); Delete removes the selected anchor."
+        ? t("Drag an anchor (its handles follow) or a handle: each side has its own direction and pull. Hold Shift while dragging a handle to put the other one in line (smooth); S smooths the selected anchors. Shift+A: anchor mode (add/remove anchors by clicking); Delete removes the selected anchor.")
         : convertTarget
-          ? `${convertTarget} has control points, not anchors: K (or the button by the curve) converts it, keeping its shape.`
-          : "Click or shift-click to select; drag a point or a line to move it; click inside a loop for the profile, shift-click for a hole. Click a spline to show its handles."
+          ? t("{{spline}} has control points, not anchors: K (or the button by the curve) converts it, keeping its shape.", { spline: convertTarget })
+          : t("Click or shift-click to select; drag a point or a line to move it; click inside a loop for the profile, shift-click for a hole. Click a spline to show its handles.")
       : tool === "line"
-        ? draft ? "Click the next point; clicking an existing point ends the chain (a click on a spline's curve adds an anchor there and ends on it); Esc ends." : "Click the first point (on a spline's curve: an anchor is added there)."
+        ? draft ? t("Click the next point; clicking an existing point ends the chain (a click on a spline's curve adds an anchor there and ends on it); Esc ends.") : t("Click the first point (on a spline's curve: an anchor is added there).")
         : tool === "circle"
-          ? draft ? "Click a point on the circle." : "Click the centre."
+          ? draft ? t("Click a point on the circle.") : t("Click the centre.")
           : tool === "spline"
             ? draft
-              ? "Click the next anchor; press and drag to pull out its handles; a click on another spline's curve adds an anchor there and goes through it. Finish: Enter, the last anchor again (double-click) or the button; the first anchor closes it. Esc drops it."
-              : "Click the first anchor; press and drag to pull out its handles (a click alone makes a smooth curve through the anchors). A click on a spline's curve adds an anchor there and starts from it."
+              ? t("Click the next anchor; press and drag to pull out its handles; a click on another spline's curve adds an anchor there and goes through it. Finish: Enter, the last anchor again (double-click) or the button; the first anchor closes it. Esc drops it.")
+              : t("Click the first anchor; press and drag to pull out its handles (a click alone makes a smooth curve through the anchors). A click on a spline's curve adds an anchor there and starts from it.")
           : tool === "arc"
-            ? draft ? (draft.tool === "arc" && draft.start ? "Click the end (counter-clockwise from start)." : "Click the start point (sets the radius).") : "Click the centre."
+            ? draft ? (draft.tool === "arc" && draft.start ? t("Click the end (counter-clockwise from start).") : t("Click the start point (sets the radius).")) : t("Click the centre.")
             : tool === "delete"
-              ? "Click an item to delete it."
+              ? t("Click an item to delete it.")
               : tool === "fillet" || tool === "chamfer"
                 ? pendingLine
-                  ? `Click the second line of the corner (${pendingLine} is picked).`
-                  : `Click a corner (a point shared by two lines) or two lines in turn, then type the ${tool === "fillet" ? "radius" : "distance"}: Enter commits, Esc cancels.`
+                  ? t("Click the second line of the corner ({{line}} is picked).", { line: pendingLine })
+                  : tool === "fillet" ? t("Click a corner (a point shared by two lines) or two lines in turn, then type the radius: Enter commits, Esc cancels.") : t("Click a corner (a point shared by two lines) or two lines in turn, then type the distance: Enter commits, Esc cancels.")
               : tool === "trim"
-                ? "Click the part of a line, arc or circle to cut away; the SDK decides the piece between its neighbours."
+                ? t("Click the part of a line, arc or circle to cut away; the SDK decides the piece between its neighbours.")
                 : tool === "extend"
-                  ? "Click a line near the end to extend; it grows to the next entity."
-                  : "Click to place a point; on a spline's curve the point is a new anchor of the spline.") + typed;
+                  ? t("Click a line near the end to extend; it grows to the next entity.")
+                  : t("Click to place a point; on a spline's curve the point is a new anchor of the spline.")) + typed;
 
   return {
     cornerHover, pendingLine, cornerBox, setCornerBox, submitCorner, projectOpen, setProjectOpen, openProject, projectSketch, projectFrom,

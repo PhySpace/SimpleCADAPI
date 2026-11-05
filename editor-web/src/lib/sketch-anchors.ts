@@ -7,6 +7,7 @@
  * here: it shows its control polygon and offers `convert_spline_to_anchors_rsketch`. */
 
 import { ensurePoint, nextId, solvedPoints, splinePath, type DrawOptions, type SEntity, type SketchDoc, type SolveResult, type Spot } from "@/lib/sketch";
+import { t } from "@/i18n";
 
 type P = [number, number];
 
@@ -103,12 +104,12 @@ export function anchorAction(doc: SketchDoc, solve: SolveResult | null, pos: rea
     const e = doc.entities.find((x) => x.id === role.spline);
     const closedSeam = e?.start === hit; // the seam of a closed spline is its start and end
     if (!closedSeam) return { kind: "remove", spline: role.spline, anchor: hit };
-    return { kind: "refuse", text: `${hit} is where ${role.spline} starts and ends: it cannot be removed` };
+    return { kind: "refuse", text: t("{{point}} is where {{spline}} starts and ends: it cannot be removed", { point: hit, spline: role.spline }) };
   }
-  if (hit && role?.kind === "anchor") return { kind: "refuse", text: `${hit} is an end of ${role.spline}: an end anchor cannot be removed (trim the spline instead)` };
+  if (hit && role?.kind === "anchor") return { kind: "refuse", text: t("{{point}} is an end of {{spline}}: an end anchor cannot be removed (trim the spline instead)", { point: hit, spline: role.spline }) };
   const on = curveAt(doc, solve, pos, tol);
   if (on) return { kind: "add", spline: on.spline, at: on.at };
-  if (hit && role?.kind === "handle") return { kind: "refuse", text: `${hit} is a handle of ${role.spline}: click its anchor ${role.anchor} to remove the anchor` };
+  if (hit && role?.kind === "handle") return { kind: "refuse", text: t("{{point}} is a handle of {{spline}}: click its anchor {{anchor}} to remove the anchor", { point: hit, spline: role.spline, anchor: role.anchor }) };
   return null;
 }
 

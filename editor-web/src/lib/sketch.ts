@@ -973,7 +973,8 @@ export async function fetchSolve(doc: SketchDoc): Promise<SolveResult | null> {
   return body;
 }
 
-export type Badge = { label: string; tone: "pass" | "fail" | "focus" | "muted" };
+/** The solver's state in a word: `label` is an English key of the translation table, `values` its interpolations. */
+export type Badge = { label: string; values?: Record<string, unknown>; tone: "pass" | "fail" | "focus" | "muted" };
 
 export function statusBadge(solve: SolveResult | null, error?: string | null): Badge {
   if (error) return { label: "invalid", tone: "fail" };
@@ -982,7 +983,7 @@ export function statusBadge(solve: SolveResult | null, error?: string | null): B
     case "solved":
       return { label: "solved", tone: "pass" };
     case "underconstrained":
-      return { label: `under-constrained ${solve.dof} dof`, tone: "focus" };
+      return { label: "under-constrained {{dof}} dof", values: { dof: solve.dof }, tone: "focus" };
     case "conflicting":
       return { label: "conflict", tone: "fail" };
     default:
