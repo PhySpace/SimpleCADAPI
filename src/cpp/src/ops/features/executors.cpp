@@ -138,6 +138,9 @@ void register_blends(reactive::ExecutorRegistry& registry) {
     return one(draft_rsolid(Solid(input(in, 0)), rest<Face>(in, 1, in.size()), number(p, "angle"),
                             point(p, "plane_origin"), point(p, "plane_normal")));
   });
+  registry.add("make_inset_face_rsolid", [](Params p, Inputs in, const ScalarValues&) {
+    return one(inset_face_rsolid(Solid(input(in, 0)), rest<Face>(in, 1, in.size()), number(p, "distance")));
+  });
 }
 
 // ---- booleans -----------------------------------------------------------------------------------

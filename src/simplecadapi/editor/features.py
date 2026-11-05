@@ -536,6 +536,10 @@ def _chamfer(c: Context) -> list[str]:
     return [*c.recipe("edges", "tip"), f"{c.slug} = scad.chamfer_rsolid(solid={c.body('body')}, edges={c.selection('edges')}, distance={c.var('distance')})"]
 
 
+def _inset_face(c: Context) -> list[str]:
+    return [*c.recipe("face", "tip"), f"{c.slug} = scad.inset_face_rsolid(solid={c.body('body')}, face={c.selection('face')}, distance={c.var('distance')})"]
+
+
 def _shell(c: Context) -> list[str]:
     return [
         *c.recipe("faces", "tip"),
@@ -679,6 +683,10 @@ SPECS: tuple[Spec, ...] = (
     Spec("extrude_face", "Extrude face", "Features", "build", "solid", "Push a flat face of the body out (or into it) along its normal, without a sketch.",
          (_BODY(), Slot("face", "Face", "select", entity="face", single=True, help="Pick one flat face of the body."),
           _enum("direction", "Direction", _FACE_DIRECTIONS, "normal"), _signed("distance", "Distance", 10.0, min=0.001)), _extrude_face),
+    Spec("inset_face", "Inset face", "Features", "modifier", "solid",
+         "Imprint the outline of a flat face moved inside it: the face splits into an inner face (pull it out or push it in next) and the ring around it.",
+         (_BODY(), Slot("face", "Face", "select", entity="face", single=True, help="Pick one flat face of the body."),
+          _length("distance", "Inset", 1.0)), _inset_face),
     Spec("fillet", "Fillet", "Features", "modifier", "solid", "Round the picked edges.",
          (_BODY(), Slot("edges", "Edges", "select", entity="edge"), _length("radius", "Radius", 0.5)), _fillet),
     Spec("chamfer", "Chamfer", "Features", "modifier", "solid", "Bevel the picked edges.",

@@ -471,6 +471,7 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
     "sweep_multisection_rsolid": {"status": "replayable", "op": "make_sweep_multisection_rsolid"},
     "extrude_until_rsolid": {"status": "replayable", "op": "make_extrude_until_rsolid"},
     "draft_rsolid": {"status": "replayable", "op": "make_draft_rsolid"},
+    "inset_face_rsolid": {"status": "replayable", "op": "make_inset_face_rsolid"},
     "mirror_shape": {"status": "replayable", "op": "make_mirror_rshape"},
     "extrude_rsolid": {"status": "replayable", "op": "make_extrude_rsolid"},
     "revolve_rsolid": {"status": "replayable", "op": "make_revolve_rsolid"},
@@ -703,6 +704,7 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "make_sweep_multisection_rsolid",
     "make_extrude_until_rsolid",
     "make_draft_rsolid",
+    "make_inset_face_rsolid",
     "make_mirror_rshape",
     "make_cut_rsolid",
     "make_cut_rsolid_list",
@@ -4554,6 +4556,19 @@ def _execute_graph(
                                 ctx.fail(f"Graph node '{node.node_id}' expected {params['selected_face_count']} draft faces, got {len(faces)}")
                             result = ops.draft_rsolid(solid=solid, faces_to_draft=faces, angle=params["angle"],
                                 plane_origin=params["plane_origin"], plane_normal=params["plane_normal"])
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "make_inset_face_rsolid":
+                        ctx.require_params(node.node_id, op_name, params, ("distance", "selected_face_count"))
+                        values = _input_outputs(ctx, outputs, node, 0)
+                        if values:
+                            solid = values[0]
+                            faces = _resolve_feature_selection(ctx, node=node, solid=solid,
+                                params=params, kind="face", outputs=outputs)
+                            if ctx.strict and len(faces) != params["selected_face_count"]:
+                                ctx.fail(f"Graph node '{node.node_id}' expected {params['selected_face_count']} inset face, got {len(faces)}")
+                            result = ops.inset_face_rsolid(solid=solid, face=faces, distance=params["distance"])
                             _store_outputs(node, result)
                         continue
 

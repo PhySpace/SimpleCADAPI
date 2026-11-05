@@ -56,7 +56,7 @@ export function OperationPanel({
       if (event.key === "Escape") {
         event.preventDefault();
         drop.current();
-      } else if (event.key === "Enter" && !event.shiftKey && !(event.target as HTMLElement | null)?.closest("textarea, .cm-editor")) {
+      } else if (event.key === "Enter" && !event.shiftKey && !(event.target instanceof Element && event.target.closest("textarea, .cm-editor"))) {
         event.preventDefault();
         // let a number box commit its value first
         window.setTimeout(() => keep.current(), 0);

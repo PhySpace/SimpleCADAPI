@@ -102,6 +102,7 @@ export const CONTEXT_ACTIONS: Record<ContextKind, { id: string; label: string }[
   face: [
     { id: "extrude_face_join", label: "Pull face" },
     { id: "extrude_face_cut", label: "Push in" },
+    { id: "inset_face", label: "Inset" },
     { id: "sketch_on_face", label: "Sketch on this face" },
     { id: "workplane_place", label: "Workplane" },
     { id: "hole", label: "Hole here" },
@@ -147,6 +148,7 @@ const WHEN: Record<string, (context: SelectionContext) => boolean> = {
   extrude_face_join: (c) => c.faces === 1 && c.planarFaces === 1 && c.edges === 0 && c.sketches === 0,
   extrude_face_cut: (c) => c.faces === 1 && c.planarFaces === 1 && c.edges === 0 && c.sketches === 0,
   shell: (c) => c.faces >= 1 && c.edges === 0 && c.sketches === 0,
+  inset_face: (c) => c.faces === 1 && c.planarFaces === 1 && c.edges === 0 && c.sketches === 0,
   fillet: (c) => c.edges >= 1 && c.sketches === 0,
   chamfer: (c) => c.edges >= 1 && c.sketches === 0,
   extrude_sketch: (c) => c.sketches === 1,
@@ -235,6 +237,7 @@ const SYNONYMS: Record<string, string[]> = {
   fillet: ["round", "rounded", "radius", "edge"],
   chamfer: ["bevel", "edge"],
   shell: ["hollow", "thin", "wall"],
+  inset_face: ["offset", "outline", "loop", "imprint", "step", "boss", "inset"],
   linear_pattern: ["array", "copies", "repeat", "row"],
   radial_pattern: ["array", "circular", "polar", "copies", "repeat"],
   mirror: ["flip", "symmetry", "reflect"],

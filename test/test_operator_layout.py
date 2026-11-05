@@ -22,6 +22,7 @@ HOME = {
     "boolean_rsolidlist": "boolean",
     "offset_rsolid": "features",
     "draft_rsolid": "features",
+    "inset_face_rsolid": "features",
     "extrude_taper_rsolid": "features",
     "extrude_until_rsolid": "features",
     "sweep_multisection_rsolid": "features",

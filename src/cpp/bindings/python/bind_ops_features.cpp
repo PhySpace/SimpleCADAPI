@@ -447,6 +447,15 @@ void bind_derived(py::module_& m) {
       "Draft planar, cylindrical or conical faces by a signed angle in degrees about a neutral plane.");
 
   m.def(
+      "inset_face_rsolid",
+      [](const Solid& solid, const FacesOrQuery& face, const Length& distance) {
+        const FaceSelection selection = selection_from<Face>(face);
+        return unlocked(selection.is_selector(), [&] { return inset_face_rsolid(solid, selection, distance); });
+      },
+      py::arg("solid"), py::arg("face"), py::arg("distance"),
+      "Imprint the loops of one planar face moved a distance inside it, splitting the face in an inner face and a ring.");
+
+  m.def(
       "extrude_taper_rsolid",
       [](const Face& profile, const VectorArg& vector, const Angle& taper, bool flip_inner) {
         const Scalar3 direction = vector_arg(vector, "vector");

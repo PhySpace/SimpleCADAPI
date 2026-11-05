@@ -414,6 +414,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [insert_curve_knot_redge](insert_curve_knot_redge.md) *(from operators/geometry.py)* `top-level`
 - [insert_spline_anchor_rsketch](insert_spline_anchor_rsketch.md) *(from operators/sketch.py)* `top-level`
 - [insert_surface_knot_rface](insert_surface_knot_rface.md) *(from operators/geometry.py)* `top-level`
+- [inset_face_rsolid](inset_face_rsolid.md) *(from operators/features.py)* `top-level`
 - [inspect_assembly_constraints_rconstraintreport](inspect_assembly_constraints_rconstraintreport.md) *(from operators/product.py)* `top-level`
 - [inspect_body_overlaps_rlist](inspect_body_overlaps_rlist.md) *(from operators/product.py)* `top-level`
 - [inspect_curve_rcurvedata](inspect_curve_rcurvedata.md) *(from operators/geometry.py)* `top-level`

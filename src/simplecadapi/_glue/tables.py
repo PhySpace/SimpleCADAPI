@@ -186,6 +186,7 @@ _OPERATION_OUTPUT_ROLE_CARDINALITY: Dict[str, Tuple[Tuple[str, str], ...]] = {
         ("revolution.side", "many"),
     ),
     _OP_MAKE_FILLET_RSOLID: (("fillet.patch", "many"),),
+    "make_inset_face_rsolid": (("inset.inner", "one"), ("inset.ring", "many")),
     _OP_MAKE_CHAMFER_RSOLID: (("chamfer.patch", "many"),),
     _OP_MAKE_SHELL_RSOLID: (
         ("shell.body_face", "many"),
