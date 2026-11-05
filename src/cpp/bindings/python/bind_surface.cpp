@@ -5,6 +5,7 @@
 // the Python package.  This is also where the units hook of the surface area is wired to the
 // reactive area's dimension inference.
 #include "bindings.hpp"
+#include "scad/ops/geometry/wires.hpp"
 
 #include <array>
 #include <optional>
@@ -284,6 +285,8 @@ void bind_surface(py::module_& m) {
           const py::object& item = section.value;
           if (py::isinstance<Wire>(item))
             sections.emplace_back(item.cast<Wire>());
+          else if (py::isinstance<Edge>(item))  // the wire of that one edge
+            sections.emplace_back(as_wire(item.cast<Edge>(), ""));
           else if (py::isinstance<Vertex>(item))
             sections.emplace_back(item.cast<Vertex>());
           else

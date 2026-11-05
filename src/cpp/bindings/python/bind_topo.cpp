@@ -16,6 +16,7 @@
 #include "scad/reactive/graph.hpp"
 #include "scad/reactive/lineage.hpp"
 #include "scad/topo/recorder.hpp"
+#include "scad/ops/geometry/wires.hpp"
 #include "scad/topo/shape.hpp"
 
 namespace occt = scad::pybind::occt;
@@ -161,6 +162,10 @@ void bind_topo(py::module_& m) {
       .def("is_closed", &Wire::is_closed)
       .def("edges", &Wire::edges);
   bind_common<Wire>(wire);
+  // An edge is taken wherever a wire is: the wire of that one edge (nothing is lost), made by the recorded
+  // make_wire_from_edges_rwire so a graph sees where it came from.
+  wire.def(py::init([](const Edge& edge) { return make_wire_from_edges_rwire({edge}); }), py::arg("edge"));
+  py::implicitly_convertible<Edge, Wire>();
 
   auto face = py::class_<Face, Shape>(m, "Face");
   face.def("get_area", &Face::area)

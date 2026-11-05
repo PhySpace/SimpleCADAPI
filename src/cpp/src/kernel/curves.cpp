@@ -2,6 +2,12 @@
 
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
+#include <algorithm>
+#include <gp_Pnt.hxx>
+#include <TopoDS_Vertex.hxx>
+#include <BRep_Tool.hxx>
+#include <TopExp.hxx>
+#include <TopExp_Explorer.hxx>
 #include <BRepLib.hxx>
 #include <GCE2d_MakeSegment.hxx>
 #include <GC_MakeArcOfCircle.hxx>
@@ -133,11 +139,85 @@ TopoDS_Edge make_interpolated_bspline_edge(const std::vector<Vec3>& points, bool
   });
 }
 
+namespace {
+
+// `edges` in the order of one chain, each touching the one before it (an end of one at an end of the next, within
+// their tolerances), starting from a free end when the chain is open.  Empty when they do not make one chain.
+std::vector<TopoDS_Edge> chained(const std::vector<TopoDS_Edge>& edges) {
+  struct Ends {
+    gp_Pnt a, b;
+    double tolerance;
+  };
+  std::vector<Ends> ends;
+  for (const TopoDS_Edge& edge : edges) {
+    TopoDS_Vertex first, last;
+    TopExp::Vertices(edge, first, last);
+    if (first.IsNull() || last.IsNull())
+      return {};
+    ends.push_back({BRep_Tool::Pnt(first), BRep_Tool::Pnt(last),
+                    std::max(BRep_Tool::Tolerance(first), BRep_Tool::Tolerance(last))});
+  }
+  const auto meet = [&](const gp_Pnt& p, const gp_Pnt& q, double tolerance) { return p.Distance(q) <= 2 * tolerance; };
+  const auto touches = [&](std::size_t i, const gp_Pnt& p) {
+    return meet(ends[i].a, p, ends[i].tolerance) || meet(ends[i].b, p, ends[i].tolerance);
+  };
+  // an edge with an end no other edge touches starts an open chain
+  std::size_t start = 0;
+  for (std::size_t i = 0; i < edges.size(); ++i) {
+    bool free_end = false;
+    for (const gp_Pnt& p : {ends[i].a, ends[i].b}) {
+      bool touched = false;
+      for (std::size_t j = 0; j < edges.size() && !touched; ++j)
+        touched = j != i && touches(j, p);
+      free_end = free_end || !touched;
+    }
+    if (free_end) {
+      start = i;
+      break;
+    }
+  }
+  std::vector<TopoDS_Edge> out{edges[start]};
+  std::vector<bool> used(edges.size(), false);
+  used[start] = true;
+  // the chain's open end: the end of the first edge no other edge touches (either, for a closed chain)
+  gp_Pnt tip = ends[start].b;
+  for (std::size_t j = 0; j < edges.size(); ++j)
+    if (j != start && touches(j, ends[start].b)) {
+      tip = ends[start].b;
+      break;
+    } else if (j != start && touches(j, ends[start].a)) {
+      tip = ends[start].a;
+    }
+  while (out.size() < edges.size()) {
+    std::size_t next = edges.size();
+    for (std::size_t j = 0; j < edges.size() && next == edges.size(); ++j)
+      if (!used[j] && touches(j, tip))
+        next = j;
+    if (next == edges.size())
+      return {};
+    used[next] = true;
+    out.push_back(edges[next]);
+    tip = meet(ends[next].a, tip, ends[next].tolerance) ? ends[next].b : ends[next].a;
+  }
+  return out;
+}
+
+}  // namespace
+
 TopoDS_Wire make_wire_from_edges(const std::vector<TopoDS_Edge>& edges) {
   return occt_guard([&] {
+    if (edges.empty())
+      throw KernelError("StdFail_NotDone", "a wire needs at least one edge");
+    // Ordered into one chain first, then added one by one: an edge that does not touch the wire built so far would
+    // otherwise be left out without a word, and an edge added in turn keeps its identity (its tags).
+    const std::vector<TopoDS_Edge> chain = chained(edges);
+    if (chain.empty())
+      throw KernelError("BRepBuilderAPI_DisconnectedWire", "the edges do not connect into one wire");
     BRepBuilderAPI_MakeWire builder;
-    for (const TopoDS_Edge& edge : edges)
+    for (const TopoDS_Edge& edge : chain)
       builder.Add(edge);
+    if (!builder.IsDone())
+      throw KernelError("BRepBuilderAPI_DisconnectedWire", "the edges do not connect into one wire");
     return builder.Wire();
   });
 }

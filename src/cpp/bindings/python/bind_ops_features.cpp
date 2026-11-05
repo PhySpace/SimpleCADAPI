@@ -408,7 +408,7 @@ void bind_sweeps(py::module_& m) {
         const py::object& binormal = binormal_arg;
         const std::vector<Shape> sections = shape_list(profiles, "sections must be Face or Wire");
         std::optional<Binormal> aux;
-        if (py::isinstance<Wire>(binormal))
+        if (py::isinstance<Wire>(binormal) || py::isinstance<Edge>(binormal))  // an edge: the wire of that one edge
           aux = Binormal(binormal.cast<Wire>());
         else if (!binormal.is_none())
           aux = Binormal(vector_arg(binormal, "binormal"));

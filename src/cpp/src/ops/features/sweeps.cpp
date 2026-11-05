@@ -7,6 +7,7 @@
 
 #include "internal.hpp"
 #include "scad/ops/features/diagnostics.hpp"
+#include "scad/ops/geometry/wires.hpp"
 #include "scad/semantic/tracking.hpp"
 
 namespace scad {
@@ -38,7 +39,9 @@ void validate_loft_sections(const std::vector<Shape>& sections, std::string_view
 
 }  // namespace
 
-Solid loft_rsolid(const std::vector<Shape>& profiles, bool ruled, const LoftOptions& options) {
+Solid loft_rsolid(const std::vector<Shape>& given, bool ruled, const LoftOptions& options) {
+  // an edge section is the wire of that one edge
+  const std::vector<Shape> profiles = edges_as_wires(given);
   static const ErrorSpec spec{
       "loft_rsolid",
       "Failed to loft the input profiles into a solid.",

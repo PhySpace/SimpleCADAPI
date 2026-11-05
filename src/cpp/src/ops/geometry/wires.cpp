@@ -38,4 +38,20 @@ Wire make_wire_from_edges_rwire(const std::vector<Edge>& edges, const OptionalSt
   });
 }
 
+Wire as_wire(const Shape& shape, const char* message) {
+  if (shape.kind() == Kind::Wire)
+    return Wire(shape);
+  if (shape.kind() == Kind::Edge)
+    return make_wire_from_edges_rwire({Edge(shape)});
+  throw ValueError(message);
+}
+
+std::vector<Shape> edges_as_wires(const std::vector<Shape>& shapes) {
+  std::vector<Shape> out;
+  out.reserve(shapes.size());
+  for (const Shape& shape : shapes)
+    out.push_back(shape.kind() == Kind::Edge ? Shape(as_wire(shape, "")) : shape);
+  return out;
+}
+
 }  // namespace scad

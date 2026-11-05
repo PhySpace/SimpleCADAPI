@@ -78,8 +78,11 @@ TEST_CASE("make_face_from_wire_rface keeps the wire's names") {
   CHECK(has_tag(face, "plate.face"));
   CHECK(count_with_tag(face.edges(), "frame.edge.line1") == 1);
 
+  // an edge is the wire of that one edge (here open, so it makes no face); a face is not a wire at all
   const Edge edge = make_line_redge(scalar3(0, 0, 0), scalar3(1, 0, 0));
-  const auto not_wire = failure_of([&] { make_face_from_wire_rface(edge); });
+  CHECK(failure_of([&] { make_face_from_wire_rface(edge); })->guidance().possible_causes.front() !=
+        "The input is not a Wire instance.");
+  const auto not_wire = failure_of([&] { make_face_from_wire_rface(face); });
   REQUIRE(not_wire);
   CHECK(not_wire->guidance().possible_causes.front() == "The input is not a Wire instance.");
 }
@@ -119,6 +122,8 @@ TEST_CASE("make_face_from_wires_rface punches holes") {
   const Edge edge = make_line_redge(scalar3(0, 0, 0), scalar3(1, 0, 0));
   CHECK(failure_of([&] { make_face_from_wires_rface(edge, {inner}); })->operation() == "make_face_from_wires_rface");
   CHECK(failure_of([&] { make_face_from_wires_rface(outer, {edge}); })->guidance().technical_details ==
+        "ValueError: inner wires must be closed");  // an edge is the wire of that one edge
+  CHECK(failure_of([&] { make_face_from_wires_rface(outer, {plate}); })->guidance().technical_details ==
         "ValueError: inner_wires must contain only Wire objects");
   CHECK(
       failure_of([&] { make_face_from_wires_rface(outer, {inner}, scalar3(0, 0, 0)); })->guidance().technical_details ==
