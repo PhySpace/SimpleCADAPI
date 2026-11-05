@@ -3,6 +3,7 @@ import { useRef } from "react";
 
 import { cn } from "@/lib/utils";
 import { isEnabled, moveIndex, type SegmentOption } from "@/lib/segmented";
+import { t } from "@/i18n";
 
 /** A segmented control: one of a few short choices, always visible (a radio group, not a dropdown).
  *
@@ -71,7 +72,7 @@ export function OperationChooser({
               aria-checked={on}
               disabled={Boolean(option.disabled)}
               tabIndex={index === tabbable ? 0 : -1}
-              title={reason ?? option.hint}
+              title={reason ? t(reason) : option.hint && t(option.hint)}
               data-testid={`${testId}-${option.value}`}
               className={cn(
                 "flex flex-1 items-center justify-center gap-1 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-40",
@@ -82,14 +83,14 @@ export function OperationChooser({
               onKeyDown={(event) => onKeyDown(event, index)}
             >
               {Icon && <Icon className="size-3.5 shrink-0" aria-hidden />}
-              {option.label}
+              {t(option.label)}
             </button>
           );
         })}
       </div>
       {(note || hint) && (
         <span className="text-[11px] text-muted-foreground" data-testid={`${testId}-hint`}>
-          {note ?? `${options[selected]?.label ?? ""} ${hint}.`}
+          {note ? t(note) : `${t(options[selected]?.label ?? "")} ${hint ? t(hint) : ""}.`}
         </span>
       )}
     </div>

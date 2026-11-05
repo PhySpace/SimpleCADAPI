@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import type { LogEntry, LogLevel, RunBatch } from "@/lib/runlog";
+import { t } from "@/i18n";
 
 const INK: Record<LogLevel, string> = {
   info: "text-muted-foreground",
@@ -61,11 +62,11 @@ export function Dock({
   const percent = batch && batch.total > 0 ? Math.round((batch.done / batch.total) * 100) : 0;
 
   return (
-    <section className="shrink-0 border-t-2 border-border bg-background" aria-label="log">
+    <section className="shrink-0 border-t-2 border-border bg-background" aria-label={t("log")}>
       {open && (
         <div ref={list} className="h-44 overflow-y-auto border-b-2 border-border px-3 py-1.5 text-[11px] leading-5">
           {entries.length === 0 ? (
-            <p className="text-muted-foreground">Nothing yet. Runs, reloads and errors are listed here.</p>
+            <p className="text-muted-foreground">{t("Nothing yet. Runs, reloads and errors are listed here.")}</p>
           ) : (
             entries.map((entry) => (
               <p key={entry.id} className={cn("flex gap-3 whitespace-pre-wrap break-words", INK[entry.level])}>
@@ -82,20 +83,20 @@ export function Dock({
           type="button"
           className="flex min-w-0 flex-1 items-center gap-2 self-stretch text-left"
           onClick={() => setOpen((value) => !value)}
-          title={open ? "Close the log" : "Open the log"}
+          title={open ? t("Close the log") : t("Open the log")}
         >
           {open ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronUp className="h-3.5 w-3.5 shrink-0" />}
-          <span className="label shrink-0">log</span>
+          <span className="label shrink-0">{t("log")}</span>
           {batch ? (
             <>
               <span className="shrink-0 text-focus">
-                re-evaluating {batch.done}/{batch.total}
+                {t("re-evaluating {{done}}/{{total}}", { done: batch.done, total: batch.total })}
               </span>
               <span className="relative h-2 w-28 shrink-0 border border-focus">
                 <span className="absolute inset-y-0 left-0 bg-focus" style={{ width: `${percent}%` }} />
               </span>
               <span className="min-w-0 truncate text-muted-foreground">
-                {batch.current ? `${batch.current} · ` : batch.done >= batch.total ? "building the model · " : ""}
+                {batch.current ? `${batch.current} · ` : batch.done >= batch.total ? `${t("building the model")} · ` : ""}
                 {(Math.max(0, tick - batch.startedAt) / 1000).toFixed(1)} s
               </span>
             </>
@@ -107,12 +108,12 @@ export function Dock({
         </button>
         {errors > 0 && (
           <span className="shrink-0 border border-fail px-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-fail">
-            {errors} {errors === 1 ? "error" : "errors"}
+            {errors === 1 ? t("1 error") : t("{{count}} errors", { count: errors })}
           </span>
         )}
         <button
           type="button"
-          title="Clear the log"
+          title={t("Clear the log")}
           className="flex h-6 w-6 shrink-0 items-center justify-center border-2 border-transparent text-muted-foreground hover:border-input hover:text-foreground"
           onClick={onClear}
         >

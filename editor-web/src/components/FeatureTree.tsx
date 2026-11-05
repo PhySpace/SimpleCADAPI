@@ -8,16 +8,17 @@ import { plainLabel } from "@/lib/commands";
 import { candidateLabel, fetchRefStatus, refState, refTone, type Catalog, type FeatureRow, type FeatureState, type RefStatus, type Spec } from "@/lib/features";
 import type { SketchInfo } from "@/lib/sketch-scene";
 import { cn } from "@/lib/utils";
+import { t } from "@/i18n";
 
 /** Undo and redo with their counts. */
 export function UndoRedo({ state, busy, onUndo, onRedo }: { state: Pick<FeatureState, "undo" | "redo">; busy?: boolean; onUndo: () => void; onRedo: () => void }) {
   return (
     <span className="flex items-center gap-1">
-      <Button type="button" size="sm" variant="outline" className="h-6 px-1.5" disabled={busy || state.undo === 0} title="Undo the last feature change (Ctrl/Cmd+Z)" onClick={onUndo}>
-        <Undo2 /> undo {state.undo > 0 && <span className="text-muted-foreground">{state.undo}</span>}
+      <Button type="button" size="sm" variant="outline" className="h-6 px-1.5" disabled={busy || state.undo === 0} title={t("Undo the last feature change (Ctrl/Cmd+Z)")} onClick={onUndo}>
+        <Undo2 /> {t("undo")} {state.undo > 0 && <span className="text-muted-foreground">{state.undo}</span>}
       </Button>
-      <Button type="button" size="sm" variant="outline" className="h-6 px-1.5" disabled={busy || state.redo === 0} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={onRedo}>
-        <Redo2 /> redo {state.redo > 0 && <span className="text-muted-foreground">{state.redo}</span>}
+      <Button type="button" size="sm" variant="outline" className="h-6 px-1.5" disabled={busy || state.redo === 0} title={t("Redo (Ctrl/Cmd+Shift+Z)")} onClick={onRedo}>
+        <Redo2 /> {t("redo")} {state.redo > 0 && <span className="text-muted-foreground">{state.redo}</span>}
       </Button>
     </span>
   );
@@ -59,7 +60,7 @@ export function ReferenceHealth({ cell, version, busy, onRepair }: { cell: strin
     );
     return () => void (live = false);
   }, [cell, version]);
-  if (failure) return <p className="mt-1 pl-[22px] text-[11px] text-muted-foreground">references: {failure}</p>;
+  if (failure) return <p className="mt-1 pl-[22px] text-[11px] text-muted-foreground">{t("references:")} {failure}</p>;
   if (!status || status.badge === null) return null;
   return (
     <div className="mt-1 space-y-1 pl-[22px] text-[11px]" data-testid={`refs-${cell}`}>
@@ -74,7 +75,7 @@ export function ReferenceHealth({ cell, version, busy, onRepair }: { cell: strin
                 <div className="mt-0.5 flex flex-wrap gap-1">
                   {row.candidates.map((candidate, choice) => (
                     <Button key={choice} type="button" size="sm" variant="outline" className="h-6 px-1.5" disabled={busy}
-                      title={state === "split" ? "Use this piece" : "Accept this look-alike"} onClick={() => onRepair(slot, index, choice)}>
+                      title={state === "split" ? t("Use this piece") : t("Accept this look-alike")} onClick={() => onRepair(slot, index, choice)}>
                       {state === "split" ? `piece ${choice + 1}` : "use"}: {candidateLabel(candidate)}
                     </Button>
                   ))}
@@ -140,23 +141,23 @@ export function FeatureTree({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between border-b border-border px-2 py-1.5">
-        <span className="label">features {state.features.length > 0 && `(${state.features.length})`}</span>
+        <span className="label">{t("features")} {state.features.length > 0 && `(${state.features.length})`}</span>
         <UndoRedo state={state} busy={busy} onUndo={onUndo} onRedo={onRedo} />
       </div>
       {stale && state.tip && (
         <div className="flex items-center gap-2 border-b-2 border-focus bg-accent px-3 py-1.5 text-[11px]">
           <span className="min-w-0 flex-1">
-            The product still builds from <span className="text-name">{stale.body}</span>.
+            {t("The product still builds from")} <span className="text-name">{stale.body}</span>.
           </span>
           <Button type="button" size="sm" className="h-6 px-2" disabled={busy} onClick={() => onUseProduct(state.tip as string)}>
-            use {state.tip}
+            {t("use {{body}}", { body: state.tip })}
           </Button>
         </div>
       )}
       {error && <div className="border-b border-fail px-3 py-1 text-[11px] text-fail">{error}</div>}
       <ScrollArea className="min-h-0 flex-1">
         {state.features.length === 0 ? (
-          <p className="px-3 py-3 text-[11px] text-muted-foreground">No features yet. Add a Box or another operation above; each one becomes an ordinary cell in the notebook.</p>
+          <p className="px-3 py-3 text-[11px] text-muted-foreground">{t("No features yet. Add a Box or another operation from the command bar; each one becomes an ordinary cell in the notebook.")}</p>
         ) : (
           <ul>
             {state.features.map((feature) => {
@@ -188,14 +189,14 @@ export function FeatureTree({
                     <span className="w-5 shrink-0 text-[10px] text-muted-foreground">{feature.index}</span>
                     <span className="min-w-0 flex-1 truncate text-name">{feature.slug}</span>
                     {isProduct && (
-                      <Badge variant="focus" title={state.product?.implicit ? "The part is this body (made by the runtime, no cell to keep)" : "The product cell builds from this body"}>
-                        product
+                      <Badge variant="focus" title={state.product?.implicit ? t("The part is this body (made by the runtime, no cell to keep)") : t("The product cell builds from this body")}>
+                        {t("product")}
                       </Badge>
                     )}
-                    <Badge variant="secondary">{feature.role}</Badge>
+                    <Badge variant="secondary">{t(feature.role)}</Badge>
                     {sketch && sketch.usedBy.length > 0 && (
-                      <Badge variant="secondary" title={`Used by ${sketch.usedBy.join(", ")}: drawn dimmer in the viewport`}>
-                        used
+                      <Badge variant="secondary" title={t("Used by {{users}}: drawn dimmer in the viewport", { users: sketch.usedBy.join(", ") })}>
+                        {t("used")}
                       </Badge>
                     )}
                     <Badge variant={feature.gui ? "outline" : "name"}>{spec ? plainLabel(spec.id, spec.label) : feature.gui ? feature.gui.spec.replace(/_/g, " ") : "code"}</Badge>
@@ -212,15 +213,15 @@ export function FeatureTree({
                         className="h-6 w-6"
                         data-testid={`sketch-eye-${sketch.name}`}
                         aria-pressed={!hiddenSketch}
-                        aria-label={hiddenSketch ? `show ${sketch.name} in the viewport` : `hide ${sketch.name} in the viewport`}
-                        title={hiddenSketch ? "Show this sketch in the viewport" : "Hide this sketch in the viewport"}
+                        aria-label={hiddenSketch ? t("show {{name}} in the viewport", { name: sketch.name }) : t("hide {{name}} in the viewport", { name: sketch.name })}
+                        title={hiddenSketch ? t("Show this sketch in the viewport") : t("Hide this sketch in the viewport")}
                         onClick={() => sketches?.onToggleHidden(sketch.name)}
                       >
                         {hiddenSketch ? <EyeOff className="text-muted-foreground" /> : <Eye />}
                       </Button>
                     )}
-                    <span title={canEdit ? "Edit this feature" : "Written as code: edit it in the notebook"}>
-                      <Button type="button" size="icon" variant="ghost" className="h-6 w-6" disabled={!canEdit || busy} aria-label={`edit ${feature.slug}`} onClick={() => spec && onEdit(feature, spec)}>
+                    <span title={canEdit ? t("Edit this feature") : t("Written as code: edit it in the notebook")}>
+                      <Button type="button" size="icon" variant="ghost" className="h-6 w-6" disabled={!canEdit || busy} aria-label={t("edit {{name}}", { name: feature.slug })} onClick={() => spec && onEdit(feature, spec)}>
                         <Pencil />
                       </Button>
                     </span>
@@ -230,8 +231,8 @@ export function FeatureTree({
                       variant={armed === feature.cell ? "destructive" : "ghost"}
                       className="h-6 w-6"
                       disabled={busy}
-                      aria-label={armed === feature.cell ? `confirm delete ${feature.slug}` : `delete ${feature.slug}`}
-                      title={armed === feature.cell ? "Click again to delete" : "Delete this feature"}
+                      aria-label={armed === feature.cell ? t("confirm delete {{name}}", { name: feature.slug }) : t("delete {{name}}", { name: feature.slug })}
+                      title={armed === feature.cell ? t("Click again to delete") : t("Delete this feature")}
                       onClick={() => {
                         if (armed === feature.cell) {
                           setArmed(null);

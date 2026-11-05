@@ -25,6 +25,7 @@ import { rayThrough } from "@/scene/camera-projection";
 import { OVERLAY_LAYER } from "@/scene/renderer/brep-renderer";
 import { pointSprites } from "@/scene/point-sprites";
 import type { SceneView } from "@/scene/scene-view";
+import { t } from "@/i18n";
 
 const EMPTY: CurveDoc = { points: [], curves: [] };
 const PATH = "#2563eb";
@@ -348,14 +349,14 @@ export function CurveDrawer({
 
   const hint =
     doc.points.length === 0
-      ? "Click the first point."
+      ? t("Click the first point.")
       : tool === "arc"
         ? pending.length === 0
-          ? "Click a point the arc passes through."
-          : "Click where the arc ends."
+          ? t("Click a point the arc passes through.")
+          : t("Click where the arc ends.")
         : tool === "spline"
-          ? "Click the points the spline passes through; another tool or Enter ends it."
-          : "Click where the line ends.";
+          ? t("Click the points the spline passes through; another tool or Enter ends it.")
+          : t("Click where the line ends.");
 
   return (
     <>
@@ -367,23 +368,23 @@ export function CurveDrawer({
       )}
       <div className="pointer-events-auto absolute left-3 top-3 z-30 flex max-w-[min(460px,90%)] flex-col gap-2 border-2 border-primary bg-popover px-3 py-2 text-[11px] shadow-[4px_4px_0_var(--shadow-hard)]" data-testid="curve-drawer">
         <div className="scroll-row items-center gap-2">
-          <span className="font-semibold">3D curve</span>
-          <input id="curve-name" aria-label="name" className="w-20 border border-input bg-background px-1 font-mono" value={name} onChange={(event) => setName(event.target.value)} />
+          <span className="font-semibold">{t("3D curve")}</span>
+          <input id="curve-name" aria-label={t("name")} className="w-20 border border-input bg-background px-1 font-mono" value={name} onChange={(event) => setName(event.target.value)} />
           <span className="flex border border-input">
             {TOOLS.map((item) => (
               <button
                 key={item.kind}
                 type="button"
-                title={`${item.label} (${item.key.toUpperCase()})`}
+                title={`${t(item.label)} (${item.key.toUpperCase()})`}
                 className={`flex items-center gap-1 px-1.5 ${tool === item.kind ? "bg-primary text-primary-foreground" : ""}`}
                 onClick={() => switchTool(item.kind)}
               >
-                <item.icon className="size-3" /> {item.label}
+                <item.icon className="size-3" /> {t(item.label)}
               </button>
             ))}
           </span>
-          <span className="text-muted-foreground">on</span>
-          <select id="curve-plane" aria-label="drawing plane" className="border border-input bg-background px-1" value={plane?.name} onChange={(event) => setPlaneName(event.target.value)}>
+          <span className="text-muted-foreground">{t("on")}</span>
+          <select id="curve-plane" aria-label={t("drawing plane")} className="border border-input bg-background px-1" value={plane?.name} onChange={(event) => setPlaneName(event.target.value)}>
             {planes.map((item) => (
               <option key={item.name} value={item.name}>
                 {item.name}
@@ -392,17 +393,17 @@ export function CurveDrawer({
           </select>
         </div>
         <span className="text-muted-foreground">
-          {hint} Snaps to vertices, edge midpoints, workplane origins, its own points and the grid. Tab: next plane · ⌫: back
+          {hint} {t("Snaps to vertices, edge midpoints, workplane origins, its own points and the grid. Tab: next plane · ⌫: back")}
         </span>
         <div className="flex items-center gap-2">
           <button type="button" disabled={busy || doc.curves.length + (pending.length && tool === "spline" ? 1 : 0) === 0} className="border-2 border-primary bg-primary px-2 py-0.5 font-semibold text-primary-foreground disabled:opacity-50" onClick={finish}>
-            Finish (Enter)
+            {t("Finish")} (Enter)
           </button>
           <button type="button" className="border border-border px-2 py-0.5 hover:bg-accent" onClick={onCancel}>
-            Cancel (Esc)
+            {t("Cancel")} (Esc)
           </button>
           <span className="font-mono text-muted-foreground">
-            {doc.curves.length} {doc.curves.length === 1 ? "segment" : "segments"} · {nextId(doc.points.map((p) => p.id), "p")}
+            {doc.curves.length === 1 ? t("1 segment") : t("{{count}} segments", { count: doc.curves.length })} · {nextId(doc.points.map((p) => p.id), "p")}
           </span>
         </div>
         {error && (

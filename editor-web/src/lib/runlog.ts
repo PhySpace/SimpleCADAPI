@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { t } from "@/i18n";
 
 export type LogLevel = "info" | "run" | "ok" | "error";
 
@@ -73,8 +74,9 @@ export function useRunLog() {
     quiet.current = null;
     const total = members.current.size;
     if (total > 0) {
-      const text = `${total} ${total === 1 ? "cell" : "cells"} re-evaluated in ${seconds(Date.now() - batchStart.current)}`;
-      if (failures.current > 0) push("error", `${text}; ${failures.current} did not complete`);
+      const time = seconds(Date.now() - batchStart.current);
+      const text = total === 1 ? t("1 cell re-evaluated in {{time}}", { time }) : t("{{count}} cells re-evaluated in {{time}}", { count: total, time });
+      if (failures.current > 0) push("error", `${text}; ${t("{{count}} did not complete", { count: failures.current })}`);
       else push("ok", text);
     }
     members.current.clear();

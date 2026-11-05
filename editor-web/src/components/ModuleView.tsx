@@ -10,6 +10,7 @@ import { ParamControl, type ParamMeta, type ParamValue } from "@/components/Para
 import { cadTheme } from "@/lib/cm-theme";
 import { createSettler, SETTLE_MS } from "@/lib/settle";
 import { sdkCompletion } from "@/lib/sdk-complete";
+import { t } from "@/i18n";
 
 /** A local module of the workspace (shared dimensions, helpers): what the
  * server sends as the `module` envelope. */
@@ -103,12 +104,12 @@ export function ModuleView({
             used by {module.used_by.map((path) => path.replace(/\.py$/, "")).join(", ")}
           </span>
         ) : (
-          <Badge variant="secondary">unused</Badge>
+          <Badge variant="secondary">{t("unused")}</Badge>
         )}
         <button
           type="button"
           className="flex h-6 w-6 items-center justify-center border-2 border-transparent text-muted-foreground hover:border-input hover:text-foreground"
-          title="Close the module view"
+          title={t("Close the module view")}
           onClick={onClose}
         >
           <X className="h-3.5 w-3.5" />

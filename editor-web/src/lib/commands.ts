@@ -5,6 +5,7 @@
 import type { LucideIcon } from "lucide-react";
 
 import type { Spec } from "@/lib/features";
+import { t } from "@/i18n";
 
 export type Command = {
   id: string;
@@ -335,6 +336,13 @@ function termScore(term: string, command: Command): number {
   if (command.group.toLowerCase().startsWith(term)) return 40;
   if (command.keywords.some((word) => word.toLowerCase().includes(term))) return 35;
   if (command.group.toLowerCase().includes(term) || (command.description ?? "").toLowerCase().includes(term)) return 30;
+  // the names shown in the person's language (a Chinese query finds 拉伸)
+  const shown = t(command.label).toLowerCase();
+  if (shown !== label) {
+    if (shown.startsWith(term)) return 85;
+    if (shown.includes(term)) return 55;
+  }
+  if (t(command.group).toLowerCase().includes(term)) return 30;
   if (term.length >= 3 && (isSubsequence(term, label) || isSubsequence(term, id.replace(/ /g, "")))) return 15;
   return 0;
 }

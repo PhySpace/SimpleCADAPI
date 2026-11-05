@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { t } from "@/i18n";
 
 export type EditorMode = "manual" | "code";
 
@@ -10,7 +11,7 @@ const OPTIONS: { value: EditorMode; label: string; hint: string }[] = [
 /** The big two-position switch of the top bar: manual mode on the left, code mode on the right. */
 export function ModeSwitch({ mode, onChange, disabled }: { mode: EditorMode; onChange: (mode: EditorMode) => void; disabled?: boolean }) {
   return (
-    <div role="radiogroup" aria-label="Editor mode" data-testid="mode-switch" className={cn("relative grid h-8 grid-cols-2 border-2 border-primary", disabled && "opacity-50")}>
+    <div role="radiogroup" aria-label={t("Editor mode")} data-testid="mode-switch" className={cn("relative grid h-8 grid-cols-2 border-2 border-primary", disabled && "opacity-50")}>
       <span
         aria-hidden
         className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-primary transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
@@ -22,7 +23,7 @@ export function ModeSwitch({ mode, onChange, disabled }: { mode: EditorMode; onC
           type="button"
           role="radio"
           aria-checked={mode === option.value}
-          title={option.hint}
+          title={t(option.hint)}
           disabled={disabled}
           data-mode={option.value}
           onClick={() => option.value !== mode && onChange(option.value)}
@@ -31,7 +32,7 @@ export function ModeSwitch({ mode, onChange, disabled }: { mode: EditorMode; onC
             mode === option.value ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground",
           )}
         >
-          {option.label}
+          {t(option.label)}
         </button>
       ))}
     </div>

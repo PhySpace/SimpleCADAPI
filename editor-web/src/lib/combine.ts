@@ -4,6 +4,7 @@
 
 import { isSlotVisible, type FeatureRow, type FeatureState, type Slot, type SlotOption, type Spec } from "@/lib/features";
 import type { SegmentOption } from "@/lib/segmented";
+import { t } from "@/i18n";
 
 export const OPERATION_SLOT = "operation";
 export const TARGET_SLOT = "target";
@@ -65,10 +66,10 @@ export function targetDisplay(state: CombineState, edit: Pick<FeatureRow, "makes
   if (edit) {
     if (open.length > 1) return { kind: "choose" };
     const name = current || "the body before it";
-    return { kind: "fixed", name, text: `Combined with: ${name}` };
+    return { kind: "fixed", name, text: `${t("Combined with:")} ${name}` };
   }
   if (open.length === 0) return { kind: "hidden" };
-  if (open.length === 1) return { kind: "fixed", name: open[0], text: `Combined with: ${open[0]}` };
+  if (open.length === 1) return { kind: "fixed", name: open[0], text: `${t("Combined with:")} ${open[0]}` };
   return { kind: "choose" };
 }
 

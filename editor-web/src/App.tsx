@@ -57,6 +57,7 @@ import { cn } from "@/lib/utils";
 import { Boxes, Cable } from "lucide-react";
 import { Viewport, type PickResult, type SelectionMode } from "@/scene/Viewport";
 import type { SceneView } from "@/scene/scene-view";
+import { t, useI18n } from "@/i18n";
 
 /** The pick intents and their keys: 1 vertex, 2 edge, 3 face, 4 solid (Plasticity's order), 5 component, 6 sketch. */
 const MODES: { mode: SelectionMode; label: string; key: string }[] = [
@@ -77,6 +78,7 @@ const MANUAL_TABS = ["features", "assembly"];
 const CODE_TABS = ["notebook", "module"];
 
 export function App() {
+  useI18n(); // a change of language renders the whole editor again
   const viewRef = useRef<SceneView | null>(null);
   // Whether a model of the open notebook is on screen (it may be the last run's,
   // restored while the kernel boots): then nothing is being waited for.
@@ -119,7 +121,7 @@ export function App() {
   // kernel is up, and a late answer of the workspace list cannot undo it.
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [kernelAlive, setKernelAlive] = useState(false);
-  const [status, setStatus] = useState("Connecting…");
+  const [status, setStatus] = useState(() => t("Connecting…"));
 
   const [params, setParams] = useState<ParamMeta[]>([]);
   const [cells, setCells] = useState<NotebookCell[]>([]);
@@ -222,7 +224,7 @@ export function App() {
   const handleStop = useCallback(() => {
     socketRef.current?.send({ type: "interrupt.request" });
     setLoading(null);
-    log.push("info", "stop requested");
+    log.push("info", t("stop requested"));
     log.resetBatch();
   }, [log.push, log.resetBatch]);
 
@@ -256,9 +258,9 @@ export function App() {
         framedNotebook.current = name;
       }
       setSceneVersion((version) => version + 1);
-      log.push("ok", `model shown: ${preview.nodes.length} ${preview.nodes.length === 1 ? "part" : "parts"}`);
+      log.push("ok", preview.nodes.length === 1 ? t("model shown: 1 part") : t("model shown: {{count}} parts", { count: preview.nodes.length }));
     } catch (error) {
-      log.push("error", error instanceof Error ? error.message : "unable to open the preview");
+      log.push("error", error instanceof Error ? error.message : t("unable to open the preview"));
     }
   }, [log.push]);
 
@@ -284,9 +286,9 @@ export function App() {
       refreshFeatures();
       // No notebook: nothing to wait for. Else the model is on its way.
       if (hasModel.current) return;
-      const stage = envelope["notebook"] ? (envelope["kernel"] ? "building the model" : "starting the kernel") : null;
+      const stage = envelope["notebook"] ? (envelope["kernel"] ? t("building the model") : t("starting the kernel")) : null;
       setLoading(stage);
-      setStatus(stage ? `${stage[0].toUpperCase()}${stage.slice(1)}…` : "No notebook yet: create one in the workspace tab");
+      setStatus(stage ? `${stage}…` : t("No notebook yet: create one in the workspace tab"));
       refreshWorkspace();
     });
 
@@ -321,10 +323,10 @@ export function App() {
       refreshFeatures();
       setNotebook(String(envelope["notebook"] ?? ""));
       setCurrentPath((envelope["path"] as string) ?? null);
-      setStatus(`opening ${envelope["notebook"]}…`);
-      setLoading(`opening ${envelope["notebook"]}`);
+      setStatus(`${t("opening {{name}}", { name: envelope["notebook"] })}…`);
+      setLoading(t("opening {{name}}", { name: envelope["notebook"] }));
       log.resetBatch();
-      log.push("info", `opening ${envelope["notebook"]}`);
+      log.push("info", t("opening {{name}}", { name: envelope["notebook"] }));
       setSceneVersion((version) => version + 1);
       refreshWorkspace();
     });
@@ -371,7 +373,7 @@ export function App() {
     // The server dropped an edit made on a cell that had changed on disk.
     socket.on("cell.conflict", (envelope) => {
       const mine = String(envelope["mine"] ?? "");
-      log.push("error", `a cell changed on disk while you were editing it: kept the file's version. Your unsaved text was:\n${mine.length > 600 ? `${mine.slice(0, 600)}…` : mine}`);
+      log.push("error", `${t("a cell changed on disk while you were editing it: kept the file's version. Your unsaved text was:")}\n${mine.length > 600 ? `${mine.slice(0, 600)}…` : mine}`);
     });
     socket.on("notebook.features", (envelope) => setFeatures((envelope["features"] as NotebookFeature[]) ?? []));
     socket.on("workplanes", (envelope) => setWorkplanes(parseWorkplanes(envelope["workplanes"])));
@@ -387,7 +389,7 @@ export function App() {
       const nextPartial = parsePartial(envelope["partial"]);
       if (nextPartial && !samePartial(partialRef.current, nextPartial)) {
         const { title, reason } = describePartial(nextPartial);
-        log.push("info", `showing ${title.charAt(0).toLowerCase()}${title.slice(1)}: ${reason}`);
+        log.push("info", t("showing {{what}}: {{reason}}", { what: title, reason }));
       }
       partialRef.current = nextPartial;
       setPartial(nextPartial);
@@ -425,18 +427,18 @@ export function App() {
           setLoading(null);
         }
       } else if (typeof envelope["info"] === "string") {
-        setStatus(envelope["info"]);
-        log.push("info", envelope["info"]);
+        setStatus(t(envelope["info"]));
+        log.push("info", t(envelope["info"]));
         setLoading(null); // a notice ends a wait as well (an empty notebook has no model to wait for)
       } else if (typeof envelope["working"] === "string") {
         setStatus(envelope["working"]);
         log.push("run", envelope["working"]);
         setLoading(envelope["working"].replace(/…$/, ""));
       } else if (typeof envelope["exported"] === "string") {
-        setStatus(`exported ${envelope["exported"]}`);
+        setStatus(t("exported {{path}}", { path: envelope["exported"] }));
         log.push("ok", `exported ${envelope["exported"]}`);
       } else if (typeof envelope["created"] === "string") {
-        setStatus(`created ${envelope["created"]}`);
+        setStatus(t("created {{path}}", { path: envelope["created"] }));
         log.push("ok", `created ${envelope["created"]}`);
       }
     });
@@ -505,7 +507,7 @@ export function App() {
     },
     [resolveFace],
   );
-  const refusal = (type: string | null) => `This face is ${type ? `a ${type.toLowerCase()}` : "curved"}: a sketch needs a flat face. Pick a flat face or a datum plane.`;
+  const refusal = (type: string | null) => (type ? t("This face is a {{type}}: a sketch needs a flat face. Pick a flat face or a datum plane.", { type: type.toLowerCase() }) : t("This face is curved: a sketch needs a flat face. Pick a flat face or a datum plane."));
 
   /** While the sketch plane is being chosen a face pick means "sketch on this face" and never reaches the selection. */
   const pickSketchFace = useCallback(
@@ -768,7 +770,7 @@ export function App() {
   const workplaneFromSelection = useCallback(async () => {
     const request = workplaneRequest(selectionRef.current);
     if (!request) {
-      setBarNote("A workplane needs one flat face, a face and an edge, two parallel faces, three vertices or one edge.");
+      setBarNote(t("A workplane needs one flat face, a face and an edge, two parallel faces, three vertices or one edge."));
       return;
     }
     setBarNote(null);
@@ -853,10 +855,10 @@ export function App() {
 
   /** The bases a workplane can be placed on: the datum planes, every workplane of the notebook, and the picked face. */
   const placeBases = useMemo<PlaceBase[]>(() => {
-    if (placing?.kind === "connector" && placing.face) return [{ value: "face", label: "picked face", frame: placing.face.frame }];
+    if (placing?.kind === "connector" && placing.face) return [{ value: "face", label: t("picked face"), frame: placing.face.frame }];
     const out: PlaceBase[] = (["XY", "XZ", "YZ"] as const).map((name) => ({ value: name, label: name, frame: NAMED_FRAMES[name] }));
     for (const wp of workplanes) out.push({ value: wp.name, label: wp.name, frame: { origin: wp.origin, x_axis: wp.x_axis, y_axis: wp.y_axis, normal: wp.normal } });
-    if (placing?.face) out.push({ value: "face", label: "picked face", frame: placing.face.frame });
+    if (placing?.face) out.push({ value: "face", label: t("picked face"), frame: placing.face.frame });
     return out;
   }, [workplanes, placing?.face, placing?.kind]);
   const placeBase = placeBases.find((item) => item.value === placing?.base) ?? placeBases[0];
@@ -869,7 +871,7 @@ export function App() {
     const face = items.length === 1 && items[0].kind === "face" ? items[0] : null;
     const frame = face ? faceFrame(face.properties) : null;
     if (face && !frame) {
-      setBarNote("That face is not flat: a workplane lies on a plane. Pick a flat face, or nothing to place one on the active workplane.");
+      setBarNote(t("That face is not flat: a workplane lies on a plane. Pick a flat face, or nothing to place one on the active workplane."));
       return;
     }
     const taken = gui.state?.taken ?? [];
@@ -887,7 +889,7 @@ export function App() {
     const face = items.length === 1 && items[0].kind === "face" ? items[0] : null;
     const frame = face ? connectorFrameFromFace(face) : null;
     if (!face || !frame) {
-      setBarNote("A connector is placed on one flat face: pick it first (face mode).");
+      setBarNote(t("A connector is placed on one flat face: pick it first (face mode)."));
       return;
     }
     setBarNote(null);
@@ -1162,9 +1164,9 @@ export function App() {
   /** A command from the assembly panel: rejects with the server's message (shown in the panel). */
   const runPanelCommand = useCallback(
     async (command: FeatureCommand) => {
-      if (noNotebook()) throw new Error("No notebook is open: create one first.");
+      if (noNotebook()) throw new Error(t("No notebook is open: create one first."));
       const result = await gui.run(command);
-      log.push("ok", command.op === "set_connectors" ? "connectors set" : `${command.op} ${result.name}`);
+      log.push("ok", command.op === "set_connectors" ? t("connectors set") : `${command.op} ${result.name}`);
       if (isCellCommand(command)) assertCellRan(result);
     },
     [gui.run, log.push, noNotebook],
@@ -1245,15 +1247,15 @@ export function App() {
   // -- actions -----------------------------------------------------------------------
 
   const handleOpen = (path: string) => {
-    setStatus(`opening ${path}…`);
+    setStatus(`${t("opening {{name}}", { name: path })}…`);
     openNotebook(path).catch((error) => {
-      log.push("error", `open failed: ${error.message}`);
+      log.push("error", t("open failed: {{reason}}", { reason: error.message }));
       setLoading(null);
     });
   };
 
   const handleCreate = async (name: string, kind: "part" | "assembly") => {
-    setStatus(`creating ${name}…`);
+    setStatus(`${t("creating {{name}}", { name })}…`);
     await newNotebook(name, kind);
     // the server opens it: show its features (manual mode) or its cells (code mode)
     setLeftTab(mode === "manual" ? "features" : "notebook");
@@ -1268,14 +1270,14 @@ export function App() {
               <TabsList className={floating ? "pr-8" : undefined}>
                 {mode === "manual" ? (
                   <>
-                    <TabsTrigger value="features">features</TabsTrigger>
-                    <TabsTrigger value="assembly">assembly</TabsTrigger>
-                    <TabsTrigger value="workspace">workspace</TabsTrigger>
+                    <TabsTrigger value="features">{t("features")}</TabsTrigger>
+                    <TabsTrigger value="assembly">{t("assembly")}</TabsTrigger>
+                    <TabsTrigger value="workspace">{t("workspace")}</TabsTrigger>
                   </>
                 ) : (
                   <>
-                    <TabsTrigger value="notebook">notebook</TabsTrigger>
-                    <TabsTrigger value="workspace">workspace</TabsTrigger>
+                    <TabsTrigger value="notebook">{t("notebook")}</TabsTrigger>
+                    <TabsTrigger value="workspace">{t("workspace")}</TabsTrigger>
                     {moduleView && <TabsTrigger value="module">{moduleView.name}</TabsTrigger>}
                   </>
                 )}
@@ -1334,7 +1336,7 @@ export function App() {
                   onCreate={handleCreate}
                   onDelete={async (path) => {
                     const { trash } = await deleteNotebook(path);
-                    log.push("ok", `deleted ${path} (kept in ${trash})`);
+                    log.push("ok", t("deleted {{path}} (kept in {{trash}})", { path, trash }));
                   }}
                 />
               </TabsContent>
@@ -1362,20 +1364,20 @@ export function App() {
                         : "border-transparent text-muted-foreground hover:border-input hover:text-foreground",
                     )}
                     onClick={() => setSelectionMode(mode)}
-                    title={`${label} (${key})`}
+                    title={`${t(label)} (${key})`}
                   >
-                    {label}
+                    {t(label)}
                     <span className="ml-1 opacity-50">{key}</span>
                   </button>
                 ))}
                 {!floating && <span className="flex-1" />}
-                {!floating && <span className="label hidden xl:inline">ctrl+click: add</span>}
+                {!floating && <span className="label hidden xl:inline">{t("ctrl+click: add")}</span>}
                 <button
                   type="button"
                   className="border-2 border-transparent px-2 py-px text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground hover:border-input hover:text-foreground"
                   onClick={() => viewRef.current?.frame()}
                 >
-                  fit
+                  {t("fit")}
                 </button>
     </>
   );
@@ -1400,7 +1402,7 @@ export function App() {
         running={running}
         onStop={handleStop}
         onRunAll={() => {
-          setLoading("running all cells");
+          setLoading(t("running all cells"));
           socketRef.current?.send({ type: "rerun.request" });
         }}
       />

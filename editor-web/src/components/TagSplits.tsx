@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Scissors } from "lucide-react";
 
 import type { SceneView } from "@/scene/scene-view";
+import { t } from "@/i18n";
 
 /** A tagged entity an operation split (the server's `tag_splits`, from `scad.list_tag_splits`): the pieces carry
  * `<tag>.split<i>`, and `pieces` lists the scene entities of each. */
@@ -50,13 +51,13 @@ export function TagSplits({ view, splits, sceneVersion, docked = false }: { view
     <div className={`pointer-events-auto ${docked ? "relative min-h-0 max-h-[360px]" : "absolute left-3 top-3 z-20 max-h-[min(50%,360px)] max-w-[min(420px,80%)]"} flex flex-col gap-1.5 border-2 border-[var(--focus)] bg-popover px-3 py-2 text-[11px] shadow-[4px_4px_0_var(--shadow-hard)]`} data-testid="tag-splits">
       <div className="flex items-center gap-2 font-semibold">
         <Scissors className="size-3.5 text-[var(--focus)]" />
-        <span>{splits.length === 1 ? "A tagged entity was split" : `${splits.length} tagged entities were split`}</span>
+        <span>{splits.length === 1 ? t("A tagged entity was split") : t("{{count}} tagged entities were split", { count: splits.length })}</span>
       </div>
       <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-1">
       {splits.map((row) => (
         <div key={`${row.op}:${row.tag}:${row.into.join(",")}`} className="flex flex-col gap-1">
           <span className="text-muted-foreground">
-            <span className="font-mono text-foreground">{row.op}</span> split <span className="font-mono text-foreground">{row.tag}</span> into {row.into.length}; the tag names none of them:
+            {t("{{op}} split {{tag}} into {{count}}; the tag names none of them:", { op: row.op, tag: row.tag, count: row.into.length })}
           </span>
           <span className="flex flex-wrap gap-1">
             {row.into.map((name, index) => (
@@ -71,10 +72,10 @@ export function TagSplits({ view, splits, sceneVersion, docked = false }: { view
       </div>
       <div className="flex shrink-0 gap-2 pt-0.5">
         <button type="button" className="border border-border px-2 py-0.5 hover:bg-accent" onClick={() => setShown((value) => !value)}>
-          {shown ? "Hide highlight" : "Show highlight"}
+          {shown ? t("Hide highlight") : t("Show highlight")}
         </button>
         <button type="button" className="border border-border px-2 py-0.5 hover:bg-accent" onClick={() => setDismissed(signature)}>
-          Dismiss
+          {t("Dismiss")}
         </button>
       </div>
     </div>

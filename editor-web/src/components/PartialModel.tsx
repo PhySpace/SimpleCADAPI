@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { TriangleAlert } from "lucide-react";
 
 import { describePartial, type PartialModel } from "@/lib/partial";
+import { t } from "@/i18n";
 
 /** Says that the model in the viewport is the one before a failing step (a cell failed, so the product was not made): which
  * step failed and why, and that the steps after it did not run.  It stays while the model is partial and goes when the
@@ -22,7 +23,7 @@ export function PartialNotice({ partial, titles, docked = false }: { partial: Pa
         <span>{title}</span>
       </div>
       <span className="line-clamp-2 text-fail">{reason}</span>
-      <span className="text-muted-foreground">{after ? `${after}; the` : "The"} whole model comes back once it is fixed.</span>
+      <span className="text-muted-foreground">{after ? `${after}; ` : ""}{t("the whole model comes back once it is fixed.")}</span>
     </div>
   );
 }

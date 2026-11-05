@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { commandGroups, pushRecent, searchCommands, type Command } from "@/lib/commands";
 import { cn } from "@/lib/utils";
+import { t } from "@/i18n";
 
 const DOCK_KEY = "sca.commandbar.dock";
 const RECENT_KEY = "sca.commandbar.recent";
@@ -135,11 +136,11 @@ export function CommandBar({ commands, fit, hint, belowTop = false }: { commands
         <button
           type="button"
           className="pointer-events-auto flex items-center gap-1.5 border-2 border-primary bg-background px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] shadow-[4px_4px_0_var(--shadow-hard)] hover:border-focus"
-          title="Show the command bar (/ or Ctrl/Cmd+K)"
-          aria-label="Show the command bar"
+          title={t("Show the command bar (/ or Ctrl/Cmd+K)")}
+          aria-label={t("Show the command bar")}
           onClick={() => setCollapsed(false)}
         >
-          <ChevronsUpDown className="size-3.5" /> add feature
+          <ChevronsUpDown className="size-3.5" /> {t("add feature")}
         </button>
       </div>
     );
@@ -147,12 +148,12 @@ export function CommandBar({ commands, fit, hint, belowTop = false }: { commands
 
   return (
     <div className={cn("pointer-events-none absolute inset-x-0 z-20 flex justify-center px-3", place)}>
-      <div ref={root} role="toolbar" aria-label="Command bar" className={cn("pointer-events-auto relative w-full max-w-[720px]", bottom ? "" : "")}>
+      <div ref={root} role="toolbar" aria-label={t("Command bar")} className={cn("pointer-events-auto relative w-full max-w-[720px]", bottom ? "" : "")}>
         {shown.length > 0 && (
           <ul
             ref={listRef}
             role="listbox"
-            aria-label="Operations"
+            aria-label={t("Operations")}
             className={cn(
               "absolute inset-x-0 overflow-y-auto border-2 border-primary bg-popover shadow-[4px_4px_0_var(--shadow-hard)]",
               bottom ? "bottom-full mb-1" : "top-full mt-1",
@@ -173,9 +174,9 @@ export function CommandBar({ commands, fit, hint, belowTop = false }: { commands
                   onClick={() => run(command)}
                 >
                   {Icon ? <Icon className="size-3.5 shrink-0" /> : <span className="size-3.5 shrink-0" />}
-                  <span className="shrink-0 font-semibold">{command.label}</span>
-                  <span className={cn("min-w-0 flex-1 truncate text-[11px]", index === at ? "opacity-80" : "text-muted-foreground")}>{command.description}</span>
-                  <span className={cn("shrink-0 text-[10px] uppercase tracking-[0.08em]", fit && fit(command) > 0 ? "font-bold" : "opacity-70")}>{fit && fit(command) > 0 ? "fits selection" : command.group}</span>
+                  <span className="shrink-0 font-semibold">{t(command.label)}</span>
+                  <span className={cn("min-w-0 flex-1 truncate text-[11px]", index === at ? "opacity-80" : "text-muted-foreground")}>{command.description ? t(command.description) : null}</span>
+                  <span className={cn("shrink-0 text-[10px] uppercase tracking-[0.08em]", fit && fit(command) > 0 ? "font-bold" : "opacity-70")}>{fit && fit(command) > 0 ? t("fits selection") : t(command.group)}</span>
                 </li>
               );
             })}
@@ -205,7 +206,7 @@ export function CommandBar({ commands, fit, hint, belowTop = false }: { commands
                   setOpen(!same);
                 }}
               >
-                {name}
+                {t(name)}
               </button>
             ))}
           </div>
@@ -217,8 +218,8 @@ export function CommandBar({ commands, fit, hint, belowTop = false }: { commands
               value={query}
               role="combobox"
               aria-expanded={open}
-              aria-label="Search operations"
-              placeholder="Search operations"
+              aria-label={t("Search operations")}
+              placeholder={t("Search operations")}
               spellCheck={false}
               className="h-6 w-full border-2 border-input bg-background pl-6 pr-[78px] text-[12px] placeholder:text-muted-foreground focus-visible:border-focus focus-visible:outline-none"
               onChange={(event) => {
@@ -231,13 +232,13 @@ export function CommandBar({ commands, fit, hint, belowTop = false }: { commands
               onKeyDown={onInputKey}
             />
             {!query && (
-              <kbd className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 border border-input px-1 text-[9px] uppercase text-muted-foreground">/ or Ctrl+K</kbd>
+              <kbd className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 border border-input px-1 text-[9px] uppercase text-muted-foreground">{t("/ or Ctrl+K")}</kbd>
             )}
           </label>
-          <button type="button" className="p-1 text-muted-foreground hover:text-foreground" aria-label={bottom ? "Dock at the top" : "Dock at the bottom"} title={bottom ? "Dock at the top" : "Dock at the bottom"} onClick={toggleDock}>
+          <button type="button" className="p-1 text-muted-foreground hover:text-foreground" aria-label={bottom ? t("Dock at the top") : t("Dock at the bottom")} title={bottom ? t("Dock at the top") : t("Dock at the bottom")} onClick={toggleDock}>
             {bottom ? <PanelTop className="size-3.5" /> : <PanelBottom className="size-3.5" />}
           </button>
-          <button type="button" className="p-1 text-muted-foreground hover:text-foreground" aria-label="Collapse the command bar" title="Collapse to a pill" onClick={() => { setOpen(false); setCollapsed(true); }}>
+          <button type="button" className="p-1 text-muted-foreground hover:text-foreground" aria-label={t("Collapse the command bar")} title={t("Collapse to a pill")} onClick={() => { setOpen(false); setCollapsed(true); }}>
             <ChevronsDownUp className="size-3.5" />
           </button>
           </div>

@@ -8,6 +8,7 @@ import { placeValues, placedFrame, type PlaceFrame, type PlaceValues } from "@/l
 import { OVERLAY_LAYER } from "@/scene/renderer/brep-renderer";
 import type { SceneView } from "@/scene/scene-view";
 import type { Vec3 } from "@/lib/sketch-plane";
+import { t } from "@/i18n";
 
 export type PlaceMode = "translate" | "rotate";
 
@@ -212,16 +213,16 @@ export function WorkplanePlacePanel({
   return (
     <div className="pointer-events-auto absolute left-3 top-3 z-30 flex max-w-[min(440px,90%)] flex-col gap-2 border-2 border-primary bg-popover px-3 py-2 text-[11px] shadow-[4px_4px_0_var(--shadow-hard)]" data-testid={title === "Workplane" ? "workplane-placer" : `${title.toLowerCase()}-placer`}>
       <div className="scroll-row items-center gap-2">
-        <span className="font-semibold">{title}</span>
+        <span className="font-semibold">{t(title)}</span>
         <input
           id="workplane-place-name"
-          aria-label="name"
+          aria-label={t("name")}
           className="w-20 border border-input bg-background px-1 font-mono"
           value={name}
           onChange={(event) => onName(event.target.value)}
         />
-        <span className="text-muted-foreground">on</span>
-        <select id="workplane-place-base" aria-label="base" className="border border-input bg-background px-1" value={base} onChange={(event) => onBase(event.target.value)}>
+        <span className="text-muted-foreground">{t("on")}</span>
+        <select id="workplane-place-base" aria-label={t("base")} className="border border-input bg-background px-1" value={base} onChange={(event) => onBase(event.target.value)}>
           {bases.map((item) => (
             <option key={item.value} value={item.value}>
               {item.label}
@@ -229,18 +230,18 @@ export function WorkplanePlacePanel({
           ))}
         </select>
         <span className="flex border border-input">
-          <button type="button" title="Move (G)" className={`flex items-center gap-1 px-1.5 ${mode === "translate" ? "bg-primary text-primary-foreground" : ""}`} onClick={() => onMode("translate")}>
-            <Move3d className="size-3" /> move
+          <button type="button" title={t("Move (G)")} className={`flex items-center gap-1 px-1.5 ${mode === "translate" ? "bg-primary text-primary-foreground" : ""}`} onClick={() => onMode("translate")}>
+            <Move3d className="size-3" /> {t("move")}
           </button>
-          <button type="button" title="Turn (R)" className={`flex items-center gap-1 px-1.5 ${mode === "rotate" ? "bg-primary text-primary-foreground" : ""}`} onClick={() => onMode("rotate")}>
-            <RotateCw className="size-3" /> turn
+          <button type="button" title={t("Turn (R)")} className={`flex items-center gap-1 px-1.5 ${mode === "rotate" ? "bg-primary text-primary-foreground" : ""}`} onClick={() => onMode("rotate")}>
+            <RotateCw className="size-3" /> {t("turn")}
           </button>
         </span>
       </div>
       <div className="scroll-row items-center gap-1.5">
         {fields.map((field) => (
           <label key={field.key} className="flex items-center gap-0.5">
-            <span className="text-muted-foreground">{field.label}</span>
+            <span className="text-muted-foreground">{t(field.label)}</span>
             <input
               id={`workplane-place-${field.key}`}
               className="w-14 border border-input bg-background px-1 text-right font-mono tabular-nums"
@@ -259,12 +260,12 @@ export function WorkplanePlacePanel({
       </div>
       <div className="flex items-center gap-2">
         <button type="button" disabled={busy} className="border-2 border-primary bg-primary px-2 py-0.5 font-semibold text-primary-foreground disabled:opacity-50" onClick={onCreate}>
-          {createLabel} (Enter)
+          {t(createLabel)} (Enter)
         </button>
         <button type="button" className="border border-border px-2 py-0.5 hover:bg-accent" onClick={onCancel}>
-          Cancel (Esc)
+          {t("Cancel")} (Esc)
         </button>
-        <span className="text-muted-foreground">drag the arrows to move, the rings to turn · Shift: no snapping</span>
+        <span className="text-muted-foreground">{t("drag the arrows to move, the rings to turn · Shift: no snapping")}</span>
       </div>
       {error && (
         <div role="alert" className="text-fail">

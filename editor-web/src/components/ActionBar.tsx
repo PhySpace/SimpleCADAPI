@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { enterRunsFirst, placeBar, type Size } from "@/lib/action-bar";
 import { cn } from "@/lib/utils";
+import { t } from "@/i18n";
 
 export type BarAction = {
   id: string;
@@ -71,7 +72,7 @@ export function ActionBar({
     <div
       ref={ref}
       role="toolbar"
-      aria-label={title ?? "Actions for the selection"}
+      aria-label={title ?? t("Actions for the selection")}
       data-testid="action-bar"
       data-docked={at.docked}
       className={cn("pointer-events-auto absolute z-20 flex max-w-[92%] flex-col gap-1", className)}
@@ -91,12 +92,12 @@ export function ActionBar({
               className="h-7 px-2"
               data-action={action.id}
               aria-disabled={Boolean(action.disabled)}
-              title={action.disabled ?? action.hint ?? action.label}
+              title={t(action.disabled ?? action.hint ?? action.label)}
               onClick={() => (action.disabled ? setWhy({ id: action.id, text: action.disabled }) : action.run())}
               style={action.disabled ? { opacity: 0.45 } : undefined}
             >
               {Icon && <Icon />}
-              {action.label}
+              {t(action.label)}
               {isFirst && enter && <kbd className="ml-0.5 border border-current px-1 text-[9px] opacity-70">enter</kbd>}
             </Button>
           );

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { ChevronsLeft, ChevronsRight, ListTree, ScanSearch } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { t } from "@/i18n";
 
 /** Whether a card is open, remembered in this browser (a convenience: it reads as open when storage is unavailable). */
 function useRemembered(key: string): [boolean, (open: boolean) => void] {
@@ -66,17 +67,17 @@ export function FloatingPanels({
               <button
                 type="button"
                 className="absolute right-0 top-0 z-10 flex h-9 w-8 items-center justify-center border-l-2 border-border bg-popover text-muted-foreground hover:text-foreground"
-                aria-label="Collapse the panel"
-                title="Collapse the panel"
+                aria-label={t("Collapse the panel")}
+                title={t("Collapse the panel")}
                 onClick={() => setBrowserOpen(false)}
               >
                 <ChevronsLeft className="size-3.5" />
               </button>
             </div>
           ) : (
-            <button type="button" className={PILL} onClick={() => setBrowserOpen(true)} aria-label="Open the panel">
+            <button type="button" className={PILL} onClick={() => setBrowserOpen(true)} aria-label={t("Open the panel")}>
               <ListTree className="size-3.5" />
-              panel
+              {t("panel")}
             </button>
           )}
           {leftNotice && <div className="w-full min-h-0 shrink">{leftNotice}</div>}
@@ -89,17 +90,17 @@ export function FloatingPanels({
             <button
               type="button"
               className="absolute right-0 top-0 z-10 flex h-9 w-8 items-center justify-center border-l-2 border-border bg-popover text-muted-foreground hover:text-foreground"
-              aria-label="Collapse the inspector"
-              title="Collapse the inspector"
+              aria-label={t("Collapse the inspector")}
+              title={t("Collapse the inspector")}
               onClick={() => setInspectorOpen(false)}
             >
               <ChevronsRight className="size-3.5" />
             </button>
           </div>
         ) : (
-          <button type="button" className={PILL} onClick={() => setInspectorOpen(true)} aria-label="Open the inspector">
+          <button type="button" className={PILL} onClick={() => setInspectorOpen(true)} aria-label={t("Open the inspector")}>
             <ScanSearch className="size-3.5" />
-            inspector{selectionCount > 0 ? ` · ${selectionCount}` : ""}
+            {t("inspector")}{selectionCount > 0 ? ` · ${selectionCount}` : ""}
           </button>
         )}
         {rightNotice && <div className="w-full">{rightNotice}</div>}

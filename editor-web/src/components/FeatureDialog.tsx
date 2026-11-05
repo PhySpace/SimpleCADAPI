@@ -46,6 +46,7 @@ import type { SelectionItem } from "@/lib/selection";
 import type { SelectionMode } from "@/scene/Viewport";
 import type { SceneView } from "@/scene/scene-view";
 import { HolePlacer, type HoleDraft } from "@/components/HolePlacer";
+import { t } from "@/i18n";
 
 /** The icon of each way a new solid meets the body (colour stays reserved for meaning, so the icons carry no ink). */
 const OPERATION_ICONS: Record<string, LucideIcon> = { join: SquarePlus, cut: Scissors, intersect: Combine, new: Box };
@@ -259,9 +260,9 @@ function FeatureForm({
   for (const slot of selectSlots) {
     const picks = picksOf(slot);
     if (replaced(slot)) {
-      if (picks.some((item) => !isDescribed(item))) selectionErrors[slot.name] = "details of the picked items are still loading";
+      if (picks.some((item) => !isDescribed(item))) selectionErrors[slot.name] = t("details of the picked items are still loading");
       else selections[slot.name] = picks.map(pickedPayload);
-    } else if (!editing && !slot.optional) selectionErrors[slot.name] = `pick ${slot.entity === "edge" ? "edges" : "faces"} in the viewport`;
+    } else if (!editing && !slot.optional) selectionErrors[slot.name] = slot.entity === "edge" ? t("pick edges in the viewport") : t("pick faces in the viewport");
   }
 
   const allErrors = { ...errors, ...selectionErrors };
@@ -290,18 +291,18 @@ function FeatureForm({
   const fillFromFace = () => {
     const faces = filterSelection(selection, "face");
     if (faces.length !== 1) {
-      setNote("Pick exactly one face in the viewport first.");
+      setNote(t("Pick exactly one face in the viewport first."));
       return;
     }
     const face = faces[0];
     if (!isDescribed(face)) {
-      setNote("The face details are still loading; try again in a moment.");
+      setNote(t("The face details are still loading; try again in a moment."));
       return;
     }
     const { point, vector } = holeFromFace(face);
     const direction = vector ? "face" : null;
     if (!point) {
-      setNote("This face has no centroid; type the start point.");
+      setNote(t("This face has no centroid; type the start point."));
       return;
     }
     setForm((previous) => ({
@@ -311,8 +312,8 @@ function FeatureForm({
     }));
     setNote(
       direction && vector
-        ? `Start point set from the face centroid; the hole follows the face's normal, into the material (${vector.map((v) => round4(v)).join(", ")}).`
-        : "Start point set from the face centroid. The face reports no normal: check the direction.",
+        ? t("Start point set from the face centroid; the hole follows the face's normal, into the material ({{normal}}).", { normal: vector.map((v) => round4(v)).join(", ") })
+        : t("Start point set from the face centroid. The face reports no normal: check the direction."),
     );
     setServerError(null);
   };
@@ -337,7 +338,7 @@ function FeatureForm({
       position: point.map((c) => String(round4(c))),
       ...(previous.direction === "face" ? { dx: String(round4(-normal[0])), dy: String(round4(-normal[1])), dz: String(round4(-normal[2])) } : {}),
     }));
-    setNote(`Start point placed at (${point.map((c) => round4(c)).join(", ")}).`);
+    setNote(t("Start point placed at ({{point}}).", { point: point.map((c) => round4(c)).join(", ") }));
     setServerError(null);
   };
 
@@ -377,12 +378,12 @@ function FeatureForm({
     >
       <DialogHeader>
         <DialogTitle>
-          {editing ? "Edit" : "Add"} {plainLabel(spec.id, spec.label).toLowerCase()}
+          {editing ? t("Edit {{what}}", { what: t(plainLabel(spec.id, spec.label)).toLowerCase() }) : t("Add {{what}}", { what: t(plainLabel(spec.id, spec.label)).toLowerCase() })}
         </DialogTitle>
-        <DialogDescription>{plainDescription(spec.id, spec.description)}</DialogDescription>
+        <DialogDescription>{t(plainDescription(spec.id, spec.description))}</DialogDescription>
       </DialogHeader>
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
-        <Field label="Name" error={touched ? nameError : null} help={editing ? "A feature keeps its name." : undefined}>
+        <Field label={t("Name")} error={touched ? nameError : null} help={editing ? t("A feature keeps its name.") : undefined}>
           <Input
             value={editing ? (edit?.slug ?? "") : name}
             disabled={editing}
@@ -392,7 +393,7 @@ function FeatureForm({
           />
         </Field>
         {visibleSlots(spec, form).map((slot) => slot.name === TARGET_SLOT && spec.combinable && targetDisplay(combine, shaped, String(form[slot.name] ?? "")).kind === "hidden" ? null : (
-          <Field key={slot.name} label={combineLine(spec, slot, form, combine, shaped) ? "" : slot.label} unit={slot.kind === "point" ? slot.unit : undefined} help={(spec.id === "hole" && slot.name === "position" && note) || (spec.combinable && (slot.name === OPERATION_SLOT || slot.name === TARGET_SLOT)) ? undefined : slot.help} error={touched ? (allErrors[slot.name] ?? null) : null}>
+          <Field key={slot.name} label={combineLine(spec, slot, form, combine, shaped) ? "" : t(slot.label)} unit={slot.kind === "point" ? slot.unit : undefined} help={(spec.id === "hole" && slot.name === "position" && note) || (spec.combinable && (slot.name === OPERATION_SLOT || slot.name === TARGET_SLOT)) ? undefined : slot.help && t(slot.help)} error={touched ? (allErrors[slot.name] ?? null) : null}>
             <SlotWidget
               slot={slot}
               form={form}
@@ -416,7 +417,7 @@ function FeatureForm({
             {spec.id === "hole" && slot.name === "position" && (
               <div className="mt-1 flex flex-col gap-1">
                 <Button type="button" size="sm" variant="outline" onClick={fillFromFace}>
-                  <MousePointerClick /> use picked face
+                  <MousePointerClick /> {t("use picked face")}
                 </Button>
                 {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
               </div>
@@ -431,10 +432,10 @@ function FeatureForm({
       </div>
       <DialogFooter>
         <Button type="button" variant="ghost" size="sm" onClick={onClose}>
-          cancel
+          {t("cancel")}
         </Button>
         <Button type="button" size="sm" disabled={busy || (touched && invalid)} onClick={() => void submit()}>
-          {busy ? "working…" : editing ? "apply" : "add"}
+          {busy ? t("working…") : editing ? t("apply") : t("add")}
         </Button>
       </DialogFooter>
       {holeDraft && view && <HolePlacer view={view} draft={holeDraft} onPlace={placeHole} />}
@@ -519,7 +520,7 @@ function SlotWidget({
   const raw = form[slot.name];
   if (slot.kind === "enum" && slot.name === OPERATION_SLOT && slot.options?.some((option) => option.value === "join")) {
     const { options: choices, note } = operationOptions(slot.options, combine, edit);
-    return <OperationChooser options={choices} value={typeof raw === "string" ? raw : ""} onChange={(value) => set(slot.name, value)} icons={OPERATION_ICONS} label={slot.label} note={note} />;
+    return <OperationChooser options={choices} value={typeof raw === "string" ? raw : ""} onChange={(value) => set(slot.name, value)} icons={OPERATION_ICONS} label={t(slot.label)} note={note} />;
   }
   if (slot.kind === "body" && slot.name === TARGET_SLOT) {
     const shown = targetDisplay(combine, edit, typeof raw === "string" ? raw : "");
@@ -527,7 +528,7 @@ function SlotWidget({
     if (shown.kind === "fixed") {
       return (
         <span className="text-[12px]" data-testid="combined-with">
-          Combined with: <span className="text-name">{shown.name}</span>
+          {t("Combined with:")} <span className="text-name">{shown.name}</span>
         </span>
       );
     }
@@ -545,18 +546,18 @@ function SlotWidget({
             <SelectContent>
               {(options ?? slot.options ?? []).map((option) => (
                 <SelectItem key={option.value} value={option.value}>
-                  {option.label}
+                  {t(option.label)}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           {flip && (
             <div className="flex items-center gap-2" data-testid="direction-flip" data-against={flip.against}>
-              <Button type="button" size="sm" variant="outline" className="h-6 px-2" data-testid="flip-direction" disabled={!flip.can} title="Push the other way (the arrow in the viewport turns)" onClick={onFlip}>
-                <ArrowUpDown /> flip
+              <Button type="button" size="sm" variant="outline" className="h-6 px-2" data-testid="flip-direction" disabled={!flip.can} title={t("Push the other way (the arrow in the viewport turns)")} onClick={onFlip}>
+                <ArrowUpDown /> {t("flip")}
               </Button>
               <span className="text-[11px] text-muted-foreground">
-                pushes <span className="text-focus">{flip.against ? "against" : "along"}</span> the sketch normal ({flip.axis}); the arrow in the viewport shows it
+                {flip.against ? t("pushes against the sketch normal ({{axis}}); the arrow in the viewport shows it", { axis: flip.axis }) : t("pushes along the sketch normal ({{axis}}); the arrow in the viewport shows it", { axis: flip.axis })}
               </span>
             </div>
           )}
@@ -568,12 +569,12 @@ function SlotWidget({
       return (
         <Select value={typeof raw === "string" ? raw : ""} onValueChange={(value) => set(slot.name, value)}>
           <SelectTrigger aria-invalid={invalid}>
-            <SelectValue placeholder="no body yet" />
+            <SelectValue placeholder={t("no body yet")} />
           </SelectTrigger>
           <SelectContent>
             {open.length > 0 && (
               <SelectGroup>
-                <SelectLabel>open bodies</SelectLabel>
+                <SelectLabel>{t("open bodies")}</SelectLabel>
                 {open.map((body) => (
                   <SelectItem key={body.name} value={body.name}>
                     {body.name}
@@ -583,7 +584,7 @@ function SlotWidget({
             )}
             {used.length > 0 && (
               <SelectGroup>
-                <SelectLabel>already used</SelectLabel>
+                <SelectLabel>{t("already used")}</SelectLabel>
                 {used.map((body) => (
                   <SelectItem key={body.name} value={body.name}>
                     {body.name}
@@ -603,7 +604,7 @@ function SlotWidget({
         return (
           <div className="flex flex-col gap-1" data-testid={`value-list-${slot.name}`}>
             <div className="flex flex-wrap gap-1">
-              {choices.length === 0 && <span className="text-[11px] text-muted-foreground">no {what} in this notebook yet</span>}
+              {choices.length === 0 && <span className="text-[11px] text-muted-foreground">{t("no {{what}} in this notebook yet", { what })}</span>}
               {choices.map((choice) => {
                 const at = chosen.indexOf(choice.name);
                 return (
@@ -614,7 +615,7 @@ function SlotWidget({
                     variant={at >= 0 ? "default" : "outline"}
                     className="h-6 px-2"
                     aria-pressed={at >= 0}
-                    title={at >= 0 ? `#${at + 1}: click to leave it out` : "click to add it (the order of the clicks is the order)"}
+                    title={at >= 0 ? t("#{{n}}: click to leave it out", { n: at + 1 }) : t("click to add it (the order of the clicks is the order)")}
                     onClick={() => set(slot.name, at >= 0 ? chosen.filter((n) => n !== choice.name) : [...chosen, choice.name])}
                   >
                     {at >= 0 && <span className="text-[10px]">{at + 1}</span>}
@@ -623,14 +624,14 @@ function SlotWidget({
                 );
               })}
             </div>
-            <span className="text-[11px] text-muted-foreground">{what}, in the order clicked</span>
+            <span className="text-[11px] text-muted-foreground">{t("{{what}}, in the order clicked", { what })}</span>
           </div>
         );
       }
       return (
         <Select value={typeof raw === "string" ? raw : ""} onValueChange={(value) => set(slot.name, value)}>
           <SelectTrigger aria-invalid={invalid}>
-            <SelectValue placeholder={`no ${what} yet`} />
+            <SelectValue placeholder={t("no {{what}} yet", { what })} />
           </SelectTrigger>
           <SelectContent>
             {choices.map((choice) => (
@@ -669,7 +670,7 @@ function SlotWidget({
           <span className="text-[12px] text-muted-foreground">{hex ? hex : slot.optional ? "unchanged" : "none"}</span>
           {hex && slot.optional && (
             <Button type="button" size="sm" variant="outline" className="h-6 px-2" onClick={() => set(slot.name, "")}>
-              clear
+              {t("clear")}
             </Button>
           )}
         </div>
@@ -685,15 +686,15 @@ function SlotWidget({
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2 border-2 border-input px-2 py-1" data-testid="sketch-field" data-armed={armed}>
             <span className="min-w-0 flex-1 truncate text-[12px]">
-              Sketch: {chosen ? <span className="text-name">{chosen.name}</span> : <span className="text-muted-foreground">none picked</span>}
+              {t("Sketch:")} {chosen ? <span className="text-name">{chosen.name}</span> : <span className="text-muted-foreground">{t("none picked")}</span>}
             </span>
-            <Button type="button" size="sm" variant={armed ? "default" : "outline"} className="h-6 px-2" data-testid="sketch-pick" aria-pressed={armed} title="Click a sketch in the viewport or the features list to use it" onClick={() => onArm(!armed)}>
-              <Crosshair /> {armed ? "picking…" : "pick in viewport"}
+            <Button type="button" size="sm" variant={armed ? "default" : "outline"} className="h-6 px-2" data-testid="sketch-pick" aria-pressed={armed} title={t("Click a sketch in the viewport or the features list to use it")} onClick={() => onArm(!armed)}>
+              <Crosshair /> {armed ? t("picking…") : t("pick in viewport")}
             </Button>
           </div>
           <Select value={typeof raw === "string" ? raw : ""} onValueChange={onProfile}>
-            <SelectTrigger aria-invalid={invalid} aria-label="Sketch (list)">
-              <SelectValue placeholder="no sketch yet" />
+            <SelectTrigger aria-invalid={invalid} aria-label={t("Sketch (list)")}>
+              <SelectValue placeholder={t("no sketch yet")} />
             </SelectTrigger>
             <SelectContent>
               {profiles.map((profile) => (
@@ -705,12 +706,12 @@ function SlotWidget({
           </Select>
           {chosen && (
             <span className="text-[11px] text-muted-foreground">
-              Plane {profilePlaneLabel(chosen)}, normal <span className="text-name">{chosen.normal}</span>
+              {t("Plane {{plane}}, normal", { plane: profilePlaneLabel(chosen) })} <span className="text-name">{chosen.normal}</span>
             </span>
           )}
           {summary && (
             <span className="text-[11px] text-muted-foreground" data-testid="profile-summary">
-              This sketch has several loops; it uses what was chosen in the sketch ({summary}).
+              {t("This sketch has several loops; it uses what was chosen in the sketch ({{summary}}).", { summary })}
             </span>
           )}
         </div>
@@ -747,24 +748,24 @@ function SlotWidget({
         />
       );
     case "select": {
-      const noun = slot.entity === "edge" ? "Edges" : "Faces";
+      const noun = slot.entity === "edge" ? t("Edges") : t("Faces");
       const loading = filterSelection(selection, slot.entity ?? "face").some((item) => !isDescribed(item));
       return (
         <div className="flex flex-col gap-1 border-2 border-input px-2 py-1.5">
           <span className="text-[12px]">
             {kept ? (
               <>
-                {noun}: <span className="text-muted-foreground">kept from the recipe</span>
+                {noun}: <span className="text-muted-foreground">{t("kept from the recipe")}</span>
               </>
             ) : (
               <>
-                {noun}: <span className="text-focus">{picks} picked</span>
-                {loading && <span className="text-muted-foreground"> (loading details…)</span>}
+                {noun}: <span className="text-focus">{t("{{count}} picked", { count: picks })}</span>
+                {loading && <span className="text-muted-foreground"> {t("(loading details…)")}</span>}
               </>
             )}
           </span>
           <span className="text-[11px] text-muted-foreground">
-            Pick {noun.toLowerCase()} in the viewport; Ctrl/Cmd+click adds.{kept ? " Pick again to replace them." : ""}
+            {slot.entity === "edge" ? t("Pick edges in the viewport; Ctrl/Cmd+click adds.") : t("Pick faces in the viewport; Ctrl/Cmd+click adds.")}{kept ? ` ${t("Pick again to replace them.")}` : ""}
           </span>
         </div>
       );

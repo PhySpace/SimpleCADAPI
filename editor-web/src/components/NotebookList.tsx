@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { ModuleRow, NotebookRow } from "@/lib/api";
+import { t } from "@/i18n";
 
 /** Names the template accepts: the notebook's id and its file name. */
 const NAME = /^[A-Za-z_][A-Za-z0-9_-]*$/;
@@ -43,14 +44,14 @@ export function NotebookList({
   return (
     <ScrollArea className="h-full">
       <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
-        <span className="label">notebooks</span>
+        <span className="label">{t("notebooks")}</span>
         <button
           type="button"
           className="label flex items-center gap-1 hover:text-foreground"
-          title="Start a new notebook from the template"
+          title={t("Start a new, empty notebook")}
           onClick={() => setAdding((open) => !open)}
         >
-          <Plus className="h-3 w-3" /> new
+          <Plus className="h-3 w-3" /> {t("new")}
         </button>
       </div>
       {(adding || empty) && (
@@ -63,7 +64,7 @@ export function NotebookList({
               <button
                 type="button"
                 className="absolute right-2 top-2 z-10 hidden p-1 text-muted-foreground hover:text-fail group-hover:block"
-                title={`Delete ${row.name} (kept in .sca-editor/trash)`}
+                title={t("Delete {{name}} (kept in .sca-editor/trash)", { name: row.name })}
                 aria-label={`delete ${row.name}`}
                 onClick={() => {
                   setDeleteError(null);
@@ -86,10 +87,10 @@ export function NotebookList({
                     onDelete?.(row.path).catch((error) => setDeleteError({ path: row.path, text: error instanceof Error ? error.message : String(error) }));
                   }}
                 >
-                  delete
+                  {t("delete")}
                 </button>
                 <button type="button" className="border border-border px-1.5 hover:bg-background" onClick={() => setConfirming(null)}>
-                  keep
+                  {t("keep")}
                 </button>
               </div>
             )}
@@ -110,7 +111,7 @@ export function NotebookList({
               <span className="flex items-center gap-2">
                 <span className={row.path === current ? "text-focus" : "text-foreground"}>{row.name}</span>
                 <Badge variant="secondary">{row.kind}</Badge>
-                {row.error && <Badge variant="fail">error</Badge>}
+                {row.error && <Badge variant="fail">{t("error")}</Badge>}
               </span>
               {row.uses && row.uses.length > 0 && (
                 <span className="truncate text-[10px] text-muted-foreground">
@@ -138,7 +139,7 @@ export function NotebookList({
                 >
                   <span className={openModule === module.path ? "text-name" : "text-foreground"}>{module.path}</span>
                   <span className="truncate text-[10px] text-muted-foreground">
-                    used by {module.used_by.map((path) => path.replace(/\.py$/, "")).join(", ")}
+                    {t("used by {{users}}", { users: module.used_by.map((path) => path.replace(/\.py$/, "")).join(", ") })}
                   </span>
                 </button>
               </li>
@@ -175,15 +176,15 @@ function NewEntry({
 
   const submit = async () => {
     const value = name.trim();
-    if (!NAME.test(value)) return setError("Use letters, digits, - and _, starting with a letter or _.");
-    if (taken(value)) return setError(`${value}.py already exists.`);
+    if (!NAME.test(value)) return setError(t("Use letters, digits, - and _, starting with a letter or _."));
+    if (taken(value)) return setError(t("{{name}}.py already exists.", { name: value }));
     setBusy(true);
     setError(null);
     try {
       await onCreate(value, kind);
       onDone();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not create the notebook.");
+      setError(reason instanceof Error ? reason.message : t("Could not create the notebook."));
     } finally {
       setBusy(false);
     }
@@ -197,7 +198,7 @@ function NewEntry({
         void submit();
       }}
     >
-      {first && <p className="text-[11px] text-muted-foreground">An empty workspace. Start with a part: a notebook that builds one solid.</p>}
+      {first && <p className="text-[11px] text-muted-foreground">{t("An empty workspace. Start with a part: a notebook that builds one solid.")}</p>}
       <input
         ref={input}
         autoFocus
@@ -207,8 +208,8 @@ function NewEntry({
           setError(null);
         }}
         onKeyDown={(event) => event.key === "Escape" && !first && onCancel()}
-        placeholder="name, e.g. bracket"
-        aria-label="Name of the new notebook"
+        placeholder={t("name, e.g. bracket")}
+        aria-label={t("Name of the new notebook")}
         spellCheck={false}
         className="w-full border-2 border-input bg-transparent px-2 py-1 focus:border-focus focus:outline-none"
       />
@@ -218,7 +219,7 @@ function NewEntry({
             key={option}
             type="button"
             disabled={option === "assembly" && parts.length === 0}
-            title={option === "assembly" && parts.length === 0 ? "An assembly puts parts together: create a part first" : undefined}
+            title={option === "assembly" && parts.length === 0 ? t("An assembly puts parts together: create a part first") : undefined}
             onClick={() => {
               setKind(option);
               input.current?.focus(); // Enter then creates
@@ -228,23 +229,23 @@ function NewEntry({
               kind === option ? "border-primary bg-primary text-primary-foreground" : "border-transparent text-muted-foreground hover:border-input hover:text-foreground",
             )}
           >
-            {option}
+            {t(option)}
           </button>
         ))}
       </div>
       {kind === "assembly" && parts.length > 0 && (
         <p className="text-[11px] text-muted-foreground">
-          Starts with {parts.slice(0, 2).map((row) => row.name).join(" and ")}; change what it uses in its cells.
+          {t("Starts with {{parts}}; change what it uses in its cells.", { parts: parts.slice(0, 2).map((row) => row.name).join(", ") })}
         </p>
       )}
       {error && <p className="text-[11px] text-fail">{error}</p>}
       <div className="flex gap-2">
         <Button size="sm" type="submit" disabled={busy || !name.trim()}>
-          create
+          {t("create")}
         </Button>
         {!first && (
           <Button size="sm" type="button" variant="ghost" onClick={onCancel}>
-            cancel
+            {t("cancel")}
           </Button>
         )}
       </div>
