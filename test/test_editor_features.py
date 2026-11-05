@@ -66,7 +66,7 @@ def test_the_catalog_lists_every_operation_with_typed_slots():
 def test_every_template_uses_real_sdk_functions_and_parameters(spec):
     """The drift test: an SDK change that breaks a template breaks this, not a user."""
     picks = {slot.name: [{"kind": slot.entity, "properties": {"centroid": [0, 0, 0], "area": 10.0, "length": 5.0}, "geometry": {"type": "plane"}}] for slot in spec.slots if slot.kind == "select"}
-    bodies = {"a": "solid", "b": "solid", "many": "solids", "prof": "face"}
+    bodies = {"a": "solid", "b": "solid", "many": "solids", "prof": "face", "e1": "edge", "e2": "edge"}
     values = {k: (v if v is not None else None) for k, v in DEFAULTS[spec.id].items()}
     for slot in spec.slots:
         if slot.kind == "body":
@@ -77,6 +77,8 @@ def test_every_template_uses_real_sdk_functions_and_parameters(spec):
             values[slot.name] = RECT_SKETCH
         elif slot.kind == "curve":
             values[slot.name] = {"points": [{"id": "p1", "at": [0, 0, 0]}, {"id": "p2", "at": [10, 0, 5]}], "curves": [{"id": "c1", "kind": "line", "points": ["p1", "p2"]}]}
+        elif slot.kind == "value" and "edge" in (slot.accepts or ()):
+            values[slot.name] = ["e1", "e2"] if slot.many else "e1"
     rendered = F.render_feature(spec.id, "probe", values, bodies=bodies, selections=picks, env={"profile_normals": {"prof": (0.0, 0.0, 1.0)}})
     seen = 0
     for call in _calls(rendered.feature):
@@ -95,7 +97,7 @@ def test_every_template_uses_real_sdk_functions_and_parameters(spec):
 def test_the_primitives_and_profiles_make_one_valid_solid_each():
     with scad.GraphSession(graph_id="features-primitives"):
         for spec in F.SPECS:
-            if spec.produces in ("face", "assembly") or any(slot.kind in ("body", "select", "profile") for slot in spec.slots):
+            if spec.produces in ("face", "assembly", "wire") or any(slot.kind in ("body", "select", "profile", "value") for slot in spec.slots):
                 continue  # sketches and assemblies have their own tests
             scope: dict = {"scad": scad}
             rendered = F.render_feature(spec.id, "made", DEFAULTS[spec.id], bodies={})

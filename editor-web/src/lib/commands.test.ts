@@ -159,3 +159,11 @@ describe("command visibility and presets", () => {
     expect(visibleCommands(old, { openBodies: 1 })).toHaveLength(1);
   });
 });
+
+describe("several curves picked", () => {
+  it("join into one wire", () => {
+    expect(whenFor("join_curves")?.(selectionContext([], [], ["a", "b"]))).toBe(true);
+    expect(whenFor("join_curves")?.(selectionContext([], [], ["a"]))).toBe(false);
+    expect(whenFor("sweep_along")?.(selectionContext([], [], ["a", "b"]))).toBe(false);
+  });
+});

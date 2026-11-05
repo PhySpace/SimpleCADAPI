@@ -25,7 +25,7 @@ PREFIX = "op."
 _VALUE_FITS: dict[str, tuple[str, ...]] = {
     "solid": ("solid",),
     "face": ("face",),
-    "wire": ("wire",),
+    "wire": ("wire", "edge"),  # an edge is taken as the wire of that one edge (a curve drawn in the editor is an edge)
     "edge": ("edge",),
     "vertex": ("vertex",),
     "shell": ("shell",),

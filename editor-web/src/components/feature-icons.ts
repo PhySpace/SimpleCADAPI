@@ -11,6 +11,7 @@ export const FEATURE_ICONS: Record<string, LucideIcon> = {
   cut_sketch: ArrowDownToLine,
   revolve_sketch: Repeat2,
   curve: Spline,
+  wire: Spline,
   assembly: Boxes,
   cylinder: Cylinder,
   sphere: Globe,

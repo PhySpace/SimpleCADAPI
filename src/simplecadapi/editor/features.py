@@ -424,6 +424,12 @@ def _curve(c: Context) -> list[str]:
         raise FeatureError(str(exc)) from exc
 
 
+def _wire(c: Context) -> list[str]:
+    """One wire through curves of the notebook (edges, in any order: they must connect end to end)."""
+    names = [c.body_named(name) for name in c.values["curves"]]
+    return [f"{c.slug} = scad.make_wire_from_edges_rwire([{', '.join(names)}])"]
+
+
 def _assembly(c: Context) -> list[str]:
     cells = assembly_doc.render(c.slug, str(c.env.get("name") or c.slug), c.values["assembly"], c.env.get("notebook_dir"), c.env.get("workspace"))
     c.raw_params(cells["params"])
@@ -719,6 +725,9 @@ SPECS: tuple[Spec, ...] = (
          (_BODY(), Slot("angle", "Angle", "angle", default=45.0, unit="deg", min=-360.0, max=360.0), _AXIS("axis", "Axis"), _point("origin", "Axis point")), _rotate),
     Spec("scale", "Scale", "Transform", "build", "solid", "Scale a body uniformly about a point.",
          (_BODY(), Slot("factor", "Factor", "float", default=1.5, min=0.01, max=100.0), _point("origin", "Centre")), _scale),
+    Spec("wire", "Wire from curves", "Curves", "datum", "wire",
+         "One wire through curves of the notebook, joined end to end in any order: a path to sweep along, a section to loft through.",
+         (Slot("curves", "Curves", "value", accepts=("edge",), many=True),), _wire),
     Spec("curve", "3D curve", "Sketch", "datum", "wire",
          "A path in space: lines, arcs and splines through points in space, on workplanes or at vertices of the model, "
          "joined into one wire (a sweep path, a rail). Drawn in the viewport with snapping.",

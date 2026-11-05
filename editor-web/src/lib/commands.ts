@@ -129,7 +129,10 @@ export const CONTEXT_ACTIONS: Record<ContextKind, { id: string; label: string }[
     { id: "edit_sketch", label: "Edit sketch" },
     { id: "sweep_along", label: "Sweep along the curve" },
   ],
-  curve: [{ id: "sweep_along", label: "Sweep" }],
+  curve: [
+    { id: "sweep_along", label: "Sweep" },
+    { id: "join_curves", label: "Join into a wire" },
+  ],
   solid: [
     { id: "translate", label: "Move" },
     { id: "rotate", label: "Rotate" },
@@ -168,6 +171,8 @@ const WHEN: Record<string, (context: SelectionContext) => boolean> = {
   edit_sketch: (c) => c.sketches === 1,
   // a profile swept along a path: the curve, and the sketch as the profile when one is picked with it
   sweep_along: (c) => c.curves === 1 && c.sketches <= 1 && c.solids + c.components + c.faces + c.edges + c.vertices === 0,
+  // several curves picked: the wire through them (in any order, as long as they connect)
+  join_curves: (c) => c.curves >= 2 && c.sketches + c.solids + c.components + c.faces + c.edges + c.vertices === 0,
   translate: (c) => (c.solids >= 1 || c.components >= 1) && c.faces + c.edges + c.sketches === 0,
   rotate: (c) => (c.solids >= 1 || c.components >= 1) && c.faces + c.edges + c.sketches === 0,
   mirror: (c) => (c.solids >= 1 || c.components >= 1) && c.faces + c.edges + c.sketches === 0,

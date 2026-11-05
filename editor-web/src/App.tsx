@@ -1330,6 +1330,20 @@ export function App() {
         },
       },
       {
+        id: "join_curves",
+        label: "Join curves into a wire",
+        group: "Curves",
+        keywords: ["wire", "join", "chain", "path", "curve", "connect"],
+        description: "One wire through the picked curves (they must connect end to end, in any order): a path to sweep along, a section to loft through.",
+        icon: FEATURE_ICONS.curve,
+        when: whenFor("join_curves"),
+        contextOnly: true,
+        run: () => {
+          const spec = gui.catalog?.specs.find((item) => item.id === "wire");
+          if (spec) openDialog({ spec, prefill: { curves: [...pickedCurvesRef.current] } });
+        },
+      },
+      {
         id: "edit_sketch",
         label: "Edit sketch",
         group: "Sketch",
