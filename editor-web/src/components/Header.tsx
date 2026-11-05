@@ -1,50 +1,27 @@
-import { Languages, Monitor, Moon, Play, Square, Sun } from "lucide-react";
+import { Languages, Monitor, Moon, Sun } from "lucide-react";
 
 import type { ThemePreference } from "@/lib/theme";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { UndoRedo } from "@/components/FeatureTree";
-import { ModeSwitch, type EditorMode } from "@/components/ModeSwitch";
-import type { FeatureState } from "@/lib/features";
 import { LANGUAGES, setLanguage, useI18n } from "@/i18n";
 
-/** Top bar: which notebook is open, whether its kernel is alive, and the
- * model's last message. Everything else lives on the cells. */
+/** Top bar: which notebook is open, whether its kernel is alive, the model's last message, the theme and the language.
+ * The mode switch and "run all" are at the top of the left column; undo and redo are the feature tree's. */
 export function Header({
   notebook,
   kind,
   kernelAlive,
   status,
-  onRunAll,
-  running,
-  onStop,
   themePreference,
   onTheme,
-  features,
-  onUndo,
-  onRedo,
-  mode,
-  onMode,
-  modeLocked,
 }: {
   notebook: string | null;
   kind: string | null;
   kernelAlive: boolean;
   status: string;
-  onRunAll: () => void;
-  /** The kernel is running cells: the button stops them instead. */
-  running: boolean;
-  onStop: () => void;
   themePreference: ThemePreference;
   onTheme: () => void;
-  features: Pick<FeatureState, "undo" | "redo">;
-  onUndo: () => void;
-  onRedo: () => void;
-  mode: EditorMode;
-  onMode: (mode: EditorMode) => void;
-  /** A sketch is open or the panels are moving: the mode cannot change now. */
-  modeLocked: boolean;
 }) {
   const { t, language } = useI18n();
   const failing = status.startsWith("error");
@@ -71,16 +48,6 @@ export function Header({
       >
         {status}
       </span>
-      <UndoRedo state={features} onUndo={onUndo} onRedo={onRedo} />
-      {running ? (
-        <Button size="sm" variant="destructive" onClick={onStop} title={t("Stop the run (interrupt the kernel)")}>
-          <Square className="fill-current" /> {t("stop")}
-        </Button>
-      ) : (
-        <Button size="sm" variant="outline" onClick={onRunAll} title={t("Run every cell")}>
-          <Play /> {t("run all")}
-        </Button>
-      )}
       <Button
         size="sm"
         variant="ghost"
@@ -101,7 +68,6 @@ export function Header({
         <Languages />
         {LANGUAGES.find((item) => item.code === language)?.label ?? "EN"}
       </Button>
-      <ModeSwitch mode={mode} onChange={onMode} disabled={modeLocked} />
     </header>
   );
 }
