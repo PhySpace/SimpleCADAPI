@@ -421,6 +421,32 @@ def encode_preview(scene: PreviewScene, omit: Collection[str] = ()) -> bytes:
     return MAGIC + struct.pack("<I", len(encoded)) + b"\0\0\0\0" + encoded + b"".join(chunks)
 
 
+def refine_preview(
+    scene: PreviewScene, keys: Collection[str], *, linear_tolerance: float, angular_tolerance: float
+) -> bytes:
+    """The parts *keys* of *scene* tessellated again at a finer tolerance, encoded as a preview with no nodes.
+
+    A viewer that sees a part up close asks for it (level of detail): the parts keep their keys and their entities
+    (the topology is the same; only the triangles and edge polylines are denser), so what it picked and highlighted
+    stays named.  Keys the scene does not have are left out.
+    """
+    if not linear_tolerance > 0 or not angular_tolerance > 0:
+        raise PreviewError("a tolerance must be positive")
+    parts = {
+        key: preview_solid(scene.solids[key], linear_tolerance=linear_tolerance, angular_tolerance=angular_tolerance)
+        for key in keys
+        if key in scene.solids
+    }
+    refined = PreviewScene(
+        parts=parts,
+        nodes=[],
+        solids={key: scene.solids[key] for key in parts},
+        definitions={key: scene.definitions[key] for key in parts},
+        bodies={key: scene.bodies[key] for key in parts if key in scene.bodies},
+    )
+    return encode_preview(refined)
+
+
 def decode_preview_header(data: bytes) -> dict[str, Any]:
     """The header of an encoded preview (the arrays follow it)."""
     if not data.startswith(MAGIC):
@@ -541,4 +567,5 @@ __all__ = [
     "entity_info",
     "part_key",
     "preview_solid",
+    "refine_preview",
 ]

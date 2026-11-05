@@ -28,7 +28,7 @@ from typing import Any
 
 from ..artifacts.assembly_io import attached_definition
 from ..product.packages import build_product_package, encode_product_package
-from ..scene.preview import PreviewScene, compile_preview, encode_preview, entity_info
+from ..scene.preview import PreviewScene, compile_preview, encode_preview, entity_info, refine_preview
 from ._marimo import safe_get_context
 from .cells import NotebookCells
 from .config import NotebookConfig, read_notebook_config
@@ -439,6 +439,18 @@ def preview_entity_info(entity_id: str) -> dict[str, Any] | None:
     return entity_info(_last_preview, entity_id)
 
 
+def preview_refined(keys: list[str], linear_tolerance: float, angular_tolerance: float, path: str) -> int:
+    """:func:`refine_preview` of the scene last previewed, written to *path* (the editor's server reads it and hands it to
+    the page that asked); the number of parts written.  Before the first preview nothing is written and 0 returned."""
+
+    if _last_preview is None:
+        return 0
+    data = refine_preview(_last_preview, keys, linear_tolerance=linear_tolerance, angular_tolerance=angular_tolerance)
+    with open(path, "wb") as handle:
+        handle.write(data)
+    return len([key for key in keys if key in _last_preview.solids])
+
+
 def publish_live(url: str, *, step: str = "", timeout: float = 60.0) -> LivePackage:
     """:func:`live_package`, then POST the package bytes to *url*."""
 
@@ -471,6 +483,7 @@ __all__ = [
     "live_package",
     "live_preview",
     "preview_entity_info",
+    "preview_refined",
     "publish_live",
     "publish_preview",
 ]

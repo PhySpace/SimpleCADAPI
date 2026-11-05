@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
+import { refinePreview } from "@/lib/api";
 import { SceneView, type PickResult, type SelectionMode } from "@/scene/scene-view";
 import { PALETTES, type SceneTheme } from "@/scene/theme";
 
@@ -46,6 +47,7 @@ export function Viewport({
   const sketchPickRef = useRef(onSketchPick);
   sketchPickRef.current = onSketchPick;
   const overlayRef = useRef<THREE.Object3D[]>([]);
+  const [geometryVersion, setGeometryVersion] = useState(0);
   // The theme the view was created with; later changes go through setTheme.
   const themeRef = useRef(theme);
   themeRef.current = theme;
@@ -75,9 +77,13 @@ export function Viewport({
       theme: themeRef.current,
     });
     viewRef.current = view;
+    // parts seen up close are tessellated again by the kernel (level of detail); the selection is drawn again on them
+    view.engine.setLodSource(refinePreview);
+    const unbindGeometry = view.engine.onGeometryChanged(() => setGeometryVersion((version) => version + 1));
     // Debug/agent affordance: reach the imperative scene from the console.
     (window as unknown as { __studioView?: SceneView }).__studioView = view;
     return () => {
+      unbindGeometry();
       dropOverlays();
       view.dispose();
       viewRef.current = null;
@@ -99,7 +105,7 @@ export function Viewport({
     view.engine.invalidate();
     document.documentElement.dataset.overlayCount = String(overlayRef.current.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selection, sceneVersion, theme]);
+  }, [selection, sceneVersion, theme, geometryVersion]);
 
   // Another theme: recolor in place (camera, model and selection stay).
   useEffect(() => {

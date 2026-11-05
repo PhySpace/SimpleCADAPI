@@ -71,6 +71,18 @@ export async function deleteNotebook(path: string): Promise<{ trash: string }> {
   return { trash: body.trash ?? "" };
 }
 
+/** The parts `keys` of the model on screen tessellated again at finer tolerances (level of detail): an encoded preview
+ * with no nodes (`lib/preview.ts`, `parsePreviewParts`). */
+export async function refinePreview(keys: string[], linear: number, angular: number): Promise<ArrayBuffer> {
+  const response = await fetch("/api/preview/refine", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ keys, linear, angular }),
+  });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return response.arrayBuffer();
+}
+
 /** What the viewport shows (PNG data URL), for coding agents to look at. */
 export async function postViewport(dataUrl: string): Promise<void> {
   const blob = await (await fetch(dataUrl)).blob();

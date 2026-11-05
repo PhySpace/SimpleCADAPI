@@ -20,6 +20,7 @@ typing in the embedded marimo editor), and is what the server reacts to.
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import json
 import os
@@ -27,6 +28,7 @@ import re
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -683,6 +685,28 @@ class MarimoKernel:
                 except json.JSONDecodeError:
                     return None
         return None
+
+    def refine_preview(self, keys: list[str], linear_tolerance: float, angular_tolerance: float) -> bytes | None:
+        """The parts *keys* of the scene last previewed, tessellated at the given tolerances (level of detail): an
+        encoded preview with no nodes, or ``None`` when the kernel has no preview or the call failed."""
+        handle, path = tempfile.mkstemp(prefix="sca-lod-", suffix=".bin")
+        os.close(handle)
+        try:
+            result = self.execute(
+                "from simplecadapi.runtime.live import preview_refined as _refined\n"
+                "try:\n"
+                f"    print('SCA-REFINED', _refined({list(keys)!r}, {float(linear_tolerance)!r}, {float(angular_tolerance)!r}, {path!r}))\n"
+                "except Exception as _e:\n"
+                "    print('SCA-REFINED-ERROR', type(_e).__name__ + ':', str(_e).splitlines()[0] if str(_e) else '')\n"
+            )
+            if not any(line.startswith("SCA-REFINED ") for line in (result.get("log") or "").splitlines()):
+                return None
+            with open(path, "rb") as stream:
+                data = stream.read()
+            return data or None
+        finally:
+            with contextlib.suppress(OSError):
+                os.unlink(path)
 
     def references(self, function: str, *args: object) -> object:
         """Call ``simplecadapi.runtime.live_refs.<function>(*args)`` in the kernel; its JSON answer.

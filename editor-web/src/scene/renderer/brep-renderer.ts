@@ -19,7 +19,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { MeshStandardNodeMaterial, PMREMGenerator, RenderPipeline, WebGPURenderer } from 'three/webgpu';
-import { float, mix, mrt, normalView, output, pass, vec4 } from 'three/tsl';
+import { float, mix, mrt, normalView, output, pass, screenUV, step, texture, uniform, vec4 } from 'three/tsl';
 import { ao } from 'three/addons/tsl/display/GTAONode.js';
 import { LineMaterial, LineSegments2, LineSegmentsGeometry } from '../fat-lines';
 import { pointSprites, setPointSpriteColor } from '../point-sprites';
@@ -27,7 +27,9 @@ import { strFromU8 } from 'fflate';
 import { DEFAULT_BASE_COLOR, CAD_EDGE_LINE_WIDTH, cadPointToGltf, disposeObject, materialFor, placementMatrix } from '../cad-three';
 import { PALETTES, type SceneTheme, type ScenePalette } from '../theme';
 import type { PackageFiles } from '../product-package';
-import type { PreviewData, PreviewPart } from '../../lib/preview';
+import { parsePreviewParts, type PreviewData, type PreviewPart } from '../../lib/preview';
+import { LOD_LEVELS, cappedLevel, levelFor, mmPerPixel } from '../lod';
+import { accelerate, release } from '../bvh';
 import { fitDistance } from '../camera-fit';
 import { applyOrthographic, isOrthographic } from '../camera-projection';
 import type { Entity, EntitySidecar, FaceGroup, SceneManifest, SceneNode, Vec3 } from '../scene2';
@@ -116,12 +118,22 @@ type BuiltPart = {
   sidecar: EntitySidecar;
 };
 
-function disposeBuilt(built: BuiltPart): void {
-  built.faces.dispose();
-  built.pick.dispose();
-  built.edges.dispose();
-  built.vertices?.dispose();
+function disposeBuilt(built: BuiltPart, keepVertices = false): void {
+  for (const geometry of [built.faces, built.pick, built.edges]) {
+    release(geometry);
+    geometry.dispose();
+  }
+  if (built.vertices && !keepVertices) {
+    release(built.vertices);
+    built.vertices.dispose();
+  }
 }
+
+/** Asks the kernel for parts tessellated again (see `lib/api.ts` refinePreview): an encoded preview with no nodes. */
+export type LodSource = (keys: string[], linear: number, angular: number) => Promise<ArrayBuffer>;
+
+/** A part drawn by this many nodes or more is drawn instanced: one draw of its faces per colour, its edges batched. */
+const INSTANCE_MIN = 2;
 
 /** Free the materials under *root* and leave its geometries alone (a preview's parts outlive its nodes). */
 function disposeMaterials(root: THREE.Object3D): void {
@@ -192,7 +204,22 @@ export class BRepRenderer {
   private previewSidecars = new Map<string, EntitySidecar>();
   /** The geometry built for each part of the preview on screen, by part key: the next preview reuses what it shares. */
   private previewBuilt = new Map<string, BuiltPart>();
+  /** The arrays of each part on screen at its current level of detail, by part key. */
+  private previewParts = new Map<string, PreviewPart>();
+  /** The level of detail of each part on screen (see scene/lod.ts); absent: 0, as previewed. */
+  private lodLevels = new Map<string, number>();
+  private lodBusy = new Set<string>();
+  private lodSource: LodSource | null = null;
+  private lodTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The instanced faces and batched edges of the parts several nodes draw (see rebuildInstances). */
+  private instanced: THREE.Object3D[] = [];
+  private previewEdgeMaterial: LineMaterial | null = null;
+  private geometryListeners = new Set<() => void>();
   private readonly gizmoScene = new THREE.Scene();
+  /** The gizmo is drawn here (transparent around it) and composited by the output node at `gizmoRect`. */
+  private readonly gizmoTarget = new THREE.RenderTarget(1, 1, { samples: 4, type: THREE.HalfFloatType });
+  /** The gizmo's corner of the view, in screen UV (top left 0, 0): x0, y0, x1, y1. */
+  private readonly gizmoRect = uniform(new THREE.Vector4(0, 0, 0, 0));
   private readonly gizmoCamera = new THREE.OrthographicCamera(-1.5, 1.5, 1.5, -1.5, 0.1, 20);
 
   constructor(host: HTMLElement, options: BRepRendererOptions = {}) {
@@ -360,8 +387,15 @@ export class BRepRenderer {
     const occlusion = aoNode.getTextureNode().x;
     const blendIntensity = 0.65;
     const shade = mix(float(1), occlusion, mask.mul(blendIntensity));
-    this.plainOutput = vec4(color.rgb, color.a);
-    this.occludedOutput = vec4(color.rgb.mul(shade), color.a);
+    // the axis gizmo, drawn into its own transparent target, laid over the corner (premultiplied: its colour is already
+    // weighted by its coverage)
+    const corner = this.gizmoRect;
+    const local = screenUV.sub(corner.xy).div(corner.zw.sub(corner.xy));
+    const inside = step(0, local.x).mul(step(local.x, 1)).mul(step(0, local.y)).mul(step(local.y, 1));
+    const gizmo = texture(this.gizmoTarget.texture, local);
+    const over = (rgb: ReturnType<typeof vec4>['rgb']) => rgb.mul(float(1).sub(gizmo.a.mul(inside))).add(gizmo.rgb.mul(inside));
+    this.plainOutput = vec4(over(color.rgb), color.a);
+    this.occludedOutput = vec4(over(color.rgb.mul(shade)), color.a);
     this.pipeline = new RenderPipeline(this.renderer);
     this.pipeline.outputNode = this.ssaoEnabled ? this.occludedOutput : this.plainOutput;
   }
@@ -396,11 +430,13 @@ export class BRepRenderer {
     this.controls.update();
     // Camera pose change (damping, user input) or an explicit invalidation
     // triggers the expensive pipeline; an idle scene skips it entirely.
-    if (!this.cameraMoved() && !this.needsRender) return;
+    const moved = this.cameraMoved();
+    if (moved) this.scheduleLod();
+    if (!moved && !this.needsRender) return;
     this.needsRender = false;
+    this.renderGizmo();
     this.renderer.setRenderTarget(null);
     this.pipeline.render();
-    this.renderGizmo();
   }
 
   // -- ground grid + axis gizmo ---------------------------------------------------
@@ -534,36 +570,25 @@ export class BRepRenderer {
     this.needsRender = true;
   }
 
+  /** Draw the axis gizmo into its target, for the output node to lay over the top right corner. */
   private renderGizmo(): void {
     const size = this.renderer.getSize(new THREE.Vector2());
     const side = 108;
     const margin = 12;
+    const pixels = Math.round(side * this.renderer.getPixelRatio());
+    if (this.gizmoTarget.width !== pixels) this.gizmoTarget.setSize(pixels, pixels);
+    this.gizmoRect.value.set((size.x - side - margin) / size.x, margin / size.y, (size.x - margin) / size.x, (margin + side) / size.y);
     const offset = this.camera.position.clone().sub(this.controls.target).normalize().multiplyScalar(6);
     this.gizmoCamera.position.copy(offset);
     this.gizmoCamera.up.copy(this.camera.up);
     this.gizmoCamera.lookAt(0, 0, 0);
-    const previousAutoClear = this.renderer.autoClear;
-    this.renderer.autoClear = false;
-    this.renderer.setRenderTarget(null);
-    this.renderer.setScissorTest(true);
-    this.renderer.setViewport(size.x - side - margin, margin, side, side);
-    this.renderer.setScissor(size.x - side - margin, margin, side, side);
-    // With tone mapping or an output colour space to convert to, the renderer draws into a frame-buffer target that
-    // outlives the frame and composites it over the canvas: clear it to transparent, or every earlier gizmo pose stays.
-    // (Drawn straight to the canvas, only the depth is cleared: the colour is the scene.)
-    if (this.renderer.needsFrameBufferTarget) {
-      const clearColor = this.renderer.getClearColor(new THREE.Color());
-      const clearAlpha = this.renderer.getClearAlpha();
-      this.renderer.setClearColor(0x000000, 0);
-      this.renderer.clear(true, true, false);
-      this.renderer.setClearColor(clearColor, clearAlpha);
-    } else {
-      this.renderer.clearDepth();
-    }
+    const clearColor = this.renderer.getClearColor(new THREE.Color());
+    const clearAlpha = this.renderer.getClearAlpha();
+    this.renderer.setClearColor(0x000000, 0);
+    this.renderer.setRenderTarget(this.gizmoTarget);
     this.renderer.render(this.gizmoScene, this.gizmoCamera);
-    this.renderer.setScissorTest(false);
-    this.renderer.setViewport(0, 0, size.x, size.y);
-    this.renderer.autoClear = previousAutoClear;
+    this.renderer.setRenderTarget(null);
+    this.renderer.setClearColor(clearColor, clearAlpha);
   }
 
   // -- scene loading -------------------------------------------------------
@@ -665,6 +690,260 @@ export class BRepRenderer {
     this.resize();
   }
 
+  // -- level of detail + instancing ------------------------------------------------------
+
+  /** Where finer tessellations come from (the editor's kernel); without one, parts stay as previewed. */
+  setLodSource(source: LodSource | null): void {
+    this.lodSource = source;
+    this.scheduleLod();
+  }
+
+  /** Call `listener` whenever parts on screen get new geometry (a finer level of detail): highlights built from the old
+   * triangles are built again.  Returns the unsubscribe function. */
+  onGeometryChanged(listener: () => void): () => void {
+    this.geometryListeners.add(listener);
+    return () => this.geometryListeners.delete(listener);
+  }
+
+  /** The level of detail of each part on screen, by part key (for tests and the console). */
+  get detailLevels(): ReadonlyMap<string, number> {
+    return this.lodLevels;
+  }
+
+  private scheduleLod(): void {
+    if (!this.lodSource || this.previewParts.size === 0 || this.disposed) return;
+    if (this.lodTimer) clearTimeout(this.lodTimer);
+    // once the camera rests: a turn or a zoom in progress asks for nothing
+    this.lodTimer = setTimeout(() => {
+      this.lodTimer = null;
+      void this.updateLod();
+    }, 250);
+  }
+
+  /** The level each visible part needs (the size of a pixel where it is nearest the camera), asked for by level. */
+  private async updateLod(): Promise<void> {
+    const source = this.lodSource;
+    if (!source) return;
+    this.modelRoot.updateMatrixWorld(true);
+    this.camera.updateMatrixWorld();
+    const frustum = new THREE.Frustum().setFromProjectionMatrix(
+      new THREE.Matrix4().multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse),
+      this.camera.coordinateSystem,
+    );
+    const orthographic = isOrthographic(this.camera);
+    const height = this.host.clientHeight;
+    const wanted = new Map<string, number>();
+    const sphere = new THREE.Sphere();
+    for (const object of this.nodeObjects.values()) {
+      const key = object.userData.partKey as string | undefined;
+      const sphereOf = key ? this.previewBuilt.get(key)?.faces.boundingSphere : null;
+      if (!key || !sphereOf || !object.visible) continue;
+      sphere.copy(sphereOf).applyMatrix4(object.matrixWorld);
+      if (!frustum.intersectsSphere(sphere)) continue;
+      const distance = orthographic
+        ? (this.camera.userData.orthoDistance as number)
+        : Math.max(sphere.center.distanceTo(this.camera.position) - sphere.radius, this.camera.near);
+      const level = levelFor(mmPerPixel(distance, this.camera.fov, height));
+      wanted.set(key, Math.max(wanted.get(key) ?? 0, level));
+    }
+    const byLevel = new Map<number, string[]>();
+    for (const [key, target] of wanted) {
+      const current = this.lodLevels.get(key) ?? 0;
+      const triangles = (this.previewParts.get(key)?.indices.length ?? 0) / 3;
+      const level = cappedLevel(target, current, triangles);
+      if (level <= current || this.lodBusy.has(key)) continue;
+      byLevel.set(level, [...(byLevel.get(level) ?? []), key]);
+    }
+    for (const [level, keys] of byLevel) {
+      for (let start = 0; start < keys.length; start += 16) {
+        const batch = keys.slice(start, start + 16);
+        batch.forEach((key) => this.lodBusy.add(key));
+        try {
+          const { linear, angular } = LOD_LEVELS[level];
+          const parts = parsePreviewParts(await source(batch, linear, angular));
+          if (this.disposed) return;
+          let swapped = false;
+          for (const [key, part] of parts) {
+            if (!this.previewBuilt.has(key) || (this.lodLevels.get(key) ?? 0) >= level) continue;
+            this.swapPart(key, part, level);
+            swapped = true;
+          }
+          if (swapped) this.geometryChanged();
+        } catch {
+          // the kernel is busy or the model changed: the parts stay as they are, and a later camera rest asks again
+        } finally {
+          batch.forEach((key) => this.lodBusy.delete(key));
+        }
+      }
+    }
+    // the camera may have come closer while the kernel worked: look again (nothing is asked when nothing is wanted)
+    if (byLevel.size) this.scheduleLod();
+  }
+
+  /** Draw part `key` with the geometry of `part` (the same topology, tessellated at `level`). */
+  private swapPart(key: string, part: PreviewPart, level: number): void {
+    const old = this.previewBuilt.get(key);
+    if (!old) return;
+    const next = this.buildPreviewPart(part);
+    // the vertices are the same points at any level: the vertex clouds keep theirs
+    next.vertices?.dispose();
+    next.vertices = old.vertices;
+    this.previewBuilt.set(key, next);
+    this.previewParts.set(key, part);
+    this.lodLevels.set(key, level);
+    for (const [nodeId, object] of this.nodeObjects) {
+      if (object.userData.partKey !== key) continue;
+      this.previewSidecars.set(nodeId, next.sidecar);
+      object.traverse((child) => {
+        if (child.name === 'cad-faces' && child instanceof THREE.Mesh) {
+          child.geometry = next.faces;
+          accelerate(child);
+        } else if (child.name === 'cad-edge-pick' && child instanceof THREE.LineSegments) {
+          child.geometry = next.pick;
+          accelerate(child);
+        } else if (child.name === 'cad-edge-visual' && child instanceof LineSegments2) {
+          child.geometry = next.edges;
+        }
+      });
+    }
+    disposeBuilt(old, true);
+    this.entityCache.clear();
+  }
+
+  private geometryChanged(): void {
+    this.rebuildInstances();
+    this.needsRender = true;
+    for (const listener of this.geometryListeners) listener();
+  }
+
+  private dropInstances(): void {
+    for (const object of this.instanced) {
+      this.modelRoot.remove(object);
+      if (object instanceof THREE.InstancedMesh) {
+        object.dispose();
+        (object.material as THREE.Material).dispose();
+      } else if (object instanceof LineSegments2) {
+        object.geometry.dispose();
+      }
+    }
+    this.instanced = [];
+  }
+
+  /** Draw the parts several nodes share instanced: per part and colour one instanced mesh of its faces, per part one
+   * batch of its edges.  The nodes stay (picks, highlights and visibility work on them as on any node); their own faces
+   * and edges are just not drawn.  Built again when the nodes, their visibility or the parts' geometry change. */
+  private rebuildInstances(): void {
+    this.dropInstances();
+    const byPart = new Map<string, THREE.Group[]>();
+    for (const object of this.nodeObjects.values()) {
+      const key = object.userData.partKey as string | undefined;
+      if (key) byPart.set(key, [...(byPart.get(key) ?? []), object]);
+    }
+    for (const [key, objects] of byPart) {
+      const built = this.previewBuilt.get(key);
+      const shared = objects.length >= INSTANCE_MIN && !!built;
+      const shown = objects.filter((object) => object.visible);
+      const byLook = new Map<string, { material: THREE.Material; objects: THREE.Group[] }>();
+      for (const object of objects) {
+        object.traverse((child) => {
+          if (child.name === 'cad-faces' && child instanceof THREE.Mesh) {
+            const material = child.material as MeshStandardNodeMaterial;
+            material.visible = !shared;
+            if (shared && object.visible) {
+              const look = `${material.color.getHexString()}:${material.opacity}`;
+              if (!byLook.has(look)) byLook.set(look, { material, objects: [] });
+              byLook.get(look)!.objects.push(object);
+            }
+          } else if (child.name === 'cad-edge-visual') {
+            child.userData.instanced = shared;
+            child.visible = this.edgesVisible && !shared;
+          }
+        });
+      }
+      if (!shared || !built) continue;
+      for (const { material, objects: looking } of byLook.values()) {
+        const mesh = new THREE.InstancedMesh(built.faces, (material as MeshStandardNodeMaterial).clone(), looking.length);
+        (mesh.material as THREE.Material).visible = true;
+        looking.forEach((object, index) => mesh.setMatrixAt(index, object.matrix));
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.computeBoundingSphere();
+        mesh.name = 'cad-instanced-faces';
+        mesh.layers.set(FACE_LAYER);
+        mesh.userData.pickable = false;
+        mesh.raycast = () => {};
+        this.modelRoot.add(mesh);
+        this.instanced.push(mesh);
+      }
+      const start = built.edges.getAttribute('instanceStart') as THREE.InterleavedBufferAttribute | undefined;
+      if (!start || !shown.length || !this.previewEdgeMaterial) continue;
+      const segments = start.data.array as Float32Array;
+      const batch = new Float32Array(segments.length * shown.length);
+      const point = new THREE.Vector3();
+      shown.forEach((object, copy) => {
+        for (let offset = 0; offset < segments.length; offset += 3) {
+          point.set(segments[offset], segments[offset + 1], segments[offset + 2]).applyMatrix4(object.matrix);
+          batch.set([point.x, point.y, point.z], copy * segments.length + offset);
+        }
+      });
+      const geometry = new LineSegmentsGeometry();
+      geometry.setPositions(batch);
+      const visual = new LineSegments2(geometry, this.previewEdgeMaterial);
+      visual.name = 'cad-edge-visual';
+      visual.layers.set(EDGE_LAYER);
+      visual.userData.pickable = false;
+      visual.raycast = () => {};
+      visual.visible = this.edgesVisible;
+      this.modelRoot.add(visual);
+      this.instanced.push(visual);
+    }
+    this.needsRender = true;
+  }
+
+  /** The face, edge and vertex geometry of a part of a preview, and its entity sidecar. */
+private buildPreviewPart(part: PreviewPart): BuiltPart {
+    const faces = new THREE.BufferGeometry();
+    faces.setAttribute('position', new THREE.BufferAttribute(part.positions, 3));
+    faces.setAttribute('normal', new THREE.BufferAttribute(part.normals, 3));
+    faces.setIndex(new THREE.BufferAttribute(part.indices, 1));
+    faces.computeBoundingSphere();
+    const pick = new THREE.BufferGeometry();
+    pick.setAttribute('position', new THREE.BufferAttribute(part.edgePositions, 3));
+    pick.setIndex(new THREE.BufferAttribute(part.edgeIndices, 1));
+    const segments: number[] = [];
+    for (let offset = 0; offset + 1 < part.edgeIndices.length; offset += 2) {
+      const a = part.edgeIndices[offset] * 3;
+      const b = part.edgeIndices[offset + 1] * 3;
+      segments.push(
+        part.edgePositions[a], part.edgePositions[a + 1], part.edgePositions[a + 2],
+        part.edgePositions[b], part.edgePositions[b + 1], part.edgePositions[b + 2],
+      );
+    }
+    const edges = new LineSegmentsGeometry();
+    if (segments.length) edges.setPositions(segments);
+    let vertices: THREE.BufferGeometry | null = null;
+    if (part.vertexIds.length) {
+      vertices = new THREE.BufferGeometry();
+      vertices.setAttribute('position', new THREE.BufferAttribute(part.vertexPositions, 3));
+    }
+    const empty = { properties: {}, geometry: {}, tags: [] as string[], parent_entity_ids: [] as string[], child_entity_ids: [] as string[], source: { kind: 'preview' } };
+    const entity = (id: string, kind: 'solid' | 'face' | 'edge' | 'vertex') => ({ entity_id: id, kind, topo_id: id.split('/').pop() ?? id, ...empty });
+    const sidecar: EntitySidecar = {
+      schema_version: '2.0',
+      definition_id: part.definitionId,
+      geometry_asset_id: '',
+      edge_asset_id: '',
+      entities: [
+        entity(part.solidEntityId, 'solid'),
+        ...part.faceGroups.map((group) => entity(group.entity_id, 'face')),
+        ...part.edgeGroups.map((group) => entity(group.entity_id, 'edge')),
+        ...part.vertexIds.map((id) => entity(id, 'vertex')),
+      ],
+      face_groups: part.faceGroups,
+      edge_groups: part.edgeGroups,
+    };
+    return { faces, pick, edges, vertices, sidecar };
+  }
+
   /** Build the scene from a preview (see `lib/preview.ts`): no package, no
    * sidecar files. Each part's geometry is built once and shared by its
    * instances; picking and highlighting use the same face and edge groups the
@@ -681,50 +960,8 @@ export class BRepRenderer {
     const nodes: SceneNode[] = [];
     const built = this.previewBuilt;
     const material = (node: SceneNode) => materialFor(node);
-    const buildPart = (part: PreviewPart) => {
-      const faces = new THREE.BufferGeometry();
-      faces.setAttribute('position', new THREE.BufferAttribute(part.positions, 3));
-      faces.setAttribute('normal', new THREE.BufferAttribute(part.normals, 3));
-      faces.setIndex(new THREE.BufferAttribute(part.indices, 1));
-      faces.computeBoundingSphere();
-      const pick = new THREE.BufferGeometry();
-      pick.setAttribute('position', new THREE.BufferAttribute(part.edgePositions, 3));
-      pick.setIndex(new THREE.BufferAttribute(part.edgeIndices, 1));
-      const segments: number[] = [];
-      for (let offset = 0; offset + 1 < part.edgeIndices.length; offset += 2) {
-        const a = part.edgeIndices[offset] * 3;
-        const b = part.edgeIndices[offset + 1] * 3;
-        segments.push(
-          part.edgePositions[a], part.edgePositions[a + 1], part.edgePositions[a + 2],
-          part.edgePositions[b], part.edgePositions[b + 1], part.edgePositions[b + 2],
-        );
-      }
-      const edges = new LineSegmentsGeometry();
-      if (segments.length) edges.setPositions(segments);
-      let vertices: THREE.BufferGeometry | null = null;
-      if (part.vertexIds.length) {
-        vertices = new THREE.BufferGeometry();
-        vertices.setAttribute('position', new THREE.BufferAttribute(part.vertexPositions, 3));
-      }
-      const empty = { properties: {}, geometry: {}, tags: [] as string[], parent_entity_ids: [] as string[], child_entity_ids: [] as string[], source: { kind: 'preview' } };
-      const entity = (id: string, kind: 'solid' | 'face' | 'edge' | 'vertex') => ({ entity_id: id, kind, topo_id: id.split('/').pop() ?? id, ...empty });
-      const sidecar: EntitySidecar = {
-        schema_version: '2.0',
-        definition_id: part.definitionId,
-        geometry_asset_id: '',
-        edge_asset_id: '',
-        entities: [
-          entity(part.solidEntityId, 'solid'),
-          ...part.faceGroups.map((group) => entity(group.entity_id, 'face')),
-          ...part.edgeGroups.map((group) => entity(group.entity_id, 'edge')),
-          ...part.vertexIds.map((id) => entity(id, 'vertex')),
-        ],
-        face_groups: part.faceGroups,
-        edge_groups: part.edgeGroups,
-      };
-      return { faces, pick, edges, vertices, sidecar };
-    };
     const edgeMaterial = createEdgeMaterial(this.palette.edge);
+    this.previewEdgeMaterial = edgeMaterial;
     const size = this.resolution();
     edgeMaterial.resolution.set(Math.max(size.width, 1), Math.max(size.height, 1));
     for (const item of preview.nodes) {
@@ -732,7 +969,7 @@ export class BRepRenderer {
       if (!part) continue;
       let geometry = built.get(part.key);
       if (!geometry) {
-        geometry = buildPart(part);
+        geometry = this.buildPreviewPart(part);
         built.set(part.key, geometry);
       }
       const node = {
@@ -750,13 +987,18 @@ export class BRepRenderer {
       object.matrix.copy(placementMatrix(item.transform));
       object.userData.nodeId = item.nodeId;
       object.userData.definitionId = item.definitionId;
+      object.userData.partKey = item.partKey;
       const group = new THREE.Group();
       group.name = item.displayName;
       const faces = new THREE.Mesh(geometry.faces, material(node));
+      faces.name = 'cad-faces';
       faces.layers.set(FACE_LAYER);
+      accelerate(faces);
       group.add(faces);
       // the invisible indexed line set is what edge picking hits; the visual hangs off it
       const pickEdges = new THREE.LineSegments(geometry.pick, new THREE.LineBasicMaterial({ visible: false }));
+      pickEdges.name = 'cad-edge-pick';
+      accelerate(pickEdges);
       if (geometry.edges.attributes.instanceStart) {
         const visual = new LineSegments2(geometry.edges, edgeMaterial);
         visual.name = 'cad-edge-visual';
@@ -771,6 +1013,7 @@ export class BRepRenderer {
         points.userData.pickRole = 'vertex';
         points.userData.pickable = true;
         points.userData.vertexEntityIds = part.vertexIds;
+        accelerate(points);
         group.add(points);
       }
       group.traverse((child: THREE.Object3D) => {
@@ -785,8 +1028,14 @@ export class BRepRenderer {
       if (!preview.parts.has(key)) {
         disposeBuilt(part);
         built.delete(key);
+        this.previewParts.delete(key);
+        this.lodLevels.delete(key);
       }
     }
+    // a part kept from the last preview keeps its level of detail (and its arrays at that level)
+    for (const [key, part] of preview.parts) if (!this.previewParts.has(key)) this.previewParts.set(key, part);
+    this.rebuildInstances();
+    this.scheduleLod();
     this.manifest = { schema_version: '2.0', nodes } as unknown as SceneManifest;
     this.setVertexCloudsVisible(false);
     if (!hadScene) this.pendingFrame = true;
@@ -905,6 +1154,7 @@ export class BRepRenderer {
 
   /** Drop a preview's nodes and keep its parts' geometry (see :meth:`loadPreview`). */
   private clearPreviewNodes(): void {
+    this.dropInstances();
     while (this.modelRoot.children.length) {
       const child = this.modelRoot.children[0];
       disposeMaterials(child);
@@ -919,6 +1169,9 @@ export class BRepRenderer {
   }
 
   clearScene(): void {
+    this.dropInstances();
+    this.previewParts.clear();
+    this.lodLevels.clear();
     for (const object of this.geometryCache.values()) disposeObject(object);
     for (const object of this.edgeCache.values()) disposeObject(object);
     while (this.modelRoot.children.length) {
@@ -943,7 +1196,7 @@ export class BRepRenderer {
   setEdgesVisible(visible: boolean): void {
     this.edgesVisible = visible;
     this.modelRoot.traverse((object) => {
-      if (object.name === 'cad-edge-visual') object.visible = visible;
+      if (object.name === 'cad-edge-visual') object.visible = visible && !object.userData.instanced;
       if (object.name === 'cad-edge-seam') object.visible = visible && this.seamsVisible;
     });
   }
@@ -999,6 +1252,7 @@ export class BRepRenderer {
     if (!object) return;
     object.visible = visible;
     this.nodeVisibility.set(nodeId, visible);
+    if (this.instanced.length) this.rebuildInstances();
   }
 
   // -- accessors -------------------------------------------------------------
@@ -1121,6 +1375,7 @@ export class BRepRenderer {
     this.controls.dispose();
     this.pipeline?.dispose();
     this.aoNode?.dispose();
+    this.gizmoTarget.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

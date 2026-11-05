@@ -66,6 +66,7 @@ export class SceneView {
   selectionMode: SelectionMode;
   marks: Mark[] = [];
   private unbindClick: (() => void) | null = null;
+  private unbindGeometry: (() => void) | null = null;
   private disposed = false;
 
   constructor(host: HTMLElement, options: SceneViewOptions = {}) {
@@ -75,6 +76,8 @@ export class SceneView {
     this.selectionMode = options.selectionMode ?? 'face';
     this.engine = new BRepRenderer(host, { background: options.background, theme: options.theme, ssao: options.ssao, seams: options.seams });
     this.rig = new CameraRig(this.engine);
+    // a finer level of detail: the marks are built again on the new triangles
+    this.unbindGeometry = this.engine.onGeometryChanged(() => this.rebuildMarks());
     if (options.interactive !== false) {
       this.unbindClick = bindClickSelection({
         element: this.engine.domElement,
@@ -349,6 +352,17 @@ export class SceneView {
     if (overlays.length) this.marks.push({ key, color, overlays });
   }
 
+  private rebuildMarks(): void {
+    for (const mark of this.marks) {
+      for (const overlay of mark.overlays) {
+        overlay.parent?.remove(overlay);
+        disposeObject(overlay);
+      }
+      const [nodeId, entity] = mark.key.split('::');
+      mark.overlays = this.buildEntityOverlays(nodeId, entity === 'component' ? null : entity, mark.color);
+    }
+  }
+
   removeMark(key: string): void {
     const index = this.marks.findIndex((mark) => mark.key === key);
     if (index < 0) return;
@@ -413,6 +427,7 @@ export class SceneView {
     if (this.disposed) return;
     this.disposed = true;
     this.unbindClick?.();
+    this.unbindGeometry?.();
     this.engine.dispose();
   }
 }

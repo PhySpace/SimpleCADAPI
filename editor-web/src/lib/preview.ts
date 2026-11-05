@@ -69,9 +69,7 @@ type Header = {
 
 const MAGIC = "SCAPREV1";
 
-/** Parse a preview.  A frame may leave out the parts the page already holds: they are taken from *cache* (the parts of
- * the preview on screen, by key), and the result holds exactly the parts the nodes draw. */
-export function parsePreview(buffer: ArrayBuffer, cache: ReadonlyMap<string, PreviewPart> = new Map()): PreviewData {
+function decode(buffer: ArrayBuffer): { header: Header; carried: Map<string, PreviewPart> } {
   const bytes = new Uint8Array(buffer);
   if (new TextDecoder().decode(bytes.subarray(0, MAGIC.length)) !== MAGIC) throw new Error("not a preview");
   const view = new DataView(buffer);
@@ -99,6 +97,18 @@ export function parsePreview(buffer: ArrayBuffer, cache: ReadonlyMap<string, Pre
       solidEntityId: part.solid_entity_id,
     });
   }
+  return { header, carried };
+}
+
+/** The parts a preview frame carries, by key, whatever its nodes (a level-of-detail answer has none). */
+export function parsePreviewParts(buffer: ArrayBuffer): Map<string, PreviewPart> {
+  return decode(buffer).carried;
+}
+
+/** Parse a preview.  A frame may leave out the parts the page already holds: they are taken from *cache* (the parts of
+ * the preview on screen, by key), and the result holds exactly the parts the nodes draw. */
+export function parsePreview(buffer: ArrayBuffer, cache: ReadonlyMap<string, PreviewPart> = new Map()): PreviewData {
+  const { header, carried } = decode(buffer);
   const nodes: PreviewNode[] = header.nodes.map((node) => ({
     nodeId: node.node_id,
     partKey: node.part,

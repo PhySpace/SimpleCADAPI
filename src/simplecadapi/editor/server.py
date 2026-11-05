@@ -2027,6 +2027,28 @@ def create_app(state: WorkspaceState) -> Starlette:
             return Response(content=state.latest_preview_bytes, media_type="application/vnd.simplecad.preview")
         return JSONResponse({"error": "no preview published yet"}, status_code=404)
 
+    async def refine_preview(request: Request) -> Response:
+        """Level of detail: the parts a page sees up close, tessellated again by the kernel at the tolerances it asks
+        for (``{"keys": [...], "linear": mm, "angular": rad}``), as an encoded preview with no nodes.  The parts keep
+        their keys and entities; a page swaps their triangles and edge lines in place."""
+        try:
+            body = await request.json()
+            keys = [str(key) for key in body["keys"]][:64]
+            linear = float(body["linear"])
+            angular = float(body["angular"])
+        except (KeyError, TypeError, ValueError):
+            return JSONResponse({"ok": False, "error": "expected keys, linear and angular"}, status_code=400)
+        # finer than this costs more triangles than any screen shows
+        if not (0.005 <= linear <= 10.0 and 0.02 <= angular <= 1.0) or not keys:
+            return JSONResponse({"ok": False, "error": "tolerance out of range"}, status_code=400)
+        kernel = state.kernel
+        if kernel is None:
+            return JSONResponse({"ok": False, "error": "no kernel"}, status_code=409)
+        data = await asyncio.to_thread(kernel.refine_preview, keys, linear, angular)
+        if data is None:
+            return JSONResponse({"ok": False, "error": "the kernel has no preview"}, status_code=409)
+        return Response(data, media_type="application/octet-stream")
+
     async def push_package(request: Request) -> JSONResponse:
         """The kernel hands over a full package, made because an export asked for it."""
         body = await request.body()
@@ -2340,6 +2362,7 @@ def create_app(state: WorkspaceState) -> Starlette:
         Route("/api/health", health),
         Route("/api/runtime/preview", push_preview, methods=["POST"]),
         Route("/api/preview/latest", latest_preview, methods=["GET"]),
+        Route("/api/preview/refine", refine_preview, methods=["POST"]),
         Route("/api/runtime/package", push_package, methods=["POST"]),
         Route("/api/package/latest", latest_package, methods=["GET"]),
         Route("/api/sdk", sdk_index, methods=["GET"]),
