@@ -149,3 +149,68 @@ def test_the_server_names_picks_shows_a_split_and_writes_the_chosen_piece(tmp_pa
         if state.kernel is not None:
             state.kernel.stop()
         server.should_exit = True
+
+
+def test_an_edit_keeps_the_references_it_is_given_and_adds_what_is_picked_on_the_result(tmp_path):
+    """The shell session: faces picked on the shelled body are named on the body before it and join the openings; the
+    ones the feature holds come back as references (a face it opened is not drawn any more), so one can be taken out."""
+    import threading
+
+    import uvicorn
+
+    from simplecadapi.editor.server import WorkspaceState, create_app
+    from simplecadapi.editor.templates import create_notebook
+
+    path = create_notebook(tmp_path, "cup", "blank")
+    state = WorkspaceState(tmp_path)
+    state.port = 17742
+    server = uvicorn.Server(uvicorn.Config(create_app(state), port=state.port, log_level="error"))
+    threading.Thread(target=server.run, daemon=True).start()
+    state.hub.attach_loop(__import__("asyncio").new_event_loop())
+
+    def pick(axis: int, at: float) -> str:
+        found = state.kernel.execute(
+            "from simplecadapi.runtime import live as _live\n"
+            "_s = _live._live_scene()\n"
+            "for _k, _solid in _s.solids.items():\n"
+            "    for _f in _solid._iter_faces():\n"
+            f"        if abs(_f.get_center().{'xyz'[axis]} - {at}) < 1e-6:\n"
+            "            print('SCA-PICK', f'entity/{_s.definitions[_k]}/face/{_f.topo_id}')\n"
+        )
+        (entity_id,) = [line.split(" ", 1)[1] for line in found["log"].splitlines() if line.startswith("SCA-PICK ")]
+        return entity_id
+
+    def cup() -> dict:
+        return next(f for f in state.features.snapshot()["features"] if f["slug"] == "cup")
+
+    try:
+        state.start_kernel(path)
+        service = state.features
+        service.add({"spec": "box", "name": "base", "values": {"width": 40.0, "height": 30.0, "depth": 20.0}})
+        _wait_idle(state)
+        service.add({"spec": "shell", "name": "cup", "values": {"body": "base"}, "selections": {"faces": [{"kind": "face", "entity_id": pick(2, 20.0)}]}})
+        _wait_idle(state)
+        (top,) = cup()["gui"]["refs"]["faces"]
+        assert top["role"] == "box.top" and not cup()["errors"]
+        assert cup()["gui"]["values"]["thickness"] == 1.0  # a thin wall to start from
+
+        # a side picked on the cup itself joins the openings; picking it again changes nothing
+        side = pick(0, 20.0)
+        kept = {"kind": "face", "ref": top}
+        service.edit({"cell": cup()["cell"], "selections": {"faces": [kept, {"kind": "face", "entity_id": side}]}})
+        _wait_idle(state)
+        refs = cup()["gui"]["refs"]["faces"]
+        assert [r["role"] for r in refs] == ["box.top", "box.front"] and not cup()["errors"], (refs, cup()["errors"])
+        again = [{"kind": "face", "ref": r} for r in refs] + [{"kind": "face", "ref": refs[1]}]
+        service.edit({"cell": cup()["cell"], "selections": {"faces": again}})
+        _wait_idle(state)
+        assert len(cup()["gui"]["refs"]["faces"]) == 2
+
+        # the top taken out again: only the side is open
+        service.edit({"cell": cup()["cell"], "selections": {"faces": [{"kind": "face", "ref": refs[1]}]}})
+        _wait_idle(state)
+        assert [r["role"] for r in cup()["gui"]["refs"]["faces"]] == ["box.front"] and not cup()["errors"]
+    finally:
+        if state.kernel is not None:
+            state.kernel.stop()
+        server.should_exit = True

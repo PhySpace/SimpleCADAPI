@@ -21,7 +21,7 @@ import { NewNotebookPrompt } from "@/components/NewNotebookPrompt";
 import { FloatingPanels } from "@/components/FloatingPanels";
 import { OperationPanel } from "@/components/OperationPanel";
 import { PressPullHandle } from "@/components/PressPullHandle";
-import { featureParams, quickStart } from "@/lib/operation-session";
+import { addPick, featureParams, pickSlot, quickStart, refLabel, removePick } from "@/lib/operation-session";
 import { createSettler, SETTLE_MS } from "@/lib/settle";
 import { PartialNotice } from "@/components/PartialModel";
 import { describePartial, parsePartial, samePartial, type PartialModel } from "@/lib/partial";
@@ -54,7 +54,7 @@ import { describeSketch, nextSketchSelection, readHidden, sketchCentre, sketchIn
 import { useSketchShapes } from "@/lib/useSketchShapes";
 import type { Vec3 } from "@/lib/sketch-plane";
 import { PALETTES } from "@/scene/theme";
-import { assertCellRan, cellFailure, isCellCommand, pickedPayload, type FeatureCommand, type FeatureRow, type Spec } from "@/lib/features";
+import { assertCellRan, cellFailure, isCellCommand, pickedPayload, type FeatureCommand, type FeatureRow, type SelectionPayload, type Spec } from "@/lib/features";
 import { useRunLog } from "@/lib/runlog";
 import { useTheme } from "@/lib/theme";
 import { selectionPayload, variableNames, type SelectionItem } from "@/lib/selection";
@@ -545,6 +545,8 @@ export function App() {
   const leftTabRef = useRef(leftTab);
   leftTabRef.current = leftTab;
   const selectComponent = asm.setSelected;
+  /** The session's pick editor (declared with the session below): a click during an operation goes to it. */
+  const editSessionPicksRef = useRef<(items: SelectionPayload[]) => void>(() => {});
   const handlePick = useCallback((result: PickResult) => {
     if (placingRef.current || drawingRef.current) return; // a click on the handles, or a curve's point, is not a pick
     if (dialogRef.current?.spec.id === "hole") return; // a click places the hole (HolePlacer), it picks nothing
@@ -570,6 +572,12 @@ export function App() {
       geometry: entity?.geometry ?? null,
       tags: entity?.tags ?? null,
     };
+    // An operation in progress that takes several picks: a click on the model adds what it hits (the server names it)
+    const current = sessionRef.current;
+    if (current) {
+      if (current.pick && item.kind === current.pick.entity && item.entityId) editSessionPicksRef.current(addPick(sessionHeldRef.current, { ...item, variable: "" }));
+      return;
+    }
     // A preview carries no entity details: ask the kernel for them.
     const needsDetails = Boolean(view?.isPreview) && Boolean(item.entityId) && Object.keys(item.properties ?? {}).length === 0;
     if (needsDetails && item.entityId) {
@@ -640,8 +648,16 @@ export function App() {
 
   // -- an operation in progress (lib/operation-session.ts): added at once, its numbers tuned live by the selection ----------
 
-  /** `handle`: a press / pull's arrow, on the picked face (mm, world) along its outward normal. */
-  type OpSession = { slug: string; cell: string | null; title: string; specId: string; anchorMm: Vec3 | null; editing: boolean; busy: boolean; error: string | null; handle: { origin: Vec3; normal: Vec3 } | null };
+  /** `handle`: an arrow on the picked face (mm, world) that drags the number whose name ends in `param`: a press / pull's
+   * distance along the face's outward normal, a shell's wall thickness into the body.
+   * `pick`: the selection a click on the model adds to (the faces a shell opens, the edges a fillet rounds), see
+   * lib/operation-session.ts; `edits`: the feature edits those clicks made (Esc undoes them with the rest). */
+  type OpSession = {
+    slug: string; cell: string | null; title: string; specId: string; anchorMm: Vec3 | null; editing: boolean; busy: boolean; error: string | null;
+    handle: { origin: Vec3; normal: Vec3; param: string; min?: number } | null;
+    pick: ReturnType<typeof pickSlot>;
+    edits: number;
+  };
   const [session, setSession] = useState<OpSession | null>(null);
   const sessionRef = useRef(session);
   sessionRef.current = session;
@@ -649,8 +665,13 @@ export function App() {
   const paramsRef = useRef<ParamMeta[]>([]);
   const sessionSettler = useRef(createSettler<ParamValue>(SETTLE_MS, (values) => socketRef.current?.send({ type: "param.set", values })));
   const sessionParams = useMemo(() => (session ? featureParams(params, session.slug) : []), [params, session]);
-  /** The distance a press / pull's arrow drags. */
-  const sessionDistance = sessionParams.find((param) => param.id.endsWith("_DISTANCE"));
+  /** The number the session's arrow drags. */
+  const sessionDistance = session?.handle ? sessionParams.find((param) => param.id.endsWith(session.handle!.param)) : undefined;
+  /** What the session's pick slot holds, as references (in the feature's cell). */
+  const sessionHeld = useMemo(() => {
+    if (!session?.pick || !session.cell) return [];
+    return gui.state.features.find((feature) => feature.cell === session.cell)?.gui?.refs?.[session.pick.slot] ?? [];
+  }, [session, gui.state.features]);
   /** The numbers changed in the session (the server's `modified` may not have come back yet when Enter is pressed). */
   const sessionTouched = useRef(new Set<string>());
   /** The numbers of the session the notebook source does not have yet. */
@@ -681,7 +702,13 @@ export function App() {
     if (names.length) socketRef.current?.send({ type: "param.revert", names });
     sessionTouched.current.clear();
     setSession(null);
-    if (!current.editing) void gui.run({ op: "undo" }).then(() => log.push("info", t("took back {{name}}", { name: current.slug }))).catch(() => undefined);
+    // the picks added while tuning are edits of their own: they go back first, then the feature itself when it is new
+    const steps = current.edits + (current.editing ? 0 : 1);
+    void (async () => {
+      for (let step = 0; step < steps; step += 1) await gui.run({ op: "undo" });
+    })()
+      .then(() => steps && log.push("info", t("took back {{name}}", { name: current.slug })))
+      .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gui.run, log.push]);
   /** Start `spec` on the selection with its defaults when that is all it needs (else false: the dialog opens). */
@@ -691,10 +718,18 @@ export function App() {
       const start = quickStart(request.spec, gui.state, selectionRef.current, request.prefill);
       if (!start) return false;
       const title = t(plainLabel(request.spec.id, request.spec.label));
-      const picked = request.spec.id === "press_pull" ? selectionRef.current.find((item) => item.kind === "face") : undefined;
+      // a press / pull drags its distance out of the face, a shell its wall thickness into the body
+      const arrow = ({ press_pull: { param: "_DISTANCE", into: false }, shell: { param: "_THICKNESS", into: true } } as const)[request.spec.id as "press_pull" | "shell"];
+      const picked = arrow ? selectionRef.current.find((item) => item.kind === "face") : undefined;
       const frame = picked?.entityId ? (viewRef.current?.faceFrameMm(picked.nodeId, picked.entityId) ?? null) : null;
-      const handle = frame ? { origin: frame.centroid, normal: frame.normal } : null;
-      setSession({ slug: start.name, cell: null, title, specId: request.spec.id, anchorMm: frame?.centroid ?? anchorRef.current, editing: false, busy: true, error: null, handle });
+      const handle =
+        frame && arrow
+          ? { origin: frame.centroid, normal: (arrow.into ? frame.normal.map((v) => -v) : frame.normal) as Vec3, param: arrow.param, ...(arrow.into ? { min: 0.1 } : {}) }
+          : null;
+      setSession({
+        slug: start.name, cell: null, title, specId: request.spec.id, anchorMm: frame?.centroid ?? anchorRef.current, editing: false, busy: true, error: null,
+        handle, pick: pickSlot(request.spec), edits: 0,
+      });
       setDialog(null);
       gui
         .run(start.command)
@@ -712,10 +747,31 @@ export function App() {
     },
     [gui.state, gui.run, log.push],
   );
+  /** Write a new list into the session's pick slot (a click added to it, the panel took one out): an edit of the feature. */
+  const editSessionPicks = useCallback(
+    (items: SelectionPayload[]) => {
+      const current = sessionRef.current;
+      if (!current?.pick || !current.cell || current.busy) return;
+      const { cell, pick } = current;
+      setSession({ ...current, busy: true });
+      gui
+        .run({ op: "edit", cell, values: {}, selections: { [pick.slot]: items } })
+        .then((result) => setSession((now) => (now && now.cell === cell ? { ...now, busy: false, edits: now.edits + 1, error: cellFailure(result) } : now)))
+        .catch((error) => setSession((now) => (now && now.cell === cell ? { ...now, busy: false, error: error instanceof Error ? error.message : String(error) } : now)));
+    },
+    [gui.run],
+  );
+  const sessionHeldRef = useRef(sessionHeld);
+  sessionHeldRef.current = sessionHeld;
+  editSessionPicksRef.current = editSessionPicks;
+
   /** Tune the numbers of a feature of the tree in place (Esc gives them back). */
   const editInPlace = useCallback((feature: FeatureRow, spec: Spec): boolean => {
     if (!featureParams(paramsRef.current, feature.slug).length) return false;
-    setSession({ slug: feature.slug, cell: feature.cell, title: t(plainLabel(spec.id, spec.label)), specId: spec.id, anchorMm: anchorRef.current, editing: true, busy: false, error: null, handle: null });
+    setSession({
+      slug: feature.slug, cell: feature.cell, title: t(plainLabel(spec.id, spec.label)), specId: spec.id, anchorMm: anchorRef.current, editing: true, busy: false, error: null,
+      handle: null, pick: feature.gui?.refs?.[pickSlot(spec)?.slot ?? ""] ? pickSlot(spec) : null, edits: 0,
+    });
     return true;
   }, []);
 
@@ -1623,6 +1679,7 @@ export function App() {
                     origin={session.handle.origin}
                     normal={session.handle.normal}
                     distance={Number(sessionDistance.value)}
+                    min={session.handle.min}
                     onChange={(distance, done) => {
                       sessionTouched.current.add(sessionDistance.id);
                       sessionSettler.current.push(sessionDistance.id, distance);
@@ -1639,6 +1696,16 @@ export function App() {
                     error={session.error ?? (session.cell ? (partial?.failed.find((cell) => cell.cell === session.cell)?.error ?? null) : null)}
                     busy={session.busy}
                     editing={session.editing}
+                    picks={
+                      session.pick && session.cell
+                        ? {
+                            label: t(session.pick.label),
+                            hint: session.pick.entity === "edge" ? t("Click edges on the model to add them") : t("Click faces on the model to add them"),
+                            items: sessionHeld.map(refLabel),
+                            onRemove: (index) => editSessionPicks(removePick(sessionHeld, index)),
+                          }
+                        : undefined
+                    }
                     onParam={(id, value, now) => {
                       sessionTouched.current.add(id);
                       sessionSettler.current.push(id, value);

@@ -108,6 +108,7 @@ sca feature ls                       # features, bodies, tip, product, defaults
 sca feature add box --name base --values '{"width": 40, "height": 30, "depth": 20}'
 sca feature add fillet --values '{"radius": 2}' --selections '{"edges": [{"kind": "edge", "entity_id": "entity/..."}]}'  # named by the kernel; geometry-only items keep the older recipe
 sca feature edit base --values '{"width": 50}'      # a GUI feature; a code feature is refused
+sca feature edit cup --selections '{"faces": [{"kind": "face", "ref": {...}}, {"kind": "face", "entity_id": "entity/..."}]}'  # keep a held reference (`sca feature ls`: gui.refs), add a pick
 sca feature rm base | sca feature undo | sca feature redo
 sca sketch ls | get CELL | put CELL -f doc.json | solve CELL
 sca sketch op CELL trim --args '{"entity": "h", "at": [8, 0]}' [--dry-run]

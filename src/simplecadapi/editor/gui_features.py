@@ -124,7 +124,19 @@ class FeatureService:
                     "index": index + 1,
                     "slug": head.slug,
                     "role": head.role,
-                    "gui": {"spec": gui["spec"], "values": gui.get("values", {}), "picked": gui.get("picked", {})} if gui else None,
+                    "gui": {
+                        "spec": gui["spec"],
+                        "values": gui.get("values", {}),
+                        "picked": gui.get("picked", {}),
+                        # what each selection holds, as references (absent for a slot written as an older recipe)
+                        "refs": {
+                            slot.name: refs
+                            for slot in F.BY_ID[gui["spec"]].slots
+                            if slot.kind == "select" and (refs := F.selection_refs(code, slot.name)) is not None
+                        },
+                    }
+                    if gui
+                    else None,
                     "makes": made,
                     "part_of": part_of,
                     "reads": sorted(loaded & (set(bodies) | {w["name"] for w in workplanes}) - set(made)),
@@ -459,7 +471,9 @@ class FeatureService:
 
     def _name_picks(self, picked: dict[str, list]) -> dict[str, list]:
         """Each picked entity with its stable reference (``ref``: a record), named in the kernel from the value it
-        was drawn from.  An entity the kernel cannot name keeps no ``ref`` (its slot falls back to the older recipe)."""
+        was drawn from.  An item that comes with its ``ref`` and no entity on screen (one an edit keeps of what the feature
+        holds: a face it opened is no longer drawn) keeps it; an entity the kernel cannot name keeps no ``ref`` (its slot
+        falls back to the older recipe)."""
         ids = [str(item.get("entity_id")) for items in picked.values() for item in items if isinstance(item, Mapping) and item.get("entity_id")]
         kernel = getattr(self.state, "kernel", None)
         named: dict[str, Any] = {}
@@ -473,6 +487,9 @@ class FeatureService:
         for slot, items in picked.items():
             rows = []
             for item in items:
+                if isinstance(item, Mapping) and not item.get("entity_id") and isinstance(item.get("ref"), Mapping):
+                    rows.append(dict(item))
+                    continue
                 row = {k: v for k, v in dict(item).items() if k != "ref"} if isinstance(item, Mapping) else item
                 record = named.get(str(row.get("entity_id"))) if isinstance(row, dict) else None
                 if record:

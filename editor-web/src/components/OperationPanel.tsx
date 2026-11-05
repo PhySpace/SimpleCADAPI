@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronsDownUp, ChevronsUpDown, SlidersHorizontal, X } from "lucide-react";
+import { Check, ChevronsDownUp, ChevronsUpDown, MousePointerClick, SlidersHorizontal, X } from "lucide-react";
 
 import { ParamControl, type ParamMeta, type ParamValue } from "@/components/ParamControl";
 import { useViewer } from "@/components/sketch/SketchOverlay";
@@ -19,6 +19,7 @@ export function OperationPanel({
   error,
   busy,
   editing,
+  picks,
   onParam,
   onConfirm,
   onCancel,
@@ -34,6 +35,9 @@ export function OperationPanel({
   busy: boolean;
   /** The feature existed before (Esc reverts its numbers instead of removing it). */
   editing: boolean;
+  /** What the operation works on, when a click on the model adds to it (the faces a shell opens): each can be taken out
+   * while more than one is left. */
+  picks?: { label: string; hint: string; items: readonly string[]; onRemove: (index: number) => void };
   onParam: (id: string, value: ParamValue, now?: boolean) => void;
   onConfirm: () => void;
   onCancel: () => void;
@@ -98,6 +102,26 @@ export function OperationPanel({
                 <ChevronsDownUp className="size-3.5" />
               </button>
             </div>
+            {picks && (
+              <div className="flex flex-col gap-1" data-testid="session-picks">
+                <span className="text-muted-foreground">{picks.label}</span>
+                <div className="flex flex-wrap gap-1">
+                  {picks.items.map((item, index) => (
+                    <span key={`${item}-${index}`} className="flex items-center gap-1 border border-border px-1.5 py-0.5 font-mono text-[10px]">
+                      {item}
+                      {picks.items.length > 1 && (
+                        <button type="button" disabled={busy} className="text-muted-foreground hover:text-fail disabled:opacity-40" aria-label={t("Take {{item}} out", { item })} title={t("Take {{item}} out", { item })} onClick={() => picks.onRemove(index)}>
+                          <X className="size-3" />
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+                <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <MousePointerClick className="size-3" /> {picks.hint}
+                </span>
+              </div>
+            )}
             {params.length ? (
               params.map((param) => <ParamControl key={param.id} param={param} forwardParam={onParam} editable />)
             ) : (

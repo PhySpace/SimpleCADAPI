@@ -9,14 +9,15 @@ import type { SceneView } from "@/scene/scene-view";
 /** Snap of a drag, mm (Shift drags freely). */
 const SNAP_MM = 0.5;
 
-/** The arrow of a press / pull: it stands on the picked face, along its outward normal, at `distance` (mm) from it.
- * Dragging it out pulls the face, dragging it in presses it (the distance goes negative); typing the distance moves it.
+/** An arrow on a picked face that drags a distance (mm) along `normal`: a press / pull's (along the outward normal; dragged
+ * in, the distance goes negative), a shell's wall thickness (into the body, at least `min`).  Typing the number moves it.
  * The scene is the CAD frame in metres. */
 export function PressPullHandle({
   view,
   origin,
   normal,
   distance,
+  min,
   onChange,
 }: {
   view: SceneView;
@@ -25,12 +26,14 @@ export function PressPullHandle({
   /** The face's outward unit normal. */
   normal: Vec3;
   distance: number;
+  /** The smallest distance the drag gives (none: any, negative included). */
+  min?: number;
   onChange: (distance: number, done: boolean) => void;
 }) {
   const targetRef = useRef<THREE.Group | null>(null);
   const dragging = useRef(false);
-  const changeRef = useRef(onChange);
-  changeRef.current = onChange;
+  const changeRef = useRef((value: number, done: boolean) => onChange(min === undefined ? value : Math.max(min, value), done));
+  changeRef.current = (value: number, done: boolean) => onChange(min === undefined ? value : Math.max(min, value), done);
   const at = useRef({ origin, normal });
   at.current = { origin, normal };
 

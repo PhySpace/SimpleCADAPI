@@ -700,7 +700,7 @@ SPECS: tuple[Spec, ...] = (
     Spec("chamfer", "Chamfer", "Features", "modifier", "solid", "Bevel the picked edges.",
          (_BODY(), Slot("edges", "Edges", "select", entity="edge"), _length("distance", "Distance", 0.5)), _chamfer),
     Spec("shell", "Shell", "Features", "modifier", "solid", "Hollow the body, opening the picked faces.",
-         (_BODY(), Slot("faces", "Faces to open", "select", entity="face"), _length("thickness", "Wall thickness", 2.0)), _shell),
+         (_BODY(), Slot("faces", "Faces to open", "select", entity="face"), _length("thickness", "Wall thickness", 1.0)), _shell),
     Spec("linear_pattern", "Linear pattern", "Pattern", "build", "solids", "Copies of a body along a direction (the original is the first copy).",
          (_body("shape", "Body to repeat"), _AXIS("direction", "Direction", "+x"), Slot("count", "Count", "count", default=3, min=2, max=500),
           _length("spacing", "Spacing", 15.0)), _linear_pattern),
@@ -989,7 +989,9 @@ def selection_recipe(slot: Slot, items: Sequence[Mapping[str, Any]], known_slugs
         raise FeatureError(f"{slot.label}: pick at least one {slot.entity} in the viewport")
     refs = _picked_refs(slot, picked)
     if refs is not None:
-        return f"_{slot.name} = {_ref.selection_code(slot.entity or 'face', refs)}".splitlines()
+        # one entity picked twice (picked again in the viewport while the feature already holds it) is selected once
+        unique = list({json.dumps(r.to_dict(), sort_keys=True): r for r in refs}.values())
+        return f"_{slot.name} = {_ref.selection_code(slot.entity or 'face', unique)}".splitlines()
     geometry: list[str] = []
     tags: list[str] = []
     all_tagged = True
@@ -1056,6 +1058,14 @@ def replace_refs(code: str, slot: str, refs: Sequence[_ref.ElementRef]) -> str:
     lines = code.splitlines()
     lines[first : last + 1] = f"_{slot} = {_ref.selection_code(kind, list(refs))}".splitlines()
     return "\n".join(lines) + ("\n" if code.endswith("\n") else "")
+
+
+def selection_refs(code: str, slot: str) -> list[dict[str, Any]] | None:
+    """The references a selection slot of a feature cell holds (records, in order), or ``None`` when it is not written as
+    ``scad.ref`` references (an older recipe, a cell written as code): what a form shows of what is picked, and what an
+    edit sends back for the ones it keeps."""
+    found = _ref_statement(code, slot)
+    return [reference.to_dict() for reference in found[3]] if found is not None else None
 
 
 def extract_recipe(code: str, slot: str) -> list[str] | None:

@@ -54,7 +54,8 @@ export type FeatureRow = {
   index: number;
   slug: string;
   role: string;
-  gui: { spec: string; values: Record<string, unknown>; picked: Record<string, unknown> } | null;
+  /** `refs`: what each selection slot holds, as references (a slot written as an older recipe is absent). */
+  gui: { spec: string; values: Record<string, unknown>; picked: Record<string, unknown>; refs?: Record<string, RefRecord[]> } | null;
   makes: string[];
   reads: string[];
   status: string | null;
@@ -81,6 +82,13 @@ export type FeatureState = {
   redo: number;
 };
 
+/** A stable reference as the server writes it (`scad.ref.face(feature, op, role=...)`; see simplecadapi/ref.py). */
+export type RefRecord = { kind: string; feature?: string; op?: string; role?: string | null; ordinal?: number; piece?: number | null; [key: string]: unknown };
+
+/** What a selection slot is given: an entity picked in the viewport (named by the server), or a reference the feature
+ * already holds (kept by an edit: a face a shell opened is not drawn any more, so it cannot be picked again). */
+export type SelectionPayload = PickedItem | { kind: string; ref: RefRecord };
+
 export type PickedItem = {
   kind: string;
   entity_id: string | null;
@@ -92,8 +100,8 @@ export type PickedItem = {
 };
 
 export type FeatureCommand =
-  | { op: "add"; spec: string; name?: string; values: Record<string, unknown>; selections?: Record<string, PickedItem[]>; after?: string }
-  | { op: "edit"; cell: string; values: Record<string, unknown>; selections?: Record<string, PickedItem[]> }
+  | { op: "add"; spec: string; name?: string; values: Record<string, unknown>; selections?: Record<string, SelectionPayload[]>; after?: string }
+  | { op: "edit"; cell: string; values: Record<string, unknown>; selections?: Record<string, SelectionPayload[]> }
   | { op: "delete"; cell: string }
   | { op: "use_as_product"; body: string }
   | { op: "set_connectors"; connectors: { id: string; origin: number[]; x_axis: number[]; y_axis: number[] }[] }

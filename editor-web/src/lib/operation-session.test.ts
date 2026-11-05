@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Spec } from "@/lib/features";
 import type { SelectionItem } from "@/lib/selection";
-import { featureParams, quickStart } from "@/lib/operation-session";
+import { addPick, featureParams, pickSlot, quickStart, refLabel, removePick } from "@/lib/operation-session";
 
 const FILLET: Spec = {
   id: "fillet",
@@ -58,5 +58,28 @@ describe("an operation started on the selection", () => {
       { id: "RADIUS", group: "" },
     ];
     expect(featureParams(params, "fillet").map((p) => p.id)).toEqual(["FILLET_RADIUS"]);
+  });
+});
+
+describe("picks added and taken out while tuning", () => {
+  const top = { kind: "face", feature: "base", op: "make_box_rsolid", role: "box.top", ordinal: 0 };
+  const side = { kind: "face", feature: "base", op: "make_box_rsolid", role: "box.front", ordinal: 0 };
+
+  it("adds to the one slot that takes several picks", () => {
+    expect(pickSlot(FILLET)).toEqual({ slot: "edges", entity: "edge", label: "Edges" });
+    const single: Spec = { ...FILLET, slots: [{ name: "face", label: "Face", kind: "select", entity: "face", single: true }] };
+    expect(pickSlot(single)).toBeNull();
+  });
+
+  it("sends back what the feature holds as references, then the new pick", () => {
+    const added = addPick([top], edge("e1"));
+    expect(added[0]).toEqual({ kind: "face", ref: top });
+    expect(added[1]).toMatchObject({ kind: "edge", entity_id: "entity/demo/edge/e1" });
+    expect(removePick([top, side], 0)).toEqual([{ kind: "face", ref: side }]);
+  });
+
+  it("names a reference by its feature and role", () => {
+    expect(refLabel(top)).toBe("base · box.top");
+    expect(refLabel({ kind: "edge", op: "make_fillet_rsolid", ordinal: 2, piece: 1 })).toBe("fillet · #3 (2)");
   });
 });
