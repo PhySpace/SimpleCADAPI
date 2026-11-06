@@ -243,17 +243,18 @@ export function fitScore(context: SelectionContext): (command: Command) => numbe
 export function selectionHint(context: SelectionContext, commands: readonly Command[] = []): string | null {
   const kind = contextKind(context);
   if (!kind) return null;
-  const labels = contextualActions(commands, context).map((item) => item.label.toLowerCase());
-  const list = labels.length > 1 ? `${labels.slice(0, -1).join(", ")} or ${labels[labels.length - 1]}` : (labels[0] ?? "");
+  const labels = contextualActions(commands, context).map((item) => t(item.label).toLowerCase());
+  const list = labels.length > 1 ? t("{{first}} or {{last}}", { first: labels.slice(0, -1).join(t(", ")), last: labels[labels.length - 1] }) : (labels[0] ?? "");
+  const count = (n: number, one: string, many: string) => (n === 1 ? t(one) : t(many, { count: n }));
   const noun = {
-    sketch: `${context.sketches} sketch${context.sketches === 1 ? "" : "es"}`,
-    edge: `${context.edges} edge${context.edges === 1 ? "" : "s"}`,
-    face: `${context.faces} face${context.faces === 1 ? "" : "s"}`,
-    curve: `${context.curves} curve${context.curves === 1 ? "" : "s"}`,
-    surface: `${context.surfaces} surface${context.surfaces === 1 ? "" : "s"}`,
-    solid: `${context.solids + context.components} body`,
+    sketch: count(context.sketches, "1 sketch", "{{count}} sketches"),
+    edge: count(context.edges, "1 edge", "{{count}} edges"),
+    face: count(context.faces, "1 face", "{{count}} faces"),
+    curve: count(context.curves, "1 curve", "{{count}} curves"),
+    surface: count(context.surfaces, "1 surface", "{{count}} surfaces"),
+    solid: count(context.solids + context.components, "1 body", "{{count}} bodies"),
   }[kind];
-  return `${noun} selected${list ? `: ${list}` : ""}.`;
+  return list ? t("{{what}} selected: {{actions}}.", { what: noun, actions: list }) : t("{{what}} selected.", { what: noun });
 }
 
 /** The word a person reads for an operation (the catalog's labels lead with the internal name: "Extrude sketch"). */

@@ -5,6 +5,7 @@
 
 import type { FeatureCommand, FeatureRow, FeatureState, PickedItem } from "@/lib/features";
 import { cross, dot, frameFromEntity, sub, unit, vec3, type Vec3 } from "@/lib/sketch-plane";
+import { t } from "@/i18n";
 
 // -- contract -------------------------------------------------------------------------------------------------------
 
@@ -265,12 +266,12 @@ export function setExplodeVector(doc: AssemblyDoc, key: "center" | "axis", index
 export function explodeProblems(explode: Explode | undefined): string[] {
   if (!explode) return [];
   const out: string[] = [];
-  if (!finite(explode.factor)) out.push("explode factor: type a number");
+  if (!finite(explode.factor)) out.push(t("explode factor: type a number"));
   for (const key of ["center", "axis"] as const) {
     const v = explode[key];
     if (!v) continue;
-    if (v.length !== 3 || !v.every(finite)) out.push(`explode ${key}: type all three numbers, or leave all three empty`);
-    else if (key === "axis" && v.every((n) => n === 0)) out.push("explode axis: a zero vector points nowhere");
+    if (v.length !== 3 || !v.every(finite)) out.push(t("explode {{key}}: type all three numbers, or leave all three empty", { key }));
+    else if (key === "axis" && v.every((n) => n === 0)) out.push(t("explode axis: a zero vector points nowhere"));
   }
   return out;
 }
@@ -282,37 +283,37 @@ export function assemblyProblems(doc: AssemblyDoc): string[] {
   const out: string[] = [];
   const ids = new Set<string>();
   for (const c of doc.components) {
-    if (!ID_PATTERN.test(c.id)) out.push(`component "${c.id}": lowercase letters, digits and underscores, starting with a letter`);
-    else if (ids.has(c.id)) out.push(`the component id "${c.id}" is used twice`);
+    if (!ID_PATTERN.test(c.id)) out.push(t("component \"{{id}}\": lowercase letters, digits and underscores, starting with a letter", { id: c.id }));
+    else if (ids.has(c.id)) out.push(t("the component id \"{{id}}\" is used twice", { id: c.id }));
     ids.add(c.id);
-    if (!/^[A-Za-z0-9_][A-Za-z0-9_./-]*\.py$/.test(c.part) || c.part.split("/").includes("..")) out.push(`${c.id}: "${c.part}" is not a notebook path inside the workspace`);
-    if (!c.origin.every(finite)) out.push(`${c.id}: the origin is three numbers`);
-    if (axesConflict(c.x_axis, c.y_axis)) out.push(`${c.id}: the x axis and the y axis must not be along the same line`);
+    if (!/^[A-Za-z0-9_][A-Za-z0-9_./-]*\.py$/.test(c.part) || c.part.split("/").includes("..")) out.push(t("{{id}}: \"{{part}}\" is not a notebook path inside the workspace", { id: c.id, part: c.part }));
+    if (!c.origin.every(finite)) out.push(t("{{id}}: the origin is three numbers", { id: c.id }));
+    if (axesConflict(c.x_axis, c.y_axis)) out.push(t("{{id}}: the x axis and the y axis must not be along the same line", { id: c.id }));
   }
-  if (doc.ground !== null && !ids.has(doc.ground)) out.push(`the grounded component "${doc.ground}" is not in the assembly`);
+  if (doc.ground !== null && !ids.has(doc.ground)) out.push(t("the grounded component \"{{id}}\" is not in the assembly", { id: doc.ground }));
   const used = new Set<string>();
   for (const k of doc.constraints) {
     const who = k.id;
-    if (!ID_PATTERN.test(k.id) || used.has(k.id)) out.push(`constraint id "${k.id}" is invalid or used twice`);
+    if (!ID_PATTERN.test(k.id) || used.has(k.id)) out.push(t("constraint id \"{{id}}\" is invalid or used twice", { id: k.id }));
     used.add(k.id);
     for (const side of ["a", "b"] as const) {
       const r = k[side];
-      if (!ids.has(r.component)) out.push(`${who}: pick the component of ${side.toUpperCase()}`);
-      else if (!r.connector) out.push(`${who}: pick the connector of ${side.toUpperCase()}`);
-      else if (!CONNECTOR_PATTERN.test(r.connector)) out.push(`${who}: "${r.connector}" is not a connector name`);
+      if (!ids.has(r.component)) out.push(t("{{who}}: pick the component of {{side}}", { who, side: side.toUpperCase() }));
+      else if (!r.connector) out.push(t("{{who}}: pick the connector of {{side}}", { who, side: side.toUpperCase() }));
+      else if (!CONNECTOR_PATTERN.test(r.connector)) out.push(t("{{who}}: \"{{name}}\" is not a connector name", { who, name: r.connector }));
     }
-    if (k.a.component && k.a.component === k.b.component) out.push(`${who}: a constraint joins two different components`);
+    if (k.a.component && k.a.component === k.b.component) out.push(t("{{who}}: a constraint joins two different components", { who }));
     if (needsDrive(k.kind)) {
-      if (k.drive !== undefined && !finite(k.drive)) out.push(`${who}: the drive is a number`);
-      if (k.limit && !(k.limit[0] < k.limit[1])) out.push(`${who}: the lower limit must be below the upper one`);
+      if (k.drive !== undefined && !finite(k.drive)) out.push(t("{{who}}: the drive is a number", { who }));
+      if (k.limit && !(k.limit[0] < k.limit[1])) out.push(t("{{who}}: the lower limit must be below the upper one", { who }));
     }
     for (const f of radiusFields(k.kind)) {
       const v = k[f.key];
-      if (!finite(v)) out.push(`${who}: ${f.label} is required`);
-      else if (v <= 0) out.push(`${who}: ${f.label} must be greater than zero`);
+      if (!finite(v)) out.push(t("{{who}}: {{field}} is required", { who, field: t(f.label) }));
+      else if (v <= 0) out.push(t("{{who}}: {{field}} must be greater than zero", { who, field: t(f.label) }));
     }
   }
-  if (doc.constraints.length > 0 && doc.ground === null) out.push("constraints need a grounded component: the solver moves everything else relative to it");
+  if (doc.constraints.length > 0 && doc.ground === null) out.push(t("constraints need a grounded component: the solver moves everything else relative to it"));
   out.push(...explodeProblems(doc.explode));
   return out;
 }
@@ -342,7 +343,7 @@ export function assemblyStatus(state: Pick<FeatureState, "features" | "assembly"
       const what = text.split("\n").find((line) => line.startsWith("What happened:"));
       errors.push((what ? what.replace("What happened:", "").trim() : text.split("\n")[0]).slice(0, 400));
     }
-    if (!row.errors.length && (row.status === "error" || row.status === "exception")) errors.push(`${row.slug} failed`);
+    if (!row.errors.length && (row.status === "error" || row.status === "exception")) errors.push(t("{{name}} failed", { name: row.slug }));
   }
   return { rows, errors, running: rows.some((r) => r.status === "running" || r.status === "queued") };
 }

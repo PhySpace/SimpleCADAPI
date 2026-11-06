@@ -7,6 +7,8 @@
  * A frame carries only the parts the page does not have; every node names its part.
  */
 
+import { t } from "@/i18n";
+
 export type PreviewGroup = { entity_id: string; first_index: number; index_count: number };
 export type PreviewTransform = {
   origin: [number, number, number];
@@ -139,6 +141,7 @@ export const isSurfaceNode = (nodeId: string): boolean => nodeId.startsWith(SURF
 export function previewSummary(all: readonly { nodeId: string }[]): string {
   const nodes = all.filter((node) => !isSurfaceNode(node.nodeId));
   const parts = new Set(nodes.map((node) => node.nodeId.replace(/\/body:[^/]+$/, "")));
-  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-  return nodes.length > parts.size ? `${plural(parts.size, "part")} · ${plural(nodes.length, "body").replace("bodys", "bodies")}` : plural(parts.size, "part");
+  const partCount = parts.size === 1 ? t("1 part") : t("{{count}} parts", { count: parts.size });
+  const bodyCount = nodes.length === 1 ? t("1 body") : t("{{count}} bodies", { count: nodes.length });
+  return nodes.length > parts.size ? `${partCount} · ${bodyCount}` : partCount;
 }

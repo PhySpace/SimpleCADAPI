@@ -47,6 +47,7 @@ import type { FeatureCommand, FeatureState } from "@/lib/features";
 import { isDescribed, filterSelection } from "@/lib/features";
 import type { SelectionItem } from "@/lib/selection";
 import type { AssemblyEditor, ConnectorDraft } from "@/lib/useAssembly";
+import { t } from "@/i18n";
 import { cn } from "@/lib/utils";
 import type { SelectionMode } from "@/scene/Viewport";
 
@@ -154,27 +155,27 @@ function ConnectorsSection({
 
   return (
     <Section
-      title="Connectors of this part"
+      title={t("Connectors of this part")}
       count={draft.list.length}
       aside={
-        <Button type="button" size="sm" variant="outline" className="h-6 px-1.5" title="Pick faces in the viewport" onClick={() => onSelectionMode("face")} data-testid="connector-face-mode">
-          <Crosshair /> face mode
+        <Button type="button" size="sm" variant="outline" className="h-6 px-1.5" title={t("Pick faces in the viewport")} onClick={() => onSelectionMode("face")} data-testid="connector-face-mode">
+          <Crosshair /> {t("face mode")}
         </Button>
       }
     >
       <div className="flex flex-col gap-1.5 px-2 py-2" data-testid="connectors-section">
-        {draft.list.length === 0 && <p className="text-[11px] text-muted-foreground">No connectors yet. A connector is a frame (origin, x, y) an assembly joins parts by: pick a planar face and add one.</p>}
+        {draft.list.length === 0 && <p className="text-[11px] text-muted-foreground">{t("No connectors yet. A connector is a frame (origin, x, y) an assembly joins parts by: pick a planar face and add one.")}</p>}
         <ul className="flex flex-col gap-1">
           {draft.list.map((c) => (
             <ConnectorRow key={c.id} c={c} active={draft.selected === c.id} onSelect={() => draft.setSelected(draft.selected === c.id ? null : c.id)} list={draft.list} setList={draft.setList} onSelected={draft.setSelected} />
           ))}
         </ul>
         <div className="flex items-center gap-1.5">
-          <Button type="button" size="sm" data-testid="connector-place" disabled={faces.length !== 1} title={faces.length === 1 ? "Place a connector on the picked face with the handles" : "Pick one flat face first"} onClick={onPlace}>
-            <Plus /> on picked face
+          <Button type="button" size="sm" data-testid="connector-place" disabled={faces.length !== 1} title={faces.length === 1 ? t("Place a connector on the picked face with the handles") : t("Pick one flat face first")} onClick={onPlace}>
+            <Plus /> {t("on picked face")}
           </Button>
           <span className="text-[10px] text-muted-foreground">
-            {faces.length === 1 ? "Place it with the handles, name it, add it." : faces.length === 0 ? "Pick a flat face (face mode), or use Connector on the selection bar." : `${faces.length} faces picked: pick exactly one.`}
+            {faces.length === 1 ? t("Place it with the handles, name it, add it.") : faces.length === 0 ? t("Pick a flat face (face mode), or use Connector on the selection bar.") : t("{{count}} faces picked: pick exactly one.", { count: faces.length })}
           </span>
         </div>
         <Problems items={problems} />
@@ -185,10 +186,10 @@ function ConnectorsSection({
         )}
         <div className="flex items-center gap-2">
           <Button type="button" size="sm" data-testid="connectors-apply" disabled={busy || working || problems.length > 0 || !draft.dirty} onClick={() => void apply()}>
-            {working ? "working…" : "apply connectors"}
+            {working ? t("working…") : t("apply connectors")}
           </Button>
-          {draft.dirty && <span className="text-[10px] text-focus">unsent changes</span>}
-          {!state.product && <span className="text-[10px] text-muted-foreground">no product yet</span>}
+          {draft.dirty && <span className="text-[10px] text-focus">{t("unsent changes")}</span>}
+          {!state.product && <span className="text-[10px] text-muted-foreground">{t("no product yet")}</span>}
         </div>
       </div>
     </Section>
@@ -249,25 +250,25 @@ function FrameEditor({ c, list, setList }: { c: ConnectorFrame; list: ConnectorF
   const degrees = Number(angle);
   return (
     <div className="mt-1 flex flex-col gap-1 pl-5" data-testid={`frame-editor-${c.id}`}>
-      <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">origin (mm)</span>
+      <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{t("origin (mm)")}</span>
       <div className="flex items-center gap-1">
         <div className="flex-1">{triple(origin, setOrigin, "origin")}</div>
-        <Button type="button" size="sm" variant="outline" className="h-6 px-1.5" disabled={!originNumbers} onClick={() => originNumbers && apply({ origin: originNumbers })}>set</Button>
+        <Button type="button" size="sm" variant="outline" className="h-6 px-1.5" disabled={!originNumbers} onClick={() => originNumbers && apply({ origin: originNumbers })}>{t("set")}</Button>
       </div>
-      <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">move along its own x, y, z (mm)</span>
+      <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{t("move along its own x, y, z (mm)")}</span>
       <div className="flex items-center gap-1">
         <div className="flex-1">{triple(move, setMove, "move")}</div>
-        <Button type="button" size="sm" variant="outline" className="h-6 px-1.5" disabled={!moveNumbers} onClick={() => moveNumbers && (apply({ move: moveNumbers }), setMove(["0", "0", "0"]))}>move</Button>
+        <Button type="button" size="sm" variant="outline" className="h-6 px-1.5" disabled={!moveNumbers} onClick={() => moveNumbers && (apply({ move: moveNumbers }), setMove(["0", "0", "0"]))}>{t("move")}</Button>
       </div>
-      <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">turn about its own axis</span>
+      <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{t("turn about its own axis")}</span>
       <div className="flex items-center gap-1">
         {(["x", "y", "z"] as const).map((a) => (
           <Button key={a} type="button" size="sm" variant={axis === a ? "default" : "outline"} className="h-6 w-6 px-0" aria-pressed={axis === a} onClick={() => setAxis(a)}>{a}</Button>
         ))}
-        <Input aria-label="turn angle" className="h-6 w-14 px-1 text-[11px]" inputMode="decimal" value={angle} onChange={(e) => setAngle(e.target.value)} />
-        <span className="text-[10px] text-muted-foreground">deg</span>
-        <Button type="button" size="sm" variant="outline" className="h-6 px-1.5" disabled={!Number.isFinite(degrees)} onClick={() => apply({ rotate: { axis, degrees } })}>turn</Button>
-        <Button type="button" size="sm" variant="ghost" className="h-6 px-1.5" title="Turn the frame over (180 deg about its x axis): z points the other way" onClick={() => apply({ rotate: { axis: "x", degrees: 180 } })}>flip z</Button>
+        <Input aria-label={t("turn angle")} className="h-6 w-14 px-1 text-[11px]" inputMode="decimal" value={angle} onChange={(e) => setAngle(e.target.value)} />
+        <span className="text-[10px] text-muted-foreground">{t("deg")}</span>
+        <Button type="button" size="sm" variant="outline" className="h-6 px-1.5" disabled={!Number.isFinite(degrees)} onClick={() => apply({ rotate: { axis, degrees } })}>{t("turn")}</Button>
+        <Button type="button" size="sm" variant="ghost" className="h-6 px-1.5" title={t("Turn the frame over (180 deg about its x axis): z points the other way")} onClick={() => apply({ rotate: { axis: "x", degrees: 180 } })}>{t("flip z")}</Button>
       </div>
     </div>
   );
@@ -285,13 +286,13 @@ function PartPicker({ editor, onPick }: { editor: AssemblyEditor; onPick: (path:
   return (
     <div className="flex flex-col gap-1">
       <Button type="button" size="sm" variant="outline" data-testid="component-add" onClick={() => { setOpen((v) => !v); if (!open) editor.refreshParts(); }}>
-        <Plus /> add component
+        <Plus /> {t("add component")}
       </Button>
       {open && (
         <div className="border-2 border-primary bg-popover" data-testid="part-picker">
           <div className="flex items-center gap-1.5 border-b border-border px-1.5">
             <Search className="size-3.5 text-muted-foreground" />
-            <input autoFocus aria-label="Search parts" placeholder="search the workspace's parts" className="h-7 flex-1 bg-transparent text-[12px] outline-none" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input autoFocus aria-label={t("Search parts")} placeholder={t("search the workspace's parts")} className="h-7 flex-1 bg-transparent text-[12px] outline-none" value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
           <ul className="max-h-40 overflow-y-auto">
             {rows.map((p) => (
@@ -302,7 +303,7 @@ function PartPicker({ editor, onPick }: { editor: AssemblyEditor; onPick: (path:
                 </button>
               </li>
             ))}
-            {rows.length === 0 && <li className="px-2 py-2 text-[11px] text-muted-foreground">{editor.partsError ?? (editor.parts.length === 0 ? "No part notebooks in this workspace yet." : "No part matches.")}</li>}
+            {rows.length === 0 && <li className="px-2 py-2 text-[11px] text-muted-foreground">{editor.partsError ?? (editor.parts.length === 0 ? t("No part notebooks in this workspace yet.") : t("No part matches."))}</li>}
           </ul>
         </div>
       )}
@@ -327,14 +328,14 @@ function ComponentCard({ c, doc, editor }: { c: Component; doc: AssemblyDoc; edi
   return (
     <li className={cn("border-2 px-2 py-1.5", selected ? "border-focus" : "border-border")} data-testid={`component-${c.id}`}>
       <div className="flex items-center gap-1.5">
-        <button type="button" aria-pressed={selected} title="Select: its connectors are drawn in the viewport" data-testid={`select-${c.id}`} onClick={() => editor.setSelected(selected ? null : c.id)} className={cn("text-muted-foreground hover:text-foreground", selected && "text-focus")}>
+        <button type="button" aria-pressed={selected} title={t("Select: its connectors are drawn in the viewport")} data-testid={`select-${c.id}`} onClick={() => editor.setSelected(selected ? null : c.id)} className={cn("text-muted-foreground hover:text-foreground", selected && "text-focus")}>
           <Anchor className="size-3.5" />
         </button>
-        <Input aria-label={`component id ${c.id}`} aria-invalid={problem !== null} title={problem ?? "component id"} className="h-6 w-28 px-1" value={text} onChange={(e) => setText(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === "Enter" && commit()} />
+        <Input aria-label={`component id ${c.id}`} aria-invalid={problem !== null} title={problem ?? t("component id")} className="h-6 w-28 px-1" value={text} onChange={(e) => setText(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === "Enter" && commit()} />
         <span className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground" title={c.part}>{c.part}</span>
-        <label className="flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] text-muted-foreground" title="The grounded component never moves">
+        <label className="flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] text-muted-foreground" title={t("The grounded component never moves")}>
           <input type="radio" name="ground" aria-label={`ground ${c.id}`} data-testid={`ground-${c.id}`} checked={doc.ground === c.id} onChange={() => editor.setDoc(setGround(doc, c.id))} />
-          ground
+          {t("ground")}
         </label>
         <Button type="button" size="icon" variant="ghost" className="h-6 w-6" aria-label={`remove ${c.id}`} data-testid={`remove-${c.id}`} onClick={() => { editor.setDoc(removeComponent(doc, c.id)); if (selected) editor.setSelected(null); }}><Trash2 /></Button>
       </div>
@@ -344,19 +345,19 @@ function ComponentCard({ c, doc, editor }: { c: Component; doc: AssemblyDoc; edi
           <NumberField key={axis} label={`${axis} mm`} testid={`origin-${c.id}-${axis}`} value={c.origin[i]} onChange={(v) => v !== undefined && editor.setDoc(updateComponent(doc, c.id, { origin: c.origin.map((o, j) => (j === i ? v : o)) as [number, number, number] }))} />
         ))}
         <label className="flex flex-col gap-0.5">
-          <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">x axis</span>
+          <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{t("x axis")}</span>
           <select aria-label={`${c.id} x axis`} className={cn(select, "w-14 flex-none")} value={c.x_axis} onChange={(e) => editor.setDoc(setAxis(doc, c.id, "x_axis", e.target.value as AxisName))}>
             {AXES.map((a) => <option key={a} value={a} disabled={!compatibleAxes(c.y_axis).includes(a)} title={compatibleAxes(c.y_axis).includes(a) ? undefined : "along the same line as the y axis"}>{a}</option>)}
           </select>
         </label>
         <label className="flex flex-col gap-0.5">
-          <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">y axis</span>
+          <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{t("y axis")}</span>
           <select aria-label={`${c.id} y axis`} className={cn(select, "w-14 flex-none")} value={c.y_axis} onChange={(e) => editor.setDoc(setAxis(doc, c.id, "y_axis", e.target.value as AxisName))}>
             {AXES.map((a) => <option key={a} value={a} disabled={!compatibleAxes(c.x_axis).includes(a)} title={compatibleAxes(c.x_axis).includes(a) ? undefined : "along the same line as the x axis"}>{a}</option>)}
           </select>
         </label>
       </div>
-      {entry?.status === "error" && <p className="mt-1 text-[11px] text-fail">connectors of {c.part}: {entry.error}</p>}
+      {entry?.status === "error" && <p className="mt-1 text-[11px] text-fail">{t("connectors of {{part}}: {{error}}", { part: c.part, error: entry.error })}</p>}
     </li>
   );
 }
@@ -377,20 +378,20 @@ function ConnectorPicker({ k, side, doc, editor }: { k: Constraint; side: "a" | 
     <div className="flex items-center gap-1" data-testid={`picker-${k.id}-${side}`}>
       <span className="w-3 text-[10px] font-bold uppercase text-muted-foreground">{side}</span>
       <select aria-label={`${k.id} ${side} component`} className={select} value={ref.component} onChange={(e) => editor.setDoc(setRef(doc, k.id, side, { component: e.target.value }))}>
-        <option value="">component…</option>
+        <option value="">{t("component…")}</option>
         {doc.components.map((c) => <option key={c.id} value={c.id}>{c.id}</option>)}
       </select>
       {manual ? (
-        <Input aria-label={`${k.id} ${side} connector`} className="h-7 min-w-0 flex-1 px-1" placeholder="connector id" value={ref.connector} onChange={(e) => editor.setDoc(setRef(doc, k.id, side, { connector: e.target.value.trim() }))} title={entry?.error ?? "this part declares no connectors: type an id"} />
+        <Input aria-label={`${k.id} ${side} connector`} className="h-7 min-w-0 flex-1 px-1" placeholder={t("connector id")} value={ref.connector} onChange={(e) => editor.setDoc(setRef(doc, k.id, side, { connector: e.target.value.trim() }))} title={entry?.error ?? t("this part declares no connectors: type an id")} />
       ) : (
         <select aria-label={`${k.id} ${side} connector`} className={select} value={ref.connector} disabled={!component || entry?.status === "loading"} onChange={(e) => editor.setDoc(setRef(doc, k.id, side, { connector: e.target.value }))}>
-          <option value="">{entry?.status === "loading" ? "loading…" : "connector…"}</option>
+          <option value="">{entry?.status === "loading" ? t("loading…") : t("connector…")}</option>
           {ids.map((id) => <option key={id} value={id}>{id}</option>)}
           {ref.connector && !ids.includes(ref.connector) && entry?.status === "ok" && <option value={ref.connector}>{ref.connector} (not declared)</option>}
         </select>
       )}
-      {entry?.status === "loading" && <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" aria-label="loading connectors" />}
-      <Button type="button" size="icon" variant={armed ? "default" : "ghost"} className="h-6 w-6" aria-pressed={armed} aria-label={`pick ${k.id} ${side} in the viewport`} title="Pick this connector by clicking its gizmo in the viewport" data-testid={`arm-${k.id}-${side}`} onClick={() => editor.setTarget(armed ? null : { constraint: k.id, side })}>
+      {entry?.status === "loading" && <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" aria-label={t("loading connectors")} />}
+      <Button type="button" size="icon" variant={armed ? "default" : "ghost"} className="h-6 w-6" aria-pressed={armed} aria-label={`pick ${k.id} ${side} in the viewport`} title={t("Pick this connector by clicking its gizmo in the viewport")} data-testid={`arm-${k.id}-${side}`} onClick={() => editor.setTarget(armed ? null : { constraint: k.id, side })}>
         <Crosshair />
       </Button>
     </div>
@@ -406,7 +407,7 @@ function ConstraintCard({ k, doc, editor }: { k: Constraint; doc: AssemblyDoc; e
         <Link2 className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="w-8 shrink-0 text-[11px] text-name">{k.id}</span>
         <select aria-label={`${k.id} kind`} className={select} value={k.kind} onChange={(e) => editor.setDoc(setKind(doc, k.id, e.target.value as ConstraintKind))}>
-          {KINDS.map((kind) => <option key={kind} value={kind}>{KIND_LABEL[kind]}</option>)}
+          {KINDS.map((kind) => <option key={kind} value={kind}>{t(KIND_LABEL[kind])}</option>)}
         </select>
         <Button type="button" size="icon" variant="ghost" className="h-6 w-6" aria-label={`remove constraint ${k.id}`} onClick={() => { editor.setDoc(removeConstraint(doc, k.id)); if (editor.target?.constraint === k.id) editor.setTarget(null); }}><Trash2 /></Button>
       </div>
@@ -418,15 +419,15 @@ function ConstraintCard({ k, doc, editor }: { k: Constraint; doc: AssemblyDoc; e
         <div className="mt-1.5 flex flex-wrap items-end gap-1.5">
           {needsDrive(k.kind) && (
             <>
-              <NumberField label={`drive ${unit}`} testid={`drive-${k.id}`} optional value={k.drive} onChange={(v) => patch({ drive: v })} />
-              <NumberField label={`limit lo ${unit}`} testid={`limit-lo-${k.id}`} optional value={k.limit?.[0]} onChange={(v) => patch({ limit: v === undefined && k.limit?.[1] === undefined ? undefined : [v ?? Number.NaN, k.limit?.[1] ?? Number.NaN] })} />
-              <NumberField label={`limit hi ${unit}`} testid={`limit-hi-${k.id}`} optional value={k.limit?.[1]} onChange={(v) => patch({ limit: v === undefined && k.limit?.[0] === undefined ? undefined : [k.limit?.[0] ?? Number.NaN, v ?? Number.NaN] })} />
+              <NumberField label={t("drive {{unit}}", { unit })} testid={`drive-${k.id}`} optional value={k.drive} onChange={(v) => patch({ drive: v })} />
+              <NumberField label={t("limit lo {{unit}}", { unit })} testid={`limit-lo-${k.id}`} optional value={k.limit?.[0]} onChange={(v) => patch({ limit: v === undefined && k.limit?.[1] === undefined ? undefined : [v ?? Number.NaN, k.limit?.[1] ?? Number.NaN] })} />
+              <NumberField label={t("limit hi {{unit}}", { unit })} testid={`limit-hi-${k.id}`} optional value={k.limit?.[1]} onChange={(v) => patch({ limit: v === undefined && k.limit?.[0] === undefined ? undefined : [k.limit?.[0] ?? Number.NaN, v ?? Number.NaN] })} />
             </>
           )}
           {radiusFields(k.kind).map((f) => (
-            <NumberField key={f.key} label={`${f.label} mm`} testid={`${f.key}-${k.id}`} width="w-20" value={k[f.key]} onChange={(v) => patch({ [f.key]: v } as Partial<Constraint>)} />
+            <NumberField key={f.key} label={`${t(f.label)} mm`} testid={`${f.key}-${k.id}`} width="w-20" value={k[f.key]} onChange={(v) => patch({ [f.key]: v } as Partial<Constraint>)} />
           ))}
-          {hasPhase(k.kind) && <NumberField label="phase deg" testid={`phase-${k.id}`} optional value={k.phase} onChange={(v) => patch({ phase: v })} />}
+          {hasPhase(k.kind) && <NumberField label={t("phase deg")} testid={`phase-${k.id}`} optional value={k.phase} onChange={(v) => patch({ phase: v })} />}
         </div>
       )}
     </li>
@@ -440,26 +441,26 @@ function ExplodeSection({ doc, editor }: { doc: AssemblyDoc; editor: AssemblyEdi
   const entry = (v: number | undefined) => (v === undefined || Number.isNaN(v) ? undefined : v);
   return (
     <Section
-      title="Exploded view"
-      aside={<Switch aria-label="Exploded view" data-testid="explode-switch" checked={Boolean(explode)} onCheckedChange={(on) => editor.setDoc(on ? enableExplode(doc) : disableExplode(doc))} />}
+      title={t("Exploded view")}
+      aside={<Switch aria-label={t("Exploded view")} data-testid="explode-switch" checked={Boolean(explode)} onCheckedChange={(on) => editor.setDoc(on ? enableExplode(doc) : disableExplode(doc))} />}
     >
       <div className="flex flex-col gap-1.5 px-2 py-2" data-testid="explode-section">
-        <p className="text-[11px] text-muted-foreground">Components move away from the assembly centre; with an axis they move along it, to the side they are on.</p>
+        <p className="text-[11px] text-muted-foreground">{t("Components move away from the assembly centre; with an axis they move along it, to the side they are on.")}</p>
         {explode && (
           <>
             <div className="flex flex-wrap items-end gap-1.5">
-              <NumberField label="factor" testid="explode-factor" width="w-20" value={Number.isFinite(explode.factor) ? explode.factor : undefined} onChange={(v) => editor.setDoc(setExplodeFactor(doc, v ?? Number.NaN))} />
-              <span className="pb-1.5 text-[10px] text-muted-foreground">0 puts everything back</span>
+              <NumberField label={t("factor")} testid="explode-factor" width="w-20" value={Number.isFinite(explode.factor) ? explode.factor : undefined} onChange={(v) => editor.setDoc(setExplodeFactor(doc, v ?? Number.NaN))} />
+              <span className="pb-1.5 text-[10px] text-muted-foreground">{t("0 puts everything back")}</span>
             </div>
             {(["center", "axis"] as const).map((key) => (
               <div key={key} className="flex flex-wrap items-end gap-1.5">
-                <span className="w-12 pb-1.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{key}{key === "center" ? " mm" : ""}</span>
+                <span className="w-12 pb-1.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{t(key)}{key === "center" ? " mm" : ""}</span>
                 {(["x", "y", "z"] as const).map((axis, i) => (
                   <NumberField key={axis} label={`${key} ${axis}`} testid={`explode-${key}-${axis}`} optional value={entry(explode[key]?.[i])} onChange={(v) => editor.setDoc(setExplodeVector(doc, key, i, v))} />
                 ))}
               </div>
             ))}
-            <span className="text-[10px] text-muted-foreground">centre: empty = the centre of the whole assembly; axis: empty = away from the centre.</span>
+            <span className="text-[10px] text-muted-foreground">{t("centre: empty = the centre of the whole assembly; axis: empty = away from the centre.")}</span>
           </>
         )}
       </div>
@@ -480,7 +481,7 @@ function AssemblySection({ state, editor, busy, onRun }: { state: FeatureState; 
     () => ({ ...doc, constraints: doc.constraints.map((k) => (k.limit && k.limit.some((v) => !Number.isFinite(v)) ? { ...k, limit: undefined } : k)) }),
     [doc],
   );
-  const half = doc.constraints.filter((k) => k.limit && k.limit.some((v) => !Number.isFinite(v))).map((k) => `${k.id}: type both limits or neither`);
+  const half = doc.constraints.filter((k) => k.limit && k.limit.some((v) => !Number.isFinite(v))).map((k) => t("{{id}}: type both limits or neither", { id: k.id }));
   const problems = [...assemblyProblems(sendable), ...half];
   const status = assemblyStatus(state);
   const taken = state.taken;
@@ -504,12 +505,12 @@ function AssemblySection({ state, editor, busy, onRun }: { state: FeatureState; 
   return (
     <>
       <Section
-        title="Components"
+        title={t("Components")}
         count={doc.components.length}
-        aside={<Button type="button" size="icon" variant="ghost" className="h-6 w-6" title="Refresh the list of parts" aria-label="Refresh parts" onClick={editor.refreshParts}><RefreshCw /></Button>}
+        aside={<Button type="button" size="icon" variant="ghost" className="h-6 w-6" title={t("Refresh the list of parts")} aria-label={t("Refresh parts")} onClick={editor.refreshParts}><RefreshCw /></Button>}
       >
         <div className="flex flex-col gap-1.5 px-2 py-2" data-testid="components-section">
-          {doc.components.length === 0 && <p className="text-[11px] text-muted-foreground">No components. Add a part notebook of this workspace; the first one added is the ground.</p>}
+          {doc.components.length === 0 && <p className="text-[11px] text-muted-foreground">{t("No components. Add a part notebook of this workspace; the first one added is the ground.")}</p>}
           <ul className="flex flex-col gap-1.5">
             {doc.components.map((c) => <ComponentCard key={c.id} c={c} doc={doc} editor={editor} />)}
           </ul>
@@ -517,7 +518,7 @@ function AssemblySection({ state, editor, busy, onRun }: { state: FeatureState; 
         </div>
       </Section>
       <Section
-        title="Constraints"
+        title={t("Constraints")}
         count={doc.constraints.length}
         aside={
           <Button type="button" size="sm" variant="outline" className="h-6 px-1.5" data-testid="constraint-add" disabled={doc.components.length < 2} title={doc.components.length < 2 ? "Add two components first" : "Add a joint or a mate"} onClick={() => editor.setDoc(addConstraint(doc).doc)}>
@@ -526,7 +527,7 @@ function AssemblySection({ state, editor, busy, onRun }: { state: FeatureState; 
         }
       >
         <div className="flex flex-col gap-1.5 px-2 py-2" data-testid="constraints-section">
-          {doc.constraints.length === 0 && <p className="text-[11px] text-muted-foreground">No constraints: every component sits at its placement. A joint moves one component about a connector of another; a drive becomes a slider.</p>}
+          {doc.constraints.length === 0 && <p className="text-[11px] text-muted-foreground">{t("No constraints: every component sits at its placement. A joint moves one component about a connector of another; a drive becomes a slider.")}</p>}
           <ul className="flex flex-col gap-1.5">
             {doc.constraints.map((k) => <ConstraintCard key={k.id} k={k} doc={doc} editor={editor} />)}
           </ul>
@@ -537,29 +538,29 @@ function AssemblySection({ state, editor, busy, onRun }: { state: FeatureState; 
       <div className="flex flex-col gap-1.5 px-2 py-2" data-testid="assembly-apply-area">
         {!state.assembly && (
           <label className="flex flex-col gap-0.5">
-            <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">feature name (optional)</span>
-            <Input aria-label="Assembly name" data-testid="assembly-name" aria-invalid={nameTaken} placeholder="assembly" value={name} onChange={(e) => setName(e.target.value)} />
+            <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{t("feature name (optional)")}</span>
+            <Input aria-label={t("Assembly name")} data-testid="assembly-name" aria-invalid={nameTaken} placeholder={t("assembly")} value={name} onChange={(e) => setName(e.target.value)} />
           </label>
         )}
         <Problems items={problems} />
         {error && <p role="alert" data-testid="assembly-error" className="border-2 border-fail px-2 py-1 text-[11px] text-fail">{error}</p>}
         <div className="flex items-center gap-2">
           <Button type="button" size="sm" data-testid="assembly-apply" disabled={busy || working || problems.length > 0 || nameTaken || (doc.components.length === 0)} onClick={() => void apply()}>
-            {working ? "working…" : state.assembly ? "apply" : "add assembly"}
+            {working ? t("working…") : state.assembly ? t("apply") : t("add assembly")}
           </Button>
-          {editor.dirty && <span className="text-[10px] text-focus">unsent changes</span>}
-          {applied && !editor.dirty && <span className="text-[10px] text-pass">applied</span>}
+          {editor.dirty && <span className="text-[10px] text-focus">{t("unsent changes")}</span>}
+          {applied && !editor.dirty && <span className="text-[10px] text-pass">{t("applied")}</span>}
         </div>
         <div data-testid="assembly-status" className="flex items-start gap-2 border border-border px-2 py-1 text-[11px]">
           <span className={cn("mt-1 inline-block h-2 w-2 shrink-0", !status ? "bg-muted-foreground" : status.errors.length ? "bg-fail" : status.running ? "bg-focus" : "bg-pass")} />
           <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">
             {!status
-              ? "not in the notebook yet"
+              ? t("not in the notebook yet")
               : status.errors.length
                 ? <span className="text-fail">{status.errors.join("\n")}</span>
                 : status.running
-                  ? "solving…"
-                  : "solved: the constraints hold (drag a joint's slider in the notebook's parameters)"}
+                  ? t("solving…")
+                  : t("solved: the constraints hold (drag a joint's slider in the notebook's parameters)")}
           </span>
         </div>
       </div>

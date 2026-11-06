@@ -474,10 +474,10 @@ export function App() {
         setLoading(envelope["working"].replace(/…$/, ""));
       } else if (typeof envelope["exported"] === "string") {
         setStatus(t("exported {{path}}", { path: envelope["exported"] }));
-        log.push("ok", `exported ${envelope["exported"]}`);
+        log.push("ok", t("exported {{file}}", { file: envelope["exported"] }));
       } else if (typeof envelope["created"] === "string") {
         setStatus(t("created {{path}}", { path: envelope["created"] }));
-        log.push("ok", `created ${envelope["created"]}`);
+        log.push("ok", t("created {{name}}", { name: envelope["created"] }));
       }
     });
 
@@ -765,7 +765,7 @@ export function App() {
       gui
         .run(start.command)
         .then((result) => {
-          log.push("ok", `add ${result.name}`);
+          log.push("ok", t("added {{name}}", { name: result.name }));
           const failure = cellFailure(result);
           setSession((current) => (current ? { ...current, slug: result.name, cell: result.cell?.id ?? null, busy: false, error: failure } : current));
           setPicked([]); // what was picked is the feature's now; the panel stays where it was
@@ -826,7 +826,7 @@ export function App() {
   const submitFeature = useCallback(
     async (command: FeatureCommand) => {
       const result = await gui.run(command);
-      log.push("ok", command.op === "undo" || command.op === "redo" ? command.op : `${command.op} ${result.name}`);
+      log.push("ok", command.op === "undo" || command.op === "redo" ? t(command.op) : t("{{op}} {{name}}", { op: t(command.op), name: result.name }));
       if (isCellCommand(command)) assertCellRan(result); // the cell failed: say so in the dialog instead of closing
       closeDialog();
     },
@@ -840,7 +840,7 @@ export function App() {
       setGuiError(null);
       try {
         const result = await gui.run(command);
-        log.push("ok", command.op === "undo" || command.op === "redo" ? command.op : `${command.op} ${result.name}`);
+        log.push("ok", command.op === "undo" || command.op === "redo" ? t(command.op) : t("{{op}} {{name}}", { op: t(command.op), name: result.name }));
       } catch (error) {
         setGuiError(error instanceof Error ? error.message : String(error));
       } finally {
@@ -906,7 +906,7 @@ export function App() {
   const submitSketch = useCallback(
     async (command: FeatureCommand, after?: SketchAfter) => {
       const result = await gui.run(command);
-      log.push("ok", command.op === "undo" || command.op === "redo" ? command.op : `${command.op} ${result.name}`);
+      log.push("ok", command.op === "undo" || command.op === "redo" ? t(command.op) : t("{{op}} {{name}}", { op: t(command.op), name: result.name }));
       if (isCellCommand(command)) assertCellRan(result);
       const restore = modeBeforeSketch.current;
       endSketch();
@@ -997,7 +997,7 @@ export function App() {
       const command: FeatureCommand = { op: "add", spec: "workplane", values: { method: request.method }, selections };
       const result = await gui.run(command);
       assertCellRan(result);
-      log.push("ok", `add ${result.name}`);
+      log.push("ok", t("added {{name}}", { name: result.name }));
       setPicked([]);
       turnedTo.current = null;
       setActiveWorkplane(result.name);
@@ -1049,7 +1049,7 @@ export function App() {
           const result = await gui.run({ op: "add", spec: "curve", name: names[index], values: { curve: part } });
           added += 1;
           assertCellRan(result);
-          log.push("ok", `add ${result.name}`);
+          log.push("ok", t("added {{name}}", { name: result.name }));
         }
         setDrawing(null);
       } catch (error) {
@@ -1147,7 +1147,7 @@ export function App() {
         if (isCellCommand(command)) assertCellRan(result);
         conn.setList(made.list);
         conn.setSelected(made.id);
-        log.push("ok", `connector ${made.id} added`);
+        log.push("ok", t("connector {{id}} added", { id: made.id }));
         setPlacing(null);
         setPicked([]);
       } catch (error) {
@@ -1176,7 +1176,7 @@ export function App() {
       };
       const result = await gui.run(command);
       assertCellRan(result);
-      log.push("ok", `add ${result.name}`);
+      log.push("ok", t("added {{name}}", { name: result.name }));
       setPlacing(null);
       setPicked([]);
       turnedTo.current = `stay:${result.name}`; // the camera stays where the person placed it from
@@ -1457,7 +1457,7 @@ export function App() {
     async (command: FeatureCommand) => {
       if (noNotebook()) throw new Error(t("No notebook is open: create one first."));
       const result = await gui.run(command);
-      log.push("ok", command.op === "set_connectors" ? t("connectors set") : `${command.op} ${result.name}`);
+      log.push("ok", command.op === "set_connectors" ? t("connectors set") : t("{{op}} {{name}}", { op: t(command.op), name: result.name }));
       if (isCellCommand(command)) assertCellRan(result);
     },
     [gui.run, log.push, noNotebook],

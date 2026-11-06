@@ -113,7 +113,7 @@ export function useRunLog() {
         }
         if (members.current.size === 0) {
           batchStart.current = now;
-          push("run", "re-evaluating…");
+          push("run", t("re-evaluating…"));
         }
         members.current.set(id, "pending");
         if (status === "running") began.current.set(id, now);
@@ -130,7 +130,7 @@ export function useRunLog() {
         failures.current += 1;
       } else if (FAILED.has(status)) {
         failures.current += 1;
-        push("error", `${title} failed${started ? ` after ${seconds(now - started)}` : ""}`);
+        push("error", started ? t("{{title}} failed after {{time}}", { title, time: seconds(now - started) }) : t("{{title}} failed", { title }));
       } else if (started !== undefined && now - started >= 300) {
         push("info", `${title}  ${seconds(now - started)}`);
       }

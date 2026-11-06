@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { CONSTRAINT_SHORT, TOOLS } from "@/components/sketch/sketch-ui";
+import { KIND_LABEL, KINDS, radiusFields } from "@/lib/assembly";
+import { CONTEXT_ACTIONS } from "@/lib/commands";
 import { CONSTRAINT_INFO, statusBadge, type SolveResult } from "@/lib/sketch";
 import { CORNER_WORD } from "@/lib/sketch-edit";
 import { typedFields } from "@/lib/sketch-typed";
@@ -61,6 +63,9 @@ describe("translations", () => {
       ...["solved", "underconstrained", "conflicting", "failed"].flatMap((status) => [status, statusBadge(solve(status)).label]),
       statusBadge(null).label,
       statusBadge(null, "bad").label,
+      ...Object.values(CONTEXT_ACTIONS).flatMap((actions) => actions.map((action) => action.label)),
+      ...Object.values(KIND_LABEL),
+      ...KINDS.flatMap((kind) => radiusFields(kind).map((field) => field.label)),
     ];
     expect([...new Set(tableKeys)].filter((key) => !(key in table))).toEqual([]);
   });
