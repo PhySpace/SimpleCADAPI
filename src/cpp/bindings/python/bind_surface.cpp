@@ -305,11 +305,11 @@ void bind_surface(py::module_& m) {
 
   m.def(
       "sew_faces_rshell",
-      [](const std::vector<Face>& faces, double tolerance, const TagPrefix& tag_prefix) {
-        return sew_faces_rshell(faces, tolerance, tag_prefix);
+      [](const std::vector<Shape>& pieces, double tolerance, const TagPrefix& tag_prefix) {
+        return sew_faces_rshell(pieces, tolerance, tag_prefix);
       },
       py::arg("faces"), py::kw_only(), py::arg("tolerance") = tol::kSewing, py::arg("tag_prefix") = py::none(),
-      "Sew faces into exactly one connected Shell.");
+      "Sew faces, and the faces of shells, into exactly one connected Shell.");
 
   m.def(
       "make_solid_from_shell_rsolid",

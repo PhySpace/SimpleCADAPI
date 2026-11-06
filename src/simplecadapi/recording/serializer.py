@@ -4219,14 +4219,15 @@ def _execute_graph(
                         ordered = _ordered_input_shapes(
                             ctx, graph, outputs, node, params
                         )
+                        # the pieces given: faces, and shells sewn as their faces
                         if len(ordered) != int(params["face_count"]) or not all(
-                            isinstance(item, Face) for item in ordered
+                            isinstance(item, (Face, Shell)) for item in ordered
                         ):
                             ctx.fail(
                                 f"Graph node '{node.node_id}' ({op_name}) face inputs do not match face_count"
                             )
                         result = ops.sew_faces_rshell(
-                            cast(Sequence[Face], ordered),
+                            cast(Sequence[Face | Shell], ordered),
                             tolerance=float(params["tolerance"]),
                             tag_prefix=cast(Optional[str], params.get("tag_prefix")),
                         )

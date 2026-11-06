@@ -70,7 +70,8 @@ consult their own documentation before the first call.
 - Editing an existing curve or surface (poles, weights, knots, degree, refit): `domains/curve-surface-editing.md`.
 - An `Edge` is taken wherever a `Wire` is (a sweep path, a loft section, a face boundary): it becomes the wire of that
   one edge (recorded as `make_wire_from_edges_rwire`). Several edges make one wire only through an explicit
-  `make_wire_from_edges_rwire([a, b, ...])`. `loft_rshell` of two open curves is the surface between them (no end wires).
+  `make_wire_from_edges_rwire([a, b, ...])` (in any order: they are chained by their ends). `loft_rshell` of two open
+  curves is the surface between them (no end wires); `sew_faces_rshell` takes faces and shells (a shell as its faces).
 - Features: `extrude_rsolid`, `revolve_rsolid`, `sweep_rsolid`,
   `twisted_sweep_rsolid` (supports inner-wire profiles), `helical_sweep_rsolid`,
   `loft_rsolid`, `loft_rshell`, `shell_rsolid`.
