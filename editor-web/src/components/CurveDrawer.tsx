@@ -111,6 +111,7 @@ export function CurveDrawer({
   plane: initialPlane,
   busy,
   error,
+  defaultName,
   onCommit,
   onCancel,
 }: {
@@ -121,6 +122,8 @@ export function CurveDrawer({
   plane: string;
   busy: boolean;
   error: string | null;
+  /** The name the first curve takes unless one is typed: a free one in the notebook. */
+  defaultName: string;
   onCommit: (doc: CurveDoc, name: string) => void;
   onCancel: () => void;
 }) {
@@ -129,7 +132,7 @@ export function CurveDrawer({
   const [planeName, setPlaneName] = useState(initialPlane);
   const [pending, setPending] = useState<string[]>([]); // an arc's middle point, a spline's points so far
   const [hover, setHover] = useState<{ at: Vec3; snap: SnapCandidate | null; screen: [number, number] } | null>(null);
-  const [name, setName] = useState("path");
+  const [name, setName] = useState(defaultName);
   const plane = planes.find((p) => p.name === planeName) ?? planes[0];
   const state = useRef({ doc, tool, plane, pending });
   state.current = { doc, tool, plane, pending };

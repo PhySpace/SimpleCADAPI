@@ -1790,6 +1790,7 @@ export function App() {
                     plane={drawing.plane}
                     busy={guiBusy}
                     error={drawing.error}
+                    defaultName={suggestName("path", gui.state.taken)}
                     onCommit={(doc, name) => void commitCurve(doc, name)}
                     onCancel={() => setDrawing(null)}
                   />
