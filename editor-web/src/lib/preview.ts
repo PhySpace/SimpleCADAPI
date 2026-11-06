@@ -131,7 +131,13 @@ export function parsePreview(buffer: ArrayBuffer, cache: ReadonlyMap<string, Pre
 
 
 /** What the header says about a preview: parts (a multi-body part's bodies are scene nodes `<part node>/body:<id>`) and bodies. */
-export function previewSummary(nodes: readonly { nodeId: string }[]): string {
+/** The node id of a surface value of the notebook (a face or shell that is not part of the product): `node/surface/<name>`
+ * (simplecadapi/scene/preview.py: drawn from both sides, picked whole with the sketches and curves). */
+export const SURFACE_NODE_PREFIX = "node/surface/";
+export const isSurfaceNode = (nodeId: string): boolean => nodeId.startsWith(SURFACE_NODE_PREFIX);
+
+export function previewSummary(all: readonly { nodeId: string }[]): string {
+  const nodes = all.filter((node) => !isSurfaceNode(node.nodeId));
   const parts = new Set(nodes.map((node) => node.nodeId.replace(/\/body:[^/]+$/, "")));
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
   return nodes.length > parts.size ? `${plural(parts.size, "part")} · ${plural(nodes.length, "body").replace("bodys", "bodies")}` : plural(parts.size, "part");

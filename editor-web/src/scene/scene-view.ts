@@ -16,7 +16,7 @@ import { BRepRenderer, OVERLAY_LAYER, type CameraState, type LiveGeometryPayload
 
 export type { LiveGeometryPayload };
 import type { PackageFiles } from './product-package';
-import type { PreviewData } from '../lib/preview';
+import { SURFACE_NODE_PREFIX, type PreviewData } from '../lib/preview';
 import type { Entity, EntitySidecar, FaceGroup, SceneNode } from './scene2';
 
 export type SelectionMode = 'component' | 'solid' | 'face' | 'edge' | 'vertex' | 'sketch';
@@ -88,7 +88,7 @@ export class SceneView {
         controls: this.engine.controls,
         onClick: (event) => {
           if (this.selectionMode === 'sketch') {
-            this.onSketchPick?.(this.sketchHitter?.(event) ?? this.curveHitter?.(event) ?? null, event.ctrlKey || event.metaKey);
+            this.onSketchPick?.(this.sketchHitter?.(event) ?? this.curveHitter?.(event) ?? this.surfaceAt(event), event.ctrlKey || event.metaKey);
             return;
           }
           const result = this.pick(event);
@@ -184,6 +184,17 @@ export class SceneView {
     const entity = sidecar?.entities.find((item) => item.entity_id === entityId);
     const props = entity?.properties as { seam?: unknown; degenerate?: unknown } | undefined;
     return props?.seam !== true && props?.degenerate !== true;
+  }
+
+  /** The name of the notebook's surface (a face or shell value the preview shows as `node/surface/<name>`) under a
+   * pointer event, or null: the sketch selection mode picks surfaces whole, with sketches and curves. */
+  surfaceAt(event: { clientX: number; clientY: number }): string | null {
+    this.pointerRay(event as PointerEvent);
+    const hit = this.raycaster
+      .intersectObjects(this.engine.modelRoot.children, true)
+      .find((item) => item.object instanceof THREE.Mesh && this.isEffectivelyVisible(item.object) && typeof item.object.userData.nodeId === 'string');
+    const nodeId = hit?.object.userData.nodeId as string | undefined;
+    return nodeId?.startsWith(SURFACE_NODE_PREFIX) ? nodeId.slice(SURFACE_NODE_PREFIX.length) : null;
   }
 
   pick(event: PointerEvent): PickResult | null {

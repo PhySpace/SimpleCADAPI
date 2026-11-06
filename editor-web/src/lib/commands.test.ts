@@ -65,7 +65,7 @@ describe("what the selection offers", () => {
 
   it("counts a selection by kind, a face of unknown kind counting as flat", () => {
     const context = selectionContext([{ kind: "face", geometry: { type: "plane" } }, { kind: "face", geometry: { type: "cylinder" } }, { kind: "face" }, { kind: "edge" }, { kind: "solid" }], ["s1"]);
-    expect(context).toEqual({ sketches: 1, curves: 0, solids: 1, components: 0, faces: 3, planarFaces: 2, edges: 1, vertices: 0 });
+    expect(context).toMatchObject({ sketches: 1, curves: 0, surfaces: 0, solids: 1, components: 0, faces: 3, planarFaces: 2, edges: 1, vertices: 0 });
     expect(contextKind(selectionContext([]))).toBeNull();
   });
   it("offers a curve a sweep along it, and with a sketch the sketch swept along it", () => {
@@ -165,5 +165,26 @@ describe("several curves picked", () => {
     expect(whenFor("join_curves")?.(selectionContext([], [], ["a", "b"]))).toBe(true);
     expect(whenFor("join_curves")?.(selectionContext([], [], ["a"]))).toBe(false);
     expect(whenFor("sweep_along")?.(selectionContext([], [], ["a", "b"]))).toBe(false);
+  });
+});
+
+describe("curves and surfaces make surfaces and solids", () => {
+  const curves = (n: number, extra = {}) => selectionContext([], [], Array.from({ length: n }, (_, i) => `c${i}`), extra);
+  it("offers a ruled and a lofted surface between curves, a fill or a flat face for a loop, a network surface", () => {
+    expect(whenFor("ruled_surface")?.(curves(2))).toBe(true);
+    expect(whenFor("ruled_surface")?.(curves(3))).toBe(false);
+    expect(whenFor("loft_surface")?.(curves(3))).toBe(true);
+    expect(whenFor("fill_curves")?.(curves(4, { curveLoop: true }))).toBe(true);
+    expect(whenFor("plane_from_curves")?.(curves(4, { curveLoop: true, curveFlat: true }))).toBe(true);
+    expect(whenFor("fill_curves")?.(curves(4, { curveLoop: true, curveFlat: true }))).toBe(false);
+    expect(whenFor("gordon_surface")?.(curves(4, { curveNet: true }))).toBe(true);
+  });
+  it("sews surfaces, and closes one shell into a solid", () => {
+    const surfaces = (n: number, shells = 0) => selectionContext([], [], [], { surfaces: n, shells });
+    expect(contextKind(surfaces(1))).toBe("surface");
+    expect(whenFor("sew_surfaces")?.(surfaces(2))).toBe(true);
+    expect(whenFor("sew_surfaces")?.(surfaces(1))).toBe(false);
+    expect(whenFor("close_shell")?.(surfaces(1, 1))).toBe(true);
+    expect(whenFor("close_shell")?.(surfaces(1, 0))).toBe(false);
   });
 });

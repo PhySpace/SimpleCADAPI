@@ -337,6 +337,46 @@ def compile_preview(
     return PreviewScene(parts=parts, nodes=nodes, solids=solids, definitions=definitions, bodies=bodies)
 
 
+SURFACE_COLOR = (0.55, 0.78, 0.95)
+"""How a surface is drawn: a light blue, apart from the bodies' grey."""
+
+SURFACE_NODE_PREFIX = "node/surface/"
+"""The node id of a surface value of the notebook: ``node/surface/<name>`` (a viewer draws it from both sides)."""
+
+
+def add_surfaces(
+    scene: PreviewScene,
+    surfaces: dict[str, Any],
+    *,
+    linear_tolerance: float = DEFAULT_LINEAR_TOLERANCE,
+    angular_tolerance: float = DEFAULT_ANGULAR_TOLERANCE,
+) -> PreviewScene:
+    """*scene* with the faces and shells of *surfaces* (``{name: Face | Shell}``: values of the notebook that are not
+    part of the product) as nodes of their own, so a viewer shows and picks them; a surface that does not mesh is left
+    out."""
+
+    for name, shape in surfaces.items():
+        try:
+            preview = preview_solid(shape, linear_tolerance=linear_tolerance, angular_tolerance=angular_tolerance)
+        except Exception:  # noqa: BLE001 - a surface the mesher refuses is not drawn
+            continue
+        key = f"{preview.key}/surface:{name}"
+        scene.parts[key] = preview
+        scene.solids[key] = shape
+        scene.definitions[key] = name
+        scene.nodes.append(
+            PreviewNode(
+                node_id=SURFACE_NODE_PREFIX + name,
+                part_key=key,
+                definition_id=name,
+                display_name=name,
+                placement=identity_placement(),
+                color=SURFACE_COLOR,
+            )
+        )
+    return scene
+
+
 # -- the wire format -----------------------------------------------------------------
 
 

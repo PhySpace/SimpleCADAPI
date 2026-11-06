@@ -6,6 +6,7 @@ import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { float, mrt } from 'three/tsl';
 import { LineMaterial, LineSegments2, LineSegmentsGeometry } from './fat-lines';
 import type { SceneNode, Transform, Vec3 } from './scene2';
+import { SURFACE_NODE_PREFIX } from '../lib/preview';
 
 export const CAD_TO_GLTF = new THREE.Matrix4().set(0.001, 0, 0, 0, 0, 0, 0.001, 0, 0, -0.001, 0, 0, 0, 0, 0, 1);
 export const GLTF_TO_CAD = new THREE.Matrix4().set(1000, 0, 0, 0, 0, 0, -1000, 0, 0, 1000, 0, 0, 0, 0, 0, 1);
@@ -49,7 +50,9 @@ export function materialFor(node: SceneNode): MeshStandardNodeMaterial {
   // Faces are pushed back in depth: edge lines lie exactly ON the surface, and
   // without the offset the face triangles win the depth fight per-pixel —
   // edges render as broken dashed fragments (classic CAD z-fighting).
-  const material = new MeshStandardNodeMaterial({ color: new THREE.Color(color[0], color[1], color[2]), metalness: 0.08, roughness: 0.52, side: THREE.FrontSide, transparent: color[3] < 1, opacity: color[3], depthWrite: color[3] >= 1, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  // a surface (an open face or shell of the notebook) is seen from both sides
+  const side = node.node_id?.startsWith(SURFACE_NODE_PREFIX) ? THREE.DoubleSide : THREE.FrontSide;
+  const material = new MeshStandardNodeMaterial({ color: new THREE.Color(color[0], color[1], color[2]), metalness: 0.08, roughness: 0.52, side, transparent: color[3] < 1, opacity: color[3], depthWrite: color[3] >= 1, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
   // faces are what ambient occlusion darkens: they set the scene pass's AO mask (see BRepRenderer.setupPostprocessing)
   material.mrtNode = mrt({ aoMask: float(1) });
   return material;

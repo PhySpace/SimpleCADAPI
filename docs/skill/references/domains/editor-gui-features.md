@@ -72,7 +72,15 @@ HOLE_DIAMETER = scad.var(name="hole_diameter", default=6.0, unit="mm", comment="
   numbers. A wire is made where one is needed, from the curves picked (`make_wire_from_edges_rwire([path, path_2])`); an
   older curve cell of several segments is still one wire. The kernel reports every top-level value's kind, so a curve
   or face written as code is a value, not a body. Every wire or edge value is drawn in the viewport from the kernel's
-  samples (`runtime/live_curves.py`) and picked with the "sketch / curve" selection mode.
+  samples (`runtime/live_curves.py`) and picked with the "sketch / curve / surface" selection mode.
+- Surfaces from curves (pick curves in that mode): Sweep (one curve: `op.sweep_rsolid`, a sketch picked with it is the
+  profile), Ruled surface (two: `op.make_ruled_surface_rface`), Loft surface (`op.loft_rshell`, in the order picked),
+  Fill (a closed loop: the `fill` feature, `make_surface_patch_rface` of `SurfaceBoundary`s), Flat face (a flat loop:
+  `flat_face`, `make_face_from_wire_rface` with the loop's normal), Network surface (two families of crossing curves,
+  found from where they cross: `op.make_gordon_surface_rface`), Join into a wire (the `wire` feature). The face and
+  shell values no later cell reads are drawn with the model (`node/surface/<name>`, light blue, both sides) and picked
+  whole in the same mode: Sew (the `sew` feature: `sew_faces_rshell` of faces and shells) and Close into a solid
+  (`solid_from_shell`: `make_solid_from_shell_rsolid`, which becomes the part's body).
 - Connectors of the part are placed like workplanes: pick one flat face, then "Connector" (selection bar, command bar,
   or the assembly tab's "on picked face"): a frame with move arrows and turn rings sits on the face; name it and Add.
   It is written into the product cell (`add_connector_rpart(...)`, `# gui-connectors:`); the assembly tab lists, edits

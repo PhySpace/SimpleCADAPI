@@ -66,19 +66,30 @@ export const PRESETS: Record<string, { suffix: string; label: string; descriptio
 // -- what the selection offers ----------------------------------------------------------------------------------------------------
 
 /** What is selected, counted by kind (the model's entities and the notebook's sketches). */
-/** `curves`: the notebook's 3D curves picked (wires and edges it holds as values: a path, a rail). */
-export type SelectionContext = { sketches: number; curves: number; solids: number; components: number; faces: number; planarFaces: number; edges: number; vertices: number };
-export type ContextKind = "sketch" | "curve" | "edge" | "face" | "solid";
+/** `curves`: the notebook's 3D curves picked (wires and edges it holds as values: a path, a rail), and what they make
+ * together (`curveLoop`: joined end to end into a closed loop, `curveFlat`: that loop lies in a plane, `curveNet`: two
+ * families that cross each other, see lib/curve-net.ts); `surfaces`: its face and shell values picked (`shells` of
+ * them shells: one bounds a solid when it is closed, which the operation checks). */
+export type SelectionContext = {
+  sketches: number; curves: number; surfaces: number; shells: number;
+  curveLoop: boolean; curveFlat: boolean; curveNet: boolean;
+  solids: number; components: number; faces: number; planarFaces: number; edges: number; vertices: number;
+};
+export type ContextKind = "sketch" | "curve" | "surface" | "edge" | "face" | "solid";
 
-export const EMPTY_CONTEXT: SelectionContext = { sketches: 0, curves: 0, solids: 0, components: 0, faces: 0, planarFaces: 0, edges: 0, vertices: 0 };
+export const EMPTY_CONTEXT: SelectionContext = {
+  sketches: 0, curves: 0, surfaces: 0, shells: 0, curveLoop: false, curveFlat: false, curveNet: false,
+  solids: 0, components: 0, faces: 0, planarFaces: 0, edges: 0, vertices: 0,
+};
 
 /** Count a selection; a face whose details are not known yet counts as planar (the click that uses it checks again). */
 export function selectionContext(
   items: readonly { kind: string; geometry?: Record<string, unknown> | null }[],
   sketches: readonly string[] = [],
   curves: readonly string[] = [],
+  values: Partial<Pick<SelectionContext, "surfaces" | "shells" | "curveLoop" | "curveFlat" | "curveNet">> = {},
 ): SelectionContext {
-  const out = { ...EMPTY_CONTEXT, sketches: sketches.length, curves: curves.length };
+  const out = { ...EMPTY_CONTEXT, ...values, sketches: sketches.length, curves: curves.length };
   for (const item of items) {
     if (item.kind === "solid") out.solids += 1;
     else if (item.kind === "component") out.components += 1;
@@ -97,6 +108,7 @@ export function selectionContext(
 export function contextKind(context: SelectionContext): ContextKind | null {
   if (context.sketches > 0) return "sketch";
   if (context.curves > 0) return "curve";
+  if (context.surfaces > 0) return "surface";
   if (context.edges > 0) return "edge";
   if (context.faces > 0) return "face";
   if (context.solids > 0 || context.components > 0) return "solid";
@@ -131,7 +143,16 @@ export const CONTEXT_ACTIONS: Record<ContextKind, { id: string; label: string }[
   ],
   curve: [
     { id: "sweep_along", label: "Sweep" },
+    { id: "ruled_surface", label: "Ruled surface" },
+    { id: "loft_surface", label: "Loft surface" },
+    { id: "fill_curves", label: "Fill" },
+    { id: "plane_from_curves", label: "Flat face" },
+    { id: "gordon_surface", label: "Network surface" },
     { id: "join_curves", label: "Join into a wire" },
+  ],
+  surface: [
+    { id: "sew_surfaces", label: "Sew" },
+    { id: "close_shell", label: "Close into a solid" },
   ],
   solid: [
     { id: "translate", label: "Move" },
@@ -173,11 +194,24 @@ const WHEN: Record<string, (context: SelectionContext) => boolean> = {
   sweep_along: (c) => c.curves === 1 && c.sketches <= 1 && c.solids + c.components + c.faces + c.edges + c.vertices === 0,
   // several curves picked: the wire through them (in any order, as long as they connect)
   join_curves: (c) => c.curves >= 2 && c.sketches + c.solids + c.components + c.faces + c.edges + c.vertices === 0,
+  // surfaces from curves only
+  ruled_surface: (c) => onlyCurves(c) && c.curves === 2,
+  loft_surface: (c) => onlyCurves(c) && c.curves >= 2,
+  fill_curves: (c) => onlyCurves(c) && c.curveLoop && !c.curveFlat,
+  plane_from_curves: (c) => onlyCurves(c) && c.curveLoop && c.curveFlat,
+  gordon_surface: (c) => onlyCurves(c) && c.curveNet,
+  // surfaces only: sewn into one shell; a closed shell bounds a solid
+  sew_surfaces: (c) => c.surfaces >= 2 && c.curves + c.sketches + c.solids + c.components + c.faces + c.edges + c.vertices === 0,
+  close_shell: (c) => c.surfaces === 1 && c.shells === 1 && c.curves + c.sketches + c.solids + c.components + c.faces + c.edges + c.vertices === 0,
   translate: (c) => (c.solids >= 1 || c.components >= 1) && c.faces + c.edges + c.sketches === 0,
   rotate: (c) => (c.solids >= 1 || c.components >= 1) && c.faces + c.edges + c.sketches === 0,
   mirror: (c) => (c.solids >= 1 || c.components >= 1) && c.faces + c.edges + c.sketches === 0,
   linear_pattern: (c) => (c.solids >= 1 || c.components >= 1) && c.faces + c.edges + c.sketches === 0,
 };
+function onlyCurves(c: SelectionContext): boolean {
+  return c.curves > 0 && c.sketches + c.surfaces + c.solids + c.components + c.faces + c.edges + c.vertices === 0;
+}
+
 export const whenFor = (id: string): ((context: SelectionContext) => boolean) | undefined => WHEN[id];
 
 /** The buttons of the contextual action bar for a selection: the registry commands whose `when` holds, in the order of
@@ -216,6 +250,7 @@ export function selectionHint(context: SelectionContext, commands: readonly Comm
     edge: `${context.edges} edge${context.edges === 1 ? "" : "s"}`,
     face: `${context.faces} face${context.faces === 1 ? "" : "s"}`,
     curve: `${context.curves} curve${context.curves === 1 ? "" : "s"}`,
+    surface: `${context.surfaces} surface${context.surfaces === 1 ? "" : "s"}`,
     solid: `${context.solids + context.components} body`,
   }[kind];
   return `${noun} selected${list ? `: ${list}` : ""}.`;

@@ -45,7 +45,8 @@ import { NotebookList } from "@/components/NotebookList";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { deleteNotebook, getWorkspace, newNotebook, openNotebook, postViewport, type ModuleRow, type NotebookRow } from "@/lib/api";
-import { parsePreview, previewSummary, type PreviewPart } from "@/lib/preview";
+import { SURFACE_NODE_PREFIX, isSurfaceNode, parsePreview, previewSummary, type PreviewPart } from "@/lib/preview";
+import { closedLoop, gordonFamilies, loopNormal } from "@/lib/curve-net";
 import { EnvelopeSocket, type Envelope } from "@/lib/envelope";
 import { emptyDoc, normalizeDoc } from "@/lib/sketch";
 import { frameFromEntity, type PlaneSpec } from "@/lib/sketch-plane";
@@ -74,7 +75,7 @@ const MODES: { mode: SelectionMode; label: string; key: string }[] = [
   { mode: "face", label: "face", key: "3" },
   { mode: "edge", label: "edge", key: "2" },
   { mode: "vertex", label: "vert", key: "1" },
-  { mode: "sketch", label: "sketch / curve", key: "6" },
+  { mode: "sketch", label: "sketch / curve / surface", key: "6" },
 ];
 
 /** Editor application: left = notebook (cells, workspace), middle = the live
@@ -217,6 +218,11 @@ export function App() {
   /** The 3D curves picked (with the sketches: the sketch selection mode picks both). */
   const [pickedCurves, setPickedCurves] = useState<string[]>([]);
   const [hoverCurve, setHoverCurve] = useState<string | null>(null);
+  /** The notebook's surfaces the preview shows (face and shell values no later cell builds on), and those picked. */
+  const [surfaces, setSurfaces] = useState<string[]>([]);
+  const surfacesRef = useRef(surfaces);
+  surfacesRef.current = surfaces;
+  const [pickedSurfaces, setPickedSurfaces] = useState<string[]>([]);
   // Sketches are drawn while they are what a click picks, while one is picked or edited, and while a form takes a
   // sketch profile; otherwise they would only clutter the model.
   const dialogTakesProfile = !!dialog?.spec.slots.some((slot) => slot.kind === "profile");
@@ -268,6 +274,11 @@ export function App() {
       }
       partCache.current = preview.parts; // the parts on screen: the next frame may leave them out
       view.loadPreview(preview);
+      // a sketch made into a face is drawn by the sketch layer: its surface node stays hidden
+      const sketchNames = new Set(sketchListRef.current.map((info) => info.name));
+      const surfaceNodes = preview.nodes.filter((node) => isSurfaceNode(node.nodeId) && !sketchNames.has(node.definitionId));
+      for (const node of preview.nodes) if (isSurfaceNode(node.nodeId) && sketchNames.has(node.definitionId)) view.engine.setNodeVisible(node.nodeId, false);
+      setSurfaces(surfaceNodes.map((node) => node.definitionId));
       setStatus(previewSummary(preview.nodes));
       // the first model of a notebook is framed (a notebook with no solid yet has nothing to frame)
       if (framedNotebook.current !== name && preview.nodes.length > 0) {
@@ -275,13 +286,14 @@ export function App() {
         framedNotebook.current = name;
       }
       setSceneVersion((version) => version + 1);
+      const solids = preview.nodes.length - preview.nodes.filter((node) => isSurfaceNode(node.nodeId)).length;
       log.push(
         "ok",
-        preview.nodes.length === 0
-          ? t("no solid yet")
-          : preview.nodes.length === 1
+        solids === 0
+          ? surfaceNodes.length ? t("{{count}} surfaces shown, no solid yet", { count: surfaceNodes.length }) : t("no solid yet")
+          : solids === 1
             ? t("model shown: 1 part")
-            : t("model shown: {{count}} parts", { count: preview.nodes.length }),
+            : t("model shown: {{count}} parts", { count: solids }),
       );
     } catch (error) {
       log.push("error", error instanceof Error ? error.message : t("unable to open the preview"));
@@ -342,6 +354,7 @@ export function App() {
       setHiddenSketches(new Set());
       setPickedSketches([]);
       setPickedCurves([]);
+      setPickedSurfaces([]);
       setHoverSketch(null);
       setPushArrow(null);
       setBarNote(null);
@@ -563,6 +576,7 @@ export function App() {
     if (sketchingRef.current) return;
     setPickedSketches((previous) => (previous.length ? [] : previous));
     setPickedCurves((previous) => (previous.length ? [] : previous));
+    setPickedSurfaces((previous) => (previous.length ? [] : previous));
     setBarNote(null);
     const view = viewRef.current;
     const node = view?.nodes.find((item) => item.node_id === result.nodeId);
@@ -604,6 +618,7 @@ export function App() {
     setPicked((previous) => (previous.length ? [] : previous));
     setPickedSketches((previous) => (previous.length ? [] : previous));
     setPickedCurves((previous) => (previous.length ? [] : previous));
+    setPickedSurfaces((previous) => (previous.length ? [] : previous));
     setBarNote(null);
   }, []);
 
@@ -615,19 +630,19 @@ export function App() {
       if (!additive) {
         setPickedSketches((previous) => (previous.length ? [] : previous));
     setPickedCurves((previous) => (previous.length ? [] : previous));
+    setPickedSurfaces((previous) => (previous.length ? [] : previous));
         setPicked((previous) => (previous.length ? [] : previous));
       }
       return;
     }
     setPicked((previous) => (previous.length ? [] : previous));
-    // a curve and a sketch share the click: a plain click picks one of either, Ctrl/Cmd adds it to the others
-    if (curvesRef.current.some((curve) => curve.name === name)) {
-      setPickedCurves((previous) => nextSketchSelection(previous, name, additive));
-      if (!additive) setPickedSketches((previous) => (previous.length ? [] : previous));
-      return;
-    }
-    setPickedSketches((previous) => nextSketchSelection(previous, name, additive));
-    if (!additive) setPickedCurves((previous) => (previous.length ? [] : previous));
+    // sketches, curves and surfaces share the click: a plain click picks one of any, Ctrl/Cmd adds it to the others
+    const kind = curvesRef.current.some((curve) => curve.name === name) ? "curve" : surfacesRef.current.includes(name) ? "surface" : "sketch";
+    const pick = (previous: string[]) => nextSketchSelection(previous, name, additive);
+    const keep = (mine: boolean) => (previous: string[]) => (mine || additive || !previous.length ? previous : []);
+    setPickedSketches(kind === "sketch" ? pick : keep(false));
+    setPickedCurves(kind === "curve" ? pick : keep(false));
+    setPickedSurfaces(kind === "surface" ? pick : keep(false));
   }, []);
 
   // The notebook follows the selection: the server writes it as ql code into
@@ -860,6 +875,7 @@ export function App() {
       setBarNote(null);
       setPickedSketches([]);
       setPickedCurves([]);
+      setPickedSurfaces([]);
       if (modeBeforeSketch.current === null) modeBeforeSketch.current = selectionMode;
       setSelectionMode("face"); // a face pick chooses the sketch plane
       setPicked([]);
@@ -926,7 +942,28 @@ export function App() {
   pickedCurvesRef.current = pickedCurves;
   // a curve gone from the notebook is no longer picked
   const livePickedCurves = useMemo(() => pickedCurves.filter((name) => curves.some((curve) => curve.name === name)), [pickedCurves, curves]);
-  const context = useMemo(() => selectionContext(selection, pickedSketches, livePickedCurves), [selection, pickedSketches, livePickedCurves]);
+  const livePickedSurfaces = useMemo(() => pickedSurfaces.filter((name) => surfaces.includes(name)), [pickedSurfaces, surfaces]);
+  const pickedSurfacesRef = useRef(livePickedSurfaces);
+  pickedSurfacesRef.current = livePickedSurfaces;
+  /** What the picked curves make together (a closed loop, flat or not; a network of two crossing families). */
+  const curveShape = useMemo(() => {
+    const picked = livePickedCurves.flatMap((name) => curves.filter((curve) => curve.name === name));
+    const loop = picked.length ? closedLoop(picked) : null;
+    return { loop, normal: loop ? loopNormal(loop) : null, families: gordonFamilies(picked) };
+  }, [livePickedCurves, curves]);
+  const curveShapeRef = useRef(curveShape);
+  curveShapeRef.current = curveShape;
+  const context = useMemo(
+    () =>
+      selectionContext(selection, pickedSketches, livePickedCurves, {
+        surfaces: livePickedSurfaces.length,
+        shells: livePickedSurfaces.filter((name) => gui.state.bodies.some((body) => body.name === name && body.produces === "shell")).length,
+        curveLoop: curveShape.loop !== null,
+        curveFlat: curveShape.normal !== null,
+        curveNet: curveShape.families !== null,
+      }),
+    [selection, pickedSketches, livePickedCurves, livePickedSurfaces, curveShape, gui.state.bodies],
+  );
 
   /** "Sketch on this face": the plane chooser's own path, started from the selected face (a clear refusal for a curved one). */
   const sketchOnSelectedFace = useCallback(async () => {
@@ -1258,6 +1295,35 @@ export function App() {
     },
     [openDialog, startSketch],
   );
+  /** The surfaces made from the picked curves, and what is made of the picked surfaces: each the SDK operation (or the
+   * feature) of its own, its values filled from the picks; it starts at once when they are all it needs. */
+  const surfaceCommands = useMemo<Command[]>(() => {
+    const start = (specId: string, prefill: () => Record<string, unknown>) => () => {
+      const spec = gui.catalog?.specs.find((item) => item.id === specId);
+      if (spec) openDialog({ spec, prefill: prefill() });
+    };
+    const curvesPicked = () => [...pickedCurvesRef.current];
+    const loopOrder = () => curveShapeRef.current.loop?.map((curve) => curve.name) ?? curvesPicked();
+    const command = (id: string, label: string, description: string, keywords: string[], run: () => void): Command => ({
+      id, label, group: "Surfaces", keywords, description, icon: FEATURE_ICONS.curve, when: whenFor(id), contextOnly: true, run,
+    });
+    return [
+      command("ruled_surface", "Ruled surface between two curves", "The surface of straight lines between two picked curves.", ["ruled", "surface", "between"],
+        start("op.make_ruled_surface_rface", () => ({ edge_a: curvesPicked()[0], edge_b: curvesPicked()[1] }))),
+      command("loft_surface", "Loft a surface through curves", "A smooth surface through the picked curves, in the order picked.", ["loft", "surface", "skin", "through"],
+        start("op.loft_rshell", () => ({ sections: curvesPicked() }))),
+      command("fill_curves", "Fill a loop of curves", "A surface filling the closed loop the picked curves make.", ["fill", "patch", "surface", "boundary"],
+        start("fill", () => ({ curves: loopOrder() }))),
+      command("plane_from_curves", "Flat face from curves", "The flat face the picked curves bound (they make a closed loop in one plane).", ["face", "plane", "flat", "fill"],
+        start("flat_face", () => ({ curves: loopOrder(), normal: curveShapeRef.current.normal ?? [0, 0, 1] }))),
+      command("gordon_surface", "Surface through a curve network", "A surface through two families of crossing curves (found from where they cross).", ["gordon", "network", "surface", "mesh"],
+        start("op.make_gordon_surface_rface", () => ({ ...(curveShapeRef.current.families ?? {}) }))),
+      command("sew_surfaces", "Sew surfaces", "One shell sewn from the picked surfaces along the edges they share.", ["sew", "join", "shell", "surface"],
+        start("sew", () => ({ surfaces: [...pickedSurfacesRef.current] }))),
+      command("close_shell", "Close into a solid", "The solid the picked closed shell bounds.", ["solid", "close", "shell", "fill"],
+        start("solid_from_shell", () => ({ shell: pickedSurfacesRef.current[0] }))),
+    ];
+  }, [gui.catalog, openDialog]);
   const allCommands = useMemo<Command[]>(
     () => [
       // The assembly layout is not a dialog: it is its own panel (registered below), so its spec is left out of the generic list.
@@ -1329,6 +1395,7 @@ export function App() {
           openDialog({ spec, prefill: { path, ...(profile ? { profile } : {}) } });
         },
       },
+      ...surfaceCommands,
       {
         id: "join_curves",
         label: "Join curves into a wire",
@@ -1356,7 +1423,7 @@ export function App() {
       },
       ...assemblyCommands(openAssembly, { assembly: Boxes, connectors: Cable }),
     ],
-    [gui.catalog, openSpec, openDialog, sketchOnSelectedFace, editSelectedSketch, openAssembly, workplaneFromSelection, startPlacing, startDrawing, startConnector],
+    [gui.catalog, openSpec, openDialog, surfaceCommands, sketchOnSelectedFace, editSelectedSketch, openAssembly, workplaneFromSelection, startPlacing, startDrawing, startConnector],
   );
   // The stand-alone combine commands (Cut, Union, Intersect, Cut/Boss with sketch) are offered only while several bodies are open:
   // a new solid says how it meets the body in its own dialog.
@@ -1614,7 +1681,21 @@ export function App() {
       }),
     [livePickedCurves, curves],
   );
-  const inspectorPanel = <Inspector selection={selection} sketches={[...inspectedSketches, ...inspectedCurves]} />;
+  const inspectedSurfaces = useMemo(
+    () =>
+      livePickedSurfaces.map((name) => ({
+        name,
+        kind: "surface" as const,
+        rows: [{ label: t("kind"), value: t(gui.state.bodies.find((body) => body.name === name)?.produces ?? "surface") }],
+      })),
+    [livePickedSurfaces, gui.state.bodies],
+  );
+  /** What the viewport highlights: the picked entities, and the picked surfaces whole. */
+  const viewportHighlights = useMemo(
+    () => [...selection, ...livePickedSurfaces.map((name) => ({ nodeId: SURFACE_NODE_PREFIX + name, entityId: null }))],
+    [selection, livePickedSurfaces],
+  );
+  const inspectorPanel = <Inspector selection={selection} sketches={[...inspectedSketches, ...inspectedCurves, ...inspectedSurfaces]} />;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
@@ -1675,7 +1756,7 @@ export function App() {
                 <Viewport
                   viewRef={viewRef}
                   selectionMode={selectionMode}
-                  selection={selection}
+                  selection={viewportHighlights}
                   sceneVersion={sceneVersion}
                   theme={theme.resolved}
                   onPick={handlePick}

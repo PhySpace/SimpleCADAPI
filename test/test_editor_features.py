@@ -66,7 +66,7 @@ def test_the_catalog_lists_every_operation_with_typed_slots():
 def test_every_template_uses_real_sdk_functions_and_parameters(spec):
     """The drift test: an SDK change that breaks a template breaks this, not a user."""
     picks = {slot.name: [{"kind": slot.entity, "properties": {"centroid": [0, 0, 0], "area": 10.0, "length": 5.0}, "geometry": {"type": "plane"}}] for slot in spec.slots if slot.kind == "select"}
-    bodies = {"a": "solid", "b": "solid", "many": "solids", "prof": "face", "e1": "edge", "e2": "edge"}
+    bodies = {"a": "solid", "b": "solid", "many": "solids", "prof": "face", "e1": "edge", "e2": "edge", "sh1": "shell"}
     values = {k: (v if v is not None else None) for k, v in DEFAULTS[spec.id].items()}
     for slot in spec.slots:
         if slot.kind == "body":
@@ -77,13 +77,19 @@ def test_every_template_uses_real_sdk_functions_and_parameters(spec):
             values[slot.name] = RECT_SKETCH
         elif slot.kind == "curve":
             values[slot.name] = {"points": [{"id": "p1", "at": [0, 0, 0]}, {"id": "p2", "at": [10, 0, 5]}], "curves": [{"id": "c1", "kind": "line", "points": ["p1", "p2"]}]}
-        elif slot.kind == "value" and "edge" in (slot.accepts or ()):
-            values[slot.name] = ["e1", "e2"] if slot.many else "e1"
+        elif slot.kind == "value":
+            fits = {"edge": "e1", "face": "prof", "shell": "sh1", "solid": "a"}
+            name = next((fits[kind] for kind in (slot.accepts or ()) if kind in fits), None)
+            if name is not None:
+                values[slot.name] = [name] if slot.many else name
     rendered = F.render_feature(spec.id, "probe", values, bodies=bodies, selections=picks, env={"profile_normals": {"prof": (0.0, 0.0, 1.0)}})
     seen = 0
     for call in _calls(rendered.feature):
         function = getattr(scad, call.func.attr, None)
         assert function is not None, f"{spec.id}: scad.{call.func.attr} does not exist"
+        if not call.keywords:  # positional only (a pybind class such as SurfaceBoundary has no signature to read)
+            seen += 1
+            continue
         names = set(inspect.signature(function).parameters)
         for keyword in call.keywords:
             assert keyword.arg in names, f"{spec.id}: scad.{call.func.attr} has no parameter {keyword.arg!r}"
@@ -97,7 +103,7 @@ def test_every_template_uses_real_sdk_functions_and_parameters(spec):
 def test_the_primitives_and_profiles_make_one_valid_solid_each():
     with scad.GraphSession(graph_id="features-primitives"):
         for spec in F.SPECS:
-            if spec.produces in ("face", "assembly", "wire") or any(slot.kind in ("body", "select", "profile", "value") for slot in spec.slots):
+            if spec.produces in ("face", "assembly", "wire", "shell") or any(slot.kind in ("body", "select", "profile", "value") for slot in spec.slots):
                 continue  # sketches and assemblies have their own tests
             scope: dict = {"scad": scad}
             rendered = F.render_feature(spec.id, "made", DEFAULTS[spec.id], bodies={})
@@ -534,3 +540,25 @@ def test_a_cell_written_as_code_makes_what_the_kernel_says_it_made():
     assert snap["bodies"] == [{"name": "path", "produces": "wire"}, {"name": "base", "produces": "solid"}]
     assert snap["open"] == ["base"] and snap["product"]["bodies"] == ["base"]
     assert snap["defaults"]["op.sweep_rsolid"]["path"] == "path"
+
+
+def test_curves_to_a_flat_face_a_sewn_shell_and_a_solid_run():
+    """The features the editor offers on picked curves and surfaces, rendered and run: a box from its eight edges."""
+    scope: dict = {"scad": scad}
+    p = [(0, 0, 0), (40, 0, 0), (40, 30, 0), (0, 30, 0)]
+    for i in range(4):
+        scope[f"lo{i}"] = scad.make_segment_redge(p[i], p[(i + 1) % 4])
+        scope[f"up{i}"] = scad.make_segment_redge((*p[i][:2], 20), (*p[(i + 1) % 4][:2], 20))
+    scope["walls"] = scad.loft_rshell([scad.make_wire_from_edges_rwire([scope[f"lo{i}"] for i in range(4)]), scad.make_wire_from_edges_rwire([scope[f"up{i}"] for i in range(4)])], ruled=True)
+    bodies = {**{f"lo{i}": "edge" for i in range(4)}, **{f"up{i}": "edge" for i in range(4)}, "walls": "shell"}
+    steps = [
+        ("flat_face", "floor", {"curves": ["lo2", "lo0", "lo3", "lo1"], "normal": [0, 0, -1]}, "face"),
+        ("fill", "roof", {"curves": ["up0", "up1", "up2", "up3"]}, "face"),
+        ("sew", "skin", {"surfaces": ["walls", "floor", "roof"]}, "shell"),
+        ("solid_from_shell", "tray", {"shell": "skin"}, "solid"),
+    ]
+    for spec, slug, values, made in steps:
+        rendered = F.render_feature(spec, slug, values, bodies=bodies)
+        exec("\n".join(rendered.params + [rendered.feature]), scope)
+        bodies[slug] = made
+    assert scope["tray"].get_volume() == pytest.approx(40 * 30 * 20, rel=1e-3)

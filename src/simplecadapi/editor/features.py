@@ -430,6 +430,29 @@ def _wire(c: Context) -> list[str]:
     return [f"{c.slug} = scad.make_wire_from_edges_rwire([{', '.join(names)}])"]
 
 
+def _fill(c: Context) -> list[str]:
+    """A surface filling a closed loop of curves (edges, in any order)."""
+    names = [c.body_named(name) for name in c.values["curves"]]
+    return [f"{c.slug} = scad.make_surface_patch_rface([{', '.join(f'scad.SurfaceBoundary({n})' for n in names)}])"]
+
+
+def _flat_face(c: Context) -> list[str]:
+    """The flat face a closed loop of curves bounds (the curves joined into its boundary wire)."""
+    names = [c.body_named(name) for name in c.values["curves"]]
+    return [f"{c.slug} = scad.make_face_from_wire_rface(scad.make_wire_from_edges_rwire([{', '.join(names)}]), normal={c.point('normal')})"]
+
+
+def _sew(c: Context) -> list[str]:
+    """One shell sewn from surfaces of the notebook (faces and shells)."""
+    names = [c.body_named(name) for name in c.values["surfaces"]]
+    return [f"{c.slug} = scad.sew_faces_rshell([{', '.join(names)}])"]
+
+
+def _solid_from_shell(c: Context) -> list[str]:
+    """The solid a closed shell of the notebook bounds."""
+    return [f"{c.slug} = scad.make_solid_from_shell_rsolid({c.body_named(c.values['shell'])})"]
+
+
 def _assembly(c: Context) -> list[str]:
     cells = assembly_doc.render(c.slug, str(c.env.get("name") or c.slug), c.values["assembly"], c.env.get("notebook_dir"), c.env.get("workspace"))
     c.raw_params(cells["params"])
@@ -728,6 +751,18 @@ SPECS: tuple[Spec, ...] = (
     Spec("wire", "Wire from curves", "Curves", "datum", "wire",
          "One wire through curves of the notebook, joined end to end in any order: a path to sweep along, a section to loft through.",
          (Slot("curves", "Curves", "value", accepts=("edge",), many=True),), _wire),
+    Spec("fill", "Fill between curves", "Surfaces", "datum", "face",
+         "A surface filling a closed loop of curves of the notebook (given in any order).",
+         (Slot("curves", "Curves", "value", accepts=("edge",), many=True),), _fill),
+    Spec("flat_face", "Flat face from curves", "Surfaces", "datum", "face",
+         "The flat face a closed loop of curves of the notebook bounds (the curves in any order; the normal says which side is up).",
+         (Slot("curves", "Curves", "value", accepts=("edge",), many=True), Slot("normal", "Normal", "point", default=[0.0, 0.0, 1.0])), _flat_face),
+    Spec("sew", "Sew surfaces", "Surfaces", "datum", "shell",
+         "One shell sewn from surfaces of the notebook (faces and shells) along the edges they share.",
+         (Slot("surfaces", "Surfaces", "value", accepts=("face", "shell"), many=True),), _sew),
+    Spec("solid_from_shell", "Close into a solid", "Surfaces", "build", "solid",
+         "The solid a closed shell of the notebook bounds.",
+         (Slot("shell", "Closed shell", "value", accepts=("shell",)),), _solid_from_shell),
     Spec("curve", "3D curve", "Sketch", "datum", "wire",
          "A path in space: lines, arcs and splines through points in space, on workplanes or at vertices of the model, "
          "joined into one wire (a sweep path, a rail). Drawn in the viewport with snapping.",

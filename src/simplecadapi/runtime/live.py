@@ -28,7 +28,8 @@ from typing import Any
 
 from ..artifacts.assembly_io import attached_definition
 from ..product.packages import build_product_package, encode_product_package
-from ..scene.preview import PreviewScene, compile_preview, encode_preview, entity_info, refine_preview
+from .._cpp import Face, Shell
+from ..scene.preview import PreviewScene, add_surfaces, compile_preview, encode_preview, entity_info, refine_preview
 from ._marimo import safe_get_context
 from .cells import NotebookCells
 from .config import NotebookConfig, read_notebook_config
@@ -259,6 +260,12 @@ _last_partial: dict[str, Any] | None = None
 """What :func:`preview_product` said of the scene last previewed: ``None`` when it is the whole product."""
 
 
+def open_surfaces(values: Mapping[str, object], read: AbstractSet[str]) -> dict[str, object]:
+    """The public face and shell values no other cell reads: the surfaces a notebook has made and not yet used (sewn,
+    filled into a solid, cut with)."""
+    return {name: value for name, value in values.items() if not name.startswith("_") and name not in read and isinstance(value, (Face, Shell))}
+
+
 def _live_scene() -> PreviewScene:
     """The preview scene of the running notebook's product (not yet encoded); partial when a cell failed."""
 
@@ -278,6 +285,8 @@ def _live_scene() -> PreviewScene:
         # no solid yet (only sketches, curves, workplanes): the model is empty, which is no fault
         product, partial = None, None
     scene = compile_preview(product) if product is not None else PreviewScene(parts={}, nodes=[], solids={}, definitions={})
+    # the surfaces no later cell builds on (a loft, a patch, a shell sewn so far) are shown with the model
+    add_surfaces(scene, open_surfaces(scope.values, product_reads(scope.cells, scope.values)))
     last_timings["compile_ms"] = round((time.perf_counter() - started) * 1000, 1)
     _last_preview, _last_partial = scene, partial
     return scene
