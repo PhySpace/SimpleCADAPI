@@ -143,7 +143,7 @@ struct Geometry {
       const opencascade::handle<Geom2d_Line> line =
           new Geom2d_Line(gp_Pnt2d(p1.first, p1.second), gp_Dir2d(p2.first - p1.first, p2.second - p1.second));
       if (!bounded)
-        return line;
+        return CurveHandle(line);
       return new Geom2d_TrimmedCurve(line, -kTol, len + kTol);
     }
     if (entity.kind == kEllipseKind) {
@@ -163,11 +163,11 @@ struct Geometry {
     const opencascade::handle<Geom2d_Circle> full = new Geom2d_Circle(
         gp_Ax2d(gp_Pnt2d(circle.center.first, circle.center.second), gp_Dir2d(1.0, 0.0)), circle.radius);
     if (entity.kind == kCircleKind || !bounded)
-      return full;
+      return CurveHandle(full);
     const auto [start, sweep] = arc_span(entity);
     const double tol = kTol / circle.radius;
     if (sweep + 2.0 * tol >= kTwoPi)
-      return full;
+      return CurveHandle(full);
     return new Geom2d_TrimmedCurve(full, start - tol, start + sweep + tol);
   }
 };

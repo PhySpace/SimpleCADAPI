@@ -189,7 +189,8 @@ Solid inset_face_rsolid(const Solid& solid, const FaceSelection& face, const Sca
     throw ValueError("inset_face takes exactly one face, got " + std::to_string(resolved.size()));
   const Face target = resolved.front();
   const std::vector<Face> own_faces = solid.faces();
-  if (std::none_of(own_faces.begin(), own_faces.end(), [&](const Face& f) { return f.wrapped().IsSame(target.wrapped()); }))
+  if (std::none_of(own_faces.begin(), own_faces.end(),
+                   [&](const Face& f) { return f.wrapped().IsSame(target.wrapped()); }))
     throw ValueError("the face must belong to the input solid");
   const TopoDS_Face source = TopoDS::Face(target.wrapped());
   if (occt_guard([&] { return BRepAdaptor_Surface(source).GetType(); }) != GeomAbs_Plane)

@@ -462,7 +462,8 @@ void bind_derived(py::module_& m) {
         return unlocked(selection.is_selector(), [&] { return inset_face_rsolid(solid, selection, distance); });
       },
       py::arg("solid"), py::arg("face"), py::arg("distance"),
-      "Imprint the loops of one planar face moved a distance inside it, splitting the face in an inner face and a ring.");
+      "Imprint the loops of one planar face moved a distance inside it, splitting the face in an inner face and a "
+      "ring.");
 
   m.def(
       "extrude_taper_rsolid",

@@ -88,7 +88,8 @@ Solid press_pull_rsolid(const Solid& solid, const FaceSelection& face, const Sca
     throw ValueError("press_pull takes exactly one face, got " + std::to_string(resolved.size()));
   const Face target = resolved.front();
   const std::vector<Face> own_faces = solid.faces();
-  if (std::none_of(own_faces.begin(), own_faces.end(), [&](const Face& f) { return f.wrapped().IsSame(target.wrapped()); }))
+  if (std::none_of(own_faces.begin(), own_faces.end(),
+                   [&](const Face& f) { return f.wrapped().IsSame(target.wrapped()); }))
     throw ValueError("the face must belong to the input solid");
   if (occt_guard([&] { return BRepAdaptor_Surface(TopoDS::Face(target.wrapped())).GetType(); }) != GeomAbs_Plane)
     throw ValueError("press_pull needs a planar face");
