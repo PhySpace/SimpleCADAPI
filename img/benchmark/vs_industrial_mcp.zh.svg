@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 520" width="1040" height="520" role="img" aria-label="每个任务消耗的 Token：SimpleCADAPI 对某成熟工业软件（经其 MCP），最多少 6.5 倍">
+<title>每个任务消耗的 Token：SimpleCADAPI 对某成熟工业软件（经其 MCP），最多少 6.5 倍</title>
+<rect width="1040" height="520" rx="14" fill="#ffffff" stroke="#e4e7ec"/>
+<text x="36" y="50" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="24" font-weight="700" fill="#16181d" text-anchor="start">同样的任务，最多少用 6.5 倍 Token</text>
+<text x="36" y="78" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="14" font-weight="400" fill="#5b6270" text-anchor="start">智能体在每个任务上消耗的 Token（百万）· SimpleCADAPI 对某成熟工业软件（经其 MCP 驱动）· 越低越好</text>
+<rect x="36" y="101" width="14.0" height="14" rx="3" fill="#e8590c"/>
+<text x="58" y="112" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="14" font-weight="600" fill="#16181d" text-anchor="start">SimpleCADAPI</text>
+<rect x="186" y="101" width="14.0" height="14" rx="3" fill="#a3aab8"/>
+<text x="208" y="112" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="14" font-weight="600" fill="#16181d" text-anchor="start">某成熟工业软件（经其 MCP）</text>
+<line x1="120.0" y1="134" x2="120.0" y2="440" stroke="#e4e7ec"/>
+<text x="120.0" y="462" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="12.5" font-weight="400" fill="#5b6270" text-anchor="middle">0 M</text>
+<line x1="376.6666666666667" y1="134" x2="376.6666666666667" y2="440" stroke="#e4e7ec"/>
+<text x="376.6666666666667" y="462" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="12.5" font-weight="400" fill="#5b6270" text-anchor="middle">10 M</text>
+<line x1="633.3333333333334" y1="134" x2="633.3333333333334" y2="440" stroke="#e4e7ec"/>
+<text x="633.3333333333334" y="462" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="12.5" font-weight="400" fill="#5b6270" text-anchor="middle">20 M</text>
+<line x1="890.0" y1="134" x2="890.0" y2="440" stroke="#e4e7ec"/>
+<text x="890.0" y="462" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="12.5" font-weight="400" fill="#5b6270" text-anchor="middle">30 M</text>
+<text x="36" y="176" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="20" font-weight="700" fill="#16181d" text-anchor="start">S01</text>
+<rect x="120" y="144" width="91.2" height="28" rx="4" fill="#e8590c"/>
+<text x="219.245" y="164" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="15" font-weight="700" fill="#16181d" text-anchor="start">3.56</text>
+<rect x="120" y="178" width="363.6" height="28" rx="4" fill="#a3aab8"/>
+<text x="491.59400000000005" y="198" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="15" font-weight="700" fill="#16181d" text-anchor="start">14.17</text>
+<text x="1004" y="176" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="20" font-weight="800" fill="#e8590c" text-anchor="end">少 4.0 倍</text>
+<text x="36" y="250" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="20" font-weight="700" fill="#16181d" text-anchor="start">S05</text>
+<rect x="120" y="218" width="284.1" height="28" rx="4" fill="#e8590c"/>
+<path d="M404.1 218 l10 14 l-10 14" fill="none" stroke="#e8590c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="424.13" y="238" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="15" font-weight="700" fill="#16181d" text-anchor="start">≥11.07</text>
+<rect x="120" y="252" width="574.8" height="28" rx="4" fill="#a3aab8"/>
+<text x="702.7536666666667" y="272" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="15" font-weight="700" fill="#16181d" text-anchor="start">22.39</text>
+<text x="1004" y="250" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="20" font-weight="800" fill="#e8590c" text-anchor="end">至多少 2.0 倍</text>
+<text x="36" y="324" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="20" font-weight="700" fill="#16181d" text-anchor="start">S06</text>
+<rect x="120" y="292" width="106.2" height="28" rx="4" fill="#e8590c"/>
+<text x="234.15733333333333" y="312" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="15" font-weight="700" fill="#16181d" text-anchor="start">4.14</text>
+<rect x="120" y="326" width="692.1" height="28" rx="4" fill="#a3aab8"/>
+<text x="820.076" y="346" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="15" font-weight="700" fill="#16181d" text-anchor="start">26.96</text>
+<text x="1004" y="324" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="20" font-weight="800" fill="#e8590c" text-anchor="end">少 6.5 倍</text>
+<text x="36" y="398" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="20" font-weight="700" fill="#16181d" text-anchor="start">S07</text>
+<rect x="120" y="366" width="309.8" height="28" rx="4" fill="#e8590c"/>
+<text x="437.848" y="386" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="15" font-weight="700" fill="#16181d" text-anchor="start">12.07</text>
+<rect x="120" y="400" width="381.9" height="28" rx="4" fill="#a3aab8"/>
+<text x="509.92" y="420" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="15" font-weight="700" fill="#16181d" text-anchor="start">14.88</text>
+<text x="1004" y="398" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="20" font-weight="800" fill="#e8590c" text-anchor="end">少 1.2 倍</text>
+<text x="36" y="496" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="12.5" font-weight="400" fill="#5b6270" text-anchor="start">≥ 表示下界：实际数值不低于该值。</text>
+</svg>
