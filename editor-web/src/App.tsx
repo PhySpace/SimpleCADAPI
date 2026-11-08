@@ -12,6 +12,7 @@ import { FEATURE_ICONS } from "@/components/feature-icons";
 import { FeatureTree, type TreeSketches } from "@/components/FeatureTree";
 import { assemblyCommands, commandsFromSpecs, fitScore, plainLabel, selectionContext, selectionHint, visibleCommands, whenFor, type Command } from "@/lib/commands";
 import { ModeSwitch, type EditorMode } from "@/components/ModeSwitch";
+import { MANUAL_MODE } from "@/lib/manual-mode";
 import { Button } from "@/components/ui/button";
 import { AssemblyPanel } from "@/components/AssemblyPanel";
 import { ConnectorGizmos, type Gizmo } from "@/components/ConnectorGizmos";
@@ -69,7 +70,7 @@ import { t, useI18n } from "@/i18n";
 /** How long the left column slides from one mode to the other. */
 const MODE_SLIDE_MS = 380;
 
-const MODES: { mode: SelectionMode; label: string; key: string }[] = [
+const ALL_MODES: { mode: SelectionMode; label: string; key: string }[] = [
   { mode: "component", label: "comp", key: "5" },
   { mode: "solid", label: "solid", key: "4" },
   { mode: "face", label: "face", key: "3" },
@@ -77,6 +78,8 @@ const MODES: { mode: SelectionMode; label: string; key: string }[] = [
   { mode: "vertex", label: "vert", key: "1" },
   { mode: "sketch", label: "sketch / curve / surface", key: "6" },
 ];
+/** What a click can pick; sketches and curves are manual mode's. */
+const MODES = ALL_MODES.filter((item) => MANUAL_MODE || item.mode !== "sketch");
 
 /** Editor application: left = notebook (cells, workspace), middle = the live
  * model, right = the selection. The model is the in-memory scadpkg the kernel
@@ -98,8 +101,8 @@ export function App() {
   const [modules, setModules] = useState<ModuleRow[]>([]);
   const [moduleView, setModuleView] = useState<ModuleState | null>(null);
   // Two modes, never mixed on one page: manual (features, assemblies) and code (notebook, workspace).  The left tab says which.
-  const [leftTab, setLeftTab] = useState("features");
-  const [sharedMode, setSharedMode] = useState<EditorMode>("manual"); // the mode the workspace tab is shown in
+  const [leftTab, setLeftTab] = useState(MANUAL_MODE ? "features" : "notebook");
+  const [sharedMode, setSharedMode] = useState<EditorMode>(MANUAL_MODE ? "manual" : "code"); // the mode the workspace tab is shown in
   const mode: EditorMode = MANUAL_TABS.includes(leftTab) ? "manual" : CODE_TABS.includes(leftTab) ? "code" : sharedMode;
   if (mode !== sharedMode) setSharedMode(mode);
   const lastTab = useRef<Record<EditorMode, string>>({ manual: "features", code: "notebook" });
@@ -854,6 +857,7 @@ export function App() {
 
   // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z undo and redo a feature change, unless a text field has the focus.
   useEffect(() => {
+    if (!MANUAL_MODE) return;
     const onKey = (event: KeyboardEvent) => {
       if (sketchingRef.current) return; // the sketch has its own undo
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLowerCase() !== "z") return;
@@ -1064,6 +1068,7 @@ export function App() {
   );
   // W: draw a 3D curve (not while typing, sketching or placing a workplane).
   useEffect(() => {
+    if (!MANUAL_MODE) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() !== "w" || event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return;
       if (drawingRef.current || sketchingRef.current || placingRef.current) return;
@@ -1259,6 +1264,7 @@ export function App() {
 
   // Space: a workplane from the selection; with nothing selected, look at the active workplane again.
   useEffect(() => {
+    if (!MANUAL_MODE) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== " " || event.repeat || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
       if (sketchingRef.current || placingRef.current || drawingRef.current) return; // space pans the sketch view
@@ -1714,7 +1720,7 @@ export function App() {
           <ResizablePanel id="browser" defaultSize={23} minSize={16} className="min-w-0" style={{ overflow: "hidden" }}>
             <div className={cn("flex h-full flex-col", sketching && "opacity-40")} inert={sketching}>
               <div className="flex shrink-0 items-center gap-2 border-b-2 border-border px-2 py-1.5">
-                <ModeSwitch mode={modeTarget ?? mode} onChange={changeMode} disabled={sketching || moving} />
+                {MANUAL_MODE && <ModeSwitch mode={modeTarget ?? mode} onChange={changeMode} disabled={sketching || moving} />}
                 <span className="flex-1" />
                 {mode === "code" &&
                   (running ? (
@@ -1736,6 +1742,9 @@ export function App() {
                   ))}
               </div>
               <div inert={moving} className="min-h-0 flex-1 overflow-hidden">
+                {!MANUAL_MODE ? (
+                  panelFor("code")
+                ) : (
                 <div
                   className="flex h-full w-[200%]"
                   style={{
@@ -1746,6 +1755,7 @@ export function App() {
                   <div className="h-full w-1/2 min-w-0">{(mode === "manual" || moving) && panelFor("manual")}</div>
                   <div className="h-full w-1/2 min-w-0">{(mode === "code" || moving) && panelFor("code")}</div>
                 </div>
+                )}
               </div>
             </div>
           </ResizablePanel>
@@ -1828,9 +1838,11 @@ export function App() {
                   <ConnectorGizmos view={viewRef.current} gizmos={gizmos} components={asm.doc.components} highlighted={gizmoHighlight} onPick={pickGizmo} armed={!!asm.target} />
                 )}
                 {/* mounted in both modes: it slides up from the bottom edge into manual mode and back down out of it */}
-                <div inert={sketching} className={cn(sketching && "opacity-40")}>
-                  <CommandBar commands={commands} fit={fit} hint={hint} shown={(modeTarget ?? mode) === "manual"} />
-                </div>
+                {MANUAL_MODE && (
+                  <div inert={sketching} className={cn(sketching && "opacity-40")}>
+                    <CommandBar commands={commands} fit={fit} hint={hint} shown={(modeTarget ?? mode) === "manual"} />
+                  </div>
+                )}
                 {session?.handle && viewRef.current && sessionDistance && (
                   <PressPullHandle
                     view={viewRef.current}

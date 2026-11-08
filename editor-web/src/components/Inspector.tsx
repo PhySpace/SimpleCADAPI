@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { JsonTree } from "@/components/JsonTree";
 import type { SelectionItem } from "@/lib/selection";
+import { MANUAL_MODE } from "@/lib/manual-mode";
 import { t } from "@/i18n";
 
 /** Right-hand inspector: what is selected in the viewport, each item with
@@ -18,7 +19,9 @@ export function Inspector({ selection, sketches = [] }: { selection: SelectionIt
       <ScrollArea className="min-h-0 flex-1">
         {count === 0 ? (
           <p className="p-3 text-[11px] text-muted-foreground">
-            {t("Click a solid, face, edge, vertex, sketch, 3D curve or surface in the viewport (pick the kind with the chips). Ctrl/Cmd+click adds to the selection; picked model items are written to the notebook as")}{" "}
+            {MANUAL_MODE
+              ? t("Click a solid, face, edge, vertex, sketch, 3D curve or surface in the viewport (pick the kind with the chips). Ctrl/Cmd+click adds to the selection; picked model items are written to the notebook as")
+              : t("Click a solid, face, edge or vertex in the viewport (pick the kind with the chips). Ctrl/Cmd+click adds to the selection; picked model items are written to the notebook as")}{" "}
             <span className="text-name">selected_item</span>.
           </p>
         ) : (

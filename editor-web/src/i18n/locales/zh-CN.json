@@ -131,6 +131,7 @@
   "Click a point on the circle.": "点击圆上的一点。",
   "Click a point the arc passes through.": "点击圆弧经过的一点。",
   "Click a sketch in the viewport or the features list to use it": "在视口或特征列表中点击草图来使用它",
+  "Click a solid, face, edge or vertex in the viewport (pick the kind with the chips). Ctrl/Cmd+click adds to the selection; picked model items are written to the notebook as": "在视口中点击实体、面、边或顶点（用选择类型按钮切换要选的种类）。Ctrl/Cmd+点击可加选；选中的模型对象会写入 notebook，变量名为",
   "Click a solid, face, edge, vertex, sketch, 3D curve or surface in the viewport (pick the kind with the chips). Ctrl/Cmd+click adds to the selection; picked model items are written to the notebook as": "在视口中点击实体、面、边、顶点、草图、3D 曲线或曲面（用选择类型按钮切换要选的种类）。Ctrl/Cmd+点击可加选；选中的模型对象会写入 notebook，变量名为",
   "Click again to delete": "再点一次删除",
   "Click again to delete this cell": "再点一次删除此单元",
