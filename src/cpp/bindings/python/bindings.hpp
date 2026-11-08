@@ -28,6 +28,7 @@ void bind_ops_geometry(py::module_& m);
 void bind_ops_features(py::module_& m);
 void bind_sketch(py::module_& m);
 void bind_surface(py::module_& m);
+void bind_surface_editing(py::module_& m);
 void bind_std(py::module_& m);
 void bind_reactive(py::module_& m);
 void bind_io(py::module_& m);
@@ -47,6 +48,12 @@ struct PyVec3 {
 
 // Installs the module's exception translator and the General handler.
 void register_exceptions(py::module_& m);
+
+// A Python exception raised by a Python callback that C++ called on its way through a C++ operation (a ql reference
+// resolver inside fillet_rsolid): operations wrap what they catch, so it crosses them as a scad::MessageError (which
+// they pass through unchanged) and the translator raises the original Python exception again, with its attributes.
+// Call from a catch of py::error_already_set, with the GIL held.
+[[noreturn]] void rethrow_python_through_cpp(py::error_already_set& error);
 
 // Python value -> scad::Value (None, bool, int, float, str, list/tuple, dict).
 Value value_from_python(const py::handle& obj);
@@ -161,3 +168,6 @@ struct type_caster<scad::Value> {
 };
 
 }  // namespace pybind11::detail
+
+// Length, Angle, Point3, Direction3, Vector3: the meaning of a parameter, written in its type.
+#include "semantic_types.hpp"  // IWYU pragma: export

@@ -480,3 +480,28 @@ TEST_CASE("a fixed circle keeps its radius; circle radius is a DOF otherwise") {
   CHECK(r.dof == 0);
   CHECK(r.solved_scalars.at("circle:k:radius") == 2.0);
 }
+
+TEST_CASE("point_on a B-spline or an ellipse keeps the point on the curve") {
+  // the arch x = 6t, y = 6t(1 - t) (cubic Bezier a b c d); the point's x is pinned at 4.5, so t = 0.75
+  Sketch s =
+      with_points(make_sketch_rsketch("on"),
+                  {{"a", {0, 0}}, {"b", {2, 2}}, {"c", {4, 2}}, {"d", {6, 0}}, {"o", {0, 0}}, {"p", {4.0, 3.0}}});
+  s = add_bspline_rsketch(s, "sp", "a", "d", {"a", "b", "c", "d"}, 3);
+  for (const char* id : {"a", "b", "c", "d", "o"})
+    s = constrain_fix_rsketch(s, id);
+  s = constrain_point_on_rsketch(s, "p", "sp");
+  s = constrain_distance_x_rsketch(s, "o", "p", 4.5);
+  const SketchSolveResult r = inspect(s);
+  CHECK(at(r, "p").first == doctest::Approx(4.5));
+  CHECK(at(r, "p").second == doctest::Approx(6.0 * 0.75 * 0.25));
+
+  Sketch e = with_points(make_sketch_rsketch("ellipse"), {{"o", {0, 0}}, {"m", {4, 0}}, {"n", {0, 2}}, {"q", {1, 3}}});
+  e = add_ellipse_rsketch(e, "el", "o", "m", "n");
+  for (const char* id : {"o", "m", "n"})
+    e = constrain_fix_rsketch(e, id);
+  e = constrain_point_on_rsketch(e, "q", "el");
+  e = constrain_distance_x_rsketch(e, "o", "q", 2.0);
+  const SketchSolveResult re = inspect(e);
+  CHECK(at(re, "q").first == doctest::Approx(2.0));
+  CHECK(at(re, "q").second == doctest::Approx(2.0 * std::sqrt(0.75)));
+}

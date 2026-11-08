@@ -29,13 +29,14 @@ import json
 import struct
 import threading
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Collection
 
 import numpy as np
 
 from .._internal.mesh import DEFAULT_ANGULAR_TOLERANCE, DEFAULT_LINEAR_TOLERANCE, cached_mesh
 from simplecadapi._cpp import Assembly, Part, Solid
+from ..product.bodies import body_display_color
 from ..product.placement import Placement, identity_placement
 from .compiler import (
     _curve_geometry,
@@ -85,6 +86,10 @@ class PreviewNode:
     definition_id: str
     display_name: str
     placement: Placement  # CAD space, millimetres, relative to the product
+    color: tuple[float, float, float] | None = None
+    """The display colour (RGB in [0, 1]): the body's colour, else the material's; ``None`` is the viewer's default."""
+    opacity: float | None = None
+    """The body's display opacity in [0, 1]; ``None`` is opaque."""
 
 
 @dataclass
@@ -95,6 +100,8 @@ class PreviewScene:
     """The solid behind each part key, for :func:`entity_info` (not serialized)."""
     definitions: dict[str, str]
     """The definition id each part key belongs to."""
+    bodies: dict[str, str] = field(default_factory=dict)
+    """The body id of each part key that draws one body of a multi-body part (one-body parts are not listed)."""
 
 
 # -- the per-part cache --------------------------------------------------------------
@@ -265,25 +272,51 @@ def compile_preview(
     parts: dict[str, PartPreview] = {}
     solids: dict[str, Solid] = {}
     definitions: dict[str, str] = {}
+    bodies: dict[str, str] = {}
     nodes: list[PreviewNode] = []
 
     def add(part: Part, path: tuple[str, ...], placement: Placement, name: str) -> None:
-        body = part.body
-        if not isinstance(body, Solid):
-            raise PreviewError(f"part {part.part_id!r} has no solid body")
-        preview = preview_solid(body, linear_tolerance=linear_tolerance, angular_tolerance=angular_tolerance)
-        parts[preview.key] = preview
-        solids.setdefault(preview.key, body)
-        definitions.setdefault(preview.key, part.part_id)
-        nodes.append(
-            PreviewNode(
-                node_id="node/" + "/".join(path),
-                part_key=preview.key,
-                definition_id=part.part_id,
-                display_name=name,
-                placement=placement,
+        if not part.multi_body:
+            body = part.body
+            if not isinstance(body, Solid):
+                raise PreviewError(f"part {part.part_id!r} has no solid body")
+            preview = preview_solid(body, linear_tolerance=linear_tolerance, angular_tolerance=angular_tolerance)
+            parts[preview.key] = preview
+            solids.setdefault(preview.key, body)
+            definitions.setdefault(preview.key, part.part_id)
+            only = part.bodies[0]
+            nodes.append(
+                PreviewNode(
+                    node_id="node/" + "/".join(path),
+                    part_key=preview.key,
+                    definition_id=part.part_id,
+                    display_name=name,
+                    placement=placement,
+                    color=body_display_color(part, only),
+                    opacity=only.opacity,
+                )
             )
-        )
+            return
+        # A multi-body part: one node per body, all with the part's placement (bodies are never placed apart).  The
+        # part key names the body as well, so two bodies of the same shape stay two entity namespaces.
+        for item in part.bodies:
+            preview = preview_solid(item.solid, linear_tolerance=linear_tolerance, angular_tolerance=angular_tolerance)
+            key = f"{preview.key}/body:{item.body_id}"
+            parts[key] = preview
+            solids.setdefault(key, item.solid)
+            definitions.setdefault(key, part.part_id)
+            bodies.setdefault(key, item.body_id)
+            nodes.append(
+                PreviewNode(
+                    node_id="node/" + "/".join(path) + "/body:" + item.body_id,
+                    part_key=key,
+                    definition_id=part.part_id,
+                    display_name=f"{name} / {item.name or item.body_id}",
+                    placement=placement,
+                    color=body_display_color(part, item),
+                    opacity=item.opacity,
+                )
+            )
 
     def visit(item: Part | Assembly, path: tuple[str, ...], placement: Placement, name: str) -> None:
         if isinstance(item, Part):
@@ -301,7 +334,47 @@ def compile_preview(
     visit(product, (root_id,), identity_placement(), root_id)
     if not nodes:
         raise PreviewError("the product has nothing to draw")
-    return PreviewScene(parts=parts, nodes=nodes, solids=solids, definitions=definitions)
+    return PreviewScene(parts=parts, nodes=nodes, solids=solids, definitions=definitions, bodies=bodies)
+
+
+SURFACE_COLOR = (0.55, 0.78, 0.95)
+"""How a surface is drawn: a light blue, apart from the bodies' grey."""
+
+SURFACE_NODE_PREFIX = "node/surface/"
+"""The node id of a surface value of the notebook: ``node/surface/<name>`` (a viewer draws it from both sides)."""
+
+
+def add_surfaces(
+    scene: PreviewScene,
+    surfaces: dict[str, Any],
+    *,
+    linear_tolerance: float = DEFAULT_LINEAR_TOLERANCE,
+    angular_tolerance: float = DEFAULT_ANGULAR_TOLERANCE,
+) -> PreviewScene:
+    """*scene* with the faces and shells of *surfaces* (``{name: Face | Shell}``: values of the notebook that are not
+    part of the product) as nodes of their own, so a viewer shows and picks them; a surface that does not mesh is left
+    out."""
+
+    for name, shape in surfaces.items():
+        try:
+            preview = preview_solid(shape, linear_tolerance=linear_tolerance, angular_tolerance=angular_tolerance)
+        except Exception:  # noqa: BLE001 - a surface the mesher refuses is not drawn
+            continue
+        key = f"{preview.key}/surface:{name}"
+        scene.parts[key] = preview
+        scene.solids[key] = shape
+        scene.definitions[key] = name
+        scene.nodes.append(
+            PreviewNode(
+                node_id=SURFACE_NODE_PREFIX + name,
+                part_key=key,
+                definition_id=name,
+                display_name=name,
+                placement=identity_placement(),
+                color=SURFACE_COLOR,
+            )
+        )
+    return scene
 
 
 # -- the wire format -----------------------------------------------------------------
@@ -333,11 +406,15 @@ def encode_preview(scene: PreviewScene, omit: Collection[str] = ()) -> bytes:
         if key in omit:
             continue
         definition = scene.definitions[key]
-        prefix = f"entity/{definition}/"
+        body_id = scene.bodies.get(key)
+        # entity/<part>/<kind>/<topo>; a body of a multi-body part: entity/<part>/body:<body>/<kind>/<topo> (as in
+        # the package's scene, scene/product_scene.py)
+        prefix = f"entity/{definition}/" if body_id is None else f"entity/{definition}/body:{body_id}/"
         parts.append(
             {
                 "key": key,
                 "definition_id": definition,
+                **({"body_id": body_id} if body_id is not None else {}),
                 "positions": array(part.positions, "<f4"),
                 "normals": array(part.normals, "<f4"),
                 "indices": array(part.indices, "<u4"),
@@ -372,6 +449,9 @@ def encode_preview(scene: PreviewScene, omit: Collection[str] = ()) -> bytes:
                     "y_axis": list(node.placement.y_axis),
                     "z_axis": list(node.placement.z_axis),
                 },
+                # the display colour and opacity, only when known (a viewer draws its default otherwise)
+                **({"color": [float(c) for c in node.color]} if node.color is not None else {}),
+                **({"opacity": float(node.opacity)} if node.opacity is not None else {}),
             }
             for node in scene.nodes
         ],
@@ -379,6 +459,32 @@ def encode_preview(scene: PreviewScene, omit: Collection[str] = ()) -> bytes:
     encoded = json.dumps(header, separators=(",", ":")).encode("utf-8")
     encoded += b" " * (-len(encoded) % 8)
     return MAGIC + struct.pack("<I", len(encoded)) + b"\0\0\0\0" + encoded + b"".join(chunks)
+
+
+def refine_preview(
+    scene: PreviewScene, keys: Collection[str], *, linear_tolerance: float, angular_tolerance: float
+) -> bytes:
+    """The parts *keys* of *scene* tessellated again at a finer tolerance, encoded as a preview with no nodes.
+
+    A viewer that sees a part up close asks for it (level of detail): the parts keep their keys and their entities
+    (the topology is the same; only the triangles and edge polylines are denser), so what it picked and highlighted
+    stays named.  Keys the scene does not have are left out.
+    """
+    if not linear_tolerance > 0 or not angular_tolerance > 0:
+        raise PreviewError("a tolerance must be positive")
+    parts = {
+        key: preview_solid(scene.solids[key], linear_tolerance=linear_tolerance, angular_tolerance=angular_tolerance)
+        for key in keys
+        if key in scene.solids
+    }
+    refined = PreviewScene(
+        parts=parts,
+        nodes=[],
+        solids={key: scene.solids[key] for key in parts},
+        definitions={key: scene.definitions[key] for key in parts},
+        bodies={key: scene.bodies[key] for key in parts if key in scene.bodies},
+    )
+    return encode_preview(refined)
 
 
 def decode_preview_header(data: bytes) -> dict[str, Any]:
@@ -396,14 +502,22 @@ def decode_preview_header(data: bytes) -> dict[str, Any]:
 def entity_info(scene: PreviewScene, entity_id: str) -> dict[str, Any] | None:
     """The geometric properties of the entity *entity_id* of a part of *scene*.
 
-    ``entity/<definition>/<kind>/<topo id>``; returns what the package's entity
+    ``entity/<definition>/<kind>/<topo id>`` (``entity/<definition>/body:<body id>/...`` for a body of a
+    multi-body part); returns what the package's entity
     sidecar holds for it (``properties``, ``geometry``, ``tags``) except the
     ``source`` links into the feature graph, or ``None`` if there is no such entity.
     """
     _, _, rest = entity_id.partition("entity/")
     definition, _, tail = rest.partition("/")
+    body_id = ""
+    if tail.startswith("body:"):  # a body of a multi-body part
+        segment, _, tail = tail.partition("/")
+        body_id = segment[len("body:") :]
     kind, _, topo_id = tail.partition("/")
-    key = next((k for k, d in scene.definitions.items() if d == definition), None)
+    key = next(
+        (k for k, d in scene.definitions.items() if d == definition and scene.bodies.get(k, "") == body_id),
+        None,
+    )
     if key is None:
         return None
     solid = scene.solids[key]
@@ -493,4 +607,5 @@ __all__ = [
     "entity_info",
     "part_key",
     "preview_solid",
+    "refine_preview",
 ]

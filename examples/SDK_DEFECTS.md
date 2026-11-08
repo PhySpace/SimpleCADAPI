@@ -328,6 +328,390 @@ that surfaced it is in brackets.
 - **Fix direction:** done. Every `ql` factory should resolve against any scope
   that contains its kind; check each (kind, scope) pair when adding a factory.
 
+## 21. Surface points and sketch positions cannot be expressions; the cylinder's U is radians [types-surface-sketch]
+
+- **Symptom:** `make_bezier_surface_rface`, `fit_point_grid_rface` and the `points` of `make_surface_patch_rface` refuse a
+  `scad.var` coordinate, and so do the `(x, y)` positions of `trim_rsketch` / `add_bspline_rsketch` control points; the
+  origin of `make_cylindrical_surface_rface` and `add_point_rsketch` accept one.  `make_cylindrical_surface_rface`
+  takes `u_range` in raw radians, where every other angle of the SDK (`Angle`) is degrees.
+- **Trigger:** typing the surface and sketch signatures (`simplecadapi.types.Point3` / `Point2`): the same meaning has
+  two loaders, `scad::Vec3` (doubles) and `std::array<Scalar, 3>` (expressions).
+- **Root cause:** `PointGrid` / `SurfacePatchOptions::points` are `Vec3`, and `SketchPosition` / `SketchControlPoint`
+  hold doubles; the cylinder range is passed to OCCT unconverted.
+- **Status:** open. The signatures now say what each parameter means; the loaders are unchanged (no behaviour change).
+- **Fix direction:** make the surface grids `std::vector<std::vector<ScalarVec3>>` (evaluate at build time, as the
+  cylinder does) and let sketch positions take `Scalar`; give the cylinder a degree `Angle` range (keep `u_range` as a
+  deprecated alias).
+
+## 22. `phase_offset` of the gear, belt and rack-pinion constraints is a length, and nothing said so [catalog]
+
+- **Symptom:** next to `drive_angle_degrees`, `phase_offset` reads like an
+  angle; a GUI or agent would pass degrees.
+- **Trigger:** `add_gear_constraint_rassembly(..., phase_offset=...)` (also
+  belt, rack_pinion).
+- **Root cause:** the coupling phase is `r_a * theta_a + r_b * theta_b`
+  (`coupling.cpp: phase_from_supports`), an arc length on the pitch circle in
+  mm; the binding took `py::object` and the docstring did not say.
+- **Status:** the signature now says `phase_offset: Length | None`.
+- **Fix direction:** say "pitch-circle arc length (mm)" in the docstrings too;
+  consider renaming to `phase_offset_length` in a major version.
+
+## 23. The std bindings are registered before the product classes [catalog]
+
+- **Symptom:** `simplecadapi._cpp.std.bearing.make_ball_bearing_rassembly`
+  prints its return type as `scad::product::Assembly` (the C++ name); a
+  `Material` argument cannot take its name from the registered class.
+- **Trigger:** `bind_std(m)` runs before `bind_product(m)` in `module.cpp`; pybind
+  writes the signature when the function is defined. Likewise `bind_semantic`
+  runs before `bind_ql`, so `apply_tag_rselection` spells out `ShapeSelector`.
+- **Root cause:** registration order.
+- **Status:** open; the names are written out where needed. The C++
+  `std.bearing.make_ball_bearing_rassembly` is also shadowed by the Python one
+  in `simplecadapi.std.bearing` (two implementations of one operation).
+- **Fix direction:** bind the value classes (product, ql) before any operation
+  that uses them; drop one of the two bearing factories.
+
+## 24. `catalog.classify` read a union that starts with `Literal[` as one Literal [catalog]
+
+- **Symptom:** `Literal['auto', ...] | tuple[Angle, Angle]` gave the choices
+  `"rear_left'] | tuple[Angle"` and `'Angle'`.
+- **Root cause:** the `Literal[...]` / `Sequence[...]` / `Annotated[...]`
+  regexes were `fullmatch`ed on the whole union text.
+- **Status:** fixed. Unions are split first; a union of bracketed members is
+  the members' kinds joined (`enum|numbers`, `query|shape`, `solid` many for
+  `Solid | Sequence[Solid]`). Also new: `path`, `scalar_limit`, `<kind>_map`
+  for `dict[str, X]`, and str-enum defaults (`<E.X: 'x'>` -> `'x'`).
+- **Fix direction:** done.
+
+## 25. Style and view strings are case-insensitive, the signatures list one spelling [catalog]
+
+- **Symptom:** `make_bolt_rsolid(head_style="HEX")`, `render_screenshot_rpath(view="Top")` work, yet the signature
+  says `Literal['hex', ...]` / `Literal['top', ...]`.
+- **Root cause:** `stdlib::choice` and `view_preset` lower-case the value before matching.
+- **Status:** open by choice: the Literal lists the canonical spellings (what a form offers); the runtime still
+  accepts any case. `apply_tag_rselection`'s enums are case-sensitive.
+- **Fix direction:** pick one rule for every string enum of the SDK.
+
+## 26. Angle units and expression support are not uniform across operations [types]
+
+- **Symptom:** `make_angle_arc_redge` / `_rwire` take `start_angle` and
+  `end_angle` in radians, while every other angle (`revolve_rsolid`,
+  `rotate_shape`, `chamfer_rsolid(angle=)`, `draft_rsolid`, patterns, sweeps)
+  is in degrees. `chamfer_rsolid(angle=)` and `offset_rsolid(tolerance=)`,
+  `union_rsolid(tol=)` take a plain float: a `scad.var` is read as its current
+  value.
+- **Trigger:** passing `90` (meant as degrees) to an angle arc gives a
+  different arc; a `scad.var` given as a chamfer angle is recorded as its
+  value, not as the expression.
+- **Root cause:** the arc follows OCC's `GC_MakeArcOfCircle` parameter
+  directly; `ChamferOptions::angle` is `std::optional<double>`.
+- **Status:** open. The signatures now say it: the arc angles are a plain
+  number (not `Angle`) and the docstring says radians; the chamfer angle
+  prints `Angle` but is loaded as a float.
+- **Fix direction:** a breaking change for the arc (degrees, with a
+  deprecation path), and `Scalar` for the chamfer angle so it records an
+  expression like the other parameters.
+
+## 27. `Compound([solids])` silently drops the solids' tags [multi-solid research]
+
+- **Symptom:** `scad.Compound([a, b])` of two tagged boxes has no face tags;
+  `compound._copy_semantic_state_from(a)` copies nothing either.
+- **Trigger:** any code that bundles solids into a Compound and later selects
+  by tag (the first multi-body spike stored a part's bodies as one Compound).
+- **Root cause:** a Compound is a new shape root with its own entity registry;
+  the semantic state of the input roots is not carried over, and the copy
+  helper only works within one root.
+- **Status:** open. Multi-body parts keep their bodies as separate Solid roots
+  (`Part.bodies`), so they are not affected; `product.bodies.part_shape`
+  documents that its Compound is a geometry view without tags.
+- **Fix direction:** either carry tags into a Compound built from tagged
+  roots (sub-shapes are shared, so the mapping is exact), or refuse
+  `_copy_semantic_state_from` across roots instead of doing nothing.
+
+## 28. Value pickling reads constructor arguments back by attribute name [multi-solid research]
+
+- **Symptom:** adding `Part(bodies=...)` broke pickling of multi-body parts:
+  the reducer called `part.body`, which (rightly) raises for several bodies.
+- **Trigger:** any product value whose constructor parameter is not a plain
+  readable attribute of the same name.
+- **Root cause:** `_glue/values.py` parses the parameter names out of the
+  pybind11 `__init__` docstring and reads each back with `getattr`.
+- **Status:** worked around: `_ARGUMENTS` maps a class to per-parameter
+  readers (Part: `body`/`bodies`).
+- **Fix direction:** give the C++ values an explicit `__getstate__`/
+  `py::pickle` (as `ql` selectors have) instead of docstring parsing.
+
+## 29. "One solid per definition" is spelled into ids and kinds [multi-solid research]
+
+- **Symptom:** a second body of a part has nowhere to live in the existing
+  names: entity ids are `entity/<definition>/<kind>/<topo>` with root-local
+  topo ids (every body has a `face_0`), preview nodes are one per part, and
+  the definition kind is called `single_solid` (about 20 places in Python).
+- **Trigger:** any part with more than one solid.
+- **Root cause:** "is a part" and "has one solid" were the same fact until
+  now.
+- **Status:** worked around: bodies get an id segment `body:<body_id>`
+  (`entity/<part>/body:<id>/...`, `node/<part>/body:<id>`), one-body parts
+  keep their old ids byte for byte; the kind stays `single_solid`.
+- **Fix direction:** treat `single_solid` as the name of the part kind (rename
+  at the next package schema bump) and keep the `body:` segment the only
+  way to address a body.
+
+## 30. Error guidance is frozen by parity goldens [multi-solid research]
+
+- **Symptom:** the `make_part_rpart` guidance still says "Union intended multiple bodies into one Solid before
+  creating the Part.", which is wrong now that `bodies=` exists; changing it fails
+  `src/cpp/tests/python/test_product_values.py::test_part_creation_and_errors`.
+- **Root cause:** the C++ port compares every error's `what_happened` / `possible_causes` / `how_to_fix` with goldens
+  captured from the old Python SDK (`tests/golden/product_*.json`), so guidance cannot follow the API.
+- **Status:** open; the old text is kept.
+- **Fix direction:** compare error *codes* and kinds against the goldens, and let guidance text change with the API
+  (or regenerate the goldens on a deliberate API change).
+
+## 31. Face tags died at the next operation, op-kwarg ones at blends and copies [stable-refs research]
+
+- **Symptom:** a plain `apply_tag_rselection` face tag was gone after any later operation; an op-kwarg face tag
+  (`top_face_tag=`) survived booleans but not fillet, chamfer, translate, mirror or patterns, although those nodes
+  record a witness for every face.
+- **Root cause:** tags were copied forward per operation (`autotag.cpp`) through channel-specific gates (the
+  face-source gate, the face channel of blends), and the effective scope excluded lineage.
+- **Status:** fixed. Tags are a view over the recorded history (`scad/reactive/tag_view.hpp`): a recorded tag
+  assignment reaches every entity its targets became, per lineage policy, and effective includes lineage.
+  Audit: `test_element_ref_history.py::test_audit_tag_channels_and_history_per_family` (every family 1/1).
+
+## 32. `OperationGraph::from_value` header said deltas are not restored; they are [stable-refs research]
+
+- **Symptom:** `include/scad/reactive/graph.hpp` commented "topology/semantic deltas are not restored" while
+  `graph.cpp` `from_value` parses `topo_delta` and `semantic_delta`.
+- **Status:** fixed (comment), and pinned: `test_tags_and_references_resolve_on_values_restored_from_the_cell_cache`
+  restores a cell's lineage record in a fresh process and resolves a tag and a reference through its deltas.
+
+## 33. A shell's kept faces had no successor witness [stable-refs research]
+
+- **Symptom:** after `shell_rsolid(box, [bottom], t)`, the untouched top face had only a `generated` witness (its
+  offset face); history could not say the top face was still there, and `body_faces_tag` always raised.
+- **Root cause:** `tracking::query_history` emitted `preserved` only when an input had neither `Modified` nor
+  `Generated` images; a kept shell face generates its offset face.
+- **Status:** fixed (owner decision, option a): `preserved` is also emitted when the input is still in the result.
+  Goldens and assertions reviewed one by one (design 7.2): shell kept faces and rim edges, and the profile edges
+  that bound an extrude / loft start cap, gain a preserved witness.
+
+## 34. `transform_rsolid`, `offset_rsolid`, draft and scale recorded no topology delta [stable-refs research]
+
+- **Symptom:** a face reference or tag through these ops could not be followed (`lost(no_history)` in the
+  resolver).
+- **Root cause:** they finish through `finish_solid`, which recorded no delta, although the OCCT makers behind them
+  (`BRepBuilderAPI_Transform` / `GTransform` after a `Copy`, `BRepOffsetAPI_MakeThickSolid`,
+  `BRepOffsetAPI_DraftAngle`) expose `Modified` / `Generated`.
+- **Status:** fixed. `modification_delta` (`src/semantic/tracking_modify.cpp`) turns the retained OCCT history into
+  face and edge witnesses (copy and transform merged into one history; an offset or drafted face, which OCCT reports
+  as generated, continues its source); `finish_solid` records it. Tests: `test_modification_delta.cpp`,
+  `test_element_ref_history.py::test_history_through_operations_that_had_none` and the draft test. The helical
+  sweep was never a gap: inside a session it records its helix, face and sweep nodes, and the sweep is tracked
+  (`test_a_helical_sweep_cap_is_anchored_by_the_sweep_it_records`).
+
+## 35. Two spellings of one topo id [stable-refs research]
+
+- **Symptom:** a recorded delta names a face `face_face_5`; the entity's own `topo_id` is `face_5`; `get_metadata(
+  "topo_ref")` re-prefixes on the fly (`bind_topo.cpp`) and `index_output_entities` builds the long form.
+- **Root cause:** the Python SDK's text form was kept for parity.
+- **Status:** open, harmless but every consumer must know which form it holds (`subshapes_by_recorded_id` takes the
+  recorded form).
+- **Fix direction:** one canonical form at the next graph schema version.
+
+## 36. A reference into a face, shell or edge body could not resolve [nurbs editing]
+
+- **Symptom:** `element_ref.resolve(anchor, face)` on a bare Face (a surface body, not a solid) raised
+  `TypeError: cannot resolve QL selector scope for target_kind=solid`.
+- **Root cause:** `_bodies_of` (`topology/element_ref.py`) asked `ql.solids()` of every non-Solid shape to find the
+  body of each resolved entity; a Face or Shell has no solid scope at all.
+- **Status:** fixed: only a Solid or a Compound is searched for bodies; the entities of a Face / Shell / Wire / Edge
+  report body `None`. Test: `test_surface_editing.py::test_tags_and_references_follow_a_face_and_its_edges_through_edits`.
+
+## 37. Curve / surface edits existed only as unrecorded in-place mutation [nurbs editing]
+
+- **Symptom:** a control-point edit had to go through `simplecadapi._cpp.occt` (`Geom_BSplineSurface.SetPole` ...)
+  on the handle the shape shares, mutating it in place: not recorded, not replayable, and every other shape sharing
+  that geometry changed with it (design-docs/nurbs-editing-capability.md).
+- **Status:** fixed for the core edits: `set/move_*_poles`, `set_*_weights`, `insert_*_knot`, `elevate_*_degree`,
+  `convert_to_bspline_*`, `rebuild_*` are recorded operations returning a new shape on an edited copy of the geometry
+  (`src/cpp/src/surface/editing`). The private OCCT setters are still reachable and still mutate shared geometry;
+  they should be hidden from the compat layer once nothing internal uses them.
+- **Open:** a face that is part of a shell or solid is edited alone (the result is a free face); propagating an edit to
+  the neighbouring faces of a body (keeping the shell closed) needs a whole-body rebuild op.
+
+## 38. A colour's colour space was never written down [body appearance]
+
+- **Symptom:** `Material.color=(0.9, 0.2, 0.1)` came out of STEP as `COLOUR_RGB(0.955, 0.485, 0.349)`, and the old
+  editor ignored material colours (a fixed tint per `material_id`).
+- **Root cause:** the STEP writer hands the numbers to OCCT as `Quantity_TOC_RGB` (linear RGB), which STEP stores as
+  sRGB; nothing said which space the SDK means, and the reader (`import_step`) gives linear values back, so a round trip
+  is consistent while a person who typed sRGB numbers sees a lighter colour.
+- **Status:** documented, not changed: an SDK colour (`simplecadapi.types.Color`, `Material.color`, a body colour) is
+  linear RGB in [0, 1], as OCCT and three.js (its working space) read it. The editor's picker converts its sRGB
+  `#rrggbb`. Changing to sRGB would move every existing STEP colour.
+- **Fix direction:** if sRGB is wanted (what people type), switch the writer and reader to `Quantity_TOC_sRGB` together
+  and say so in the type.
+
+## 39. `apply_tag_rselection` returned an untyped `object` [body appearance]
+
+- **Symptom:** the only operation in `sca ops` whose result kind was `object`; the editor could not tell what the
+  "name a face" form makes.
+- **Status:** fixed: the binding names the result `AnyShape`.
+
+## 40. The generic op form dropped picked selections [body appearance]
+
+- **Symptom:** `op.fillet_rsolid` (and every `op.*` with a `select` slot) wrote the call without its edges/faces.
+- **Root cause:** the builder skipped every slot without a value; a selection is picked, not a value.
+- **Status:** fixed (`editor/op_specs.py`); `test_a_picked_selection_is_passed_to_the_operation` covers every such op.
+
+## 41. Person-facing face names and package names are two tiers of one tag system [body appearance]
+
+- **Symptom:** a face named `lid_seat` in the editor is kept on its entity in the package, but only `interface.*` tags
+  enter the package's public `name_index`.
+- **Status:** by design (no second naming system); the skill says to name a face other tools read `interface.<name>`.
+- **Fix direction:** if people need public names without the prefix, a `public=True` on the tag op rather than a new
+  naming scheme.
+
+## 42. A one-body Part pickles its default body as a bare Solid [body appearance]
+
+- **Symptom:** a one-body Part whose body has a name or colour lost them through pickle (the cell cache).
+- **Root cause:** `_glue/values.py` rebuilt a one-body Part from `Part.body` (the Solid), not its `Body`.
+- **Status:** fixed: such a Part is rebuilt from `bodies`; a plain one-body Part keeps the old reduction (same bytes).
+
+## 43. A sketch point could not be kept on a B-spline or an ellipse [sketch B-spline trim]
+
+- **Symptom:** `constrain_point_on_rsketch(point, spline)` was refused, so a trim had no way to keep a cut point on a
+  B-spline or ellipse cutter.
+- **Status:** fixed: the solver keeps a point on a non-periodic B-spline (a foot-parameter unknown, de Boor on the knot
+  span of the point's starting foot) and on an ellipse (focal-distance sum). Limits: the span is chosen when the system
+  is built, so a point dragged far along the curve in one solve follows that span's polynomial until the next solve;
+  periodic B-splines and degrees above 7 (the solver's 20-unknown equation support) are refused.
+
+## 44. Trim's orphan check did not see B-spline control points [sketch B-spline trim]
+
+- **Symptom:** trimming a line whose end point was also an inner control point of a B-spline removed that point.
+- **Root cause:** the "still used" set only read the `start` / `end` / `center` / `major` / `minor` roles.
+- **Status:** fixed: control point refs count as uses.
+
+## 45. The editor document dropped a B-spline's knots [sketch B-spline trim]
+
+- **Symptom:** a B-spline with non-uniform knots came back from `from_sketch` with only `control_points` and `degree`,
+  so `to_sketch` rebuilt it with uniform knots: a different curve.
+- **Status:** fixed: the document carries `knots` / `multiplicities` when they are not the uniform clamped ones (every
+  trimmed or extended B-spline). Weighted and periodic B-splines are still code only.
+
+## 46. Tangency on a B-spline needs a cubic Bezier chain [sketch B-spline trim]
+
+- **Symptom:** a tangent at a B-spline end is refused unless the spline is cubic with C0 (multiplicity 3) inner knots;
+  an extension adds a C2 knot.
+- **Status:** worked around: extending a Bezier chain raises the new knot to multiplicity 3 (same curve), so the
+  piece keeps its end tangents. The solver still moves such poles freely, so the extension is C2 only until a pole is
+  dragged.
+- **Fix direction:** tangent equations from the end derivative of any clamped spline (first two poles and the knots).
+
+## 47. A trimmed B-spline is less constrained than the original [sketch B-spline trim]
+
+- **Symptom:** each piece has new inner control points (free sketch points) where the cut moved them, and the
+  constraints on the original inner control points that are gone are removed; a fully constrained sketch becomes
+  under-constrained after a B-spline trim.
+- **Status:** by design for now (a pole that moved is a new point, the diff lists every removal).
+- **Fix direction:** an option to fix the new inner control points, or a "shape fixed" B-spline whose poles are literals.
+
+## 48. extend_rsketch aims a B-spline along its end tangent [sketch B-spline trim]
+
+- **Symptom:** a target the curve would reach only by bending is "nothing ahead": the extension is aimed at where the
+  end tangent meets the next entity (GeomLib extends towards a point), then cut at the first crossing.
+- **Fix direction:** search along the curvature-continuous extension itself (extend by a length, intersect, repeat).
+
+## 49. A workplane was a context manager, not a value [workplanes]
+
+- **Symptom:** `pickle.dumps(scad.Workplane(...))` failed, so a cell defining one made the cell cache fall back; it could
+  not be copied, could not be the plane of a sketch (`plane=` took only names and frozen mappings), and a sketch "on a
+  face" carried copied numbers that did not follow the face.
+- **Root cause:** `scad::Workplane` was a non-copyable RAII scope with no metadata/runtime, so it had no graph lineage.
+- **Status:** fixed: it is a value (copy, re-enter, pickle with its lineage), `make_workplane_*_rworkplane` record it,
+  `make_sketch_rsketch(plane=wp)` takes it, and replay rebuilds its frame from the recorded inputs.
+
+## 50. A QL-picked face is recorded as an exact-geometry selector [workplanes]
+
+- **Symptom:** export a model whose workplane (or fillet, shell ...) uses a face picked with `ql`, change the box's
+  height in the model JSON, replay: `make_select_rface` fails with "geo selector did not match a stable face candidate".
+- **Root cause:** the selection node stores `geo_exact` (bbox, centre, area), not the query or the tag that picked it.
+- **Status:** open. The notebook re-runs the query, so a notebook follows; model-JSON replay follows a moved face only
+  when the face comes straight from an operation's output (test_workplanes uses a rectangle face).
+
+## 51. A Sketch cannot be pickled [workplanes]
+
+- **Symptom:** `pickle.dumps(scad.make_sketch_rsketch("s"))` raises; a cell that leaves a Sketch in a public variable
+  is restored as a stub and the notebook runs again without the cache.
+- **Root cause:** the native `Sketch` has no pickle support (the editor's sketch cells keep it in `_sketch`, so they are
+  not hit).
+- **Status:** open.
+
+## 52. `with wp:` names its workplane in the node context, not as an input edge [workplanes]
+
+- **Symptom:** none for replay (the serializer orders such a node after the workplane's and uses the replayed frame),
+  but the reactive engine's impact queries and `upstream_closure` do not see that a box made inside `with wp:` depends
+  on the workplane.
+- **Root cause:** an input edge would put a non-shape value among the inputs of every shape operation and their
+  executors; the link is `context["workplane"] = {node_id, output_slot}` instead.
+- **Status:** by design for now; a sketch on `plane=wp` does have the edge.
+
+## 53. A cell reading a body consumed it, so a datum cell removed the implicit product [workplanes]
+
+- **Symptom:** in a `kind = "part"` notebook, a cell `wp = make_workplane_from_face_rworkplane(<face of base>)` made
+  "no top-level Part" (base was no longer an open body), and the editor dropped its PRODUCT badge.
+- **Root cause:** `find_product` / `open_bodies` and the editor snapshot count every read as a consumption.
+- **Status:** fixed for cells whose values are all workplanes (`runtime.projection.product_reads`, role `datum` in the
+  snapshot). Other read-only cells (a measurement that keeps a name) still consume.
+
+## 54. `extract_recipe` read only the first picked-selection recipe of a cell [workplanes]
+
+- **Symptom:** editing a GUI feature with two picked slots (face and edge) kept the face's lines inside the edge's recipe,
+  which re-bound `_face` to a query after it had been resolved.
+- **Status:** fixed: each slot's recipe starts at the comment nearest above its line.
+
+## 55. `get_center()` of a round shape is not its centre [workplanes]
+
+- **Symptom:** `make_cylinder_rsolid(2, 3).get_center()` is `(2, 0, 1.5)`: a point of the seam, not the axis.
+- **Status:** open; tests use the bounding box (`_bounds()`) for centres.
+
+## 56. Recording a pick re-stamps the picked entity of the value it was picked from [public refs]
+
+- **Symptom:** in the editor, a shell feature picked the top face of `base`; a groove feature cut `base` afterwards, and
+  the top face's history through the cut named the *shell's* selection node as its parent, a node not upstream of the
+  groove: the reference into `base` was `lost(no_history)` at the cut.
+- **Root cause:** `Session::record_geo_selection_nodes` records the selection with the picked handle as its output, and
+  the handle shares its entity state with the source value, so the entity's `topo_ref` now names the selection node.
+  Every later operation on the source value records that node as the parent.
+- **Status:** worked around in the resolver (`element_ref.cpp` `through_foreign_identity`: a parent named by a
+  registered selection/tag node outside the walk stands for the entity of its source);
+  `test_a_pick_made_by_a_later_cell_does_not_hide_the_history_of_the_value_it_read`.  The tag view
+  (`tag_view.cpp`) reads the same parents and is not worked around.
+- **Fix direction:** a selection node's output should be a copy of the handle (its own entity state), never the
+  source's entity.
+
+## 57. Booleans record no history for the edges of their inputs [public refs]
+
+- **Symptom:** a box edge picked before a cut was `lost(no_history)` at the cut; fillets after any boolean could not
+  use an edge reference anchored on the edge itself.
+- **Root cause:** `tracking_booleans.cpp` asks OCCT's history for the faces of every input only (edges: only the
+  section edges, as generated).
+- **Status:** designed around: `scad.ref.of(edge, shape)` names an edge by the two faces it lies between
+  (`between=("box.front", "box.top")`), which every operation does track, and it reads better.  Edges of a seam (one
+  face) still anchor on themselves.
+- **Fix direction:** query edge history in booleans too (goldens of every boolean change; review them one by one).
+
+## 58. A notebook cell's node namespace was the hash of its code [public refs]
+
+- **Symptom:** a stable reference names its node by the feature (the node id's namespace); a notebook cell's namespace
+  was `c<sha256(code)[:8]>`, so a GUI edit of the referenced feature (its `# gui:` line changes) moved every node to a
+  new namespace and every reference into it was `lost(anchor_missing)`.
+- **Status:** fixed: a feature cell's key is `<slug>.c<digest>` (`runtime/cells.py`) and `node_feature` drops what follows
+  the dot.  A plain cell (no `# ---- feature:` header) still has a code-hash feature, so references into hand-written
+  cells break when the cell's code changes; give such a cell a feature header.
+
 ## Heuristics
 
 - Run every notebook three times: fresh, all cached, `--no-cache`. The three

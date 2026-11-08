@@ -24,6 +24,15 @@ Solid union_rsolid(const std::vector<Solid>& solids, const UnionOptions& options
 struct CutOptions {
   bool skip_non_intersecting = true;  // a tool that does not meet the body is ignored
   std::string tracking_policy = "full";
+  // cut_rsolid_list: order the pieces by centroid (x, then y, then z) instead of kernel order, so piece i is the same
+  // piece on every OCCT version.  Recorded as params.piece_order = "centroid" only when set.
+  bool order_pieces = false;
+};
+
+// What a cut that may split leaves: one Solid, or (`solid` empty) every piece, ordered by centroid.
+struct CutOutcome {
+  std::optional<Solid> solid;
+  std::vector<Solid> pieces;
 };
 
 // The first solid minus every other.  Error "cut_rsolid".
@@ -33,6 +42,10 @@ Solid cut_rsolid(const std::vector<Solid>& solids, const CutOptions& options = {
 // consumes the body returns an empty list.  cut_rsolid refuses such a result instead of dropping parts.
 // Error "cut_rsolid_list"; recorded as make_cut_rsolid_list.
 std::vector<Solid> cut_rsolid_list(const std::vector<Solid>& solids, const CutOptions& options = {});
+
+// cut_rsolid that accepts a split: a one-piece result is exactly cut_rsolid (same record); a split is
+// cut_rsolid_list with order_pieces (recorded as make_cut_rsolid_list).  An empty result is still an error.
+CutOutcome cut_rsolid_keep_split(const std::vector<Solid>& solids, const CutOptions& options = {});
 
 // The overlap of all `solids`.  Error "intersect_rsolid".
 Solid intersect_rsolid(const std::vector<Solid>& solids);

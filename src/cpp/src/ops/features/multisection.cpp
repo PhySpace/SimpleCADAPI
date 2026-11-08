@@ -7,11 +7,14 @@
 #include "scad/core/tolerance.hpp"
 #include "scad/kernel/convert.hpp"
 #include "scad/ops/features/sweeps.hpp"
+#include "scad/ops/geometry/wires.hpp"
 
 namespace scad {
 
-Solid sweep_multisection_rsolid(const std::vector<Shape>& profiles, const Wire& path, bool is_frenet,
+Solid sweep_multisection_rsolid(const std::vector<Shape>& given, const Wire& path, bool is_frenet,
                                 const std::optional<Binormal>& binormal) {
+  // an edge section is the wire of that one edge
+  const std::vector<Shape> profiles = edges_as_wires(given);
   if (profiles.size() < 2)
     throw ValueError("multi-section sweep requires at least two sections");
 

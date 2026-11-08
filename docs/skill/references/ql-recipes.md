@@ -77,7 +77,7 @@ with GraphSession(graph_id="blend") as s:
 
 ## Recipe: tagged bore -> rim chamfer
 
-Tag the bore wall right after the cut (Ground rule 3: tag in time),
+Tag the bore wall right after the cut (Ground rule 3: tag the value you go on with),
 then chamfer its top rim:
 
 ```python
@@ -140,3 +140,48 @@ datum = (ql.faces().where(ql.prop("geom.normal.z", ">=", 0.999))
 as a profile — same object, no re-derivation needed. Extruding the
 top face of a 30×20 plate (bore opening r=6 after chamfer) by 2 mm
 gives exactly `(30*20 - pi*6**2) * 2` volume.
+
+## Recipe: a picked face or edge as a stable reference
+
+When the task says "this face" (the person picked it, or you found it once with a query and it must stay that face),
+turn it into a reference and use the reference from then on. Find it once with a query, print its card, then:
+
+```python
+with scad.GraphSession(namespace="base"):        # in a notebook: the cell's "# ---- feature: base" header
+    base = scad.make_box_rsolid(40, 20, 10)
+    (top_face,) = scad.ql.faces().where(scad.ql.prop("geom.center.z", ">=", 9.99)).exactly(1).resolve(base)
+    top = scad.ref.of(top_face, base)
+    print(top)    # scad.ref.face('base', 'make_box_rsolid', role='box.top', guard=('PLANE', (0, 0, 10), 800, (0, 0, 1)))
+    rims = [scad.ref.of(e, base) for e in scad.ql.edges().where(scad.ql.prop("geom.center.z", ">=", 9.99)).resolve(base)]
+    bored = scad.cut_rsolid(base, scad.make_cylinder_rsolid(3, 30))
+    rounded = scad.fillet_rsolid(bored, scad.ref.edges(rims), 1.0)       # the rim edges, found after the cut
+    print(top.resolve(rounded).status, top.one(rounded).get_area())      # ok 674.73...
+```
+
+- The reference names where the entity was **born**: the feature (the slug of a `# ---- feature: <slug>` cell; a cell
+  without that header is named by the hash of its code, so a reference into it breaks when its code changes), the
+  operation as recorded (`make_box_rsolid`, `make_cut_rsolid`; `occurrence=` when the feature has several feeding the
+  shape) and the kernel role (`box.top`, `extrusion.end`, `cylinder.side`).
+- An **edge is named by the faces it lies between** (`between=`): booleans record no history for edges (SDK_DEFECTS 57),
+  faces they do. Faces of another feature are written as references: `between=(top, scad.ref.face("bore", ...))`.
+- `topo="face_7"` (a position in that operation's output) appears only for an entity without a role, always with its
+  `guard=(type, centre, size[, normal])`, the look of the entity when it was picked.
+- Outcomes: `ok`; `merged` (one face that absorbed others: a coplanar union; it runs); `split` (several pieces, listed in
+  a geometric order, until `piece=i` says which); `lost` (where and why; with a guard, the closest look-alikes).
+  `ref.choose(i, part)` writes a choice back: a piece, or a new reference at a look-alike.
+- A **solid** (a body) has a reference too: `scad.ref.of(piece, piece)` gives `scad.ref.solid("slot", "make_cut_rsolid_list",
+  slot=1, guard=("SOLID", centre, volume))`, its place in the output of the op that made it. A fillet, shell or move
+  continues it, a union merges it, a cut that splits it splits it. Resolve it in a solid or in the pieces of a split
+  body (`r.one(pieces)`); `scad.ref.solids(r)` is the selection. Over pieces, a face or edge reference selects on the
+  piece it lies on (`scad.fillet_rsolid(pieces, scad.ref.edges(rim), 1.0)` blends that piece only).
+
+Write the printed code into the cell that uses it (not the query that found it): it reads as what it means and the
+editor reads it back. When a reference fails, read the error, do not widen anything:
+
+```python
+try:
+    face = top.one(part)
+except scad.ElementRefError as error:
+    print(error.status, error.resolved.describe())   # split: the pieces; lost: where, why, look-alikes
+    top = top.choose(0, part)                         # only with the person's choice (or the task's evidence)
+```

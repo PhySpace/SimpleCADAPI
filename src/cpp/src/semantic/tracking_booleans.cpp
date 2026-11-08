@@ -25,7 +25,8 @@ TrackedBooleanResult to_boolean_result(std::optional<Solid> solid, std::vector<S
                               std::move(finished.delta_entries)};
 }
 
-// Face history of one input of a boolean.
+// Face history of one input of a boolean, and the history of the input solid itself: which solids of the answer
+// it became (several when a cut splits it), so a body can be followed, and named, like its faces.
 void query_input_faces(tracking::HistorySource& history, const Solid& input, std::string_view origin_role,
                        kernel::SubShapeIndex& in_result, tracking::DeltaBuilder& delta) {
   tracking::QuerySpec spec;
@@ -34,6 +35,12 @@ void query_input_faces(tracking::HistorySource& history, const Solid& input, std
   spec.result = &in_result;
   spec.project_source_tags = true;
   tracking::query_sub_shape_history(history, input.wrapped(), TopAbs_FACE, spec, delta.witnesses);
+  tracking::QuerySpec solids;
+  solids.origin_role = origin_role;
+  solids.kind = Kind::Solid;
+  solids.result = &in_result;
+  solids.project_source_tags = false;
+  tracking::query_sub_shape_history(history, input.wrapped(), TopAbs_SOLID, solids, delta.witnesses);
 }
 
 std::string input_role(std::size_t index) {
@@ -113,6 +120,21 @@ TrackedBooleanResult track_union_history(const std::vector<Solid>& solids, const
       tracking::RetainedHistory retained(history);
       for (std::size_t i = 0; i < solids.size(); ++i) {
         query_input_faces(retained, solids[i], input_role(i), in_result, delta);
+      }
+      // The fuse reports its input solids deleted: the one solid of the answer is new to it.  It is the merge of them
+      // all (that is what a union is), so it continues each of them as a merge, not as nothing.
+      std::erase_if(delta.witnesses,
+                    [](const tracking::Witness& w) { return w.kind == Kind::Solid && w.event == TopoEvent::Deleted; });
+      for (std::size_t i = 0; i < solids.size(); ++i) {
+        tracking::Witness merged;
+        merged.topo_id = kernel_topo_id(result_solid.wrapped());
+        merged.event = TopoEvent::Modified;
+        merged.kind = Kind::Solid;
+        merged.source_kind = Kind::Solid;
+        merged.origin_role = input_role(i);
+        merged.input_topo_id = kernel_topo_id(solids[i].wrapped());
+        merged.derivation = "merge";
+        delta.witnesses.push_back(std::move(merged));
       }
     }
 

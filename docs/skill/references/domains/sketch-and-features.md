@@ -28,6 +28,10 @@ requested (sketch tier profiles and paths).
 
 - Plane mapping (which model plane the sketch lives on), closure requirements,
   arc direction conventions, spline definitions, and known degrees of freedom.
+- A sketch off the XY/XZ/YZ planes goes on a workplane value: `plane=wp` where `wp` is a recorded
+  `make_workplane_*_rworkplane` (a face, three points, an axis, a midplane, a curve's normal plane; see
+  `references/docs/core/simple_workplane.md`). It follows the geometry the workplane was made from; a frame mapping of
+  copied numbers does not.
 
 ## Outputs
 
@@ -62,8 +66,14 @@ Read the exact page under `references/docs/api/` for every API used:
   `constrain_fix_rsketch`. Driving `constrain_angle_rsketch` holds the
   directed angle from the first line to the second (0-360 degrees; the
   solve keeps the branch nearest the initial geometry).
+- Editing: `trim_rsketch`, `extend_rsketch` (see "Trim and extend" below),
+  `fillet_corner_rsketch`, `chamfer_corner_rsketch` (see "Fillet and chamfer a
+  corner"), `project_rsketch` (see "Relating sketches: project"),
+  `insert_spline_anchor_rsketch`, `remove_spline_anchor_rsketch`,
+  `convert_spline_to_anchors_rsketch` (see "B-splines with anchors").
 - Promotion: `make_wire_from_sketch_rwire`, `make_face_from_sketch_rface`.
-- Diagnostics: `inspect_sketch_rsketchresult` (non-recording).
+- Diagnostics: `inspect_sketch_rsketchresult` (non-recording),
+  `diff_sketch_rsketchdiff` (non-recording report of what an edit changed).
 
 ## Construction rules
 
@@ -80,6 +90,131 @@ Read the exact page under `references/docs/api/` for every API used:
   `backend`, `backend_version`, and `backend_status_code` for replay evidence.
 - `inner_profiles` is valid only when adjacent-carrier evidence shows the loops
   belong to the same generating profile.
+
+## Trim and extend
+
+Use `trim_rsketch` when overlapping or overshooting lines, circles, arcs and
+B-splines must be cut back to where other entities cross them (a rectangle drawn
+as four over-long lines, a circle cut by a slot, a spline running past a wall);
+use `extend_rsketch` to lengthen a line or a B-spline until it meets another
+entity. Lines, circles, arcs, ellipses and B-splines all cut (an ellipse cannot be
+trimmed itself: the sketch has no elliptic arc). Both solve the sketch first and cut or extend on
+the solved geometry, return a new `Sketch`, are recorded in the graph and replay
+from model JSON. They keep the sketch connected: a new cut point is tied to the
+entity that cut it with `point_on`, a line piece keeps the `horizontal` /
+`vertical` constraint of its line, constraints on `<entity>.start|end|center`
+stay on the point, and constraints that name the removed entity (and a dimension
+that no longer holds) are removed. The edit picks the new ids: points are
+`p<n>`, lines `l<n>`, arcs `a<n>`, B-splines `s<n>` (the lowest number never used
+by the sketch) and constraints `c_<kind>_<n>`.
+
+```python
+before = sketch
+# remove the part of line "h" that contains the point (8, 0), between the crossings
+sketch = scad.trim_rsketch(sketch, "h", (8.0, 0.0))          # at: (x, y) or a point id
+sketch = scad.trim_rsketch(sketch, "c", "click", against=["l1", "l2"])  # only these entities cut
+sketch = scad.extend_rsketch(sketch, "spur", "end")            # to the nearest entity ahead
+sketch = scad.extend_rsketch(sketch, "spur", "end", to="wall") # or to a named one
+print(scad.diff_sketch_rsketchdiff(before, sketch))
+# {'created': [...], 'removed': [...], 'changed': [...],
+#  'created_constraints': [...], 'removed_constraints': [...], 'changed_constraints': [...]}
+```
+
+- A circle needs two cuts to leave an arc (one cut is an error, no cut removes
+  it whole); an entity nothing crosses is removed whole.
+- A trimmed B-spline keeps each piece as a new B-spline of the same curve: its
+  first and last control points are its end points, its inner control points are
+  sketch points (an original control point the piece keeps unmoved keeps its id;
+  the others are new `p<n>`), and its knots are no longer uniform. A closed
+  B-spline (periodic, or starting and ending on one point) needs two cuts, like a
+  circle. A tangent at a B-spline end moves to the piece that keeps that end;
+  original control points no piece uses are removed with their constraints.
+- `extend_rsketch` on a B-spline grows it curvature-continuously along its end
+  tangent to the first crossing (the old part keeps its shape; a closed one has no
+  end). It refuses an end point shared with another entity and names the ids.
+- A tangent touch is one cut. Cut points on a B-spline or an ellipse are tied with
+  `point_on` too (`constrain_point_on_rsketch` takes both).
+- Read `diff_sketch_rsketchdiff(before, after)` instead of diffing
+  `Sketch.to_dict()` yourself; the last edit's notes are in
+  `sketch.get_metadata("last_edit")`.
+
+## B-splines with anchors
+
+A cubic B-spline whose inner knots have multiplicity 3 is a chain of Bezier spans:
+control points `[A0, out0, in1, A1, out1, in2, A2, ...]`, the anchors `A<i>` on the
+curve, each with an in-handle and an out-handle (a pen tool's curve; the editor's
+spline tool draws this form, knots `0..n`, multiplicities `[4, 3, ..., 3, 4]`). Every
+control point is a sketch point and the solver moves all of them, so moving an anchor
+or a handle is moving a point; the two handles of an anchor are independent (each
+has its own direction and length, the pull on that side; they need not be in one line
+-- when they are, the anchor is smooth). Trim and extend keep the form.
+
+```python
+sketch = scad.insert_spline_anchor_rsketch(sketch, "s1", (12.0, 8.0))  # curve unchanged: new p<n> anchor + 2 handles
+sketch = scad.remove_spline_anchor_rsketch(sketch, "s1", "p2")         # merge the spans beside an inner anchor
+sketch = scad.convert_spline_to_anchors_rsketch(sketch, "s7")          # a control-point B-spline -> anchor form
+```
+
+- Insert splits the span at the curve point nearest `at` (de Casteljau): the curve
+  stays, the span's two handles get shorter (same ids; a dimension or fix on them is
+  dropped, see `last_edit` notes) and the new anchor and its handles are new points.
+- Remove keeps the outer handles' ids and directions and fits their lengths to the
+  old curve (remove after insert gives the curve back); a handle a constraint holds
+  stays put. End anchors and handles are refused by name.
+- Convert is exact for degree <= 3 without weights, else approximated within 1e-4
+  (the notes say how close); periodic splines are refused.
+
+## Fillet and chamfer a corner
+
+`fillet_corner_rsketch(sketch, a, b, radius)` rounds the corner where two lines
+meet; `chamfer_corner_rsketch(sketch, a, b, distance)` cuts it with a line. The
+lines must share an end point (build them from the same point id). Like trim,
+both solve the sketch first, return a new `Sketch`, are recorded and replay.
+
+```python
+sketch = scad.fillet_corner_rsketch(sketch, "bottom", "right", 2.0)    # arc a1, points p1..p3
+sketch = scad.chamfer_corner_rsketch(sketch, "top", "left", 1.0)       # line l<n>
+```
+
+- Both lines are shortened to the tangent points; the arc runs counter-clockwise
+  from its start to its end around its centre and gets a `tangent` constraint
+  with each line plus a driving `radius`, so a re-solve keeps it. A chamfer gets
+  a driving `length` (its chord) and a driving `angle` to line `a`.
+- The corner point goes away unless something else uses it; if a constraint
+  does, it stays as the sharp corner and the cut-off parts of the lines stay as
+  construction lines (collinear with their lines), so the lines keep their place.
+- `horizontal`, `vertical` and the other constraints that hold for a shorter
+  line stay; lengths and other dimensions of the two lines are dropped and
+  listed by `diff_sketch_rsketchdiff` and `get_metadata("last_edit")["notes"]`.
+  Re-dimension what you need afterwards (the remaining DOF show what to add).
+- Refused with the ids named: parallel lines, lines without a shared point, a
+  radius or distance that does not leave part of the shorter line (the message
+  gives the largest radius).
+
+## Relating sketches: project
+
+`project_rsketch(sketch, source, *, entities=None, construction=True)` brings
+geometry from another sketch (any plane) or from shape edges into `sketch` as
+reference geometry, so a sketch in one plane can be constrained to another.
+
+```python
+plan = scad.project_rsketch(plan, front, entities=["wall", "hole"])   # another Sketch
+plan = scad.project_rsketch(plan, scad.ql.edges().resolve(solid))   # edges of a shape, in world coordinates
+plan = scad.constrain_point_on_rsketch(plan, "tail", "proj_front_3")  # constrain to the projection
+print(plan.get_metadata("projections"))   # [{'source': 'front', 'entity': 'wall', 'projected': 'proj_front_3'}, ...]
+```
+
+- Coordinates go through both plane frames: `u = (P - origin) . x_axis`,
+  `v = (P - origin) . y_axis`. Points, lines, circles and arcs in a parallel
+  plane are copied (an arc keeps its sense); a circle or arc seen edge on becomes
+  a line, a line along the sketch normal a point, an oblique full circle an
+  ellipse. An oblique arc, a spline edge, or an unknown id is refused by name.
+- Copies are `construction` (default) and fixed at their projected coordinates;
+  ids are `proj_<source sketch id>_<n>` (`proj_shape_<n>`), never colliding with
+  existing ids. Projecting the same source again reuses what is there.
+- Without `entities`, ellipses and B-splines of a source sketch are skipped and
+  named in `get_metadata("last_edit")["notes"]`; `entities` is for source
+  sketches only.
 
 ## Validation gates
 

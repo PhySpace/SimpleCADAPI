@@ -299,7 +299,8 @@ TEST_CASE("loft toward a point still finds its one cap") {
   CHECK(count_role(up.delta, "loft.side") == 4);
   CHECK(count_role(up.delta, "loft.start") == 1);
   CHECK(count_role(up.delta, "loft.end") == 0);
-  CHECK(up.delta.entries.size() == 4);
+  // Four generated side faces, and the four base edges, which stay in the result as the cap's boundary.
+  CHECK(up.delta.entries.size() == 8);
 
   const TrackedResult down = tracked_loft({tip, base});
   CHECK(count_role(down.delta, "loft.start") == 0);
@@ -383,7 +384,9 @@ TEST_CASE("shell roles: body, offset, closing descendants and walls") {
   CHECK(count_role(tracked.delta, "shell.offset_face") == 5);
   CHECK(count_role(tracked.delta, "shell.closing_descendant") == 1);
   CHECK(count_role(tracked.delta, "shell.wall") == 4);
-  CHECK(count_role(tracked.delta, "shell.body_face") == 0);  // every kept face was re-created
+  // The five kept faces are still the input's faces (IsSame in the result) while each also generates its offset
+  // face: they are preserved, with their body role, as well as the seeds of the offset faces.
+  CHECK(count_role(tracked.delta, "shell.body_face") == 5);
 }
 
 // ---------------------------------------------------------------------------
@@ -395,13 +398,36 @@ TEST_CASE("a cut that removes everything has no solid, only deletions") {
   const Solid big = box_solid(10, 10, 10);
   const TrackedBooleanResult tracked = tracked_cut(tiny, big);
   CHECK_FALSE(tracked.solid.has_value());
-  CHECK(tracked.delta.deleted.size() == 12);  // all six faces of each input
+  CHECK(tracked.delta.deleted.size() == 14);  // all six faces of each input, and both input solids
   std::map<std::string, int> by_role;
   for (const TopoEntry& entry : tracked.delta.entries) {
     CHECK(entry.event == TopoEvent::Deleted);
     ++by_role[*entry.origin_role];
   }
-  CHECK(by_role == std::map<std::string, int>{{"body", 6}, {"tool", 6}});
+  CHECK(by_role == std::map<std::string, int>{{"body", 7}, {"tool", 7}});
+}
+
+TEST_CASE("a boolean says what became of its solids: a split cut continues the body in every piece") {
+  const Solid bar = box_solid(40, 10, 10);
+  const Solid slot = box_solid(2, 20, 20, {0, 0, -5});
+  const TrackedBooleanResult tracked = tracked_cut(bar, slot);
+  REQUIRE(tracked.solids.size() == 2);
+  std::map<std::string, int> solids;  // "<event>|<origin role>" -> count
+  for (const TopoEntry& entry : tracked.delta.entries) {
+    if (entry.ref.kind == Kind::Solid)
+      ++solids[std::string(to_string(entry.event)) + "|" + entry.origin_role.value_or("-")];
+  }
+  // the bar continues as both pieces, the slot is consumed
+  CHECK(solids == std::map<std::string, int>{{"deleted|tool", 1}, {"modified|body", 2}});
+
+  // a fuse reports its inputs deleted; the one solid of the answer merges them
+  const TrackedBooleanResult fused = tracked_union(bar, box_solid(4, 4, 20), false, 0.0);
+  std::map<std::string, int> merged;
+  for (const TopoEntry& entry : fused.delta.entries) {
+    if (entry.ref.kind == Kind::Solid)
+      ++merged[std::string(to_string(entry.event)) + "|" + entry.metadata.find("derivation")->as_string()];
+  }
+  CHECK(merged == std::map<std::string, int>{{"modified|merge", 2}});
 }
 
 TEST_CASE("the same boolean twice gives the same delta") {

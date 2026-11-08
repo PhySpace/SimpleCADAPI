@@ -28,8 +28,11 @@ export type ParamMeta = {
 export function ParamControl({
   param,
   forwardParam,
+  editable = false,
 }: {
   param: ParamMeta;
+  /** A slider also has a box to type the value in (the operation panel: exact values matter while tuning). */
+  editable?: boolean;
   /** `now`: send at once (a click, a release) instead of when the changes settle. */
   forwardParam: (id: string, value: ParamValue, now?: boolean) => void;
 }) {
@@ -65,7 +68,7 @@ export function ParamControl({
       <div className="mb-1 flex items-baseline justify-between gap-2 text-[11px]">
         <span className={cn("truncate", ink)}>{label}</span>
         <span className="flex shrink-0 items-baseline gap-1">
-          {param.control === "number" ? (
+          {param.control === "number" || (editable && param.control === "slider") ? (
             <NumberField
               value={value}
               min={param.min}

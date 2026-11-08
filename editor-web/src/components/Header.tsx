@@ -1,20 +1,18 @@
-import { Monitor, Moon, Play, Square, Sun } from "lucide-react";
+import { Languages, Monitor, Moon, Sun } from "lucide-react";
 
 import type { ThemePreference } from "@/lib/theme";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { LANGUAGES, setLanguage, useI18n } from "@/i18n";
 
-/** Top bar: which notebook is open, whether its kernel is alive, and the
- * model's last message. Everything else lives on the cells. */
+/** Top bar: which notebook is open, whether its kernel is alive, the model's last message, the theme and the language.
+ * The mode switch and "run all" are at the top of the left column; undo and redo are the feature tree's. */
 export function Header({
   notebook,
   kind,
   kernelAlive,
   status,
-  onRunAll,
-  running,
-  onStop,
   themePreference,
   onTheme,
 }: {
@@ -22,14 +20,12 @@ export function Header({
   kind: string | null;
   kernelAlive: boolean;
   status: string;
-  onRunAll: () => void;
-  /** The kernel is running cells: the button stops them instead. */
-  running: boolean;
-  onStop: () => void;
   themePreference: ThemePreference;
   onTheme: () => void;
 }) {
+  const { t, language } = useI18n();
   const failing = status.startsWith("error");
+  const nextLanguage = LANGUAGES[(LANGUAGES.findIndex((item) => item.code === language) + 1) % LANGUAGES.length];
   return (
     <header className="flex h-11 shrink-0 items-center gap-3 border-b-2 border-border bg-background px-3">
       <span className="text-[13px] font-bold uppercase tracking-[0.14em]">SimpleCAD</span>
@@ -40,11 +36,11 @@ export function Header({
           {kind && kind !== "helper" && <Badge variant="outline">{kind}</Badge>}
         </span>
       ) : (
-        <span className="text-muted-foreground">no notebook</span>
+        <span className="text-muted-foreground">{t("no notebook")}</span>
       )}
       <span
         className={`inline-block h-2 w-2 ${kernelAlive ? "bg-pass" : "bg-fail"}`}
-        title={kernelAlive ? "kernel running" : "kernel stopped"}
+        title={kernelAlive ? t("kernel running") : t("kernel stopped")}
       />
       <span
         className={`min-w-0 flex-1 truncate text-[11px] ${failing ? "text-fail" : "text-muted-foreground"}`}
@@ -52,24 +48,25 @@ export function Header({
       >
         {status}
       </span>
-      {running ? (
-        <Button size="sm" variant="destructive" onClick={onStop} title="Stop the run (interrupt the kernel)">
-          <Square className="fill-current" /> stop
-        </Button>
-      ) : (
-        <Button size="sm" variant="outline" onClick={onRunAll} title="Run every cell">
-          <Play /> run all
-        </Button>
-      )}
       <Button
         size="sm"
         variant="ghost"
         onClick={onTheme}
-        title={`Theme: ${themePreference} (click: ${NEXT_THEME[themePreference]})`}
-        aria-label={`Theme: ${themePreference}. Switch to ${NEXT_THEME[themePreference]}`}
+        title={t("Theme: {{theme}} (click: {{next}})", { theme: t(themePreference), next: t(NEXT_THEME[themePreference]) })}
+        aria-label={t("Theme: {{theme}}. Switch to {{next}}", { theme: t(themePreference), next: t(NEXT_THEME[themePreference]) })}
       >
         {themePreference === "system" ? <Monitor /> : themePreference === "light" ? <Sun /> : <Moon />}
-        {themePreference}
+        {t(themePreference)}
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => setLanguage(nextLanguage.code)}
+        title={t("Language (click: {{next}})", { next: nextLanguage.label })}
+        aria-label={t("Language (click: {{next}})", { next: nextLanguage.label })}
+      >
+        <Languages />
+        {LANGUAGES.find((item) => item.code === language)?.label ?? "EN"}
       </Button>
     </header>
   );

@@ -27,7 +27,8 @@ from ..artifacts.canonical import validate_logical_id, validate_revision
 from ..build.dependencies import FileInput
 from ._marimo import read_pyproject_from_script
 
-_KEYS = frozenset({"id", "revision", "tolerance_profile", "inputs"})
+_KEYS = frozenset({"id", "revision", "tolerance_profile", "inputs", "kind"})
+_KINDS = ("part", "assembly")
 
 
 class NotebookConfigError(ValueError):
@@ -46,6 +47,9 @@ class NotebookConfig:
     tolerance_profile: str
     inputs: tuple[FileInput, ...]
     """Project files (relative to the notebook directory) the product reads."""
+    kind: str | None = None
+    """``part`` or ``assembly`` when the header says so (set when the notebook is created).  A ``part`` notebook needs no cell
+    that builds its ``Part``: without one, its one open body is the product (:func:`.projection.find_product`)."""
 
     @property
     def directory(self) -> Path:
@@ -93,6 +97,9 @@ def _parse_table(path: Path, table: Mapping[str, Any]) -> NotebookConfig:
     profile = table.get("tolerance_profile", "simplecad-default")
     if not isinstance(profile, str) or not profile:
         raise NotebookConfigError(f"{path}: tolerance_profile must be a non-empty string")
+    kind = table.get("kind")
+    if kind is not None and kind not in _KINDS:
+        raise NotebookConfigError(f"{path}: kind must be one of {list(_KINDS)}")
     inputs = table.get("inputs", [])
     if not isinstance(inputs, list) or not all(isinstance(item, str) for item in inputs):
         raise NotebookConfigError(f"{path}: inputs must be a list of relative paths")
@@ -104,6 +111,7 @@ def _parse_table(path: Path, table: Mapping[str, Any]) -> NotebookConfig:
         ),
         tolerance_profile=profile,
         inputs=tuple(FileInput(item) for item in inputs),
+        kind=kind,
     )
 
 

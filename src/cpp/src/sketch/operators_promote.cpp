@@ -1,11 +1,14 @@
-// inspect_sketch_rsketchresult, make_wire_from_sketch_rwire, make_face_from_sketch_rface.
+// inspect_sketch_rsketchresult, inspect_sketch_rsketchprofiles, make_wire_from_sketch_rwire,
+// make_face_from_sketch_rface.
 #include <TopoDS.hxx>
 
 #include "finalize.hpp"
 #include "promotion.hpp"
+#include "regions.hpp"
 #include "scad/core/error.hpp"
 #include "scad/kernel/features.hpp"
 #include "scad/sketch/operators.hpp"
+#include "scad/sketch/profile.hpp"
 
 namespace scad {
 
@@ -51,6 +54,72 @@ SketchSolveResult inspect_sketch_rsketchresult(const Sketch& sketch, const Sketc
   return guarded(kSpec, [&] {
     Sketch working = sketch.clone(/*include_solve=*/false);
     return working.solve(request);
+  });
+}
+
+Value inspect_sketch_rsketchprofiles(const Sketch& sketch, const SketchSolveRequest& request) {
+  static const ErrorSpec kSpec{"inspect_sketch_rsketchprofiles",
+                               "Failed to list the sketch profiles.",
+                               {"The sketch has invalid or conflicting constraints and strict=True."},
+                               {"Pass strict=False to list the profiles of a sketch that does not solve cleanly."}};
+  return guarded(kSpec, [&] {
+    Sketch working = sketch.clone(/*include_solve=*/false);
+    const SketchSolveResult result = working.solve(request);
+    const auto strings = [](const std::vector<std::string>& ids) {
+      Value::Array out;
+      for (const std::string& id : ids)
+        out.emplace_back(id);
+      return Value(std::move(out));
+    };
+    Value::Array profiles;
+    Value::Array components;
+    Value::Array regions;
+    if (!result.solved_points.empty()) {
+      const std::vector<SketchProfile> listed = sketch_profiles(working, result);
+      std::vector<ProfileNesting> nesting(listed.size());
+      try {
+        nesting = profile_nesting(working, result, listed);
+      } catch (const std::exception&) {  // geometry the solve left unusable: no nesting, the profiles still list
+      }
+      const auto number_or_null = [](int value) { return value < 0 ? Value() : Value(value); };
+      int index = 0;
+      for (const SketchProfile& profile : listed) {
+        const ProfileNesting& nest = nesting[static_cast<std::size_t>(index)];
+        if (profile.closed && nest.depth >= 0 && nest.depth % 2 == 0) {
+          Value region = Value::object();
+          region.set("outer", index);
+          Value::Array holes;
+          for (std::size_t j = 0; j < listed.size(); ++j)
+            if (nesting[j].parent == index)
+              holes.emplace_back(static_cast<int>(j));
+          region.set("holes", Value(std::move(holes)));
+          regions.push_back(std::move(region));
+        }
+        Value item = Value::object();
+        item.set("parent", number_or_null(nest.parent));
+        item.set("depth", number_or_null(nest.depth));
+        item.set("index", index++);
+        item.set("id", profile.id);
+        item.set("kind", profile.kind);
+        item.set("closed", profile.closed);
+        item.set("entity_ids", strings(profile.entity_ids));
+        item.set("point_ids", strings(profile.point_ids));
+        Value::Array reversed;
+        for (const bool flag : profile.reversed)
+          reversed.emplace_back(flag);
+        item.set("reversed", Value(std::move(reversed)));
+        profiles.push_back(std::move(item));
+      }
+      for (const std::string& text : describe_edge_components(working)) {
+        if (text.rfind("closed loop", 0) != 0 && text.rfind("open chain", 0) != 0)
+          components.emplace_back(text);
+      }
+    }
+    Value out = Value::object();
+    out.set("profiles", Value(std::move(profiles)));
+    out.set("unusable", Value(std::move(components)));
+    out.set("regions", Value(std::move(regions)));
+    return out;
   });
 }
 
@@ -105,6 +174,67 @@ Face make_face_from_sketch_rface(const Sketch& sketch, const SketchProfileId& pr
       apply_sketch_promotion_identity_tags(shape, sketch, promotion, "make_face_from_sketch_rface");
       return Face(shape);
     });
+  });
+}
+
+std::vector<Face> make_faces_from_sketch_rfacelist(const Sketch& sketch,
+                                                   const std::optional<std::vector<SketchProfileId>>& profiles,
+                                                   const SketchSolveRequest& request) {
+  static const ErrorSpec kSpec{
+      "make_faces_from_sketch_rfacelist",
+      "Failed to create the faces of the sketch's regions.",
+      {"The sketch has no closed profile.",
+       "A requested profile does not exist, is an open chain, or is a hole "
+       "(a loop inside another loop).",
+       "The sketch constraints are conflicting or invalid."},
+      {"List the regions with inspect_sketch_rsketchprofiles(...)['regions'] and pass their outer profiles.",
+       "Leave profiles out to make every region.", "Add constraints until the profile can solve cleanly."}};
+  return guarded(kSpec, [&] {
+    Sketch working = sketch.clone(/*include_solve=*/false);
+    const SketchSolveResult result = working.solve(request);
+    const std::vector<SketchProfile> listed = sketch_profiles(working, result);
+    const std::vector<ProfileNesting> nesting = profile_nesting(working, result, listed);
+    const auto is_outer = [&](std::size_t i) { return listed[i].closed && nesting[i].depth % 2 == 0; };
+    std::vector<std::size_t> outers;
+    if (!profiles) {
+      for (std::size_t i = 0; i < listed.size(); ++i)
+        if (is_outer(i))
+          outers.push_back(i);
+      if (outers.empty())
+        throw ValueError("Sketch contains no closed profile; a region needs a closed loop. Components: " + [&] {
+          std::string text;
+          for (const std::string& part : describe_edge_components(working))
+            text += (text.empty() ? "" : "; ") + part;
+          return text;
+        }());
+    } else {
+      for (const SketchProfileId& wanted : *profiles) {
+        std::size_t found = listed.size();
+        for (std::size_t i = 0; i < listed.size(); ++i)
+          if (wanted.is_index() ? static_cast<int>(i) == wanted.index() : listed[i].id == wanted.id())
+            found = i;
+        const std::string name = wanted.to_value().dump();
+        if (found == listed.size())
+          throw ValueError("there is no sketch profile " + name + " (inspect_sketch_rsketchprofiles lists them)");
+        if (!listed[found].closed)
+          throw ValueError("sketch profile " + name + " is an open chain: a region needs a closed loop");
+        if (!is_outer(found))
+          throw ValueError("sketch profile " + name + " is a hole of profile " + std::to_string(nesting[found].parent) +
+                           ": pick the region's outer loop (its holes come with it)");
+        if (std::find(outers.begin(), outers.end(), found) == outers.end())
+          outers.push_back(found);
+      }
+    }
+    // Each region is one recorded face: its outer loop, and the loops directly inside it as holes.
+    std::vector<Face> faces;
+    for (const std::size_t outer : outers) {
+      std::vector<SketchProfileId> holes;
+      for (std::size_t j = 0; j < listed.size(); ++j)
+        if (nesting[j].parent == static_cast<int>(outer))
+          holes.emplace_back(listed[j].id);
+      faces.push_back(make_face_from_sketch_rface(sketch, SketchProfileId(listed[outer].id), holes, request));
+    }
+    return faces;
   });
 }
 

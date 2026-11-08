@@ -78,6 +78,24 @@ if __name__ == "__main__":
     app.run()
 ```
 
+- **The kind** is fixed when the notebook is made: the header says
+  `kind = "part"` or `kind = "assembly"` (`sca new` and the editor write it).
+  A `kind = "part"` notebook needs **no product cell**: when no top-level
+  `Part` has the notebook id, the runtime makes one from the notebook's
+  *open bodies* (public top-level `Solid`s, or the piece lists of split cuts,
+  that no other cell reads and that no other such value was built from; a cell
+  that only makes construction geometry -- workplanes, wires, edges, e.g. a path
+  through the body's vertices -- does not count as reading it), with
+  the notebook id. One open body is a one-body Part (body id `"body"`); several
+  are the bodies of one Part, named by their variables (pieces `<name>_1..n`).
+  Write a `make_part_rpart` cell only to add connectors or a material, or to
+  choose and name the bodies yourself; it then wins. The headless run and the
+  editor use the same rule (`runtime/projection.py`, `find_product`).
+  A notebook with no Part, Assembly or solid yet (a new one, or only sketches,
+  curves and workplanes so far) raises `NoProductYetError` (a
+  `ProductNotFoundError`) where a product is needed (export, a headless run
+  with `product=True`); the editor previews it as an empty model, not an error.
+  A Part or Assembly with another id is still a `ProductNotFoundError`.
 - **The product** is the top-level variable whose id (`Part.part_id` or
   `Assembly.assembly_id`) equals the notebook id. An assembly built up over
   several cells (components, then constraints, then the solve) carries the
@@ -87,6 +105,12 @@ if __name__ == "__main__":
   (`run_notebook(..., id=...)`, `scad.use(..., id=...)`, `sca run --id`);
   cells read the id of their run with `scad.notebook_id()` — see
   [Part families](notebook-composition-and-cache.md#part-families).
+- **A part with several bodies** is one product:
+  `scad.make_part_rpart(part_id=scad.notebook_id(), bodies={"base": base, "lid": lid})`.
+  Each body keeps its own BRep, topology snapshot and tags in the package, whose
+  part definition then has profile `simplecad-part-definition-3` (an older SDK
+  refuses it instead of reading one body). One-body parts are unchanged.
+  The cell cache restores a multi-body part like any other value.
 - **Parameters** are ordinary top-level variables. Overriding one replaces it,
   and the cell that defines it does not run, so all variables of that cell
   must be overridden together. Group parameters into cells by what changes
@@ -126,7 +150,9 @@ sca run bracket.py --no-cache             # run every cell
 `--set` values are Python literals, else strings; the option may repeat. The
 report lists the definition id, kind, revision, `content_hash`, and every
 cell's status: `ran`, `cached` (restored from the cell cache), or `skipped`
-(replaced by an override).
+(replaced by an override). A cell whose operations split a tagged entity also
+lists `tag_splits` (`{tag, into, op}`: the pieces carry `<tag>.split1` ..), ran or
+restored; a cell that runs prints a `TagSplitWarning` at its place in the file.
 
 From Python:
 
@@ -208,6 +234,9 @@ The editor and a coding agent share the notebook file:
   selection, each cell's state and errors, the parameter values, and the path
   of the viewport image (`.sca-editor/viewport.png`) the agent can look at. The
   editor keeps `.sca-editor/snapshot.json` current while it runs.
+  When a cell failed, the editor previews the model before it and the snapshot
+  says so in `partial` (the failing cell, its error, the cells that did not run,
+  the bodies shown; `runtime.live.preview_product`); `null` when the model is whole.
 - The local modules a notebook imports (`from dimensions import DIMS`) are
   listed under *modules* in the workspace tab, with the notebooks that use
   them. A module opens in a module view: its source, autosaved, and the fields

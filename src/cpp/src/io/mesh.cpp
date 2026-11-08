@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include <BRepBuilderAPI_Copy.hxx>
+#include <BRepLib_ToolTriangulatedShape.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRep_Tool.hxx>
 #include <IMeshTools_Parameters.hxx>
@@ -75,6 +76,11 @@ FaceTessellation extract_face(const TopoDS_Face& face) {
         {static_cast<std::uint32_t>(a - 1), static_cast<std::uint32_t>(b - 1), static_cast<std::uint32_t>(c - 1)});
   }
 
+  // The surface's own normal at every node (from its UV parameters), so a curved face is shaded smooth and its
+  // triangles share their vertices; without it each triangle would carry its flat normal (a faceted look, and a vertex
+  // per corner).
+  if (!triangulation->HasNormals() && triangulation->HasUVNodes())
+    BRepLib_ToolTriangulatedShape::ComputeNormals(face, triangulation);
   if (triangulation->HasNormals()) {
     out.node_normals.reserve(static_cast<std::size_t>(node_count));
     for (int i = 1; i <= node_count; ++i) {

@@ -153,7 +153,9 @@ std::string general_format(double value, int digits);
 // `_finish`: what the builders that have no face-history channel end with.  `built` must
 // hold exactly one solid; it is made outward-pointing, checked for validity, given the
 // metadata of `source`, and recorded with `record` (op, params, inputs) as partial lineage
-// of `source`.
-Solid finish_solid(const Shape& source, const TopoDS_Shape& built, OpRecord record);
+// of `source`.  `delta`, when the builder has a history (modification_delta), is recorded with it, so stable
+// references follow the faces through the operation.
+Solid finish_solid(const Shape& source, const TopoDS_Shape& built, OpRecord record,
+                   std::optional<TopoDelta> delta = std::nullopt);
 
 }  // namespace scad

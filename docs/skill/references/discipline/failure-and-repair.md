@@ -47,9 +47,10 @@ which claims cannot be made (see "Reporting failed repairs"). Interactive: the r
 - Isolate and simplify the failing base/tool pair.
 - `cut_rsolid(..., skip_non_intersecting=False)` is the strict diagnostic mode;
   with the default `True`, non-intersecting tools may be ignored.
-- `cut_rsolid` expected a single Solid but the kernel returned several: the cut
-  split the body. If that is intended, call `cut_rsolid_list`; if not, the tool
-  crosses the body completely or touches a wall tangentially — resize or
+- `cut_rsolid` returned a list instead of a Solid: the cut split the body
+  (with `on_split="error"` it raises instead). If that is intended, pass the
+  pieces on as bodies (`make_part_rpart(part_id=..., body=pieces)`); if not, the
+  tool crosses the body completely or touches a wall tangentially — resize or
   reposition it.
 - After repeated failure, reconsider operation order — not just retry the same
   cut harder.
@@ -59,7 +60,9 @@ which claims cannot be made (see "Reporting failed repairs"). Interactive: the r
 `union_rsolid` requires a one-manifold-`Solid` result and fails if it cannot
 produce one. If the design is one body, use a contact or overlap that is
 topologically capable of producing one solid, then recompute. If the design is
-actually multiple parts, the answer is an assembly, not a union.
+actually multiple parts, the answer is an assembly, not a union; if it is one
+part whose bodies stay apart, make a multi-body part
+(`make_part_rpart(bodies=...)`).
 
 ### Fillet/chamfer failure
 

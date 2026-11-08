@@ -36,7 +36,12 @@ from ..build.definition import (
 )
 from ..build.dependencies import snapshot_file_inputs
 from ..build.results import AssemblyBuildResult, PartBuildResult
-from simplecadapi._cpp import Assembly, isolated_recording, Part
+import weakref
+from typing import Any
+
+from simplecadapi._cpp import Assembly, Edge, find_registered_node, isolated_recording, Part, SimpleWorkplane, Solid, Wire
+from simplecadapi._glue.session import lineage_of
+from ..product.bodies import part_from_bodies
 from simplecadapi._glue.session import GraphSession
 from ..recording.source_mapping import cell_sources
 from .cells import NotebookCells, bound_requirements
@@ -49,6 +54,11 @@ class ProductNotFoundError(ValueError):
     """No top-level value, or more than one, is the notebook's product."""
 
 
+class NoProductYetError(ProductNotFoundError):
+    """The notebook makes no Part, no Assembly and no solid yet (a new notebook, or one with only sketches, curves and
+    workplanes so far).  There is no product to export, but nothing is wrong: a preview of it is empty."""
+
+
 def _product_id(value: Product) -> str:
     return value.part_id if isinstance(value, Part) else value.assembly_id
 
@@ -59,6 +69,26 @@ def _as_product(value: object) -> Product | None:
     if isinstance(value, (Part, Assembly)):
         return value
     return None
+
+
+_CONSTRUCTION = (SimpleWorkplane, Wire, Edge)
+"""Values that are construction geometry, not bodies: a cell making only these does not build on what it reads."""
+
+
+def product_reads(cells: Iterable[Any], values: Mapping[str, object]) -> frozenset[str]:
+    """The names the cells read, as :func:`find_product` and :func:`open_bodies` take them (*read*).
+
+    A cell whose values are all construction geometry -- workplanes, wires, edges -- reads a body without building on it
+    (a workplane on the top face of ``base``, a 3D path drawn through its vertices): its reads leave the body open.
+    """
+
+    out: set[str] = set()
+    for cell in cells:
+        made = [values[name] for name in cell.defs if name in values]
+        if made and all(isinstance(value, _CONSTRUCTION) for value in made):
+            continue
+        out.update(cell.refs)
+    return frozenset(out)
 
 
 def find_product(
@@ -98,11 +128,84 @@ def find_product(
             f"id {config.id!r} and none is the only one no other cell reads: "
             f"{', '.join(names)}"
         )
-    found = ", ".join(sorted(others)) if others else "none"
+    if config.kind == "part" and not others:
+        implicit = _implicit_part(config, values, read)
+        if implicit is not None:
+            return implicit
+    if not others:
+        raise NoProductYetError(f"{config.path.name}: no Part, Assembly or solid yet")
     raise ProductNotFoundError(
         f"{config.path.name}: no top-level Part or Assembly has the notebook "
-        f"id {config.id!r}; Parts and Assemblies found: {found}"
+        f"id {config.id!r}; Parts and Assemblies found: {', '.join(sorted(others))}"
     )
+
+
+def open_bodies(values: Mapping[str, object], read: AbstractSet[str]) -> list[str]:
+    """The public top-level solids nothing else is built from, in cell order: the bodies a part notebook leaves at the end.
+
+    A solid another cell reads is not open; nor is one that another candidate was made from (a tool cut out in the same cell
+    that keeps it under a name): the operation graph the values carry says so.
+    """
+
+    seen: set[int] = set()
+    candidates: list[tuple[str, object]] = []
+    for name, value in values.items():
+        pieces = isinstance(value, (list, tuple)) and bool(value) and all(isinstance(v, Solid) for v in value)
+        if name.startswith("_") or name in read or not (isinstance(value, Solid) or pieces) or id(value) in seen:
+            continue
+        seen.add(id(value))
+        if pieces:  # the pieces of a split cut: one candidate, its lineage is the first piece's
+            seen.update(id(v) for v in value)  # type: ignore[union-attr]
+        candidates.append((name, value))
+    if len(candidates) < 2:
+        return [name for name, _ in candidates]
+    nodes = {name: _node(value[0] if isinstance(value, (list, tuple)) else value) for name, value in candidates}
+    upstream: set[str] = set()
+    for name, node in nodes.items():
+        if node is not None:
+            upstream |= _ancestors(node)
+    return [name for name, _ in candidates if nodes[name] is None or nodes[name].node_id not in upstream]
+
+
+def _node(value: object) -> Any:
+    found = lineage_of(value)
+    if found is None:
+        return None
+    graph_id, node_id = found
+    return find_registered_node(graph_id, node_id)
+
+
+def _ancestors(node: Any) -> set[str]:
+    """The ids of the nodes *node* was made from (not itself)."""
+
+    out: set[str] = set()
+    stack = list(node.inputs)
+    while stack:
+        item = stack.pop()
+        if item.node_id in out:
+            continue
+        out.add(item.node_id)
+        stack.extend(item.inputs)
+    return out
+
+
+def _implicit_part(config: NotebookConfig, values: Mapping[str, object], read: AbstractSet[str]) -> Part | None:
+    """The product of a ``kind = "part"`` notebook without a cell that builds it: its open bodies, as a Part with the notebook id.
+
+    One open body is a one-body Part (body id ``"body"``); several are the bodies of one Part, named by their variables
+    (the pieces of a split cut ``<name>_1..n``).  ``None`` when there is no body yet.
+    """
+
+    names = open_bodies(values, read)
+    if not names:
+        return None
+    part = part_from_bodies(config.id, {name: values[name] for name in names})
+    _IMPLICIT[id(part)] = part
+    return part
+
+
+_IMPLICIT: "weakref.WeakValueDictionary[int, Part]" = weakref.WeakValueDictionary()
+"""The Parts :func:`_implicit_part` made (outside any cell): :func:`project_product` records them in the definition."""
 
 
 def project_product(
@@ -131,6 +234,11 @@ def project_product(
     # an assembly records its solve, which must not see the caller's session
     # or coordinate system.
     with isolated_recording(), cell_sources(cells):
+        if _IMPLICIT.get(id(product)) is product:
+            # the implicit Part of a kind = "part" notebook was made outside any cell: make it here, recorded, so the
+            # definition has its one result node (the Part), whatever the number of bodies
+            with session:
+                product = part_from_bodies(product.part_id, {body.body_id: body.solid for body in product.bodies})
         session.validate_graph_ownership(product)
         for node in session.graph.topological_order():
             for expression in node.expressions:
@@ -164,4 +272,4 @@ def project_product(
         ).value
 
 
-__all__ = ["Product", "ProductNotFoundError", "find_product", "project_product"]
+__all__ = ["NoProductYetError", "Product", "ProductNotFoundError", "find_product", "project_product"]

@@ -116,7 +116,7 @@ Sketch constrain_connect_rsketch(const Sketch& sketch, const SketchTarget& a, co
 
 Sketch constrain_point_on_rsketch(const Sketch& sketch, const SketchTarget& point, const SketchTarget& entity,
                                   const SketchConstraintId& id) {
-  return two(sketch, "point_on", point, kPoint, entity, kLineCircleArc, id);
+  return two(sketch, "point_on", point, kPoint, entity, kLineCircleArcSplineEllipse, id);
 }
 
 Sketch constrain_horizontal_rsketch(const Sketch& sketch, const SketchTarget& line, const SketchConstraintId& id) {

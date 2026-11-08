@@ -6,6 +6,7 @@
 
 #include "internal.hpp"
 #include "scad/ops/geometry/diagnostics.hpp"
+#include "scad/ops/geometry/wires.hpp"
 
 namespace scad {
 
@@ -22,10 +23,9 @@ void warn_if_reversed(const Vec3& requested, const Face& face) {
                  dot);
 }
 
+// A wire, or an edge as the wire of that one edge.
 Wire require_wire(const Shape& shape, const char* message) {
-  if (shape.kind() != Kind::Wire)
-    throw ValueError(message);
-  return Wire(shape);
+  return as_wire(shape, message);
 }
 
 }  // namespace

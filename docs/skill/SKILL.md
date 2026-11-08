@@ -90,5 +90,12 @@ it as a blocker in the report and do the strongest supported work.
 - `references/README.md`: every page by layer (workflows, domains, discipline, guides, generated API docs).
 - `references/SDK_OVERVIEW.md`: package map. `references/ql-playbook.md` and `references/ql-recipes.md`: selection.
 - `references/scadpkg-format.md`: the `.scadpkg` consumer spec.
-- `references/docs/api/`, `references/docs/stdlib/`, `references/docs/core/`: exact signatures.
+- `references/docs/api/`, `references/docs/stdlib/`, `references/docs/core/`: exact signatures. `sca ops [NAME] [--json]`
+  lists every operation with what each parameter means (`length`, `angle`, `point3`, `direction3`, `color`, ... read
+  from the signature types in `simplecadapi.types`; `simplecadapi.catalog` in code).
+- Sketches and features off the base planes: a recorded workplane (`make_workplane_from_face_rworkplane`, `..._from_points_`,
+  `..._from_axis_`, `..._midplane_`, `..._normal_to_curve_`), then `make_sketch_rsketch(plane=wp)` or `with wp:`. See
+  `references/discipline/datums-and-coordinate-systems.md`.
+- Colours and names for people: a body's colour, opacity and name are `set_body_appearance_rpart`; a face or edge name is
+  a tag (`apply_tag_rselection`, `ql.tag`). See "Colours and names for people" in `references/domains/part-modeling.md`.
 - Maintainers: the contract these pages follow is `skill-design.md` in the repository's `docs/` folder.

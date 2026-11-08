@@ -2,9 +2,11 @@
   <img src="img/repocover.png" alt="SimpleCADAPI repository cover">
 </p>
 
-# SimpleCADAPI
+<h1 align="center">SimpleCADAPI</h1>
 
-[中文说明](README.zh-CN.md)
+<p align="center"><b>Parametric CAD built for agents.</b><br/>Efficient · Low-overhead · Agent-native</p>
+
+<p align="center"><a href="README.zh-CN.md">中文</a> · <a href="CHANGELOG.md">Changelog</a> · <a href="docs/skill-design.md">Skill design</a> · <a href="https://arxiv.org/abs/2608.00891">Paper</a></p>
 
 **Start here.** Paste this line to your coding agent (Claude Code, Codex, OpenCode, …):
 
@@ -12,758 +14,135 @@
 Read physpace.dev/sca/landing.md and landing me on this sdk.
 ```
 
-It installs the SDK, installs the skill for itself, opens a real example in the
-code-first editor, and shows you how to work with it. SimpleCADAPI is a
-parametric CAD SDK built for agents: a model is a notebook of code, every
-dimension is a named parameter, selection is by what geometry *is*, and every
-step reports back why it worked or failed.
+It installs the SDK, installs the skill for itself, opens a real example in the editor, and shows you how to work with it.
 
-## What Can It Do
+---
 
-Four capability pillars. Every case below is a **real, reproducible session**:
-the replay demos are single-file offline HTML pages that faithfully replay the
-full recorded conversation (user turns, agent thinking, every tool call and
-patch, role switches) next to the exported 3D model — open them directly in a
-browser.
+## The idea
 
-### 1 · Single-Part Modeling
+CAD software was made for a person with a mouse. An agent has no mouse. It has code, a context window and a token bill.
+SimpleCADAPI starts from that.
 
-Parametric parts authored as readable [Feature Tree
-Convention](docs/skill/references/discipline/feature-tree-convention.md)
-feature blocks — named parameters with units, verifier-first staged modeling,
-deterministic face tags that survive re-parameterization, and synchronized
-`.scadpkg` / STEP AP242 / STL / editable FreeCAD exports.
+|  |  |
+| --- | --- |
+| **Efficient** | More first attempts come out right, and fewer tokens are spent getting there. Change one parameter and only the cells that depend on it run again. |
+| **Low-overhead** | One `pip install`: the geometry engine is native C++ on OpenCASCADE inside the wheel, with no CadQuery or OCP stack. A functional API with no hidden state, so every step is a cell that can be cached, checked and replayed. A skill an agent reads in one batch, not twenty. |
+| **Agent-native** | Errors say what happened, give the measured numbers and say how to fix it. Geometry is selected by what it *is* (`ql`, stable `scad.ref`), not by an index that moves. Every call is recorded as a replayable graph. The editor writes what you click into the notebook, so your agent reads your selection from disk. |
 
-<table>
-<tr>
-<th width="18%">Case</th>
-<th width="40%">First-turn requirement (excerpt)</th>
-<th width="42%">Delivered model · BRep turntable</th>
-</tr>
-<tr>
-<td><b>Robotic-arm U-link + motor mount</b><br/>15 user turns · 601 tool calls<br/><a href="examples/u_link_motor_mount/demo/index.html">▶ Full session replay</a></td>
-<td>"Build a parametric robotic-arm link that adapts to length changes and mounts motors generically: sweep a circular profile down D → right L → up D into a U; cut motor sockets with spheres; the mounting face must carry a deterministic name indexable by the query language; split the bottom cylinder into a half cylinder; then fillet everything."</td>
-<td><img src="img/capability/ulink_turntable.gif" width="420" alt="u_link turntable"></td>
-</tr>
-<tr>
-<td><b>Parametric flange plate</b><br/>2 user turns · 66 tool calls<br/><a href="examples/flange_plate/demo/index.html">▶ Full session replay</a></td>
-<td>"Parametric flange: OD 100, thickness 10, hub ⌀55 top +30, bore ⌀30, 6×⌀11 bolt holes on PCD 78, hub-root R3 / rim R2 fillets; every dimension a named parameter; edge-selection cards printed before each fillet; parameter-feasibility guards; one feature per block."<br/><br/><i>GIF shows the final 8-hole @PCD 84.5 state: turn 2 re-parameterized 6→8 holes; PCD 88 was rejected live by the guards and 85 excluded for fillet tangency.</i></td>
-<td><img src="img/capability/flange_turntable.gif" width="420" alt="flange turntable"></td>
-</tr>
-<tr>
-<td><b>Ribbed L-bracket (FEM main model)</b><br/>2 user turns · 49 tool calls<br/><a href="examples/ap242_gmsh_volume_mesh/demo/index.html">▶ Full session replay</a></td>
-<td>"Formalize the existing legacy L-bracket script through the single-part workflow: rebuild with FTC feature blocks and named parameters; geometric equivalence to the legacy model (volume delta < 0.1%); the <code>interface.*</code> FEM boundary tags must survive untouched — the downstream Gmsh/CalculiX pipeline selects faces by them."</td>
-<td><img src="img/capability/bracket_turntable.gif" width="420" alt="bracket turntable"></td>
-</tr>
-</table>
+## The evidence
 
-Turntables are rendered with BRep shading and wide edges; one full turn = 48
-deterministic azimuth steps.
+**Against CadQuery.** Same model, same prompt, same 200 real parts, one attempt each. A frozen, independent scorer compares each result with the original.
 
-### 2 · Assembly Modeling
+<p align="center"><img src="img/benchmark/vs_cadquery.svg" alt="Same model and prompt on 200 parts: SimpleCADAPI delivers 3.5 times fewer badly wrong models than CadQuery" width="900"></p>
 
-Nested durable assemblies with explicit kinematics: gear meshes, revolute
-joints, and bearing interfaces are solved constraints, not eyeballed
-positions. Standard parts — involute gears, ball bearings (as subassemblies
-with individual balls), roller-chain sprockets, metric fasteners with real
-thread profiles — come from `scad.std.*` and compose into mechanisms that
-export to STEP, editable FreeCAD projects, and MJCF for physics engines.
+<sub>DeepSeek-V4.1-Flash, SimpleCADAPI 2.2.7b1 vs CadQuery 2.8.0, 200 open-hardware parts from 27 projects. "Badly wrong" is a delivered model whose surface F1 at 1 mm is below 99.99 %. Disclosed in the report: the SimpleCADAPI run also had a STEP-reconstruction workflow guide, the CadQuery run a general third-party CadQuery skill; the parts are mostly simple (median 19 faces).</sub>
 
-<table>
-<tr>
-<td width="44%" align="center" valign="top">
-<img src="img/capability/bldc_assembly.png" alt="BLDC joint actuator assembled"><br/>
-<b>Integrated BLDC joint actuator</b> — assembled, studio render<br/>
-29 components · 51 constraints, all solved · 20:1 two-stage planetary
-</td>
-<td width="56%" align="center" valign="top">
-<img src="img/capability/bldc_exploded.gif" width="430" alt="BLDC joint actuator exploded turntable"><br/>
-<b>Same model, exploding turntable</b> — four modules (ESC · motor ·<br/>
-two-stage reducer · output shaft) separate along the axis while<br/>
-concentric parts peel into radius bands; camera circles on an inclined orbit
-</td>
-</tr>
-</table>
+**Against a mature industrial CAD.** Tokens spent per task; the industrial CAD is driven through its MCP server.
 
-Reproduce it: the model is the `integrated_bldc_joint_actuator.py` assembly
-notebook, composed with `scad.use` from part and sub-assembly notebooks.
-`uv run python examples/integrated_bldc_joint_actuator/export_all.py` emits
-the package plus STEP / editable FCStd / MJCF; `render_showcase.py` renders
-the views above.
+<p align="center"><img src="img/benchmark/vs_industrial_mcp.svg" alt="Tokens spent per task: SimpleCADAPI uses up to 6.5 times fewer than a mature industrial CAD through its MCP" width="900"></p>
 
-### 3 · Code-first Editor
+## What it builds
 
-`sca edit` opens a browser editor over a directory of notebooks, built for
-working *with* an agent. The notebook's cells are on the left and the live
-model is in the middle; a slider or toggle appears for every parameter. Click a
-solid, face, edge or vertex and the editor writes a `scad.ql` selection cell
-into the notebook file (autosaved), so your coding agent reads what you picked
-from disk and "chamfer these two edges" needs no ids. Copy a cell's reference
-to tell the agent which cell to change. A log dock shows which cells are being
-re-evaluated. The editor and `sca run` share one runtime and one per-cell
-cache.
+Two six-axis arms, each an assembly of part notebooks composed with `scad.use`. Every joint angle and link length is a named parameter: drag a slider and the model follows.
 
-<table>
-<tr>
-<td align="center" valign="top">
-<img src="img/capability/editor.png" alt="sca edit on the u_link motor mount: a picked face, the selection cell it wrote, its properties"><br/>
-<b>u_link motor mount in <code>sca edit</code></b> — a picked cylindrical face, the
-<code>selected_face</code> cell the editor wrote for it, and its properties;
-<code>sca example u_link</code> copies this workspace out
-</td>
-</tr>
-</table>
+<p align="center"><img src="img/editor/sg90_arm_en.jpg" alt="The SG90 six-axis arm in the SimpleCADAPI editor: notebook cells and joint sliders on the left, the live assembly on the right" width="900"></p>
 
-### 4 · Simulation Plugins
+**SG90 educational arm** · 34 parts, six revolute joints solved as constraints, 3D-printable links, reserved envelopes for the electronics. `sg90_arm_6dof.py`
 
-The same parametric package feeds downstream solvers without manual rework:
-AP242 STEP into Gmsh for volume meshing and CalculiX for static FEM (boundary
-faces are selected by preserved `interface.*` tags, so simulation survives
-model revisions), and MJCF into MuJoCo for mechanism dynamics — where a
-virtual-collision pass catches assembly interference and drives the correction
-before the mechanism runs clean.
+<p align="center"><img src="img/editor/desktop_arm_en.jpg" alt="The desktop six-axis arm with a gripper in the SimpleCADAPI editor" width="900"></p>
+
+**Desktop six-axis arm with gripper** · 34 parts. The joint motor is a purchased part with its real mounting interface (34 × 20 × 19.6 mm body, six M2 holes on a Ø10.5 circle), and the links carry the matching pockets, screw channels and plug windows. `arm6.py`
+
+The editor, `sca edit`, is code-first: cells on the left, the live model on the right, a slider for every parameter. Click a solid, face, edge or vertex and it writes a selection into the notebook. Your agent reads what you picked from the file, so "chamfer these two edges" needs no ids. The editor and `sca run` share one runtime and one per-cell cache; on the six-axis arm a joint angle already seen re-renders in 0.6 s, a new one in 2.7 s (2.2.7).
+
+## The skill
+
+The skill is how an agent learns the SDK. It is a router and a library of small pages, written so the agent reads exactly what a step needs, in one parallel batch.
+
+**What it does** — seven routes, each a complete workflow with its own checks:
+
+| Ask | Route |
+| --- | --- |
+| Model one physical part | single-part modeling: requirements → plan → build → verify |
+| Build a multi-part product or mechanism | assembly: connectors, constraints, kinematics, standard parts |
+| Rebuild an editable model from a STEP file | STEP reconstruction with stable entity ids and acceptance gates |
+| Rebuild from a mesh, point cloud or photos | scan reconstruction |
+| Rebuild from a vector-PDF drawing | drawing reconstruction |
+| Produce a GB engineering drawing (DXF) | engineering drawing from validated geometry |
+| Hand the model to someone else | export and translation: STEP AP242, STL, FreeCAD, MJCF |
+
+**How it is organized**
+
+```text
+SKILL.md                  router: pick one route, read its batch (≤ 130 lines)
+workflows/                one lifecycle per route; roles and stages load when they start
+domains/                  what the SDK offers for a kind of task
+discipline/               rules and invariants: core rules, feature order, verifiers, failure and repair
+docs/api · stdlib · core  400+ generated signature pages; a method with no page does not exist
+```
+
+- **Small reading budget.** The first batch of any route is at most 1,200 lines. Every page has one job, and every rule has one home. A build check fails the skill if a page breaks the contract.
+- **Two modes.** Every workflow runs interactive (a person can answer) or unattended (nobody will). The mode changes who decides, never what is checked.
+- **One source, seven harnesses.** The same pages compile for Claude Code, Codex, OpenCode, ZCode, OMP, DSH and Kimi Code.
+
+```bash
+sca skill targets            # the harnesses
+sca skill install            # compile for yours and install
+```
+
+## Plugins
+
+Modeling is the SDK's job. Checking, simulating and translating a finished model belong in a plugin, and a plugin is a repository:
+
+```text
+sca-addon.toml     machine-checked facts: name, version, which SDK versions, how to provision
+skill/SKILL.md     everything an agent reads about it
+...                its own code, binaries and docs, in any language
+```
+
+```bash
+sca addon add owner/repo          # from GitHub; owner/repo@v1.2.0 pins a tag
+sca addon add ./my-addon          # a local checkout
+sca addon list                    # what is installed, and whether its runtime works
+sca addon update                  # re-fetch; code is swapped, runtime state is kept
+```
+
+- **The agent learns it on install.** The addon's skill lands beside the SDK's as `sca-<name>`, so the agent gets the capability and the instructions together.
+- **Isolated by design.** A plugin reads `.scadpkg` product packages across a process boundary and runs in its own environment, so plugin dependencies never touch the one that models geometry.
+- **Already in use.** Connector verification (bolted, pinned, press-fit, welded and other joints, checked and then run through FEM) and FEM mesh preparation (fasteners removed, their holes filled, closure proven) are plugins. The AP242 → Gmsh → CalculiX and MJCF → MuJoCo paths below run off the same package.
 
 <table>
 <tr>
 <td width="34%" align="center" valign="top" rowspan="2">
 <img src="img/capability/ap242_gmsh_bracket_static_von_mises.png" alt="Bracket FEM von Mises"><br/>
-<b>L-bracket static FEM</b> — CalculiX von Mises<br/>
-meshed via Gmsh OpenCASCADE kernel from the AP242 export
+<b>L-bracket static FEM</b><br/>CalculiX von Mises on the Gmsh mesh of the AP242 export; faces are chosen by <code>interface.*</code> tags that survive model changes
 </td>
 <td width="33%" align="center" valign="top">
-<img src="img/capability/fourbar_collision_before.gif" alt="Four-bar assembly with links crashing into each other in MuJoCo"><br/>
-<b>Four-bar linkage + MuJoCo</b> — first assembly pass:<br/>
-the links crash through each other mid-cycle; the assembly is wrong ·
-<a href="img/capability/fourbar_collision_before.mp4">▶ full video</a>
+<img src="img/capability/fourbar_collision_before.gif" alt="Four-bar links crashing through each other in MuJoCo"><br/>
+<b>Four-bar linkage, first pass</b><br/>MuJoCo shows the links crossing: the assembly is wrong
 </td>
 </tr>
 <tr>
 <td width="33%" align="center" valign="top">
-<img src="img/capability/fourbar_collision_after.gif" alt="Corrected four-bar assembly articulating clean in MuJoCo"><br/>
-<b>After the virtual-collision correction</b> — corrected assembly:<br/>
-the full crank cycle sweeps clean in the same sim ·
-<a href="img/capability/fourbar_collision_after.mp4">▶ full video</a>
+<img src="img/capability/fourbar_collision_after.gif" alt="Corrected four-bar assembly in MuJoCo"><br/>
+<b>After the collision pass</b><br/>the same crank cycle sweeps clean
 </td>
 </tr>
 </table>
 
----
-
-## Update Notes (2.2.7)
-
-> Validate generated definitions, assembly constraints, and manufacturing
-> geometry before production use.
-
-- **First stable release of the C++ engine**, inside prebuilt wheels (Linux x86_64 and aarch64, macOS arm64 14+, Windows
-  x86_64; Python 3.10-3.13; one OpenCASCADE 7.9.3). `pip install simplecadapi` needs no `cadquery-ocp`.
-- **The editor is faster.** On the six-axis arm a joint angle never seen before takes 2.7 s (was 5.7 s in the beta), one seen
-  before 0.6 s (was 5.5 s), and the model reaches the page 0.36-0.41 s after the last cell. The kernel uses about 300 MB more
-  memory at idle than the beta.
-- **`Var` and `Expr` behave like numbers**: `r > 3`, `int(r)`, `round(r, 2)`, `range(n)`, `max(r, 3)`, f-strings work, and
-  a ql predicate with a value computed from a `Var` matches. `bool(var)` and `json.dumps(var)` still raise.
-- **`shape.wrapped` is an OCP shape** when OCP is installed (`simplecadapi[verify]`), a copy, so OCCT verifier scripts run as written.
-- Failing fillets, chamfers and ql selections attach their picture again. Notebooks with saved parameter values rebuild once.
-
-Full notes for this version: [`docs/updates/2.2.7.md`](docs/updates/2.2.7.md).
-Earlier versions: the [changelog](CHANGELOG.md) and [`docs/updates/`](docs/updates/).
-
----
-
-<div align="center">
-  <h2>SimpleCADAPI Research Artifact</h2>
-  <p>This repository is an artifact of</p>
-  <p>
-    <strong><a href="https://arxiv.org/abs/2608.00891">CADIR: A Cross-Backend Editable Intermediate Representation for Agentic CAD Generation</a></strong>
-  </p>
-</div>
-
----
-
-SimpleCADAPI is an OpenCASCADE-native Python SDK for building CAD models with clear,
-functional operations and replayable model graphs. It wraps OpenCascade geometry
-in a compact public API for creating solids, applying features, tagging semantic
-intent, querying topology, exporting manufacturing files, and translating recorded
-models into FreeCAD workflows.
-
-Current release: `simplecadapi==2.2.7`.
-
-## What It Provides
-
-- Models as [marimo](https://marimo.io) notebooks: plain `.py` files that are
-  the only source of truth, one feature per cell, a per-cell cache for
-  incremental headless runs (`sca run`), and notebook composition (`scad.use`).
-- A code-first web editor, `sca edit`: live model, parameter controls, viewport
-  picks written back as selection code, built for working alongside an agent.
-- OpenCASCADE-native shape types: `Vertex`, `Edge`, `Wire`, `Face`, and `Solid`.
-- Functional modeling operations for primitives, profiles, extrude, revolve,
-  loft, sweep, booleans, transforms, patterns, fillets, chamfers, and shells.
-- Canonical `.scadpkg` product packages generated from the notebooks for
-  exchange and publishing; they are never read back as model input.
-- Replayable operation graphs with explicit `GraphSession`,
-  `export_model_json(...)`, `import_model_json(...)`, and `replay_model_json(...)`.
-- Expression parameters with `var(...)`, arithmetic expressions, and serialized
-  expression graphs.
-- Physical units with automatic dimension inference, canonical CAD conversion,
-  and manufacturing tolerance-chain validation.
-- QL selectors for geometry grounding, topology queries, and stable feature
-  selections.
-- Semantic tags through `apply_tag(shape=..., tag=...)` and `list_tags(shape=...)`.
-- STEP/STL export, editable FreeCAD product-package translation, and AP242
-  product-structure export with material and named metadata properties.
-- Agent-oriented STEP/BREP reconstruction with stable entity IDs, focused local
-  diagnostics, highlighted region renders, and measured acceptance gates.
-- Replayable open and periodic interpolated B-spline Edges/Wires for freeform
-  profiles and Loft sections.
-
 ## Install
 
-The shortest way is the line at the top of this page: paste it to your coding
-agent and it does the rest.
-
-By hand:
-
 ```bash
-pip install simplecadapi
+pip install "simplecadapi[editor]"      # the SDK and the editor
+sca example u_link                       # a real workspace to open
+sca edit u_link                          # the editor
+sca skill install                        # the skill for your agent
 ```
 
-The code-first editor (`sca edit`) needs its extra, `pip install "simplecadapi[editor]"`;
-`uv tool install "simplecadapi[editor]"` or `pipx install "simplecadapi[editor]"` put
-`sca` on your PATH without a virtual environment. `sca example u_link` copies a
-bundled example workspace out to open with `sca edit`.
+Python 3.10–3.13 on Linux, macOS and Windows. `uv tool install "simplecadapi[editor]"` puts `sca` on your PATH without a virtual environment. `sca run model.py` runs a notebook headless; `sca export` writes STEP, STL and OBJ.
 
-With `uv`:
+## Research artifact
 
-```bash
-uv add simplecadapi
-```
+This repository is an artifact of [**CADIR: A Cross-Backend Editable Intermediate Representation for Agentic CAD Generation**](https://arxiv.org/abs/2608.00891).
 
-For local development from this repository:
-
-```bash
-uv sync --group dev
-```
-
-### Agent Skill
-
-After installing with pip above, install the bundled skill for your agent
-harness:
-
-```bash
-sca skill targets
-# Default location (~/.agents/skills), or select ZCode's explicitly:
-sca skill install --target zcode --skills-dir ~/.zcode/skills
-```
-
-`targets` lists the available harness targets. `install` compiles the bundled
-source and writes it to `<skills-dir>/simplecadapi`; without `--skills-dir`,
-it uses the existing addon configuration/environment resolution, falling back
-to `~/.agents/skills`; `sca init` is not required. The wheel includes the
-uncompiled `docs/skill/` source tree and `skillproj.toml` as package
-resources — compilation happens on install, no repository checkout needed.
-With `uv`, prefix these commands with `uv run`.
-
-`install` fails if the destination already exists. Add `--force` to replace it
-only if it is a directory whose `SKILL.md` declares the matching skill name
-(`simplecadapi`); unrelated directories cannot be overwritten.
-
-## Quick Start
-
-A model is a [marimo](https://marimo.io) notebook: a plain `.py` file in your
-repository, which stays the only source of truth. A `[tool.simplecadapi]`
-table in its PEP 723 header names the product; each cell holds one
-[feature block](docs/skill/references/discipline/feature-tree-convention.md)
-and records its geometry automatically — no session or decorator boilerplate.
-
-```python
-# bracket.py
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["simplecadapi"]
-#
-# [tool.simplecadapi]
-# id = "bracket"
-# revision = "1.0.0"
-# ///
-import marimo
-
-app = marimo.App()
-
-with app.setup:
-    import simplecadapi as scad
-
-
-@app.cell
-def _():
-    # ---- params: plate ----
-    width = scad.var("width", 60.0, unit="mm")
-    return (width,)
-
-
-@app.cell
-def _():
-    # ---- params: bore ----
-    hole_radius = scad.var("hole_radius", 5.0, unit="mm")
-    return (hole_radius,)
-
-
-@app.cell
-def _(width):
-    # ---- feature: base-plate (build) ----
-    base = scad.make_box_rsolid(
-        width=width, height=36.0, depth=8.0, bottom_face_center=(0.0, 0.0, 0.0)
-    )
-    return (base,)
-
-
-@app.cell
-def _(base, hole_radius):
-    # ---- feature: bore-and-slot (subtract) ----
-    _bore = scad.make_cylinder_rsolid(
-        radius=hole_radius, height=14.0, bottom_face_center=(0.0, 0.0, -3.0)
-    )
-    _slot = scad.make_box_rsolid(
-        width=18.0, height=8.0, depth=14.0, bottom_face_center=(14.0, 0.0, -3.0)
-    )
-    drilled = scad.cut_rsolid(base, _bore, _slot)
-    return (drilled,)
-
-
-@app.cell
-def _(drilled):
-    # ---- feature: boss (add) ----
-    _boss = scad.make_cylinder_rsolid(
-        radius=8.0, height=7.0, bottom_face_center=(-18.0, 0.0, 8.0)
-    )
-    bossed = scad.union_rsolid(drilled, _boss)
-    return (bossed,)
-
-
-@app.cell
-def _(bossed):
-    # ---- feature: role-tag (annotate) ----
-    tagged = scad.apply_tag(shape=bossed, tag="role.demo.bracket")
-    return (tagged,)
-
-
-@app.cell
-def _(tagged):
-    bracket = scad.Part(part_id="bracket", body=tagged)
-    return (bracket,)
-
-
-if __name__ == "__main__":
-    app.run()
-```
-
-The product is the top-level value whose id equals the notebook id. Edit the
-notebook interactively, or run it headlessly with only `simplecadapi`
-installed:
-
-```bash
-marimo edit bracket.py                                    # reactive editor
-sca run bracket.py                                        # run, print a JSON report
-sca run bracket.py --set width=80 --out out/bracket.scadpkg
-sca export out/bracket.scadpkg --output-dir out/exports   # AP242 STEP, STL, OBJ
-sca edit .                                                # web editor over this directory of notebooks
-```
-
-`sca edit` (`pip install "simplecadapi[editor]"`) is the code-first editor
-described above: the notebook's cells on the left, the live model in the
-middle, a slider or toggle for every parameter (`# ---- params ----` cells; a
-`# ui:` comment on the line picks the control), and your viewport picks written
-back as `selected_*` selection cells. See
-`docs/skill/references/docs/guides/notebook-runtime.md` and
-`docs/skill/references/domains/editor-collaboration.md` (how an agent works with
-what you picked and which cell you mean).
-
-## Notebook Runtime
-
-The same runtime runs a notebook in the marimo editor, under `sca run`, and
-from Python with `simplecadapi.runtime.run_notebook()`. Headless runs cache
-every cell, so a rerun only executes the cells whose code, inputs, local
-modules, or child notebooks changed. `--set` overrides a top-level variable
-(the cell that defines it is skipped, so group parameters into cells by what
-changes together); the report lists each cell as `ran`, `cached`, or
-`skipped`.
-
-Export and verification scripts are plain Python that load the product with
-`run_notebook` and write packages from it:
-
-```python
-from pathlib import Path
-
-import simplecadapi as scad
-from simplecadapi.runtime import run_notebook
-
-out = Path("out")
-run = run_notebook("bracket.py", overrides={"width": 80.0})
-print("volume", round(run.product.body.get_volume(), 3))
-print("tags", scad.list_tags(shape=run.product.body))
-
-package = out / "bracket.scadpkg"
-scad.capture(run.definition, package)
-scad.exporter.export_product_package_to_step(package, out / "bracket.step")
-scad.exporter.export_product_package_to_stl(package, out / "bracket.stl")
-scad.exporter.export_product_package_to_obj(package, out / "bracket.obj")
-```
-
-The `.scadpkg` embeds the definition closure, evaluated scene, feature
-graphs, source snapshots, topology, and render/selection assets. It is
-generated for exchange and publishing, never read back as model input.
-
-### Composing notebooks
-
-An assembly notebook brings in other notebooks with `scad.use`. A relative
-path is relative to the calling notebook, and keyword arguments override the
-child's top-level variables:
-
-```python
-@app.cell
-def _():
-    bracket = scad.use("bracket.py", width=80.0)
-    return (bracket,)
-
-
-@app.cell
-def _(bracket):
-    rig = scad.make_assembly_rassembly(assembly_id="rig", name="Rig")
-    rig = scad.add_component_rassembly(
-        assembly=rig, item=bracket, component_id="bracket",
-        placement=scad.identity_placement_rplacement(),
-    )
-    return (rig,)
-```
-
-One notebook can describe a part family — parts that differ only in their
-parameters, such as the links of a linkage. Its product takes
-`part_id=scad.notebook_id()`, and each use names its member:
-`scad.use("link_bar.py", id="crank", center_distance=40.0)` (or
-`sca run link_bar.py --id crank`). Each member is one definition with its own
-content hash and cell cache.
-
-`@scad.part` / `@scad.assemble` remain for reusable library builders in plain
-modules next to the notebooks; cells call them and take `.value`. See the
-[notebook runtime and product build workflow](docs/skill/references/docs/guides/notebook-runtime.md)
-for the project layout, the cell cache, and downstream targets.
-
-### Migrating from `@scad.part` scripts
-
-The script-anchored part cache of 2.1.2 (the `cache=` builder option, the
-`.simplecad` cache directories, and the incremental assembly report) is
-removed; the cell is now the unit of caching.
-
-- Move each part into a notebook: its parameters into params cells, each FTC
-  block into a cell of its own (each cell binds a new name), and the final
-  `scad.Part(...)` / assembly into the last cell.
-- Replace `main.py` entry points that build and export as a side effect with
-  export scripts that call `run_notebook` and `scad.capture`.
-- Replace direct builder calls between products with `scad.use(...)`; keep
-  `@scad.part` builders only for library parts called from cells.
-- Add `__marimo__/` (generated runtime state) to `.gitignore`.
-
-### Command-line product export
-
-Export the standard delivery set (AP242 STEP, binary STL, and OBJ) from a
-validated product package with no wrapper script:
-
-```bash
-uv run sca export out/bracket.scadpkg --output-dir out/exports
-```
-
-Request additional targets explicitly.  FCStd requires `FreeCADCmd` (or an
-explicit `--freecad-cmd` path); `--check` validates the package, output paths,
-and selected target prerequisites without writing files.
-
-```bash
-uv run sca export out/bracket.scadpkg \
-  --format fcstd --format mjcf --output-dir out/exports --check
-uv run sca export out/bracket.scadpkg \
-  --format fcstd --freecad-cmd /path/to/FreeCADCmd --output-dir out/exports
-```
-
-STL and OBJ share one direct OpenCASCADE tessellation of the evaluated BREP.
-Both outputs contain the same oriented triangles and require no optional
-remeshing dependency. Control curved-surface accuracy with `linear_deflection`
-and `angular_deflection_degrees`.
-
-## Replayable Operation Graphs
-
-Use an explicit `GraphSession` when a geometry flow outside a notebook should
-be inspectable, serializable, or replayable.
-
-```python
-import simplecadapi as scad
-from simplecadapi import GraphSession, export_model_json, replay_model_json
-from simplecadapi import ql as Q
-
-with GraphSession(graph_id="chamfered_block") as session:
-    body = scad.make_box_rsolid(
-        width=40.0, height=24.0, depth=10.0,
-        bottom_face_center=(0.0, 0.0, 0.0),
-    )
-    cutter = scad.make_cylinder_rsolid(
-        radius=4.0, height=16.0, bottom_face_center=(0.0, 0.0, -3.0)
-    )
-    drilled = scad.cut_rsolid(body, cutter)
-
-    bottom_circle = (
-        Q.edges()
-        .where(Q.curve_type(kind="circle"))
-        .order_by(Q.center_axis(axis="z"))
-        .take(1)
-        .exactly(1)
-    )
-    final = scad.chamfer_rsolid(solid=drilled, edges=bottom_circle, distance=0.6)
-    session.capture_result(value=final)
-    model_json = export_model_json(session=session)
-    recorded_nodes = session.graph.node_count
-
-rebuilt = replay_model_json(json_str=model_json)
-print("recorded_nodes", recorded_nodes)
-print("replayed_outputs", len(rebuilt))
-```
-
-An explicit `GraphSession` is for inspection, serialization, and replay
-outside a notebook; notebook cells already record into sessions of their own,
-so do not open one there. It stays in memory until an export API is called.
-A durable CAD/viewer deliverable is a notebook product captured to
-`.scadpkg` (see [Notebook Runtime](#notebook-runtime)).
-
-## STEP/BREP Inspection
-
-Synchronized STEP views, highlighted regions and slice overlays need nothing
-beyond `pip install simplecadapi`: they are drawn by the built-in software
-renderer (no GPU, no display server, no VTK). Only the engineering-drawing
-family (`simplecadapi.inspect.drawing`) needs the `drawing` extra.
-
-Inspection lives under `simplecadapi.inspect.brep`. These APIs are diagnostic
-tools, not modeling operations: they do not enter the graph and are rejected
-inside `GraphSession`. Export or obtain the geometry first, then
-inspect it outside the modeling script.
-
-Choose calls from the evidence required by the case instead of following a
-fixed reverse-engineering pipeline. Start with bounded global and local facts;
-add sections, component renders, boundary distance, material difference, or
-strict topology comparison only when those facts answer the current question.
-
-```python
-from simplecadapi.inspect import brep
-
-summary = brep.inspect_step_rsummary(
-    path="target.step",
-    include_parameter_groups=True,
-)
-face = brep.inspect_step_entity_rdescriptor(
-    path="target.step",
-    entity_id="face:0",
-)
-
-print("faces", summary["face_count"])
-print("carrier", face["geometry"]["type"])
-```
-
-Use the [Reconstruction Agent test specification](docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md)
-for controlled runs and the [STEP reconstruction workflow](docs/skill/references/workflows/step-reconstruction.md)
-for the inspection primitives, modeling loop, replay checks, and acceptance gates.
-
-## Physical Units And Tolerances
-
-Declare nominal and manufacturing-tolerance units at the variable boundary.
-SimpleCAD evaluates lengths in millimeters and angles in degrees while preserving
-the declaration units in model JSON:
-
-```python
-import simplecadapi as scad
-
-width = scad.var(
-    "width",
-    1.0,
-    unit="in",
-    tolerance=0.1,
-    tolerance_unit="mm",
-)
-height = scad.var("height", 40.0, unit="mm", tolerance=0.2)
-diagonal = scad.sqrt(width**2 + height**2)
-
-analysis = scad.analyze_tolerance(diagonal)
-check = scad.check_tolerance(diagonal, 0.3, tolerance_unit="mm")
-
-print(analysis.dimension.name, analysis.unit.symbol)
-print(analysis.nominal, analysis.lower_bound, analysis.upper_bound)
-print("passes", check.passed)
-```
-
-Addition and subtraction require matching dimensions. Multiplication, division,
-integer powers, and square root derive dimensions. Trigonometric functions require
-angle or dimensionless inputs as appropriate. Legacy variables without `unit`
-remain supported, but cannot be mixed with unit-declared variables in one
-expression.
-
-## Modeling Mental Model
-
-- Start from design intent: reference axes, critical profiles, and the features
-  that produce the final solid.
-- Build from lower-dimensional geometry to higher-dimensional geometry: profile
-  wires/faces first, then solid features such as extrude, revolve, loft, and
-  sweep.
-- Keep operations functional. Create new values with public functions such as
-  `make_rectangle_rface(...)`, `extrude_rsolid(...)`, `cut_rsolid(...)`, and
-  `fillet_rsolid(...)`.
-- Use tags for semantic intent and selection anchors, for example
-  `role.mounting.surface`, `anchor.datum.primary`, or `group.fasteners`.
-- Store numeric and geometric facts in metadata or graph payloads, not in tags.
-- Use QL to ground selections by geometry facts rather than relying on topology
-  iteration order.
-- When an indexed topology pick is intentional, pass the index to the plural
-  child-geometry getter, such as `get_edges(index)`, `get_faces(index)`,
-  `get_wires(index)`, or `get_vertices(index)`, so replayable graph workflows
-  preserve the pick as a geo select node.
-
-Use model JSON only for graph replay and inspection. External CAD translation and
-file export consume the validated `.scadpkg` closure:
-
-```python
-script = scad.translator.freecad_translator.translate_product_package_to_freecad_script(
-    package_path
-)
-scad.translator.freecad_translator.translate_product_package_to_fcstd(
-    package_path, "bracket.FCStd"
-)
-```
-
-Part/Assembly models are written as editable FreeCAD assembly structure: parts are
-`App::Part`, assemblies are `Assembly::AssemblyObject`, and components are links.
-The exporter namespace owns neutral STEP and STL file output.
-
-## Examples
-
-Every example is a self-contained folder: part and assembly notebooks, the
-plain modules they import, export and verification scripts, and fresh
-artifacts under `examples/<name>/out/`. The set covers part modeling,
-assemblies, reverse engineering, and FEM — see the category index in
-[`examples/README.md`](examples/README.md).
-
-```bash
-# part (quickstart FTC notebook, external verification script included)
-marimo edit examples/flange_plate/flange_plate.py
-uv run python examples/flange_plate/verify.py
-
-# assembly (two-stage planetary reducer: part-family notebooks, MJCF export)
-sca run examples/compact_two_stage_planetary_reducer/compact_two_stage_planetary_reducer.py
-uv run python examples/compact_two_stage_planetary_reducer/export_mjcf.py
-
-# Gmsh volume mesh (AP242 STEP -> volume mesh)
-uv run python examples/ap242_gmsh_volume_mesh/export_step.py
-uv run --extra gmsh python examples/ap242_gmsh_volume_mesh/export_fem_mesh.py
-```
-
-To try the editor on a real model, `sca example u_link` copies a motor mount
-(two part notebooks and the assembly that fixes them) out of the package, and
-`sca edit u_link_motor_mount` opens it; from a checkout,
-`sca edit examples/u_link_motor_mount`. Reconstructing a STEP file (see
-`examples/bowl_connector/`) is driven by the agent through the inspection API
-and the [STEP reconstruction workflow](docs/skill/references/workflows/step-reconstruction.md).
-
-## Documentation
-
-- 2.2.7 update notes: [`docs/updates/2.2.7.md`](docs/updates/2.2.7.md)
-- 2.2.7b1 update notes: [`docs/updates/2.2.7b1.md`](docs/updates/2.2.7b1.md)
-- 2.2.6.post2 update notes: [`docs/updates/2.2.6.post2.md`](docs/updates/2.2.6.post2.md)
-- 2.2.6.post1 update notes: [`docs/updates/2.2.6.post1.md`](docs/updates/2.2.6.post1.md)
-- 2.2.6 update notes: [`docs/updates/2.2.6.md`](docs/updates/2.2.6.md)
-- 2.2.5 update notes: [`docs/updates/2.2.5.md`](docs/updates/2.2.5.md)
-- 2.2.4 update notes: [`docs/updates/2.2.4.md`](docs/updates/2.2.4.md)
-- 2.2.3 update notes: [`docs/updates/2.2.3.md`](docs/updates/2.2.3.md)
-- 2.2.2 update notes: [`docs/updates/2.2.2.md`](docs/updates/2.2.2.md)
-- 2.2.1 update notes: [`docs/updates/2.2.1.md`](docs/updates/2.2.1.md)
-- 2.1.3b1 update notes: [`docs/updates/2.1.3b1.md`](docs/updates/2.1.3b1.md)
-- 2.1.2 update notes: [`docs/updates/2.1.2.md`](docs/updates/2.1.2.md)
-- 2.1.1 update notes: [`docs/updates/2.1.1.md`](docs/updates/2.1.1.md)
-- 2.1.0 update notes: [`docs/updates/2.1.0.md`](docs/updates/2.1.0.md)
-- Reconstruction Agent test specification:
-  [`docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md`](docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md)
-- Landing script for agents: [`docs/landing.md`](docs/landing.md)
-- Editor collaboration (selection, cell references, parameters):
-  [`docs/skill/references/domains/editor-collaboration.md`](docs/skill/references/domains/editor-collaboration.md)
-- STEP reconstruction workflow:
-  [`docs/skill/references/workflows/step-reconstruction.md`](docs/skill/references/workflows/step-reconstruction.md)
-- Notebook runtime and product build workflow:
-  [`docs/skill/references/docs/guides/notebook-runtime.md`](docs/skill/references/docs/guides/notebook-runtime.md)
-- Public API reference: [`docs/skill/references/docs/api/`](docs/skill/references/docs/api/)
-- Core type and modeling notes: [`docs/skill/references/docs/core/`](docs/skill/references/docs/core/)
-- Serialization and replay details:
-  [`docs/skill/references/docs/core/serialization/README.md`](docs/skill/references/docs/core/serialization/README.md)
-- Dimension tolerance chains:
-  [`docs/core/dimension-tolerance-chains.md`](docs/skill/references/docs/core/dimension-tolerance-chains.md)
-- Physical units and dimension inference:
-  [`docs/core/physical-units.md`](docs/skill/references/docs/core/physical-units.md)
-- Operation graph JSON spec:
-  [`docs/core/operation_graph_json_spec.md`](docs/skill/references/docs/core/operation_graph_json_spec.md)
-- `.scadpkg` package format:
-  [`docs/skill/references/scadpkg-format.md`](docs/skill/references/scadpkg-format.md)
-
-## Releasing the Agent Skill
-
-The skill source tree lives under `docs/skill/` and stays harness-neutral.
-`tools/skillbuild.py` wraps the same compiler the `sca skill` CLI uses, for
-maintainer builds in this repository: it compiles per harness target (targets
-and default output directories are configured in `skillproj.toml`; the outputs
-under `skills/simplecadapi-*/` are regenerable build artifacts and are not
-committed). Harness-specific text, when it is ever needed, is marked with
-`<!-- skill:if ... -->` conditional blocks that compile per target. The wheel
-itself never contains precompiled targets — end users install from the
-bundled source with `sca skill install`.
-
-From a clean checkout, update the project version and documentation, then
-build and validate the release artifacts:
-
-```bash
-uv sync --group dev
-uv run python tools/auto_docs_gen.py --quiet
-uv run python tools/skillbuild.py --target omp
-uv run pytest test/test_skill_build.py
-tar -C skills -czf skills/simplecadapi.tar.gz simplecadapi-omp
-```
-
-The commands regenerate the API references inside the skill tree, recompile
-the omp target, and create `skills/simplecadapi.tar.gz`. Review the source
-tree and the compiled output before release:
-
-```bash
-git diff -- docs/skill
-tar -tzf skills/simplecadapi.tar.gz | head
-```
-
-Commit only the `docs/skill/` source tree; the release workflow builds the
-harness outputs and uploads the archive to the GitHub release. Prefer
-`sca skill` for installation from a pip-installed package.
-
-## Development
-
-```bash
-uv sync --group dev
-uv run python -m pytest test tests
-python3 -m compileall src/simplecadapi
-```
-
-## License
-
-Apache-2.0, see [`LICENSE`](LICENSE).
-
-## Community
-
-The group chat currently has too many members for direct QR-code joining. Scan the QR code below to add Teacher Du Peng on WeChat, then ask him for an invitation to the CADDesigner technical community:
-
-<p align="center">
-  <img src="img/dp个人账号.png.jpg" alt="Teacher Du Peng's personal WeChat QR code" width="420">
-</p>
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=PhySpace%2FSimpleCADAPI&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=PhySpace/SimpleCADAPI&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=PhySpace/SimpleCADAPI&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=PhySpace/SimpleCADAPI&type=date&legend=top-left" />
- </picture>
-</a>
+Apache-2.0. Validate generated models before production use.

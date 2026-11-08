@@ -25,7 +25,9 @@ unchanged result. Other surface families are explicitly rejected.
 
 The operation is recorded as ``make_draft_rsolid``; the body and selected
 faces are ordered inputs, and the angle, neutral plane and face selection
-nodes are parameters, so model JSON replay is strict.
+nodes are parameters, so model JSON replay is strict. The recorded node carries the kernel's face and edge history, so element
+references follow faces through it (a
+drafted face continues its source face).
 
 ## Parameters
 

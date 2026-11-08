@@ -98,7 +98,7 @@ std::vector<TopoDS_Wire> free_boundaries(const TopoDS_Shape& shell, double toler
 
 using namespace surface::detail;
 
-Shell sew_faces_rshell(const std::vector<Face>& faces, double tolerance, const TagPrefix& tag_prefix) {
+Shell sew_faces_rshell(const std::vector<Shape>& pieces, double tolerance, const TagPrefix& tag_prefix) {
   static const ErrorSpec kSpec{
       "sew_faces_rshell",
       "Failed to sew faces into one shell.",
@@ -110,24 +110,35 @@ Shell sew_faces_rshell(const std::vector<Face>& faces, double tolerance, const T
        "When freeform patches must share exact boundary edges, build them with make_gordon_surface_rface on a shared "
        "edge network before sewing."}};
   return operator_scope(kSpec, [&] {
-    if (faces.empty())
+    if (pieces.empty())
       throw ValueError("sew_faces_rshell requires a non-empty Face sequence");
     require_positive_finite(tolerance, "tolerance");
+    // a shell is sewn as its faces
+    std::vector<Face> faces;
+    for (const Shape& piece : pieces) {
+      if (piece.kind() == Kind::Face)
+        faces.push_back(Face(piece));
+      else if (piece.kind() == Kind::Shell)
+        for (const Face& face : Shell(piece).faces())
+          faces.push_back(face);
+      else
+        throw TypeError("sew_faces_rshell takes Face and Shell objects");
+    }
     std::vector<TopoDS_Face> raw;
     for (const Face& face : faces)
       raw.push_back(TopoDS::Face(face.wrapped()));
     SewnShell sewn = sew_faces_with_history(raw, tolerance);
 
     Value params = Value::object();
-    params.set("face_count", static_cast<std::int64_t>(faces.size()));
+    params.set("face_count", static_cast<std::int64_t>(pieces.size()));  // the pieces given: faces and shells
     params.set("tolerance", tolerance);
     params.set("tag_prefix", to_value(tag_prefix));
     SewnOutput output{.record = {.op = "sew_faces_rshell", .params = std::move(params)},
                       .tag_prefix = tag_prefix,
                       .sources = faces,
                       .result_face_indices = std::move(sewn.result_face_indices)};
-    for (const Face& face : faces)
-      output.record.inputs.push_back({face, "face"});
+    for (const Shape& piece : pieces)
+      output.record.inputs.push_back({piece, piece.kind() == Kind::Shell ? "shell" : "face"});
     return finalize_surface_output(Shell(sewn.shell), std::move(output));
   });
 }

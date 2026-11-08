@@ -54,9 +54,11 @@ Stage and role pages of the long workflows:
 | --- | --- |
 | `domains/addon-development.md` | you create, publish, install, update or remove a SimpleCADAPI addon (`sca-addon.toml`), or decide whether a capability is an addon or SDK work. |
 | `domains/assembly-and-product.md` | the deliverable has more than one physical part, repeated instances, nested subassemblies, motion semantics, or a `.scadpkg` package (details under "Use when"). |
+| `domains/curve-surface-editing.md` | an existing Edge or Face must be reshaped by its control points, weights, knots or degree, refitted, or sampled for a curvature comb / isocurves. |
 | `domains/drawing-inspection-evidence.md` | a section view of the drawing must be verified against the rebuilt model, a DIM ledger row needs its `measurement_contract`, or the roundtrip evidence (annotations, reviews, coverage) is built or checked. |
 | `domains/drawing-inspection.md` | a vector-PDF engineering drawing must be parsed into tiered evidence, or a rebuilt model is read back for the roundtrip. |
 | `domains/editor-collaboration.md` | a person has the code-first editor open (`sca edit`) and you edit the same notebooks (a selection, a cell reference or a tuned value arrives). |
+| `domains/editor-gui-features.md` | a person made features with the editor's buttons (`# gui:` cells, `scad.ref` selections, workplanes, canvas sketches), or you run the same operations with `sca feature` / `sca sketch`. |
 | `domains/engineering-drawing.md` | a validated part or product needs a GB-standard drawing sheet (DXF + PNG). |
 | `domains/export-and-translation.md` | a validated `.scadpkg` must be delivered as STEP, STL, OBJ, MJCF or an editable external CAD document. |
 | `domains/part-modeling.md` | the deliverable is one physical single-solid part, or an existing part source needs a geometry edit (Role 4 of `workflows/single-part-modeling.md`). |

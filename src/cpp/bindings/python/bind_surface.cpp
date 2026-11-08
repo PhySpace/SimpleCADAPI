@@ -5,6 +5,7 @@
 // the Python package.  This is also where the units hook of the surface area is wired to the
 // reactive area's dimension inference.
 #include "bindings.hpp"
+#include "scad/ops/geometry/wires.hpp"
 
 #include <array>
 #include <optional>
@@ -36,6 +37,37 @@
 namespace {
 
 using namespace scad;
+using scad::pybind::AnyOf;
+using scad::pybind::Choice;
+using scad::pybind::Direction3;
+using scad::pybind::Length;
+using scad::pybind::Point3;
+using scad::pybind::PointVec3;
+
+// The names the signatures show.
+struct ContinuityTag {
+  static constexpr auto name = py::detail::const_name("Literal['C0', 'G1', 'G2']");
+};
+struct LoftSectionTag {
+  static constexpr auto name = py::detail::const_name("Wire | Vertex");
+};
+struct WeightsTag {  // three smoothing weights, not a point
+  static constexpr auto name = py::detail::const_name("tuple[float, float, float]");
+};
+using SmoothingWeights = scad::pybind::Renamed<std::array<double, 3>, WeightsTag>;
+using PointRows = std::vector<std::vector<PointVec3>>;  // a rectangular grid of positions, row by row
+
+PointGrid grid_of(const PointRows& rows) {
+  PointGrid grid;
+  grid.reserve(rows.size());
+  for (const auto& row : rows)
+    grid.emplace_back(row.begin(), row.end());
+  return grid;
+}
+
+std::vector<Vec3> points_of(const std::vector<PointVec3>& points) {
+  return {points.begin(), points.end()};
+}
 
 // expression_uses_units / infer_dimension for the surface operators' dimension checks.
 ScalarUnits probe_units(const Scalar& value) {
@@ -124,8 +156,8 @@ void bind_surface(py::module_& m) {
 
   // ---- value types ---------------------------------------------------------------------------
   py::class_<SurfaceBoundary>(m, "SurfaceBoundary", "One edge constraint used by make_surface_patch_rface.")
-      .def(py::init([](Edge edge, const std::string& continuity, std::optional<Face> support) {
-             return SurfaceBoundary(std::move(edge), continuity, std::move(support));
+      .def(py::init([](Edge edge, const Choice<ContinuityTag>& continuity, std::optional<Face> support) {
+             return SurfaceBoundary(std::move(edge), continuity.value, std::move(support));
            }),
            py::arg("edge"), py::arg("continuity") = "C0", py::arg("support") = py::none())
       .def_property_readonly("edge", [](const SurfaceBoundary& b) { return b.edge; })
@@ -166,38 +198,40 @@ void bind_surface(py::module_& m) {
   // ---- operators -----------------------------------------------------------------------------
   m.def(
       "make_bezier_surface_rface",
-      [](const PointGrid& control_points, const std::optional<WeightGrid>& weights, const TagPrefix& tag_prefix) {
-        return make_bezier_surface_rface(control_points, weights, tag_prefix);
+      [](const PointRows& control_points, const std::optional<WeightGrid>& weights, const TagPrefix& tag_prefix) {
+        return make_bezier_surface_rface(grid_of(control_points), weights, tag_prefix);
       },
       py::arg("control_points"), py::arg("weights") = py::none(), py::kw_only(), py::arg("tag_prefix") = py::none(),
       "Create a trimmed Face carrying a tensor-product Bezier surface.");
 
   m.def(
       "make_cylindrical_surface_rface",
-      [](const Scalar& radius, const ScalarRange& u_range, const ScalarRange& v_range, const ScalarVec3& origin,
-         const ScalarVec3& axis, const std::optional<ScalarVec3>& x_direction, const Scalar& tolerance,
-         const TagPrefix& tag_prefix) {
-        return make_cylindrical_surface_rface(radius, u_range, v_range,
-                                              {.origin = origin,
-                                               .axis = axis,
-                                               .x_direction = x_direction,
-                                               .tolerance = tolerance,
-                                               .tag_prefix = tag_prefix});
+      // u is the raw angle in radians (not an Angle, which is degrees); v runs along the axis, a length.
+      [](const Length& radius, const ScalarRange& u_range, const std::pair<Length, Length>& v_range,
+         const Point3& origin, const Direction3& axis, const std::optional<Direction3>& x_direction,
+         const Scalar& tolerance, const TagPrefix& tag_prefix) {
+        const std::optional<ScalarVec3> x_dir =
+            x_direction ? std::optional<ScalarVec3>(x_direction->value) : std::nullopt;
+        return make_cylindrical_surface_rface(
+            radius, u_range, ScalarRange{v_range.first, v_range.second},
+            {.origin = origin, .axis = axis, .x_direction = x_dir, .tolerance = tolerance, .tag_prefix = tag_prefix});
       },
-      py::arg("radius"), py::arg("u_range"), py::arg("v_range"), py::arg("origin") = ScalarVec3{0.0, 0.0, 0.0},
-      py::arg("axis") = ScalarVec3{0.0, 0.0, 1.0}, py::arg("x_direction") = py::none(), py::kw_only(),
+      py::arg("radius"), py::arg("u_range"), py::arg("v_range"), py::arg("origin") = py::make_tuple(0.0, 0.0, 0.0),
+      py::arg("axis") = py::make_tuple(0.0, 0.0, 1.0), py::arg("x_direction") = py::none(), py::kw_only(),
       py::arg("tolerance") = Scalar(tol::kSurfaceTrim), py::arg("tag_prefix") = py::none(),
       "Create a finite cylindrical carrier Face over explicit U/V ranges (U in raw radians, at most one turn).");
 
   m.def(
       "fit_point_grid_rface",
-      [](const PointGrid& points, double tolerance, int degree_min, int degree_max,
-         const std::optional<std::array<double, 3>>& smoothing, const TagPrefix& tag_prefix) {
-        return fit_point_grid_rface(points, {.tolerance = tolerance,
-                                             .degree_min = degree_min,
-                                             .degree_max = degree_max,
-                                             .smoothing = smoothing,
-                                             .tag_prefix = tag_prefix});
+      [](const PointRows& points, double tolerance, int degree_min, int degree_max,
+         const std::optional<SmoothingWeights>& smoothing, const TagPrefix& tag_prefix) {
+        const std::optional<std::array<double, 3>> weights =
+            smoothing ? std::optional<std::array<double, 3>>(smoothing->value) : std::nullopt;
+        return fit_point_grid_rface(grid_of(points), {.tolerance = tolerance,
+                                                      .degree_min = degree_min,
+                                                      .degree_max = degree_max,
+                                                      .smoothing = weights,
+                                                      .tag_prefix = tag_prefix});
       },
       py::arg("points"), py::kw_only(), py::arg("tolerance") = tol::kFitError, py::arg("degree_min") = 3,
       py::arg("degree_max") = 8, py::arg("smoothing") = py::none(), py::arg("tag_prefix") = py::none(),
@@ -220,14 +254,14 @@ void bind_surface(py::module_& m) {
 
   m.def(
       "make_surface_patch_rface",
-      [](const std::vector<SurfaceBoundary>& boundaries, const std::vector<Vec3>& points,
+      [](const std::vector<SurfaceBoundary>& boundaries, const std::vector<PointVec3>& points,
          const std::optional<SurfaceFillingSettings>& settings, const std::vector<Wire>& holes,
          const TagPrefix& tag_prefix) {
         return make_surface_patch_rface(
-            boundaries, {.points = points, .settings = settings, .holes = holes, .tag_prefix = tag_prefix});
+            boundaries, {.points = points_of(points), .settings = settings, .holes = holes, .tag_prefix = tag_prefix});
       },
-      py::arg("boundaries"), py::kw_only(), py::arg("points") = std::vector<Vec3>{}, py::arg("settings") = py::none(),
-      py::arg("holes") = std::vector<Wire>{}, py::arg("tag_prefix") = py::none(),
+      py::arg("boundaries"), py::kw_only(), py::arg("points") = std::vector<PointVec3>{},
+      py::arg("settings") = py::none(), py::arg("holes") = std::vector<Wire>{}, py::arg("tag_prefix") = py::none(),
       "Fill a constrained boundary network into one Face, optionally with holes.");
 
   m.def(
@@ -242,14 +276,17 @@ void bind_surface(py::module_& m) {
 
   m.def(
       "loft_rshell",
-      [](const std::vector<py::object>& raw_sections, bool ruled, const TagPrefix& tag_prefix,
+      [](const std::vector<AnyOf<LoftSectionTag>>& raw_sections, bool ruled, const TagPrefix& tag_prefix,
          const std::optional<std::string>& result_tag, const std::optional<std::string>& start_wire_tag,
          const std::optional<std::string>& end_wire_tag, const std::optional<std::string>& side_faces_tag) {
         std::vector<LoftSection> sections;
         sections.reserve(raw_sections.size());
-        for (const py::object& item : raw_sections) {
+        for (const auto& section : raw_sections) {
+          const py::object& item = section.value;
           if (py::isinstance<Wire>(item))
             sections.emplace_back(item.cast<Wire>());
+          else if (py::isinstance<Edge>(item))  // the wire of that one edge
+            sections.emplace_back(as_wire(item.cast<Edge>(), ""));
           else if (py::isinstance<Vertex>(item))
             sections.emplace_back(item.cast<Vertex>());
           else
@@ -268,11 +305,11 @@ void bind_surface(py::module_& m) {
 
   m.def(
       "sew_faces_rshell",
-      [](const std::vector<Face>& faces, double tolerance, const TagPrefix& tag_prefix) {
-        return sew_faces_rshell(faces, tolerance, tag_prefix);
+      [](const std::vector<Shape>& pieces, double tolerance, const TagPrefix& tag_prefix) {
+        return sew_faces_rshell(pieces, tolerance, tag_prefix);
       },
       py::arg("faces"), py::kw_only(), py::arg("tolerance") = tol::kSewing, py::arg("tag_prefix") = py::none(),
-      "Sew faces into exactly one connected Shell.");
+      "Sew faces, and the faces of shells, into exactly one connected Shell.");
 
   m.def(
       "make_solid_from_shell_rsolid",

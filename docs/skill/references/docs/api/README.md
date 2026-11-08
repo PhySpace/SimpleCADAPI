@@ -37,6 +37,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [make_face_from_sketch_rface](make_face_from_sketch_rface.md) *(from operators/sketch.py)* `top-level`
 - [make_face_from_wire_rface](make_face_from_wire_rface.md) *(from operators/geometry.py)* `top-level`
 - [make_face_from_wires_rface](make_face_from_wires_rface.md) *(from operators/geometry.py)* `top-level`
+- [make_faces_from_sketch_rfacelist](make_faces_from_sketch_rfacelist.md) *(from operators/sketch.py)* `top-level`
 - [make_gordon_surface_rface](make_gordon_surface_rface.md) *(from operators/geometry.py)* `top-level`
 - [make_helix_redge](make_helix_redge.md) *(from operators/geometry.py)* `top-level`
 - [make_helix_rwire](make_helix_rwire.md) *(from operators/geometry.py)* `top-level`
@@ -67,6 +68,13 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [make_vertex_connector_rconnector](make_vertex_connector_rconnector.md) *(from operators/product.py)* `top-level`
 - [make_wire_from_edges_rwire](make_wire_from_edges_rwire.md) *(from operators/geometry.py)* `top-level`
 - [make_wire_from_sketch_rwire](make_wire_from_sketch_rwire.md) *(from operators/sketch.py)* `top-level`
+- [make_workplane_from_axis_rworkplane](make_workplane_from_axis_rworkplane.md) *(from operators/geometry.py)* `top-level`
+- [make_workplane_from_face_rworkplane](make_workplane_from_face_rworkplane.md) *(from operators/geometry.py)* `top-level`
+- [make_workplane_from_points_rworkplane](make_workplane_from_points_rworkplane.md) *(from operators/geometry.py)* `top-level`
+- [make_workplane_midplane_rworkplane](make_workplane_midplane_rworkplane.md) *(from operators/geometry.py)* `top-level`
+- [make_workplane_normal_to_curve_rworkplane](make_workplane_normal_to_curve_rworkplane.md) *(from operators/geometry.py)* `top-level`
+- [make_workplane_offset_rworkplane](make_workplane_offset_rworkplane.md) *(from operators/geometry.py)* `top-level`
+- [make_workplane_rworkplane](make_workplane_rworkplane.md) *(from operators/geometry.py)* `top-level`
 
 ## Transforms
 
@@ -187,7 +195,9 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 
 ## Advanced Features
 
+- [chamfer_corner_rsketch](chamfer_corner_rsketch.md) *(from operators/sketch.py)* `top-level`
 - [chamfer_rsolid](chamfer_rsolid.md) *(from operators/features.py)* `top-level`
+- [fillet_corner_rsketch](fillet_corner_rsketch.md) *(from operators/sketch.py)* `top-level`
 - [fillet_rsolid](fillet_rsolid.md) *(from operators/features.py)* `top-level`
 - [helical_sweep_rsolid](helical_sweep_rsolid.md) *(from operators/features.py)* `top-level`
 - [shell_rsolid](shell_rsolid.md) *(from operators/features.py)* `top-level`
@@ -314,6 +324,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 ## Other
 
 - [Assembly](Assembly.md) *(from product/assembly.py)* `top-level`
+- [Body](Body.md) *(from product/part.py)* `top-level`
 - [CaptureResult](CaptureResult.md) *(from product/capture.py)* `top-level`
 - [Component](Component.md) *(from product/assembly.py)* `top-level`
 - [Connector](Connector.md) *(from product/connector.py)* `top-level`
@@ -322,6 +333,8 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [Constraint](Constraint.md) *(from product/constraint.py)* `top-level`
 - [ConstraintReport](ConstraintReport.md) *(from product/constraint.py)* `top-level`
 - [ConstraintResidual](ConstraintResidual.md) *(from product/constraint.py)* `top-level`
+- [ElementRef](ElementRef.md) *(from ref.py)* `top-level`
+- [ElementRefError](ElementRefError.md) *(from topology/element_ref.py)* `top-level`
 - [GeometryRef](GeometryRef.md) *(from product/connector.py)* `top-level`
 - [Material](Material.md) *(from product/material.py)* `top-level`
 - [Part](Part.md) *(from product/part.py)* `top-level`
@@ -380,8 +393,16 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [constrain_symmetric_rsketch](constrain_symmetric_rsketch.md) *(from operators/sketch.py)* `top-level`
 - [constrain_tangent_rsketch](constrain_tangent_rsketch.md) *(from operators/sketch.py)* `top-level`
 - [constrain_vertical_rsketch](constrain_vertical_rsketch.md) *(from operators/sketch.py)* `top-level`
+- [convert_spline_to_anchors_rsketch](convert_spline_to_anchors_rsketch.md) *(from operators/sketch.py)* `top-level`
+- [convert_to_bspline_redge](convert_to_bspline_redge.md) *(from operators/geometry.py)* `top-level`
+- [convert_to_bspline_rface](convert_to_bspline_rface.md) *(from operators/geometry.py)* `top-level`
+- [diff_sketch_rsketchdiff](diff_sketch_rsketchdiff.md) *(from operators/sketch.py)* `top-level`
 - [draft_rsolid](draft_rsolid.md) *(from operators/features.py)* `top-level`
+- [elevate_curve_degree_redge](elevate_curve_degree_redge.md) *(from operators/geometry.py)* `top-level`
+- [elevate_surface_degree_rface](elevate_surface_degree_rface.md) *(from operators/geometry.py)* `top-level`
 - [explain_tag](explain_tag.md) *(from operators/selection.py)* `top-level`
+- [explode_rassembly](explode_rassembly.md) *(from operators/product.py)* `top-level`
+- [extend_rsketch](extend_rsketch.md) *(from operators/sketch.py)* `top-level`
 - [fill_holes_rshell](fill_holes_rshell.md) *(from operators/geometry.py)* `top-level`
 - [fit_point_grid_rface](fit_point_grid_rface.md) *(from operators/geometry.py)* `top-level`
 - [free_boundaries_rwirelist](free_boundaries_rwirelist.md) *(from operators/geometry.py)* `top-level`
@@ -390,14 +411,27 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [get_sketch_point_rsketchref](get_sketch_point_rsketchref.md) *(from operators/sketch.py)* `top-level`
 - [ground_component_rassembly](ground_component_rassembly.md) *(from operators/product.py)* `top-level`
 - [identity_placement_rplacement](identity_placement_rplacement.md) *(from operators/product.py)* `top-level`
+- [insert_curve_knot_redge](insert_curve_knot_redge.md) *(from operators/geometry.py)* `top-level`
+- [insert_spline_anchor_rsketch](insert_spline_anchor_rsketch.md) *(from operators/sketch.py)* `top-level`
+- [insert_surface_knot_rface](insert_surface_knot_rface.md) *(from operators/geometry.py)* `top-level`
+- [inset_face_rsolid](inset_face_rsolid.md) *(from operators/features.py)* `top-level`
 - [inspect_assembly_constraints_rconstraintreport](inspect_assembly_constraints_rconstraintreport.md) *(from operators/product.py)* `top-level`
+- [inspect_body_overlaps_rlist](inspect_body_overlaps_rlist.md) *(from operators/product.py)* `top-level`
+- [inspect_curve_rcurvedata](inspect_curve_rcurvedata.md) *(from operators/geometry.py)* `top-level`
+- [inspect_sketch_rsketchcrossings](inspect_sketch_rsketchcrossings.md) *(from operators/sketch.py)* `top-level`
+- [inspect_sketch_rsketchprofiles](inspect_sketch_rsketchprofiles.md) *(from operators/sketch.py)* `top-level`
 - [inspect_sketch_rsketchresult](inspect_sketch_rsketchresult.md) *(from operators/sketch.py)* `top-level`
+- [inspect_surface_rsurfacedata](inspect_surface_rsurfacedata.md) *(from operators/geometry.py)* `top-level`
 - [key](key.md) *(from ql.py)* `submodule:ql`
 - [linear_pattern_rsolidlist](linear_pattern_rsolidlist.md) *(from operators/transform.py)* `top-level`
+- [list_tag_splits](list_tag_splits.md) *(from operators/selection.py)* `top-level`
 - [load_brep_region_rshell](load_brep_region_rshell.md) *(from operators/geometry.py)* `top-level`
 - [load_brep_region_rsolid](load_brep_region_rsolid.md) *(from operators/geometry.py)* `top-level`
 - [measure_constraint_residual_rconstraintresidual](measure_constraint_residual_rconstraintresidual.md) *(from operators/product.py)* `top-level`
+- [measure_part_mass_rmassreport](measure_part_mass_rmassreport.md) *(from operators/product.py)* `top-level`
 - [meta](meta.md) *(from ql.py)* `submodule:ql`
+- [move_curve_poles_redge](move_curve_poles_redge.md) *(from operators/geometry.py)* `top-level`
+- [move_surface_poles_rface](move_surface_poles_rface.md) *(from operators/geometry.py)* `top-level`
 - [not_](not_.md) *(from ql.py)* `submodule:ql`
 - [offset_rsolid](offset_rsolid.md) *(from operators/features.py)* `top-level`
 - [operation_event](operation_event.md) *(from ql.py)* `submodule:ql`
@@ -408,13 +442,36 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [placement_frame_mm](placement_frame_mm.md) *(from product/placement.py)* `submodule:product/placement`
 - [placement_from_canonical](placement_from_canonical.md) *(from product/placement.py)* `submodule:product/placement`
 - [placement_ticks](placement_ticks.md) *(from product/placement.py)* `submodule:product/placement`
+- [press_pull_rsolid](press_pull_rsolid.md) *(from operators/features.py)* `top-level`
+- [project_rsketch](project_rsketch.md) *(from operators/sketch.py)* `top-level`
 - [prop](prop.md) *(from ql.py)* `submodule:ql`
+- [ql.ref](ql.ref.md) *(from ql.py)* `submodule:ql`
 - [radial_pattern_rsolidlist](radial_pattern_rsolidlist.md) *(from operators/transform.py)* `top-level`
+- [rebuild_curve_redge](rebuild_curve_redge.md) *(from operators/geometry.py)* `top-level`
+- [rebuild_surface_rface](rebuild_surface_rface.md) *(from operators/geometry.py)* `top-level`
+- [ref.coerce](ref.coerce.md) *(from ref.py)* `submodule:ref`
+- [ref.edge](ref.edge.md) *(from ref.py)* `submodule:ref`
+- [ref.edges](ref.edges.md) *(from ref.py)* `submodule:ref`
+- [ref.face](ref.face.md) *(from ref.py)* `submodule:ref`
+- [ref.faces](ref.faces.md) *(from ref.py)* `submodule:ref`
+- [ref.of](ref.of.md) *(from ref.py)* `submodule:ref`
+- [ref.parse](ref.parse.md) *(from ref.py)* `submodule:ref`
+- [ref.resolve](ref.resolve.md) *(from ref.py)* `submodule:ref`
+- [ref.vertex](ref.vertex.md) *(from ref.py)* `submodule:ref`
+- [ref.vertices](ref.vertices.md) *(from ref.py)* `submodule:ref`
 - [register_property_resolver](register_property_resolver.md) *(from ql.py)* `submodule:ql`
+- [remove_spline_anchor_rsketch](remove_spline_anchor_rsketch.md) *(from operators/sketch.py)* `top-level`
 - [render_screenshot_rpath](render_screenshot_rpath.md) *(from operators/features.py)* `top-level`
+- [sample_curve_rcurvature](sample_curve_rcurvature.md) *(from operators/geometry.py)* `top-level`
+- [sample_surface_risocurves](sample_surface_risocurves.md) *(from operators/geometry.py)* `top-level`
 - [scale_rsolid](scale_rsolid.md) *(from operators/transform.py)* `top-level`
 - [select](select.md) *(from ql.py)* `submodule:ql`
+- [set_body_appearance_rpart](set_body_appearance_rpart.md) *(from operators/product.py)* `top-level`
+- [set_curve_poles_redge](set_curve_poles_redge.md) *(from operators/geometry.py)* `top-level`
+- [set_curve_weights_redge](set_curve_weights_redge.md) *(from operators/geometry.py)* `top-level`
 - [set_public_connector_rassembly](set_public_connector_rassembly.md) *(from operators/product.py)* `top-level`
+- [set_surface_poles_rface](set_surface_poles_rface.md) *(from operators/geometry.py)* `top-level`
+- [set_surface_weights_rface](set_surface_weights_rface.md) *(from operators/geometry.py)* `top-level`
 - [sew_faces_rshell](sew_faces_rshell.md) *(from operators/geometry.py)* `top-level`
 - [shells](shells.md) *(from ql.py)* `submodule:ql`
 - [solve_assembly_constraints_rassembly](solve_assembly_constraints_rassembly.md) *(from operators/product.py)* `top-level`
@@ -422,6 +479,7 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [source_topology](source_topology.md) *(from ql.py)* `submodule:ql`
 - [tag](tag.md) *(from ql.py)* `submodule:ql`
 - [transform_rsolid](transform_rsolid.md) *(from operators/transform.py)* `top-level`
+- [trim_rsketch](trim_rsketch.md) *(from operators/sketch.py)* `top-level`
 - [trim_surface_rface](trim_surface_rface.md) *(from operators/geometry.py)* `top-level`
 - [twisted_sweep_rsolid](twisted_sweep_rsolid.md) *(from operators/features.py)* `top-level`
 - [unground_component_rassembly](unground_component_rassembly.md) *(from operators/product.py)* `top-level`

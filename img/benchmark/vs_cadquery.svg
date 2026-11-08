@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 430" width="1040" height="430" role="img" aria-label="SimpleCADAPI against CadQuery, same model and prompt on 200 parts: 3.5 times fewer badly wrong results">
+<title>SimpleCADAPI against CadQuery, same model and prompt on 200 parts: 3.5 times fewer badly wrong results</title>
+<rect width="1040" height="430" rx="14" fill="#ffffff" stroke="#e4e7ec"/>
+<text x="36" y="50" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="24" font-weight="700" fill="#16181d" text-anchor="start">Same model. Same prompt. Same 200 real parts. One attempt each.</text>
+<text x="36" y="78" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="14" font-weight="400" fill="#5b6270" text-anchor="start">Task: rebuild a part as parametric code from its STEP file. An independent, frozen scorer measures the result against the original.</text>
+<rect x="36" y="101" width="14.0" height="14" rx="3" fill="#e8590c"/>
+<text x="58" y="112" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="14" font-weight="600" fill="#16181d" text-anchor="start">SimpleCADAPI</text>
+<rect x="186" y="101" width="14.0" height="14" rx="3" fill="#a3aab8"/>
+<text x="208" y="112" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="14" font-weight="600" fill="#16181d" text-anchor="start">CadQuery</text>
+<text x="36" y="150" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="16" font-weight="700" fill="#16181d" text-anchor="start">Delivered, but badly wrong</text>
+<text x="36" y="170" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="12.5" font-weight="400" fill="#5b6270" text-anchor="start">lower is better</text>
+<line x1="36" y1="188" x2="344" y2="188" stroke="#e4e7ec"/>
+<rect x="36" y="212" width="51.8" height="34" rx="4" fill="#e8590c"/>
+<text x="93.82222222222222" y="235" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="17" font-weight="700" fill="#16181d" text-anchor="start">4.4%</text>
+<rect x="36" y="274" width="183.7" height="34" rx="4" fill="#a3aab8"/>
+<text x="225.73333333333332" y="297" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="17" font-weight="700" fill="#16181d" text-anchor="start">15.6%</text>
+<text x="36" y="368" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="30" font-weight="800" fill="#e8590c" text-anchor="start">3.5× fewer</text>
+<text x="374" y="150" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="16" font-weight="700" fill="#16181d" text-anchor="start">Distance from the original</text>
+<text x="374" y="170" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="12.5" font-weight="400" fill="#5b6270" text-anchor="start">mean surface error, mm · lower is better</text>
+<line x1="374" y1="188" x2="682" y2="188" stroke="#e4e7ec"/>
+<rect x="374" y="212" width="2.0" height="34" rx="4" fill="#e8590c"/>
+<text x="380.40545" y="235" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="17" font-weight="700" fill="#16181d" text-anchor="start">0.006 mm</text>
+<rect x="374" y="274" width="191.1" height="34" rx="4" fill="#a3aab8"/>
+<text x="571.13125" y="297" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="17" font-weight="700" fill="#16181d" text-anchor="start">2.885 mm</text>
+<text x="374" y="368" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="30" font-weight="800" fill="#e8590c" text-anchor="start">472× smaller</text>
+<text x="712" y="150" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="16" font-weight="700" fill="#16181d" text-anchor="start">Valid models delivered</text>
+<text x="712" y="170" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="12.5" font-weight="400" fill="#5b6270" text-anchor="start">out of 200 · higher is better</text>
+<line x1="712" y1="188" x2="1020" y2="188" stroke="#e4e7ec"/>
+<rect x="712" y="212" width="191.9" height="34" rx="4" fill="#e8590c"/>
+<text x="909.86" y="235" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="17" font-weight="700" fill="#16181d" text-anchor="start">181</text>
+<rect x="712" y="274" width="183.4" height="34" rx="4" fill="#a3aab8"/>
+<text x="901.38" y="297" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="17" font-weight="700" fill="#16181d" text-anchor="start">173</text>
+<text x="712" y="368" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="30" font-weight="800" fill="#e8590c" text-anchor="start">+8 models</text>
+<text x="36" y="400" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" font-size="12.5" font-weight="400" fill="#5b6270" text-anchor="start">SimpleCADAPI 2.2.7b1 vs CadQuery 2.8.0 · DeepSeek-V4.1-Flash · 200 open-hardware parts (2–1,384 mm) · no retries · paired test on the distorted rate: p = 0.002</text>
+</svg>

@@ -20,6 +20,7 @@ typing in the embedded marimo editor), and is what the server reacts to.
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import json
 import os
@@ -27,6 +28,7 @@ import re
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -587,12 +589,75 @@ class MarimoKernel:
             "try:\n"
             f"    _p = _preview({url!r}, step={step!r})\n"
             "    print('SCA-PREVIEWED', _p['nodes'], _p['parts'], _p['bytes'], _p.get('compile_ms', 0), _p.get('encode_ms', 0), _p.get('post_ms', 0))\n"
+            # a cell failed: the model is the one before it (what failed, what is shown)
+            "    if _p.get('partial') is not None:\n"
+            "        import json as _pjson\n"
+            "        print('SCA-PARTIAL', _pjson.dumps(_p['partial']))\n"
             "except Exception as _e:\n"
             "    print('SCA-PREVIEW-ERROR', type(_e).__name__ + ':', str(_e).splitlines()[0] if str(_e) else '')\n"
+            # the workplanes ride along, product or not (a notebook mid-edit has workplanes before it has a product)
+            "try:\n"
+            "    from simplecadapi.runtime.live import live_workplanes as _workplanes\n"
+            "    import json as _wjson\n"
+            "    print('SCA-WORKPLANES', _wjson.dumps(_workplanes()))\n"
+            "except Exception:\n"
+            "    pass\n"
+            # the notebook's wires and edges (3D paths, rails), sampled by the SDK: the viewport draws them
+            "try:\n"
+            "    from simplecadapi.runtime.live_curves import live_curves as _curves\n"
+            "    import json as _cjson\n"
+            "    print('SCA-CURVES', _cjson.dumps(_curves()))\n"
+            "except Exception:\n"
+            "    pass\n"
+            # what each top-level value is (a cell written as code does not say: a wire, a face, a solid)
+            "try:\n"
+            "    from simplecadapi.runtime.live_curves import live_value_kinds as _kinds\n"
+            "    import json as _kjson\n"
+            "    print('SCA-KINDS', _kjson.dumps(_kinds()))\n"
+            "except Exception:\n"
+            "    pass\n"
+            # the tagged entities the model's operations split, with the entities of their pieces (a diagnostic)
+            "try:\n"
+            "    from simplecadapi.runtime.live import live_tag_splits as _splits\n"
+            "    import json as _sjson\n"
+            "    print('SCA-TAGSPLITS', _sjson.dumps(_splits()))\n"
+            "except Exception:\n"
+            "    pass\n"
         )
 
     @staticmethod
     def _preview_result(result: dict) -> dict:
+        out = MarimoKernel._preview_outcome(result)
+        for line in (result.get("log") or "").splitlines():
+            if line.startswith("SCA-WORKPLANES "):
+                try:
+                    out["workplanes"] = json.loads(line[len("SCA-WORKPLANES "):])
+                except ValueError:
+                    pass
+            elif line.startswith("SCA-CURVES "):
+                try:
+                    out["curves"] = json.loads(line[len("SCA-CURVES "):])
+                except ValueError:
+                    pass
+            elif line.startswith("SCA-KINDS "):
+                try:
+                    out["kinds"] = json.loads(line[len("SCA-KINDS "):])
+                except ValueError:
+                    pass
+            elif line.startswith("SCA-TAGSPLITS "):
+                try:
+                    out["tag_splits"] = json.loads(line[len("SCA-TAGSPLITS "):])
+                except ValueError:
+                    pass
+            elif line.startswith("SCA-PARTIAL "):
+                try:
+                    out["partial"] = json.loads(line[len("SCA-PARTIAL "):])
+                except ValueError:
+                    pass
+        return out
+
+    @staticmethod
+    def _preview_outcome(result: dict) -> dict:
         for line in (result.get("log") or "").splitlines():
             if line.startswith("SCA-PREVIEWED "):
                 _, nodes, parts, size, *times = line.split(" ")
@@ -632,6 +697,51 @@ class MarimoKernel:
                 except json.JSONDecodeError:
                     return None
         return None
+
+    def refine_preview(self, keys: list[str], linear_tolerance: float, angular_tolerance: float) -> bytes | None:
+        """The parts *keys* of the scene last previewed, tessellated at the given tolerances (level of detail): an
+        encoded preview with no nodes, or ``None`` when the kernel has no preview or the call failed."""
+        handle, path = tempfile.mkstemp(prefix="sca-lod-", suffix=".bin")
+        os.close(handle)
+        try:
+            result = self.execute(
+                "from simplecadapi.runtime.live import preview_refined as _refined\n"
+                "try:\n"
+                f"    print('SCA-REFINED', _refined({list(keys)!r}, {float(linear_tolerance)!r}, {float(angular_tolerance)!r}, {path!r}))\n"
+                "except Exception as _e:\n"
+                "    print('SCA-REFINED-ERROR', type(_e).__name__ + ':', str(_e).splitlines()[0] if str(_e) else '')\n"
+            )
+            if not any(line.startswith("SCA-REFINED ") for line in (result.get("log") or "").splitlines()):
+                return None
+            with open(path, "rb") as stream:
+                data = stream.read()
+            return data or None
+        finally:
+            with contextlib.suppress(OSError):
+                os.unlink(path)
+
+    def references(self, function: str, *args: object) -> object:
+        """Call ``simplecadapi.runtime.live_refs.<function>(*args)`` in the kernel; its JSON answer.
+
+        Raises :class:`KernelError` with the kernel's words when the call fails.
+        """
+        if function not in ("entity_refs", "reference_status", "reference_choose"):
+            raise KernelError(f"unknown reference call {function!r}")
+        result = self.execute(
+            "import json as _json\n"
+            "from simplecadapi.runtime import live_refs as _refs\n"
+            "try:\n"
+            f"    _r = _refs.{function}(*_json.loads({json.dumps(json.dumps(list(args)))}))\n"
+            "    print('SCA-REFS', _json.dumps(_r))\n"
+            "except Exception as _e:\n"
+            "    print('SCA-REFS-ERROR', type(_e).__name__ + ':', str(_e).splitlines()[0] if str(_e) else '')\n"
+        )
+        for line in (result.get("log") or "").splitlines():
+            if line.startswith("SCA-REFS "):
+                return json.loads(line[len("SCA-REFS "):])
+            if line.startswith("SCA-REFS-ERROR "):
+                raise KernelError(line[len("SCA-REFS-ERROR "):])
+        raise KernelError((result.get("log") or "the reference call gave no answer").strip()[-300:])
 
     def publish(self, url: str, step: str = "") -> dict:
         """Have the kernel project its product and POST the package to *url*.

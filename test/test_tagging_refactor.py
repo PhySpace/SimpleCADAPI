@@ -41,7 +41,8 @@ class TestTaggingRefactor(unittest.TestCase):
         self.assertNotIn(binding, face._tag_bindings)
         self.assertIn("role.mounting_surface", face._tags)
 
-    def test_effective_excludes_lineage(self):
+    def test_effective_includes_lineage(self):
+        # Tags are a view over history: what the lineage carries is part of the effective tags.
         source = scad.make_point_rvertex(0.0, 0.0, 0.0)
         result = scad.make_point_rvertex(1.0, 0.0, 0.0)
         binding = source._apply_user_tag("role.datum")
@@ -55,7 +56,7 @@ class TestTaggingRefactor(unittest.TestCase):
         )
         result._set_runtime("semantic.lineage.coverage", "complete")
 
-        self.assertNotIn("role.datum", result._list_tags("effective"))
+        self.assertIn("role.datum", result._list_tags("effective"))
         self.assertEqual(result._list_tags("lineage"), ["role.datum"])
 
     def test_lineage_requires_complete_history(self):
@@ -89,7 +90,7 @@ class TestTaggingRefactor(unittest.TestCase):
         first = scad.translate_shape(source, (1.0, 0.0, 0.0))
         second = scad.translate_shape(first, (1.0, 0.0, 0.0))
 
-        self.assertNotIn("role.datum", scad.list_tags(second, "effective"))
+        self.assertIn("role.datum", scad.list_tags(second, "effective"))
         self.assertEqual(scad.list_tags(second, "lineage"), ["role.datum"])
 
     def test_disallowed_lineage_does_not_seed_later_continuation(self):

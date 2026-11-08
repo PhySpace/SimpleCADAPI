@@ -7,6 +7,8 @@
  * A frame carries only the parts the page does not have; every node names its part.
  */
 
+import { t } from "@/i18n";
+
 export type PreviewGroup = { entity_id: string; first_index: number; index_count: number };
 export type PreviewTransform = {
   origin: [number, number, number];
@@ -37,6 +39,10 @@ export type PreviewNode = {
   definitionId: string;
   displayName: string;
   transform: PreviewTransform;
+  /** The display colour (linear RGB in [0, 1]): the body's colour, else its material's; absent: the default. */
+  color?: [number, number, number];
+  /** The body's display opacity in [0, 1]; absent: opaque. */
+  opacity?: number;
 };
 
 /** `parts` holds exactly the parts the nodes draw; `missing` names the ones the frame left out that the cache lacks. */
@@ -60,14 +66,12 @@ type HeaderPart = {
 type Header = {
   schema: string;
   parts: HeaderPart[];
-  nodes: { node_id: string; part: string; definition_id: string; display_name: string; transform: PreviewTransform }[];
+  nodes: { node_id: string; part: string; definition_id: string; display_name: string; transform: PreviewTransform; color?: [number, number, number]; opacity?: number }[];
 };
 
 const MAGIC = "SCAPREV1";
 
-/** Parse a preview.  A frame may leave out the parts the page already holds: they are taken from *cache* (the parts of
- * the preview on screen, by key), and the result holds exactly the parts the nodes draw. */
-export function parsePreview(buffer: ArrayBuffer, cache: ReadonlyMap<string, PreviewPart> = new Map()): PreviewData {
+function decode(buffer: ArrayBuffer): { header: Header; carried: Map<string, PreviewPart> } {
   const bytes = new Uint8Array(buffer);
   if (new TextDecoder().decode(bytes.subarray(0, MAGIC.length)) !== MAGIC) throw new Error("not a preview");
   const view = new DataView(buffer);
@@ -95,12 +99,26 @@ export function parsePreview(buffer: ArrayBuffer, cache: ReadonlyMap<string, Pre
       solidEntityId: part.solid_entity_id,
     });
   }
+  return { header, carried };
+}
+
+/** The parts a preview frame carries, by key, whatever its nodes (a level-of-detail answer has none). */
+export function parsePreviewParts(buffer: ArrayBuffer): Map<string, PreviewPart> {
+  return decode(buffer).carried;
+}
+
+/** Parse a preview.  A frame may leave out the parts the page already holds: they are taken from *cache* (the parts of
+ * the preview on screen, by key), and the result holds exactly the parts the nodes draw. */
+export function parsePreview(buffer: ArrayBuffer, cache: ReadonlyMap<string, PreviewPart> = new Map()): PreviewData {
+  const { header, carried } = decode(buffer);
   const nodes: PreviewNode[] = header.nodes.map((node) => ({
     nodeId: node.node_id,
     partKey: node.part,
     definitionId: node.definition_id,
     displayName: node.display_name,
     transform: node.transform,
+    ...(node.color ? { color: node.color } : {}),
+    ...(node.opacity !== undefined ? { opacity: node.opacity } : {}),
   }));
   const parts = new Map<string, PreviewPart>();
   const missing: string[] = [];
@@ -111,4 +129,19 @@ export function parsePreview(buffer: ArrayBuffer, cache: ReadonlyMap<string, Pre
     else if (!missing.includes(node.partKey)) missing.push(node.partKey);
   }
   return { parts, nodes, missing };
+}
+
+
+/** What the header says about a preview: parts (a multi-body part's bodies are scene nodes `<part node>/body:<id>`) and bodies. */
+/** The node id of a surface value of the notebook (a face or shell that is not part of the product): `node/surface/<name>`
+ * (simplecadapi/scene/preview.py: drawn from both sides, picked whole with the sketches and curves). */
+export const SURFACE_NODE_PREFIX = "node/surface/";
+export const isSurfaceNode = (nodeId: string): boolean => nodeId.startsWith(SURFACE_NODE_PREFIX);
+
+export function previewSummary(all: readonly { nodeId: string }[]): string {
+  const nodes = all.filter((node) => !isSurfaceNode(node.nodeId));
+  const parts = new Set(nodes.map((node) => node.nodeId.replace(/\/body:[^/]+$/, "")));
+  const partCount = parts.size === 1 ? t("1 part") : t("{{count}} parts", { count: parts.size });
+  const bodyCount = nodes.length === 1 ? t("1 body") : t("{{count}} bodies", { count: nodes.length });
+  return nodes.length > parts.size ? `${partCount} · ${bodyCount}` : partCount;
 }

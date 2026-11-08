@@ -10,7 +10,7 @@ function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive
 function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.List>) {
   return (
     <TabsPrimitive.List
-      className={cn("flex h-9 shrink-0 items-stretch border-b-2 border-border", className)}
+      className={cn("scroll-row h-9 shrink-0 items-stretch border-b-2 border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
       {...props}
     />
   );
@@ -20,7 +20,7 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        "-mb-[2px] inline-flex items-center justify-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:text-foreground",
+        "-mb-[2px] inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:text-foreground",
         className,
       )}
       {...props}
@@ -29,7 +29,7 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
 }
 
 function TabsContent({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Content>) {
-  return <TabsPrimitive.Content className={cn("flex-1 outline-none", className)} {...props} />;
+  return <TabsPrimitive.Content className={cn("min-w-0 flex-1 overflow-x-auto outline-none", className)} {...props} />;
 }
 
 export { Tabs, TabsList, TabsTrigger, TabsContent };

@@ -53,8 +53,10 @@ review.
   picks are preserved as graph geo-select nodes.
 - `apply_tag(shape=..., tag=...)` attaches a tag to exactly the given shape
   with LOCAL scope — it never propagates downward; `list_tags(shape=...)`
-  reads effective tags. Downward/topology-scoped propagation is only exposed
-  by `apply_tag_rselection` with an explicit propagation policy. Keep numeric
+  reads effective tags, which include the tags the recorded history carries
+  to the entity (a tagged face stays tagged through later booleans, blends
+  and copies). Downward/topology-scoped propagation is only exposed by
+  `apply_tag_rselection` with an explicit propagation policy. Keep numeric
   facts in metadata, never in tags.
 - A QL-selected face or edge reused by a later feature is preserved as a
   stable geo-select node in replayable graphs.

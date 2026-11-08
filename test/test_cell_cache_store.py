@@ -151,3 +151,32 @@ class TestSelectorIsCacheable(NotebookTestCase):
         self.assertNotIn("cached", self.statuses(first))
         # the first status is the setup cell, which always runs
         self.assertEqual(self.statuses(second), ["ran"] + ["cached"] * (len(self.statuses(first)) - 1))
+
+
+SPLIT = notebook_text(
+    cell(
+        "pieces = scad.cut_rsolid(scad.make_box_rsolid(40.0, 10.0, 10.0), scad.make_box_rsolid(2.0, 20.0, 20.0))",
+        returns="pieces",
+    ),
+    cell(
+        "moved = scad.translate_shape(pieces, (0.0, 0.0, 5.0))\nkind = type(pieces).__name__",
+        reads="pieces",
+        returns="moved, kind",
+    ),
+    cell("part = scad.make_part_rpart(part_id='split', body=moved)", reads="moved", returns="part"),
+    table='id = "split"',
+)
+
+
+class TestPiecesComeBackAsPieces(NotebookTestCase):
+    """marimo stores a list as a plain list; the pieces of a split body restored from the cache are still pieces."""
+
+    def test_a_restored_split_feeds_the_next_cell_as_pieces(self) -> None:
+        nb = self.write("split.py", SPLIT)
+        first = run_notebook(nb)
+        source = nb.read_text(encoding="utf-8").replace("(0.0, 0.0, 5.0)", "(0.0, 0.0, 6.0)")
+        nb.write_text(source, encoding="utf-8")
+        second = run_notebook(nb)
+        self.assertEqual(self.statuses(second), ["ran", "cached", "ran", "ran"])
+        self.assertEqual(second.values["kind"], "Pieces")
+        self.assertEqual(len(second.definition.bodies), len(first.definition.bodies))

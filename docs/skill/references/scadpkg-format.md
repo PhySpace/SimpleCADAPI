@@ -75,7 +75,12 @@ by its own sha256 through the map above works uniformly.
 Part definitions carry: `units` (`"mm"`), `generator`
 (`{ocp_version}`), `solid_cache` (body reference — the BREP payload for
 in-process rebuild), `topology_snapshot_ref` (the tag channel, below),
-`connectors`, `material_ref`, `metadata`, `profile`, `revision`.
+`connectors`, `material_ref`, `metadata`, `profile`, `revision`, and,
+only when a body has a display appearance, `appearance`
+(`{"bodies": [{"body_id", "color", "opacity", "name"?}]}`: colour as
+linear RGB in [0, 1] overriding the material colour for display; `name`
+only on a one-body part, a multi-body part names its bodies in
+`solid_cache.bodies`).
 Assembly definitions carry `definition_refs`, `instances`,
 `relations`, `public_connectors`, `solved_snapshot`,
 `grounded_instance_ids`, `feature_graph_ref`. Identity is

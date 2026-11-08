@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class CellReport(name: str, key: str, status: CellStatus)
+class CellReport(name: str, key: str, status: CellStatus, tag_splits: tuple[dict, ...] = ())
 ```
 
 *Source: runtime/runner.py*

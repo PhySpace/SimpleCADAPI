@@ -29,9 +29,17 @@ def specs_of(code: str) -> dict[str, ParamSpec]:
 
 
 class TemplatesTest(unittest.TestCase):
-    def test_new_part_runs_and_offers_sliders(self) -> None:
+    def test_a_new_part_is_empty(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            path = create_notebook(Path(tmp), "bracket", "part")
+            for kind in ("part", "blank"):
+                path = create_notebook(Path(tmp), f"bracket_{kind}", kind)
+                text = path.read_text()
+                self.assertIn('kind = "part"', text)
+                self.assertNotIn("@app.cell", text)  # no cells: whoever models it adds the first feature
+
+    def test_the_sample_part_runs_and_offers_sliders(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = create_notebook(Path(tmp), "bracket", "sample")
             run = run_notebook(path)
             self.assertEqual(run.definition.definition_kind, "single_solid")
             self.assertEqual(run.definition.definition_id, "bracket")
@@ -45,8 +53,8 @@ class TemplatesTest(unittest.TestCase):
             root = Path(tmp)
             with self.assertRaisesRegex(ValueError, "create a part first"):
                 create_notebook(root, "unit", "assembly")
-            create_notebook(root, "bracket", "part")
-            create_notebook(root, "pin-a", "part")
+            create_notebook(root, "bracket", "sample")
+            create_notebook(root, "pin-a", "sample")
             path = create_notebook(root, "unit", "assembly")
             run = run_notebook(path)
             self.assertEqual(run.definition.definition_kind, "assembly")
@@ -69,8 +77,8 @@ class PickNotebookTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self.assertIsNone(pick_notebook(root))
-            create_notebook(root, "a-part", "part")
-            create_notebook(root, "b-part", "part")
+            create_notebook(root, "a-part", "sample")
+            create_notebook(root, "b-part", "sample")
             self.assertEqual(pick_notebook(root), (root / "a-part.py").resolve())
             create_notebook(root, "top", "assembly")
             self.assertEqual(pick_notebook(root), (root / "top.py").resolve())
@@ -151,7 +159,7 @@ class EditorEndToEndTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            path = create_notebook(root, "bracket", "part")
+            path = create_notebook(root, "bracket", "sample")
             state = WorkspaceState(root)
             state.port = 17731
             app = create_app(state)
@@ -345,7 +353,7 @@ class ModulesTest(unittest.TestCase):
             "from dataclasses import dataclass\n\n@dataclass(frozen=True)\nclass D:\n    L: float = 80.0\n\nDIMS = D()\n"
         )
         (root / "helper.py").write_text("def helper():\n    return 1\n")
-        notebook = create_notebook(root, "part", "part")
+        notebook = create_notebook(root, "part", "sample")
         notebook.write_text(
             notebook.read_text().replace(
                 "with app.setup:\n    import simplecadapi as scad\n",
@@ -574,7 +582,7 @@ class RestoreTest(unittest.TestCase):
 
     def _workspace(self, root: Path) -> Path:
         (root / "dims.py").write_text("L = 10.0\n")
-        path = create_notebook(root, "part", "part")
+        path = create_notebook(root, "part", "sample")
         path.write_text(path.read_text().replace("import simplecadapi as scad\n", "import simplecadapi as scad\n    import dims\n", 1))
         return path
 
@@ -619,7 +627,7 @@ class RestoreTest(unittest.TestCase):
             self.assertEqual((package["cached"], package["size"]), (True, 3))
             self.assertEqual(state.latest_preview_bytes, b"PKG")
             cells = next(m for m in sent if m["type"] == "notebook.cells")["cells"]
-            self.assertEqual([c["title"] for c in cells], ["params", "base", "part"])
+            self.assertEqual([c["title"] for c in cells], ["params", "base"])  # a part needs no product cell (kind = "part")
             self.assertTrue(all(c["readonly"] for c in cells))  # not editable until a kernel has them
             self.assertIn("RADIUS", state.specs)
 
@@ -627,10 +635,10 @@ class RestoreTest(unittest.TestCase):
         from simplecadapi.editor.server import _static_cells
 
         with tempfile.TemporaryDirectory() as tmp:
-            path = create_notebook(Path(tmp), "part", "part")
+            path = create_notebook(Path(tmp), "part", "sample")
             names = [cell["name"] for cell in _static_cells(path)]
             self.assertNotIn("setup", names)
-            self.assertEqual(len(names), 3)
+            self.assertEqual(len(names), 2)  # params and base: a part needs no product cell (kind = "part")
 
 
 class SwitchOrderTest(unittest.TestCase):
@@ -669,8 +677,8 @@ class SwitchOrderTest(unittest.TestCase):
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
-                a = create_notebook(root, "alpha", "part")
-                b = create_notebook(root, "beta", "part")
+                a = create_notebook(root, "alpha", "sample")
+                b = create_notebook(root, "beta", "sample")
                 state = WorkspaceState(root, a)
                 sent: list[dict] = []
                 state.hub.broadcast = sent.append  # type: ignore[method-assign]
@@ -717,8 +725,8 @@ class SwitchOrderTest(unittest.TestCase):
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp).resolve()
-                create_notebook(root, "alpha", "part")
-                b = create_notebook(root, "beta", "part")
+                create_notebook(root, "alpha", "sample")
+                b = create_notebook(root, "beta", "sample")
                 state = WorkspaceState(root, None)
                 state.hub.broadcast = lambda message: None  # type: ignore[method-assign]
                 errors: list[BaseException] = []
@@ -857,7 +865,10 @@ class ApiIndexTest(unittest.TestCase):
         part = self.scad["Part"]
         self.assertEqual(part["k"], "c")
         names = [p["n"] for p in part["p"]]
-        self.assertEqual([p["n"] for p in part["p"] if p["r"]], ["part_id", "body"])
+        # a Part takes one ``body`` or several ``bodies`` (multi-body parts), so only part_id is required
+        self.assertEqual([p["n"] for p in part["p"] if p["r"]], ["part_id"])
+        self.assertIn("body", names)
+        self.assertIn("bodies", names)
         self.assertFalse([n for n in names if n.startswith("_")])
 
     def test_namespaces_and_submodules(self) -> None:
@@ -920,11 +931,11 @@ class WorkspaceWatchTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             state = WorkspaceState(root)
-            create_notebook(root, "first", "part")
+            create_notebook(root, "first", "sample")
             before = state._workspace_stamps()
             (root / ".sca-editor").mkdir()
             (root / ".sca-editor" / "x.py").write_text("x = 1\n")
-            create_notebook(root, "second", "part")
+            create_notebook(root, "second", "sample")
             after = state._workspace_stamps()
             self.assertEqual({p.name for p in after} - {p.name for p in before}, {"second.py"})
 
@@ -934,14 +945,14 @@ class CellCliTest(unittest.TestCase):
         from simplecadapi.cli import main
 
         with tempfile.TemporaryDirectory() as tmp:
-            path = create_notebook(Path(tmp), "bracket", "part")
+            path = create_notebook(Path(tmp), "bracket", "sample")
             self.assertEqual(main(["cell", "rm", "1", "--notebook", str(path)]), 2)
 
     def test_cell_ls_reads_the_file_when_no_editor_runs(self) -> None:
         from simplecadapi.editor import cli
 
         with tempfile.TemporaryDirectory() as tmp:
-            path = create_notebook(Path(tmp), "bracket", "part")
+            path = create_notebook(Path(tmp), "bracket", "sample")
             cells = cli._cells_from_file(path)
             self.assertTrue(cells)
             self.assertEqual(cells[0]["index"], 1)
@@ -953,7 +964,7 @@ class ExternalEditTest(unittest.TestCase):
     def test_an_edit_of_the_file_is_taken_in_and_not_written_over(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            path = create_notebook(root, "bracket", "part")
+            path = create_notebook(root, "bracket", "sample")
             state = WorkspaceState(root)
             state.port = 17733
             state.hub.attach_loop(__import__("asyncio").new_event_loop())
@@ -991,12 +1002,13 @@ class PublishErrorReportingTest(unittest.TestCase):
         self.root = Path(tmp.name).resolve()
 
     def state(self) -> tuple[WorkspaceState, list[dict]]:
-        path = create_notebook(self.root, "bracket", "part")
+        path = create_notebook(self.root, "bracket", "sample")
         state = WorkspaceState(self.root, path)
         sent: list[dict] = []
         state.hub.broadcast = sent.append  # type: ignore[method-assign]
         state.push_cells = lambda: None  # type: ignore[method-assign]
         state._signature = lambda notebook: None  # type: ignore[method-assign]
+        state.cells = [{"id": "c1", "code": "base = scad.make_box_rsolid(10, 10, 10)"}]
         self.fail_kernel(state)
         return state, sent
 
@@ -1162,7 +1174,7 @@ class EndpointDiscoveryTest(unittest.TestCase):
         from simplecadapi.editor.cli import _find_editor
         from simplecadapi.editor.server import create_app
 
-        path = create_notebook(self.root, "bracket", "part")
+        path = create_notebook(self.root, "bracket", "sample")
         state = WorkspaceState(self.root, path)
         state.port = 17613
         server = uvicorn.Server(uvicorn.Config(create_app(state), port=state.port, log_level="error"))
@@ -1206,7 +1218,7 @@ class EndpointDiscoveryTest(unittest.TestCase):
 
         from simplecadapi.editor import cli
 
-        path = create_notebook(self.root, "bracket", "part")
+        path = create_notebook(self.root, "bracket", "sample")
         args = argparse.Namespace(notebook=path, workspace=None, cell="1")
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
@@ -1271,7 +1283,7 @@ class CellOpenAndViewportTest(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name).resolve()
-        self.other = create_notebook(self.root, "other", "part")
+        self.other = create_notebook(self.root, "other", "sample")
 
     @staticmethod
     def _fake_call(responses: list[dict]) -> object:
@@ -1428,3 +1440,28 @@ class CellOpenAndViewportTest(unittest.TestCase):
             report, code = cli._viewport(args)
         self.assertEqual(code, 0)
         self.assertEqual(report["path"], str(directory / "viewport.png"))
+
+
+class DeleteNotebookTest(unittest.TestCase):
+    """The workspace tab deletes a notebook by moving it to .sca-editor/trash/; the only, open one is refused."""
+
+    def test_a_deleted_notebook_is_kept_in_the_trash_and_the_last_open_one_stays(self) -> None:
+        from starlette.testclient import TestClient
+
+        from simplecadapi.editor.server import create_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = create_notebook(root, "first", "sample")
+            create_notebook(root, "second", "sample")
+            state = WorkspaceState(root, first)
+            client = TestClient(create_app(state))
+            gone = client.post("/api/workspace/delete", json={"path": "second.py"}).json()
+            self.assertTrue(gone["ok"])
+            self.assertFalse((root / "second.py").exists())
+            self.assertTrue((root / gone["trash"]).is_file() and gone["trash"].startswith(".sca-editor/trash/"))
+            refused = client.post("/api/workspace/delete", json={"path": "first.py"})
+            self.assertEqual(refused.status_code, 400)
+            self.assertIn("only notebook", refused.json()["error"])
+            self.assertTrue(first.exists())
+            self.assertEqual(client.post("/api/workspace/delete", json={"path": "../x.py"}).status_code, 400)

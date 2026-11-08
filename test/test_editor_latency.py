@@ -216,7 +216,7 @@ class RepeatedParamTest(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         root = Path(tmp.name).resolve()
-        state = WorkspaceState(root, create_notebook(root, "bracket", "part"))
+        state = WorkspaceState(root, create_notebook(root, "bracket", "sample"))
         state.specs = {"RADIUS": ParamSpec("RADIUS", "", "c1", 1, "float", "literal", 10.0, "slider", 1.0, 50.0, 1.0)}
         self.runs: list[list[str]] = []
         state.emit_params = lambda: None  # type: ignore[method-assign]
@@ -261,7 +261,7 @@ class SignatureBesideTheBuildTest(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         root = Path(tmp.name).resolve()
-        state = WorkspaceState(root, create_notebook(root, "bracket", "part"))
+        state = WorkspaceState(root, create_notebook(root, "bracket", "sample"))
         self.filed: list[tuple[str, bytes]] = []
         state.remember_model = lambda notebook, signature, data: self.filed.append((signature, data))  # type: ignore[method-assign]
         state.write_snapshot = lambda: None  # type: ignore[method-assign]
@@ -321,7 +321,7 @@ class StoredModelTest(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         root = Path(tmp.name).resolve()
-        self.path = create_notebook(root, "bracket", "part")
+        self.path = create_notebook(root, "bracket", "sample")
         return WorkspaceState(root, self.path)
 
     def scene(self):

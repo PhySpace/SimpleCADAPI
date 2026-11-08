@@ -308,16 +308,7 @@
     "technical_details": "ValueError: The underlying validation failed; use the structured guidance above to repair the operation.",
     "what_happened": "Failed to apply the shell operation."
   },
-  "shell_role": {
-    "how_to_fix": [],
-    "inventory": [],
-    "measurements": [],
-    "operation": "semantic_query",
-    "possible_causes": [],
-    "repair": [],
-    "technical_details": null,
-    "what_happened": "operation output role 'shell.body_face' requires at least one kernel-proven result"
-  },
+  "shell_role": null,
   "tangent": {
     "how_to_fix": [
       "Use a positive fillet radius.",

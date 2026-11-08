@@ -25,6 +25,8 @@ DEFAULT_SOURCE_FILENAMES: tuple[str, ...] = (
     "operators/selection.py",
     "operators/features.py",
     "ql.py",
+    "ref.py",
+    "topology/element_ref.py",
     "recording/serializer.py",
     "math.py",
     "product/placement.py",
@@ -175,6 +177,11 @@ EXPORTED_CALLABLE_MODULES = frozenset(
 RUNTIME_EXPORTS = frozenset(
     {"CellReport", "NotebookConfig", "NotebookRun", "notebook_id", "run_notebook", "use"}
 )
+
+# ``scad.ref`` (stable references): its functions are documented as ``ref.<name>`` (``faces`` / ``edges`` would
+# otherwise share a page name with ``ql``'s).
+REF_MODULE = "ref.py"
+REF_FUNCTIONS = frozenset({"of", "face", "edge", "vertex", "faces", "edges", "vertices", "resolve", "coerce", "parse"})
 
 MISSING = object()
 
@@ -386,6 +393,15 @@ class APIDocumentGenerator:
         signature = re.sub(r"SupportsInt \| SupportsIndex", "int", signature)
         signature = re.sub(r"SupportsFloat \| SupportsIndex", "float", signature)
         head = "def" if kind == "function" else "class"
+        if module_name == "ql.py" and name == "ref":  # not the scad.ref module of the same name
+            return ApiInfo(
+                name="ql.ref",
+                kind=kind,
+                signature=f"def ql.ref{signature}",
+                source_file=module_name,
+                parsed_doc=self._parse_docstring(docstring),
+                import_surface="submodule: `from simplecadapi.ql import ref` or `simplecadapi.ql.ref`",
+            )
         return ApiInfo(
             name=name,
             kind=kind,
@@ -452,6 +468,17 @@ class APIDocumentGenerator:
         exported_names: set[str],
     ) -> ApiInfo | None:
         if isinstance(node, ast.FunctionDef):
+            if module_name == REF_MODULE:
+                if node.name not in REF_FUNCTIONS or not ast.get_docstring(node):
+                    return None
+                return ApiInfo(
+                    name=f"ref.{node.name}",
+                    kind="function",
+                    signature=self._get_function_signature(node).replace("def ", "def ref.", 1),
+                    source_file=module_name,
+                    parsed_doc=self._parse_docstring(ast.get_docstring(node) or ""),
+                    import_surface=f"stable references: `import simplecadapi as scad` then `scad.ref.{node.name}(...)`",
+                )
             if not self._should_include_function(
                 node.name, module_name, exported_names
             ):

@@ -9,7 +9,9 @@
     sca viewport [WORKSPACE] [--out PATH]  # the image of what the person sees
     sca cell ls|get|put|insert|rm|run   # edit the cells of the notebook the editor has open
     sca cell open NOTEBOOK [--wait S]   # have the editor open another notebook
-    sca new NAME [--kind part|assembly] # a new notebook; the editor lists it at once
+    sca new NAME [--kind part|assembly|sample] # a new notebook (a part starts empty); the editor lists it at once
+    sca feature specs|ls|add|edit|rm|undo|redo   # the features the buttons make, from the command line
+    sca sketch ls|get|put|solve|op              # edit a sketch feature's document (trim, extend, ...)
 """
 
 from __future__ import annotations
@@ -138,9 +140,223 @@ def configure(subparsers: argparse._SubParsersAction) -> None:
         "current directory).  A running editor on that workspace lists it without a reload.",
     )
     new.add_argument("name")
-    new.add_argument("--kind", choices=("part", "assembly"), default="part")
+    new.add_argument("--kind", choices=("part", "assembly", "sample", "blank"), default="part")
     new.add_argument("--workspace", "-w", type=Path, default=None)
     new.set_defaults(handler=_new_notebook, printer=_print_json)
+    _configure_features(subparsers)
+
+
+def _configure_features(subparsers: argparse._SubParsersAction) -> None:
+    """``sca feature`` and ``sca sketch``: what the GUI does, for an agent (JSON in, JSON out, same rules as the buttons)."""
+
+    def where(parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--workspace", "-w", type=Path, default=None, help="the workspace the editor serves (default: found from the current directory)")
+        parser.add_argument("--notebook", "-n", type=Path, default=None)
+
+    def jsonable(parser: argparse.ArgumentParser, name: str, what: str) -> None:
+        parser.add_argument(f"--{name}", default=None, help=f"{what} as JSON, or @file.json")
+
+    feature = subparsers.add_parser(
+        "feature",
+        help="add, edit, remove and undo the features the editor's buttons make",
+        description="The same operations as the editor's command bar, with the same checks: every command carries the code it was "
+        "made from, so a concurrent edit is refused (409), not overwritten.  `specs` lists the operations and their typed slots; "
+        "values are plain JSON (lengths in mm, angles in degrees, bodies by name).  Selections are lists of picked items as the "
+        "viewport sends them ({kind, properties, geometry, tags}).",
+    )
+    sub = feature.add_subparsers(dest="feature_command", required=True)
+    specs = sub.add_parser("specs", help="the operations and their slots")
+    where(specs)
+    specs.add_argument("spec", nargs="?", help="one operation")
+    specs.set_defaults(handler=_feature_specs, printer=_print_json)
+    ls = sub.add_parser("ls", help="the features, bodies, product and defaults of the open notebook")
+    where(ls)
+    ls.set_defaults(handler=_feature_ls, printer=_print_json)
+    add = sub.add_parser("add", help="add a feature")
+    where(add)
+    add.add_argument("spec")
+    add.add_argument("--name", default=None)
+    jsonable(add, "values", "slot values")
+    jsonable(add, "selections", "picked items per selection slot")
+    add.add_argument("--after", default=None, help="insert after this cell")
+    add.set_defaults(handler=_feature_add, printer=_print_json)
+    edit = sub.add_parser("edit", help="change the values of a GUI feature")
+    where(edit)
+    edit.add_argument("cell")
+    jsonable(edit, "values", "slot values to change")
+    jsonable(edit, "selections", "picked items per selection slot")
+    edit.set_defaults(handler=_feature_edit, printer=_print_json)
+    rm = sub.add_parser("rm", help="remove a feature (its params cell goes with it)")
+    where(rm)
+    rm.add_argument("cell")
+    rm.set_defaults(handler=_feature_rm, printer=_print_json)
+    for name in ("undo", "redo"):
+        one = sub.add_parser(name, help=f"{name} the last GUI command")
+        where(one)
+        one.set_defaults(handler=_feature_history, printer=_print_json, history=name)
+
+    sketch = subparsers.add_parser(
+        "sketch",
+        help="edit the document of a sketch feature: solve, trim, extend",
+        description="A sketch feature is a document (plane, points, entities, constraints) inside a cell.  `op` applies one edit "
+        "operation to it (a pure function of the document: ids are deterministic and the answer lists what was created, removed "
+        "and dropped) and writes the result back; `--dry-run` only prints it.  Operations: trim {entity, at:[x,y], against?}, "
+        "extend {entity, end:start|end, to?}, fillet_corner, chamfer_corner, project, insert_spline_anchor {spline, at:[x,y]}, "
+        "remove_spline_anchor {spline, anchor}, convert_spline_to_anchors {spline}; each is the SDK function of the same name "
+        "(scad.trim_rsketch, scad.insert_spline_anchor_rsketch, ...), which "
+        "an agent can equally call in a notebook cell.",
+    )
+    ssub = sketch.add_subparsers(dest="sketch_command", required=True)
+    sls = ssub.add_parser("ls", help="the sketch features")
+    where(sls)
+    sls.set_defaults(handler=_sketch_ls, printer=_print_json)
+    sget = ssub.add_parser("get", help="print a sketch feature's document")
+    where(sget)
+    sget.add_argument("cell")
+    sget.set_defaults(handler=_sketch_get, printer=_print_json)
+    sput = ssub.add_parser("put", help="replace a sketch feature's document")
+    where(sput)
+    sput.add_argument("cell")
+    sput.add_argument("--file", "-f", required=True, help="the document, JSON")
+    sput.set_defaults(handler=_sketch_put, printer=_print_json)
+    ssolve = ssub.add_parser("solve", help="solve a document (a sketch feature, or --file) and print status, dof, points, diagnostics")
+    where(ssolve)
+    ssolve.add_argument("cell", nargs="?")
+    ssolve.add_argument("--file", "-f", default=None)
+    ssolve.set_defaults(handler=_sketch_solve, printer=_print_json)
+    sop = ssub.add_parser("op", help="apply an edit operation to a sketch feature's document")
+    where(sop)
+    sop.add_argument("cell")
+    sop.add_argument("operation")
+    jsonable(sop, "args", "the operation's arguments")
+    sop.add_argument("--dry-run", action="store_true", help="print the result and write nothing")
+    sop.set_defaults(handler=_sketch_op, printer=_print_json)
+
+
+def _editor_url(args: argparse.Namespace) -> str:
+    url, _notebook, _name = _session(_cell_args(args), write=True)
+    assert url is not None
+    return url
+
+
+def _cell_args(args: argparse.Namespace) -> argparse.Namespace:
+    return argparse.Namespace(workspace=args.workspace, notebook=args.notebook, open=False, wait=None)
+
+
+def _json_arg(value: str | None, what: str) -> Any:
+    import json
+
+    if value is None:
+        return None
+    text = Path(value[1:]).read_text(encoding="utf-8") if value.startswith("@") else value
+    try:
+        return json.loads(text)
+    except ValueError as error:
+        raise ValueError(f"{what}: not valid JSON ({error})") from error
+
+
+def _feature_specs(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    report = _call(_editor_url(args), "/api/features/specs")
+    if args.spec:
+        found = [s for s in report["specs"] if s["id"] == args.spec]
+        if not found:
+            return {"error": f"unknown operation {args.spec!r}; run `sca feature specs`"}, 1
+        return found[0], 0
+    return {"specs": [{"id": s["id"], "group": s["group"], "label": s["label"], "slots": [x["name"] for x in s["slots"]]} for s in report["specs"]]}, 0
+
+
+def _feature_ls(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    state = _call(_editor_url(args), "/api/features")
+    state.pop("taken", None)
+    return state, 0
+
+
+def _feature_command(args: argparse.Namespace, body: dict[str, Any]) -> tuple[dict[str, Any], int]:
+    report = _call(_editor_url(args), "/api/features", body)
+    return report, 0 if report.get("ok") else 1
+
+
+def _feature_add(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    body: dict[str, Any] = {"op": "add", "spec": args.spec, "values": _json_arg(args.values, "--values") or {}}
+    if args.name:
+        body["name"] = args.name
+    if args.selections:
+        body["selections"] = _json_arg(args.selections, "--selections")
+    if args.after:
+        body["after"] = args.after
+    return _feature_command(args, body)
+
+
+def _feature_edit(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    body: dict[str, Any] = {"op": "edit", "cell": args.cell, "values": _json_arg(args.values, "--values") or {}}
+    if args.selections:
+        body["selections"] = _json_arg(args.selections, "--selections")
+    return _feature_command(args, body)
+
+
+def _feature_rm(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    return _feature_command(args, {"op": "delete", "cell": args.cell})
+
+
+def _feature_history(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    return _feature_command(args, {"op": args.history})
+
+
+def _sketch_feature(args: argparse.Namespace, ref: str) -> tuple[str, dict[str, Any]]:
+    url = _editor_url(args)
+    state = _call(url, "/api/features")
+    for feature in state.get("features", []):
+        gui = feature.get("gui")
+        if ref in (feature["cell"], feature["slug"]) and gui and gui["spec"] == "sketch":
+            return url, feature
+    raise ValueError(f"{ref!r} is not a sketch feature of the open notebook; run `sca sketch ls`")
+
+
+def _sketch_ls(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    state = _call(_editor_url(args), "/api/features")
+    rows = [
+        {"cell": f["cell"], "slug": f["slug"], "plane": (f["gui"]["values"].get("sketch") or {}).get("plane"), "status": f["status"], "errors": f["errors"]}
+        for f in state.get("features", [])
+        if f.get("gui") and f["gui"]["spec"] == "sketch"
+    ]
+    return {"sketches": rows}, 0
+
+
+def _sketch_get(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    _url, feature = _sketch_feature(args, args.cell)
+    return {"slug": feature["slug"], "cell": feature["cell"], "sketch": feature["gui"]["values"]["sketch"]}, 0
+
+
+def _sketch_write(args: argparse.Namespace, url: str, feature: dict[str, Any], doc: dict[str, Any]) -> tuple[dict[str, Any], int]:
+    report = _call(url, "/api/features", {"op": "edit", "cell": feature["cell"], "values": {"sketch": doc}})
+    return report, 0 if report.get("ok") else 1
+
+
+def _sketch_put(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    url, feature = _sketch_feature(args, args.cell)
+    return _sketch_write(args, url, feature, _json_arg("@" + args.file, "--file"))
+
+
+def _sketch_solve(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    if args.file:
+        url, doc = _editor_url(args), _json_arg("@" + args.file, "--file")
+    elif args.cell:
+        url, feature = _sketch_feature(args, args.cell)
+        doc = feature["gui"]["values"]["sketch"]
+    else:
+        raise ValueError("give a sketch feature (cell or slug) or --file")
+    report = _call(url, "/api/sketch/solve", {"sketch": doc})
+    return report, 0 if report.get("ok") else 1
+
+
+def _sketch_op(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    url, feature = _sketch_feature(args, args.cell)
+    doc = feature["gui"]["values"]["sketch"]
+    answer = _call(url, "/api/sketch/op", {"sketch": doc, "op": args.operation, "args": _json_arg(args.args, "--args") or {}})
+    if not answer.get("ok") or args.dry_run:
+        return answer, 0 if answer.get("ok") else 1
+    written, code = _sketch_write(args, url, feature, answer["sketch"])
+    return {**{k: answer[k] for k in ("created", "removed", "changed", "created_constraints", "removed_constraints", "changed_constraints", "notes")}, "written": written.get("ok", False), **({"error": written.get("error")} if code else {})}, code
 
 
 def _execute(args: argparse.Namespace) -> tuple[dict[str, Any], int]:

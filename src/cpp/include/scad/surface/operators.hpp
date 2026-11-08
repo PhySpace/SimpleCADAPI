@@ -6,6 +6,7 @@
 // failures as scad::Error with the Python operation name and guidance text.
 #pragma once
 
+#include <concepts>
 #include <optional>
 #include <string>
 #include <vector>
@@ -91,9 +92,17 @@ struct LoftShellTags {
 // endpoint wires and side faces.
 Shell loft_rshell(const std::vector<LoftSection>& sections, bool ruled = false, const LoftShellTags& tags = {});
 
-// Sew faces into exactly one connected Shell.
-Shell sew_faces_rshell(const std::vector<Face>& faces, double tolerance = tol::kSewing,
+// Sew faces, and the faces of shells (a loft's surface, a shell sewn before), into exactly one connected Shell.
+// TypeError for any other shape.
+Shell sew_faces_rshell(const std::vector<Shape>& pieces, double tolerance = tol::kSewing,
                        const TagPrefix& tag_prefix = std::nullopt);
+// A list of faces as it is (a template, so a braced list still means the pieces above).
+template <class F>
+  requires std::same_as<F, Face>
+Shell sew_faces_rshell(const std::vector<F>& faces, double tolerance = tol::kSewing,
+                       const TagPrefix& tag_prefix = std::nullopt) {
+  return sew_faces_rshell(std::vector<Shape>(faces.begin(), faces.end()), tolerance, tag_prefix);
+}
 
 // One oriented Solid from one valid closed Shell.
 Solid make_solid_from_shell_rsolid(const Shell& shell, const TagPrefix& tag_prefix = std::nullopt);

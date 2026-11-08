@@ -69,3 +69,33 @@ TEST_CASE("Value keeps object insertion order and dumps JSON") {
   CHECK(v.dump() == R"({"b":2.5,"a":"x"})");
   CHECK(Value(1) == Value(1.0));
 }
+
+TEST_CASE("a Workplane is a value: copied, entered again, and on an exact frame") {
+  Workplane wp({0, 0, 5}, {0, 1, 0}, {1, 0, 0});
+  wp.set_runtime("graph.node_id", Value("node_7"));
+  const Workplane copy(wp);
+  CHECK(copy.origin() == Vec3{0, 0, 5});
+  CHECK(copy.normal() == Vec3{0, 1, 0});
+  CHECK(copy.get_runtime("graph.node_id").as_string() == "node_7");
+  CHECK_FALSE(copy.entered());
+  for (int round = 0; round < 2; ++round) {  // `with wp:` twice
+    wp.enter();
+    CHECK(current_cs().origin() == Vec3{0, 0, 5});
+    REQUIRE(current_frame_source() != nullptr);
+    CHECK(current_frame_source()->node_id == "node_7");
+    wp.exit();
+    CHECK(current_frame_source() == nullptr);
+  }
+  {
+    CoordinateSystemScope plain(CoordinateSystem({1, 2, 3}, {1, 0, 0}, {0, 1, 0}));
+    CHECK(current_frame_source() == nullptr);  // a plain scope has no recorded source
+    const Workplane exact = Workplane::from_frame(CoordinateSystem({9, 0, 0}, {0, 1, 0}, {0, 0, 1}));
+    CHECK(exact.origin() == Vec3{9, 0, 0});  // not moved by the current system
+    CHECK(exact.normal() == Vec3{1, 0, 0});
+    const Value plane = exact.plane_value();
+    CHECK(plane.find("x_axis")->dump() == "[0,1,0]");
+  }
+  wp.enter();
+  CHECK_THROWS_AS(wp.enter(), RuntimeError);
+  wp.exit();
+}

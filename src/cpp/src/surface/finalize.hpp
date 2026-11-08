@@ -17,6 +17,7 @@
 
 #include "scad/core/scalar.hpp"
 #include "scad/core/value.hpp"
+#include "scad/semantic/tracked_result.hpp"
 #include "scad/surface/operators.hpp"
 #include "scad/topo/delta.hpp"
 #include "scad/topo/recorder.hpp"
@@ -32,6 +33,8 @@ struct OperationRecord {
   std::vector<OpInput> inputs;
   // The node labels (`tags=` of record_operation_if_active); empty = {primitive|derived, surface, <kind>}.
   std::vector<std::string> labels;
+  // The inputs are written as ordered `input_refs` (always for the ops listed in finalize.cpp).
+  bool ordered_inputs = false;
 };
 
 // A Face, whether built from data (`inputs` empty) or from shapes.
@@ -85,5 +88,19 @@ struct BoundariesOutput {
   Shell source;
 };
 std::vector<Wire> finalize_surface_output(std::vector<Wire> result, BoundariesOutput output);
+
+// The curve / surface edits (editing/*.cpp): one input Edge or Face, one result of the same kind, built on edited
+// geometry.  `delta` / `entries` are the history of the rebuild (modification_history): the face and its edges
+// continue, and their tags follow through the tracked pipeline (projected per entity; with a recorder, the tags a
+// recorded assignment made follow through the delta in the graph).
+struct EditOutput {
+  OperationRecord record;
+  TagPrefix tag_prefix;
+  Shape source;
+  TopoDelta delta;
+  DeltaEntries entries;
+};
+Face finalize_surface_output(Face result, EditOutput output);
+Edge finalize_surface_output(Edge result, EditOutput output);
 
 }  // namespace scad::surface::detail

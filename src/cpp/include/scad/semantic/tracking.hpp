@@ -149,6 +149,30 @@ TrackedResult tracked_shell(const Solid& solid, const std::vector<Face>& faces_t
                             double tol = 1e-6);
 
 // ---------------------------------------------------------------------------
+// Modifications finished by finish_solid (operators: transform_rsolid, scale_rsolid, offset_rsolid, draft_rsolid)
+// ---------------------------------------------------------------------------
+
+// The face and edge history of `input` -> `result` (origin_role "body") from the retained history of the
+// builder(s) that made `result` (compose a copy step and the transform with BRepTools_History::Merge).  A
+// modified image has derivation `modified_derivation` ("continuation" for a transform: the same entity, moved).
+// With `generated_faces_continue`, a face whose only image is a generated face of the result (an offset
+// solid's moved face) is reported modified/continuation instead, so it keeps its identity.  The delta still
+// carries temporary tracking ids, which the recorder binds.  Empty under TrackingPolicy::Graph.
+TopoDelta modification_delta(const BRepTools_History& history, const TopoDS_Shape& input, const TopoDS_Shape& result,
+                             std::string_view modified_derivation, bool generated_faces_continue = false);
+
+// The same, with the per-entity entries the tag projection reads (finalize_tracked): for a modification whose result
+// is finished through the tracked pipeline (the curve / surface edits), so tags of sub-entities follow without a
+// recorder too.
+struct ModificationHistory {
+  TopoDelta delta;
+  DeltaEntries entries;
+};
+ModificationHistory modification_history(const BRepTools_History& history, const TopoDS_Shape& input,
+                                         const TopoDS_Shape& result, std::string_view modified_derivation,
+                                         bool generated_faces_continue = false);
+
+// ---------------------------------------------------------------------------
 // Booleans (operators: cut_rsolid, union_rsolid, intersect_rsolid)
 // ---------------------------------------------------------------------------
 

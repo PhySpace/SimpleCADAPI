@@ -26,6 +26,7 @@
 #include "scad/core/value.hpp"
 #include "scad/core/vec.hpp"
 #include "scad/kernel/properties.hpp"
+#include "scad/ql/scope.hpp"
 #include "scad/topo/shape.hpp"
 
 namespace scad::ql {
@@ -54,6 +55,14 @@ enum class Measure : unsigned char { Area, Length, Volume };
 class EvalContext {
  public:
   EvalContext();
+  // A run over `scope`: what a reference predicate (ql.ref, reference.hpp) resolves in.
+  explicit EvalContext(const Scope& scope);
+
+  // The scope of the run, or nullptr for a predicate matched on its own.
+  [[nodiscard]] const Scope* scope() const noexcept { return scope_.get(); }
+  // Is `candidate` among the entities the reference `record` names in the scope?  The reference is resolved once
+  // per run (keyed by `key`, the record's text); a run without one shape to resolve in is a ValueError.
+  [[nodiscard]] bool referenced(const Shape& candidate, const std::string& key, const Value& record) const;
 
   [[nodiscard]] const std::vector<ResolverEntry>& resolvers() const noexcept { return *resolvers_; }
 
@@ -71,6 +80,7 @@ class EvalContext {
   [[nodiscard]] Memo& memo() const;
 
   std::shared_ptr<const std::vector<ResolverEntry>> resolvers_;
+  std::shared_ptr<const Scope> scope_;
   mutable std::shared_ptr<Memo> memo_;
 };
 

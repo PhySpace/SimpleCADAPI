@@ -424,9 +424,40 @@ void bind_constraints(py::module_& m) {
 
 void bind_part(py::module_& m) {
   using namespace sp;
-  py::class_<Part, py::smart_holder> cls(m, "Part", "Single-body product item wrapping exactly one Solid.");
+  py::class_<Body, py::smart_holder>(m, "Body", "One named solid of a Part; a multi-body Part keeps several apart.")
+      .def(py::init([](const py::object& body_id, const py::object& solid, const py::object& name,
+                       const py::object& color, const py::object& opacity) {
+             std::optional<double> opacity_value;
+             if (!opacity.is_none())
+               opacity_value = number(opacity, "opacity");
+             return std::make_shared<Body>(text(body_id, "body_id"), typed<Solid>(solid, "solid must be a Solid"),
+                                           optional_name(name), optional_vec3(color, "color"), opacity_value);
+           }),
+           py::arg("body_id"), py::arg("solid"), py::arg("name") = py::none(), py::arg("color") = py::none(),
+           py::arg("opacity") = py::none())
+      .def_property_readonly("body_id", &Body::body_id)
+      .def_property_readonly("solid", &Body::solid)
+      .def_property_readonly("name", [](const Body& self) { return optional_object(self.name()); })
+      .def_property_readonly(
+          "color", [](const Body& self) -> py::object { return self.color() ? py::cast(*self.color()) : py::none(); },
+          "The display colour of this body (RGB in [0, 1]), or None to show the material colour.")
+      .def_property_readonly(
+          "opacity", [](const Body& self) { return optional_float(self.opacity()); },
+          "The display opacity of this body in [0, 1], or None (opaque).")
+      .def("to_dict", [](const Body& self) { return self.to_dict(); })
+      .def("__repr__", [](const Body& self) {
+        std::string out = "Body(body_id=" + str_repr(self.body_id()) + ", name=" + opt_str_repr(self.name());
+        if (self.color())
+          out += ", color=" + tuple_repr(*self.color());
+        if (self.opacity())
+          out += ", opacity=" + opt_float_repr(self.opacity());
+        return out + ")";
+      });
+
+  py::class_<Part, py::smart_holder> cls(
+      m, "Part", "Product item holding one Solid (`body`) or several named bodies (`bodies`), never placed apart.");
   cls.def(py::init([](const py::object& part_id, const py::object& body, const py::object& name,
-                      const py::object& material, const py::object& connectors) {
+                      const py::object& material, const py::object& connectors, const py::object& bodies) {
             std::optional<Material> material_value;
             if (!material.is_none())
               material_value = typed<Material>(material, "material must be a Material");
@@ -437,13 +468,30 @@ void bind_part(py::module_& m) {
                                                             "connectors must contain Connector values"));
               }
             }
+            if (body.is_none() == bodies.is_none())
+              throw scad::TypeError("give exactly one of body (a Solid) or bodies (several named solids)");
+            if (!bodies.is_none() || is_pieces(body)) {  // several bodies, or the pieces of a split cut
+              std::vector<Body> values;
+              if (bodies.is_none())
+                add_bodies(values, kDefaultBodyId, body);
+              else
+                values = body_list(bodies);
+              return std::make_shared<Part>(text(part_id, "part_id"), std::move(values), optional_name(name),
+                                            material_value, std::move(connector_values));
+            }
             return std::make_shared<Part>(text(part_id, "part_id"), typed<Solid>(body, "body must be a Solid"),
                                           optional_name(name), material_value, std::move(connector_values));
           }),
-          py::arg("part_id"), py::arg("body"), py::arg("name") = py::none(), py::arg("material") = py::none(),
-          py::arg("connectors") = py::tuple())
+          py::arg("part_id"), py::arg("body") = py::none(), py::arg("name") = py::none(),
+          py::arg("material") = py::none(), py::arg("connectors") = py::tuple(), py::arg("bodies") = py::none())
+      .def_property_readonly("bodies", [](const Part& self) { return to_tuple(self.bodies()); })
+      .def_property_readonly("multi_body", &Part::multi_body)
+      .def("body_ids", [](const Part& self) { return to_tuple(self.body_ids()); })
+      .def(
+          "get_body", [](const Part& self, const py::object& id) { return self.get_body(text(id, "body_id")); },
+          py::arg("body_id"))
       .def_property_readonly("part_id", &Part::part_id)
-      .def_property_readonly("body", &Part::body)
+      .def_property_readonly("body", &Part::body, "The Solid of a one-body Part; TypeError for a multi-body Part.")
       .def_property_readonly("name", [](const Part& self) { return optional_object(self.name()); })
       .def_property_readonly(
           "material",

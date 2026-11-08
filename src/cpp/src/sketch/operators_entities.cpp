@@ -6,6 +6,7 @@
 #include "scad/core/coordinate_system.hpp"
 #include "scad/core/error.hpp"
 #include "scad/sketch/operators.hpp"
+#include "scad/topo/value_lineage.hpp"
 
 namespace scad {
 
@@ -69,6 +70,13 @@ Value plane_in_current_coordinates(const Value& plane) {
     origin = vec_from_value(plane.find("origin"), origin);
     x_axis = vec_from_value(plane.find("x_axis"), x_axis);
     y_axis = vec_from_value(plane.find("y_axis"), y_axis);
+    if (const Value* world = plane.find("workplane"); world != nullptr && world->is_bool() && world->as_bool()) {
+      Value out = Value::object();  // a workplane's frame: world coordinates already
+      out.set("origin", vec_value(origin));
+      out.set("x_axis", vec_value(x_axis));
+      out.set("y_axis", vec_value(y_axis));
+      return out;
+    }
   } else {
     throw ValueError("Sketch plane must be 'XY', 'XZ', 'YZ', or a plane mapping");
   }
@@ -95,6 +103,28 @@ Sketch make_sketch_rsketch(const std::optional<std::string>& name, const Value& 
     params.set("plane", plane);
     params.set("sketch_id", sketch.sketch_id());
     finalize_sketch_object("make_sketch_rsketch", std::move(params), {}, sketch);
+    return sketch;
+  });
+}
+
+Sketch make_sketch_rsketch(const std::optional<std::string>& name, const Workplane& plane,
+                           const std::optional<std::string>& sketch_id) {
+  static const ErrorSpec kSpec{"make_sketch_rsketch",
+                               "Failed to create a sketch document on the workplane.",
+                               {"The sketch name is invalid."},
+                               {"Pass a Workplane made by SimpleWorkplane(...) or a make_workplane_*_rworkplane op."}};
+  return guarded(kSpec, [&] {
+    Sketch sketch(name, plane.plane_value(), sketch_id);
+    Value recorded = plane.plane_value();
+    recorded.set("workplane", true);
+    Value params = Value::object();
+    params.set("name", name ? Value(*name) : Value());
+    params.set("plane", std::move(recorded));
+    params.set("sketch_id", sketch.sketch_id());
+    std::vector<ValueLineage> values;
+    if (auto lineage = value_lineage_of(plane))
+      values.push_back(std::move(*lineage));
+    finalize_sketch_object("make_sketch_rsketch", std::move(params), {}, sketch, nullptr, std::move(values));
     return sketch;
   });
 }

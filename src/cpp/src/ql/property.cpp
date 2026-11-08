@@ -17,6 +17,7 @@
 #include "scad/kernel/properties.hpp"
 #include "scad/kernel/topology.hpp"
 #include "scad/ql/identity.hpp"
+#include "scad/ql/reference.hpp"
 
 namespace scad::ql {
 
@@ -221,9 +222,27 @@ struct EvalContext::Memo {
     Memoised<kernel::BoundingBox> bbox;
   };
   std::unordered_map<Shape, Entry, IdentityHash, IdentityEqual> entries;
+  std::unordered_map<std::string, IdentitySet> references;  // record text -> the entities it names in the scope
 };
 
 EvalContext::EvalContext() : resolvers_(registry().snapshot()) {}
+
+EvalContext::EvalContext(const Scope& scope)
+    : resolvers_(registry().snapshot()), scope_(std::make_shared<const Scope>(scope)) {}
+
+bool EvalContext::referenced(const Shape& candidate, const std::string& key, const Value& record) const {
+  if (!scope_ || scope_->is_list())
+    throw ValueError(
+        "ql.ref resolves in one shape: use it in a selector resolved against that shape, "
+        "e.g. ql.faces().where(ql.ref(r)).resolve(part)");
+  auto& known = memo().references;
+  auto found = known.find(key);
+  if (found == known.end()) {
+    const std::vector<Shape> targets = resolve_reference(scope_->shape(), record);
+    found = known.emplace(key, IdentitySet(targets.begin(), targets.end())).first;
+  }
+  return found->second.contains(candidate);
+}
 
 EvalContext::Memo& EvalContext::memo() const {
   if (!memo_)

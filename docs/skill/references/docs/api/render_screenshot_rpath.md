@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def render_screenshot_rpath(shapes: 'Any', output_path: 'str', highlight_tags: 'Optional[Sequence[str]]' = None, tag_labels: 'Optional[Dict[str, str]]' = None, image_size: 'Tuple[int, int]' = (1400, 900), view: 'Union[Tuple[float, float], str]' = 'auto', views: 'Optional[Sequence[Tuple[float, float, str]]]' = None, show_axes: 'bool' = True, show_legend: 'bool' = True, zoom: 'float' = 4.0, show_callouts: 'bool' = True, linear_deflection: 'Optional[float]' = None, angular_deflection: 'Optional[float]' = None, style: 'str' = 'studio', edge_width_scale: 'Optional[float]' = None, view_up: 'Optional[Sequence[float]]' = None, supersample: 'int' = 2, highlight_edges: 'Optional[Sequence[Any]]' = None, highlight_edge_width: 'float' = 4.5) -> 'str'
+def render_screenshot_rpath(shapes: 'Solid | Sequence[Solid]', output_path: 'str | PathLike[str]', highlight_tags: 'Sequence[str] | None' = None, tag_labels: 'dict[str, str] | None' = None, image_size: 'tuple[int, int]' = (1400, 900), view: "Literal['auto', 'iso', 'isometric', 'top', 'bottom', 'front', 'back', 'left', 'right', 'front_right', 'front_left', 'rear_right', 'rear_left'] | tuple[Angle, Angle] | None" = 'auto', views: 'Sequence[tuple[Angle, Angle, str]] | None' = None, show_axes: 'bool' = True, show_legend: 'bool' = True, zoom: 'float' = 4.0, show_callouts: 'bool' = True, linear_deflection: 'Length | None' = None, angular_deflection: 'float | None' = None, style: "Literal['studio', 'standard']" = 'studio', edge_width_scale: 'float | None' = None, view_up: 'Direction3 | None' = None, supersample: 'int' = 2, highlight_edges: 'Sequence[AnyShape] | None' = None, highlight_edge_width: 'float' = 4.5) -> 'str'
 ```
 
 *Source: operators/features.py*

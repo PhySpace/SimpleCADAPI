@@ -12,6 +12,7 @@
 #include "scad/core/error.hpp"
 #include "scad/ql/selector.hpp"
 #include "scad/semantic/finalize.hpp"
+#include "scad/reactive/tag_view.hpp"
 #include "scad/semantic/selection.hpp"
 #include "scad/topo/tag_factories.hpp"
 
@@ -614,6 +615,27 @@ TagTargets targets_from_py(const py::object& targets) {
   return TagTargets(std::move(shapes));
 }
 
+// `targets` of apply_tag_rselection, for the signature (the body checks it: targets_from_py).  ShapeSelector is bound
+// after this module, so the names are written out.
+struct TagTargetsName {
+  static constexpr auto name = py::detail::const_name(
+      "simplecadapi._cpp._native.ShapeSelector | collections.abc.Sequence[simplecadapi._cpp._native.AnyShape]");
+};
+
+// The result of apply_tag_rselection: the scope's shape, as the class it is.
+struct TaggedShapeName {
+  static constexpr auto name = py::detail::const_name("simplecadapi._cpp._native.AnyShape");
+};
+
+// The str enums by their values (members of the Python enums are str too).
+struct TopologyPropagationName {
+  static constexpr auto name = py::detail::const_name("typing.Literal['local', 'downward']");
+};
+struct LineagePolicyName {
+  static constexpr auto name =
+      py::detail::const_name("typing.Literal['none', 'continuation', 'continuation_fragment', 'explicit']");
+};
+
 void bind_operators(py::module_& m) {
   m.def(
       "apply_tag",
@@ -634,8 +656,9 @@ void bind_operators(py::module_& m) {
 
   m.def(
       "apply_tag_rselection",
-      [](const Shape& scope, const py::object& targets, const std::string& tag, TopologyPropagation topology,
-         LineagePolicy lineage) {
+      [](const Shape& scope, const scad::pybind::AnyOf<TagTargetsName>& targets, const std::string& tag,
+         scad::pybind::Renamed<TopologyPropagation, TopologyPropagationName> topology,
+         scad::pybind::Renamed<LineagePolicy, LineagePolicyName> lineage) {
         static const ErrorSpec spec{
             "apply_tag_rselection",
             "Failed to attach the tag to the selected shapes.",
@@ -644,8 +667,8 @@ void bind_operators(py::module_& m) {
             {"Pass a valid scope and a non-empty ShapeSelector or shape sequence.",
              "Use a normalized tag string such as 'role.mounting_surface' or 'group.fasteners'.",
              "Ensure every explicit target belongs to the assignment scope."}};
-        return shape_to_py(guarded(
-            spec, [&] { return apply_tag_rselection(scope, targets_from_py(targets), tag, topology, lineage); }));
+        return scad::pybind::AnyOf<TaggedShapeName>{shape_to_py(guarded(
+            spec, [&] { return apply_tag_rselection(scope, targets_from_py(targets), tag, topology, lineage); }))};
       },
       py::arg("scope"), py::arg("targets"), py::arg("tag"),
       py::arg("topology_propagation") = TopologyPropagation::Local,
@@ -660,6 +683,36 @@ void bind_operators(py::module_& m) {
       [](const Shape& shape, const std::string& tag, TagScope scope) { return explain_tag(shape, tag, scope); },
       py::arg("shape"), py::arg("tag"), py::arg("scope") = TagScope::Effective,
       "Explain every visible binding that produces a tag token.");
+  m.def(
+      "list_tag_splits",
+      [](const Shape& shape) {
+        py::list out;
+        const auto opaque = shape.root().graph_node();
+        if (!opaque)
+          return out;
+        for (const reactive::TagSplit& split :
+             reactive::tag_splits(std::static_pointer_cast<const reactive::OperationNode>(opaque))) {
+          py::list pieces;
+          for (const TopoRef& piece : split.pieces) {
+            py::dict item;
+            item["output_slot"] = piece.output_slot;
+            item["kind"] = std::string(kind_name(piece.kind));
+            item["topo_id"] = piece.topo_id;
+            pieces.append(item);
+          }
+          py::dict row;
+          row["tag"] = split.tag;
+          row["into"] = split.into;
+          row["node_id"] = split.node_id;
+          row["op"] = split.op;
+          row["source_topo_id"] = split.source_topo_id;
+          row["pieces"] = pieces;
+          out.append(row);
+        }
+        return out;
+      },
+      py::arg("shape"),
+      "The tagged entities the operations behind a shape split into pieces (each piece carries <tag>.split<i>).");
   m.def(
       "select_faces_by_tag",
       [](const Solid& solid, const std::string& tag, TagScope scope) { return select_faces_by_tag(solid, tag, scope); },

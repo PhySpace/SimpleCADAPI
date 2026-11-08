@@ -22,3 +22,5 @@ face and the reference face — the chamfer is asymmetric with the second
 leg at ``distance * tan(angle)`` on the non-reference side;
 ``reference_direction`` picks, per edge, the adjacent face whose outward
 normal best matches it as the reference face.
+
+``solid`` may also be the list of pieces a cut that split a body returns: each piece gets the picked edges that lie on it, a piece with none is kept as it is, and the result is the list of pieces in the same order. A selector is resolved on every piece and its cardinality (``exactly``/``at_least``/``at_most``) is checked on the edges of all of them.

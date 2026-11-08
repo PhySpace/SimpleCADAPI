@@ -8,7 +8,7 @@
 // allocation per candidate for the geometric and metadata predicates.
 //
 // Kinds: tag, operation_event, origin_role, output_role, source_binding,
-// source_topology, meta, property_compare, and, or, not.
+// source_topology, meta, property_compare, ref (reference.hpp), and, or, not.
 #pragma once
 
 #include <memory>

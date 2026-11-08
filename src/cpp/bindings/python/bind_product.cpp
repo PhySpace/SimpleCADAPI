@@ -4,7 +4,8 @@
 //
 // Every operator takes py::object for the arguments whose type Python checks inside its wrapped
 // body, and converts them inside guard_operation, so a wrong type is the operation's
-// SimpleCADError exactly as in Python (see bind_product_args.hpp).
+// SimpleCADError exactly as in Python (see bind_product_args.hpp).  The py::object arrives as a
+// `AnyOf<Name>` (semantic_types.hpp), so the signature still says what each argument is.
 #include "bind_product_args.hpp"
 
 #include "scad/reactive/registry.hpp"
@@ -14,6 +15,79 @@ namespace {
 using namespace scad;
 using namespace scad::product_binding;
 using sp::guard_operation;
+
+// What each argument is, for the signature; the bodies still receive the py::object and check it themselves.
+namespace names {
+using py::detail::const_name;
+using scad::pybind::kOr;
+using scad::pybind::kOrNone;
+using scad::pybind::type_name;
+SCAD_SIGNATURE_NAME(Text, const_name("str"));
+SCAD_SIGNATURE_NAME(TextOrNone, const_name("str | None"));
+SCAD_SIGNATURE_NAME(Number, const_name("float | Expr"));
+SCAD_SIGNATURE_NAME(NumberOrNone, const_name("float | Expr | None"));
+SCAD_SIGNATURE_NAME(Bool, const_name("bool"));
+SCAD_SIGNATURE_NAME(Color, scad::pybind::ColorTag::name + kOrNone);
+SCAD_SIGNATURE_NAME(Length, scad::pybind::LengthTag::name);
+SCAD_SIGNATURE_NAME(LengthOrNone, scad::pybind::LengthTag::name + kOrNone);
+SCAD_SIGNATURE_NAME(AngleOrNone, scad::pybind::AngleTag::name + kOrNone);
+SCAD_SIGNATURE_NAME(Point, scad::pybind::PointTag::name);
+SCAD_SIGNATURE_NAME(PointOrNone, scad::pybind::PointTag::name + kOrNone);
+SCAD_SIGNATURE_NAME(Direction, scad::pybind::DirectionTag::name);
+SCAD_SIGNATURE_NAME(DirectionOrNone, scad::pybind::DirectionTag::name + kOrNone);
+SCAD_SIGNATURE_NAME(Directions, const_name("dict[str, ") + scad::pybind::DirectionTag::name + const_name("] | None"));
+SCAD_SIGNATURE_NAME(Weights, const_name("dict[str, float | Expr] | None"));
+SCAD_SIGNATURE_NAME(Solid, type_name<scad::Solid>());
+// make_part_rpart: one Solid, or the pieces of a split cut (each a body), or several named bodies.
+SCAD_SIGNATURE_NAME(SolidOrPieces, type_name<scad::Solid>() + kOr + const_name("collections.abc.Sequence[") +
+                                       type_name<scad::Solid>() + const_name("] | None"));
+SCAD_SIGNATURE_NAME(Bodies, const_name("dict[str, ") + type_name<scad::Solid>() + kOr +
+                                const_name("collections.abc.Sequence[") + type_name<scad::Solid>() +
+                                const_name("]] | None"));
+SCAD_SIGNATURE_NAME(Face, type_name<scad::Face>());
+SCAD_SIGNATURE_NAME(Edge, type_name<scad::Edge>());
+SCAD_SIGNATURE_NAME(Vertex, type_name<scad::Vertex>());
+SCAD_SIGNATURE_NAME(Part, type_name<sp::Part>());
+SCAD_SIGNATURE_NAME(Assembly, type_name<sp::Assembly>());
+SCAD_SIGNATURE_NAME(Item, type_name<sp::Part>() + kOr + type_name<sp::Assembly>());
+SCAD_SIGNATURE_NAME(Placement, type_name<sp::Placement>());
+SCAD_SIGNATURE_NAME(Material, type_name<sp::Material>());
+SCAD_SIGNATURE_NAME(Connector, type_name<sp::Connector>());
+SCAD_SIGNATURE_NAME(Ref, type_name<sp::ConnectorRef>());
+SCAD_SIGNATURE_NAME(Limit, type_name<sp::ScalarLimit>() + kOrNone);
+}  // namespace names
+
+using scad::pybind::AnyOf;
+using TextArg = AnyOf<names::Text>;
+using NameArg = AnyOf<names::TextOrNone>;  // anything str() takes: a display name
+using TextOrNoneArg = AnyOf<names::TextOrNone>;
+using NumberArg = AnyOf<names::Number>;
+using NumberOrNoneArg = AnyOf<names::NumberOrNone>;
+using BoolArg = AnyOf<names::Bool>;  // any object, read by its truth value
+using ColorArg = AnyOf<names::Color>;
+using LengthArg = AnyOf<names::Length>;
+using LengthOrNoneArg = AnyOf<names::LengthOrNone>;
+using AngleOrNoneArg = AnyOf<names::AngleOrNone>;
+using PointArg = AnyOf<names::Point>;
+using PointOrNoneArg = AnyOf<names::PointOrNone>;
+using DirectionArg = AnyOf<names::Direction>;
+using DirectionOrNoneArg = AnyOf<names::DirectionOrNone>;
+using DirectionsArg = AnyOf<names::Directions>;
+using WeightsArg = AnyOf<names::Weights>;
+using SolidArg = AnyOf<names::Solid>;
+using SolidOrPiecesArg = AnyOf<names::SolidOrPieces>;
+using BodiesArg = AnyOf<names::Bodies>;
+using FaceArg = AnyOf<names::Face>;
+using EdgeArg = AnyOf<names::Edge>;
+using VertexArg = AnyOf<names::Vertex>;
+using PartArg = AnyOf<names::Part>;
+using AssemblyArg = AnyOf<names::Assembly>;
+using ItemArg = AnyOf<names::Item>;
+using PlacementArg = AnyOf<names::Placement>;
+using MaterialArg = AnyOf<names::Material>;
+using ConnectorArg = AnyOf<names::Connector>;
+using RefArg = AnyOf<names::Ref>;
+using LimitArg = AnyOf<names::Limit>;
 
 const sp::Assembly& assembly_arg(const py::object& value) {
   return typed<sp::Assembly>(value, "assembly must be an Assembly");
@@ -46,8 +120,8 @@ Scalar3 point_arg(const py::object& value, const char* field) {
 void bind_structure(py::module_& m) {
   m.def(
       "make_material_rmaterial",
-      [](const py::object& material_id, const py::object& name, const py::object& density,
-         const py::object& density_unit, const py::object& color) {
+      [](const TextArg& material_id, const NameArg& name, const NumberOrNoneArg& density,
+         const TextOrNoneArg& density_unit, const ColorArg& color) {
         return guard_operation("make_material_rmaterial", [&] {
           sp::OptionalString unit;
           if (!density_unit.is_none())
@@ -65,7 +139,7 @@ void bind_structure(py::module_& m) {
 
   m.def(
       "make_placement_rplacement",
-      [](const py::object& origin, const py::object& x_axis, const py::object& y_axis) {
+      [](const PointArg& origin, const DirectionArg& x_axis, const DirectionArg& y_axis) {
         return guard_operation("make_placement_rplacement", [&] {
           return sp::make_placement_rplacement(point_arg(origin, "origin"), point_arg(x_axis, "x_axis"),
                                                point_arg(y_axis, "y_axis"));
@@ -79,27 +153,54 @@ void bind_structure(py::module_& m) {
 
   m.def(
       "make_part_rpart",
-      [](const py::object& part_id, const py::object& body, const py::object& name) {
+      [](const TextArg& part_id, const SolidOrPiecesArg& body, const NameArg& name, const BodiesArg& bodies) {
         return guard_operation("make_part_rpart", [&] {
+          if (body.is_none() == bodies.is_none())
+            throw scad::TypeError("give exactly one of body (a Solid) or bodies (several named solids)");
+          if (!bodies.is_none())
+            return sp::make_part_rpart(text(part_id, "part_id"), body_list(bodies), optional_name(name));
+          if (is_pieces(body) && py::len(body) > 1) {  // a split cut: its pieces are bodies body_1 .. body_n
+            std::vector<sp::Body> pieces;
+            add_bodies(pieces, sp::kDefaultBodyId, body);
+            return sp::make_part_rpart(text(part_id, "part_id"), pieces, optional_name(name));
+          }
+          if (is_pieces(body))
+            return sp::make_part_rpart(
+                text(part_id, "part_id"),
+                typed<Solid>(py::reinterpret_borrow<py::object>(body.value[py::int_(0)]), "body"), optional_name(name));
           return sp::make_part_rpart(text(part_id, "part_id"), typed<Solid>(body, "body must be a Solid"),
                                      optional_name(name));
         });
       },
-      py::arg("part_id"), py::arg("body"), py::arg("name") = py::none(),
-      "Wrap exactly one Solid as a semantic single-body Part.");
+      py::arg("part_id"), py::arg("body") = py::none(), py::arg("name") = py::none(), py::arg("bodies") = py::none(),
+      "Wrap one Solid (body) or several named solids (bodies) as a semantic Part.");
   m.def(
       "assign_material_rpart",
-      [](const py::object& part, const py::object& material) {
+      [](const PartArg& part, const MaterialArg& material) {
         return guard_operation("assign_material_rpart", [&] {
           return sp::assign_material_rpart(part_arg(part),
                                            typed<sp::Material>(material, "material must be a Material"));
         });
       },
       py::arg("part"), py::arg("material"), "Assign a Material to a Part and return the updated Part.");
+  m.def(
+      "set_body_appearance_rpart",
+      [](const PartArg& part, const TextArg& body_id, const ColorArg& color, const NumberOrNoneArg& opacity,
+         const NameArg& name, const BoolArg& reset) {
+        return guard_operation("set_body_appearance_rpart", [&] {
+          return sp::set_body_appearance_rpart(
+              part_arg(part), text(body_id, "body_id"), optional_vec3(color, "color"),
+              opacity.is_none() ? sp::OptionalDouble{} : sp::OptionalDouble{number(opacity, "opacity")},
+              optional_name(name), truthy(reset));
+        });
+      },
+      py::arg("part"), py::arg("body_id") = sp::kDefaultBodyId, py::kw_only(), py::arg("color") = py::none(),
+      py::arg("opacity") = py::none(), py::arg("name") = py::none(), py::arg("reset") = false,
+      "Set the display colour, opacity and display name of one body of a Part and return the updated Part.");
 
   m.def(
       "make_assembly_rassembly",
-      [](const py::object& assembly_id, const py::object& name) {
+      [](const TextArg& assembly_id, const NameArg& name) {
         return guard_operation("make_assembly_rassembly", [&] {
           return sp::make_assembly_rassembly(text(assembly_id, "assembly_id"), optional_name(name));
         });
@@ -107,8 +208,8 @@ void bind_structure(py::module_& m) {
       py::arg("assembly_id"), py::arg("name") = py::none(), "Create an empty assembly product structure.");
   m.def(
       "add_component_rassembly",
-      [](const py::object& assembly, const py::object& item, const py::object& component_id,
-         const py::object& placement, const py::object& name) {
+      [](const AssemblyArg& assembly, const ItemArg& item, const TextArg& component_id, const PlacementArg& placement,
+         const NameArg& name) {
         return guard_operation("add_component_rassembly", [&] {
           const sp::Assembly& target = assembly_arg(assembly);
           const sp::Item chosen = item_of(item);
@@ -120,7 +221,7 @@ void bind_structure(py::module_& m) {
       "Add a placed Part or subassembly component instance to an Assembly.");
   m.def(
       "place_component_rassembly",
-      [](const py::object& assembly, const py::object& component_id, const py::object& placement) {
+      [](const AssemblyArg& assembly, const TextArg& component_id, const PlacementArg& placement) {
         return guard_operation("place_component_rassembly", [&] {
           const sp::Assembly& target = assembly_arg(assembly);
           return sp::place_component_rassembly(target, text(component_id, "component_id"), placement_arg(placement));
@@ -128,12 +229,41 @@ void bind_structure(py::module_& m) {
       },
       py::arg("assembly"), py::arg("component_id"), py::arg("placement"),
       "Move an existing assembly component by replacing its placement.");
+  m.def(
+      "explode_rassembly",
+      [](const AssemblyArg& assembly, const NumberArg& factor, const PointOrNoneArg& center,
+         const DirectionOrNoneArg& axis, const DirectionsArg& directions, const WeightsArg& weights) {
+        return guard_operation("explode_rassembly", [&] {
+          const sp::Assembly& target = assembly_arg(assembly);
+          std::map<std::string, Vec3> direction_map;
+          if (!directions.is_none()) {
+            if (!py::isinstance<py::dict>(directions))
+              throw TypeError("directions must be a dict of component_id -> direction");
+            for (const auto& item : py::reinterpret_borrow<py::dict>(directions))
+              direction_map[text(py::reinterpret_borrow<py::object>(item.first), "a directions key")] =
+                  vec3(py::reinterpret_borrow<py::object>(item.second), "a direction");
+          }
+          std::map<std::string, double> weight_map;
+          if (!weights.is_none()) {
+            if (!py::isinstance<py::dict>(weights))
+              throw TypeError("weights must be a dict of component_id -> number");
+            for (const auto& item : py::reinterpret_borrow<py::dict>(weights))
+              weight_map[text(py::reinterpret_borrow<py::object>(item.first), "a weights key")] =
+                  number(py::reinterpret_borrow<py::object>(item.second), "a weight");
+          }
+          return sp::explode_rassembly(target, scalar(factor, "factor"), optional_vec3(center, "center"),
+                                       optional_vec3(axis, "axis"), direction_map, weight_map);
+        });
+      },
+      py::arg("assembly"), py::arg("factor"), py::kw_only(), py::arg("center") = py::none(),
+      py::arg("axis") = py::none(), py::arg("directions") = py::none(), py::arg("weights") = py::none(),
+      "Return a display copy of the assembly with its components pushed apart for an exploded view.");
 }
 
 void bind_connectors(py::module_& m) {
   m.def(
       "make_face_connector_rconnector",
-      [](const py::object& connector_id, const py::object& face, const py::object& name, const py::object& flip) {
+      [](const TextArg& connector_id, const FaceArg& face, const NameArg& name, const BoolArg& flip) {
         return guard_operation("make_face_connector_rconnector", [&] {
           const Face& target = typed<Face>(face, "face must be a Face");
           return sp::make_face_connector_rconnector(text(connector_id, "connector_id"), target, optional_name(name),
@@ -145,7 +275,7 @@ void bind_connectors(py::module_& m) {
       "Set flip=True to negate the Z axis (point it opposite to the normal).");
   m.def(
       "make_edge_connector_rconnector",
-      [](const py::object& connector_id, const py::object& edge, const py::object& name, const py::object& flip) {
+      [](const TextArg& connector_id, const EdgeArg& edge, const NameArg& name, const BoolArg& flip) {
         return guard_operation("make_edge_connector_rconnector", [&] {
           const Edge& target = typed<Edge>(edge, "edge must be an Edge");
           return sp::make_edge_connector_rconnector(text(connector_id, "connector_id"), target, optional_name(name),
@@ -158,7 +288,7 @@ void bind_connectors(py::module_& m) {
       "Set flip=True to negate the Z axis.");
   m.def(
       "make_vertex_connector_rconnector",
-      [](const py::object& connector_id, const py::object& vertex, const py::object& name, const py::object& flip) {
+      [](const TextArg& connector_id, const VertexArg& vertex, const NameArg& name, const BoolArg& flip) {
         return guard_operation("make_vertex_connector_rconnector", [&] {
           const Vertex& target = typed<Vertex>(vertex, "vertex must be a Vertex");
           return sp::make_vertex_connector_rconnector(text(connector_id, "connector_id"), target, optional_name(name),
@@ -170,7 +300,7 @@ void bind_connectors(py::module_& m) {
       "flip has no effect on vertex connectors (no direction).");
   m.def(
       "make_placement_connector_rconnector",
-      [](const py::object& connector_id, const py::object& placement, const py::object& name) {
+      [](const TextArg& connector_id, const PlacementArg& placement, const NameArg& name) {
         return guard_operation("make_placement_connector_rconnector", [&] {
           const sp::Placement& frame = placement_arg(placement);
           return sp::make_placement_connector_rconnector(text(connector_id, "connector_id"), frame,
@@ -181,7 +311,7 @@ void bind_connectors(py::module_& m) {
       "Create a connector anchored to an explicit local placement frame.");
   m.def(
       "add_connector_rpart",
-      [](const py::object& part, const py::object& connector) {
+      [](const PartArg& part, const ConnectorArg& connector) {
         return guard_operation("add_connector_rpart", [&] {
           const sp::Part& target = part_arg(part);
           return sp::add_connector_rpart(target, typed<sp::Connector>(connector, "connector must be a Connector"));
@@ -190,8 +320,8 @@ void bind_connectors(py::module_& m) {
       py::arg("part"), py::arg("connector"), "Attach a connector datum frame to a Part definition.");
   m.def(
       "set_public_connector_rassembly",
-      [](const py::object& assembly, const py::object& public_id, const py::object& component_id,
-         const py::object& connector_id, const py::object& name) {
+      [](const AssemblyArg& assembly, const TextArg& public_id, const TextArg& component_id,
+         const TextArg& connector_id, const NameArg& name) {
         return guard_operation("set_public_connector_rassembly", [&] {
           const sp::Assembly& target = assembly_arg(assembly);
           return sp::set_public_connector_rassembly(target, text(public_id, "public_connector_id"),
@@ -204,7 +334,7 @@ void bind_connectors(py::module_& m) {
       "Expose an existing connector on a direct child component.");
   m.def(
       "make_connector_ref_rconnectorref",
-      [](const py::object& component_id, const py::object& connector_id) {
+      [](const TextArg& component_id, const TextArg& connector_id) {
         return guard_operation("make_connector_ref_rconnectorref", [&] {
           return sp::make_connector_ref_rconnectorref(text(component_id, "component_id"),
                                                       text(connector_id, "connector_id"));
@@ -213,7 +343,7 @@ void bind_connectors(py::module_& m) {
       py::arg("component_id"), py::arg("connector_id"), "Reference a connector through a component instance.");
   m.def(
       "make_scalar_limit_rscalarlimit",
-      [](const py::object& lower_value, const py::object& upper_value) {
+      [](const NumberArg& lower_value, const NumberArg& upper_value) {
         return guard_operation("make_scalar_limit_rscalarlimit", [&] {
           return sp::make_scalar_limit_rscalarlimit(scalar(lower_value, "lower_value"),
                                                     scalar(upper_value, "upper_value"));
@@ -228,7 +358,7 @@ void bind_connectors(py::module_& m) {
 void bind_constraints(py::module_& m) {
   m.def(
       "ground_component_rassembly",
-      [](const py::object& assembly, const py::object& component_id) {
+      [](const AssemblyArg& assembly, const TextArg& component_id) {
         return guard_operation("ground_component_rassembly", [&] {
           const sp::Assembly& target = assembly_arg(assembly);
           return sp::ground_component_rassembly(target, text(component_id, "component_id"));
@@ -237,7 +367,7 @@ void bind_constraints(py::module_& m) {
       py::arg("assembly"), py::arg("component_id"), "Ground a component at its current authored placement.");
   m.def(
       "unground_component_rassembly",
-      [](const py::object& assembly, const py::object& component_id) {
+      [](const AssemblyArg& assembly, const TextArg& component_id) {
         return guard_operation("unground_component_rassembly", [&] {
           const sp::Assembly& target = assembly_arg(assembly);
           return sp::unground_component_rassembly(target, text(component_id, "component_id"));
@@ -256,8 +386,8 @@ void bind_constraints(py::module_& m) {
 
   m.def(
       "add_fixed_constraint_rassembly",
-      [ref](const py::object& assembly, const py::object& constraint_id, const py::object& a, const py::object& b,
-            const py::object& name) {
+      [ref](const AssemblyArg& assembly, const TextArg& constraint_id, const RefArg& a, const RefArg& b,
+            const NameArg& name) {
         return sp::add_fixed_constraint_rassembly(constraint_assembly("add_fixed_constraint_rassembly", assembly),
                                                   text(constraint_id, "constraint_id"), ref(a, "connector_a"),
                                                   ref(b, "connector_b"), optional_name(name));
@@ -266,9 +396,8 @@ void bind_constraints(py::module_& m) {
       py::arg("name") = py::none(), "Constrain two component connectors to the same frame.");
   m.def(
       "add_revolute_constraint_rassembly",
-      [ref, limit](const py::object& assembly, const py::object& constraint_id, const py::object& a,
-                   const py::object& b, const py::object& drive_angle_degrees, const py::object& angle_limit,
-                   const py::object& name) {
+      [ref, limit](const AssemblyArg& assembly, const TextArg& constraint_id, const RefArg& a, const RefArg& b,
+                   const AngleOrNoneArg& drive_angle_degrees, const LimitArg& angle_limit, const NameArg& name) {
         return sp::add_revolute_constraint_rassembly(
             constraint_assembly("add_revolute_constraint_rassembly", assembly), text(constraint_id, "constraint_id"),
             ref(a, "connector_a"), ref(b, "connector_b"), optional_scalar(drive_angle_degrees, "drive_angle_degrees"),
@@ -279,9 +408,8 @@ void bind_constraints(py::module_& m) {
       "Constrain two connectors as a revolute axis pair.");
   m.def(
       "add_prismatic_constraint_rassembly",
-      [ref, limit](const py::object& assembly, const py::object& constraint_id, const py::object& a,
-                   const py::object& b, const py::object& drive_distance, const py::object& distance_limit,
-                   const py::object& name) {
+      [ref, limit](const AssemblyArg& assembly, const TextArg& constraint_id, const RefArg& a, const RefArg& b,
+                   const LengthOrNoneArg& drive_distance, const LimitArg& distance_limit, const NameArg& name) {
         return sp::add_prismatic_constraint_rassembly(
             constraint_assembly("add_prismatic_constraint_rassembly", assembly), text(constraint_id, "constraint_id"),
             ref(a, "connector_a"), ref(b, "connector_b"), optional_scalar(drive_distance, "drive_distance"),
@@ -292,9 +420,9 @@ void bind_constraints(py::module_& m) {
       "Constrain two connectors as a prismatic slider pair.");
   m.def(
       "add_gear_constraint_rassembly",
-      [ref](const py::object& assembly, const py::object& constraint_id, const py::object& a, const py::object& b,
-            const py::object& pitch_radius_a, const py::object& pitch_radius_b, const py::object& phase_offset,
-            const py::object& name) {
+      [ref](const AssemblyArg& assembly, const TextArg& constraint_id, const RefArg& a, const RefArg& b,
+            const LengthArg& pitch_radius_a, const LengthArg& pitch_radius_b, const LengthOrNoneArg& phase_offset,
+            const NameArg& name) {
         return sp::add_gear_constraint_rassembly(constraint_assembly("add_gear_constraint_rassembly", assembly),
                                                  text(constraint_id, "constraint_id"), ref(a, "connector_a"),
                                                  ref(b, "connector_b"), scalar(pitch_radius_a, "pitch_radius_a"),
@@ -306,9 +434,9 @@ void bind_constraints(py::module_& m) {
       py::arg("name") = py::none(), "Couple two revolute axes as meshing gears with inverse rotation.");
   m.def(
       "add_belt_constraint_rassembly",
-      [ref](const py::object& assembly, const py::object& constraint_id, const py::object& a, const py::object& b,
-            const py::object& pulley_radius_a, const py::object& pulley_radius_b, const py::object& phase_offset,
-            const py::object& name) {
+      [ref](const AssemblyArg& assembly, const TextArg& constraint_id, const RefArg& a, const RefArg& b,
+            const LengthArg& pulley_radius_a, const LengthArg& pulley_radius_b, const LengthOrNoneArg& phase_offset,
+            const NameArg& name) {
         return sp::add_belt_constraint_rassembly(constraint_assembly("add_belt_constraint_rassembly", assembly),
                                                  text(constraint_id, "constraint_id"), ref(a, "connector_a"),
                                                  ref(b, "connector_b"), scalar(pulley_radius_a, "pulley_radius_a"),
@@ -320,9 +448,8 @@ void bind_constraints(py::module_& m) {
       py::arg("name") = py::none(), "Couple two revolute axes as belt-linked pulleys with same-direction rotation.");
   m.def(
       "add_rack_pinion_constraint_rassembly",
-      [ref](const py::object& assembly, const py::object& constraint_id, const py::object& rack,
-            const py::object& pinion, const py::object& pitch_radius, const py::object& phase_offset,
-            const py::object& name) {
+      [ref](const AssemblyArg& assembly, const TextArg& constraint_id, const RefArg& rack, const RefArg& pinion,
+            const LengthArg& pitch_radius, const LengthOrNoneArg& phase_offset, const NameArg& name) {
         return sp::add_rack_pinion_constraint_rassembly(
             constraint_assembly("add_rack_pinion_constraint_rassembly", assembly), text(constraint_id, "constraint_id"),
             ref(rack, "connector_a"), ref(pinion, "connector_b"), scalar(pitch_radius, "pitch_radius"),
@@ -336,7 +463,7 @@ void bind_constraints(py::module_& m) {
 void bind_solving(py::module_& m) {
   m.def(
       "solve_assembly_constraints_rassembly",
-      [](const py::object& assembly, const py::object& strict) {
+      [](const AssemblyArg& assembly, const BoolArg& strict) {
         return guard_operation("solve_assembly_constraints_rassembly", [&] {
           return sp::solve_assembly_constraints_rassembly(assembly_ptr_arg(assembly), truthy(strict));
         });
@@ -354,7 +481,7 @@ void bind_solving(py::module_& m) {
       "``inspect_assembly_constraints_rassembly``.");
   m.def(
       "measure_constraint_residual_rconstraintresidual",
-      [](const py::object& assembly, const py::object& constraint_id) {
+      [](const AssemblyArg& assembly, const TextArg& constraint_id) {
         return sp::measure_constraint_residual_rconstraintresidual(assembly_arg(assembly),
                                                                    text(constraint_id, "constraint_id"));
       },
@@ -362,13 +489,13 @@ void bind_solving(py::module_& m) {
       "Measure residual for one assembly constraint without mutating the assembly.");
   m.def(
       "inspect_assembly_constraints_rconstraintreport",
-      [](const py::object& assembly) {
+      [](const AssemblyArg& assembly) {
         return sp::inspect_assembly_constraints_rconstraintreport(assembly_arg(assembly));
       },
       py::arg("assembly"), "Inspect all assembly constraint residuals without mutating the assembly.");
   m.def(
       "make_compound_from_assembly_rcompound",
-      [](const py::object& assembly) {
+      [](const AssemblyArg& assembly) {
         return guard_operation("make_compound_from_assembly_rcompound",
                                [&] { return sp::make_compound_from_assembly_rcompound(assembly_arg(assembly)); });
       },

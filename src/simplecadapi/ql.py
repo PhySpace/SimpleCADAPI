@@ -8,6 +8,8 @@ is behind it):
   * ``bind_core.cpp`` -> ``src/cpp/src/core``
   * ``bind_io.cpp`` -> ``src/cpp/src/io``
   * ``bind_ql.cpp`` -> ``src/cpp/src/ql``
+
+``ref`` (a stable reference as a predicate) is defined in ``simplecadapi/ref.py``.
 """
 
 from __future__ import annotations
@@ -59,6 +61,8 @@ value = _ns.value
 wires = _ns.wires
 # (defined in Python or by the module itself)
 MISSING = _ns.MISSING
+# simplecadapi/ref.py: a stable reference as a predicate
+from .ref import predicate as ref  # noqa: E402
 
 __all__ = [
     "MISSING",
@@ -83,6 +87,7 @@ __all__ = [
     "origin_role",
     "output_role",
     "prop",
+    "ref",
     "register_property_resolver",
     "role",
     "select",

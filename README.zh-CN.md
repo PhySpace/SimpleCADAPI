@@ -2,9 +2,11 @@
   <img src="img/repocover.png" alt="SimpleCADAPI 仓库封面">
 </p>
 
-# SimpleCADAPI
+<h1 align="center">SimpleCADAPI</h1>
 
-[English](README.md)
+<p align="center"><b>为 Agent 而生的参数化 CAD。</b><br/>高效率 · 低开销 · Agent Native</p>
+
+<p align="center"><a href="README.md">English</a> · <a href="CHANGELOG.md">更新日志</a> · <a href="docs/skill-design.md">Skill 设计</a> · <a href="https://arxiv.org/abs/2608.00891">论文</a></p>
 
 **从这里开始。** 把下面这句话发给你的 coding agent（Claude Code、Codex、OpenCode 等）：
 
@@ -12,639 +14,135 @@
 Read physpace.dev/sca/landing.md and landing me on this sdk.
 ```
 
-它会帮你安装 SDK、为自己安装 skill、在 code-first 编辑器里打开一个真实示例，并
-教你怎么和它一起工作。SimpleCADAPI 是为 agent 设计的参数化 CAD SDK：模型就是一个
-代码 notebook，每个尺寸都是命名参数，按“几何是什么”来选择对象，每一步都会反馈
-成功或失败的原因。
+它会帮你安装 SDK、为自己安装 skill、在编辑器里打开一个真实示例，并教你怎么和它一起工作。
+
+---
+
+## 理念
+
+CAD 软件是为握着鼠标的人做的。Agent 没有鼠标，它只有代码、上下文窗口和 Token 账单。
+SimpleCADAPI 从这一点出发。
+
+|  |  |
+| --- | --- |
+| **高效率** | 一次尝试就做对的更多，花的 Token 更少。改一个参数，只有依赖它的单元会重新运行。 |
+| **低开销** | 一条 `pip install`：几何引擎是 wheel 里的原生 C++（基于 OpenCASCADE），没有 CadQuery 或 OCP 那一整套依赖。函数式 API、没有隐藏状态，每一步都是可以缓存、检查、重放的单元。Skill 让 agent 一批读完所需内容，而不是读二十次。 |
+| **Agent Native** | 报错会说清发生了什么、给出带单位的实测数值、告诉你怎么修。按“几何是什么”选择对象（`ql`、稳定的 `scad.ref`），而不是靠会漂移的序号。每次调用都被记录成可重放的图。编辑器把你点选的内容写进 notebook，agent 直接从文件里读到你的选择。 |
+
+## 数据
+
+**对 CadQuery。** 同一个模型、同一套提示词、同样 200 个真实零件，各只试一次。由独立且已冻结的评分器，把每个结果与原件比对。
+
+<p align="center"><img src="img/benchmark/vs_cadquery.zh.svg" alt="同一模型、同一提示词、200 个零件：SimpleCADAPI 交付的严重失真模型比 CadQuery 少 3.5 倍" width="900"></p>
+
+<sub>DeepSeek-V4.1-Flash，SimpleCADAPI 2.2.7b1 对 CadQuery 2.8.0，来自 27 个项目的 200 个开源硬件零件。“严重失真”指已交付、但 1 mm 阈值下表面 F1 低于 99.99 % 的模型。报告中已披露：SimpleCADAPI 一组另有 STEP 逆向重建的工作流文档，CadQuery 一组用的是通用的第三方 CadQuery skill；零件以简单件为主（面数中位数 19）。</sub>
+
+**对某成熟工业软件。** 每个任务消耗的 Token；该工业软件通过其 MCP 服务驱动。
+
+<p align="center"><img src="img/benchmark/vs_industrial_mcp.zh.svg" alt="每个任务消耗的 Token：SimpleCADAPI 比某成熟工业软件（经其 MCP）最多少 6.5 倍" width="900"></p>
 
 ## 它能做什么
 
-四块能力支柱。下面每个 case 都是**真实、可复现的会话**：回放 demo 是单文件离线
-HTML，忠实回放完整录制的对话（用户输入、Agent 思考、每一次工具调用与补丁、角色
-切换），旁边就是导出的 3D 模型 —— 浏览器直接打开即可。
+两台六轴机械臂，都是由零件 notebook 通过 `scad.use` 组合出来的装配体。每个关节角和连杆长度都是命名参数：拖动滑块，模型跟着动。
 
-### 1 · 单零件建模
+<p align="center"><img src="img/editor/sg90_arm_zh.jpg" alt="SimpleCADAPI 编辑器里的 SG90 六轴机械臂：左侧是 notebook 单元和关节滑块，右侧是实时装配体" width="900"></p>
 
-以可读的[特征树规约](docs/skill/references/discipline/feature-tree-convention.md)
-特征块编写参数化零件 —— 带单位的命名参数、验证先行的分阶段建模、改参后仍然命中的
-确定性面标签，以及同步产出的 `.scadpkg` / STEP AP242 / STL / 可编辑 FreeCAD 工程。
+**SG90 教学机械臂** · 34 个零件，六个转动关节作为约束被求解，连杆可 3D 打印，为电子元件预留了空间。`sg90_arm_6dof.py`
 
-<table>
-<tr>
-<th width="18%">案例</th>
-<th width="40%">首轮需求（prompt 节选）</th>
-<th width="42%">交付模型 · BRep 旋转展示</th>
-</tr>
-<tr>
-<td><b>机械臂 U 形连杆 + 电机安装槽</b><br/>15 轮用户输入 · 601 次工具调用<br/><a href="examples/u_link_motor_mount/demo/index.html">▶ 完整会话回放</a></td>
-<td>“构建参数化的机械臂连杆，能适应长度变化、通用安装电机：圆形 profile 沿『下 D → 右 L → 上 D』扫掠成 U 形；两侧圆珠 boolean cut 切出电机安装槽，安装面必须有确定命名、可被查询语言索引；底部圆柱切成半圆柱；然后全局倒角平滑。”</td>
-<td><img src="img/capability/ulink_turntable.gif" width="420" alt="u_link 旋转展示"></td>
-</tr>
-<tr>
-<td><b>参数化法兰盘</b><br/>2 轮用户输入 · 66 次工具调用<br/><a href="examples/flange_plate/demo/index.html">▶ 完整会话回放</a></td>
-<td>“参数化法兰盘：外径 100、厚 10、凸台 ⌀55 顶高 30、中心孔 ⌀30、6×⌀11 螺栓孔 @PCD 78、根部 R3 / 外缘 R2 圆角；所有尺寸走命名参数；每次圆角前打印选边卡；参数可行性守卫；一个 feature 一个块。”<br/><br/><i>GIF 为终态 8 孔 @PCD 84.5：第 2 轮改参 6→8 孔，PCD 88 被守卫当场拒绝、85 因圆角相切排除。</i></td>
-<td><img src="img/capability/flange_turntable.gif" width="420" alt="法兰旋转展示"></td>
-</tr>
-<tr>
-<td><b>筋板 L 形支架（FEM 主模型）</b><br/>2 轮用户输入 · 49 次工具调用<br/><a href="examples/ap242_gmsh_volume_mesh/demo/index.html">▶ 完整会话回放</a></td>
-<td>“把已有的 L 形直角连接件 legacy 脚本按 single-part-modeling 工作流正式化：FTC 特征块 + 命名参数重建；与旧版几何等价（体积偏差 &lt; 0.1%）；<code>interface.*</code> FEM 边界标签必须原样保留——下游 Gmsh/CalculiX 按标签选面。”</td>
-<td><img src="img/capability/bracket_turntable.gif" width="420" alt="支架旋转展示"></td>
-</tr>
-</table>
+<p align="center"><img src="img/editor/desktop_arm_zh.jpg" alt="SimpleCADAPI 编辑器里带夹爪的桌面六轴机械臂" width="900"></p>
 
-旋转展示使用 BRep 着色加宽边线渲染；转一整圈 = 48 个确定性方位角步进。
+**带夹爪的桌面六轴机械臂** · 34 个零件。关节电机是带真实安装接口的采购件（机体 34 × 20 × 19.6 mm，Ø10.5 圆周上六个 M2 孔），连杆上开有对应的腔体、螺钉通道和插接窗口。`arm6.py`
 
-### 2 · 装配体建模
+编辑器 `sca edit` 是代码优先的：左边是单元，右边是实时模型，每个参数都有滑块。点选实体、面、边或顶点，它就把一条选择写进 notebook。Agent 从文件里读到你选了什么，所以“把这两条边倒角”不需要任何 id。编辑器和 `sca run` 共用同一个运行时和同一份逐单元缓存；在六轴臂上，见过的关节角 0.6 秒重新渲染，新角度 2.7 秒（2.2.7）。
 
-嵌套持久装配体 + 显式运动学：齿轮啮合、转动副、轴承接口都是被求解的约束，不是目测
-摆放。标准件 —— 渐开线齿轮、带滚珠的轴承子装配、滚子链轮、真实牙型公制紧固件 ——
-全部来自 `scad.std.*`，组合成机构后可导出 STEP、可编辑 FreeCAD 工程和面向物理引擎
-的 MJCF。
+## Skill
 
-<table>
-<tr>
-<td width="44%" align="center" valign="top">
-<img src="img/capability/bldc_assembly.png" alt="BLDC 关节执行器装配态"><br/>
-<b>一体化 BLDC 关节执行器</b> —— 装配态（影棚渲染）<br/>
-29 个组件 · 51 条约束全部解算 · 两级行星减速 20:1
-</td>
-<td width="56%" align="center" valign="top">
-<img src="img/capability/bldc_exploded.gif" width="430" alt="BLDC 关节执行器爆炸旋转"><br/>
-<b>同一模型</b> —— 爆炸旋转展示：四个模块（电调 · 电机 ·<br/>
-双级减速器 · 输出轴）沿轴向分离，模块内同心零件按半径<br/>
-分层剥离；相机沿倾斜圆轨道环绕
-</td>
-</tr>
-</table>
+Skill 是 agent 学会使用 SDK 的方式。它是一个路由页加一批小页面，写成让 agent 恰好读到一步所需的内容，并且一批并行读完。
 
-复现方式：模型是装配 notebook `integrated_bldc_joint_actuator.py`，用
-`scad.use` 组合各零件与子装配 notebook。
-`uv run python examples/integrated_bldc_joint_actuator/export_all.py` 导出装配包和
-STEP / 可编辑 FCStd / MJCF；`render_showcase.py` 渲染上述视图。
+**能做什么** —— 七条路线，每条都是带自检的完整工作流：
 
-### 3 · Code-first 编辑器
+| 你要 | 路线 |
+| --- | --- |
+| 建一个实体零件 | 单零件建模：需求 → 规划 → 构建 → 验证 |
+| 建多零件产品或机构 | 装配：连接器、约束、运动学、标准件 |
+| 从 STEP 文件重建可编辑模型 | STEP 逆向重建，稳定实体 id 与验收门 |
+| 从网格、点云或照片重建 | 扫描重建 |
+| 从矢量 PDF 图纸重建 | 图纸重建 |
+| 出国标工程图（DXF） | 由已验证的几何生成工程图 |
+| 把模型交给别人 | 导出与转译：STEP AP242、STL、FreeCAD、MJCF |
 
-`sca edit` 在浏览器里打开一个面向“与 agent 协作”的编辑器，作用于一个 notebook
-目录。左边是 notebook 的 cell，中间是实时模型，每个参数都有滑块或开关。点选实体、
-面、边或顶点后，编辑器会把一个 `scad.ql` 选择 cell 写进 notebook 文件（自动保存），
-你的 coding agent 直接从磁盘读到你选了什么，“给这两条边倒角”不需要任何 id。复制
-cell 引用就能告诉 agent 要改哪个 cell。底部日志面板显示哪些 cell 正在重算。编辑器
-与 `sca run` 共用同一个运行时和同一份逐 cell 缓存。
+**怎么组织**
 
-<table>
-<tr>
-<td align="center" valign="top">
-<img src="img/capability/editor.png" alt="sca edit 打开 u_link 电机座：选中的面、编辑器写出的选择 cell 及其属性"><br/>
-<b><code>sca edit</code> 中的 u_link 电机座</b> —— 选中的圆柱面、编辑器为它写出的
-<code>selected_face</code> cell，以及它的属性；
-<code>sca example u_link</code> 可把这个工作区复制出来
-</td>
-</tr>
-</table>
+```text
+SKILL.md                  路由：选一条路线，读它的那一批页面（≤ 130 行）
+workflows/                每条路线一个生命周期；角色与阶段在开始时才加载
+domains/                  某类任务上 SDK 提供什么
+discipline/               规则与不变量：核心规则、特征顺序、验证脚本、失败与修复
+docs/api · stdlib · core  400+ 页自动生成的签名；没有页面的方法就不存在
+```
 
-### 4 · 仿真插件
+- **阅读预算很小。** 任何路线的第一批最多 1,200 行；每页只做一件事，每条规则只有一个家。构建检查会在页面违反约定时让 skill 构建失败。
+- **两种模式。** 每个工作流都分交互式（有人可以回答）和无人值守（没人回答）。模式改变的是谁来决定，而不是检查什么。
+- **一份源码，七个 harness。** 同一批页面可编译给 Claude Code、Codex、OpenCode、ZCode、OMP、DSH 和 Kimi Code。
 
-同一份参数化包直接喂给下游求解器，无需人工返工：AP242 STEP 进 Gmsh 体网格 +
-CalculiX 静力 FEM（边界面按保真的 `interface.*` 标签选取，仿真链在模型改版后依然
-成立），MJCF 进 MuJoCo 做机构动力学——仿真环境里的虚拟碰撞检查会暴露装配干涉，
-驱动修正，直到机构全程干净运动。
+```bash
+sca skill targets            # 支持的 harness
+sca skill install            # 为你的 harness 编译并安装
+```
+
+## 插件
+
+建模是 SDK 的事。对建好的模型做检查、仿真、转译，属于插件；一个插件就是一个仓库：
+
+```text
+sca-addon.toml     可机器检查的事实：名称、版本、兼容的 SDK 版本、如何准备运行环境
+skill/SKILL.md     agent 读到的关于它的一切
+...                它自己的代码、二进制和文档，任何语言都行
+```
+
+```bash
+sca addon add owner/repo          # 从 GitHub 安装；owner/repo@v1.2.0 锁定标签
+sca addon add ./my-addon          # 本地目录
+sca addon list                    # 已装了什么，运行环境是否可用
+sca addon update                  # 重新拉取；代码被替换，运行时状态保留
+```
+
+- **装上即会用。** 插件的 skill 会以 `sca-<名字>` 装在 SDK 的 skill 旁边，agent 同时得到能力和使用说明。
+- **天然隔离。** 插件通过进程边界读取 `.scadpkg` 产品包，在自己的环境里运行，因此插件的依赖不会碰到做几何建模的那套环境。
+- **已经在用。** 连接器验证（螺栓、销、过盈、焊接等连接，先检查再送入有限元）和有限元网格预处理（移除紧固件、补上它们的孔、证明闭合）都是插件。下面的 AP242 → Gmsh → CalculiX 与 MJCF → MuJoCo 两条链路，用的是同一个产品包。
 
 <table>
 <tr>
 <td width="34%" align="center" valign="top" rowspan="2">
-<img src="img/capability/ap242_gmsh_bracket_static_von_mises.png" alt="支架 FEM von Mises 云图"><br/>
-<b>L 形支架静力 FEM</b> —— CalculiX von Mises 云图<br/>
-经 Gmsh OpenCASCADE 内核从 AP242 导出体网格
+<img src="img/capability/ap242_gmsh_bracket_static_von_mises.png" alt="支架有限元 von Mises"><br/>
+<b>L 形支架静力有限元</b><br/>AP242 导出经 Gmsh 划分网格，CalculiX 算出 von Mises；边界面由模型改动后仍保留的 <code>interface.*</code> 标签选取
 </td>
 <td width="33%" align="center" valign="top">
-<img src="img/capability/fourbar_collision_before.gif" alt="MuJoCo 中四连杆相互碰撞贯穿"><br/>
-<b>四连杆 + MuJoCo</b> —— 首次装配：连杆在运动中撞在一起，装配不对 ·
-<a href="img/capability/fourbar_collision_before.mp4">▶ 完整视频</a>
+<img src="img/capability/fourbar_collision_before.gif" alt="MuJoCo 里四连杆互相穿过"><br/>
+<b>四连杆，第一版</b><br/>MuJoCo 里连杆互相穿过：装配是错的
 </td>
 </tr>
 <tr>
 <td width="33%" align="center" valign="top">
-<img src="img/capability/fourbar_collision_after.gif" alt="修正后的四连杆在 MuJoCo 中全程干净运动"><br/>
-<b>虚拟碰撞修正后</b> —— 同一仿真环境，修正后的装配全程干净运动 ·
-<a href="img/capability/fourbar_collision_after.mp4">▶ 完整视频</a>
+<img src="img/capability/fourbar_collision_after.gif" alt="修正后的四连杆装配在 MuJoCo 里运行"><br/>
+<b>碰撞修正之后</b><br/>同一个曲柄周期，干净地转完
 </td>
 </tr>
 </table>
 
----
-
-## 更新日志（2.2.7）
-
-> 投入生产前请验证生成的定义、装配约束和制造几何。
-
-- **C++ 引擎的第一个正式版**，随预编译 wheel 发布（Linux x86_64 与 aarch64、macOS arm64 14+、Windows x86_64；
-  Python 3.10-3.13；统一使用 OpenCASCADE 7.9.3）。`pip install simplecadapi` 不再需要 `cadquery-ocp`。
-- **编辑器更快。** 六轴机械臂上一个没见过的关节角 2.7 s（beta 是 5.7 s），见过的 0.6 s（beta 是 5.5 s），
-  模型在最后一个 cell 之后 0.36-0.41 s 到达页面。内核空闲时比 beta 多用约 300 MB 内存。
-- **`Var` 和 `Expr` 像数字一样工作**：`r > 3`、`int(r)`、`round(r, 2)`、`range(n)`、`max(r, 3)`、f-string 可用，
-  用 `Var` 算出的值写 ql 谓词也能匹配。`bool(var)` 和 `json.dumps(var)` 仍然报错。
-- **装了 OCP 时 `shape.wrapped` 是 OCP 形状**（`simplecadapi[verify]`），是拷贝，OCCT 验证脚本可以原样运行。
-- fillet、chamfer 和 ql 选择失败重新附带图片。保存了参数值的笔记本会重建一次。
-
-本版本的完整说明：[`docs/updates/2.2.7.zh-CN.md`](docs/updates/2.2.7.zh-CN.md)。
-更早的版本：见[更新日志](CHANGELOG.md)和 [`docs/updates/`](docs/updates/)。
-
----
-
-<div align="center">
-  <h2>SimpleCADAPI 论文成果</h2>
-  <p>本仓库是以下论文工作的项目产物：</p>
-  <p>
-    <strong><a href="https://arxiv.org/abs/2608.00891">CADIR: A Cross-Backend Editable Intermediate Representation for Agentic CAD Generation</a></strong>
-  </p>
-  <p><strong>Computer-Aided Design 2026 接收</strong></p>
-</div>
-
----
-
-SimpleCADAPI 是一个基于 OCP 的 Python CAD SDK，提供清晰的函数式建模操作和可重放的模型图。它在 OpenCascade 几何内核之上提供精简的公共 API，可用于创建实体、应用特征、添加语义标签、查询拓扑、导出制造文件，以及将记录的模型转换为 FreeCAD 工作流。
-
-当前版本：`simplecadapi==2.2.7`。
-
-## 核心能力
-
-- 模型即 [marimo](https://marimo.io) notebook：普通 `.py` 文件就是唯一的真相
-  来源，一个 cell 一个特征，按 cell 缓存实现增量无头运行（`sca run`），并可用
-  `scad.use` 组合 notebook。
-- Code-first 网页编辑器 `sca edit`：实时模型、参数控件，视口点选写回为选择代码，
-  为与 agent 协作而设计。
-- 由 notebook 生成的规范 `.scadpkg` 产品包，用于交换和发布，不会反过来作为模型
-  输入。
-- 基于 OCP 的 `Vertex`、`Edge`、`Wire`、`Face` 和 `Solid` 类型。
-- 支持基本体、轮廓、拉伸、旋转、放样、扫掠、布尔运算、变换、阵列、圆角、倒角和抽壳等函数式建模操作。
-- 通过显式 `GraphSession`、`export_model_json(...)`、`import_model_json(...)` 和 `replay_model_json(...)` 记录并重放操作图。
-- 通过 `var(...)`、算术表达式和可序列化表达式图定义参数。
-- 使用 QL 选择器定位几何、查询拓扑并稳定选择特征。
-- 通过 `apply_tag(shape=..., tag=...)` 和 `list_tags(shape=...)` 管理语义标签。
-- 支持 STEP/STL/OBJ 导出、可编辑 FreeCAD 产品包转换，以及带材料和命名元数据
-  属性的 AP242 产品结构导出。
-- 面向 Agent 的 STEP/BREP 逆向能力，提供稳定实体 ID、局部诊断、区域高亮截图和
-  可测量的验收门槛。
-- 可回放的开放/周期插值 B 样条 Edge 和 Wire，可用于自由轮廓与 Loft 截面。
-
 ## 安装
 
-最快的方式是页面顶部那句话：发给你的 coding agent，剩下的它来做。
-
-手动安装，使用 pip：
-
 ```bash
-pip install simplecadapi
+pip install "simplecadapi[editor]"      # SDK 和编辑器
+sca example u_link                       # 一个可以直接打开的真实工作区
+sca edit u_link                          # 编辑器
+sca skill install                        # 给你的 agent 装 skill
 ```
 
-代码优先编辑器（`sca edit`）需要 `editor` extra：`pip install "simplecadapi[editor]"`；
-`uv tool install "simplecadapi[editor]"` 或 `pipx install "simplecadapi[editor]"`
-不用虚拟环境就能把 `sca` 放进 PATH。`sca example u_link` 把内置示例工作区复制出来，
-再用 `sca edit` 打开。
+Python 3.10–3.13，Linux、macOS 和 Windows。`uv tool install "simplecadapi[editor]"` 不需要虚拟环境就能把 `sca` 放进 PATH。`sca run model.py` 无界面运行 notebook；`sca export` 导出 STEP、STL 和 OBJ。
 
-使用 uv：
+## 研究 artifact
 
-```bash
-uv add simplecadapi
-```
+本仓库是 [**CADIR: A Cross-Backend Editable Intermediate Representation for Agentic CAD Generation**](https://arxiv.org/abs/2608.00891) 的 artifact。
 
-从本仓库进行本地开发：
-
-```bash
-uv sync --group dev
-```
-
-### Agent Skill
-
-pip 安装完成后，为你的 agent harness 安装内置 skill：
-
-```bash
-sca skill targets
-# 默认位置（~/.agents/skills），或显式指定 ZCode 的 skills 目录：
-sca skill install --target zcode --skills-dir ~/.zcode/skills
-```
-
-`targets` 列出可用的 harness 目标。`install` 编译内置源码并写入
-`<skills-dir>/simplecadapi`；不传 `--skills-dir` 时，沿用既有 addon 配置/
-环境解析，默认回退到 `~/.agents/skills`，不要求先执行 `sca init`。wheel
-内置的是未编译的 `docs/skill/` 源树和 `skillproj.toml` 资源，编译发生在
-安装时机；无需 checkout 本仓库。使用 `uv` 时，上述命令前缀 `uv run`。
-
-`install` 在目标位置已存在时报错。加 `--force` 允许替换，但仅限
-`SKILL.md` 声明了同名 skill（`simplecadapi`）的目录；无关目录不会被覆盖。
-
-## 快速开始
-
-模型是一个 [marimo](https://marimo.io) notebook：仓库里的一个普通 `.py` 文件，
-它始终是唯一的真相来源。PEP 723 头部的 `[tool.simplecadapi]` 表声明产品；每个
-cell 放一个[特征块](docs/skill/references/discipline/feature-tree-convention.md)，
-几何会被自动记录——不需要 session 或装饰器样板代码。
-
-```python
-# bracket.py
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["simplecadapi"]
-#
-# [tool.simplecadapi]
-# id = "bracket"
-# revision = "1.0.0"
-# ///
-import marimo
-
-app = marimo.App()
-
-with app.setup:
-    import simplecadapi as scad
-
-
-@app.cell
-def _():
-    # ---- params: plate ----
-    width = scad.var("width", 60.0, unit="mm")
-    return (width,)
-
-
-@app.cell
-def _():
-    # ---- params: bore ----
-    hole_radius = scad.var("hole_radius", 5.0, unit="mm")
-    return (hole_radius,)
-
-
-@app.cell
-def _(width):
-    # ---- feature: base-plate (build) ----
-    base = scad.make_box_rsolid(
-        width=width, height=36.0, depth=8.0, bottom_face_center=(0.0, 0.0, 0.0)
-    )
-    return (base,)
-
-
-@app.cell
-def _(base, hole_radius):
-    # ---- feature: bore-and-slot (subtract) ----
-    _bore = scad.make_cylinder_rsolid(
-        radius=hole_radius, height=14.0, bottom_face_center=(0.0, 0.0, -3.0)
-    )
-    _slot = scad.make_box_rsolid(
-        width=18.0, height=8.0, depth=14.0, bottom_face_center=(14.0, 0.0, -3.0)
-    )
-    drilled = scad.cut_rsolid(base, _bore, _slot)
-    return (drilled,)
-
-
-@app.cell
-def _(drilled):
-    # ---- feature: boss (add) ----
-    _boss = scad.make_cylinder_rsolid(
-        radius=8.0, height=7.0, bottom_face_center=(-18.0, 0.0, 8.0)
-    )
-    bossed = scad.union_rsolid(drilled, _boss)
-    return (bossed,)
-
-
-@app.cell
-def _(bossed):
-    # ---- feature: role-tag (annotate) ----
-    tagged = scad.apply_tag(shape=bossed, tag="role.demo.bracket")
-    return (tagged,)
-
-
-@app.cell
-def _(tagged):
-    bracket = scad.Part(part_id="bracket", body=tagged)
-    return (bracket,)
-
-
-if __name__ == "__main__":
-    app.run()
-```
-
-产品是 id 等于 notebook id 的那个顶层变量。可以在编辑器里交互修改，也可以只装
-`simplecadapi` 无头运行：
-
-```bash
-marimo edit bracket.py                                    # 响应式编辑器
-sca run bracket.py                                        # 运行并输出 JSON 报告
-sca run bracket.py --set width=80 --out out/bracket.scadpkg
-sca export out/bracket.scadpkg --output-dir out/exports   # AP242 STEP、STL、OBJ
-sca edit .                                                # 这个目录 notebook 的网页编辑器
-```
-
-`sca edit`（`pip install "simplecadapi[editor]"`）就是上面介绍的 code-first
-编辑器：左边是 notebook 的 cell，中间是实时模型，每个参数一个滑块或开关
-（`# ---- params ----` cell；一行末尾的 `# ui:` 注释选择控件），视口点选写回为
-`selected_*` 选择 cell。详见
-`docs/skill/references/docs/guides/notebook-runtime.md` 和
-`docs/skill/references/domains/editor-collaboration.md`（agent 如何使用你的选择和
-指定的 cell）。
-
-## Notebook 运行时
-
-marimo 编辑器、`sca run` 和 Python 里的 `simplecadapi.runtime.run_notebook()`
-用的是同一个运行时。无头运行会缓存每个 cell，重跑时只执行代码、输入文件、本地
-模块或子 notebook 发生变化的 cell。`--set` 覆盖一个顶层变量（定义它的 cell
-不再运行，所以要按“一起变化”的原则把参数分进不同 cell）；报告里每个 cell 的
-状态是 `ran`、`cached` 或 `skipped`。
-
-导出和验证脚本是普通 Python 脚本，用 `run_notebook` 载入产品再写出产品包：
-
-```python
-from pathlib import Path
-
-import simplecadapi as scad
-from simplecadapi.runtime import run_notebook
-
-out = Path("out")
-run = run_notebook("bracket.py", overrides={"width": 80.0})
-print("volume", round(run.product.body.get_volume(), 3))
-print("tags", scad.list_tags(shape=run.product.body))
-
-package = out / "bracket.scadpkg"
-scad.capture(run.definition, package)
-scad.exporter.export_product_package_to_step(package, out / "bracket.step")
-scad.exporter.export_product_package_to_stl(package, out / "bracket.stl")
-scad.exporter.export_product_package_to_obj(package, out / "bracket.obj")
-```
-
-`.scadpkg` 包含完整定义闭包、求值场景、特征图、源码快照、拓扑以及渲染/选择
-资源。它由代码生成，只用于交换和发布，不会反过来作为模型输入。
-
-### 组合 notebook
-
-装配 notebook 用 `scad.use` 引入其他 notebook。相对路径相对于调用方 notebook，
-关键字参数覆盖子 notebook 的顶层变量：
-
-```python
-@app.cell
-def _():
-    bracket = scad.use("bracket.py", width=80.0)
-    return (bracket,)
-
-
-@app.cell
-def _(bracket):
-    rig = scad.make_assembly_rassembly(assembly_id="rig", name="Rig")
-    rig = scad.add_component_rassembly(
-        assembly=rig, item=bracket, component_id="bracket",
-        placement=scad.identity_placement_rplacement(),
-    )
-    return (rig,)
-```
-
-一个 notebook 可以描述一个零件族——只有参数不同的一组零件，比如连杆机构里的
-各根连杆。产品写成 `part_id=scad.notebook_id()`，每处使用时给成员起名：
-`scad.use("link_bar.py", id="crank", center_distance=40.0)`（或
-`sca run link_bar.py --id crank`）。每个成员是一个独立定义，有自己的内容哈希和
-cell 缓存。
-
-`@scad.part` / `@scad.assemble` 保留给放在 notebook 旁边普通模块里的可复用库
-构建函数；cell 调用它们并取 `.value`。工程目录结构、cell 缓存和下游格式见
-[Notebook 运行时与产品构建工作流](docs/skill/references/docs/guides/notebook-runtime.md)。
-
-### 从 `@scad.part` 脚本迁移
-
-2.1.2 的脚本锚定 part cache（构建函数的 `cache=` 选项、`.simplecad` 缓存目录和
-增量装配报告）已删除；现在缓存的单位是 cell。
-
-- 每个零件搬进一个 notebook：参数放进 params cell，每个 FTC 块单独一个 cell
-  （每个 cell 绑定一个新名字），最后一个 cell 构建 `scad.Part(...)` 或装配体。
-- 用调用 `run_notebook` 和 `scad.capture` 的导出脚本，替换那些顺带构建并导出的
-  `main.py` 入口。
-- 产品之间直接调用构建函数的地方改成 `scad.use(...)`；`@scad.part` 构建函数只
-  保留给在 cell 中调用的库零件。
-- 把 `__marimo__/`（生成的运行时状态）加入 `.gitignore`。
-
-### 命令行产品导出
-
-不写包装脚本，直接从经过验证的产品包导出标准交付集（AP242 STEP、二进制 STL
-和 OBJ）：
-
-```bash
-uv run sca export out/bracket.scadpkg --output-dir out/exports
-```
-
-其他格式需显式指定。FCStd 需要 `FreeCADCmd`（或显式的 `--freecad-cmd` 路径）；
-`--check` 只校验产品包、输出路径和所选格式的前置条件，不写文件。
-
-```bash
-uv run sca export out/bracket.scadpkg \
-  --format fcstd --format mjcf --output-dir out/exports --check
-uv run sca export out/bracket.scadpkg \
-  --format fcstd --freecad-cmd /path/to/FreeCADCmd --output-dir out/exports
-```
-
-STL 与 OBJ 共用 OpenCASCADE 对求值后 BREP 的直接三角化。两种格式包含相同的
-定向三角面，不再需要可选 remeshing 依赖。曲面精度由 `linear_deflection` 和
-`angular_deflection_degrees` 控制。
-
-## 可重放操作图
-
-notebook 之外的几何流程需要检查、序列化或重放时，使用显式 `GraphSession`：
-
-```python
-import simplecadapi as scad
-from simplecadapi import GraphSession, export_model_json, replay_model_json
-from simplecadapi import ql as Q
-
-with GraphSession(graph_id="chamfered_block") as session:
-    body = scad.make_box_rsolid(
-        width=40.0, height=24.0, depth=10.0,
-        bottom_face_center=(0.0, 0.0, 0.0),
-    )
-    cutter = scad.make_cylinder_rsolid(
-        radius=4.0, height=16.0, bottom_face_center=(0.0, 0.0, -3.0)
-    )
-    drilled = scad.cut_rsolid(body, cutter)
-
-    bottom_circle = (
-        Q.edges()
-        .where(Q.curve_type(kind="circle"))
-        .order_by(Q.center_axis(axis="z"))
-        .take(1)
-        .exactly(1)
-    )
-    final = scad.chamfer_rsolid(solid=drilled, edges=bottom_circle, distance=0.6)
-    session.capture_result(value=final)
-    model_json = export_model_json(session=session)
-    recorded_nodes = session.graph.node_count
-
-rebuilt = replay_model_json(json_str=model_json)
-print("recorded_nodes", recorded_nodes)
-print("replayed_outputs", len(rebuilt))
-```
-
-显式 `GraphSession` 用于 notebook 之外的检查、序列化和重放；notebook 的每个
-cell 已经记录进各自的 session，不要在 cell 里再开一个。它在调用导出 API 前只
-存在于内存。持久的 CAD/Viewer 交付物是 notebook 产品捕获出的 `.scadpkg`（见
-[Notebook 运行时](#notebook-运行时)）。
-
-## STEP/BREP 检查
-
-同步 STEP 视图、区域高亮和截面叠加不需要额外安装：`pip install simplecadapi` 即可，由内置软渲染绘制
-（不依赖 GPU、显示服务和 VTK）。只有工程图系列（`simplecadapi.inspect.drawing`）需要 `drawing` 额外依赖。
-
-检查 API 位于 `simplecadapi.inspect.brep`。它们是诊断工具，不是建模操作：不进入
-操作图，在 `GraphSession` 内调用会被拒绝。先导出或拿到几何，再在建模脚本之外
-检查。
-
-按当前问题需要的证据选择调用，而不是走固定的逆向流程。先取有界的全局和局部
-事实；只有这些事实回答得了当前问题时，才再加截面、组件渲染、边界距离、材料差集
-或严格拓扑比较。
-
-```python
-from simplecadapi.inspect import brep
-
-summary = brep.inspect_step_rsummary(
-    path="target.step",
-    include_parameter_groups=True,
-)
-face = brep.inspect_step_entity_rdescriptor(
-    path="target.step",
-    entity_id="face:0",
-)
-
-print("faces", summary["face_count"])
-print("carrier", face["geometry"]["type"])
-```
-
-受控测试请使用 [Reconstruction Agent 测试规范](docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md)，
-检查原语、建模循环、回放检查和验收门槛请阅读
-[STEP 重建工作流](docs/skill/references/workflows/step-reconstruction.md)。
-
-## FreeCAD 转换
-
-外部 CAD 转换只接受经过验证的 `.scadpkg` 产品包：
-
-```python
-package_path = "out/bracket.scadpkg"
-script = scad.translator.freecad_translator.translate_product_package_to_freecad_script(
-    package_path
-)
-scad.translator.freecad_translator.translate_product_package_to_fcstd(
-    package_path, "out/bracket.FCStd"
-)
-```
-
-Part/Assembly 模型写成可编辑的 FreeCAD 装配结构：零件是 `App::Part`，装配是
-`Assembly::AssemblyObject`，组件是链接。中性 STEP 与 STL 文件由 exporter 命名
-空间输出。
-
-## 示例
-
-每个示例都是一个自包含目录：零件和装配 notebook、它们导入的普通模块、导出与
-验证脚本，以及 `examples/<name>/out/` 下的新鲜产物。覆盖零件建模、装配、逆向
-工程和 FEM——分类索引见 [`examples/README.md`](examples/README.md)。
-
-```bash
-# 零件（快速入门 FTC notebook，附外部验证脚本）
-marimo edit examples/flange_plate/flange_plate.py
-uv run python examples/flange_plate/verify.py
-
-# 装配（两级行星减速器：零件族 notebook、MJCF 导出）
-sca run examples/compact_two_stage_planetary_reducer/compact_two_stage_planetary_reducer.py
-uv run python examples/compact_two_stage_planetary_reducer/export_mjcf.py
-
-# Gmsh 体网格（AP242 STEP -> 体网格）
-uv run python examples/ap242_gmsh_volume_mesh/export_step.py
-uv run --extra gmsh python examples/ap242_gmsh_volume_mesh/export_fem_mesh.py
-```
-
-想在真实模型上试用编辑器：`sca example u_link` 把一个电机座（两个零件 notebook 加
-把它们固定在一起的装配）从包里复制出来，`sca edit u_link_motor_mount` 打开它；
-在源码仓库里则是 `sca edit examples/u_link_motor_mount`。重建 STEP 文件（见
-`examples/bowl_connector/`）由 agent 通过检查 API 和
-[STEP 重建工作流](docs/skill/references/workflows/step-reconstruction.md)驱动。
-
-## 文档
-
-- 2.2.7 更新说明：[`docs/updates/2.2.7.zh-CN.md`](docs/updates/2.2.7.zh-CN.md)
-- 2.2.7b1 更新说明：[`docs/updates/2.2.7b1.zh-CN.md`](docs/updates/2.2.7b1.zh-CN.md)
-- 2.2.6.post2 更新说明：[`docs/updates/2.2.6.post2.zh-CN.md`](docs/updates/2.2.6.post2.zh-CN.md)
-- 2.2.6.post1 更新说明：[`docs/updates/2.2.6.post1.zh-CN.md`](docs/updates/2.2.6.post1.zh-CN.md)
-- 2.2.6 更新说明：[`docs/updates/2.2.6.zh-CN.md`](docs/updates/2.2.6.zh-CN.md)
-- 2.2.5 更新说明：[`docs/updates/2.2.5.zh-CN.md`](docs/updates/2.2.5.zh-CN.md)
-- 2.2.4 更新说明：[`docs/updates/2.2.4.zh-CN.md`](docs/updates/2.2.4.zh-CN.md)
-- 2.2.3 更新说明：[`docs/updates/2.2.3.zh-CN.md`](docs/updates/2.2.3.zh-CN.md)
-- 2.2.2 更新说明：[`docs/updates/2.2.2.zh-CN.md`](docs/updates/2.2.2.zh-CN.md)
-- 2.2.1 更新说明：[`docs/updates/2.2.1.zh-CN.md`](docs/updates/2.2.1.zh-CN.md)
-- 2.1.3b1 更新说明：[`docs/updates/2.1.3b1.zh-CN.md`](docs/updates/2.1.3b1.zh-CN.md)
-- 2.1.2 更新说明：[`docs/updates/2.1.2.zh-CN.md`](docs/updates/2.1.2.zh-CN.md)
-- 2.1.1 更新说明：[`docs/updates/2.1.1.zh-CN.md`](docs/updates/2.1.1.zh-CN.md)
-- 2.1.0 更新说明：[`docs/updates/2.1.0.zh-CN.md`](docs/updates/2.1.0.zh-CN.md)
-- Reconstruction Agent 测试规范：
-  [`docs/guides/reconstruction-agent-test-prompt.md`](docs/skill/references/docs/guides/reconstruction-agent-test-prompt.md)
-- Agent 落地脚本：[`docs/landing.md`](docs/landing.md)
-- 编辑器协作（选择、cell 引用、参数）：
-  [`docs/skill/references/domains/editor-collaboration.md`](docs/skill/references/domains/editor-collaboration.md)
-- STEP 重建工作流：
-  [`docs/skill/references/workflows/step-reconstruction.md`](docs/skill/references/workflows/step-reconstruction.md)
-- Notebook 运行时与产品构建工作流：
-  [`docs/guides/notebook-runtime.md`](docs/skill/references/docs/guides/notebook-runtime.md)
-- 公共 API 参考：[`docs/api/`](docs/skill/references/docs/api/)
-- 核心类型与建模说明：[`docs/core/`](docs/skill/references/docs/core/)
-- 序列化与重放：[`docs/core/serialization/README.md`](docs/skill/references/docs/core/serialization/README.md)
-- 操作图 JSON 规范：[`docs/core/operation_graph_json_spec.md`](docs/skill/references/docs/core/operation_graph_json_spec.md)
-- 示例索引：[`examples/README.md`](examples/README.md)
-- `.scadpkg` 产品包格式：[`docs/skill/references/scadpkg-format.md`](docs/skill/references/scadpkg-format.md)
-
-## 发布 Agent Skill
-
-skill 源树位于 `docs/skill/`，保持 harness 中立。`tools/skillbuild.py` 是
-`sca skill` CLI 所用同一编译器的封装，供本仓库维护者构建：按 harness 目标
-编译（目标与默认输出目录配置在 `skillproj.toml`；`skills/simplecadapi-*/`
-下的输出是可再生的构建产物，不提交入库）。如需 harness 特定文本，用
-`<!-- skill:if ... -->` 条件块标记，按目标编译。wheel 本身不包含任何预编译
-目标——终端用户用 `sca skill install` 从内置源码自行安装。
-
-在干净的工作区中更新项目版本和文档，然后生成并验证发布产物：
-
-```bash
-uv sync --group dev
-uv run python tools/auto_docs_gen.py --quiet
-uv run python tools/skillbuild.py --target omp
-uv run pytest test/test_skill_build.py
-tar -C skills -czf skills/simplecadapi.tar.gz simplecadapi-omp
-```
-
-这组命令会重新生成 skill 源树内的 API 参考、重新编译 omp 目标，并生成
-`skills/simplecadapi.tar.gz`。发布前检查源树和编译产物：
-
-```bash
-git diff -- docs/skill
-tar -tzf skills/simplecadapi.tar.gz | head
-```
-
-发布时只提交 `docs/skill/` 源树；harness 编译产物由发布工作流生成，归档
-文件上传到 GitHub Release。通过 pip 安装后，优先使用 `sca skill` 构建和安装。
-
-## 开发
-
-```bash
-uv sync --group dev
-uv run python -m pytest test tests
-python3 -m compileall src/simplecadapi
-```
-
-## 许可证
-
-本项目采用 Apache 许可证 2.0 版（Apache-2.0），详见 [`LICENSE`](LICENSE)。
-
-## 社区交流
-
-由于群聊人数过多，无法直接扫码入群。请扫描下方二维码添加杜鹏老师微信，由杜鹏老师邀请加入 CADDesigner 技术交流群：
-
-<p align="center">
-  <img src="img/dp个人账号.png.jpg" alt="杜鹏老师个人微信二维码" width="420">
-</p>
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=PhySpace%2FSimpleCADAPI&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=PhySpace/SimpleCADAPI&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=PhySpace/SimpleCADAPI&type=date&theme=dark&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=PhySpace/SimpleCADAPI&type=date&legend=top-left" />
- </picture>
-</a>
+Apache-2.0。生产使用前请验证生成的模型。

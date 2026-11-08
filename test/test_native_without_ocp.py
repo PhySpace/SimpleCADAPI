@@ -141,7 +141,7 @@ class NativeWithoutOcpTest(unittest.TestCase):
         (cls.work / "plate.py").write_text(NOTEBOOK, encoding="utf-8")
         from simplecadapi.editor.templates import create_notebook
 
-        create_notebook(cls.work, "bracket", "part")
+        create_notebook(cls.work, "bracket", "sample")
 
     @classmethod
     def tearDownClass(cls) -> None:
