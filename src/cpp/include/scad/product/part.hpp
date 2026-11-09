@@ -1,9 +1,10 @@
-// A Part: one or more named bodies (Solids), with an optional material and its connector datums
-// (product/part.py).  Values are immutable: every `with_*` returns a new Part.
+// A Part: one Solid (its body), with an optional material and its connector datums (product/part.py).  Values are
+// immutable: every `with_*` returns a new Part.
 //
-// A one-body Part is what every Part was before multi-body parts: `body()` is its Solid.  A multi-body
-// Part keeps several solids apart inside one product item (bodies of one part are not components: they
-// have no placements, joints or constraints between them).  See design-docs/multi-solid-design.md.
+// A Part holds exactly one solid: it is the unit an assembly places, mates and gives connectors to.  Several solids that
+// exist side by side while a model is built (a tool and its target) are loose values of the notebook, and a deliverable
+// of several solids is an Assembly of Parts.  The body is kept as a `Body` only because it carries the display name,
+// colour and opacity (`set_body_appearance_rpart`).
 #pragma once
 
 #include <memory>
@@ -61,16 +62,15 @@ class Part : public SemanticValue {
   // ValueError for a malformed id, an empty name, or duplicate connector ids.
   Part(std::string part_id, Solid body, OptionalString name = {}, std::optional<Material> material = {},
        std::vector<Connector> connectors = {});
-  // A Part of several bodies, in this order.  ValueError for no bodies, duplicate body ids, or connectors on
-  // more than one body (connectors of a multi-body part are not supported yet).
+  // A Part of the one body in `bodies` (a vector so that the body keeps its id and appearance).  ValueError for any
+  // other number of bodies.
   Part(std::string part_id, std::vector<Body> bodies, OptionalString name = {}, std::optional<Material> material = {},
        std::vector<Connector> connectors = {});
 
   const std::string& part_id() const noexcept { return part_id_; }
-  // The Solid of a one-body Part.  TypeError for a multi-body Part: read bodies() instead.
   const Solid& body() const;
+  // Always one element.
   const std::vector<Body>& bodies() const noexcept { return bodies_; }
-  bool multi_body() const noexcept { return bodies_.size() > 1; }
   std::vector<std::string> body_ids() const;
   // KeyError ("part has no body_id 'x'") for an unknown id.
   const Body& get_body(std::string_view body_id) const;

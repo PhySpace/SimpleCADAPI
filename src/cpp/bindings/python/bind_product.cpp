@@ -38,12 +38,9 @@ SCAD_SIGNATURE_NAME(DirectionOrNone, scad::pybind::DirectionTag::name + kOrNone)
 SCAD_SIGNATURE_NAME(Directions, const_name("dict[str, ") + scad::pybind::DirectionTag::name + const_name("] | None"));
 SCAD_SIGNATURE_NAME(Weights, const_name("dict[str, float | Expr] | None"));
 SCAD_SIGNATURE_NAME(Solid, type_name<scad::Solid>());
-// make_part_rpart: one Solid, or the pieces of a split cut (each a body), or several named bodies.
+// make_part_rpart: one Solid (or the single piece of a split cut).
 SCAD_SIGNATURE_NAME(SolidOrPieces, type_name<scad::Solid>() + kOr + const_name("collections.abc.Sequence[") +
-                                       type_name<scad::Solid>() + const_name("] | None"));
-SCAD_SIGNATURE_NAME(Bodies, const_name("dict[str, ") + type_name<scad::Solid>() + kOr +
-                                const_name("collections.abc.Sequence[") + type_name<scad::Solid>() +
-                                const_name("]] | None"));
+                                       type_name<scad::Solid>() + const_name("]"));
 SCAD_SIGNATURE_NAME(Face, type_name<scad::Face>());
 SCAD_SIGNATURE_NAME(Edge, type_name<scad::Edge>());
 SCAD_SIGNATURE_NAME(Vertex, type_name<scad::Vertex>());
@@ -76,7 +73,6 @@ using DirectionsArg = AnyOf<names::Directions>;
 using WeightsArg = AnyOf<names::Weights>;
 using SolidArg = AnyOf<names::Solid>;
 using SolidOrPiecesArg = AnyOf<names::SolidOrPieces>;
-using BodiesArg = AnyOf<names::Bodies>;
 using FaceArg = AnyOf<names::Face>;
 using EdgeArg = AnyOf<names::Edge>;
 using VertexArg = AnyOf<names::Vertex>;
@@ -153,27 +149,14 @@ void bind_structure(py::module_& m) {
 
   m.def(
       "make_part_rpart",
-      [](const TextArg& part_id, const SolidOrPiecesArg& body, const NameArg& name, const BodiesArg& bodies) {
+      [](const TextArg& part_id, const SolidOrPiecesArg& body, const NameArg& name) {
         return guard_operation("make_part_rpart", [&] {
-          if (body.is_none() == bodies.is_none())
-            throw scad::TypeError("give exactly one of body (a Solid) or bodies (several named solids)");
-          if (!bodies.is_none())
-            return sp::make_part_rpart(text(part_id, "part_id"), body_list(bodies), optional_name(name));
-          if (is_pieces(body) && py::len(body) > 1) {  // a split cut: its pieces are bodies body_1 .. body_n
-            std::vector<sp::Body> pieces;
-            add_bodies(pieces, sp::kDefaultBodyId, body);
-            return sp::make_part_rpart(text(part_id, "part_id"), pieces, optional_name(name));
-          }
-          if (is_pieces(body))
-            return sp::make_part_rpart(
-                text(part_id, "part_id"),
-                typed<Solid>(py::reinterpret_borrow<py::object>(body.value[py::int_(0)]), "body"), optional_name(name));
-          return sp::make_part_rpart(text(part_id, "part_id"), typed<Solid>(body, "body must be a Solid"),
-                                     optional_name(name));
+          const std::string id = text(part_id, "part_id");
+          return sp::make_part_rpart(id, single_solid(body, id), optional_name(name));
         });
       },
-      py::arg("part_id"), py::arg("body") = py::none(), py::arg("name") = py::none(), py::arg("bodies") = py::none(),
-      "Wrap one Solid (body) or several named solids (bodies) as a semantic Part.");
+      py::arg("part_id"), py::arg("body"), py::arg("name") = py::none(),
+      "Wrap one Solid (body) as a semantic Part. A Part holds exactly one solid.");
   m.def(
       "assign_material_rpart",
       [](const PartArg& part, const MaterialArg& material) {
