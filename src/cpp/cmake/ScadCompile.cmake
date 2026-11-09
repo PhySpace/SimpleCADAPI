@@ -31,6 +31,11 @@ function(scad_apply_compile_options target)
     target_compile_definitions(${target} PRIVATE
       $<$<CONFIG:Debug>:_GLIBCXX_ASSERTIONS>
       $<$<CONFIG:Debug>:_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE>)
+    # MinGW: OCCT headers (gp_Dir.hxx & co.) use M_PI, which MinGW's math.h hides under
+    # -std=c++20 (strict ANSI) unless _USE_MATH_DEFINES is set; MSVC already gets it above.
+    if(MINGW)
+      target_compile_definitions(${target} PRIVATE _USE_MATH_DEFINES)
+    endif()
     if(SCAD_SANITIZE)
       target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
       target_link_options(${target} PRIVATE -fsanitize=address,undefined)
