@@ -319,8 +319,6 @@ def _part_geometry(
     str,
 ]:
     runtime = materialize_definition(definition)
-    if runtime.multi_body:
-        raise ProductSceneError(f"part {definition.definition_id!r} has several bodies: use _body_geometries")
     body = runtime.body
     if not isinstance(body, Solid):
         raise ProductSceneError(f"part {definition.definition_id!r} has no solid body")
@@ -340,40 +338,6 @@ def _part_geometry(
         linear_tolerance=linear_tolerance,
         angular_tolerance=angular_tolerance,
     )
-
-
-def _body_geometries(
-    definition: PartDefinition,
-    *,
-    linear_tolerance: float,
-    angular_tolerance: float,
-) -> list[tuple[str, str | None, tuple[list[dict[str, Any]], dict[str, Any], dict[str, bytes], str, str]]]:
-    """The geometry of every body of a multi-body part: ``(body_id, name, the _solid_geometry tuple)`` in body order.
-
-    Each body has its own GLB and entity document; its entities are ``entity/<part>/body:<body_id>/<kind>/<topo>``.
-    """
-
-    runtime = materialize_definition(definition)
-    mark_part_definition_validated(definition, body=runtime.bodies, feature_graph=_feature_graph(definition))
-    refs = {item.body_id: item for item in definition.bodies}
-    out = []
-    for body in runtime.bodies:
-        snapshot = parse_artifact_json(definition.blobs[refs[body.body_id].topology_snapshot_ref.path])
-        out.append(
-            (
-                body.body_id,
-                body.name,
-                _solid_geometry(
-                    definition.definition_id,
-                    f"{definition.definition_id}/body:{body.body_id}",
-                    body.solid,
-                    snapshot,
-                    linear_tolerance=linear_tolerance,
-                    angular_tolerance=angular_tolerance,
-                ),
-            )
-        )
-    return out
 
 
 def _solid_geometry(
@@ -602,20 +566,19 @@ def _node_id(path: tuple[str, ...]) -> str:
     return "node/" + "/".join(path)
 
 
-def _appearance_properties(definition: PartDefinition, body_id: str | None) -> dict[str, Any]:
-    """``color`` / ``opacity`` of a body that has its own (``body_id`` None: the body of a one-body part), else ``{}``.
+def _appearance_properties(definition: PartDefinition) -> dict[str, Any]:
+    """``color`` / ``opacity`` of the part's body when it has its own (``set_body_appearance_rpart``), else ``{}``.
 
     A viewer draws a node with ``properties.color`` in that colour; without one, the material's (``material_id``).
     """
 
     for row in definition.appearance:
-        if body_id is None or row.body_id == body_id:
-            out: dict[str, Any] = {}
-            if row.color is not None:
-                out["color"] = list(row.color)
-            if row.opacity is not None:
-                out["opacity"] = row.opacity
-            return out
+        out: dict[str, Any] = {}
+        if row.color is not None:
+            out["color"] = list(row.color)
+        if row.opacity is not None:
+            out["opacity"] = row.opacity
+        return out
     return {}
 
 
@@ -624,7 +587,6 @@ def _build_nodes(
     definitions: Mapping[str, Definition],
     geometry_ids: Mapping[str, str],
     entity_ids: Mapping[str, str],
-    body_assets: Mapping[str, list[tuple[str, str | None, str, str]]] = {},
 ) -> tuple[
     list[dict[str, Any]],
     dict[str, list[str]],
@@ -667,31 +629,11 @@ def _build_nodes(
                 "properties": {
                     "content_hash": definition.content_hash,
                     "revision": definition.revision,
-                    # a one-body part's body colour / opacity (set_body_appearance_rpart), when it has one
-                    **(_appearance_properties(definition, None) if is_part and not definition.bodies else {}),
+                    # the part's body colour / opacity (set_body_appearance_rpart), when it has one
+                    **(_appearance_properties(definition) if is_part else {}),
                 },
             }
         )
-        part_node = nodes[-1]
-        for body_id, body_name, geometry_id, entity_id in body_assets.get(definition.definition_id, ()):
-            # a body of a multi-body part: a solid node under the part node, at the part's origin
-            nodes.append(
-                {
-                    "node_id": f"{node_id}/body:{body_id}",
-                    "parent_node_id": node_id,
-                    "display_name": body_name or body_id,
-                    "node_kind": "solid",
-                    "definition_id": definition.definition_id,
-                    "definition_kind": definition.definition_kind,
-                    "component_id": None,
-                    "instance_id": None,
-                    "transform": identity_placement().to_dict(),
-                    "geometry_asset_id": geometry_id,
-                    "entity_asset_id": entity_id,
-                    "material_id": part_node["material_id"],
-                    "properties": {"body_id": body_id, **_appearance_properties(definition, body_id)},
-                }
-            )
         if isinstance(definition, AssemblyDefinition):
             for instance in definition.instances:
                 child = definitions[instance.definition_id]
@@ -1057,21 +999,7 @@ def compile_product_scene(
         for definition in definitions.values()
         if isinstance(definition, PartDefinition)
     ]
-    body_assets: dict[str, list[tuple[str, str | None, str, str]]] = {}
     for definition in sorted(part_definitions, key=lambda item: item.definition_id):
-        if definition.bodies:  # a multi-body part: one GLB and entity document per body, drawn by child nodes
-            rows = []
-            for body_id, body_name, (records, entity_record, part_blobs, geometry_id, entity_id) in _body_geometries(
-                definition, linear_tolerance=linear_tolerance, angular_tolerance=angular_tolerance
-            ):
-                for record in records:
-                    geometry_assets_by_id.setdefault(record["asset_id"], record)
-                if all(item["asset_id"] != entity_record["asset_id"] for item in entity_assets):
-                    entity_assets.append(entity_record)
-                blobs.update(part_blobs)
-                rows.append((body_id, body_name, geometry_id, entity_id))
-            body_assets[definition.definition_id] = rows
-            continue
         geometry_records, entity_record, part_blobs, geometry_id, entity_id = (
             _part_geometry(
                 definition,
@@ -1087,7 +1015,7 @@ def compile_product_scene(
         entity_ids[definition.definition_id] = entity_id
 
     nodes, occurrences, children = _build_nodes(
-        root, definitions, geometry_ids, entity_ids, body_assets
+        root, definitions, geometry_ids, entity_ids
     )
     connectors, connector_index = _connectors(
         definitions, feature_graphs, occurrences

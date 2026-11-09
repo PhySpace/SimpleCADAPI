@@ -12,7 +12,6 @@ from typing import Any
 
 from ..artifacts import materialize_definition
 from simplecadapi._cpp import Assembly, Part
-from ..product.bodies import part_shape
 from ..translator.package_units import (
     ProductPackageInput,
     read_product_package_translation_units,
@@ -74,8 +73,7 @@ def _native_definitions(root_value: Part | Assembly, units: Any) -> list[dict[st
                 "id": definition_id,
                 "kind": kind,
                 "name": value.name or value.part_id,
-                # a multi-body part is one STEP product whose shape holds every body
-                "shape": part_shape(value),
+                "shape": value.body,
                 "metadata": {
                     "record_kind": "definition",
                     "definition_id": value.part_id,
@@ -97,23 +95,9 @@ def _native_definitions(root_value: Part | Assembly, units: Any) -> list[dict[st
                 }
                 if material.color is not None:
                     entry["color"] = tuple(float(c) for c in material.color)
-            if not value.multi_body:
-                own = value.bodies[0].color  # a body colour overrides the material colour
-                if own is not None:
-                    entry["color"] = tuple(float(c) for c in own)
-            else:
-                # each body with a name or a colour of its own is a named / coloured solid of the product's shape
-                shape = entry["shape"]
-                solids = shape.solids()
-                entry["bodies"] = [
-                    {
-                        "shape": solid,
-                        "name": body.name,
-                        "color": None if body.color is None else tuple(float(c) for c in body.color),
-                    }
-                    for body, solid in zip(value.bodies, solids)
-                    if body.name is not None or body.color is not None
-                ]
+            own = value.bodies[0].color  # a body colour overrides the material colour
+            if own is not None:
+                entry["color"] = tuple(float(c) for c in own)
             out[key] = entry
             return definition_id
         entry = {

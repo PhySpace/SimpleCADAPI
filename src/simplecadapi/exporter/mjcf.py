@@ -18,7 +18,6 @@ from ..artifacts.assembly_io import materialize_definition
 from ..artifacts.canonical import parse_canonical_json
 from ..artifacts.part_definition import PartDefinition
 from simplecadapi._cpp import Assembly, Part
-from ..product.bodies import part_shape
 from ..product.placement import Placement, relative_placement
 from ..translator.package_units import (
     ProductPackageInput,
@@ -678,7 +677,7 @@ def export_product_package_to_mjcf(
         mesh_path = mesh_root / f"{mesh_name}.obj"
         _write_obj(
             mesh_path,
-            part_shape(part),
+            part.body,
             linear_deflection=float(linear_deflection),
             angular_deflection_degrees=float(angular_deflection_degrees),
         )

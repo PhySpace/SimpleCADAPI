@@ -255,7 +255,7 @@ def _attach_feature_graph_result(
         raise ArtifactValidationError(
             "result_invalid", "/result_node_ids/0", "result node does not exist"
         )
-    for item in part.bodies:  # one Solid, or every body of a multi-body part
+    for item in part.bodies:  # the Part's one body
         attach_graph_node(item.solid, node, graph_id=session.graph.graph_id)
     attach_semantic_graph_node(part, node, graph_id=session.graph.graph_id)
     session._captured_values.append(part)
