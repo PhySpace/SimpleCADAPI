@@ -55,3 +55,40 @@ failed three times before it worked. Each failure had a cause that is not visibl
 - `design-docs/` is git-ignored but some files in it are tracked: a new file there needs `git add -f`.
 - `docstrings.json` is read back over the docstring in the Python source at import time, so a docstring edit is
   invisible in `help()` until `_glue/docstrings.json` is updated too (edit the one line, do not re-dump the file).
+
+## How to commit: one decision per commit, with the reasons (the owner's rule, 2026-11-10)
+
+Why this rule exists: a change that reverses an earlier design (for example "a Part holds exactly one solid") is
+made of many small edits across layers. Someone who takes over later sees the edits, not the conversation that
+caused them. The commit history is where that conversation has to survive, so that handing over and tracing back
+are possible without asking anyone.
+
+1. **One commit per decision, split as finely as is sensible.** A decision is a choice that could have gone the
+   other way (a rule, a format, an API removal, a place where a feature lives). Edits that only follow from a
+   decision (tests, docs, comments, dead code) are their own commits, each stating which decision they follow.
+   Do not mix two decisions in one commit; do not split one decision so far that no commit holds its reason.
+2. **Every message states the chain of the decision and WHY, and the why carries the core of the discussion**
+   between the owner and the assistant that led to it: the need that started it, the owner's judgement, the
+   analysis that was agreed, and what was rejected. Write it as what was said, not as a summary of the diff. The
+   reader must be able to see why the decision exists from the message alone.
+3. **Message layout** (subject line, then paragraphs; the subject says the decision, not only the edit):
+   - `DECISION:` what is decided, in one or two sentences.
+   - `WHY` (name the discussion and its date; point to the decision record): the need, the judgement, the
+     analysis, and facts found by checking (with where and how they were checked).
+   - `ALTERNATIVE CONSIDERED AND REJECTED:` when there was one, and why.
+   - `WHAT CHANGES:` the files / behaviour, only as far as the reason needs; and what is kept on purpose.
+   - `Checked:` what was run and what it showed, including what was not verified.
+   - Last line: `Co-Authored-By: ...` as the session's attribution reminder says.
+4. **A decision that outlives one commit gets a decision record** in `design-docs/<name>.md` (the whole
+   discussion, the audit table, the rules after the decision, the list of commits). The first commit of the
+   series carries the full account; later commits carry the short form and name that commit or the record.
+   `design-docs/` is git-ignored: add a new file with `git add -f`. If an older design document is replaced, mark
+   it superseded at its top and keep its body.
+5. **Refer to other commits by subject line, not by hash.** Hashes change when history is rewritten (rewording a
+   message with `filter-branch` changed every hash of the series once); a subject survives. A hash is acceptable
+   only for a commit that is already published or will not be rewritten.
+6. **Say the true thing.** If a message claims a check passed or a set of files is equal, run the check first; if
+   a claim turns out wrong, `git commit --amend` while the commit is still the newest and unpublished.
+7. **Mechanics that worked here**: write the message to a file with the file tool and use `git commit -F file`
+   (long heredocs with quotes broke in this shell); stage by explicit paths, never `git add -A` (the untracked
+   `STILL` file is not ours); work on a branch, not on `master`; do not push or merge unless asked.
