@@ -141,7 +141,7 @@ jobs:
           every = [
               {"name": "linux-x86_64", "os": "ubuntu-latest", "archs": "x86_64", "occt_cache": "/home/runner/occt-cache"},
               {"name": "linux-aarch64", "os": "ubuntu-24.04-arm", "archs": "aarch64", "occt_cache": "/home/runner/occt-cache"},
-              {"name": "macos-arm64", "os": "macos-14", "archs": "arm64", "occt_cache": "/tmp/occt"},
+              {"name": "macos-arm64", "os": "macos-15", "archs": "arm64", "occt_cache": "/tmp/occt"},
               {"name": "windows-x86_64", "os": "windows-2022", "archs": "AMD64", "occt_cache": "C:\\occt"},
           ]
           wanted = [p.strip() for p in os.environ["PLATFORMS"].split(",") if p.strip()]
