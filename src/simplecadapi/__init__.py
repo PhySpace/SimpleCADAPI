@@ -414,15 +414,7 @@ from .core import TaggedMixin
 from .errors import SimpleCADError
 from simplecadapi._glue.session import GraphSession
 from .operators import render_screenshot_rpath
-from .product.bodies import (
-    BodyMass,
-    BodyOverlap,
-    BodyOverlapWarning,
-    MassReport,
-    inspect_body_overlaps_rlist,
-    measure_part_mass_rmassreport,
-    part_shape,
-)
+from .product.bodies import BodyMass, MassReport, measure_part_mass_rmassreport
 from .product.placement import Placement
 from .product.capture import CaptureResult, capture
 from .product.packages import (
@@ -667,7 +659,6 @@ __all__ = [
     "solve_assembly_constraints_rassembly",
     "measure_constraint_residual_rconstraintresidual",
     "measure_part_mass_rmassreport",
-    "inspect_body_overlaps_rlist",
     "inspect_assembly_constraints_rconstraintreport",
     # Sketch construction and constraints
     "add_point_rsketch",

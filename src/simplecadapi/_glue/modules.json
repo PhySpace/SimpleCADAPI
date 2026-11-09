@@ -189,7 +189,6 @@
 "cut_rsolid": "simplecadapi.operators.boolean",
 "cut_rsolid_list": "simplecadapi.operators.boolean",
 "measure_part_mass_rmassreport": "simplecadapi.operators.product",
-"inspect_body_overlaps_rlist": "simplecadapi.operators.product",
 "cut_shapes": "simplecadapi.kernel.ocp_booleans",
 "diagnose_blend_failure": "simplecadapi.operators._diagnostics",
 "diagnose_boolean_failure": "simplecadapi.operators._diagnostics",

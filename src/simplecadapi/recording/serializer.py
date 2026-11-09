@@ -385,13 +385,9 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
         "status": "diagnostic",
         "reason": "Measures current constraint residuals without changing model state.",
     },
-    "inspect_body_overlaps_rlist": {
-        "status": "diagnostic",
-        "reason": "Reports which bodies of a Part share volume without changing model state.",
-    },
     "measure_part_mass_rmassreport": {
         "status": "diagnostic",
-        "reason": "Measures volume and mass of each body without changing model state.",
+        "reason": "Measures volume and mass of a Part without changing model state.",
     },
     "inspect_assembly_constraints_rconstraintreport": {
         "status": "diagnostic",
