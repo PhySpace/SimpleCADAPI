@@ -44,7 +44,7 @@ from .part_definition import (
     take_validated_part_body,
     with_definition_appearance,
 )
-from .part_io import encode_part_definition, load_part_definition, read_part_bodies
+from .part_io import encode_part_definition, load_part_definition, read_part_body
 from .references import ConnectorInterface, PartRef
 from .topology_snapshot import (
     restore_topology_snapshot,
@@ -760,15 +760,13 @@ def materialize_definition(
             body = take_validated_part_body(node)
             if body is None:
                 validate_artifact_blobs(node.to_dict(), node.blobs)
-                body = read_part_bodies(node)
+                body = read_part_body(node)
                 mark_part_definition_validated(node)
-            body = with_definition_appearance(node, body)  # body colours, opacity and names, when any
-            multi = isinstance(body, tuple)  # the Body values of a multi-body part (or of a one-body part with an appearance)
+            body = with_definition_appearance(node, body)  # the body's colour, opacity and name, when it has any
             value: Part | Assembly = Part(
                 part_id=node.definition_id,
                 name=node.metadata.get("name"),
-                body=None if multi else body,
-                bodies=body if multi else None,
+                body=body,
                 material=_material_from_definition(node),
                 connectors=tuple(_runtime_connector(item) for item in node.connectors),
             )

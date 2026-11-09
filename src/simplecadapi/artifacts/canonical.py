@@ -14,8 +14,6 @@ from ..scene.canonical import canonical_json_bytes, parse_canonical_json, parse_
 
 ARTIFACT_SCHEMA_VERSION = "2.0"
 PART_DEFINITION_PROFILE = "simplecad-part-definition-2"
-# A multi-body part (solid_cache.bodies): a reader that knows only profile 2 refuses it instead of misreading it.
-MULTI_BODY_PART_DEFINITION_PROFILE = "simplecad-part-definition-3"
 ASSEMBLY_DEFINITION_PROFILE = "simplecad-assembly-definition-2"
 SOLID_EVALUATOR_PROFILE = "ocp-evaluated-solid-1"
 TOPOLOGY_SNAPSHOT_PROFILE = "ocp-stable-topology-4"
@@ -198,7 +196,6 @@ __all__ = [
     "ArtifactLimits",
     "ArtifactValidationError",
     "DEFAULT_ARTIFACT_LIMITS",
-    "MULTI_BODY_PART_DEFINITION_PROFILE",
     "PART_DEFINITION_PROFILE",
     "SOLID_EVALUATOR_PROFILE",
     "TOPOLOGY_SNAPSHOT_PROFILE",

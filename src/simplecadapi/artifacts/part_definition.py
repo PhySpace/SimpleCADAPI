@@ -1,17 +1,10 @@
-"""Persistent PartDefinition contract: one evaluated Solid, or several named bodies.
+"""Persistent PartDefinition contract: one evaluated Solid.
 
-A one-body part is what every PartDefinition was: ``solid_cache.body_ref`` is the BRep of its Solid and
-``topology_snapshot_ref`` the semantic state of that Solid.  A multi-body part also lists ``solid_cache.bodies``:
-one :class:`BodyRef` per body (its own BRep and topology snapshot, so each body keeps its tags), in body order.  Its
-``body_ref`` is then a BRep Compound of every body (what a geometry-only reader such as STEP needs, and what a reader
-that expects exactly one Solid refuses), and ``topology_snapshot_ref`` repeats the first body's snapshot.
-A multi-body definition has profile ``simplecad-part-definition-3`` (``contracts/part-definition-3.schema.json``), so
-a reader that knows only profile 2 refuses it; a one-body definition keeps profile 2 and its bytes.
+``solid_cache.body_ref`` is the BRep of the Part's Solid and ``topology_snapshot_ref`` the semantic state of that Solid.
 
-``appearance`` (optional, both profiles) holds the display appearance of the bodies that have one
-(``set_body_appearance_rpart``): ``{"bodies": [{"body_id", "color", "opacity"}]}``, plus ``name`` on the row of a
-one-body part (a multi-body part's body names live in ``solid_cache.bodies``).  A definition whose bodies have no
-appearance writes no ``appearance`` key, so its bytes and content hash are what they always were.
+``appearance`` (optional) holds the display appearance of the body when it has one (``set_body_appearance_rpart``):
+``{"bodies": [{"body_id", "color", "opacity", "name"}]}``, one row at most.  A definition whose body has no appearance
+writes no ``appearance`` key, so its bytes and content hash are what they always were.
 """
 
 from __future__ import annotations
@@ -22,7 +15,6 @@ from typing import Any, Mapping, Sequence
 
 from .canonical import (
     ARTIFACT_SCHEMA_VERSION,
-    MULTI_BODY_PART_DEFINITION_PROFILE,
     PART_DEFINITION_PROFILE,
     ArtifactValidationError,
     canonical_bytes,
@@ -41,40 +33,6 @@ from .references import (
 )
 
 
-@dataclass(frozen=True, slots=True)
-class BodyRef:
-    """One body of a multi-body PartDefinition: its id, display name, BRep and topology snapshot."""
-
-    body_id: str
-    name: str | None
-    body_ref: BlobRef
-    topology_snapshot_ref: BlobRef
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "body_id", validate_logical_id(self.body_id, "/solid_cache/bodies/body_id"))
-        if self.name is not None and (not isinstance(self.name, str) or not self.name):
-            raise ArtifactValidationError("name_invalid", "/solid_cache/bodies/name", "expected a name or null")
-        if not isinstance(self.body_ref, BlobRef) or not isinstance(self.topology_snapshot_ref, BlobRef):
-            raise ArtifactValidationError("reference_invalid", "/solid_cache/bodies", "expected BlobRef values")
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "body_id": self.body_id,
-            "name": self.name,
-            "body_ref": self.body_ref.to_dict(),
-            "topology_snapshot_ref": self.topology_snapshot_ref.to_dict(),
-        }
-
-    @classmethod
-    def from_dict(cls, data: Mapping[str, Any], path: str) -> "BodyRef":
-        return cls(
-            body_id=str(data["body_id"]),
-            name=data.get("name"),
-            body_ref=BlobRef.from_dict(data["body_ref"], f"{path}/body_ref"),
-            topology_snapshot_ref=BlobRef.from_dict(data["topology_snapshot_ref"], f"{path}/topology_snapshot_ref"),
-        )
-
-
 def _color(value: Any, path: str) -> tuple[float, float, float] | None:
     if value is None:
         return None
@@ -89,8 +47,8 @@ def _color(value: Any, path: str) -> tuple[float, float, float] | None:
 
 @dataclass(frozen=True, slots=True)
 class BodyAppearance:
-    """The display appearance of one body of a PartDefinition: colour (RGB in [0, 1]), opacity and, for the body of
-    a one-body part, its display name.  ``None`` fields are unset (the material colour, opaque, the body id)."""
+    """The display appearance of the body of a PartDefinition: colour (RGB in [0, 1]), opacity and display name.
+    ``None`` fields are unset (the material colour, opaque, the body id)."""
 
     body_id: str
     color: tuple[float, float, float] | None = None
@@ -108,13 +66,12 @@ class BodyAppearance:
             raise ArtifactValidationError("name_invalid", "/appearance/bodies/name", "expected a name or null")
 
     @classmethod
-    def of_body(cls, body: Any, *, with_name: bool) -> "BodyAppearance | None":
+    def of_body(cls, body: Any) -> "BodyAppearance | None":
         """The appearance of a runtime ``Body``, or ``None`` when it has nothing to record."""
 
-        name = body.name if with_name else None
-        if body.color is None and body.opacity is None and name is None:
+        if body.color is None and body.opacity is None and body.name is None:
             return None
-        return cls(body_id=body.body_id, color=body.color, opacity=body.opacity, name=name)
+        return cls(body_id=body.body_id, color=body.color, opacity=body.opacity, name=body.name)
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -149,8 +106,7 @@ class PartDefinition:
     metadata: Mapping[str, Any] = field(default_factory=dict)
     content_hash: str = ""
     blobs: Mapping[str, bytes] = field(default_factory=dict, compare=False, repr=False)
-    bodies: tuple[BodyRef, ...] = ()  # empty for a one-body part; else every body, in order (at least two)
-    appearance: tuple[BodyAppearance, ...] = ()  # the bodies that have a display appearance (usually none)
+    appearance: tuple[BodyAppearance, ...] = ()  # the body's display appearance, when it has one (usually none)
     _validated_manifest: bytes | None = field(
         default=None,
         init=False,
@@ -214,39 +170,12 @@ class PartDefinition:
                 "connector_invalid", "/connectors", "connector IDs must be unique"
             )
         object.__setattr__(self, "connectors", connectors)
-        bodies = tuple(self.bodies)
-        if bodies:
-            if len(bodies) < 2 or not all(isinstance(item, BodyRef) for item in bodies):
-                raise ArtifactValidationError(
-                    "bodies_invalid", "/solid_cache/bodies", "expected two or more BodyRef values"
-                )
-            body_ids = [item.body_id for item in bodies]
-            if len(set(body_ids)) != len(body_ids):
-                raise ArtifactValidationError("bodies_invalid", "/solid_cache/bodies", "body IDs must be unique")
-            if connectors:
-                raise ArtifactValidationError(
-                    "bodies_invalid", "/connectors", "connectors on a multi-body part are not supported yet"
-                )
-        object.__setattr__(self, "bodies", bodies)
         appearance = tuple(self.appearance)
         if not all(isinstance(item, BodyAppearance) for item in appearance):
             raise ArtifactValidationError("appearance_invalid", "/appearance/bodies", "expected BodyAppearance values")
-        known = [item.body_id for item in bodies] if bodies else None
-        seen = [item.body_id for item in appearance]
-        if len(set(seen)) != len(seen):
-            raise ArtifactValidationError("appearance_invalid", "/appearance/bodies", "body IDs must be unique")
-        for item in appearance:
-            if known is not None and item.body_id not in known:
-                raise ArtifactValidationError("appearance_invalid", "/appearance/bodies", f"no body {item.body_id!r}")
-            if known is None and len(appearance) > 1:
-                raise ArtifactValidationError("appearance_invalid", "/appearance/bodies", "a one-body part has one body")
-            if known is not None and item.name is not None:
-                raise ArtifactValidationError(
-                    "appearance_invalid", "/appearance/bodies/name", "a multi-body part names its bodies in solid_cache.bodies"
-                )
+        if len(appearance) > 1:
+            raise ArtifactValidationError("appearance_invalid", "/appearance/bodies", "a part has one body")
         object.__setattr__(self, "appearance", appearance)
-        # a multi-body part is profile 3, so a profile-2 reader refuses it (one-body parts keep profile 2 and their bytes)
-        object.__setattr__(self, "profile", MULTI_BODY_PART_DEFINITION_PROFILE if bodies else PART_DEFINITION_PROFILE)
         if self.material_ref is not None and not isinstance(
             self.material_ref, MaterialRef
         ):
@@ -343,8 +272,6 @@ class PartDefinition:
             "solid_cache": {
                 "evaluator_profile": "ocp-evaluated-solid-1",
                 "body_ref": self.solid_cache_ref.to_dict(),
-                # a one-body part writes the manifest it always wrote (same bytes, same content hash)
-                **({"bodies": [item.to_dict() for item in self.bodies]} if self.bodies else {}),
             },
             "topology_snapshot_ref": self.topology_snapshot_ref.to_dict(),
             "connectors": [item.to_dict() for item in self.connectors],
@@ -408,10 +335,6 @@ class PartDefinition:
             metadata=dict(data["metadata"]),
             content_hash=str(data["content_hash"]),
             blobs=blobs or {},
-            bodies=tuple(
-                BodyRef.from_dict(item, f"/solid_cache/bodies/{index}")
-                for index, item in enumerate(cache.get("bodies") or ())
-            ),
             appearance=tuple(
                 BodyAppearance.from_dict(item) for item in ((data.get("appearance") or {}).get("bodies") or ())
             ),
@@ -451,23 +374,16 @@ def validated_part_feature_graph(definition: PartDefinition) -> Any:
 
 
 def with_definition_appearance(definition: PartDefinition, body: Any) -> Any:
-    """The bodies of *definition* with their appearance: *body* is what ``read_part_bodies`` gives (a Solid, or the
-    ``Body`` values of a multi-body part).  Without an appearance it is returned as is; a one-body part with one
-    becomes a one-element tuple of ``Body`` (``Part(bodies=...)`` takes it)."""
+    """The body of *definition* with its appearance: *body* is the Solid ``read_part_body`` gives.  Without an
+    appearance it is returned as it is; with one it becomes a ``Body`` (which ``Part(body=...)`` takes) carrying the
+    id, display name, colour and opacity."""
 
     if not definition.appearance:
         return body
     from simplecadapi._cpp import Body
 
-    rows = {item.body_id: item for item in definition.appearance}
-    if not isinstance(body, tuple):
-        row = definition.appearance[0]
-        return (Body(row.body_id, body, row.name, row.color, row.opacity),)
-    out = []
-    for item in body:
-        row = rows.get(item.body_id)
-        out.append(item if row is None else Body(item.body_id, item.solid, item.name, row.color, row.opacity))
-    return tuple(out)
+    row = definition.appearance[0]
+    return Body(row.body_id, body, row.name, row.color, row.opacity)
 
 
-__all__ = ["BodyAppearance", "BodyRef", "PartDefinition", "with_definition_appearance"]
+__all__ = ["BodyAppearance", "PartDefinition", "with_definition_appearance"]

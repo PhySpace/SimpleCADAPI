@@ -39,7 +39,7 @@ from ..artifacts.feature_graph import (
     encode_feature_graph_artifact,
 )
 from ..artifacts.geometry_interface import geometry_interface_fingerprint
-from ..artifacts.part_definition import BodyAppearance, BodyRef, PartDefinition, mark_part_definition_validated
+from ..artifacts.part_definition import BodyAppearance, PartDefinition, mark_part_definition_validated
 from ..artifacts.references import (
     BlobRef,
     ConnectorInterface,
@@ -72,7 +72,6 @@ from simplecadapi._cpp import (
     suspend_graph_recording,
 )
 from ..product.assembly import _AUTHORED_PLACEMENTS_RUNTIME_KEY, _component_occurrence_placements
-from ..product.bodies import part_shape, warn_body_overlaps
 from ..product.placement import canonical_frame, placement_ticks
 from simplecadapi._glue.session import GraphSession, record_operation_if_active
 from ..recording.graph import attach_graph_node, attach_semantic_graph_node
@@ -168,43 +167,9 @@ def _part_definition(
 
     feature_payload = encode_feature_graph_artifact(feature_graph)
     feature_path = _feature_graph_path(feature_graph)
-    body_blobs: dict[str, bytes] = {}
-    body_refs: tuple[BodyRef, ...] = ()
-    if part.multi_body:
-        warn_body_overlaps(part, stacklevel=4)  # allowed, but said once per build
-        # every body keeps its own BRep and snapshot (its tags); the part's BRep is a Compound of all of them
-        rows = []
-        for item in part.bodies:
-            brep, brep_path = _brep_blob(item.solid)
-            snapshot, snapshot_path = _snapshot_blob(item.solid)
-            body_blobs[brep_path], body_blobs[snapshot_path] = brep, snapshot
-            rows.append(
-                BodyRef(
-                    body_id=item.body_id,
-                    name=item.name,
-                    body_ref=_blob_ref(brep_path, brep, "application/vnd.opencascade.brep"),
-                    topology_snapshot_ref=_blob_ref(snapshot_path, snapshot, "application/json"),
-                )
-            )
-        body_refs = tuple(rows)
-        body_payload, body_path = _brep_blob(part_shape(part))
-        topology_payload, topology_path = _snapshot_blob(part.bodies[0].solid)
-        geometry_hash = content_hash(
-            {
-                "bodies": [
-                    {
-                        "body_id": item.body_id,
-                        "geometry": geometry_interface_fingerprint(item.solid, tolerance_profile=tolerance_profile),
-                    }
-                    for item in part.bodies
-                ]
-            },
-            omit=(),
-        )
-    else:
-        body_payload, body_path = _brep_blob(part.body)
-        topology_payload, topology_path = _snapshot_blob(part.body)
-        geometry_hash = geometry_interface_fingerprint(part.body, tolerance_profile=tolerance_profile)
+    body_payload, body_path = _brep_blob(part.body)
+    topology_payload, topology_path = _snapshot_blob(part.body)
+    geometry_hash = geometry_interface_fingerprint(part.body, tolerance_profile=tolerance_profile)
     material_ref, material_blobs = _material_ref(part.material)
     connectors = tuple(
         sorted(
@@ -222,7 +187,6 @@ def _part_definition(
         feature_path: feature_payload,
         body_path: body_payload,
         topology_path: topology_payload,
-        **body_blobs,
         **material_blobs,
     }
     definition = PartDefinition(
@@ -247,19 +211,17 @@ def _part_definition(
         interface_hashes=interface_hashes,
         metadata={"name": part.name},
         blobs=blobs,
-        bodies=body_refs,
         appearance=tuple(
             row
             for item in part.bodies
-            if (row := BodyAppearance.of_body(item, with_name=not part.multi_body)) is not None
+            if (row := BodyAppearance.of_body(item)) is not None
         ),
     )
     validate_artifact_blobs(definition.to_dict(), definition.blobs)
-    if not part.multi_body:  # a multi-body part has no connectors yet
-        validate_connector_entity_bindings(part.body, definition.connectors)
+    validate_connector_entity_bindings(part.body, definition.connectors)
     mark_part_definition_validated(
         definition,
-        body=part.bodies if part.multi_body else part.body,
+        body=part.body,
         feature_graph=feature_graph,
     )
     return definition
