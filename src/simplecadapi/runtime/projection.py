@@ -68,7 +68,8 @@ class SeveralOpenBodiesError(ProductNotFoundError):
     """A ``kind = "part"`` notebook ends with several solids nothing is built from, and no cell makes the Part.
 
     A Part holds exactly one solid, so the runtime cannot choose for the author which of them is the part.  ``names`` are
-    the variables of the open solids, in cell order; a preview shows them side by side (:class:`OpenBodies`).
+    the variables of the open solids (cells in order; the names a single cell defines come in no fixed order); a preview
+    shows them side by side (:class:`OpenBodies`).
     """
 
     def __init__(self, message: str, names: tuple[str, ...]) -> None:

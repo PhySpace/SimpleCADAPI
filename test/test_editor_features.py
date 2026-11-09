@@ -596,7 +596,7 @@ def test_several_open_solids_have_no_product_until_the_author_picks_one(tmp_path
         try:
             run_notebook(path, cache=False)
         except SeveralOpenBodiesError as error:
-            assert error.names == ("base", "tool") and "exactly one solid" in str(error)
+            assert sorted(error.names) == ["base", "tool"] and "exactly one solid" in str(error)
         else:
             raise AssertionError("a headless run must not pick a solid for the author")
         service.use_as_product({"body": "base"})

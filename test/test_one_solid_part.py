@@ -219,7 +219,7 @@ class TestNotebookProduct(NotebookTestCase):
     def test_several_open_solids_have_no_product(self) -> None:
         with self.assertRaises(SeveralOpenBodiesError) as caught:
             run_notebook(self.write("two.py", TWO_OPEN))
-        self.assertEqual(caught.exception.names, ("base", "tool"))
+        self.assertEqual(sorted(caught.exception.names), ["base", "tool"])  # the order of names defined in one cell is not fixed
         message = str(caught.exception)
         self.assertIn("exactly one solid", message)
         self.assertIn("make_part_rpart", message)
