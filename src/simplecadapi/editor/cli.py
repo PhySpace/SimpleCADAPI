@@ -453,6 +453,40 @@ def _opener() -> Any:
     return urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
+def _pid_alive(pid: int) -> bool:
+    """Probe a pid without signalling it.
+
+    ``os.kill(pid, 0)`` is a POSIX liveness probe: on Windows ``os.kill``
+    maps every signal except the two CTRL events to ``TerminateProcess``,
+    so probing the editor's pid that way kills the editor.
+    """
+    import os
+
+    if os.name == "nt":
+        import ctypes
+
+        process_query_limited_information = 0x1000
+        still_active = 259
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return False
+            return code.value == still_active
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        pass  # a live process we cannot signal
+    return True
+
+
 def _find_editor(start: Path) -> tuple[Path, str] | None:
     """The running editor whose workspace holds *start*: ``(workspace, base url)``.
 
@@ -479,16 +513,11 @@ def _find_editor(start: Path) -> tuple[Path, str] | None:
             unreachable.append(f"{record}: unreadable ({error})")
             continue
         pid = body.get("pid")
-        if isinstance(pid, int):
-            try:
-                os.kill(pid, 0)
-            except ProcessLookupError:
-                unreachable.append(
-                    f"stale record {record} (pid {pid} is gone); delete it or restart the editor"
-                )
-                continue
-            except OSError:
-                pass  # a live process we cannot signal
+        if isinstance(pid, int) and not _pid_alive(pid):
+            unreachable.append(
+                f"stale record {record} (pid {pid} is gone); delete it or restart the editor"
+            )
+            continue
         try:
             with opener.open(f"{url}/api/health", timeout=1.5):
                 pass
