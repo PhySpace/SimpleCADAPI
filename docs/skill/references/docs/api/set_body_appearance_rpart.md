@@ -23,8 +23,8 @@ overrides the material colour for display (the live preview, the package scene, 
 surface colour of that solid).  Mass, density and geometry never read it.
 
 ``lid = scad.set_body_appearance_rpart(lid, color=(0.9, 0.3, 0.2), name="Lid")``
-paints the part's body (a Part holds one solid, whose body id is ``"body"``). Recorded and replayed like
-``assign_material_rpart``. To name a face or an edge for people, tag it
+paints the part's body (a Part holds one solid, whose body id is ``"body"``). Recorded and
+replayed like ``assign_material_rpart``. To name a face or an edge for people, tag it
 (``scad.apply_tag_rselection`` / ``ql.tag``): a tag is the name.
 
 ## Parameters
@@ -55,7 +55,7 @@ paints the part's body (a Part holds one solid, whose body id is ``"body"``). Re
 
 ## Returns
 
-Part: The Part with that body's appearance changed; ``part.bodies[0].color``,
+Part: The Part with the body's appearance changed; ``part.get_body(body_id).color``,
 ``.opacity`` and ``.name`` read it back.
 
 ## Raises
