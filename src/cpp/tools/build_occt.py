@@ -119,10 +119,10 @@ def main() -> int:
         "INSTALL_DIR_LAYOUT": "Unix",
     }
     cmd = ["cmake", "-S", str(src), "-B", str(build)]
-    # Ninja where a compiler is already on the path (Linux, macOS).  On Windows only when the MSVC environment is active
-    # (`cl` on the path: the release workflow activates it); otherwise the default Visual Studio generator finds MSVC by
-    # itself, which a bare Ninja would not.
-    ninja = shutil.which("ninja") is not None and (sys.platform != "win32" or shutil.which("cl") is not None)
+    # Ninja where a compiler is already on the path (Linux, macOS).  On Windows when the MSVC environment is active
+    # (`cl` on the path: the release workflow activates it) or a MinGW g++ is (with cl absent CMake falls back to
+    # gcc); otherwise the default Visual Studio generator finds MSVC by itself, which a bare Ninja would not.
+    ninja = shutil.which("ninja") is not None and (sys.platform != "win32" or shutil.which("cl") is not None or shutil.which("g++") is not None)
     if ninja:
         cmd += ["-G", "Ninja"]
     cmd += [f"-D{k}={v}" for k, v in options.items()]
