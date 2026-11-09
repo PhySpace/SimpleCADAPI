@@ -31,7 +31,6 @@ from ..errors import raise_harness_error
 from simplecadapi._cpp import (
     AnyShape,
     Assembly,
-    Body,
     Compound,
     Connector,
     ConnectorRef,
@@ -386,13 +385,9 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
         "status": "diagnostic",
         "reason": "Measures current constraint residuals without changing model state.",
     },
-    "inspect_body_overlaps_rlist": {
-        "status": "diagnostic",
-        "reason": "Reports which bodies of a Part share volume without changing model state.",
-    },
     "measure_part_mass_rmassreport": {
         "status": "diagnostic",
-        "reason": "Measures volume and mass of each body without changing model state.",
+        "reason": "Measures volume and mass of a Part without changing model state.",
     },
     "inspect_assembly_constraints_rconstraintreport": {
         "status": "diagnostic",
@@ -3449,23 +3444,13 @@ def _execute_graph(
                         ctx.require_params(node.node_id, op_name, params, ("part_id",))
                         body_outputs = _feature_input_shapes(ctx, graph, outputs, node, params)
                         rows = params.get("bodies")
-                        if body_outputs and isinstance(rows, list) and len(rows) > 1:
-                            # a multi-body part: one recorded input per body, in the order of the rows
-                            if len(body_outputs) != len(rows):
-                                raise ValueError(
-                                    f"make_part_rpart node {node.node_id}: {len(rows)} bodies recorded, "
-                                    f"{len(body_outputs)} inputs resolved"
-                                )
-                            result = ops.make_part_rpart(
-                                str(params["part_id"]),
-                                name=cast(Optional[str], params.get("name")),
-                                bodies=[
-                                    Body(str(row["body_id"]), cast(Solid, shape), row.get("name"))
-                                    for row, shape in zip(rows, body_outputs)
-                                ],
+                        if isinstance(rows, list) and len(rows) > 1:
+                            # a model recorded while a Part could hold several solids (SDK 2.2.8 development builds)
+                            raise ValueError(
+                                f"make_part_rpart node {node.node_id}: it recorded {len(rows)} solids for one Part; "
+                                "a Part holds exactly one solid. Make one Part per solid and put them in an Assembly"
                             )
-                            _store_outputs(node, result)
-                        elif body_outputs:
+                        if body_outputs:
                             result = ops.make_part_rpart(
                                 str(params["part_id"]),
                                 cast(Solid, body_outputs[0]),

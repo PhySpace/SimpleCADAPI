@@ -294,9 +294,7 @@ export function App() {
         "ok",
         solids === 0
           ? surfaceNodes.length ? t("{{count}} surfaces shown, no solid yet", { count: surfaceNodes.length }) : t("no solid yet")
-          : solids === 1
-            ? t("model shown: 1 part")
-            : t("model shown: {{count}} parts", { count: solids }),
+          : t("model shown: {{summary}}", { summary: previewSummary(preview.nodes) }),
       );
     } catch (error) {
       log.push("error", error instanceof Error ? error.message : t("unable to open the preview"));

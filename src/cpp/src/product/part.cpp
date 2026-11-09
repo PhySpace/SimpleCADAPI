@@ -109,15 +109,17 @@ Part::Part(std::string part_id, std::vector<Body> bodies, OptionalString name, s
       name_(clean_name(name)),
       material_(std::move(material)),
       connectors_(unique_connectors(std::move(connectors))) {
-  if (bodies_.size() > 1 && !connectors_.empty())
-    throw ValueError("connectors on a multi-body part are not supported yet (part '" + part_id_ + "')");
+  // A Part is one product item: one solid, so that it can be placed, mated and given connectors as a whole.  Several
+  // solids that exist side by side while a model is built (a tool and its target) are loose values, not a Part.
+  if (bodies_.size() != 1) {
+    throw ValueError("part '" + part_id_ + "' would hold " + std::to_string(bodies_.size()) + " solids (" +
+                     joined_ids(bodies_) +
+                     "); a Part holds exactly one solid. Make one Part per solid and put them in an Assembly, or "
+                     "union / cut them into one solid first");
+  }
 }
 
 const Solid& Part::body() const {
-  if (bodies_.size() != 1) {
-    throw TypeError("part '" + part_id_ + "' has " + std::to_string(bodies_.size()) + " bodies (" +
-                    joined_ids(bodies_) + "); read Part.bodies or Part.get_body(body_id)");
-  }
   return bodies_.front().solid();
 }
 
@@ -198,8 +200,8 @@ Value Part::to_dict() const {
   for (const Connector& connector : connectors_)
     rows.push_back(connector.to_dict());
   out.set("connectors", std::move(rows));
-  // a one-body Part keeps the dict it always had, unless its body has a name or an appearance
-  if (bodies_.size() > 1 || !plain_default_body(bodies_.front())) {
+  // a Part keeps the dict it always had, unless its body has a name or an appearance
+  if (!plain_default_body(bodies_.front())) {
     Value bodies = Value::array();
     for (const Body& body : bodies_)
       bodies.push_back(body.to_dict());

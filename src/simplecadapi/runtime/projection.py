@@ -26,6 +26,7 @@ also cache the notebook's values must flush the cache first.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Set as AbstractSet
+from dataclasses import dataclass
 
 from ..artifacts.assembly_io import attached_definition
 from ..build.assembly_builder import declared_definitions
@@ -39,9 +40,18 @@ from ..build.results import AssemblyBuildResult, PartBuildResult
 import weakref
 from typing import Any
 
-from simplecadapi._cpp import Assembly, Edge, find_registered_node, isolated_recording, Part, SimpleWorkplane, Solid, Wire
+from simplecadapi._cpp import (
+    Assembly,
+    Edge,
+    find_registered_node,
+    isolated_recording,
+    make_part_rpart,
+    Part,
+    SimpleWorkplane,
+    Solid,
+    Wire,
+)
 from simplecadapi._glue.session import lineage_of
-from ..product.bodies import part_from_bodies
 from simplecadapi._glue.session import GraphSession
 from ..recording.source_mapping import cell_sources
 from .cells import NotebookCells, bound_requirements
@@ -52,6 +62,30 @@ Product = Part | Assembly
 
 class ProductNotFoundError(ValueError):
     """No top-level value, or more than one, is the notebook's product."""
+
+
+class SeveralOpenBodiesError(ProductNotFoundError):
+    """A ``kind = "part"`` notebook ends with several solids nothing is built from, and no cell makes the Part.
+
+    A Part holds exactly one solid, so the runtime cannot choose for the author which of them is the part.  ``names`` are
+    the variables of the open solids (cells in order; the names a single cell defines come in no fixed order); a preview
+    shows them side by side (:class:`OpenBodies`).
+    """
+
+    def __init__(self, message: str, names: tuple[str, ...]) -> None:
+        super().__init__(message)
+        self.names = names
+
+
+@dataclass(frozen=True)
+class OpenBodies:
+    """The solids a notebook has made and not yet used, shown side by side: what a preview draws while no cell makes a
+    Part of one of them (a tool next to the body it will cut).  They are loose values, not a product: nothing places,
+    mates or exports them."""
+
+    part_id: str
+    bodies: Mapping[str, Solid]
+    """Solid by name: the variable, or ``<variable>_<n>`` for the n-th piece of a split cut."""
 
 
 class NoProductYetError(ProductNotFoundError):
@@ -129,7 +163,7 @@ def find_product(
             f"{', '.join(names)}"
         )
     if config.kind == "part" and not others:
-        implicit = _implicit_part(config, values, read)
+        implicit = _implicit_part(config, values, read)  # SeveralOpenBodiesError when it cannot choose
         if implicit is not None:
             return implicit
     if not others:
@@ -189,17 +223,45 @@ def _ancestors(node: Any) -> set[str]:
     return out
 
 
-def _implicit_part(config: NotebookConfig, values: Mapping[str, object], read: AbstractSet[str]) -> Part | None:
-    """The product of a ``kind = "part"`` notebook without a cell that builds it: its open bodies, as a Part with the notebook id.
+def loose_solids(values: Mapping[str, object], names: Iterable[str]) -> dict[str, Solid]:
+    """The solids behind *names* (variables of open bodies): a Solid by its name, the pieces of a split cut as
+    ``<name>_1 .. <name>_n``."""
 
-    One open body is a one-body Part (body id ``"body"``); several are the bodies of one Part, named by their variables
-    (the pieces of a split cut ``<name>_1..n``).  ``None`` when there is no body yet.
+    out: dict[str, Solid] = {}
+    for name in names:
+        value = values[name]
+        if isinstance(value, Solid):
+            out[name] = value
+        elif len(value) == 1:  # type: ignore[arg-type]
+            out[name] = value[0]  # type: ignore[index]
+        else:
+            for index, piece in enumerate(value, start=1):  # type: ignore[arg-type]
+                out[f"{name}_{index}"] = piece
+    return out
+
+
+def _implicit_part(config: NotebookConfig, values: Mapping[str, object], read: AbstractSet[str]) -> Part | None:
+    """The product of a ``kind = "part"`` notebook without a cell that builds it: its one open body, as a Part with the
+    notebook id (body id ``"body"``).  ``None`` when there is no body yet.
+
+    A Part holds exactly one solid.  Several open solids are several things the notebook has not chosen between:
+    :class:`SeveralOpenBodiesError` says which, and what to do.
     """
 
     names = open_bodies(values, read)
     if not names:
         return None
-    part = part_from_bodies(config.id, {name: values[name] for name in names})
+    solids = loose_solids(values, names)
+    if len(solids) > 1:
+        raise SeveralOpenBodiesError(
+            f"{config.path.name}: {len(solids)} solids are open at the end of the notebook ({', '.join(solids)}) and no "
+            "cell makes the Part from one of them. A Part holds exactly one solid: make it from the solid that is the "
+            "part (scad.make_part_rpart(part_id=scad.notebook_id(), body=...)); if they are separate parts, make a Part "
+            "of each and an Assembly of them",
+            tuple(names),
+        )
+    (solid,) = solids.values()
+    part = make_part_rpart(part_id=config.id, body=solid)
     _IMPLICIT[id(part)] = part
     return part
 
@@ -236,9 +298,9 @@ def project_product(
     with isolated_recording(), cell_sources(cells):
         if _IMPLICIT.get(id(product)) is product:
             # the implicit Part of a kind = "part" notebook was made outside any cell: make it here, recorded, so the
-            # definition has its one result node (the Part), whatever the number of bodies
+            # definition has its one result node (the Part)
             with session:
-                product = part_from_bodies(product.part_id, {body.body_id: body.solid for body in product.bodies})
+                product = make_part_rpart(part_id=product.part_id, body=product.body)
         session.validate_graph_ownership(product)
         for node in session.graph.topological_order():
             for expression in node.expressions:
@@ -272,4 +334,13 @@ def project_product(
         ).value
 
 
-__all__ = ["NoProductYetError", "Product", "ProductNotFoundError", "find_product", "project_product"]
+__all__ = [
+    "NoProductYetError",
+    "OpenBodies",
+    "Product",
+    "ProductNotFoundError",
+    "SeveralOpenBodiesError",
+    "find_product",
+    "loose_solids",
+    "project_product",
+]

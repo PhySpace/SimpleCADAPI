@@ -1,5 +1,9 @@
 # Multi-body parts (several solids in one part, without an assembly)
 
+> **SUPERSEDED on 2026-11-10 by `part-holds-one-solid.md`.** The multi-body Part described here was withdrawn: a Part
+> holds exactly one solid again. Read that document for the decision, the reasons and the discussion behind it. This
+> one is kept only as the record of what was tried.
+
 Status: research and spike on `research/multi-solid` (cut from `dev`). The spike is in the code and in
 `test/test_multi_body_part.py`. Everything under "Staged plan" after stage 1 is a proposal. Section 9 records the
 owner's decisions and how they are implemented; where it differs from an earlier section, section 9 wins.

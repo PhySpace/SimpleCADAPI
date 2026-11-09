@@ -60,9 +60,8 @@ which claims cannot be made (see "Reporting failed repairs"). Interactive: the r
 `union_rsolid` requires a one-manifold-`Solid` result and fails if it cannot
 produce one. If the design is one body, use a contact or overlap that is
 topologically capable of producing one solid, then recompute. If the design is
-actually multiple parts, the answer is an assembly, not a union; if it is one
-part whose bodies stay apart, make a multi-body part
-(`make_part_rpart(bodies=...)`).
+actually multiple parts, the answer is an assembly, not a union: a Part holds
+exactly one solid, so make one Part per solid and put them in an Assembly.
 
 ### Fillet/chamfer failure
 

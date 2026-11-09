@@ -14,7 +14,7 @@ def set_body_appearance_rpart(part, body_id='body', *, color=None, opacity=None,
 
 ## Description
 
-Set the display colour, opacity and display name of one body of a Part.
+Set the display colour, opacity and display name of the body of a Part.
 
 A Part is a value: the result is a new Part, the input is unchanged.  The colour is an
 appearance only.  A body without a colour shows its Part's material colour
@@ -22,21 +22,20 @@ appearance only.  A body without a colour shows its Part's material colour
 overrides the material colour for display (the live preview, the package scene, the STEP
 surface colour of that solid).  Mass, density and geometry never read it.
 
-``case = scad.set_body_appearance_rpart(case, "lid", color=(0.9, 0.3, 0.2), name="Lid")``
-paints the lid body of a multi-body part; ``scad.set_body_appearance_rpart(part,
-color=(0.2, 0.4, 0.8))`` paints a one-body part. Recorded and replayed like
-``assign_material_rpart``. To name a face or an edge for people, tag it
+``lid = scad.set_body_appearance_rpart(lid, color=(0.9, 0.3, 0.2), name="Lid")``
+paints the part's body (a Part holds one solid, whose body id is ``"body"``). Recorded and
+replayed like ``assign_material_rpart``. To name a face or an edge for people, tag it
 (``scad.apply_tag_rselection`` / ``ql.tag``): a tag is the name.
 
 ## Parameters
 
 ### part
 
-- **Description**: The Part (one body or several).
+- **Description**: The Part.
 
 ### body_id
 
-- **Description**: The body to change: an id from ``part.body_ids()``. A one-body Part has the one body ``"body"`` (the default).
+- **Description**: The body to change: the Part's one body, ``"body"`` (the default).
 
 ### color
 
@@ -56,7 +55,7 @@ color=(0.2, 0.4, 0.8))`` paints a one-body part. Recorded and replayed like
 
 ## Returns
 
-Part: The Part with that body's appearance changed; ``part.get_body(body_id).color``,
+Part: The Part with the body's appearance changed; ``part.get_body(body_id).color``,
 ``.opacity`` and ``.name`` read it back.
 
 ## Raises

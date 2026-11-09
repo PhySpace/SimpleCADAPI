@@ -52,8 +52,8 @@ Solid: The cut result solid, when the result is one piece.
 list[Solid]: The pieces (a ``scad.Pieces``), when the cut split the body
 (``on_split="pieces"``). Operations that take one shape run on every piece
 (``cut_rsolid(pieces, tool)``, ``translate_shape(pieces, ...)``) and return
-``Pieces``; a selector's cardinality is checked over all pieces. Pass them on as bodies: ``make_part_rpart(part_id=..., body=pieces)`` makes the
-bodies ``body_1 .. body_n``, ``bodies={"bar": pieces}`` makes ``bar_1 .. bar_n``.
+``Pieces``; a selector's cardinality is checked over all pieces. They are notebook values: a Part holds exactly one solid, so make one Part of each piece
+(an Assembly of them is the several-piece result), not ``make_part_rpart(body=pieces)``.
 
 ## Raises
 

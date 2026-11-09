@@ -431,7 +431,7 @@ def face(
         ordinal: Which of the op's faces with that role (0 first).
         topo: For a face without a role: its position in the op's output (``"face_5"``); give a ``guard`` with it.
         occurrence: Which of the feature's *op* operations feeding the shape (0: the first).
-        slot: The output of that operation (a multi-body result has one per body).
+        slot: The output of that operation (an operation that makes several solids has one per solid).
         piece: The chosen piece once the face has been split (in the order the split error lists them).
         follow: ``"identity"``; ``"derived"`` also follows into what the face generated.
         guard: ``(geometry type, (x, y, z), area[, normal])`` of the face when it was picked.

@@ -14,17 +14,16 @@ def measure_part_mass_rmassreport(part: 'Part', *, density: 'float | None' = Non
 
 ## Description
 
-Measure the volume, mass and centre of mass of every body of a Part, and of the Part as a whole.
+Measure the volume, mass and centre of mass of a Part.
 
-``scad.measure_part_mass_rmassreport(case).body("lid").mass_kg`` is the mass of
-the lid body; ``.mass_kg`` the mass of the whole part. Every body has the
-Part's material.
+``scad.measure_part_mass_rmassreport(bracket).mass_kg`` is the mass of the part.
+The part's material gives the density unless ``density`` is passed.
 
 ## Parameters
 
 ### part
 
-- **Description**: The Part to measure (one body or several).
+- **Description**: The Part to measure.
 
 ### density
 
@@ -36,9 +35,9 @@ Part's material.
 
 ## Returns
 
-MassReport: ``bodies`` (one ``BodyMass`` per body, in body order: ``body_id``,
-``volume_mm3``, ``mass_kg``, ``centroid_mm``) and the totals of the part
-(``volume_mm3``, ``mass_kg``, volume-weighted ``centroid_mm``).
+MassReport: ``bodies`` (the Part's one ``BodyMass``: ``body_id``, ``volume_mm3``,
+``mass_kg``, ``centroid_mm``) and the totals of the part (``volume_mm3``,
+``mass_kg``, ``centroid_mm``).
 
 ## Raises
 

@@ -421,9 +421,8 @@ that surfaced it is in brackets.
 - **Root cause:** a Compound is a new shape root with its own entity registry;
   the semantic state of the input roots is not carried over, and the copy
   helper only works within one root.
-- **Status:** open. Multi-body parts keep their bodies as separate Solid roots
-  (`Part.bodies`), so they are not affected; `product.bodies.part_shape`
-  documents that its Compound is a geometry view without tags.
+- **Status:** open. The multi-body Part that made this matter was withdrawn (a Part holds one Solid), so no
+  product value is affected any more; a user-built Compound still drops tags.
 - **Fix direction:** either carry tags into a Compound built from tagged
   roots (sub-shapes are shared, so the mapping is exact), or refuse
   `_copy_semantic_state_from` across roots instead of doing nothing.
@@ -437,7 +436,8 @@ that surfaced it is in brackets.
 - **Root cause:** `_glue/values.py` parses the parameter names out of the
   pybind11 `__init__` docstring and reads each back with `getattr`.
 - **Status:** worked around: `_ARGUMENTS` maps a class to per-parameter
-  readers (Part: `body`/`bodies`).
+  readers (Part: `body`, which is the `Body` when the body carries a name or an appearance; the `bodies`
+  argument went with the multi-body Part).
 - **Fix direction:** give the C++ values an explicit `__getstate__`/
   `py::pickle` (as `ql` selectors have) instead of docstring parsing.
 
@@ -450,17 +450,19 @@ that surfaced it is in brackets.
 - **Trigger:** any part with more than one solid.
 - **Root cause:** "is a part" and "has one solid" were the same fact until
   now.
-- **Status:** worked around: bodies get an id segment `body:<body_id>`
-  (`entity/<part>/body:<id>/...`, `node/<part>/body:<id>`), one-body parts
-  keep their old ids byte for byte; the kind stays `single_solid`.
+- **Status:** resolved by withdrawing the multi-body Part: a Part is one solid again, so `single_solid` is
+  accurate. The `body:<name>` id segment (`entity/<notebook id>/body:<name>/...`, `node/<notebook id>/body:<name>`)
+  remains only for the open solids of a notebook that has no Part yet (a preview of loose solids); Part ids
+  are the old ones byte for byte.
 - **Fix direction:** treat `single_solid` as the name of the part kind (rename
   at the next package schema bump) and keep the `body:` segment the only
   way to address a body.
 
 ## 30. Error guidance is frozen by parity goldens [multi-solid research]
 
-- **Symptom:** the `make_part_rpart` guidance still says "Union intended multiple bodies into one Solid before
-  creating the Part.", which is wrong now that `bodies=` exists; changing it fails
+- **Symptom:** the `make_part_rpart` guidance says "Union intended multiple bodies into one Solid before
+  creating the Part." (it was wrong while `bodies=` existed, and is right again now that a Part holds one solid; it
+  does not mention the Assembly alternative). Changing it fails
   `src/cpp/tests/python/test_product_values.py::test_part_creation_and_errors`.
 - **Root cause:** the C++ port compares every error's `what_happened` / `possible_causes` / `how_to_fix` with goldens
   captured from the old Python SDK (`tests/golden/product_*.json`), so guidance cannot follow the API.

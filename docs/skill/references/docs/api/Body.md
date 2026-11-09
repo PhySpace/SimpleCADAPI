@@ -14,10 +14,10 @@ class Body(body_id, solid, name=None, color=None, opacity=None)
 
 ## Description
 
-One named solid of a Part.
+The solid of a Part, with its display name, colour and opacity.
 
 ``Body(body_id, solid, name=None, color=None, opacity=None)``: ``body_id`` is an
-identifier unique within the part, ``solid`` the body's Solid, ``name`` an optional
+identifier (``"body"`` for the body of a Part), ``solid`` the body's Solid, ``name`` an optional
 display name, ``color`` an optional display colour (RGB floats in [0, 1]) and
 ``opacity`` an optional display opacity in [0, 1]. A one-body Part has one Body with
 the id ``"body"``. The colour overrides the Part's material colour for display only;

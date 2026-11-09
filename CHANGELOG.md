@@ -6,6 +6,16 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+### Changed
+- A `Part` holds exactly one solid again. The multi-body Part of the withdrawn 2.2.8 release (`make_part_rpart(bodies=...)`,
+  `Part.multi_body`, `scad.part_shape`, `inspect_body_overlaps_rlist`, `BodyOverlapWarning`, part definition profile
+  `simplecad-part-definition-3` with `solid_cache.bodies`) is removed: a Part is the unit an assembly places, mates and gives
+  connectors to, and a Part of several bodies could do none of that (no connectors, `explode_rassembly` raised). Several
+  solids that exist side by side while a model is built (a tool next to its body) are ordinary notebook values: a part
+  notebook with one open solid still gets the implicit Part; with several there is no product and the run raises
+  `SeveralOpenBodiesError` naming them. The editor draws them side by side ("N open solids") and its `use_as_product`
+  makes the Part from the one you choose. Several solids as a deliverable are one Part each in an Assembly.
+
 ## 2.2.8 — 2026-11-09
 
 User-facing notes: [`docs/updates/2.2.8.md`](docs/updates/2.2.8.md).

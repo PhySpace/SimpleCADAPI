@@ -39,8 +39,6 @@ Placement make_placement_rplacement(const Scalar3& origin, const Scalar3& x_axis
 Placement identity_placement_rplacement();
 
 PartPtr make_part_rpart(const std::string& part_id, const Solid& body, const OptionalString& name = {});
-// A Part of several named bodies, kept apart (no boolean between them), in this order.
-PartPtr make_part_rpart(const std::string& part_id, const std::vector<Body>& bodies, const OptionalString& name = {});
 PartPtr assign_material_rpart(const Part& part, const Material& material);
 // The Part with the display colour, opacity and display name of one body set.  An argument left empty keeps what
 // the body has; `reset` first clears all three (the body then shows the material colour, opaque, under its id).

@@ -155,6 +155,16 @@ export function FeatureTree({
           </Button>
         </div>
       )}
+      {!state.product && state.open.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2 border-b-2 border-focus bg-accent px-3 py-1.5 text-[11px]">
+          <span className="min-w-0 flex-1">{t("{{count}} solids are open, and a Part holds exactly one solid. Choose the part:", { count: state.open.length })}</span>
+          {state.open.map((body) => (
+            <Button key={body} type="button" size="sm" className="h-6 px-2" disabled={busy} onClick={() => onUseProduct(body)}>
+              {t("use {{body}}", { body })}
+            </Button>
+          ))}
+        </div>
+      )}
       {error && <div className="border-b border-fail px-3 py-1 text-[11px] text-fail">{error}</div>}
       <ScrollArea className="min-h-0 flex-1">
         {state.features.length === 0 ? (
@@ -164,7 +174,7 @@ export function FeatureTree({
             {state.features.map((feature) => {
               const spec = feature.gui ? catalog?.specs.find((item) => item.id === feature.gui?.spec) : undefined;
               const problem = errorText(feature);
-              const productBodies = state.product ? (state.product.bodies ?? [state.product.body]) : [];
+              const productBodies = state.product ? [state.product.body] : [];
               const isProduct = feature.makes.some((name) => productBodies.includes(name));
               const canEdit = Boolean(feature.gui && spec);
               const Icon = feature.gui ? FEATURE_ICONS[feature.gui.spec] : CODE_FEATURE_ICON;

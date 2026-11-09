@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_part_rpart(part_id, body=None, name=None, bodies=None)
+def make_part_rpart(part_id, body, name=None)
 ```
 
 *Source: operators/product.py*
@@ -14,13 +14,13 @@ def make_part_rpart(part_id, body=None, name=None, bodies=None)
 
 ## Description
 
-Wrap one Solid, or several named solids, as a semantic Part.
+Wrap one Solid as a semantic Part. A Part holds exactly one solid.
 
-``scad.make_part_rpart(part_id=scad.notebook_id(), body=bracket)`` for one solid;
-``scad.make_part_rpart(part_id=scad.notebook_id(), bodies={"case": case, "lid": lid})``
-for a case and its lid kept as two bodies of one part. Material applies to every
-body. Connectors are not supported on multi-body parts yet. Union the solids
-first when they must become one body.
+``scad.make_part_rpart(part_id=scad.notebook_id(), body=bracket)``. Several solids
+are not one Part: make one Part per solid and put them in an Assembly (identity
+placements when they only sit together), or union / cut them into one solid first.
+Solids that sit side by side while a model is built (a tool next to the body it will
+cut) are ordinary notebook values, not a Part.
 
 ## Parameters
 
@@ -30,25 +30,17 @@ first when they must become one body.
 
 ### body
 
-- **Description**: The Solid of a one-body Part. The pieces of a split cut (a list of Solids) become the bodies ``body_1 .. body_n``.
+- **Description**: The Solid of the Part. A ``Body`` (a solid with a display name, colour and opacity) and a list of exactly one piece of a split cut are also taken. Several solids, or a list of several pieces, are refused.
 
 ### name
 
 - **Description**: Optional display name.
 
-### bodies
-
-- **Description**: Instead of ``body``: several solids kept apart in one Part, as a mapping ``body_id -> Solid`` (in its order) or a sequence of ``Body`` values. A mapping value may be the pieces of a split cut (a list of
-
-### Solids)
-
-- **Description**: they become ``<body_id>_1 .. <body_id>_n``. Body ids are identifiers, unique within the part. Overlapping bodies are allowed; building the definition warns (``BodyOverlapWarning``).
-
 ## Returns
 
-Part: The new Part. ``part.bodies`` lists its bodies; ``part.body`` is the
-Solid of a one-body Part.
+Part: The new Part. ``part.body`` is its Solid; ``part.bodies`` is that body as a
+one-element tuple.
 
 ## Raises
 
-- **SimpleCADError**: Neither or both of ``body`` and ``bodies`` were given, a body is not a Solid, a body id is malformed or repeated, or the part_id is already used.
+- **SimpleCADError**: The body is not a Solid, more than one solid was given (a ValueError that says to make one Part per solid in an Assembly, or to union / cut them to one solid), or the part_id is already used.

@@ -250,7 +250,7 @@ from . import boolean  # noqa: F401
 from . import transform  # noqa: F401
 from . import selection  # noqa: F401
 from . import product  # noqa: F401
-from .product import inspect_body_overlaps_rlist, measure_part_mass_rmassreport  # Python-defined (product/bodies.py)
+from .product import measure_part_mass_rmassreport  # Python-defined (product/bodies.py)
 from . import sketch  # noqa: F401
 
 __all__ = [
@@ -346,7 +346,6 @@ __all__ = [
     "insert_curve_knot_redge",
     "insert_surface_knot_rface",
     "inspect_assembly_constraints_rconstraintreport",
-    "inspect_body_overlaps_rlist",
     "inspect_curve_rcurvedata",
     "inspect_sketch_rsketchcrossings",
     "inspect_sketch_rsketchprofiles",
