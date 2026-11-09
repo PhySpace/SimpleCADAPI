@@ -4,7 +4,9 @@ All notable changes to SimpleCADAPI are documented here. Per-version
 user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 中文).
 
-## Unreleased
+## 2.2.9 — 2026-11-10
+
+Replaces 2.2.8, which was withdrawn (yanked on PyPI). User-facing notes: [`docs/updates/2.2.9.md`](docs/updates/2.2.9.md).
 
 ### Changed
 - A `Part` holds exactly one solid again. The multi-body Part of the withdrawn 2.2.8 release (`make_part_rpart(bodies=...)`,
@@ -15,6 +17,12 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   notebook with one open solid still gets the implicit Part; with several there is no product and the run raises
   `SeveralOpenBodiesError` naming them. The editor draws them side by side ("N open solids") and its `use_as_product`
   makes the Part from the one you choose. Several solids as a deliverable are one Part each in an Assembly.
+
+### Fixed
+- On Windows `sca cell` no longer kills the editor it talks to: the editor pid is probed without signalling it
+  (`os.kill(pid, 0)` terminates the process on Windows).
+- Building from source with GCC 14 (`operators_promote.cpp` includes `<algorithm>`) and MinGW (`_USE_MATH_DEFINES`; `build_occt.py`
+  picks Ninja when a MinGW `g++` is the compiler); the macOS wheels are built on `macos-15` (still targeting macOS 14.0).
 
 ## 2.2.8 — 2026-11-09
 
