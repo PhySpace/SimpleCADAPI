@@ -1,8 +1,8 @@
 # SDK Overview
 
 - Project: `simplecadapi`
-- Version: `2.2.7`
-- Package distribution: `simplecadapi==2.2.7`
+- Version: `2.2.8`
+- Package distribution: `simplecadapi==2.2.8`
 
 ## What this skill bundles
 
