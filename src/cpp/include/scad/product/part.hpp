@@ -1,10 +1,10 @@
 // A Part: one Solid (its body), with an optional material and its connector datums (product/part.py).  Values are
 // immutable: every `with_*` returns a new Part.
 //
-// A Part holds exactly one solid: it is the unit an assembly places, mates and gives connectors to.  Several solids that
-// exist side by side while a model is built (a tool and its target) are loose values of the notebook, and a deliverable
-// of several solids is an Assembly of Parts.  The body is kept as a `Body` only because it carries the display name,
-// colour and opacity (`set_body_appearance_rpart`).
+// A Part holds exactly one solid: it is the unit an assembly places, mates and gives connectors to.  Several solids
+// that exist side by side while a model is built (a tool and its target) are loose values of the notebook, and a
+// deliverable of several solids is an Assembly of Parts.  The body is kept as a `Body` only because it carries the
+// display name, colour and opacity (`set_body_appearance_rpart`).
 #pragma once
 
 #include <memory>

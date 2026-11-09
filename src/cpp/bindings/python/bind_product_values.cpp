@@ -477,8 +477,9 @@ void bind_part(py::module_& m) {
           }),
           py::arg("part_id"), py::arg("body"), py::arg("name") = py::none(), py::arg("material") = py::none(),
           py::arg("connectors") = py::tuple())
-      .def_property_readonly("bodies", [](const Part& self) { return to_tuple(self.bodies()); },
-                             "The Part's body as a one-element tuple (the Body carries the display appearance).")
+      .def_property_readonly(
+          "bodies", [](const Part& self) { return to_tuple(self.bodies()); },
+          "The Part's body as a one-element tuple (the Body carries the display appearance).")
       .def("body_ids", [](const Part& self) { return to_tuple(self.body_ids()); })
       .def(
           "get_body", [](const Part& self, const py::object& id) { return self.get_body(text(id, "body_id")); },
