@@ -6,6 +6,10 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+## 2.2.8 — 2026-11-09
+
+User-facing notes: [`docs/updates/2.2.8.md`](docs/updates/2.2.8.md).
+
 ### Added
 - Editing existing curves and surfaces as recorded operations (the SDK half of NURBS control-point editing):
   `inspect_curve_rcurvedata` / `inspect_surface_rsurfacedata` read degree, poles, weights, knots and trimming;
