@@ -426,8 +426,8 @@ def encode_preview(scene: PreviewScene, omit: Collection[str] = ()) -> bytes:
             continue
         definition = scene.definitions[key]
         body_id = scene.bodies.get(key)
-        # entity/<part>/<kind>/<topo>; a body of a multi-body part: entity/<part>/body:<body>/<kind>/<topo> (as in
-        # the package's scene, scene/product_scene.py)
+        # entity/<part>/<kind>/<topo>; an open solid of a notebook (compile_open_bodies):
+        # entity/<notebook id>/body:<name>/<kind>/<topo>
         prefix = f"entity/{definition}/" if body_id is None else f"entity/{definition}/body:{body_id}/"
         parts.append(
             {
@@ -521,15 +521,15 @@ def decode_preview_header(data: bytes) -> dict[str, Any]:
 def entity_info(scene: PreviewScene, entity_id: str) -> dict[str, Any] | None:
     """The geometric properties of the entity *entity_id* of a part of *scene*.
 
-    ``entity/<definition>/<kind>/<topo id>`` (``entity/<definition>/body:<body id>/...`` for a body of a
-    multi-body part); returns what the package's entity
+    ``entity/<definition>/<kind>/<topo id>`` (``entity/<notebook id>/body:<name>/...`` for an open solid of a
+    notebook); returns what the package's entity
     sidecar holds for it (``properties``, ``geometry``, ``tags``) except the
     ``source`` links into the feature graph, or ``None`` if there is no such entity.
     """
     _, _, rest = entity_id.partition("entity/")
     definition, _, tail = rest.partition("/")
     body_id = ""
-    if tail.startswith("body:"):  # a body of a multi-body part
+    if tail.startswith("body:"):  # an open solid of a notebook
         segment, _, tail = tail.partition("/")
         body_id = segment[len("body:") :]
     kind, _, topo_id = tail.partition("/")
