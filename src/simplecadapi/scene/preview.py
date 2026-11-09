@@ -30,7 +30,7 @@ import struct
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Collection
+from typing import Any, Collection, Mapping
 
 import numpy as np
 
@@ -101,7 +101,8 @@ class PreviewScene:
     definitions: dict[str, str]
     """The definition id each part key belongs to."""
     bodies: dict[str, str] = field(default_factory=dict)
-    """The body id of each part key that draws one body of a multi-body part (one-body parts are not listed)."""
+    """The name of each part key that draws one open solid of the notebook (:func:`compile_open_bodies`); the parts of a
+    product are not listed."""
 
 
 # -- the per-part cache --------------------------------------------------------------
@@ -272,51 +273,28 @@ def compile_preview(
     parts: dict[str, PartPreview] = {}
     solids: dict[str, Solid] = {}
     definitions: dict[str, str] = {}
-    bodies: dict[str, str] = {}
     nodes: list[PreviewNode] = []
 
     def add(part: Part, path: tuple[str, ...], placement: Placement, name: str) -> None:
-        if not part.multi_body:
-            body = part.body
-            if not isinstance(body, Solid):
-                raise PreviewError(f"part {part.part_id!r} has no solid body")
-            preview = preview_solid(body, linear_tolerance=linear_tolerance, angular_tolerance=angular_tolerance)
-            parts[preview.key] = preview
-            solids.setdefault(preview.key, body)
-            definitions.setdefault(preview.key, part.part_id)
-            only = part.bodies[0]
-            nodes.append(
-                PreviewNode(
-                    node_id="node/" + "/".join(path),
-                    part_key=preview.key,
-                    definition_id=part.part_id,
-                    display_name=name,
-                    placement=placement,
-                    color=body_display_color(part, only),
-                    opacity=only.opacity,
-                )
+        body = part.body
+        if not isinstance(body, Solid):
+            raise PreviewError(f"part {part.part_id!r} has no solid body")
+        preview = preview_solid(body, linear_tolerance=linear_tolerance, angular_tolerance=angular_tolerance)
+        parts[preview.key] = preview
+        solids.setdefault(preview.key, body)
+        definitions.setdefault(preview.key, part.part_id)
+        only = part.bodies[0]
+        nodes.append(
+            PreviewNode(
+                node_id="node/" + "/".join(path),
+                part_key=preview.key,
+                definition_id=part.part_id,
+                display_name=name,
+                placement=placement,
+                color=body_display_color(part, only),
+                opacity=only.opacity,
             )
-            return
-        # A multi-body part: one node per body, all with the part's placement (bodies are never placed apart).  The
-        # part key names the body as well, so two bodies of the same shape stay two entity namespaces.
-        for item in part.bodies:
-            preview = preview_solid(item.solid, linear_tolerance=linear_tolerance, angular_tolerance=angular_tolerance)
-            key = f"{preview.key}/body:{item.body_id}"
-            parts[key] = preview
-            solids.setdefault(key, item.solid)
-            definitions.setdefault(key, part.part_id)
-            bodies.setdefault(key, item.body_id)
-            nodes.append(
-                PreviewNode(
-                    node_id="node/" + "/".join(path) + "/body:" + item.body_id,
-                    part_key=key,
-                    definition_id=part.part_id,
-                    display_name=f"{name} / {item.name or item.body_id}",
-                    placement=placement,
-                    color=body_display_color(part, item),
-                    opacity=item.opacity,
-                )
-            )
+        )
 
     def visit(item: Part | Assembly, path: tuple[str, ...], placement: Placement, name: str) -> None:
         if isinstance(item, Part):
@@ -334,7 +312,48 @@ def compile_preview(
     visit(product, (root_id,), identity_placement(), root_id)
     if not nodes:
         raise PreviewError("the product has nothing to draw")
-    return PreviewScene(parts=parts, nodes=nodes, solids=solids, definitions=definitions, bodies=bodies)
+    return PreviewScene(parts=parts, nodes=nodes, solids=solids, definitions=definitions)
+
+
+def compile_open_bodies(
+    part_id: str,
+    bodies: Mapping[str, Solid],
+    *,
+    linear_tolerance: float = DEFAULT_LINEAR_TOLERANCE,
+    angular_tolerance: float = DEFAULT_ANGULAR_TOLERANCE,
+) -> PreviewScene:
+    """Preview solids that exist side by side and are not a product: the open solids of a notebook (a tool and the
+    body it will cut), by name.
+
+    Each is a node ``node/<part_id>/body:<name>`` in world position, with its own entity namespace
+    (``entity/<part_id>/body:<name>/...``, so two solids of the same shape stay two) and the viewer's default colour.
+    They are loose values: nothing places, mates or exports them, and a Part holds exactly one solid.
+    """
+
+    parts: dict[str, PartPreview] = {}
+    solids: dict[str, Solid] = {}
+    definitions: dict[str, str] = {}
+    names: dict[str, str] = {}
+    nodes: list[PreviewNode] = []
+    for name, solid in bodies.items():
+        preview = preview_solid(solid, linear_tolerance=linear_tolerance, angular_tolerance=angular_tolerance)
+        key = f"{preview.key}/body:{name}"
+        parts[key] = preview
+        solids[key] = solid
+        definitions[key] = part_id
+        names[key] = name
+        nodes.append(
+            PreviewNode(
+                node_id=f"node/{part_id}/body:{name}",
+                part_key=key,
+                definition_id=part_id,
+                display_name=name,
+                placement=identity_placement(),
+            )
+        )
+    if not nodes:
+        raise PreviewError("there is no solid to draw")
+    return PreviewScene(parts=parts, nodes=nodes, solids=solids, definitions=definitions, bodies=names)
 
 
 SURFACE_COLOR = (0.55, 0.78, 0.95)
