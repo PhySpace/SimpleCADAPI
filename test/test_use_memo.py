@@ -20,7 +20,7 @@ class UseMemoTest(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name).resolve()
-        self.child = Path(create_notebook(self.root, "child", "part"))
+        self.child = Path(create_notebook(self.root, "child", "sample"))
         self.runs: list[tuple] = []
         original = runner.run_notebook
 
@@ -85,7 +85,7 @@ class UseMemoTest(unittest.TestCase):
         self.assertIn(self.child.resolve(), {path.resolve() for path in recorded[1]})
 
     def test_two_children_under_one_id_do_not_both_stay_kept(self) -> None:
-        other = Path(create_notebook(self.root, "other", "part"))
+        other = Path(create_notebook(self.root, "other", "sample"))
         first = runner.use(self.child, id="shared")
         runner.use(other, id="shared")  # registers its nodes under "shared", replacing the first run's
         again = runner.use(self.child, id="shared")

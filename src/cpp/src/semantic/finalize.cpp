@@ -3,6 +3,7 @@
 #include "scad/semantic/finalize.hpp"
 
 #include <algorithm>
+#include <unordered_map>
 #include <functional>
 #include <map>
 #include <set>
@@ -34,6 +35,14 @@ std::string entity_type_of(std::string_view op) {
               "add_circle_rsketch",
               "add_arc_rsketch",
               "add_bspline_rsketch",
+              "trim_rsketch",
+              "extend_rsketch",
+              "fillet_corner_rsketch",
+              "chamfer_corner_rsketch",
+              "project_rsketch",
+              "insert_spline_anchor_rsketch",
+              "remove_spline_anchor_rsketch",
+              "convert_spline_to_anchors_rsketch",
               "make_wire_from_sketch_rwire",
               "make_face_from_sketch_rface",
               "make_constrain_coincident_rsketch",
@@ -169,7 +178,12 @@ std::vector<std::string> node_labels_for_op(std::string_view op) {
       {"add_ellipse_rsketch", {"ellipse", "sketch"}},
       {"add_line_rsketch", {"line", "sketch"}},
       {"add_point_rsketch", {"point", "sketch"}},
+      {"chamfer_corner_rsketch", {"edit", "sketch"}},
+      {"convert_spline_to_anchors_rsketch", {"edit", "sketch"}},
+      {"extend_rsketch", {"edit", "sketch"}},
       {"fill_holes_rshell", {"derived", "shell", "surface"}},
+      {"fillet_corner_rsketch", {"edit", "sketch"}},
+      {"insert_spline_anchor_rsketch", {"edit", "sketch"}},
       {"fit_point_grid_rface", {"face", "primitive", "surface"}},
       {"make_2d_cut_rface", {"derived", "face"}},
       {"make_2d_intersect_rface", {"derived", "face"}},
@@ -211,6 +225,9 @@ std::vector<std::string> node_labels_for_op(std::string_view op) {
       {"make_wire_from_edges_rwire", {"derived", "wire"}},
       {"make_wire_from_sketch_rwire", {"derived", "sketch", "wire"}},
       {"sew_faces_rshell", {"derived", "shell", "surface"}},
+      {"project_rsketch", {"edit", "sketch"}},
+      {"remove_spline_anchor_rsketch", {"edit", "sketch"}},
+      {"trim_rsketch", {"edit", "sketch"}},
       {"trim_surface_rface", {"derived", "face", "surface", "trimmed"}},
   };
   if (const auto found = table.find(op); found != table.end())
@@ -393,7 +410,7 @@ void attach_lineage_from_source(const Shape& source, Shape& target, LineageDeriv
   for (TagBinding& binding : source.local_tag_bindings())
     if (lineage_policy_allows(binding.propagation(), derivation))
       carried.push_back({std::move(binding), effective});
-  for (const TagLineageWitness& witness : source.lineage_witnesses()) {
+  for (const TagLineageWitness& witness : source.stored_lineage_witnesses()) {
     if (!lineage_policy_allows(witness.binding.propagation(), witness.derivation) ||
         !lineage_policy_allows(witness.binding.propagation(), derivation))
       continue;
@@ -435,13 +452,56 @@ std::optional<TopoDelta> merge_topo_deltas(const std::vector<TopoDelta>& deltas)
   const auto append = [](std::vector<TopoRef>& to, const std::vector<TopoRef>& from) {
     to.insert(to.end(), from.begin(), from.end());
   };
+  // A later step names what it consumed by the kernel ids of an earlier step's outputs (the intermediate solid,
+  // which no recorded node owns).  Compose: such a parent stands for the earlier step's own parents, so every
+  // entry descends from the operation's real inputs and the chain is not cut at the intermediate.
+  std::unordered_map<std::string, std::vector<TopoRef>> sources_of;  // kind|kernel id of an output -> its inputs
+  const auto key = [](const TopoRef& ref) { return std::string(kind_name(ref.kind)) + '|' + ref.topo_id; };
+  const auto compose = [&](const std::vector<TopoRef>& parents) {
+    std::vector<TopoRef> out;
+    for (const TopoRef& parent : parents) {
+      const auto found = sources_of.find(key(parent));
+      if (found == sources_of.end()) {
+        out.push_back(parent);
+        continue;
+      }
+      for (const TopoRef& source : found->second) {
+        if (std::none_of(out.begin(), out.end(), [&](const TopoRef& r) { return key(r) == key(source); }))
+          out.push_back(source);
+      }
+    }
+    return out;
+  };
   for (const TopoDelta& delta : deltas) {
     append(merged.preserved, delta.preserved);
     append(merged.modified, delta.modified);
     append(merged.generated, delta.generated);
     append(merged.deleted, delta.deleted);
     append(merged.section_edges, delta.section_edges);
-    merged.entries.insert(merged.entries.end(), delta.entries.begin(), delta.entries.end());
+    std::unordered_map<std::string, std::vector<TopoRef>> produced;
+    for (const TopoEntry& entry : delta.entries) {
+      if (entry.event == TopoEvent::Deleted) {
+        // The deletion of an intermediate entity is the deletion of what it came from.
+        const std::vector<TopoRef> originals = compose({entry.ref});
+        for (const TopoRef& original : originals) {
+          TopoEntry item = entry;
+          item.ref = original;
+          item.parent_refs = compose(entry.parent_refs);
+          merged.entries.push_back(std::move(item));
+        }
+        continue;
+      }
+      TopoEntry item = entry;
+      item.parent_refs = compose(entry.parent_refs);
+      auto& sources = produced[key(item.ref)];
+      for (const TopoRef& source : item.parent_refs) {
+        if (std::none_of(sources.begin(), sources.end(), [&](const TopoRef& r) { return key(r) == key(source); }))
+          sources.push_back(source);
+      }
+      merged.entries.push_back(std::move(item));
+    }
+    for (auto& [id, sources] : produced)
+      sources_of[id] = std::move(sources);
     steps.push_back(object({{"index", index++},
                             {"preserved", static_cast<std::int64_t>(delta.preserved.size())},
                             {"modified", static_cast<std::int64_t>(delta.modified.size())},

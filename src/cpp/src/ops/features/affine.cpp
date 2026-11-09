@@ -2,6 +2,8 @@
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBuilderAPI_GTransform.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
+#include <BRepTools_History.hxx>
+#include <TopTools_ListOfShape.hxx>
 #include <gp_GTrsf.hxx>
 #include <gp_Trsf.hxx>
 
@@ -13,6 +15,7 @@
 #include "scad/core/tolerance.hpp"
 #include "scad/kernel/convert.hpp"
 #include "scad/ops/features/transforms.hpp"
+#include "scad/semantic/tracking.hpp"
 
 namespace scad {
 
@@ -57,9 +60,21 @@ Mat3 current_basis() {
 // A general (affine) transformation of a solid.  The kernel's GTransform copies topology but can
 // keep curve geometry shared with the boolean / fillet history that built the solid; isolating it
 // first avoids invalid p-curves (and a crash in the checker) in OCCT 7.9.
-TopoDS_Shape general_transform(const TopoDS_Shape& solid, const Mat3& linear, const Vec3& translation,
-                               const char* failure) {
-  return occt_guard([&]() -> TopoDS_Shape {
+// A transformed solid and what became of the input's sub-shapes.
+struct Transformed {
+  TopoDS_Shape shape;
+  BRepTools_History history;
+};
+
+TopTools_ListOfShape arguments(const TopoDS_Shape& shape) {
+  TopTools_ListOfShape out;
+  out.Append(shape);
+  return out;
+}
+
+Transformed general_transform(const TopoDS_Shape& solid, const Mat3& linear, const Vec3& translation,
+                              const char* failure) {
+  return occt_guard([&]() -> Transformed {
     gp_GTrsf transform;
     for (int row = 0; row < 3; ++row) {
       for (int col = 0; col < 3; ++col)
@@ -68,12 +83,42 @@ TopoDS_Shape general_transform(const TopoDS_Shape& solid, const Mat3& linear, co
     transform.SetValue(1, 4, translation.x);
     transform.SetValue(2, 4, translation.y);
     transform.SetValue(3, 4, translation.z);
-    const TopoDS_Shape copied = BRepBuilderAPI_Copy(solid, true, false).Shape();
+    BRepBuilderAPI_Copy copy(solid, true, false);
+    const TopoDS_Shape copied = copy.Shape();
     BRepBuilderAPI_GTransform builder(copied, transform, true);
     builder.Build();
     if (!builder.IsDone())
       throw ValueError(failure);
-    return builder.Shape();
+    // The copy, then the transform: one history from the input to the result.
+    Transformed out{builder.Shape(), BRepTools_History(arguments(solid), copy)};
+    out.history.Merge(arguments(copied), builder);
+    return out;
+  });
+}
+
+// A rigid motion (orthonormal linear part, determinant +1) is exact in the kernel's Trsf form, which
+// moves the geometry by location/transformation and keeps every surface, curve and p-curve as built.
+// GTransform would rebuild them as approximated B-splines, which can lose BRepCheck validity.
+bool is_rigid(const Mat3& linear) {
+  const Mat3 gram = multiply(linear, transposed(linear));
+  for (std::size_t i = 0; i < 3; ++i)
+    for (std::size_t j = 0; j < 3; ++j)
+      if (std::abs(gram[i][j] - (i == j ? 1.0 : 0.0)) > 1e-9)
+        return false;
+  return determinant(linear) > 0;
+}
+
+Transformed rigid_transform(const TopoDS_Shape& solid, const Mat3& linear, const Vec3& translation,
+                            const char* failure) {
+  return occt_guard([&]() -> Transformed {
+    gp_Trsf transform;
+    transform.SetValues(linear[0][0], linear[0][1], linear[0][2], translation.x, linear[1][0], linear[1][1],
+                        linear[1][2], translation.y, linear[2][0], linear[2][1], linear[2][2], translation.z);
+    BRepBuilderAPI_Transform builder(solid, transform, true);
+    builder.Build();
+    if (!builder.IsDone())
+      throw ValueError(failure);
+    return Transformed{builder.Shape(), BRepTools_History(arguments(solid), builder)};
   });
 }
 
@@ -86,16 +131,16 @@ Solid scale_rsolid(const Solid& solid, const Scalar3& factors, const Scalar3& ce
     throw ValueError("scale factors must be nonzero");
   const Vec3 global_center = features_detail::place_point(center_value);
 
-  TopoDS_Shape scaled;
+  Transformed scaled;
   if (values.x == values.y && values.y == values.z) {
-    scaled = occt_guard([&]() -> TopoDS_Shape {
+    scaled = occt_guard([&]() -> Transformed {
       gp_Trsf transform;
       transform.SetScale(kernel::to_pnt(global_center), values.x);
       BRepBuilderAPI_Transform builder(solid.wrapped(), transform, true);
       builder.Build();
       if (!builder.IsDone())
         throw ValueError("kernel could not scale the solid");
-      return builder.Shape();
+      return Transformed{builder.Shape(), BRepTools_History(arguments(solid.wrapped()), builder)};
     });
   } else {
     const Mat3 basis = current_basis();
@@ -109,7 +154,8 @@ Solid scale_rsolid(const Solid& solid, const Scalar3& factors, const Scalar3& ce
   rec.point("factors", factors);
   rec.point("center", center);
   rec.input(solid, "body");
-  return finish_solid(solid, scaled, std::move(rec).take());
+  TopoDelta delta = modification_delta(scaled.history, solid.wrapped(), scaled.shape, "continuation");
+  return finish_solid(solid, scaled.shape, std::move(rec).take(), std::move(delta));
 }
 
 Solid transform_rsolid(const Solid& solid, const std::vector<std::vector<Scalar>>& matrix) {
@@ -142,10 +188,14 @@ Solid transform_rsolid(const Solid& solid, const std::vector<std::vector<Scalar>
   const Vec3 origin = features_detail::place_point({0, 0, 0});
   const Mat3 linear = multiply(multiply(basis, affine), transposed(basis));
   const Vec3 offset = apply(basis, {values[0][3], values[1][3], values[2][3]});
-  const TopoDS_Shape transformed = general_transform(solid.wrapped(), linear, origin + offset - apply(linear, origin),
-                                                     "kernel could not transform the solid");
+  const Vec3 translation = origin + offset - apply(linear, origin);
+  const Transformed transformed =
+      is_rigid(linear)
+          ? rigid_transform(solid.wrapped(), linear, translation, "kernel could not transform the solid")
+          : general_transform(solid.wrapped(), linear, translation, "kernel could not transform the solid");
   rec.input(solid, "body");
-  return finish_solid(solid, transformed, std::move(rec).take());
+  TopoDelta delta = modification_delta(transformed.history, solid.wrapped(), transformed.shape, "continuation");
+  return finish_solid(solid, transformed.shape, std::move(rec).take(), std::move(delta));
 }
 
 }  // namespace scad

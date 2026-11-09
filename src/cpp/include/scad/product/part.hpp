@@ -1,5 +1,9 @@
-// A Part: exactly one Solid, with an optional material and its connector datums
+// A Part: one or more named bodies (Solids), with an optional material and its connector datums
 // (product/part.py).  Values are immutable: every `with_*` returns a new Part.
+//
+// A one-body Part is what every Part was before multi-body parts: `body()` is its Solid.  A multi-body
+// Part keeps several solids apart inside one product item (bodies of one part are not components: they
+// have no placements, joints or constraints between them).  See design-docs/multi-solid-design.md.
 #pragma once
 
 #include <memory>
@@ -16,19 +20,67 @@
 
 namespace scad::product {
 
+// One named solid of a Part.  The body id is a stable identifier within its Part ("base", "lid").
+//
+// A body may carry a display colour (RGB in [0, 1], like Material::color) and an opacity in [0, 1].  They are an
+// appearance only: the material colour is the default, a body colour overrides it for display (preview, package
+// scene, STEP surface colour).  Mass and density never read them.
+class Body {
+ public:
+  // ValueError for a malformed id, an empty name, a colour outside [0, 1] or an opacity outside [0, 1].
+  Body(std::string body_id, Solid solid, OptionalString name = {}, std::optional<Vec3> color = {},
+       OptionalDouble opacity = {});
+
+  const std::string& body_id() const noexcept { return body_id_; }
+  const Solid& solid() const noexcept { return solid_; }
+  const OptionalString& name() const noexcept { return name_; }
+  const std::optional<Vec3>& color() const noexcept { return color_; }
+  const OptionalDouble& opacity() const noexcept { return opacity_; }
+  // True when the body has a colour or an opacity of its own.
+  bool has_appearance() const noexcept { return color_.has_value() || opacity_.has_value(); }
+
+  // A copy with another display name, colour and opacity (same id and solid).
+  Body with_appearance(OptionalString name, std::optional<Vec3> color, OptionalDouble opacity) const;
+
+  // {"body_id", "name"}, plus "color" / "opacity" when set (the solid is geometry, not a dict field).
+  Value to_dict() const;
+
+ private:
+  std::string body_id_;
+  Solid solid_;
+  OptionalString name_;
+  std::optional<Vec3> color_;
+  OptionalDouble opacity_;
+};
+
+// The body id of a Part made from one Solid.
+inline constexpr const char* kDefaultBodyId = "body";
+
 class Part : public SemanticValue {
  public:
   // ValueError for a malformed id, an empty name, or duplicate connector ids.
   Part(std::string part_id, Solid body, OptionalString name = {}, std::optional<Material> material = {},
        std::vector<Connector> connectors = {});
+  // A Part of several bodies, in this order.  ValueError for no bodies, duplicate body ids, or connectors on
+  // more than one body (connectors of a multi-body part are not supported yet).
+  Part(std::string part_id, std::vector<Body> bodies, OptionalString name = {}, std::optional<Material> material = {},
+       std::vector<Connector> connectors = {});
 
   const std::string& part_id() const noexcept { return part_id_; }
-  const Solid& body() const noexcept { return body_; }
+  // The Solid of a one-body Part.  TypeError for a multi-body Part: read bodies() instead.
+  const Solid& body() const;
+  const std::vector<Body>& bodies() const noexcept { return bodies_; }
+  bool multi_body() const noexcept { return bodies_.size() > 1; }
+  std::vector<std::string> body_ids() const;
+  // KeyError ("part has no body_id 'x'") for an unknown id.
+  const Body& get_body(std::string_view body_id) const;
   const OptionalString& name() const noexcept { return name_; }
   const std::optional<Material>& material() const noexcept { return material_; }
   const std::vector<Connector>& connectors() const noexcept { return connectors_; }
 
   Part with_material(const Material& material) const;
+  // The Part with `body` in place of the body of the same id.  KeyError for an unknown id.
+  Part with_body(const Body& body) const;
   // ValueError when the Part already has a connector with that id.
   Part with_connector(const Connector& connector) const;
 
@@ -40,7 +92,7 @@ class Part : public SemanticValue {
 
  private:
   std::string part_id_;
-  Solid body_;
+  std::vector<Body> bodies_;
   OptionalString name_;
   std::optional<Material> material_;
   std::vector<Connector> connectors_;

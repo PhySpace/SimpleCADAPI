@@ -122,6 +122,36 @@ PartPtr make_part_rpart(const std::string& part_id, const Solid& body, const Opt
   });
 }
 
+PartPtr make_part_rpart(const std::string& part_id, const std::vector<Body>& bodies, const OptionalString& name) {
+  return guard_operation("make_part_rpart", [&] {
+    auto part = std::make_shared<const Part>(part_id, bodies, name);
+    reserve_semantic_id("part", part->part_id());
+    record_value(
+        [&] {
+          Value params = Value::object();
+          params.set("part_id", part->part_id());
+          params.set("name", optional_name(part->name()));
+          Value rows = Value::array();
+          Value refs = Value::array();
+          for (const Body& body : part->bodies()) {
+            rows.push_back(body.to_dict());
+            const Value body_refs = input_refs(body.solid());
+            for (const Value& ref : body_refs.as_array())
+              refs.push_back(ref);
+          }
+          params.set("bodies", std::move(rows));
+          params.set("input_refs", std::move(refs));
+          OpRecord record = op_record("make_part_rpart", std::move(params));
+          for (const Body& body : part->bodies())
+            record.inputs.push_back(OpInput{body.solid(), "body"});
+          record.semantic_delta = semantic_created("Part", part->part_id(), part->to_dict());
+          return record;
+        },
+        part);
+    return part;
+  });
+}
+
 PartPtr assign_material_rpart(const Part& part, const Material& material) {
   return guard_operation("assign_material_rpart", [&] {
     auto result = std::make_shared<const Part>(part.with_material(material));
@@ -138,6 +168,32 @@ PartPtr assign_material_rpart(const Part& part, const Material& material) {
           return record;
         },
         result, part, material);
+    return result;
+  });
+}
+
+PartPtr set_body_appearance_rpart(const Part& part, const std::string& body_id, const std::optional<Vec3>& color,
+                                  const OptionalDouble& opacity, const OptionalString& name, bool reset) {
+  return guard_operation("set_body_appearance_rpart", [&] {
+    const Body& body = part.get_body(body_id);
+    const Body updated = body.with_appearance(name ? name : (reset ? OptionalString{} : body.name()),
+                                              color ? color : (reset ? std::optional<Vec3>{} : body.color()),
+                                              opacity ? opacity : (reset ? OptionalDouble{} : body.opacity()));
+    auto result = std::make_shared<const Part>(part.with_body(updated));
+    record_value(
+        [&] {
+          Value params = Value::object();
+          params.set("part_id", part.part_id());
+          params.set("body_id", updated.body_id());
+          params.set("color", color ? to_array(*updated.color()) : Value());
+          params.set("opacity", opacity ? Value(*updated.opacity()) : Value());
+          params.set("name", name ? Value(*updated.name()) : Value());
+          params.set("reset", reset);
+          OpRecord record = op_record("make_set_body_appearance_rpart", std::move(params));
+          record.semantic_delta = semantic_modified("Part", part.part_id(), updated.to_dict());
+          return record;
+        },
+        result, part);
     return result;
   });
 }

@@ -100,8 +100,26 @@ inline std::string join(const Value* list) {
 }
 
 // counts first, then the sorted E/R/S/D lines of tracking_golden_record.py.
-inline std::vector<std::string> summarise(const TopoDelta& delta, const DeltaEntries& entries,
+// The delta without its solid history: the Python reference the goldens were recorded from tracks faces and edges
+// only (what became of the input solids is SimpleCAD's own, tested in test_tracking_behaviour.cpp).
+inline TopoDelta without_solids(const TopoDelta& delta) {
+  TopoDelta out = delta;
+  const auto solid = [](const TopoRef& ref) { return ref.kind == Kind::Solid; };
+  for (auto* list : {&out.preserved, &out.modified, &out.generated, &out.deleted})
+    std::erase_if(*list, solid);
+  std::erase_if(out.entries, [&](const TopoEntry& e) { return solid(e.ref); });
+  return out;
+}
+
+inline std::vector<std::string> summarise(const TopoDelta& full, const DeltaEntries& all_entries,
                                           const std::vector<TopoDS_Shape>& inputs, const TopoDS_Shape& result) {
+  const TopoDelta delta = without_solids(full);
+  DeltaEntries entries;
+  for (const auto& [id, value] : all_entries) {
+    const Value* kind = value.find("kind");
+    if (kind == nullptr || upper(kind->as_string()) != "SOLID")
+      entries.emplace(id, value);
+  }
   std::vector<TopoDS_Shape> roots = inputs;
   roots.push_back(result);
   const ShapeIndex index = index_shapes(roots);

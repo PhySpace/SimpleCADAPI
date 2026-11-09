@@ -26,9 +26,11 @@ def test_drawing_workflow_is_complete_in_each_host_build(target, tmp_path):
     router = (output / "SKILL.md").read_text(encoding="utf-8")
     assert "references/workflows/drawing-reconstruction.md" in router
     assert "references/domains/addon-development.md" in router
-    workflow = (output / "references/workflows/drawing-reconstruction.md").read_text(
-        encoding="utf-8"
-    )
+    # the workflow is an outline plus one page per stage (docs/skill-design.md)
+    pages = [output / "references/workflows/drawing-reconstruction.md"]
+    pages += sorted((output / "references/workflows/drawing-reconstruction").glob("*.md"))
+    pages += [output / "references/domains/drawing-inspection-evidence.md"]
+    workflow = "\n".join(page.read_text(encoding="utf-8") for page in pages)
     assert "section_checks" in workflow and "measurement_contract" in workflow
     assert "Host binding:" in workflow
     assert "<!-- skill:" not in workflow

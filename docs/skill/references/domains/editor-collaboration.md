@@ -1,10 +1,17 @@
 # Editor collaboration: working with a person in `sca edit`
 
+**Read when:** a person has the code-first editor open (`sca edit`) and you edit the same notebooks (a selection, a cell reference or a tuned value arrives).
+
 Use this domain when a person has the code-first editor open (`sca edit`) and
 you work on the same notebooks: they click, drag and tune; you read files and
 edit code. It is not a workflow. The modeling you do still follows the workflow
 you selected; this page says how to see what the person sees and how to hand
 work back.
+
+**Unattended:** there is no person and no editor. Do not start `sca edit`; edit the notebook file directly, check it with
+`sca run <notebook>` and read its report instead of the snapshot, the viewport image or a selection cell. A selection
+you were handed in the task is resolved and checked like any selector. Never wait for a person to run, pick or tune
+anything (`discipline/operating-modes.md`).
 
 The notebook file is the shared state. The editor autosaves every edit to
 it, and every message the person gives you (a selection, a cell reference, a
@@ -64,7 +71,7 @@ sca cell insert --after 3 -f new.py  # add a cell (--after start|end|CELL, --nam
 sca cell rm 4
 sca cell run [CELL ...]              # run cells (default all) and what they feed
 sca cell open other.py               # have the editor open another notebook (waits for its kernel)
-sca new bracket --kind part          # a new notebook; the open editor lists it, the person's view stays
+sca new bracket --kind part          # a new, empty notebook; the open editor lists it, the person's view stays
 ```
 
 - A cell is named by its number in `sca cell ls`, its `key`, its function name, or its id.
@@ -90,7 +97,7 @@ sca new bracket --kind part          # a new notebook; the open editor lists it,
 
 `sca snapshot` only has an answer while the editor runs; it reports the last
 state the editor wrote. If the snapshot is old (`updated`), ask the person to
-move the viewport or re-select, or read the notebook file instead.
+move the viewport or re-select, or read the notebook file instead. (Unattended: read the notebook file.)
 
 ## The selection cell
 
@@ -126,7 +133,8 @@ selected_item = [selected_edge_1, selected_edge_2]
 - A selector says where, not what: confirm before changing geometry. Resolve it
   and print small QL facts (count, a measurement) per the global rules. If it
   matches nothing the person's model changed since the pick: ask them to pick
-  again rather than guessing.
+  again rather than guessing. (Unattended: no selection will arrive; derive the selector from the task's evidence, print
+  its card, and record it in the report.)
 - Do not rename `selected_*` variables or delete the cell; the editor finds it
   again by its first line. When the person is done with the selection, they
   clear it themselves.
@@ -140,7 +148,7 @@ selected_item = [selected_edge_1, selected_edge_2]
    name. Keep one feature per cell; give it a feature header.
 4. Save the file. The editor shows the change (cells you edited show `stale`
    until run). Ask the person to run it, or run `sca run <notebook>` yourself
-   to check the model builds, and read the errors.
+   to check the model builds, and read the errors. (Unattended: always `sca run`.)
 
 ## Cell references
 
@@ -189,12 +197,36 @@ Errors there are the same errors `sca snapshot` reports per cell. A module that
 does not compile is reported as `setup failed` with the file and line; fix that
 file first, since every cell is blocked until it compiles.
 
+## When a step fails: the model before it
+
+A cell that fails (a parameter change that breaks a fillet, an edit) leaves no
+values, and the cells after it do not run, so the product is not made. The
+viewport then shows **the model before the failing step**, not the last model
+that built: for a part notebook the open bodies of the cells that are left (the
+body the failing feature was applied to); for an assembly built up over cells,
+the assembly before the failing cell. A red notice in the viewport says which
+step failed and why, and the snapshot carries it as `partial`:
+`{failed: [{cell, name, status, error}], skipped: [cell ids that did not run],
+shown: [bodies on screen]}` (`null` when the model is whole). Fix the failing
+cell; the whole model replaces it. When nothing before the failing cell makes a
+model (a broken params cell, an assembly made in one cell), the last model stays
+on screen and the error names the failing cell. Exports never use a partial
+model: they fail until the cell is fixed.
+
+## Features the person made with buttons
+
+Cells with a `# gui:` line, the `sca feature` / `sca sketch` commands, sketches, workplanes and `scad.ref` selections
+made in the editor: read `editor-gui-features.md`.
+
 ## Rules of thumb
 
 - Re-read the cell before editing (`sca cell get`, or the file): the person edits and
   autosaves too, and the editor rewrites the selection cell.
 - Edit by cell, with `sca cell`. A change that touches many cells at once makes the person's
   screen reflow and loses their place.
+- A notebook the person deletes in the workspace tab (manual or code mode) is moved to
+  `<workspace>/.sca-editor/trash/<time>-<name>.py`, not erased; the open one is closed by opening another
+  first. Look there before recreating a notebook the person says they lost.
 - New notebooks: `sca new`, not a bare file write plus a request to refresh; the editor
   lists a new file by itself either way.
 - After an edit, say which cells you changed (by reference) and what to look

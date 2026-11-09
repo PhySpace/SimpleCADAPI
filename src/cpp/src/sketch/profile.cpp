@@ -280,18 +280,13 @@ std::vector<SketchProfile> sketch_profiles(const Sketch& sketch, const SketchSol
 
 SketchProfile select_sketch_profile(const Sketch& sketch, const SketchProfileId& profile,
                                     const SketchSolveResult& result, bool require_closed) {
+  // The index is the one inspect_sketch_rsketchprofiles lists (open chains included), for a face as for a wire.
   std::vector<SketchProfile> profiles = sketch_profiles(sketch, result);
-  if (require_closed) {
-    std::vector<SketchProfile> closed;
-    for (SketchProfile& item : profiles) {
-      if (item.closed)
-        closed.push_back(std::move(item));
-    }
-    if (closed.empty()) {
-      throw ValueError("Sketch contains no closed profile; face promotion requires a closed loop. Components: " +
-                       join(describe_edge_components(sketch), "; "));
-    }
-    profiles = std::move(closed);
+  const bool any_closed =
+      std::any_of(profiles.begin(), profiles.end(), [](const SketchProfile& p) { return p.closed; });
+  if (require_closed && !any_closed) {
+    throw ValueError("Sketch contains no closed profile; face promotion requires a closed loop. Components: " +
+                     join(describe_edge_components(sketch), "; "));
   }
   if (profiles.empty()) {
     const std::vector<std::string> descriptions = describe_edge_components(sketch);
@@ -299,18 +294,29 @@ SketchProfile select_sketch_profile(const Sketch& sketch, const SketchProfileId&
                                                     : "Components: " + join(descriptions, "; ");
     throw ValueError("Sketch contains no promotable closed loop or open chain. " + detail);
   }
+  std::size_t chosen = profiles.size();
   if (!profile.is_index()) {
-    for (SketchProfile& item : profiles) {
-      if (item.id == profile.id())
-        return std::move(item);
-    }
-    throw ValueError("Unknown sketch profile '" + profile.id() + "'");
+    for (std::size_t i = 0; i < profiles.size(); ++i)
+      if (profiles[i].id == profile.id())
+        chosen = i;
+    if (chosen == profiles.size())
+      throw ValueError("Unknown sketch profile '" + profile.id() + "'");
+  } else {
+    const int index = profile.index();
+    if (index < 0 || index >= static_cast<int>(profiles.size()))
+      throw ValueError("Sketch profile index " + std::to_string(index) + " is out of range (the sketch has " +
+                       std::to_string(profiles.size()) + " profiles, inspect_sketch_rsketchprofiles lists them)");
+    chosen = static_cast<std::size_t>(index);
   }
-  const int index = profile.index();
-  if (index < 0 || index >= static_cast<int>(profiles.size())) {
-    throw ValueError("Sketch profile index " + std::to_string(index) + " is out of range");
+  if (require_closed && !profiles[chosen].closed) {
+    std::vector<std::string> closed;
+    for (std::size_t i = 0; i < profiles.size(); ++i)
+      if (profiles[i].closed)
+        closed.push_back(std::to_string(i));
+    throw ValueError("Sketch profile " + profile.to_value().dump() + " ('" + profiles[chosen].id +
+                     "') is an open chain: a face needs a closed one (closed profiles: " + join(closed, ", ") + ")");
   }
-  return std::move(profiles[static_cast<std::size_t>(index)]);
+  return std::move(profiles[chosen]);
 }
 
 }  // namespace scad

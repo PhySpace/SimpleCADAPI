@@ -4,6 +4,8 @@ Author, install, and manage SimpleCADAPI addons: third-party packages that
 add non-modeling capabilities — simulation, analysis, downstream tooling —
 by consuming `.scadpkg` product packages.
 
+**Read when:** you create, publish, install, update or remove a SimpleCADAPI addon (`sca-addon.toml`), or decide whether a capability is an addon or SDK work.
+
 ## Use when
 
 - Creating or publishing an addon (a repository with `sca-addon.toml` and

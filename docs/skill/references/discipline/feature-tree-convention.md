@@ -1,5 +1,7 @@
 # Discipline: Feature Tree Convention (FTC)
 
+**Read when:** you author or edit any part source (every workflow): what a feature block is, its header and name.
+
 Part sources are block-structured feature chains: every block is one feature
 in the sense of a commercial CAD feature tree (Onshape / SolidWorks /
 Fusion 360), readable by humans and LLMs, and translatable by the package
@@ -7,9 +9,8 @@ translators. This convention is mandatory for every part source authored in
 any workflow.
 
 A model is a marimo notebook (`docs/guides/notebook-runtime.md`), and each
-block is one cell of it: the cell is the unit the runtime caches and re-runs,
-so one feature per cell makes an edit re-run that feature and its downstream
-features only.
+block is one cell of it. Why the cell is the unit, and where cell boundaries go,
+is in `notebook-cell-design.md` (rule C1 and the facts it rests on).
 
 ## The paradigm
 
@@ -113,36 +114,22 @@ design parameters) stay in the source; geometric verification never does
 
 ## Blocks are cells
 
-In a notebook every block is one `@app.cell`. This section is the structure;
-`notebook-cell-design.md` gives the rules for where boundaries go, when a number
-is a `Var`, and the reason for each (read it too):
+In a notebook every block is one `@app.cell`. This section owns what a block
+looks like inside its cell (header and name); `notebook-cell-design.md` owns the
+rest, each rule with its reason: one feature per cell (C1) and when cells may
+merge (C4), `_private` temporaries (C5), the parameters cell (C8), the product
+cell (C9), local-module imports (C12). Read it too.
 
 - The block header is the first line of the cell body.
 - The cell returns the body under the block's slug in snake_case
   (`base-plate` → `base_plate`), and the next block reads that name. The
   variable names then spell the feature tree, and an override
-  (`sca run --set`) or a failure points at one feature.
-- Each block binds a new name because marimo gives every top-level
-  variable exactly one defining cell: that is how it orders cells by data
-  dependency and keys each cell's cache by the values it reads. Rebinding
-  `body` in a second cell is a multiple-definition error.
-- Tools, profiles, and other temporaries are cell-local: prefix them with
-  `_` (`_pockets = ...`) so marimo keeps them out of the notebook's
-  namespace.
-- Several small blocks that always change together may share one cell,
-  rebinding the body inside it; the cell returns the body under the last
-  block's slug. They are then cached and re-run as one unit, so keep this
-  the exception.
-- Parameters live in their own cell(s) at the top (`# ---- params ----`),
-  grouped by what is overridden together: an override replaces every
-  variable of its cell. A trailing `# ui: slider(min, max, step=, unit=,
-  label=)` comment (or `number(...)`, `toggle()`) on a parameter's line
-  chooses the control an editor offers; see the notebook runtime guide. The product — the `Part` or `Assembly` whose id is
-  the notebook id — is made in the last cell. A notebook that describes a part family names the
-  product `scad.notebook_id()`, and each use gives the member its id
+  (`sca run --set`) or a failure points at one feature. (Each block binds a new
+  name because a notebook name has one defining cell: `notebook-cell-design.md`,
+  fact 3.)
+- A notebook that describes a part family names the product
+  `scad.notebook_id()`, and each use gives the member its id
   (`scad.use("link_bar.py", id="crank", ...)`).
-- Imports from local modules go in the cell that uses them, or in the setup
-  cell; either way, editing the module invalidates the notebook's cache.
 
 ## Library parts: the `@scad.part` decorator
 
@@ -162,8 +149,8 @@ the source itself:
 - `tolerance_profile` — kernel tolerance fingerprint (default
   `'simplecad-default'`).
 
-A builder never caches; each call builds afresh. Inside a notebook the
-calling cell is cached, and editing the module invalidates it.
+A builder never caches; each call builds afresh. How the calling cell is cached
+is in `docs/guides/notebook-composition-and-cache.md`.
 
 **Delivered sources state the anchor explicitly.** A translator-emitted
 or standalone `.ftc.py` passes `project_root=Path(__file__).parent`

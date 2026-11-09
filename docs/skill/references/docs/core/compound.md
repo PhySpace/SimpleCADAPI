@@ -19,4 +19,7 @@ Use `Compound` when a workflow intentionally needs a flattened geometry
 projection. Do not use it as a substitute for `Assembly` product structure.
 
 For normal part modeling, keep using `Solid` as the body-level geometry. A
-single-body `Part` wraps exactly one `Solid`.
+`Part` wraps one `Solid`, or several named bodies (`Part.bodies`), each its own
+`Solid`. A `Compound` built from solids does not keep their tags, so it is not
+a way to hold the bodies of a part (`scad.part_shape(part)` gives that view for
+geometry-only use).

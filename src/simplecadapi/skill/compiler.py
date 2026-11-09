@@ -133,6 +133,7 @@ class SkillProject:
     source: Path
     targets: tuple[str, ...]
     outputs: dict
+    lint: bool = False  # [lint] enabled = true: --check also enforces the structure contract
 
 
 @dataclass(frozen=True)
@@ -203,7 +204,9 @@ def load_project(root: Path) -> SkillProject:
         outputs[target] = (root / entry).resolve()
 
     _validate_output_paths(root.resolve(), source, outputs)
-    return SkillProject(root.resolve(), name, source, tuple(targets), outputs)
+    lint_table = data.get("lint", {})
+    lint_on = isinstance(lint_table, dict) and lint_table.get("enabled") is True
+    return SkillProject(root.resolve(), name, source, tuple(targets), outputs, lint_on)
 
 
 def _validate_output_paths(root: Path, source: Path, outputs: dict) -> None:
@@ -426,6 +429,11 @@ def main(argv=None) -> int:
         action="store_true",
         help="validate the tree without writing outputs",
     )
+    parser.add_argument(
+        "--read-budget",
+        action="store_true",
+        help="print the compiled size of each route's first read batch and exit",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -434,7 +442,20 @@ def main(argv=None) -> int:
         source_files = collect_source_files(
             project.source, frozenset(project.targets), project.root
         )
+        if args.read_budget:
+            from .lint import read_budget_report
+
+            print("\n".join(read_budget_report(project, source_files)))
+            return 0
         if args.check:
+            from .lint import lint
+
+            problems = lint(project, source_files) if project.lint else []
+            if problems:
+                for problem in problems:
+                    print(f"skill lint: {problem}", file=sys.stderr)
+                print(f"error: {len(problems)} skill lint problem(s)", file=sys.stderr)
+                return 1
             conditional = sum(1 for entry in source_files if entry.blocks)
             print(
                 f"OK: {len(source_files)} files, {conditional} with conditional "

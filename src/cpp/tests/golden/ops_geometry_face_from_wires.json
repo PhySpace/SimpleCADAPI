@@ -41,7 +41,7 @@
       "The inner wires are not contained by the outer wire or are geometrically invalid.",
       "The kernel rejected the multi-loop face definition."
     ],
-    "technical_details": "ValueError: inner_wires must contain only Wire objects",
+    "technical_details": "ValueError: inner wires must be closed",
     "what_happened": "Failed to create a face from the input outer and inner wires."
   },
   "inner_open": {
@@ -99,7 +99,7 @@
       "The inner wires are not contained by the outer wire or are geometrically invalid.",
       "The kernel rejected the multi-loop face definition."
     ],
-    "technical_details": "ValueError: outer_wire must be a Wire",
+    "technical_details": "ValueError: outer_wire must be closed",
     "what_happened": "Failed to create a face from the input outer and inner wires."
   },
   "outer_open": {

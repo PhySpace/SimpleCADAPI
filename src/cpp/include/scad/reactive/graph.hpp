@@ -152,7 +152,8 @@ class OperationGraph {
   // ---- serialization (OperationGraph.to_dict / from_dict) --------------------
   Value to_value() const;
   std::string to_json(int indent = 2) const;
-  // Restores nodes and edges; topology/semantic deltas are not restored.
+  // Restores nodes and edges, with their topology and semantic deltas (what stable references and the tag view
+  // read on a restored cell).
   // `expressions` / `frames`, when given, are what the nodes' expression and frame records are
   // looked up in (a restored node carries the expressions its parameters refer to, and its frame).
   static OperationGraph from_value(const Value& payload, bool strict = true,

@@ -47,10 +47,15 @@ def lineage_of(value: Any) -> Optional[Tuple[str, str]]:
     return graph_id, node_id
 
 
+_PRODUCT_KINDS = frozenset({"Part", "Assembly", "Component", "Connector"})
+"""The product values whose children :func:`_children` lists (not walked as plain dataclasses)."""
+
+
 def _children(item: Any) -> Iterable[Any]:
     kind = type(item).__name__
     if kind == "Part":
-        yield item.body
+        for body in item.bodies:  # one Solid, or every body of a multi-body part
+            yield body.solid
         yield from item.connectors
         if item.material is not None:
             yield item.material
@@ -85,7 +90,9 @@ def walk_values(value: Any, *, deep: bool, seen: Optional[Set[int]] = None) -> I
         for item in value:
             yield from walk_values(item, deep=deep, seen=seen)
     elif deep:
-        if dataclasses.is_dataclass(value) and not isinstance(value, type):  # a result wrapped in the caller's own dataclass
+        # a result wrapped in the caller's own dataclass (the product values have their own children: a multi-body Part's
+        # `body` field refuses to name one body)
+        if dataclasses.is_dataclass(value) and not isinstance(value, type) and type(value).__name__ not in _PRODUCT_KINDS:
             for field in dataclasses.fields(value):
                 if not field.name.startswith("_"):
                     yield from walk_values(getattr(value, field.name), deep=True, seen=seen)
@@ -457,14 +464,25 @@ def _frame(node_id: str) -> Any:
     )
 
 
-def _context() -> Dict[str, Any]:
+def _context(session: Any = None) -> Dict[str, Any]:
     cs = _n.get_current_cs()
-    return {
+    out: Dict[str, Any] = {
         "origin": tuple(float(v) for v in cs.origin),
         "x_axis": tuple(float(v) for v in cs.x_axis),
         "y_axis": tuple(float(v) for v in cs.y_axis),
         "z_axis": tuple(float(v) for v in cs.z_axis),
     }
+    # Inside `with wp:` of a recorded workplane: its node, as the C++ recorder writes it (a replay takes the frame
+    # from the replayed workplane).
+    source = _n.get_current_frame_source()
+    if source is not None and session is not None:
+        try:
+            node = session._node_of(source["graph_id"], source["node_id"])
+        except ValueError:
+            node = None
+        if node is not None:
+            out["workplane"] = {"node_id": node.node_id, "output_slot": int(source["output_slot"])}
+    return out
 
 
 def record_operation_if_active(
@@ -503,7 +521,7 @@ def record_operation_if_active(
         node_id=node_id,
         output_count=1 if outputs is None else len(output_list),  # a value op holds one output; an empty list result none
         semantic_delta=semantic_delta,
-        context=context or _context(),
+        context=context or _context(session),
         tags=tags,
         source=(source if source is not None else capture_source_provenance()),
         expressions=_n.referenced_expressions(exprs, session.expression_graph),
@@ -580,6 +598,7 @@ _PRODUCT_OPS = (
     "make_vertex_connector_rconnector",
     "make_placement_connector_rconnector",
     "add_connector_rpart",
+    "set_body_appearance_rpart",
     "set_public_connector_rassembly",
     "make_connector_ref_rconnectorref",
     "make_scalar_limit_rscalarlimit",

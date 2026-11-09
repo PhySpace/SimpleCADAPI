@@ -6,7 +6,10 @@
   session allocates, and it names the cell in recorded source positions.
   It follows the code rather than marimo's cell id because the cell cache
   is keyed by code too: node ids restored from the cache can never collide
-  with ids another cell allocates.
+  with ids another cell allocates.  A feature cell (``# ---- feature: <slug>``)
+  puts its slug first, ``<slug>.c<hex>``: the part before the dot is the
+  *feature* a stable reference names its nodes by (``simplecadapi.ref``), so
+  a reference into the cell survives every edit of its code.
 * **Source lookup.** :class:`NotebookCells` implements
   :class:`~simplecadapi.recording.source_mapping.CellSourceMap`: it maps a
   frame's compile filename and line to the cell code running there, and a
@@ -19,6 +22,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
@@ -35,6 +39,15 @@ from ._marimo import (
 )
 
 
+_FEATURE_SLUG = re.compile(r"^#\s*-{2,}\s*feature:\s*(?P<slug>[A-Za-z][A-Za-z0-9_]*)[\s(-]", re.MULTILINE)
+
+
+def feature_of_key(key: str) -> str:
+    """The feature a cell key stands for: the slug of a feature cell, else the key itself."""
+
+    return key.split(".", 1)[0]
+
+
 def cell_keys(codes: Iterable[str]) -> list[str]:
     """Return the key of each cell, given the cells' code in notebook order."""
 
@@ -42,6 +55,9 @@ def cell_keys(codes: Iterable[str]) -> list[str]:
     keys: list[str] = []
     for code in codes:
         digest = "c" + hashlib.sha256(code.strip().encode("utf-8")).hexdigest()[:8]
+        feature = _FEATURE_SLUG.search(code)
+        if feature is not None:
+            digest = f"{feature.group('slug')}.{digest}"
         seen[digest] += 1
         keys.append(digest if seen[digest] == 1 else f"{digest}_{seen[digest]}")
     return keys

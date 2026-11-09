@@ -21,6 +21,7 @@ from typing import Any, Dict, Tuple
 # class name -> (constructor parameter names, has state dictionaries)
 _VALUES: Dict[str, bool] = {
     "Part": True,
+    "Body": False,
     "Assembly": True,
     "Placement": True,
     "Material": True,
@@ -93,9 +94,30 @@ def _token_for(key: str, item: Any) -> str:
     return f"{_TOKEN}{key}:{id(item):x}"
 
 
+def _plain_body(part: Any) -> bool:
+    """A one-body Part whose body is just its Solid: no name, colour or opacity, and the default id."""
+
+    if part.multi_body:
+        return False
+    body = part.bodies[0]
+    return body.body_id == "body" and body.name is None and body.color is None and body.opacity is None
+
+
+# Constructor arguments that are not read back by the attribute of the same name.  A Part holds one ``body`` or
+# several ``bodies``, and is rebuilt from exactly one of them (``Part.body`` raises for a multi-body Part).  A one-body
+# Part whose body carries a name or an appearance is rebuilt from its ``Body`` so they survive.
+_ARGUMENTS: Dict[str, Dict[str, Any]] = {
+    "Part": {
+        "body": lambda value: value.body if _plain_body(value) else None,
+        "bodies": lambda value: None if _plain_body(value) else value.bodies,
+    },
+}
+
+
 def _reduce(has_state: bool, names: Tuple[str, ...]):
     def reduce(value: Any) -> tuple:
-        args = tuple(getattr(value, name) for name in names)
+        readers = _ARGUMENTS.get(type(value).__name__, {})
+        args = tuple(readers[name](value) if name in readers else getattr(value, name) for name in names)
         state = None
         if has_state:
             runtime = value._runtime_dict()

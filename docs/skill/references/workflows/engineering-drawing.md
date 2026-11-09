@@ -77,12 +77,22 @@ this gate closes.
    defaults first (`domains/requirement-refinement.md`). Record the rest in
    the Ask-or-Record ledger with basis.
 
+   **Unattended:** no ask round. Decide each drawing-level choice from the
+   model's facts (the conservative default of `domains/requirement-refinement.md`
+   when the evidence ties) and record it in the assumption ledger inside
+   `DRAWING.md`: `value / evidence / how to change it / the check that would show it wrong`.
+
 Write `DRAWING.md` with: scale; per-sheet view roster; datum scheme;
 dimension roster seeds (parameter → kind/semantic guess); R5 ledger skeleton
 (every parameter → dimension carrier or notes/table); open assumptions.
 
 Gate: the ask round returned and consent is recorded. Entering Role 2
 without this gate is the cardinal violation.
+
+**Unattended:** the gate is a self-review. Re-read `DRAWING.md` against the
+request and the model's facts, write one paragraph of decision with the open
+risks, and go on only when every required field is filled (a recorded
+assumption fills a field; an empty one does not).
 
 ## Role 2 — Sheet Planner
 
@@ -149,6 +159,11 @@ Rendered-PNG-only judgment, delegated in the same spirit as image verdicts
 in `workflows/single-part-modeling.md`: the reviewer sees the artifacts, not
 the reasoning.
 
+**Unattended:** a fresh-context check of your own replaces the delegated
+reviewer (a subagent if the host offers one): it reads only the PNG and the
+check list below, and its structured verdict quotes what it observed per item.
+The report says the review was not independent.
+
 1. Read the PNG rendered from the final DXF (both sheets if multiple).
 2. Check, in order: views aligned as planned; hidden lines (虚线) and center
    lines present; arrows touch their geometry; texts sit clear of lines;
@@ -193,3 +208,35 @@ A failed item becomes a `repair:` item for Role 3. Never patch the DXF.
   linear dims only; radius labels same-side outward): restructure the view
   set or record the limitation; do not simulate missing features with
   leader-note spam.
+
+## Read now (one parallel batch)
+
+| File | Why |
+| --- | --- |
+| `workflows/engineering-drawing.md` | standing discipline, role map, Role 1 (this page) |
+| `domains/engineering-drawing.md` | solver rules and engine boundaries; this workflow does not repeat them |
+| `domains/requirement-refinement.md` | Role 1 decides or asks the drawing-level choices |
+
+## Read when
+
+| When | File |
+| --- | --- |
+| Role 2 fixes the datum scheme | `discipline/datums-and-coordinate-systems.md` |
+| the model's requirements or build plan exist | `domains/part-modeling.md` |
+| Role 4 compares with the image-verdict practice | `workflows/single-part-modeling.md` |
+| any part source is authored or edited to make geometry final | `discipline/feature-tree-convention.md` |
+| a sheet fails twice for the same cause | `discipline/failure-and-repair.md` |
+
+## Unattended mode
+
+Decide the mode first (`discipline/operating-modes.md`). In unattended mode never ask; a gate still binds its artifact
+(`DRAWING.md`, a solver-clean `report()`, a written verdict) and the result goes into `report.md`.
+
+| Interactive gate | Unattended replacement |
+| --- | --- |
+| Role map and Role 1 consent gate (⛔ user consent received) | Self-review gate on `DRAWING.md`: one paragraph of decision with open risks, every required field filled |
+| Role 1 step 2 decide-or-ask (scale, views, datums, critical parameters, notes/table split) | Decide from the model's facts and record each in the assumption ledger |
+| Role 1 step 3 one batched ask round | No ask round; ledger rows with evidence, how to change, and the check that would show it wrong |
+| Missing or unvalidated model geometry on entry | Record the blocker in the report, do the work the available evidence supports, never invent geometry or parameters |
+| Role 4 delegated visual review of the PNG | Fresh-context check against the written list, quoted observations, listed as not independent in the report |
+| Role 2 plan presented (no approval gate) | No change |

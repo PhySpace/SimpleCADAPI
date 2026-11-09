@@ -178,7 +178,7 @@ std::vector<Shape> ShapeSelector::resolve_with(const Scope& scope, const EvalCon
 }
 
 std::vector<Shape> ShapeSelector::resolve(const Scope& scope) const {
-  const EvalContext ctx;
+  const EvalContext ctx(scope);
   return resolve_with(scope, ctx);
 }
 

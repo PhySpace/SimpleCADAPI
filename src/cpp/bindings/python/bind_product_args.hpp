@@ -52,6 +52,47 @@ inline sp::OptionalString optional_name(const py::object& value) {
   return py::str(value).cast<std::string>();
 }
 
+// True for a list or tuple of Solids: the pieces of a cut that split a body.
+inline bool is_pieces(const py::object& value) {
+  return (py::isinstance<py::list>(value) || py::isinstance<py::tuple>(value)) && py::len(value) > 0 &&
+         py::isinstance<Solid>(py::reinterpret_borrow<py::object>(value[py::int_(0)]));
+}
+
+// One mapping entry: a Solid is one body; the pieces of a split cut are bodies <id>_1 .. <id>_n (one piece keeps <id>).
+inline void add_bodies(std::vector<sp::Body>& out, const std::string& body_id, const py::object& value) {
+  if (!is_pieces(value)) {
+    out.emplace_back(body_id, typed<Solid>(value, "bodies values must be Solids or lists of Solids"));
+    return;
+  }
+  const py::sequence pieces = py::reinterpret_borrow<py::sequence>(value);
+  const std::size_t count = pieces.size();
+  for (std::size_t index = 0; index < count; ++index) {
+    out.emplace_back(count == 1 ? body_id : body_id + "_" + std::to_string(index + 1),
+                     typed<Solid>(py::reinterpret_borrow<py::object>(pieces[index]),
+                                  "bodies values must be Solids or lists of Solids"));
+  }
+}
+
+// The bodies of a multi-body Part: a mapping body_id -> Solid or pieces (in its order), or a sequence of Body values.
+inline std::vector<sp::Body> body_list(const py::object& value) {
+  std::vector<sp::Body> out;
+  if (py::isinstance<py::dict>(value) || py::hasattr(value, "items")) {
+    for (const py::handle item : value.attr("items")()) {
+      const py::tuple pair = py::reinterpret_borrow<py::tuple>(item);
+      add_bodies(out, text(py::reinterpret_borrow<py::object>(pair[0]), "body_id"),
+                 py::reinterpret_borrow<py::object>(pair[1]));
+    }
+    return out;
+  }
+  if (py::isinstance<py::str>(value) || !py::isinstance<py::sequence>(value))
+    throw scad::TypeError("bodies must be a mapping body_id -> Solid or a sequence of Body values");
+  for (const py::handle item : value) {
+    out.push_back(typed<sp::Body>(py::reinterpret_borrow<py::object>(item),
+                                  "bodies must be a mapping body_id -> Solid or a sequence of Body values"));
+  }
+  return out;
+}
+
 inline scad::Scalar scalar(const py::object& value, const char* field) {
   try {
     return value.cast<scad::Scalar>();

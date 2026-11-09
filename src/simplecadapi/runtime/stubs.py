@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Any
 
 from simplecadapi._cpp import Const, Expr, Var
+from .._glue.pieces import Pieces
 from ..params.expr import ScalarExprBase, _expr_signature
 from ._marimo import CustomStub, register_stub
 
@@ -45,6 +46,30 @@ def register_scalar_stubs() -> None:
         register_stub(kind, ScalarExprStub)
 
 
+class PiecesStub(CustomStub):
+    """Stands for the pieces of a split body (``scad.Pieces``) in a stored entry.
+
+    marimo copies every list a cell defines into a plain ``list`` before it stores it, so the pieces would come back
+    as a list of tools (``cut_rsolid([a, b])`` is ``a - b``) instead of pieces an operation applies to one by one.
+    :class:`~simplecadapi.runtime.cache.CellCache` stores them in this stub, which marimo keeps as it is.
+    """
+
+    __slots__ = ("pieces",)
+
+    def __init__(self, obj: Any) -> None:
+        self.pieces = list(obj)
+
+    def load(self, glbls: dict[str, Any]) -> Any:
+        return Pieces(self.pieces)
+
+    @staticmethod
+    def get_type() -> type:
+        return Pieces
+
+    def to_bytes(self) -> bytes:
+        return repr([getattr(piece, "content_hash", id(piece)) for piece in self.pieces]).encode("utf-8")
+
+
 register_scalar_stubs()
 
-__all__ = ["ScalarExprStub", "register_scalar_stubs"]
+__all__ = ["PiecesStub", "ScalarExprStub", "register_scalar_stubs"]

@@ -3,6 +3,8 @@
 Deterministic checks decide pass/fail; scale them to the specification. Every
 user-specified dimension requires a targeted measurement.
 
+**Read when:** you write or run checks on a model: validity and volume gates, selection evidence before a fillet or chamfer, spec-driven measurements, replay, or what to report as having run.
+
 ## Evidence labels
 
 - **SDK contract:** `Solid.get_volume()` returns a volume measurement;
@@ -51,8 +53,10 @@ review.
   picks are preserved as graph geo-select nodes.
 - `apply_tag(shape=..., tag=...)` attaches a tag to exactly the given shape
   with LOCAL scope — it never propagates downward; `list_tags(shape=...)`
-  reads effective tags. Downward/topology-scoped propagation is only exposed
-  by `apply_tag_rselection` with an explicit propagation policy. Keep numeric
+  reads effective tags, which include the tags the recorded history carries
+  to the entity (a tagged face stays tagged through later booleans, blends
+  and copies). Downward/topology-scoped propagation is only exposed by
+  `apply_tag_rselection` with an explicit propagation policy. Keep numeric
   facts in metadata, never in tags.
 - A QL-selected face or edge reused by a later feature is preserved as a
   stable geo-select node in replayable graphs.
@@ -133,6 +137,8 @@ check.
 3. A failed check closes by changing the design, or by changing the
    check's definition with the user — never by weakening the check or
    deleting the interfering material out of the verification body.
+   **Unattended:** redefine the check yourself, in the open: write the old and the new definition and why in the
+   report (`discipline/operating-modes.md`), and never weaken it silently.
 4. Convert review feedback into a predicate before implementing it:
    "it occludes the hole in the render" -> does measured material
    intersect the hole cylinder? Run the cheap experiment that

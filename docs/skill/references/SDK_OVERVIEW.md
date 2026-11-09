@@ -1,12 +1,12 @@
 # SDK Overview
 
 - Project: `simplecadapi`
-- Version: `2.0.4b3`
-- Package distribution: `simplecadapi==2.0.4b3`
+- Version: `2.2.8`
+- Package distribution: `simplecadapi==2.2.8`
 
 ## What this skill bundles
 
-- Task router (`SKILL.md`) with six workflows
+- Task router (`SKILL.md`) with seven workflows (including unattended mode)
 - Capability domains (`references/domains/`)
 - Modeling discipline (`references/discipline/`)
 - Generated API/stdlib/core references (`references/docs/`)
@@ -31,3 +31,18 @@
 - Record modeling steps inside `GraphSession` when you need replayable outputs.
 - Export session/model payloads with `export_session_json()` and `export_model_json()`.
 - Re-import or replay with `import_model_json()` and `replay_model_json()`.
+
+## Example SDK usage
+
+```python
+import simplecadapi as scad
+from simplecadapi import GraphSession, export_model_json, replay_model_json
+
+with GraphSession(graph_id="box") as session:
+    shape = scad.make_box_rsolid(width=10.0, height=20.0, depth=30.0)
+    session.capture_result(value=shape)
+    payload = export_model_json(session=session)
+
+rebuilt = replay_model_json(json_str=payload)
+print(len(rebuilt))
+```

@@ -316,6 +316,9 @@ void bind_predicate(py::module_& q) {
           },
           py::arg("obj"))
       .def("to_dict", [](const ql::Predicate& p) { return dict_of(p.to_value()); })
+      // pickle / copy: the dict form is the whole state (marimo's cell cache pickles every returned value).
+      .def(py::pickle([](const ql::Predicate& p) { return dict_of(p.to_value()); },
+                      [](const py::dict& state) { return ql::Predicate::from_value(state.cast<Value>()); }))
       .def_static(
           "from_dict", [](const Value& payload) { return ql::Predicate::from_value(payload); }, py::arg("data"))
       .def(
@@ -350,6 +353,8 @@ void bind_predicate(py::module_& q) {
           },
           py::arg("obj"))
       .def("to_dict", [](const ql::Key& k) { return dict_of(k.to_value()); })
+      .def(py::pickle([](const ql::Key& k) { return dict_of(k.to_value()); },
+                      [](const py::dict& state) { return ql::Key::from_value(state.cast<Value>()); }))
       .def_static(
           "from_dict", [](const Value& payload) { return ql::Key::from_value(payload); }, py::arg("data"))
       .def(
@@ -363,6 +368,8 @@ void bind_predicate(py::module_& q) {
       .def(py::init([](const std::string& relation) { return ql::TraversalSpec{relation}; }), py::arg("relation"))
       .def_readonly("relation", &ql::TraversalSpec::relation)
       .def("to_dict", [](const ql::TraversalSpec& t) { return dict_of(t.to_value()); })
+      .def(py::pickle([](const ql::TraversalSpec& t) { return dict_of(t.to_value()); },
+                      [](const py::dict& state) { return ql::TraversalSpec::from_value(state.cast<Value>()); }))
       .def_static(
           "from_dict", [](const Value& payload) { return ql::TraversalSpec::from_value(payload); }, py::arg("data"))
       .def("__eq__", [](const ql::TraversalSpec& a, const ql::TraversalSpec& b) { return a == b; }, py::is_operator());
@@ -454,6 +461,9 @@ void bind_factories(py::module_& q) {
       },
       py::arg("topo_id"), "Match a projected local binding by its exact source topology identity.");
   q.def("role", [](const std::string& role_name) { return ql::role(role_name); }, py::arg("role_name"));
+  q.def(
+      "_ref", [](const Value& record) { return ql::ref(record); }, py::arg("record"),
+      "The predicate of a reference record (ElementRef.to_dict()); simplecadapi.ql.ref is the public spelling.");
 
   q.def(
       "register_property_resolver",
@@ -646,6 +656,9 @@ void bind_selector(py::module_& q) {
           },
           py::arg("scope"), "The shapes this query picks inside `scope` (a shape or a list of shapes).")
       .def("to_dict", [](const ql::ShapeSelector& s) { return dict_of(s.to_value()); })
+      // pickle / copy: the dict form is the whole state (marimo's cell cache pickles every returned value).
+      .def(py::pickle([](const ql::ShapeSelector& s) { return dict_of(s.to_value()); },
+                      [](const py::dict& state) { return ql::ShapeSelector::from_value(state.cast<Value>()); }))
       .def_static(
           "from_dict", [](const Value& payload) { return ql::ShapeSelector::from_value(payload); }, py::arg("data"))
       .def(
@@ -702,6 +715,33 @@ void bind_hooks_and_testing(py::module_& q) {
       py::arg("provider"),
       "Install provider(scope, matched, target_kind, dedup_key, near_misses) -> list of evidence dicts; it "
       "attaches rendered views to cardinality errors.  None removes it.");
+
+  q.def(
+      "_set_reference_resolver",
+      [](const py::object& resolver) {
+        if (resolver.is_none()) {
+          ql::set_reference_resolver({});
+          return;
+        }
+        const auto callable = std::make_shared<PyCallable>(resolver);
+        ql::set_reference_resolver([callable](const Shape& scope, const Value& record) {
+          const py::gil_scoped_acquire gil;
+          py::object found;
+          try {
+            found = callable->get()(shape_to_py(scope), value_to_python(record));
+          } catch (py::error_already_set& error) {
+            // ElementRefError (a split or lost reference) reaches the caller as itself, through any operation.
+            scad::pybind::rethrow_python_through_cpp(error);
+          }
+          std::vector<Shape> out;
+          for (const py::handle item : found)
+            out.push_back(item.cast<Shape>());
+          return out;
+        });
+      },
+      py::arg("resolver"),
+      "Install resolver(scope, record) -> the entities of scope a reference record names (it raises for a split or "
+      "lost reference); ql.ref predicates ask it once per reference per query run.  None removes it.");
 
   py::module_ testing = q.def_submodule("_testing", "raw-OCCT shapes for the QL tests (the operators live elsewhere)");
   testing.def("box_at", &box_at, py::arg("origin"), py::arg("dx"), py::arg("dy"), py::arg("dz"));

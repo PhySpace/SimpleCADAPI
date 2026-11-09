@@ -12,7 +12,7 @@ notebook file stays the only source of truth.
 
 from .config import NotebookConfig, NotebookConfigError
 from .executor import UnboundRequirementError, notebook_id
-from .projection import ProductNotFoundError
+from .projection import NoProductYetError, ProductNotFoundError
 from .runner import CellReport, CellStatus, NotebookRun, run_notebook, use
 
 __all__ = [
@@ -21,6 +21,7 @@ __all__ = [
     "NotebookConfig",
     "NotebookConfigError",
     "NotebookRun",
+    "NoProductYetError",
     "ProductNotFoundError",
     "UnboundRequirementError",
     "notebook_id",

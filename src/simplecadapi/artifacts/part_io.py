@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .brep import read_brep_solid
+from .brep import read_brep_shape, read_brep_solid
 from .canonical import ArtifactValidationError
 from .part_definition import (
     PartDefinition,
@@ -64,6 +64,9 @@ def load_part_definition(
     material_ref = manifest["material_ref"]
     if material_ref is not None:
         expected_paths.add(str(material_ref["path"]))
+    for body in manifest["solid_cache"].get("bodies") or ():  # a multi-body part: each body's BRep and snapshot
+        expected_paths.add(str(body["body_ref"]["path"]))
+        expected_paths.add(str(body["topology_snapshot_ref"]["path"]))
     expected_members = {
         _PART_DEFINITION_MANIFEST,
         *(_BLOB_PREFIX + path for path in expected_paths),
@@ -90,18 +93,42 @@ def load_part_definition(
             "/definition/feature_graph_ref",
             "feature graph owner differs from PartDefinition identity",
         )
-    body = read_brep_solid(definition.blobs[definition.solid_cache_ref.path])
-    restore_topology_snapshot(
-        body,
-        definition.blobs[definition.topology_snapshot_ref.path],
-    )
-    validate_connector_entity_bindings(body, definition.connectors)
+    body = read_part_bodies(definition)
     mark_part_definition_validated(
         definition,
         body=body,
         feature_graph=feature_graph,
     )
     return definition
+
+
+def read_part_bodies(definition: PartDefinition) -> Any:
+    """The Solid of a one-body definition, or the ``Body`` values of a multi-body one, with their semantic state.
+
+    A multi-body definition's ``body_ref`` must be a Compound of exactly as many solids as it lists bodies.
+    """
+
+    if not definition.bodies:
+        body = read_brep_solid(definition.blobs[definition.solid_cache_ref.path])
+        restore_topology_snapshot(body, definition.blobs[definition.topology_snapshot_ref.path])
+        validate_connector_entity_bindings(body, definition.connectors)
+        return body
+    from simplecadapi._cpp import Body
+
+    compound = read_brep_shape(definition.blobs[definition.solid_cache_ref.path])
+    count = len(compound.solids()) if hasattr(compound, "solids") else 1
+    if count != len(definition.bodies):
+        raise ArtifactValidationError(
+            "solid_cardinality_invalid",
+            "/solid_cache/body_ref",
+            f"BRep holds {count} solids, the definition lists {len(definition.bodies)} bodies",
+        )
+    bodies = []
+    for item in definition.bodies:
+        solid = read_brep_solid(definition.blobs[item.body_ref.path])
+        restore_topology_snapshot(solid, definition.blobs[item.topology_snapshot_ref.path])
+        bodies.append(Body(item.body_id, solid, item.name))
+    return tuple(bodies)
 
 
 def export_part_definition(

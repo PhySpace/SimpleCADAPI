@@ -37,33 +37,53 @@ around it as shown.
    session, and the next operation rejects it with "graph node not owned by
    active graph" (same surface message as the timing defect in rule 3).
 
-3. **Tag in time — the tag lands in the step right after the operation
-   that produced the targets.** Projections into later outputs are
-   computed when each operation runs, so a tag that arrives after a
-   later operation has already consumed the shape can never reach
-   anything. Tagging there is rejected with "graph node not owned by
-   active graph" — the message names ownership, but the real defect is
-   timing. When targets only become addressable later, re-derive the
-   selectors from the newest result and tag immediately, before the
-   next operation consumes it (Pattern B tags the seam directly after
-   the union; the bore recipe below tags right after the cut).
+3. **Tag the value you go on with.** A tag reaches the results of the
+   operations that consume the tagged value (the clone
+   `apply_tag_rselection` returns), through their recorded history. A tag
+   applied to a shape an operation has already consumed can never reach
+   that operation's result. Tagging such a stale value is rejected with
+   "graph node not owned by active graph" — the message names ownership,
+   but the real defect is timing. When targets only become addressable
+   later, re-derive the selectors from the newest result and tag that
+   (Pattern B tags the seam directly after the union; the bore recipe
+   below tags right after the cut).
 
 4. **Enumerate with QL, not plural getters.** `ql.edges().resolve(shape)`,
    never bare `get_edges()` (raises by design; enumeration is QL-exclusive).
 
-5. **Pick the naming channel by the reach you need:**
+5. **Tags are a view over recorded history.** Every tag assignment
+   (`apply_tag_rselection`, an op-kwarg tag such as `top_face_tag=`) is a
+   graph node; `ql.tag(...)` on a later shape finds the entities the tagged
+   ones became, through each operation's kernel history, as the tag's
+   lineage policy allows. A tag follows its entity as a reference does: an
+   entity an operation **splits** keeps it on no piece; the pieces carry
+   `<tag>.split1` .. (by centre, then size), reported by `TagSplitWarning`,
+   `sca run` (`tag_splits`), `scad.list_tag_splits(shape)` and the editor's
+   highlight. Tag the pieces later code needs. Verified per family in
+   `test/test_element_ref_history.py` (audit). For one particular entity,
+   prefer a reference (rule 6) over a tag made only to find it again:
 
-   | Channel | Example | Survives boolean | Survives fillet/chamfer |
+   | Channel | Example | Survives boolean | Survives fillet/chamfer, shell, copies, patterns, transform/scale/offset/draft |
    | --- | --- | --- | --- |
-   | op-kwarg role naming | `extrude_rsolid(..., end_face_tag="cap.top")`, `make_box_rsolid(..., top_face_tag="base.top")` | yes (verified) | **no** (face channel gap) |
-   | source-edge naming | `apply_tag_rselection(profile, [edge], "profile.long.a")` → side face; `apply_tag_rselection(result, [seam], "seam.d")` → fillet patch | yes (via kernel images) | **yes** (edge→patch projection) |
+   | op-kwarg role naming | `extrude_rsolid(..., end_face_tag="cap.top")`, `make_box_rsolid(..., top_face_tag="base.top")` | yes | yes |
+   | plain user tag on a face | `apply_tag_rselection(solid, [face], "base.body")` | yes | yes |
+   | source-edge naming | `apply_tag_rselection(profile, [edge], "profile.long.a")` → side face; `apply_tag_rselection(result, [seam], "seam.d")` → fillet patch | yes | yes (the op names the generated face after its edge) |
    | `origin_role("body"/"tool")` | parent argument of a boolean | single-step only | no |
    | `output_role("<slot>")` | `extrusion.end`, `box.top`, `fillet.patch` | single-step only | own op only |
-   | plain user tag on a face | `apply_tag_rselection(solid, [face], "base.body")` | **no** (face-source gate) | **no** |
 
-   "Single-step" means the metadata describes the last operation that touched
-   the shape; the next tracked operation overwrites it. Long-range identity =
-   op-kwarg names (across booleans) and edge-source names (across modifiers).
+   "Single-step": the next tracked operation overwrites it. A tag ends where the history says
+   the entity ends (a face a cut removes, one a fillet's patch replaces, an op without history).
+   `scad.explain_tag(face, tag)` shows the binding and what carried it; scope `lineage` is
+   the carried part alone, `effective` (default) includes it.
+
+6. **A rule is a query; a particular entity is a reference.** `ql` picks
+   whatever matches a rule; `scad.ref` means *this* face, edge or solid through booleans,
+   blends, copies and edits, e.g.
+   `scad.ref.faces(scad.ref.face("base", "make_box_rsolid", role="box.top"))` or
+   `scad.ref.edge("base", "make_box_rsolid", between=("box.front", "box.top"))`
+   (`scad.ref.of(face, part)` makes one, of a solid too; `scad.ql.ref(r)` uses one in a query).
+   A split or lost reference raises `ElementRefError` with the candidates; never fall back to a
+   geometric window. See `ql-recipes.md` (stable reference).
 
 ## The selection loop (card before cardinality)
 
@@ -186,76 +206,9 @@ Verified extensions:
   identity is NOT stable (section correspondence is kernel-matched), so select
   sides as a group or post-hoc — never index them.
 
-## Pattern B — boolean seam curves (D-boss recipe)
+## Recipes (worked examples)
 
-A D-shaped boss standing on the long side face of a bar base, unioned with a
-1 mm dip into the base and a top that rises 4 mm above the bar: the seam is a
-closed 3-D curve set running across the base side face, the base top face and
-the bottom imprint. All of it is selectable, then filletable, in two moves.
-
-```python
-with scad.GraphSession():
-    base = scad.make_box_rsolid(120.0, 30.0, 20.0, (0, 0, 0),
-                                top_face_tag="base.top")
-
-    # D boss = box U cylinder; cylinder bottom-face center sits at the
-    # midpoint of the boss box's +y bottom edge -> classic D outline
-    boss_box = scad.make_box_rsolid(24.0, 10.0, 24.0, (0, 19.0, 0.0))
-    boss_cyl = scad.make_cylinder_rsolid(12.0, 24.0, (0, 24.0, 0.0), (0, 0, 1))
-    boss = scad.union_rsolid(boss_box, boss_cyl)
-
-    result = scad.union_rsolid(base, boss, clean=False)
-
-    # parents by kernel-proven boolean origin role (arg 0 = body, arg 1 = tool)
-    body_sel = ql.faces().where(ql.origin_role("body"))
-    tool_sel = ql.faces().where(ql.origin_role("tool"))
-
-    # the seam: edges with one distinct incident face per parent
-    seam = ql.edges().incident_to(body_sel, tool_sel, distinct=True).resolve(result)
-
-    # name the seam, then fillet it — the selector feeds fillet directly
-    result = scad.apply_tag_rselection(result, seam, "seam.d")
-    seam_sel = ql.edges().incident_to(body_sel, tool_sel, distinct=True)
-    filleted = scad.fillet_rsolid(result, seam_sel, 2.0)
-
-    # the patches inherit the seam-edge name (verified 7/7 patches)
-    ql.faces().where(ql.tag("seam.d")).resolve(filleted)
-```
-
-Verified seam inventory for the dimensions above (`clean=False`): 13 edges —
-2 vertical lines on the side face (±12, y=15), 5 edges on the base top plane
-(the D outline where the boss crosses z=20: 1.0 + 5.367 + 14.056 + 5.367 +
-1.0), 6 on the bottom plane (same outline at z=0 plus the 24-long dip
-imprint). With `clean=True` the coplanar bottom pieces unify and part of the
-imprint seam disappears — keep `clean=False` when the seam itself is the
-selection target.
-
-Facts that matter when filleting a seam:
-
-- **`fillet_rsolid` accepts a `ShapeSelector`** for its `edges` argument; no
-  need to materialize the list twice.
-- A boss/base seam is mostly **concave**: the fillet ADDS volume
-  (82780.7 → 82841.1 at r=2). Never assert `v1 < v0` on seam fillets.
-- The whole seam filleted at once is a hard kernel case; if a radius fails,
-  step down (2.0 → 1.5 → 1.0 verified ladder pattern).
-
-## Recipe: root blend via shared boundary
-
-Edges shared between two named bodies are the first-choice selection
-(`discipline/geometric-validation.md`, edge-selection defaults):
-
-```python
-walls     = ql.faces().where(ql.prop("geom.type", "==", "CYLINDER"))
-plate_top = ql.faces().where(ql.and_(
-    ql.prop("geom.normal.z", ">=", 0.999),
-    ql.prop("geom.center.z", ">=", 14.5), ql.prop("geom.center.z", "<=", 15.5)))
-root = walls.shared_boundary(plate_top, to_kind="edge")
-
-with GraphSession(graph_id="blend") as s:
-    blended = scad.fillet_rsolid(solid, root.exactly(card_count), radius=2.0,
-                                 generated_faces_tag="fillet.root_patch")
-    s.capture_result(value=blended)
-```
+Pattern B (boolean seam curves, the D-boss recipe, with seam inventory and fillet facts), the root blend recipe, tagged bore -> rim chamfer, and selected face -> sketch datum plane are in `ql-recipes.md`. The rules above and the failure signatures below apply to all of them.
 
 ### Shared-boundary failure signatures (read them, do not fight them)
 
@@ -276,72 +229,6 @@ degenerate configuration in the design, not a selector bug. Before
 blending a seated feature, assert clearance: axis-to-neighboring-wall
 distance must exceed the blend radius (same family as fastener
 envelopes, `discipline/mechanical-modeling.md`).
-
-## Recipe: tagged bore -> rim chamfer
-
-Tag the bore wall right after the cut (Ground rule 3: tag in time),
-then chamfer its top rim:
-
-```python
-bore_faces = bore.resolve(solid)              # resolve first — see Ground rule 2
-tagged = scad.apply_tag_rselection(scope=solid, targets=bore_faces,
-                                   tag="role.fastener_bore")
-bore_sel = ql.faces().where(ql.tag("role.fastener_bore")).exactly(1)
-top_rim = ql.edges().incident_to(bore_sel, distinct=True).where(
-    ql.prop("geom.center.z", ">=", 14.0))
-rim_card = top_rim.resolve(tagged)
-chamfed = scad.chamfer_rsolid(tagged, top_rim.exactly(len(rim_card)),
-                              distance=1.0)
-```
-
-Gotchas this recipe absorbs:
-
-- `incident_to` on a cylindrical wall returns seam edges too (the
-  vertical seam of the cylinder surface sits mid-wall); filter rims by
-  an axial coordinate window. The rim card is one closed arc of length
-  `2*pi*r`.
-- Passing an unresolved selector as `targets` (instead of the resolved
-  list) produces a clone foreign to the active session; the next
-  operation rejects it with "graph node not owned by active graph".
-  Tagging a shape that a later operation has already consumed fails
-  the same way — tag immediately after the op that produced the
-  faces (Ground rule 3).
-- Objects live in one `GraphSession`; passing a solid into operations
-  under another session fails loudly. Keep the whole build in one.
-
-## Recipe: selected face -> sketch datum plane
-
-`make_sketch_rsketch(plane=...)` accepts `"XY"/"XZ"/"YZ"` or a plane
-mapping — never a Face. Derive the mapping from the selected face:
-
-```python
-def plane_mapping_from_face(face):
-    c, n = face.get_center(), face.get_normal_at()
-    z = (n.x, n.y, n.z)
-    ref = (1.0, 0.0, 0.0) if abs(z[2]) >= 0.9 else (0.0, 0.0, 1.0)
-    dot = sum(ref[i] * z[i] for i in range(3))
-    x = [ref[i] - dot * z[i] for i in range(3)]
-    m = sum(v * v for v in x) ** 0.5
-    x = [v / m for v in x]
-    y = (z[1]*x[2]-z[2]*x[1], z[2]*x[0]-z[0]*x[2], z[0]*x[1]-z[1]*x[0])
-    return {"origin": (c.x, c.y, c.z), "x_axis": tuple(x), "y_axis": y}
-
-sketch = scad.make_sketch_rsketch(name="on_face",
-                                  plane=plane_mapping_from_face(selected_face))
-```
-
-Pick the datum face itself with QL when the intent is structural
-("largest up-facing face") rather than positional:
-
-```python
-datum = (ql.faces().where(ql.prop("geom.normal.z", ">=", 0.999))
-         .order_by(ql.value("geom.area"), desc=True).take(1).exactly(1))
-```
-
-`extrude_rsolid(profile=..., ...)` accepts the selected Face directly
-as a profile — same object, no re-derivation needed. Extruding the
-top face of a 30×20 plate (bore opening r=6 after chamfer) by 2 mm
-gives exactly `(30*20 - pi*6**2) * 2` volume.
 
 ## Lineage routes (proving what an operation produced)
 
@@ -369,34 +256,37 @@ ql.select(ql.faces().resolve(shape)).where(ql.prop("geom.type", "==", "PLANE")) 
 
 ## Verified boundaries
 
-Current engine gaps found by the harnesses — each has a workaround above:
+What the harnesses established about the engine's reach — limits and
+behaviours to design around:
 
-1. **Plain user tags on faces do not project through any later op.** The
-   face-source projection gate (`autotag._project_source_bindings` with
-   `require_lineage_policy=True`) passes only operation-output and topology
-   naming; plain user bindings project from **edge** sources only. Use
-   op-kwarg names for cross-boolean face identity, edge names for
-   cross-modifier identity.
-2. **Modifier face-source projection lacks `project_source_tags`**
-   (`tracking.py`, `tracked_fillet`/`tracked_chamfer` face query). Face names
-   — even op-kwarg ones that survive booleans — are dropped when the face is
-   trimmed by a fillet/chamfer. The edge→patch channel is complete (7/7).
+1. **Tags stop where kernel history stops.** An operation that records no
+   topology history ends every tag through it (none of the solid modelling
+   operations do since the stable-refs work; check `node.topo_delta` for a
+   new operator). Within history a tag follows only entities that live on:
+   a generated face is named after its source by the operation itself
+   (fillet patches, extrude sides), never by continuation.
+2. **Tags assigned outside a `GraphSession`, imported sidecar facts and
+   sketch topology names live on the shapes** and are carried by the
+   operations' projection, not by the recorded view: model inside a session
+   so the graph carries your tags (and they survive the cell cache).
 3. **`origin_role` / `output_role` are single-step metadata.** After the seam
    fillet, every face reports the fillet's own roles; the boolean body/tool
    partition is gone. Query parent identity immediately after the boolean, or
    carry it as a name.
-4. **Primitive auto role tags (`face.box.top`, ...) do not project through
-   booleans** — only kwarg-named slots (`top_face_tag="base.top"`) do.
+4. **Primitive auto role tags (`face.box.top`, ...) are tags like any other:**
+   they follow their face through later operations in the effective scope,
+   so `face.box.top` on a finished part means "descends from the box's top".
+   Use `ql.output_role(...)` when you mean "the role in the last operation".
 5. **The planar profile in-plane basis switches discontinuously near
    vertical.** The reference-axis branch (`|z_z| > 0.9`) in the plane-basis
    helper swaps its reference between global X and Z, so sweeping a plane
    normal across roughly 25° from vertical rotates the in-plane frame
    abruptly. When normals vary, address profile edges by length and center
    sign rather than by axis assumptions.
-6. **N-ary cut unrolls hop-by-hop**; multi-hop modification chains can lose
-   projected bindings (later hops overwrite earlier witnesses for the same
-   output). For long-range names across a cut chain, prefer naming after the
-   final cut, or union-side naming.
+6. **An N-ary cut is followed step by step:** its steps name the
+   intermediate solids, and the recorded delta composes them back to the
+   real inputs, so names and references cross the whole chain
+   (`test_an_n_ary_cut_composes_its_steps`).
 
 ## Verification harnesses
 

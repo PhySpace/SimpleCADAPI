@@ -47,7 +47,7 @@ class LineageGraphTest(unittest.TestCase):
         from simplecadapi.editor.templates import create_notebook
 
         with tempfile.TemporaryDirectory() as tmp:
-            notebook = create_notebook(Path(tmp), "child", "part")
+            notebook = create_notebook(Path(tmp), "child", "sample")
             source = Path(notebook).read_text().replace("    return (base,)", CELL, 1)
             Path(notebook).write_text(source)
             for ident in ("child", "member"):
@@ -84,7 +84,7 @@ class MissingRecordHealsTest(unittest.TestCase):
         from simplecadapi.editor.templates import create_notebook
 
         with tempfile.TemporaryDirectory() as tmp:
-            notebook = create_notebook(Path(tmp), "child", "part")
+            notebook = create_notebook(Path(tmp), "child", "sample")
             Path(notebook).write_text(Path(notebook).read_text().replace("    return (base,)", CELL, 1))
             run_notebook(notebook)
             config = read_notebook_config(notebook)

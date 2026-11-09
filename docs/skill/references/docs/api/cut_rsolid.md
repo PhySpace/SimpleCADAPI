@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def cut_rsolid(*solids, skip_non_intersecting=True, tracking_policy='full')
+def cut_rsolid(*solids, skip_non_intersecting=True, tracking_policy='full', on_split='pieces')
 ```
 
 *Source: operators/boolean.py*
@@ -33,10 +33,28 @@ sequences, and returns a single `Solid`.
 
 - **Description**: FULL computes topology history and lineage. GRAPH keeps the replayable operation node without computing a TopoDelta.
 
+### on_split
+
+- **Description**: What a cut that splits the body (a slot through a bar) returns.
+
+### ``"pieces"``
+
+- **Type**: `default`
+- **Description**: every piece, as ``list[Solid]`` ordered by centroid
+
+### (x, then y, then z), recorded like ``cut_rsolid_list``. ``"error"``
+
+- **Description**: raise, for code that needs exactly one Solid.
+
 ## Returns
 
-Solid: The cut result solid.
+Solid: The cut result solid, when the result is one piece.
+list[Solid]: The pieces (a ``scad.Pieces``), when the cut split the body
+(``on_split="pieces"``). Operations that take one shape run on every piece
+(``cut_rsolid(pieces, tool)``, ``translate_shape(pieces, ...)``) and return
+``Pieces``; a selector's cardinality is checked over all pieces. Pass them on as bodies: ``make_part_rpart(part_id=..., body=pieces)`` makes the
+bodies ``body_1 .. body_n``, ``bodies={"bar": pieces}`` makes ``bar_1 .. bar_n``.
 
 ## Raises
 
-- **SimpleCADError**: The cut produced no solid, or split the body into several (a slot through a bar). Use ``cut_rsolid_list`` to keep every piece.
+- **SimpleCADError**: The cut produced no solid, or (``on_split="error"``) split the body. Use ``cut_rsolid_list`` to always get a list.

@@ -387,3 +387,46 @@ TEST_CASE("backends are pluggable and the default is the native solver") {
   }
   CHECK(get_default_sketch_solver_backend()->name() == "scad-native");
 }
+
+namespace {
+class ValueRecorder : public Recorder {
+ public:
+  void record(const OpRecord& record, const std::vector<Shape>&) override { params.push_back(record.params); }
+  std::optional<ValueLineage> record_value_op(const OpRecord& record,
+                                              const std::vector<ValueLineage>& value_inputs) override {
+    params.push_back(record.params);
+    inputs = value_inputs;
+    return std::nullopt;
+  }
+  std::vector<Value> params;
+  std::vector<ValueLineage> inputs;
+};
+}  // namespace
+
+TEST_CASE("a sketch on a workplane takes its frame whatever the current system, and records the workplane") {
+  Workplane wp({0, 0, 4}, {1, 0, 0}, {0, 1, 0});  // the YZ plane through (0, 0, 4): x = +Y
+  wp.set_runtime("graph.node_id", Value("node_wp"));
+  ValueRecorder recorder;
+  RecorderScope scope(&recorder);
+  Workplane other({100, 0, 0});
+  other.enter();
+  const Sketch sketch = make_sketch_rsketch(std::string("on_wp"), wp);
+  other.exit();
+  const SketchPlaneFrame frame = sketch.plane_frame();
+  CHECK(frame.origin.z == doctest::Approx(4.0));
+  CHECK(frame.origin.x == doctest::Approx(0.0));  // not moved by the entered workplane
+  CHECK(frame.normal.x == doctest::Approx(1.0));
+  REQUIRE_FALSE(recorder.params.empty());
+  const Value* plane = recorder.params.back().find("plane");
+  REQUIRE(plane != nullptr);
+  CHECK(plane->find("workplane")->as_bool());
+  REQUIRE(recorder.inputs.size() == 1);
+  CHECK(recorder.inputs.front().node_id == "node_wp");
+
+  // Its recorded plane read back as a mapping: a world frame, not transformed again.
+  Workplane moved({0, 0, 50});
+  moved.enter();
+  const Sketch again = make_sketch_rsketch(std::string("again"), *plane);
+  moved.exit();
+  CHECK(again.plane_frame().origin.z == doctest::Approx(4.0));
+}

@@ -88,5 +88,5 @@ TEST_CASE("every guarded operator has guidance and no name is registered twice")
   reactive::ExecutorRegistry registry{false};
   register_product_executors(registry);
   CHECK_THROWS_AS(register_product_executors(registry), ValueError);
-  CHECK(registry.operations().size() == 25);
+  CHECK(registry.operations().size() == 27);  // + make_set_body_appearance_rpart
 }

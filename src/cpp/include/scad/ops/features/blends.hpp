@@ -52,4 +52,8 @@ Solid offset_rsolid(const Solid& solid, const Scalar& amount, const FaceSelectio
 Solid draft_rsolid(const Solid& solid, const FaceSelection& faces_to_draft, const Scalar& angle,
                    const Scalar3& plane_origin = scalar3(0, 0, 0), const Scalar3& plane_normal = scalar3(0, 0, 1));
 
+// Imprint the loops of one planar face moved `distance` inside it: the face becomes an inner face (role inset.inner)
+// and the ring around it (inset.ring); the solid is the same shape.  Recorded as make_inset_face_rsolid.
+Solid inset_face_rsolid(const Solid& solid, const FaceSelection& face, const Scalar& distance);
+
 }  // namespace scad

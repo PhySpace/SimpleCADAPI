@@ -6,19 +6,20 @@
 
 import type { SceneTheme } from './theme';
 import * as THREE from 'three';
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
-import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial, LineSegments2, LineSegmentsGeometry } from './fat-lines';
+import { pointSprites } from './point-sprites';
 import { bindClickSelection } from './components/click-selection';
 import { disposeObject } from './cad-three';
+import { CameraRig } from './camera-rig';
+import { rayThrough } from './camera-projection';
 import { BRepRenderer, OVERLAY_LAYER, type CameraState, type LiveGeometryPayload } from './renderer';
 
 export type { LiveGeometryPayload };
 import type { PackageFiles } from './product-package';
-import type { PreviewData } from '../lib/preview';
+import { SURFACE_NODE_PREFIX, type PreviewData } from '../lib/preview';
 import type { Entity, EntitySidecar, FaceGroup, SceneNode } from './scene2';
 
-export type SelectionMode = 'component' | 'solid' | 'face' | 'edge' | 'vertex';
+export type SelectionMode = 'component' | 'solid' | 'face' | 'edge' | 'vertex' | 'sketch';
 export type PickResult = {
   nodeId: string;
   entityId: string | null;
@@ -35,6 +36,8 @@ export type SceneViewOptions = {
   onPick?: (result: PickResult) => void;
   /** A click that hit nothing. */
   onClear?: () => void;
+  /** A click in sketch mode: the name of the sketch (or 3D curve) under it, or null (the sketch and curve layers answer which). */
+  onSketchPick?: (name: string | null, additive: boolean) => void;
   selectionMode?: SelectionMode;
   background?: string;
   /** The scene's theme (default dark). */
@@ -50,27 +53,44 @@ type Mark = { key: string; color: string; overlays: THREE.Object3D[] };
 
 export class SceneView {
   readonly engine: BRepRenderer;
+  /** Direct camera control (sketch mode parks the trackball and drives the camera through it). */
+  readonly rig: CameraRig;
   onPick: ((result: PickResult) => void) | null;
   onClear: (() => void) | null;
+  onSketchPick: ((name: string | null, additive: boolean) => void) | null;
+  /** Which sketch is under a pointer event (set by the sketch layer; null when nothing is). */
+  sketchHitter: ((event: { clientX: number; clientY: number }) => string | null) | null = null;
+  /** Which of the notebook's 3D curves is under a pointer event (set by the curve layer, components/CurveLines.tsx):
+   * the sketch selection mode picks them too. */
+  curveHitter: ((event: { clientX: number; clientY: number }) => string | null) | null = null;
 
   private raycaster = new THREE.Raycaster();
   private pointer = new THREE.Vector2();
   selectionMode: SelectionMode;
   marks: Mark[] = [];
   private unbindClick: (() => void) | null = null;
+  private unbindGeometry: (() => void) | null = null;
   private disposed = false;
 
   constructor(host: HTMLElement, options: SceneViewOptions = {}) {
     this.onPick = options.onPick ?? null;
     this.onClear = options.onClear ?? null;
+    this.onSketchPick = options.onSketchPick ?? null;
     this.selectionMode = options.selectionMode ?? 'face';
     this.engine = new BRepRenderer(host, { background: options.background, theme: options.theme, ssao: options.ssao, seams: options.seams });
+    this.rig = new CameraRig(this.engine);
+    // a finer level of detail: the marks are built again on the new triangles
+    this.unbindGeometry = this.engine.onGeometryChanged(() => this.rebuildMarks());
     if (options.interactive !== false) {
       this.unbindClick = bindClickSelection({
         element: this.engine.domElement,
         camera: this.engine.camera,
         controls: this.engine.controls,
         onClick: (event) => {
+          if (this.selectionMode === 'sketch') {
+            this.onSketchPick?.(this.sketchHitter?.(event) ?? this.curveHitter?.(event) ?? this.surfaceAt(event), event.ctrlKey || event.metaKey);
+            return;
+          }
           const result = this.pick(event);
           if (result) this.onPick?.({ ...result, additive: event.ctrlKey || event.metaKey });
           else if (!(event.ctrlKey || event.metaKey)) this.onClear?.();
@@ -151,7 +171,7 @@ export class SceneView {
     const bounds = this.engine.domElement.getBoundingClientRect();
     this.pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
     this.pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
-    this.raycaster.setFromCamera(this.pointer, this.engine.camera);
+    rayThrough(this.raycaster, this.pointer, this.engine.camera);
     const distance = this.engine.camera.position.distanceTo(this.engine.controls.target);
     const worldPerPixel = 2 * Math.tan(THREE.MathUtils.degToRad(this.engine.camera.fov * 0.5)) * distance / Math.max(bounds.height, 1);
     this.raycaster.params.Line.threshold = worldPerPixel * 5;
@@ -166,7 +186,19 @@ export class SceneView {
     return props?.seam !== true && props?.degenerate !== true;
   }
 
+  /** The name of the notebook's surface (a face or shell value the preview shows as `node/surface/<name>`) under a
+   * pointer event, or null: the sketch selection mode picks surfaces whole, with sketches and curves. */
+  surfaceAt(event: { clientX: number; clientY: number }): string | null {
+    this.pointerRay(event as PointerEvent);
+    const hit = this.raycaster
+      .intersectObjects(this.engine.modelRoot.children, true)
+      .find((item) => item.object instanceof THREE.Mesh && this.isEffectivelyVisible(item.object) && typeof item.object.userData.nodeId === 'string');
+    const nodeId = hit?.object.userData.nodeId as string | undefined;
+    return nodeId?.startsWith(SURFACE_NODE_PREFIX) ? nodeId.slice(SURFACE_NODE_PREFIX.length) : null;
+  }
+
   pick(event: PointerEvent): PickResult | null {
+    if (this.selectionMode === 'sketch') return null; // sketches are picked by the sketch layer, not by ray
     this.pointerRay(event);
     const hits = this.raycaster.intersectObjects(this.engine.modelRoot.children, true).filter((hit) => {
       if (hit.object.userData.pickable === false || !this.isEffectivelyVisible(hit.object)) return false;
@@ -229,6 +261,70 @@ export class SceneView {
     return sidecar.edge_groups.find((group: FaceGroup) => hit.index! >= group.first_index && hit.index! < group.first_index + group.index_count)?.entity_id;
   }
 
+  /** The model's B-rep vertices in the world frame, in mm (what a sketch snaps to once projected onto its plane). */
+  modelVertices(): [number, number, number][] {
+    this.engine.modelRoot.updateMatrixWorld(true);
+    const seen = new Set<string>();
+    const out: [number, number, number][] = [];
+    const point = new THREE.Vector3();
+    this.engine.modelRoot.traverse((object) => {
+      if (!(object instanceof THREE.Points) || !Array.isArray(object.userData.vertexEntityIds)) return;
+      const position = object.geometry.getAttribute('position');
+      for (let i = 0; i < position.count; i++) {
+        point.fromBufferAttribute(position, i).applyMatrix4(object.matrixWorld).multiplyScalar(1000);
+        const key = `${Math.round(point.x * 100)}:${Math.round(point.y * 100)}:${Math.round(point.z * 100)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push([point.x, point.y, point.z]);
+      }
+    });
+    return out;
+  }
+
+  /** A face of the model as the viewport draws it: its area-weighted centroid (mm, world) and outward normal, from its
+   * triangles (null when the node or face is not on screen).  Immediate: no kernel round trip. */
+  faceFrameMm(nodeId: string, entityId: string): { centroid: [number, number, number]; normal: [number, number, number] } | null {
+    const object = this.engine.nodeObject(nodeId);
+    const node = this.engine.nodes.find((item) => item.node_id === nodeId);
+    const group = this.engine.sidecarFor(node)?.face_groups.find((item: FaceGroup) => item.entity_id === entityId);
+    let mesh: THREE.Mesh | null = null;
+    object?.traverse((child) => {
+      if (!mesh && child instanceof THREE.Mesh && child.name === 'cad-faces') mesh = child;
+    });
+    if (!group || !mesh) return null;
+    const faces = mesh as THREE.Mesh;
+    faces.updateWorldMatrix(true, false);
+    const position = faces.geometry.getAttribute('position');
+    const index = faces.geometry.index;
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    const centroid = new THREE.Vector3(), normal = new THREE.Vector3(), cross = new THREE.Vector3();
+    let area = 0;
+    for (let i = group.first_index; i + 2 < group.first_index + group.index_count; i += 3) {
+      const at = (k: number) => (index ? index.getX(k) : k);
+      a.fromBufferAttribute(position, at(i)).applyMatrix4(faces.matrixWorld);
+      b.fromBufferAttribute(position, at(i + 1)).applyMatrix4(faces.matrixWorld);
+      c.fromBufferAttribute(position, at(i + 2)).applyMatrix4(faces.matrixWorld);
+      cross.subVectors(b, a).cross(c.clone().sub(a));
+      const twice = cross.length();
+      if (twice === 0) continue;
+      area += twice;
+      normal.add(cross);
+      centroid.addScaledVector(a.clone().add(b).add(c), twice / 3);
+    }
+    if (area === 0) return null;
+    centroid.divideScalar(area).multiplyScalar(1000);
+    normal.normalize();
+    return { centroid: [centroid.x, centroid.y, centroid.z], normal: [normal.x, normal.y, normal.z] };
+  }
+
+  /** The model's bounding box in the world frame, mm ([min, max]), or null for an empty scene. */
+  modelBoundsMm(): { min: [number, number, number]; max: [number, number, number] } | null {
+    this.engine.modelRoot.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(this.engine.modelRoot);
+    if (box.isEmpty()) return null;
+    return { min: [box.min.x * 1000, box.min.y * 1000, box.min.z * 1000], max: [box.max.x * 1000, box.max.y * 1000, box.max.z * 1000] };
+  }
+
   // -- highlight + marks -------------------------------------------------------
 
   private attachOverlay(source: THREE.Object3D, overlay: THREE.Object3D): THREE.Object3D {
@@ -283,10 +379,11 @@ export class SceneView {
         material.resolution.set(this.engine.domElement.clientWidth, this.engine.domElement.clientHeight);
         overlays.push(this.attachOverlay(source, new LineSegments2(lineGeometry, material)));
       } else if (source instanceof THREE.Points) {
-        const geometry = source.geometry.clone();
+        // the picked vertex as a 16 px dot (a sprite: WebGPU points are one pixel wide)
         const vertexIndex = source.userData.vertexEntityIds.indexOf(entityId!);
-        geometry.setDrawRange(vertexIndex, 1);
-        overlays.push(this.attachOverlay(source, new THREE.Points(geometry, new THREE.PointsMaterial({ color, size: 16, sizeAttenuation: false, transparent: true, opacity: 1, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }))));
+        const position = source.geometry.getAttribute('position');
+        const one = new THREE.BufferAttribute(new Float32Array([position.getX(vertexIndex), position.getY(vertexIndex), position.getZ(vertexIndex)]), 3);
+        overlays.push(this.attachOverlay(source, pointSprites(one, { color, size: 16 })));
       } else {
         const geometry = source.geometry.clone();
         if (range) geometry.setDrawRange(range.first_index, range.index_count);
@@ -303,6 +400,17 @@ export class SceneView {
     if (this.marks.some((mark) => mark.key === key)) return;
     const overlays = this.buildEntityOverlays(nodeId, entityId, color);
     if (overlays.length) this.marks.push({ key, color, overlays });
+  }
+
+  private rebuildMarks(): void {
+    for (const mark of this.marks) {
+      for (const overlay of mark.overlays) {
+        overlay.parent?.remove(overlay);
+        disposeObject(overlay);
+      }
+      const [nodeId, entity] = mark.key.split('::');
+      mark.overlays = this.buildEntityOverlays(nodeId, entity === 'component' ? null : entity, mark.color);
+    }
   }
 
   removeMark(key: string): void {
@@ -369,6 +477,7 @@ export class SceneView {
     if (this.disposed) return;
     this.disposed = true;
     this.unbindClick?.();
+    this.unbindGeometry?.();
     this.engine.dispose();
   }
 }

@@ -5,7 +5,11 @@
 //   * a typed `track` metadata envelope on every face and edge,
 //   * `<kind>.<role>` bindings for kernel-proven output roles,
 //   * lineage witnesses: which source tag bindings reach which result entity,
-//   * projected bindings for user tags the tracker proved should follow a feature.
+//   * projected bindings for source tags the tracker proved should follow a feature.
+// Copied are the bindings only the shapes know (imported sidecar facts, sketch topology names, tags assigned
+// outside a recording session) and, for any binding, the naming of a generated entity after its source (the
+// projected binding of a fillet patch or an extrude side face).  The continuation of a binding a recorded tag
+// assignment made is carried by the tag view over the recorded history instead (scad/reactive/tag_view.hpp).
 // Missing evidence stays "unknown": nothing is guessed from geometry.
 //
 // Operators do not call this directly; finalize_tracked (finalize.hpp) does.

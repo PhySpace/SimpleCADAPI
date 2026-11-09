@@ -121,6 +121,9 @@ class WorkspaceState:
         "params.values",
         "preview",
         "selection",
+        "workplanes",
+        "tag_splits",
+        "curves",
     )
 
     def __init__(self, workspace: Path, notebook: Path | None = None) -> None:
@@ -131,6 +134,12 @@ class WorkspaceState:
         self.port = 0
         self.lock = threading.Lock()
         self.latest: dict[str, dict] = {}
+        self._workplanes: list[dict] | None = None  # the frames last sent (see _push_workplanes)
+        self._tag_splits: list[dict] | None = None  # the tag splits last sent (see _push_tag_splits)
+        self._curves: list[dict] | None = None  # the curves last sent (see _push_curves)
+        self.value_kinds: dict[str, str] = {}  # what each top-level value is, as the kernel last said (solid, wire, face ...)
+        # A cell failed and the model shown is the one before it: {failed, skipped, shown} (see runtime.live.preview_product)
+        self.partial: dict | None = None
         self.latest_package_bytes: bytes | None = None  # a full package, made on demand (export)
         # The latest preview (replaced as a whole, so a reader on another thread never sees half of one) and the
         # parts of it by key: a page is sent only the parts it lacks.
@@ -142,6 +151,9 @@ class WorkspaceState:
         self.selection_items: list[dict] = []
         self.viewport_png: bytes | None = None
         self.cells: list[dict] = []
+        from .gui_features import FeatureService
+
+        self.features = FeatureService(self)  # GUI-made features: commands and undo (see gui_features.py)
         self.specs: dict[str, ParamSpec] = {}
         self._pending_params: dict[str, float | int | bool] = {}
         self._rebuild_inflight = False
@@ -263,6 +275,11 @@ class WorkspaceState:
             if not self._begin_switch(notebook, generation):
                 return
             restored = self._restore(notebook, generation)
+        self._workplanes = None  # a new notebook: its workplanes are sent on its first settle, whatever they are
+        self._tag_splits = None
+        self._curves = None
+        self.value_kinds = {}
+        self.partial = None
         kernel = MarimoKernel(
             notebook,
             server_port=self.port,
@@ -419,6 +436,7 @@ class WorkspaceState:
                 "name": notebook.stem,
                 "size": len(data),
                 "cached": True,
+                "partial": None,  # only a whole model is filed
             }
         )
         self.hub.broadcast({"type": "status", "info": "restored from the last run; the kernel is starting…"})
@@ -1133,7 +1151,13 @@ class WorkspaceState:
             signed = began
             result = kernel.publish_preview(self.preview_url, step=self.notebook.stem if self.notebook else "")
             published = time.perf_counter()
+            if isinstance(result.get("kinds"), dict):
+                self.value_kinds = {str(k): str(v) for k, v in result["kinds"].items()}
             self.push_cells()
+            self._push_workplanes(result.get("workplanes"))
+            self._push_curves(result.get("curves"))
+            if result.get("ok"):  # a failed preview keeps what was last shown
+                self._push_tag_splits(result.get("tag_splits"))
             if os.environ.get("SCA_EDITOR_TRACE"):
                 print(
                     f"[sca edit] settle: kernel call {(published - signed) * 1000:.0f} ms "
@@ -1161,6 +1185,29 @@ class WorkspaceState:
             if message != self._last_publish_error:
                 self._last_publish_error = message
                 self.hub.broadcast({"type": "status", "error": message[-300:]})
+
+    def _push_curves(self, curves: Any) -> None:
+        """The notebook's wires and edges, sampled by the kernel (3D paths are not solids: the preview does not draw
+        them): sent when they change."""
+        if not isinstance(curves, list) or curves == (self._curves or []):
+            return
+        self._curves = curves
+        self.emit({"type": "curves", "curves": curves})
+
+    def _push_tag_splits(self, splits: Any) -> None:
+        """The tagged entities the model's operations split, and the entities of their pieces: sent when they change."""
+        if not isinstance(splits, list) or splits == (self._tag_splits or []):
+            return
+        self._tag_splits = splits
+        self.emit({"type": "tag_splits", "splits": splits})
+        self.write_snapshot()
+
+    def _push_workplanes(self, workplanes: Any) -> None:
+        """The notebook's workplanes and their frames, as the kernel computed them: sent when they change."""
+        if not isinstance(workplanes, list) or workplanes == self._workplanes:
+            return
+        self._workplanes = workplanes
+        self.emit({"type": "workplanes", "workplanes": workplanes})
 
     def _begin_run(self) -> None:
         """Cells are about to run because someone asked for it: report afresh.
@@ -1468,8 +1515,9 @@ class WorkspaceState:
         saved = read_saved_params(config)
         # A drag that pauses and is then released sends its value twice (the pause, the release): the second is
         # what the model already shows.  Rebuilding for it would run the cells that depend on child notebooks
-        # again for nothing -- unless the last run failed, when the person may be asking for a retry.
-        if not self._last_publish_error:
+        # again for nothing -- unless the last run failed (no model, or the model before a failing step), when the person
+        # may be asking for a retry.
+        if not self._last_publish_error and self.partial is None:
             values = {name: value for name, value in values.items() if saved.get(name, self.specs[name].default) != value}
             if not values:
                 self.emit_params()  # keep the page's controls in step
@@ -1646,6 +1694,13 @@ class WorkspaceState:
             },
             "modified_parameters": sorted(saved),
             "model_revision": self.preview_revision,
+            # a cell failed: the model shown is the one before it -- failed: [{cell, name, status, error}], skipped: the
+            # cells after it that did not run, shown: the bodies (or product) on screen; null when the model is whole
+            "partial": self.partial,
+            # tagged entities the model's operations split: the pieces carry <tag>.split<i>, highlighted in the viewport
+            "tag_splits": [
+                {"tag": row.get("tag"), "into": row.get("into"), "op": row.get("op")} for row in self._tag_splits or []
+            ],
         }
 
     def write_endpoint(self, host: str) -> None:
@@ -1900,6 +1955,17 @@ def _is_function_cell(code: str) -> bool:
     return len(body) == 1 and isinstance(body[0], (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
 
 
+def _partial_header(text: str | None) -> dict | None:
+    """The ``X-Preview-Partial`` header of a published preview: what failed and what the model shown is (else ``None``)."""
+    if not text:
+        return None
+    try:
+        partial = json.loads(text)
+    except ValueError:
+        return None
+    return partial if isinstance(partial, dict) else None
+
+
 def create_app(state: WorkspaceState) -> Starlette:
     hub = state.hub
 
@@ -1931,6 +1997,8 @@ def create_app(state: WorkspaceState) -> Starlette:
         except KeyError as missing:
             # Parts the kernel left out are not here (the server was given another model since): it sends them all.
             return JSONResponse({"ok": False, "missing": missing.args[0]}, status_code=409)
+        partial = _partial_header(request.headers.get("X-Preview-Partial"))
+        state.partial = partial
         state.preview_revision += 1
         state.emit(
             {
@@ -1941,6 +2009,8 @@ def create_app(state: WorkspaceState) -> Starlette:
                 "size": len(state.latest_preview_bytes or b""),
                 # The model on screen is this model: nothing to reload.
                 "unchanged": unchanged,
+                # A cell failed: this is the model before it ({failed, skipped, shown}); None for the whole product.
+                "partial": partial,
             }
         )
         # The pages have the model.  Filing it on disk (and the snapshot an agent reads) wait for nothing: the kernel
@@ -1948,7 +2018,8 @@ def create_app(state: WorkspaceState) -> Starlette:
         hub.broadcast({"type": "status", "error": ""})  # the model is fine again: clear a stale "no product yet"
         threading.Thread(
             target=state.after_publish,
-            args=(arrived, len(body), state.take_signing(), state.latest_preview_bytes),
+            # the model before a failing step is not filed: a restart restores only a whole model
+            args=(arrived, len(body), state.take_signing(), None if partial else state.latest_preview_bytes),
             name="after-publish",
             daemon=True,
         ).start()
@@ -1959,6 +2030,28 @@ def create_app(state: WorkspaceState) -> Starlette:
         if state.latest_preview_bytes:
             return Response(content=state.latest_preview_bytes, media_type="application/vnd.simplecad.preview")
         return JSONResponse({"error": "no preview published yet"}, status_code=404)
+
+    async def refine_preview(request: Request) -> Response:
+        """Level of detail: the parts a page sees up close, tessellated again by the kernel at the tolerances it asks
+        for (``{"keys": [...], "linear": mm, "angular": rad}``), as an encoded preview with no nodes.  The parts keep
+        their keys and entities; a page swaps their triangles and edge lines in place."""
+        try:
+            body = await request.json()
+            keys = [str(key) for key in body["keys"]][:64]
+            linear = float(body["linear"])
+            angular = float(body["angular"])
+        except (KeyError, TypeError, ValueError):
+            return JSONResponse({"ok": False, "error": "expected keys, linear and angular"}, status_code=400)
+        # finer than this costs more triangles than any screen shows
+        if not (0.005 <= linear <= 10.0 and 0.02 <= angular <= 1.0) or not keys:
+            return JSONResponse({"ok": False, "error": "tolerance out of range"}, status_code=400)
+        kernel = state.kernel
+        if kernel is None:
+            return JSONResponse({"ok": False, "error": "no kernel"}, status_code=409)
+        data = await asyncio.to_thread(kernel.refine_preview, keys, linear, angular)
+        if data is None:
+            return JSONResponse({"ok": False, "error": "the kernel has no preview"}, status_code=409)
+        return Response(data, media_type="application/octet-stream")
 
     async def push_package(request: Request) -> JSONResponse:
         """The kernel hands over a full package, made because an export asked for it."""
@@ -1994,11 +2087,105 @@ def create_app(state: WorkspaceState) -> Starlette:
         status = 409 if str(report.get("error", "")).startswith("conflict") else 400 if "error" in report else 200
         return JSONResponse(report, status_code=status)
 
+    async def features_specs(request: Request) -> JSONResponse:
+        """The operations a person can add with a button, as typed forms (see features.py)."""
+        from .features import catalog
+
+        return _revalidated(request, catalog())
+
+    async def features_state(request: Request) -> JSONResponse:
+        """The features of the open notebook, its bodies, the product, and the defaults a form opens with."""
+        return JSONResponse(await asyncio.to_thread(state.features.snapshot))
+
+    async def features_command(request: Request) -> JSONResponse:
+        """``{op: add|edit|delete|use_as_product|set_connectors|ref_status|ref_repair|undo|redo, ...}``: one GUI command."""
+        from .gui_features import GuiError
+
+        try:
+            body = json.loads(await request.body() or b"{}")
+        except json.JSONDecodeError:
+            return JSONResponse({"ok": False, "error": "body is not JSON"}, status_code=400)
+        body = body if isinstance(body, dict) else {}
+        op = str(body.get("op", ""))
+        handler = {
+            "add": state.features.add,
+            "edit": state.features.edit,
+            "delete": state.features.delete,
+            "use_as_product": state.features.use_as_product,
+            "set_connectors": state.features.set_connectors,
+            "ref_status": state.features.ref_status,
+            "ref_repair": state.features.ref_repair,
+            "undo": lambda _request: state.features.undo(),
+            "redo": lambda _request: state.features.redo(),
+        }.get(op)
+        if handler is None:
+            return JSONResponse({"ok": False, "error": f"unknown operation {op!r}"}, status_code=400)
+        try:
+            result = await asyncio.to_thread(handler, body)
+        except GuiError as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=409 if exc.conflict else 400)
+        except ValueError as exc:  # a request the registry refuses (FeatureError, SketchError, AssemblyError) is the person's to fix
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+        return JSONResponse(result)
+
+    async def sketch_op(request: Request) -> JSONResponse:
+        """``{sketch, op, args}`` -> ``{ok, sketch, created, removed, ...}``: one SDK sketch edit (``<op>_rsketch``) on a document."""
+        from .sketch_doc import SketchError, apply_edit
+
+        try:
+            body = json.loads(await request.body() or b"{}")
+        except json.JSONDecodeError:
+            return JSONResponse({"ok": False, "error": "body is not JSON"}, status_code=400)
+        body = body if isinstance(body, dict) else {}
+        try:
+            args = dict(body.get("args") or {})
+            if "from_sketch" in args:  # project: name another sketch feature of this notebook as the source
+                source = state.features.sketch_document(str(args.pop("from_sketch")))
+                if source is None:
+                    return JSONResponse({"ok": False, "error": "from_sketch: there is no such sketch feature in this notebook"}, status_code=400)
+                args["source_doc"] = source
+            result = await asyncio.to_thread(apply_edit, body.get("sketch") or {}, str(body.get("op", "")), args)
+        except SketchError as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+        return JSONResponse({"ok": True, **result})
+
+    async def assembly_parts(request: Request) -> JSONResponse:
+        """The part notebooks of the workspace; ``?path=`` adds the connectors that one part declares."""
+        from ..runtime.workspace import scan_workspace
+        from .assembly_doc import connectors_of
+
+        rows = [{"path": entry.path, "name": Path(entry.path).stem, "kind": entry.kind} for entry in scan_workspace(state.workspace) if entry.kind == "part"]
+        wanted = request.query_params.get("path")
+        if wanted:
+            target = (state.workspace / wanted).resolve()
+            if state.workspace.resolve() not in target.parents or target.suffix != ".py" or not target.is_file():
+                return JSONResponse({"ok": False, "error": "not a notebook of this workspace"}, status_code=400)
+            try:
+                connectors = await asyncio.to_thread(connectors_of, target)
+            except Exception as exc:  # noqa: BLE001 - the part may not run; say why
+                return JSONResponse({"ok": False, "error": f"{type(exc).__name__}: {str(exc)[-300:]}"}, status_code=400)
+            return JSONResponse({"ok": True, "path": wanted, "connectors": connectors})
+        return JSONResponse({"ok": True, "parts": rows})
+
+    async def sketch_solve(request: Request) -> JSONResponse:
+        """Solve a sketch document without recording anything (a canvas calls this at every drag step)."""
+        from .sketch_doc import SketchError, solve
+
+        try:
+            body = json.loads(await request.body() or b"{}")
+        except json.JSONDecodeError:
+            return JSONResponse({"ok": False, "error": "body is not JSON"}, status_code=400)
+        try:
+            result = await asyncio.to_thread(solve, body.get("sketch") if isinstance(body, dict) else {})
+        except SketchError as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+        return JSONResponse({"ok": True, **result})
+
     async def sdk_index(request: Request) -> JSONResponse:
         """The SDK's public API (names and parameters), for the cell editor's completion."""
         from .apiindex import build_index
 
-        return JSONResponse(build_index(), headers={"Cache-Control": "max-age=3600"})
+        return _revalidated(request, build_index())
 
     async def workspace_list(request: Request) -> JSONResponse:
         """The SimpleCAD notebooks of the workspace."""
@@ -2066,6 +2253,54 @@ def create_app(state: WorkspaceState) -> Starlette:
         threading.Thread(target=run, name="notebook-new", daemon=True).start()
         return JSONResponse({"ok": True, "created": rel_path})
 
+    async def workspace_delete(request: Request) -> JSONResponse:
+        """Delete a notebook of the workspace: it is moved to ``.sca-editor/trash/`` (recoverable), not erased.
+
+        The open notebook is closed by opening another one first; the only notebook of the workspace is refused (there
+        would be nothing to open: create another first).
+        """
+        try:
+            message = json.loads(await request.body())
+            rel_path = str(message["path"])
+            target = state.resolve_notebook(rel_path)
+        except (KeyError, TypeError, json.JSONDecodeError):
+            return JSONResponse({"ok": False, "error": "body must be {path}"}, status_code=400)
+        except ValueError as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+        others = [entry.path for entry in scan_workspace(state.workspace) if entry.kind and entry.path != rel_path]
+        is_open = state.notebook is not None and state.notebook.resolve() == target
+        if is_open and not others:
+            return JSONResponse(
+                {"ok": False, "error": f"{rel_path} is the only notebook of the workspace: create another before deleting it"},
+                status_code=400,
+            )
+        trash = state.snapshot_dir / "trash"
+        trash.mkdir(parents=True, exist_ok=True)
+        kept = trash / f"{time.strftime('%Y%m%d-%H%M%S')}-{target.name}"
+        where = kept.relative_to(state.workspace).as_posix()
+
+        def remove() -> None:
+            target.replace(kept)
+            hub.broadcast({"type": "workspace.changed"})
+            hub.broadcast({"type": "status", "info": f"deleted {rel_path} (kept in {where})"})
+
+        if not is_open:
+            remove()
+            return JSONResponse({"ok": True, "deleted": rel_path, "trash": where})
+        # the open notebook: open another first (the kernel must not keep running on a file that is gone), then move it
+        generation = state.reserve_switch()
+        state.announce_opening(state.workspace / others[0])
+
+        def run() -> None:
+            try:
+                state.open_notebook(others[0], generation)
+                remove()
+            except Exception as exc:
+                hub.broadcast({"type": "status", "error": f"delete failed: {exc}"})
+
+        threading.Thread(target=run, name="notebook-delete", daemon=True).start()
+        return JSONResponse({"ok": True, "deleting": rel_path, "opening": others[0], "trash": where})
+
     async def studio_select(request: Request) -> JSONResponse:
         """Webui reports the viewport selection; agents read it back."""
         try:
@@ -2131,14 +2366,22 @@ def create_app(state: WorkspaceState) -> Starlette:
         Route("/api/health", health),
         Route("/api/runtime/preview", push_preview, methods=["POST"]),
         Route("/api/preview/latest", latest_preview, methods=["GET"]),
+        Route("/api/preview/refine", refine_preview, methods=["POST"]),
         Route("/api/runtime/package", push_package, methods=["POST"]),
         Route("/api/package/latest", latest_package, methods=["GET"]),
         Route("/api/sdk", sdk_index, methods=["GET"]),
         Route("/api/cells", api_cells, methods=["GET"]),
         Route("/api/cells/{op}", api_cell_command, methods=["POST"]),
+        Route("/api/features/specs", features_specs, methods=["GET"]),
+        Route("/api/sketch/solve", sketch_solve, methods=["POST"]),
+        Route("/api/sketch/op", sketch_op, methods=["POST"]),
+        Route("/api/assembly/parts", assembly_parts, methods=["GET"]),
+        Route("/api/features", features_state, methods=["GET"]),
+        Route("/api/features", features_command, methods=["POST"]),
         Route("/api/workspace", workspace_list, methods=["GET"]),
         Route("/api/workspace/open", workspace_open, methods=["POST"]),
         Route("/api/workspace/new", workspace_new, methods=["POST"]),
+        Route("/api/workspace/delete", workspace_delete, methods=["POST"]),
         Route("/api/studio/select", studio_select, methods=["POST"]),
         Route("/api/studio/selected", studio_selected, methods=["GET"]),
         Route("/api/studio/viewport", viewport_image, methods=["POST"]),
@@ -2147,8 +2390,30 @@ def create_app(state: WorkspaceState) -> Starlette:
     ]
     app = Starlette(routes=routes)
     if DIST_DIR.is_dir():
-        app.mount("/", StaticFiles(directory=DIST_DIR, html=True), name="webui")
+        app.mount("/", _WebUI(directory=DIST_DIR, html=True), name="webui")
     return app
+
+
+def _revalidated(request: Request, payload: Any) -> Response:
+    """A large JSON answer the page may keep, but must check: it is fetched again (or a 304 is answered) on every load,
+    so an editor updated in place never serves a page its old catalog (an ``max-age`` kept a changed default for an hour)."""
+    body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    tag = '"' + hashlib.sha256(body).hexdigest()[:20] + '"'
+    headers = {"Cache-Control": "no-cache", "ETag": tag}
+    if request.headers.get("if-none-match") == tag:
+        return Response(status_code=304, headers=headers)
+    return Response(body, media_type="application/json", headers=headers)
+
+
+class _WebUI(StaticFiles):
+    """The built web UI. The page itself is never cached (a rebuilt UI must load on the next visit); its assets carry
+    content hashes in their names and may be."""
+
+    async def get_response(self, path: str, scope: Any) -> Response:
+        response = await super().get_response(path, scope)
+        if path in ("", ".", "index.html") or path.endswith(".html"):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 def serve_workspace(

@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include <pybind11/eval.h>
@@ -94,6 +96,30 @@ void set_python_error(const Exception& e) {
 
 namespace {
 
+// The Python exception rethrow_python_through_cpp sent through C++, per thread: its text (what the MessageError
+// carries) and the exception object (a strong reference; one per thread at most, so never released at thread exit).
+struct PendingPythonError {
+  std::string text;
+  PyObject* value = nullptr;
+};
+
+PendingPythonError& pending_python_error() {
+  thread_local PendingPythonError pending;
+  return pending;
+}
+
+// The pending Python exception when `e` is the error that carried it: set as the Python error.
+bool restore_python_error(const Error& e) {
+  PendingPythonError& pending = pending_python_error();
+  if (pending.value == nullptr || !e.operation().empty() || e.guidance().what_happened != pending.text)
+    return false;
+  PyObject* value = std::exchange(pending.value, nullptr);
+  pending.text.clear();
+  PyErr_SetObject(reinterpret_cast<PyObject*>(Py_TYPE(value)), value);
+  Py_DECREF(value);
+  return true;
+}
+
 struct Handler {
   ExceptionPriority priority;
   ExceptionHandler handle;
@@ -108,6 +134,8 @@ bool translate_general(std::exception_ptr p) {
   try {
     std::rethrow_exception(p);
   } catch (const Error& e) {
+    if (restore_python_error(e))
+      return true;
     try {
       py::object errors = py::module_::import("simplecadapi._cpp.errors");
       // The message-first families are real classes in the SDK: which one this is travels with the error.
@@ -135,6 +163,17 @@ bool translate_general(std::exception_ptr p) {
 }
 
 }  // namespace
+
+void rethrow_python_through_cpp(py::error_already_set& error) {
+  const py::object value = error.value();
+  const std::string text =
+      std::string(py::str(py::type::handle_of(value).attr("__name__"))) + ": " + std::string(py::str(value));
+  PendingPythonError& pending = pending_python_error();
+  Py_XDECREF(pending.value);
+  pending.value = value.inc_ref().ptr();
+  pending.text = text;
+  throw MessageError("", text);
+}
 
 void add_exception_handler(ExceptionPriority priority, ExceptionHandler handler) {
   auto& all = handlers();

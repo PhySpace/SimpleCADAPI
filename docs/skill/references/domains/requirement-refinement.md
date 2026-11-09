@@ -3,6 +3,9 @@
 Convert a user request — prose, reference images, technical drawings, or a
 combination — into an actionable modeling brief before any geometry is written.
 
+**Read when:** every task starts here: any modeling, assembly, reconstruction, or export request is refined into a brief
+first, and whenever inputs conflict, are ambiguous, or mix modalities.
+
 ## Use when
 
 - Every task starts here: any modeling, assembly, reconstruction, or export
@@ -38,6 +41,7 @@ combination — into an actionable modeling brief before any geometry is written
 
 ```text
 CAD brief:
+- Mode: <interactive | unattended (why)>   (first line; see `discipline/operating-modes.md`)
 - Model: <name>, <part | assembly | modification | inspection | export>
 - Inputs: <prose | reference images | drawing views used>
 - Units: <explicit or assumed>
@@ -49,6 +53,7 @@ CAD brief:
 - Paths: <source file(s), package/export targets>
 - Validation targets: <measurable checks>
 - Assumptions: <meaningful inferred choices only>
+- Assumption ledger (unattended): | item | value | evidence | how to change it | the check that would show it wrong |
 ```
 
 ## Input precedence
@@ -110,6 +115,13 @@ radius suffices, or the user asked for a first-pass concept.
 The brief is complete only when its validation targets name the checks that will run: every blocking answer and every user-stated requirement maps to a targeted measurement or a rendered view, written down before the first modeling call. Modeling never precedes the acceptance set; volume and face counts alone have never distinguished a correct part from a rejected one.
 
 Own the methods, ask about the requirements: how a claim will be verified (an insertion-envelope sweep, a highlight render, a comparison view) is yours to propose in the plan — do not wait for the user to invent the test. What counts as success (fit, load direction, finish) is the user's call and belongs in the Ask-or-Record set.
+
+**Unattended:** the clarification policy and the "confirm with the user" rule above change who decides, not what is
+checked (`discipline/operating-modes.md`). Nothing is asked: every blocking item is recorded in the brief's assumption
+ledger with its evidence and the check that would show it wrong. The interpreted shape of a reference image is still
+described region by region before any geometry, checked against the measured evidence, and its confidence recorded; it is
+not skipped. Conflicting dimensioned sources: record the conflict and the choice (measured over prose over inference)
+instead of flagging it to a person.
 
 ## Success criteria
 

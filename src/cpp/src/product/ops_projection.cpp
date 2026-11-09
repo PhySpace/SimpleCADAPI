@@ -17,8 +17,10 @@ namespace {
 // Every Part body below `item`, placed by `placement` composed with the component chain.
 void collect_placed_solids(const Item& item, const Placement& placement, std::vector<Solid>& out) {
   if (const auto* part = std::get_if<PartPtr>(&item)) {
-    out.emplace_back(kernel::place_shape((*part)->body().wrapped(), placement.origin(), placement.x_axis(),
-                                         placement.y_axis(), placement.z_axis()));
+    for (const Body& body : (*part)->bodies()) {  // every body of a multi-body part, in order
+      out.emplace_back(kernel::place_shape(body.solid().wrapped(), placement.origin(), placement.x_axis(),
+                                           placement.y_axis(), placement.z_axis()));
+    }
     return;
   }
   for (const Component& component : std::get<AssemblyPtr>(item)->components()) {

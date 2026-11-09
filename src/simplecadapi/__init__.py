@@ -34,6 +34,8 @@ harden_console_streams((sys.stdout, sys.stderr))
 install_mapping_proxy_pickle()
 
 from . import math, ql, std, surface
+from . import ref
+from .ref import ElementRef, ElementRefError
 
 # Features that read OpenCASCADE shapes load on first use.
 _LAZY_SUBMODULES = ("exporter", "inspect", "translator")
@@ -95,6 +97,7 @@ from simplecadapi._cpp import (
     asin,
     Assembly,
     atan,
+    Body,
     CM,
     Connector,
     ConnectorAnchor,
@@ -181,6 +184,8 @@ from simplecadapi._cpp import (
     cut_rsolid,
     cut_rsolid_list,
     draft_rsolid,
+    inset_face_rsolid,
+    press_pull_rsolid,
     extrude_rsolid,
     extrude_taper_rsolid,
     extrude_until_rsolid,
@@ -208,6 +213,13 @@ from simplecadapi._cpp import (
     make_angle_arc_redge,
     make_angle_arc_rwire,
     make_box_rsolid,
+    make_workplane_rworkplane,
+    make_workplane_from_face_rworkplane,
+    make_workplane_from_points_rworkplane,
+    make_workplane_from_axis_rworkplane,
+    make_workplane_midplane_rworkplane,
+    make_workplane_normal_to_curve_rworkplane,
+    make_workplane_offset_rworkplane,
     make_circle_redge,
     make_circle_rface,
     make_circle_rwire,
@@ -246,6 +258,7 @@ from simplecadapi._cpp import (
     add_rack_pinion_constraint_rassembly,
     add_revolute_constraint_rassembly,
     assign_material_rpart,
+    explode_rassembly,
     ground_component_rassembly,
     identity_placement_rplacement,
     inspect_assembly_constraints_rconstraintreport,
@@ -262,6 +275,7 @@ from simplecadapi._cpp import (
     make_vertex_connector_rconnector,
     measure_constraint_residual_rconstraintresidual,
     place_component_rassembly,
+    set_body_appearance_rpart,
     set_public_connector_rassembly,
     solve_assembly_constraints_rassembly,
     unground_component_rassembly,
@@ -297,6 +311,7 @@ from simplecadapi._cpp import (
     apply_tag,
     apply_tag_rselection,
     explain_tag,
+    list_tag_splits,
     list_tags,
     select_edges_by_tag,
     select_faces_by_tag,
@@ -318,6 +333,16 @@ from simplecadapi._cpp import (
     add_line_rsketch,
     add_point_rsketch,
     constrain_midpoint_points_rsketch,
+    chamfer_corner_rsketch,
+    diff_sketch_rsketchdiff,
+    extend_rsketch,
+    fillet_corner_rsketch,
+    project_rsketch,
+    trim_rsketch,
+    insert_spline_anchor_rsketch,
+    make_faces_from_sketch_rfacelist,
+    remove_spline_anchor_rsketch,
+    convert_spline_to_anchors_rsketch,
     constrain_mirror_rsketch,
     constrain_symmetric_rsketch,
     constrain_tangent_rsketch,
@@ -326,6 +351,8 @@ from simplecadapi._cpp import (
     get_sketch_point_rsketchref,
     get_sketch_solver_backend,
     inspect_sketch_rsketchresult,
+    inspect_sketch_rsketchprofiles,
+    inspect_sketch_rsketchcrossings,
     make_face_from_sketch_rface,
     make_sketch_rsketch,
     make_wire_from_sketch_rwire,
@@ -339,6 +366,25 @@ from simplecadapi._cpp import (
     SketchSolverBackend,
     SketchSolveResult,
     SketchSolverOptions,
+    # bind_surface_editing.cpp
+    convert_to_bspline_redge,
+    convert_to_bspline_rface,
+    elevate_curve_degree_redge,
+    elevate_surface_degree_rface,
+    insert_curve_knot_redge,
+    insert_surface_knot_rface,
+    inspect_curve_rcurvedata,
+    inspect_surface_rsurfacedata,
+    move_curve_poles_redge,
+    move_surface_poles_rface,
+    rebuild_curve_redge,
+    rebuild_surface_rface,
+    sample_curve_rcurvature,
+    sample_surface_risocurves,
+    set_curve_poles_redge,
+    set_curve_weights_redge,
+    set_surface_poles_rface,
+    set_surface_weights_rface,
     # bind_surface.cpp
     fill_holes_rshell,
     fit_point_grid_rface,
@@ -368,6 +414,15 @@ from .core import TaggedMixin
 from .errors import SimpleCADError
 from simplecadapi._glue.session import GraphSession
 from .operators import render_screenshot_rpath
+from .product.bodies import (
+    BodyMass,
+    BodyOverlap,
+    BodyOverlapWarning,
+    MassReport,
+    inspect_body_overlaps_rlist,
+    measure_part_mass_rmassreport,
+    part_shape,
+)
 from .product.placement import Placement
 from .product.capture import CaptureResult, capture
 from .product.packages import (
@@ -415,6 +470,7 @@ __description__ = "Simplified OpenCASCADE-native CAD modeling Python API"
 
 # Convenience aliases
 Workplane = SimpleWorkplane
+from ._glue.pieces import Pieces, TagSplitWarning  # noqa: E402  (the pieces of a split body; a split tag)
 
 # Creation-function aliases
 create_angle_arc = make_angle_arc_redge
@@ -487,6 +543,8 @@ __all__ = [
     "exporter",
     # Core classes
     "CoordinateSystem",
+    "Pieces",
+    "TagSplitWarning",
     "SimpleWorkplane",
     "Workplane",
     "Vertex",
@@ -497,6 +555,25 @@ __all__ = [
     "Solid",
     "Compound",
     "AnyShape",
+    # Curve and surface editing
+    "inspect_curve_rcurvedata",
+    "inspect_surface_rsurfacedata",
+    "convert_to_bspline_redge",
+    "convert_to_bspline_rface",
+    "set_curve_poles_redge",
+    "move_curve_poles_redge",
+    "set_curve_weights_redge",
+    "insert_curve_knot_redge",
+    "elevate_curve_degree_redge",
+    "set_surface_poles_rface",
+    "move_surface_poles_rface",
+    "set_surface_weights_rface",
+    "insert_surface_knot_rface",
+    "elevate_surface_degree_rface",
+    "rebuild_curve_redge",
+    "rebuild_surface_rface",
+    "sample_curve_rcurvature",
+    "sample_surface_risocurves",
     # Surface construction
     "SurfaceBoundary",
     "SurfaceFillingSettings",
@@ -520,6 +597,13 @@ __all__ = [
     "make_angle_arc_redge",
     "make_angle_arc_rwire",
     "make_box_rsolid",
+    "make_workplane_rworkplane",
+    "make_workplane_from_face_rworkplane",
+    "make_workplane_from_points_rworkplane",
+    "make_workplane_from_axis_rworkplane",
+    "make_workplane_midplane_rworkplane",
+    "make_workplane_normal_to_curve_rworkplane",
+    "make_workplane_offset_rworkplane",
     "load_brep_region_rsolid",
     "load_brep_region_rshell",
     "make_circle_redge",
@@ -561,12 +645,14 @@ __all__ = [
     "make_assembly_rassembly",
     "add_component_rassembly",
     "place_component_rassembly",
+    "explode_rassembly",
     "make_compound_from_assembly_rcompound",
     "make_face_connector_rconnector",
     "make_edge_connector_rconnector",
     "make_vertex_connector_rconnector",
     "make_placement_connector_rconnector",
     "add_connector_rpart",
+    "set_body_appearance_rpart",
     "set_public_connector_rassembly",
     "make_connector_ref_rconnectorref",
     "make_scalar_limit_rscalarlimit",
@@ -580,6 +666,8 @@ __all__ = [
     "add_rack_pinion_constraint_rassembly",
     "solve_assembly_constraints_rassembly",
     "measure_constraint_residual_rconstraintresidual",
+    "measure_part_mass_rmassreport",
+    "inspect_body_overlaps_rlist",
     "inspect_assembly_constraints_rconstraintreport",
     # Sketch construction and constraints
     "add_point_rsketch",
@@ -621,6 +709,18 @@ __all__ = [
     "get_sketch_entity_rsketchref",
     "get_sketch_point_rsketchref",
     "inspect_sketch_rsketchresult",
+    "inspect_sketch_rsketchprofiles",
+    "inspect_sketch_rsketchcrossings",
+    "trim_rsketch",
+    "extend_rsketch",
+    "insert_spline_anchor_rsketch",
+    "make_faces_from_sketch_rfacelist",
+    "remove_spline_anchor_rsketch",
+    "convert_spline_to_anchors_rsketch",
+    "diff_sketch_rsketchdiff",
+    "fillet_corner_rsketch",
+    "chamfer_corner_rsketch",
+    "project_rsketch",
     # Transform operations
     "mirror_shape",
     "rotate_shape",
@@ -629,6 +729,8 @@ __all__ = [
     "translate_shape",
     # 3D operations
     "draft_rsolid",
+    "inset_face_rsolid",
+    "press_pull_rsolid",
     "extrude_rsolid",
     "extrude_taper_rsolid",
     "extrude_until_rsolid",
@@ -643,9 +745,14 @@ __all__ = [
     "apply_tag",
     "apply_tag_rselection",
     "explain_tag",
+    "list_tag_splits",
     "list_tags",
     "select_edges_by_tag",
     "select_faces_by_tag",
+    # Stable references (scad.ref)
+    "ref",
+    "ElementRef",
+    "ElementRefError",
     # Boolean operations
     "boolean_rsolidlist",
     "cut_rsolid",
@@ -829,6 +936,7 @@ __all__ = [
     "ConstraintResidual",
     "GeometryRef",
     "Material",
+    "Body",
     "Part",
     "Placement",
     "ScalarLimit",

@@ -237,3 +237,17 @@
     background-position: 24px 0;
   }
 }
+
+/* A row of buttons or tabs that keeps one line: past the width it scrolls sideways (a thin bar; the mouse wheel scrolls
+ * it too, see lib/scroll-row.ts) instead of breaking onto a second line. */
+@utility scroll-row {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+  & > * {
+    flex-shrink: 0;
+  }
+}

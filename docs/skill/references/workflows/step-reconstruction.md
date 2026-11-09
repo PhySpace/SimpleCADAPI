@@ -10,6 +10,43 @@ Use when the deliverable is an editable/replayable model reproducing a target
 `.step`/`.stp`. Not for read-only questions about a STEP file — those stay in
 `domains/step-inspection.md` without reconstruction.
 
+## Read now (one parallel batch)
+
+| File | Why |
+| --- | --- |
+| `workflows/step-reconstruction.md` | this page: steps, gates, failure routes |
+| `domains/step-inspection.md` | inspection primitives, comparison ladder, acceptance hierarchy |
+| `inspect/brep-reverse-engineering.md` | normative: read completely before any inspection or comparison |
+
+## Read when
+
+| When | File |
+| --- | --- |
+| the fidelity, scope or acceptance asked for is unclear beyond step 1 | `domains/requirement-refinement.md` |
+| step 3: inferring feature families and provenance rows | `docs/guides/reconstruction-agent-strategy.md` |
+| the run is a controlled reconstruction trial | `docs/guides/reconstruction-agent-test-prompt.md` |
+| step 4: building the candidate | `workflows/single-part-modeling.md`, `domains/part-modeling.md` |
+| authoring or editing the candidate source | `discipline/feature-tree-convention.md`, `docs/guides/notebook-runtime.md` |
+| splitting the candidate into cells | `discipline/notebook-cell-design.md` |
+| constraints represent the evidence | `domains/sketch-and-features.md` |
+| the target has several components | `domains/assembly-and-product.md`, `workflows/assembly-product-build.md` |
+| re-exporting for comparison or delivery | `domains/export-and-translation.md` |
+| a comparison fails or a feature is falsified | `discipline/failure-and-repair.md` |
+| the source is a mesh, point cloud or photos, not a STEP | `workflows/scan-reconstruction.md` |
+
+## Unattended mode
+
+| Interactive gate | Unattended replacement |
+| --- | --- |
+| Step 1: ask what fidelity (exact transcription vs functional equivalence), which components, what acceptance means | Record each as an assumption in the ledger; default to the strictest acceptance the hierarchy allows (topology identity) and the whole file in scope |
+| The target STEP, or a component of it, is missing or unreadable | Record the blocker in the report; reconstruct only what the readable evidence supports; never invent the target |
+| Reconstruction tooling absent (for example the `drawing` extra) | Report the missing capability, do the strongest work without it, say which parts it supports |
+| Step 7: a structurally different but visually close stop | Allowed only with the recorded evidence the hierarchy demands (no better feature order exists or the SDK lacks the operation); the report states the acceptance tier reached |
+| A person looks at comparison renders | Look yourself: name the views (`render_step_comparison_rpath`), what you looked for, quote the observation; strict BREP comparison still decides |
+| A second reviewer of the verdict | Fresh-context checklist pass quoting observations (subagent if offered); otherwise the report says the review was not independent |
+| Same comparison failure twice for the same cause | Change the feature hypothesis or redefine the check in the report (`discipline/failure-and-repair.md`) |
+| Closing message to the person | `report.md` with the acceptance tier, iteration rows, unrecovered regions, reproduce commands (`discipline/operating-modes.md`) |
+
 ## Task decomposition
 
 ```yaml
@@ -42,6 +79,7 @@ repair_routes:
 1. **Refine the requirement**: what fidelity is required (exact transcription
    vs functional equivalence), which components are in scope, what acceptance
    means here.
+   **Unattended:** record each as an assumption; default to topology identity over the whole file.
 2. **Inventory the target economically**
    (`domains/step-inspection.md`): `inspect_step_rsummary` (with
    `include_parameter_groups=True` once), entity descriptors for specific
@@ -85,10 +123,12 @@ repair_routes:
    failed strict comparison, group causes with
    `BRepComparison.to_error_summary()`, fix related groups together, rerun a
    fresh cycle.
+   **Unattended:** look at the renders yourself and quote what you saw; the same failure twice changes the hypothesis.
 7. **Accept per the hierarchy** (`domains/step-inspection.md`): topology
    identity is the endpoint; float-level serialization drift is acceptable;
    a structurally different but visually close stop requires recorded evidence
    that no better feature order exists or the SDK lacks the operation.
+   **Unattended:** the report names the acceptance tier reached.
 
 ## Validation gates
 
@@ -107,11 +147,13 @@ repair_routes:
 - Reconstruction tooling absent (for example the `drawing` extra, which
   `simplecadapi.inspect.drawing` needs, is not installed) → report the missing
   capability rather than degrading silently.
+  **Unattended:** the report names the capability and what it would have covered.
 
 ## Deliverables
 
 Candidate source path, replay evidence, comparison evidence with verdict and
 its acceptance tier, provenance rows, and explicitly unrecovered regions.
+**Unattended:** these go in `report.md` (`discipline/operating-modes.md`).
 
 **Required reading before authoring or editing any part source in this
 workflow:** `discipline/feature-tree-convention.md` — the block-structured

@@ -124,12 +124,17 @@ Shell loft_rshell(const std::vector<LoftSection>& sections, bool ruled, const Lo
     try {
       return occt_guard([&] {
         validate_sections(sections);
-        const bool start_is_wire = std::holds_alternative<Wire>(sections.front());
-        const bool end_is_wire = std::holds_alternative<Wire>(sections.back());
+        // A closed end section is a boundary loop of its own; an open one (a surface between two curves) is a stretch
+        // of the shell's one boundary, so it has no end wire to name.
+        const auto closed = [](const LoftSection& section) {
+          return std::holds_alternative<Wire>(section) && std::get<Wire>(section).is_closed();
+        };
+        const bool start_is_wire = closed(sections.front());
+        const bool end_is_wire = closed(sections.back());
         if (tags.start_wire_tag && !start_is_wire)
-          throw ValueError("start_wire_tag requires a Wire start section");
+          throw ValueError("start_wire_tag requires a closed Wire start section");
         if (tags.end_wire_tag && !end_is_wire)
-          throw ValueError("end_wire_tag requires a Wire end section");
+          throw ValueError("end_wire_tag requires a closed Wire end section");
         // Bad tag names fail before any geometry is built.
         (void)plan_output_tags(kOp, {.tag_prefix = tags.tag_prefix,
                                      .result_tag = tags.result_tag,

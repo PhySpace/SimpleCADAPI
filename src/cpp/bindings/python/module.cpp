@@ -1,11 +1,13 @@
 #include "bindings.hpp"
 #include "occt/occt.hpp"
 #include "scad/core/error.hpp"
+#include "scad/reactive/tag_view.hpp"
 
 PYBIND11_MODULE(_native, m, py::mod_gil_not_used()) {
   m.doc() = "SimpleCADAPI on OpenCASCADE, implemented in C++ (pybind11).";
   scad::set_error_module_name("simplecadapi._cpp");
   scad::pybind::register_exceptions(m);
+  scad::reactive::install_tag_view();  // tags of recorded values are read through their recorded history
 
   bind_core(m);
   bind_topo(m);
@@ -18,6 +20,7 @@ PYBIND11_MODULE(_native, m, py::mod_gil_not_used()) {
   bind_ops_features(m);
   bind_sketch(m);
   bind_surface(m);
+  bind_surface_editing(m);  // after bind_surface: adds its names to the `surface` namespace
   bind_std(m);
   bind_product(m);
   bind_canonical(m);

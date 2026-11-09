@@ -41,6 +41,7 @@ from simplecadapi._cpp import (
     union_rsolid,
 )
 from ..topology.tracking import graph_tracking_scope
+from ..types import Angle, Count, Length
 
 __all__ = ["build_ball_bearing", "make_ball_bearing_rassembly"]
 
@@ -237,18 +238,18 @@ def _ball_placement(ball_pitch_radius: float, angle_degrees: float):
 
 @graph_tracking_scope
 def make_ball_bearing_rassembly(
-    bore_diameter: float,
-    outer_diameter: float,
-    bearing_width: float,
-    ball_diameter: float,
-    ball_count: Optional[int] = None,
-    raceway_clearance: float = 0.02,
-    edge_chamfer: float = 0.0,
+    bore_diameter: Length,
+    outer_diameter: Length,
+    bearing_width: Length,
+    ball_diameter: Length,
+    ball_count: Count | None = None,
+    raceway_clearance: Length = 0.02,
+    edge_chamfer: Length = 0.0,
     assembly_id: str = "ball_bearing",
-    drive_angle_degrees: Optional[float] = None,
+    drive_angle_degrees: Angle | None = None,
     fuse_rolling_elements: bool = False,
-    rolling_element_fuse_overlap: float = 0.01,
-    material: Optional[Material] = None,
+    rolling_element_fuse_overlap: Length = 0.01,
+    material: Material | None = None,
 ) -> Assembly:
     """Create a parameterized radial ball bearing assembly.
 

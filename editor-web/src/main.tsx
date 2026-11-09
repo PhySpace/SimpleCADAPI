@@ -3,6 +3,10 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./App";
 import "./index.css";
+import "./i18n";
+import { installScrollRows } from "./lib/scroll-row";
+
+installScrollRows();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

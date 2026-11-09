@@ -45,8 +45,10 @@ from simplecadapi.operators.features import extrude_taper_rsolid
 from simplecadapi.operators.features import extrude_until_rsolid
 from simplecadapi.operators.features import fillet_rsolid
 from simplecadapi.operators.features import helical_sweep_rsolid
+from simplecadapi.operators.features import inset_face_rsolid
 from simplecadapi.operators.features import loft_rsolid
 from simplecadapi.operators.features import offset_rsolid
+from simplecadapi.operators.features import press_pull_rsolid
 from simplecadapi.operators.features import revolve_rsolid
 from simplecadapi.operators.features import shell_rsolid
 from simplecadapi.operators.features import sweep_multisection_rsolid
@@ -112,6 +114,13 @@ from simplecadapi.operators.geometry import make_three_point_arc_rwire
 from simplecadapi.operators.geometry import make_three_point_arc_rwire as create_arc_wire
 from simplecadapi.operators.geometry import make_wire_from_edges_rwire
 from simplecadapi.operators.geometry import make_wire_from_edges_rwire as create_wire_from_edges
+from simplecadapi.operators.geometry import make_workplane_from_axis_rworkplane
+from simplecadapi.operators.geometry import make_workplane_from_face_rworkplane
+from simplecadapi.operators.geometry import make_workplane_from_points_rworkplane
+from simplecadapi.operators.geometry import make_workplane_midplane_rworkplane
+from simplecadapi.operators.geometry import make_workplane_normal_to_curve_rworkplane
+from simplecadapi.operators.geometry import make_workplane_offset_rworkplane
+from simplecadapi.operators.geometry import make_workplane_rworkplane
 from simplecadapi.operators.product import add_belt_constraint_rassembly
 from simplecadapi.operators.product import add_component_rassembly
 from simplecadapi.operators.product import add_connector_rpart
@@ -121,6 +130,7 @@ from simplecadapi.operators.product import add_prismatic_constraint_rassembly
 from simplecadapi.operators.product import add_rack_pinion_constraint_rassembly
 from simplecadapi.operators.product import add_revolute_constraint_rassembly
 from simplecadapi.operators.product import assign_material_rpart
+from simplecadapi.operators.product import explode_rassembly
 from simplecadapi.operators.product import ground_component_rassembly
 from simplecadapi.operators.product import identity_placement_rplacement
 from simplecadapi.operators.product import inspect_assembly_constraints_rconstraintreport
@@ -137,12 +147,14 @@ from simplecadapi.operators.product import make_scalar_limit_rscalarlimit
 from simplecadapi.operators.product import make_vertex_connector_rconnector
 from simplecadapi.operators.product import measure_constraint_residual_rconstraintresidual
 from simplecadapi.operators.product import place_component_rassembly
+from simplecadapi.operators.product import set_body_appearance_rpart
 from simplecadapi.operators.product import set_public_connector_rassembly
 from simplecadapi.operators.product import solve_assembly_constraints_rassembly
 from simplecadapi.operators.product import unground_component_rassembly
 from simplecadapi.operators.selection import apply_tag
 from simplecadapi.operators.selection import apply_tag_rselection
 from simplecadapi.operators.selection import explain_tag
+from simplecadapi.operators.selection import list_tag_splits
 from simplecadapi.operators.selection import list_tags
 from simplecadapi.operators.selection import select_edges_by_tag
 from simplecadapi.operators.selection import select_faces_by_tag
@@ -152,6 +164,7 @@ from simplecadapi.operators.sketch import add_circle_rsketch
 from simplecadapi.operators.sketch import add_ellipse_rsketch
 from simplecadapi.operators.sketch import add_line_rsketch
 from simplecadapi.operators.sketch import add_point_rsketch
+from simplecadapi.operators.sketch import chamfer_corner_rsketch
 from simplecadapi.operators.sketch import constrain_angle_rsketch
 from simplecadapi.operators.sketch import constrain_coincident_rsketch
 from simplecadapi.operators.sketch import constrain_collinear_rsketch
@@ -182,12 +195,23 @@ from simplecadapi.operators.sketch import constrain_radius_rsketch
 from simplecadapi.operators.sketch import constrain_symmetric_rsketch
 from simplecadapi.operators.sketch import constrain_tangent_rsketch
 from simplecadapi.operators.sketch import constrain_vertical_rsketch
+from simplecadapi.operators.sketch import convert_spline_to_anchors_rsketch
+from simplecadapi.operators.sketch import diff_sketch_rsketchdiff
+from simplecadapi.operators.sketch import extend_rsketch
+from simplecadapi.operators.sketch import fillet_corner_rsketch
 from simplecadapi.operators.sketch import get_sketch_entity_rsketchref
 from simplecadapi.operators.sketch import get_sketch_point_rsketchref
+from simplecadapi.operators.sketch import insert_spline_anchor_rsketch
+from simplecadapi.operators.sketch import inspect_sketch_rsketchcrossings
+from simplecadapi.operators.sketch import inspect_sketch_rsketchprofiles
 from simplecadapi.operators.sketch import inspect_sketch_rsketchresult
 from simplecadapi.operators.sketch import make_face_from_sketch_rface
+from simplecadapi.operators.sketch import make_faces_from_sketch_rfacelist
 from simplecadapi.operators.sketch import make_sketch_rsketch
 from simplecadapi.operators.sketch import make_wire_from_sketch_rwire
+from simplecadapi.operators.sketch import project_rsketch
+from simplecadapi.operators.sketch import remove_spline_anchor_rsketch
+from simplecadapi.operators.sketch import trim_rsketch
 from simplecadapi.operators.transform import linear_pattern_rsolidlist
 from simplecadapi.operators.transform import mirror_shape
 from simplecadapi.operators.transform import radial_pattern_rsolidlist
@@ -243,6 +267,7 @@ from simplecadapi.product.constraint import ConstraintReport
 from simplecadapi.product.constraint import ConstraintResidual
 from simplecadapi.product.constraint import ScalarLimit
 from simplecadapi.product.material import Material
+from simplecadapi.product.part import Body
 from simplecadapi.product.part import Part
 from simplecadapi.product.placement import Placement
 from simplecadapi.product.solver import inspect_assembly_constraints
@@ -260,9 +285,17 @@ from simplecadapi.sketch import SketchRef
 from simplecadapi.sketch import SketchSolveResult
 from simplecadapi.surface import SurfaceBoundary
 from simplecadapi.surface import SurfaceFillingSettings
+from simplecadapi.surface import convert_to_bspline_redge
+from simplecadapi.surface import convert_to_bspline_rface
+from simplecadapi.surface import elevate_curve_degree_redge
+from simplecadapi.surface import elevate_surface_degree_rface
 from simplecadapi.surface import fill_holes_rshell
 from simplecadapi.surface import fit_point_grid_rface
 from simplecadapi.surface import free_boundaries_rwirelist
+from simplecadapi.surface import insert_curve_knot_redge
+from simplecadapi.surface import insert_surface_knot_rface
+from simplecadapi.surface import inspect_curve_rcurvedata
+from simplecadapi.surface import inspect_surface_rsurfacedata
 from simplecadapi.surface import loft_rshell
 from simplecadapi.surface import make_bezier_surface_rface
 from simplecadapi.surface import make_cylindrical_surface_rface
@@ -270,6 +303,16 @@ from simplecadapi.surface import make_gordon_surface_rface
 from simplecadapi.surface import make_ruled_surface_rface
 from simplecadapi.surface import make_solid_from_shell_rsolid
 from simplecadapi.surface import make_surface_patch_rface
+from simplecadapi.surface import move_curve_poles_redge
+from simplecadapi.surface import move_surface_poles_rface
+from simplecadapi.surface import rebuild_curve_redge
+from simplecadapi.surface import rebuild_surface_rface
+from simplecadapi.surface import sample_curve_rcurvature
+from simplecadapi.surface import sample_surface_risocurves
+from simplecadapi.surface import set_curve_poles_redge
+from simplecadapi.surface import set_curve_weights_redge
+from simplecadapi.surface import set_surface_poles_rface
+from simplecadapi.surface import set_surface_weights_rface
 from simplecadapi.surface import sew_faces_rshell
 from simplecadapi.surface import trim_surface_rface
 from simplecadapi.topology import tagging
@@ -305,7 +348,7 @@ import numpy.typing
 import simplecadapi.core
 import simplecadapi.params.units
 import typing
-__all__: list[str] = ['ANGLE', 'AREA', 'AnyShape', 'Assembly', 'BSplineFitResult', 'BlendDiagnosis', 'BooleanDiagnosis', 'CM', 'CUBIC_CM', 'CUBIC_FOOT', 'CUBIC_INCH', 'CUBIC_M', 'CUBIC_MM', 'Component', 'Compound', 'Connector', 'ConnectorAnchor', 'ConnectorRef', 'Const', 'Constraint', 'ConstraintReport', 'ConstraintResidual', 'CoordinateSystem', 'DEGREE', 'DIMENSIONLESS', 'Dimension', 'DimensionTolerance', 'Edge', 'ExecutorRegistry', 'Expr', 'ExprBase', 'ExpressionGraph', 'FOOT', 'Face', 'FrameGraph', 'FrameNode', 'GeometryRef', 'GraphSession', 'INCH', 'LENGTH', 'LineageDerivation', 'LineagePolicy', 'M', 'MM', 'Material', 'Mesh', 'NodeFailure', 'ONE', 'OperationGraph', 'OperationNode', 'PERCENT', 'Part', 'Placement', 'PublicConnectorRef', 'RADIAN', 'RecomputeReport', 'RenderFrame', 'RenderPanel', 'RenderScene', 'SQUARE_CM', 'SQUARE_FOOT', 'SQUARE_INCH', 'SQUARE_M', 'SQUARE_MM', 'ScalarLimit', 'SemanticDelta', 'SemanticRef', 'Shell', 'SimpleWorkplane', 'Sketch', 'SketchConstraint', 'SketchConstraintDiagnostic', 'SketchEntity', 'SketchRef', 'SketchSolveResult', 'SketchSolverBackend', 'SketchSolverOptions', 'Solid', 'StaleLineageError', 'SurfaceBoundary', 'SurfaceFillingSettings', 'TagAttachment', 'TagBinding', 'TagBindingScope', 'TagCertainty', 'TagEvidence', 'TagEvidenceKind', 'TagLifecycle', 'TagLineageWitness', 'TagPolicy', 'TagProducer', 'TagProducerKind', 'TagPropagation', 'TagScope', 'TagTarget', 'TagTargetKind', 'TopologyPropagation', 'TrackingPolicy', 'Unit', 'UnitValidationError', 'VOLUME', 'Var', 'Vec3', 'Vertex', 'WORLD_CS', 'Wire', 'Workplane', 'acos', 'add_arc_rsketch', 'add_belt_constraint_rassembly', 'add_bspline_rsketch', 'add_circle_rsketch', 'add_component_rassembly', 'add_connector_rpart', 'add_ellipse_rsketch', 'add_fixed_constraint_rassembly', 'add_gear_constraint_rassembly', 'add_line_rsketch', 'add_point_rsketch', 'add_prismatic_constraint_rassembly', 'add_rack_pinion_constraint_rassembly', 'add_revolute_constraint_rassembly', 'apply_tag', 'apply_tag_rselection', 'asin', 'assert_blend_volume_monotonic', 'assign_material_rpart', 'atan', 'atan2', 'boolean_rsolidlist', 'canonical_brep_bytes', 'canonical_bytes', 'canonical_hash', 'canonical_unit_for_dimension', 'canonicalize_params', 'chamfer_rsolid', 'clone_semantic_view', 'const', 'constrain_angle_rsketch', 'constrain_coincident_rsketch', 'constrain_collinear_rsketch', 'constrain_concentric_rsketch', 'constrain_connect_rsketch', 'constrain_diameter_rsketch', 'constrain_distance_rsketch', 'constrain_distance_x_rsketch', 'constrain_distance_y_rsketch', 'constrain_equal_length_rsketch', 'constrain_equal_radius_rsketch', 'constrain_fix_rsketch', 'constrain_horizontal_rsketch', 'constrain_length_rsketch', 'constrain_line_distance_rsketch', 'constrain_major_radius_rsketch', 'constrain_midpoint_points_rsketch', 'constrain_midpoint_rsketch', 'constrain_minor_radius_rsketch', 'constrain_mirror_rsketch', 'constrain_normal_rsketch', 'constrain_parallel_rsketch', 'constrain_perpendicular_rsketch', 'constrain_point_on_rsketch', 'constrain_points_horizontal_rsketch', 'constrain_points_vertical_rsketch', 'constrain_radius_rsketch', 'constrain_symmetric_rsketch', 'constrain_tangent_rsketch', 'constrain_vertical_rsketch', 'constraint_reports_match', 'convert_value', 'cos', 'create_angle_arc', 'create_angle_arc_wire', 'create_arc', 'create_arc_wire', 'create_box', 'create_circle_edge', 'create_circle_face', 'create_circle_wire', 'create_cylinder', 'create_face_from_wire', 'create_face_from_wires', 'create_helix', 'create_helix_wire', 'create_interpolated_spline', 'create_interpolated_spline_wire', 'create_line', 'create_periodic_spline_wire', 'create_point', 'create_polyline_wire', 'create_rectangle_face', 'create_rectangle_wire', 'create_segment', 'create_segment_wire', 'create_sphere', 'create_spline', 'create_spline_wire', 'create_wire_from_edges', 'current_tracking_policy', 'cut_rsolid', 'cut_rsolid_list', 'deserialize_shape', 'diagnose_blend_failure', 'diagnose_boolean_failure', 'draft_rsolid', 'evaluate_scalar', 'evaluate_value', 'explain_tag', 'export_brep', 'export_glb', 'export_obj', 'export_step', 'export_step_assembly', 'export_stl', 'expression_uses_units', 'extrude_rsolid', 'extrude_taper_rsolid', 'extrude_until_rsolid', 'fill_holes_rshell', 'fillet_rsolid', 'find_registered_node', 'fit_cubic_bspline_control_points', 'fit_point_grid_rface', 'forget_graph_nodes', 'free_boundaries_rwirelist', 'from_brep', 'get_active_session', 'get_current_cs', 'get_default_sketch_solver_backend', 'get_sketch_entity_rsketchref', 'get_sketch_point_rsketchref', 'get_sketch_solver_backend', 'get_unit', 'global_executor_registry', 'ground_component_rassembly', 'helical_sweep_rsolid', 'identity_placement_rplacement', 'import_brep', 'import_step', 'import_stl', 'import_stl_shape', 'infer_dimension', 'inspect_assembly_constraints', 'inspect_assembly_constraints_rconstraintreport', 'inspect_sketch_rsketchresult', 'intersect_rsolid', 'isolated_recording', 'lift_scalar', 'linear_pattern_rsolidlist', 'list_tags', 'load_brep_region_rshell', 'load_brep_region_rsolid', 'loft_rshell', 'loft_rsolid', 'make_2d_cut_rface', 'make_2d_intersect_rface', 'make_2d_union_rface', 'make_angle_arc_redge', 'make_angle_arc_rwire', 'make_assembly_rassembly', 'make_bezier_surface_rface', 'make_box_rsolid', 'make_circle_redge', 'make_circle_rface', 'make_circle_rwire', 'make_compound_from_assembly_rcompound', 'make_cone_rsolid', 'make_connector_ref_rconnectorref', 'make_cylinder_rsolid', 'make_cylindrical_surface_rface', 'make_edge_connector_rconnector', 'make_ellipse_redge', 'make_ellipse_rface', 'make_ellipse_rwire', 'make_face_connector_rconnector', 'make_face_from_sketch_rface', 'make_face_from_wire_rface', 'make_face_from_wires_rface', 'make_gordon_surface_rface', 'make_helix_redge', 'make_helix_rwire', 'make_interpolated_spline_redge', 'make_interpolated_spline_rwire', 'make_line_redge', 'make_material_rmaterial', 'make_param_spec', 'make_part_rpart', 'make_periodic_spline_rwire', 'make_placement_connector_rconnector', 'make_placement_rplacement', 'make_point_rvertex', 'make_polyline_rwire', 'make_rectangle_rface', 'make_rectangle_rwire', 'make_ruled_surface_rface', 'make_scalar_limit_rscalarlimit', 'make_segment_redge', 'make_segment_rwire', 'make_sketch_rsketch', 'make_solid_from_shell_rsolid', 'make_sphere_rsolid', 'make_spline_redge', 'make_spline_rwire', 'make_surface_patch_rface', 'make_three_point_arc_redge', 'make_three_point_arc_rwire', 'make_vertex_connector_rconnector', 'make_wire_from_edges_rwire', 'make_wire_from_sketch_rwire', 'math', 'measure_constraint_residual_rconstraintresidual', 'mesh', 'mirror_shape', 'offset_rsolid', 'parse_ui_comment', 'place_component_rassembly', 'ql', 'radial_pattern_rsolidlist', 'raise_loft_failure_if_diagnosed', 'record_operation_if_active', 'recording_active', 'referenced_expressions', 'register_executor', 'register_graph_nodes', 'register_node', 'register_sketch_solver_backend', 'render_auto_view', 'render_default_threads', 'render_edge_polylines', 'render_scene', 'render_view_preset', 'resolve_connector', 'resolve_connector_placement', 'resolve_connector_ref_placement', 'resolve_item_connector', 'resolve_item_connector_placement', 'revolve_rsolid', 'rotate_shape', 'same_node_content', 'scale_rsolid', 'select_edges_by_tag', 'select_faces_by_tag', 'serialize_shape', 'set_default_sketch_solver_backend', 'set_producer_version', 'set_public_connector_rassembly', 'sew_faces_rshell', 'shell_rsolid', 'sin', 'sketch_solver_backend', 'solve_assembly_constraints', 'solve_assembly_constraints_rassembly', 'sqrt', 'std', 'step_bytes', 'surface', 'suspend_graph_recording', 'sweep_multisection_rsolid', 'sweep_rsolid', 'tagging', 'tan', 'tessellate_solid', 'tracking_policy_scope', 'transform_rsolid', 'translate_shape', 'trim_surface_rface', 'twisted_sweep_rsolid', 'unground_component_rassembly', 'union_rsolid', 'unit_from_payload', 'unit_to_payload', 'upstream_closure', 'use_coordinate_system', 'var']
+__all__: list[str] = ['ANGLE', 'AREA', 'AnyShape', 'Assembly', 'BSplineFitResult', 'BlendDiagnosis', 'Body', 'BooleanDiagnosis', 'CM', 'CUBIC_CM', 'CUBIC_FOOT', 'CUBIC_INCH', 'CUBIC_M', 'CUBIC_MM', 'Component', 'Compound', 'Connector', 'ConnectorAnchor', 'ConnectorRef', 'Const', 'Constraint', 'ConstraintReport', 'ConstraintResidual', 'CoordinateSystem', 'DEGREE', 'DIMENSIONLESS', 'Dimension', 'DimensionTolerance', 'Edge', 'ExecutorRegistry', 'Expr', 'ExprBase', 'ExpressionGraph', 'FOOT', 'Face', 'FrameGraph', 'FrameNode', 'GeometryRef', 'GraphSession', 'INCH', 'LENGTH', 'LineageDerivation', 'LineagePolicy', 'M', 'MM', 'Material', 'Mesh', 'NodeFailure', 'ONE', 'OperationGraph', 'OperationNode', 'PERCENT', 'Part', 'Placement', 'PublicConnectorRef', 'RADIAN', 'RecomputeReport', 'RenderFrame', 'RenderPanel', 'RenderScene', 'SQUARE_CM', 'SQUARE_FOOT', 'SQUARE_INCH', 'SQUARE_M', 'SQUARE_MM', 'ScalarLimit', 'SemanticDelta', 'SemanticRef', 'Shell', 'SimpleWorkplane', 'Sketch', 'SketchConstraint', 'SketchConstraintDiagnostic', 'SketchEntity', 'SketchRef', 'SketchSolveResult', 'SketchSolverBackend', 'SketchSolverOptions', 'Solid', 'StaleLineageError', 'SurfaceBoundary', 'SurfaceFillingSettings', 'TagAttachment', 'TagBinding', 'TagBindingScope', 'TagCertainty', 'TagEvidence', 'TagEvidenceKind', 'TagLifecycle', 'TagLineageWitness', 'TagPolicy', 'TagProducer', 'TagProducerKind', 'TagPropagation', 'TagScope', 'TagTarget', 'TagTargetKind', 'TopologyPropagation', 'TrackingPolicy', 'Unit', 'UnitValidationError', 'VOLUME', 'Var', 'Vec3', 'Vertex', 'WORLD_CS', 'Wire', 'Workplane', 'acos', 'add_arc_rsketch', 'add_belt_constraint_rassembly', 'add_bspline_rsketch', 'add_circle_rsketch', 'add_component_rassembly', 'add_connector_rpart', 'add_ellipse_rsketch', 'add_fixed_constraint_rassembly', 'add_gear_constraint_rassembly', 'add_line_rsketch', 'add_point_rsketch', 'add_prismatic_constraint_rassembly', 'add_rack_pinion_constraint_rassembly', 'add_revolute_constraint_rassembly', 'apply_tag', 'apply_tag_rselection', 'asin', 'assert_blend_volume_monotonic', 'assign_material_rpart', 'atan', 'atan2', 'boolean_rsolidlist', 'canonical_brep_bytes', 'canonical_bytes', 'canonical_hash', 'canonical_unit_for_dimension', 'canonicalize_params', 'chamfer_corner_rsketch', 'chamfer_rsolid', 'clone_semantic_view', 'const', 'constrain_angle_rsketch', 'constrain_coincident_rsketch', 'constrain_collinear_rsketch', 'constrain_concentric_rsketch', 'constrain_connect_rsketch', 'constrain_diameter_rsketch', 'constrain_distance_rsketch', 'constrain_distance_x_rsketch', 'constrain_distance_y_rsketch', 'constrain_equal_length_rsketch', 'constrain_equal_radius_rsketch', 'constrain_fix_rsketch', 'constrain_horizontal_rsketch', 'constrain_length_rsketch', 'constrain_line_distance_rsketch', 'constrain_major_radius_rsketch', 'constrain_midpoint_points_rsketch', 'constrain_midpoint_rsketch', 'constrain_minor_radius_rsketch', 'constrain_mirror_rsketch', 'constrain_normal_rsketch', 'constrain_parallel_rsketch', 'constrain_perpendicular_rsketch', 'constrain_point_on_rsketch', 'constrain_points_horizontal_rsketch', 'constrain_points_vertical_rsketch', 'constrain_radius_rsketch', 'constrain_symmetric_rsketch', 'constrain_tangent_rsketch', 'constrain_vertical_rsketch', 'constraint_reports_match', 'convert_spline_to_anchors_rsketch', 'convert_to_bspline_redge', 'convert_to_bspline_rface', 'convert_value', 'cos', 'create_angle_arc', 'create_angle_arc_wire', 'create_arc', 'create_arc_wire', 'create_box', 'create_circle_edge', 'create_circle_face', 'create_circle_wire', 'create_cylinder', 'create_face_from_wire', 'create_face_from_wires', 'create_helix', 'create_helix_wire', 'create_interpolated_spline', 'create_interpolated_spline_wire', 'create_line', 'create_periodic_spline_wire', 'create_point', 'create_polyline_wire', 'create_rectangle_face', 'create_rectangle_wire', 'create_segment', 'create_segment_wire', 'create_sphere', 'create_spline', 'create_spline_wire', 'create_wire_from_edges', 'current_tracking_policy', 'cut_rsolid', 'cut_rsolid_list', 'deserialize_shape', 'diagnose_blend_failure', 'diagnose_boolean_failure', 'diff_sketch_rsketchdiff', 'draft_rsolid', 'elevate_curve_degree_redge', 'elevate_surface_degree_rface', 'evaluate_scalar', 'evaluate_value', 'explain_tag', 'explode_rassembly', 'export_brep', 'export_glb', 'export_obj', 'export_step', 'export_step_assembly', 'export_stl', 'expression_uses_units', 'extend_rsketch', 'extrude_rsolid', 'extrude_taper_rsolid', 'extrude_until_rsolid', 'fill_holes_rshell', 'fillet_corner_rsketch', 'fillet_rsolid', 'find_registered_node', 'fit_cubic_bspline_control_points', 'fit_point_grid_rface', 'forget_graph_nodes', 'free_boundaries_rwirelist', 'from_brep', 'get_active_session', 'get_current_cs', 'get_current_frame_source', 'get_default_sketch_solver_backend', 'get_sketch_entity_rsketchref', 'get_sketch_point_rsketchref', 'get_sketch_solver_backend', 'get_unit', 'global_executor_registry', 'ground_component_rassembly', 'helical_sweep_rsolid', 'identity_placement_rplacement', 'import_brep', 'import_step', 'import_stl', 'import_stl_shape', 'infer_dimension', 'insert_curve_knot_redge', 'insert_spline_anchor_rsketch', 'insert_surface_knot_rface', 'inset_face_rsolid', 'inspect_assembly_constraints', 'inspect_assembly_constraints_rconstraintreport', 'inspect_curve_rcurvedata', 'inspect_sketch_rsketchcrossings', 'inspect_sketch_rsketchprofiles', 'inspect_sketch_rsketchresult', 'inspect_surface_rsurfacedata', 'intersect_rsolid', 'isolated_recording', 'lift_scalar', 'linear_pattern_rsolidlist', 'list_tag_splits', 'list_tags', 'load_brep_region_rshell', 'load_brep_region_rsolid', 'loft_rshell', 'loft_rsolid', 'make_2d_cut_rface', 'make_2d_intersect_rface', 'make_2d_union_rface', 'make_angle_arc_redge', 'make_angle_arc_rwire', 'make_assembly_rassembly', 'make_bezier_surface_rface', 'make_box_rsolid', 'make_circle_redge', 'make_circle_rface', 'make_circle_rwire', 'make_compound_from_assembly_rcompound', 'make_cone_rsolid', 'make_connector_ref_rconnectorref', 'make_cylinder_rsolid', 'make_cylindrical_surface_rface', 'make_edge_connector_rconnector', 'make_ellipse_redge', 'make_ellipse_rface', 'make_ellipse_rwire', 'make_face_connector_rconnector', 'make_face_from_sketch_rface', 'make_face_from_wire_rface', 'make_face_from_wires_rface', 'make_faces_from_sketch_rfacelist', 'make_gordon_surface_rface', 'make_helix_redge', 'make_helix_rwire', 'make_interpolated_spline_redge', 'make_interpolated_spline_rwire', 'make_line_redge', 'make_material_rmaterial', 'make_param_spec', 'make_part_rpart', 'make_periodic_spline_rwire', 'make_placement_connector_rconnector', 'make_placement_rplacement', 'make_point_rvertex', 'make_polyline_rwire', 'make_rectangle_rface', 'make_rectangle_rwire', 'make_ruled_surface_rface', 'make_scalar_limit_rscalarlimit', 'make_segment_redge', 'make_segment_rwire', 'make_sketch_rsketch', 'make_solid_from_shell_rsolid', 'make_sphere_rsolid', 'make_spline_redge', 'make_spline_rwire', 'make_surface_patch_rface', 'make_three_point_arc_redge', 'make_three_point_arc_rwire', 'make_vertex_connector_rconnector', 'make_wire_from_edges_rwire', 'make_wire_from_sketch_rwire', 'make_workplane_from_axis_rworkplane', 'make_workplane_from_face_rworkplane', 'make_workplane_from_points_rworkplane', 'make_workplane_midplane_rworkplane', 'make_workplane_normal_to_curve_rworkplane', 'make_workplane_offset_rworkplane', 'make_workplane_rworkplane', 'math', 'measure_constraint_residual_rconstraintresidual', 'mesh', 'mirror_shape', 'move_curve_poles_redge', 'move_surface_poles_rface', 'offset_rsolid', 'parse_ui_comment', 'place_component_rassembly', 'press_pull_rsolid', 'project_rsketch', 'ql', 'radial_pattern_rsolidlist', 'raise_loft_failure_if_diagnosed', 'rebuild_curve_redge', 'rebuild_surface_rface', 'record_operation_if_active', 'recording_active', 'referenced_expressions', 'register_executor', 'register_graph_nodes', 'register_node', 'register_sketch_solver_backend', 'remove_spline_anchor_rsketch', 'render_auto_view', 'render_default_threads', 'render_edge_polylines', 'render_scene', 'render_view_preset', 'resolve_connector', 'resolve_connector_placement', 'resolve_connector_ref_placement', 'resolve_item_connector', 'resolve_item_connector_placement', 'revolve_rsolid', 'rotate_shape', 'same_node_content', 'sample_curve_rcurvature', 'sample_surface_risocurves', 'scale_rsolid', 'select_edges_by_tag', 'select_faces_by_tag', 'serialize_shape', 'set_body_appearance_rpart', 'set_curve_poles_redge', 'set_curve_weights_redge', 'set_default_sketch_solver_backend', 'set_producer_version', 'set_public_connector_rassembly', 'set_surface_poles_rface', 'set_surface_weights_rface', 'sew_faces_rshell', 'shell_rsolid', 'sin', 'sketch_solver_backend', 'solve_assembly_constraints', 'solve_assembly_constraints_rassembly', 'sqrt', 'std', 'step_bytes', 'surface', 'suspend_graph_recording', 'sweep_multisection_rsolid', 'sweep_rsolid', 'tagging', 'tan', 'tessellate_solid', 'tracking_policy_scope', 'transform_rsolid', 'translate_shape', 'trim_rsketch', 'trim_surface_rface', 'twisted_sweep_rsolid', 'unground_component_rassembly', 'union_rsolid', 'unit_from_payload', 'unit_to_payload', 'upstream_closure', 'use_coordinate_system', 'var']
 class AnyShape:
     """
     Tag mixin that provides tagging support for geometry objects.
@@ -708,7 +751,11 @@ class _TrackingPolicyScope:
         ...
     def __exit__(self, *args) -> None:
         ...
-def _brep_region_path(path: typing.Any, *, for_graph: bool) -> str:
+def _anchors_for_role(node: OperationNode, role: str) -> list:
+    """
+    The anchors of the node's entities with a kernel output role.
+    """
+def _brep_region_path(path: str | os.PathLike[str], *, for_graph: bool) -> str:
     """
     The checks on a .scadbrep locator (graph replay: relative, no drive, no '..', '/' separators).
     """
@@ -732,6 +779,14 @@ def _interpolated_bspline_edge(points: collections.abc.Sequence[typing.Annotated
     """
     An interpolating B-spline edge through the points (GeomAPI_Interpolate).
     """
+def _locate_anchor(within: OperationNode, stable: typing.Any) -> typing.Any:
+    """
+    The anchor {node_id, output_slot, kind, topo_id} a stable anchor names upstream of `within`, or None.
+    """
+def _resolve_by_history(target: OperationNode, anchor: dict, target_slot: typing.SupportsInt | typing.SupportsIndex = 0, follow: str = 'identity') -> typing.Any:
+    """
+    Follow an element anchor {node_id, output_slot, kind, topo_id} through the recorded topology deltas to output `target_slot` of node `target`: {status: ok|split|merged|lost, targets, hops, lost_at, reason}.
+    """
 def _sample_edge_points(edge: AnyShape, samples: typing.SupportsInt | typing.SupportsIndex = 16) -> list[typing.Annotated[list[float], "FixedSize(3)"]]:
     """
     Points along an edge, evenly in parameter.
@@ -739,6 +794,22 @@ def _sample_edge_points(edge: AnyShape, samples: typing.SupportsInt | typing.Sup
 def _set_diagnostic_image_provider(provider: typing.Any) -> None:
     """
     Install provider(kind, operation, view, caption, dedup_key, shapes, payload) -> evidence dict or None: it draws the pictures a failing operation asks for.  None removes it.
+    """
+def _stable_anchor(within: OperationNode, anchor: dict) -> typing.Any:
+    """
+    The re-execution-stable form {feature, op, occurrence, output_slot, kind, role, role_ordinal, topo_id} of an anchor whose node is `within` or upstream of it.
+    """
+def _stable_candidates(within: OperationNode, stable: typing.Any) -> list:
+    """
+    The node ids upstream of `within` that share the stable anchor's (feature, op, occurrence).
+    """
+def _stable_node_key(node: OperationNode) -> tuple[str, str, int]:
+    """
+    (feature, op, occurrence) of a node: what a stable anchor names it by.
+    """
+def _subshapes_by_recorded_id(root: AnyShape, kind: str, topo_ids: collections.abc.Sequence[str]) -> list:
+    """
+    The sub-shapes of `root` with recorded topo ids ('face_face_5'); ValueError for one that is absent.
     """
 def canonical_brep_bytes(shape: AnyShape) -> bytes:
     """
@@ -801,6 +872,8 @@ def from_brep(data: bytes, require_valid: bool = False) -> typing.Any:
     from_brep(data: bytes) -> Shape
     The shape (Solid, Face, ...) stored in BinTools or ASCII BRep bytes.
     """
+def get_current_frame_source() -> typing.Any:
+    ...
 def get_default_sketch_solver_backend() -> SketchSolverBackend:
     ...
 def get_sketch_solver_backend(name: str | None = None) -> SketchSolverBackend:
@@ -884,7 +957,7 @@ def tessellate_solid(shape: AnyShape, *, linear_deflection: typing.SupportsFloat
     """
     (vertices Nx3 float64, triangles Mx3 int32): the shape's surface tessellated, vertices welded.
     """
-def tracking_policy_scope(policy: typing.Any) -> _TrackingPolicyScope:
+def tracking_policy_scope(policy: typing.Literal['full', 'graph'] | simplecadapi._cpp.TrackingPolicy) -> _TrackingPolicyScope:
     """
     Run a block with graph-only or full topology tracking.
     """
@@ -913,3 +986,4 @@ SQUARE_M: simplecadapi.params.units.Unit  # value = Unit(symbol='m^2', dimension
 SQUARE_MM: simplecadapi.params.units.Unit  # value = Unit(symbol='mm^2', dimension=Dimension(length=2, angle=0), scale_to_canonical=1.0)
 VOLUME: simplecadapi.params.units.Dimension  # value = Dimension(length=3, angle=0)
 WORLD_CS: simplecadapi.core.CoordinateSystem  # value = CoordinateSystem(origin=(0, 0, 0), x_axis=(1, 0, 0), y_axis=(0, 1, 0))
+_naming_version: str = 'scad-naming/1'

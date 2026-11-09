@@ -212,7 +212,17 @@ def _definition_refs(definition: Definition) -> list[Mapping[str, Any]]:
                 f"definition blob path {path!r} outside its semantic domain {role.path_prefix!r}"
             )
         refs.append(ref.to_dict())
+    for body in getattr(definition, "bodies", ()) or ():  # every body of a multi-body part has its own BRep and snapshot
+        refs.extend(_checked_body_refs((body.body_ref.to_dict(), body.topology_snapshot_ref.to_dict())))
     return refs
+
+
+def _checked_body_refs(refs: tuple[Mapping[str, Any], ...]) -> list[Mapping[str, Any]]:
+    for ref, prefix in zip(refs, ("body/", "topology/")):
+        path = str(ref["path"])
+        if not path.startswith(prefix):
+            raise ProductPackageError(f"definition blob path {path!r} outside its semantic domain {prefix!r}")
+    return list(refs)
 
 
 def _definition_closure(root: Definition) -> dict[str, Definition]:
@@ -624,6 +634,10 @@ def _definition_refs_from_manifest(kind: str, manifest: Mapping[str, Any]) -> li
                 f"definition blob path {path!r} outside its semantic domain {role.path_prefix!r}"
             )
         refs.append(ref)
+    if kind == "single_solid":
+        cache = manifest.get("solid_cache")
+        for body in (cache.get("bodies") or ()) if isinstance(cache, Mapping) else ():
+            refs.extend(_checked_body_refs((body["body_ref"], body["topology_snapshot_ref"])))
     return refs
 
 

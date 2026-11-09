@@ -31,6 +31,7 @@ from ..errors import raise_harness_error
 from simplecadapi._cpp import (
     AnyShape,
     Assembly,
+    Body,
     Compound,
     Connector,
     ConnectorRef,
@@ -41,6 +42,7 @@ from simplecadapi._cpp import (
     Material,
     Part,
     ScalarLimit,
+    SimpleWorkplane,
     Shell,
     Sketch,
     Solid,
@@ -111,6 +113,13 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
         "status": "replayable",
         "op": "make_wire_from_edges_rwire",
     },
+    "make_workplane_rworkplane": {"status": "replayable", "op": "make_workplane_rworkplane"},
+    "make_workplane_from_face_rworkplane": {"status": "replayable", "op": "make_workplane_from_face_rworkplane"},
+    "make_workplane_from_points_rworkplane": {"status": "replayable", "op": "make_workplane_from_points_rworkplane"},
+    "make_workplane_from_axis_rworkplane": {"status": "replayable", "op": "make_workplane_from_axis_rworkplane"},
+    "make_workplane_midplane_rworkplane": {"status": "replayable", "op": "make_workplane_midplane_rworkplane"},
+    "make_workplane_normal_to_curve_rworkplane": {"status": "replayable", "op": "make_workplane_normal_to_curve_rworkplane"},
+    "make_workplane_offset_rworkplane": {"status": "replayable", "op": "make_workplane_offset_rworkplane"},
     "make_sketch_rsketch": {"status": "replayable", "op": "make_sketch_rsketch"},
     "add_point_rsketch": {"status": "replayable", "op": "add_point_rsketch"},
     "add_line_rsketch": {"status": "replayable", "op": "add_line_rsketch"},
@@ -118,6 +127,18 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
     "add_arc_rsketch": {"status": "replayable", "op": "add_arc_rsketch"},
     "add_bspline_rsketch": {"status": "replayable", "op": "add_bspline_rsketch"},
     "add_ellipse_rsketch": {"status": "replayable", "op": "add_ellipse_rsketch"},
+    "trim_rsketch": {"status": "replayable", "op": "trim_rsketch"},
+    "extend_rsketch": {"status": "replayable", "op": "extend_rsketch"},
+    "fillet_corner_rsketch": {"status": "replayable", "op": "fillet_corner_rsketch"},
+    "chamfer_corner_rsketch": {"status": "replayable", "op": "chamfer_corner_rsketch"},
+    "project_rsketch": {"status": "replayable", "op": "project_rsketch"},
+    "insert_spline_anchor_rsketch": {"status": "replayable", "op": "insert_spline_anchor_rsketch"},
+    "remove_spline_anchor_rsketch": {"status": "replayable", "op": "remove_spline_anchor_rsketch"},
+    "convert_spline_to_anchors_rsketch": {"status": "replayable", "op": "convert_spline_to_anchors_rsketch"},
+    "diff_sketch_rsketchdiff": {
+        "status": "diagnostic",
+        "reason": "Compares two sketches for inspection only; the edit that made the difference is the recorded node.",
+    },
     "constrain_coincident_rsketch": {
         "status": "replayable",
         "op": "make_constrain_coincident_rsketch",
@@ -242,6 +263,14 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
         "status": "diagnostic",
         "reason": "Runs the sketch solver for inspection only; solve evidence is recorded on sketch promotion nodes.",
     },
+    "inspect_sketch_rsketchcrossings": {
+        "status": "diagnostic",
+        "reason": "Lists where the solved sketch's curves cross, for inspection only; an edit that uses a crossing is the recorded node.",
+    },
+    "inspect_sketch_rsketchprofiles": {
+        "status": "diagnostic",
+        "reason": "Lists the profiles of the solved sketch for inspection only; promotion records the chosen profile.",
+    },
     "make_wire_from_sketch_rwire": {
         "status": "replayable",
         "op": "make_wire_from_sketch_rwire",
@@ -267,6 +296,10 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
         "status": "replayable",
         "op": "make_assign_material_rpart",
     },
+    "set_body_appearance_rpart": {
+        "status": "replayable",
+        "op": "make_set_body_appearance_rpart",
+    },
     "make_assembly_rassembly": {
         "status": "replayable",
         "op": "make_assembly_rassembly",
@@ -279,6 +312,7 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
         "status": "replayable",
         "op": "make_place_component_rassembly",
     },
+    "explode_rassembly": {"status": "replayable", "op": "explode_rassembly"},
     "make_compound_from_assembly_rcompound": {
         "status": "replayable",
         "op": "make_compound_from_assembly_rcompound",
@@ -351,6 +385,14 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
     "measure_constraint_residual_rconstraintresidual": {
         "status": "diagnostic",
         "reason": "Measures current constraint residuals without changing model state.",
+    },
+    "inspect_body_overlaps_rlist": {
+        "status": "diagnostic",
+        "reason": "Reports which bodies of a Part share volume without changing model state.",
+    },
+    "measure_part_mass_rmassreport": {
+        "status": "diagnostic",
+        "reason": "Measures volume and mass of each body without changing model state.",
     },
     "inspect_assembly_constraints_rconstraintreport": {
         "status": "diagnostic",
@@ -429,6 +471,12 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
     "sweep_multisection_rsolid": {"status": "replayable", "op": "make_sweep_multisection_rsolid"},
     "extrude_until_rsolid": {"status": "replayable", "op": "make_extrude_until_rsolid"},
     "draft_rsolid": {"status": "replayable", "op": "make_draft_rsolid"},
+    "inset_face_rsolid": {"status": "replayable", "op": "make_inset_face_rsolid"},
+    "press_pull_rsolid": {
+        "status": "expanded_macro",
+        "op": "make_extrude_rsolid",
+        "reason": "Recorded as make_extrude_rsolid of the face, then make_union_rsolid (pull) or make_cut_rsolid (press).",
+    },
     "mirror_shape": {"status": "replayable", "op": "make_mirror_rshape"},
     "extrude_rsolid": {"status": "replayable", "op": "make_extrude_rsolid"},
     "revolve_rsolid": {"status": "replayable", "op": "make_revolve_rsolid"},
@@ -479,6 +527,36 @@ PUBLIC_API_COVERAGE: Dict[str, Dict[str, str]] = {
         "op": "make_cylindrical_surface_rface",
     },
     "trim_surface_rface": {"status": "replayable", "op": "trim_surface_rface"},
+    "convert_to_bspline_redge": {"status": "replayable", "op": "convert_to_bspline_redge"},
+    "convert_to_bspline_rface": {"status": "replayable", "op": "convert_to_bspline_rface"},
+    "set_curve_poles_redge": {"status": "replayable", "op": "set_curve_poles_redge"},
+    "move_curve_poles_redge": {"status": "replayable", "op": "move_curve_poles_redge"},
+    "set_curve_weights_redge": {"status": "replayable", "op": "set_curve_weights_redge"},
+    "insert_curve_knot_redge": {"status": "replayable", "op": "insert_curve_knot_redge"},
+    "elevate_curve_degree_redge": {"status": "replayable", "op": "elevate_curve_degree_redge"},
+    "set_surface_poles_rface": {"status": "replayable", "op": "set_surface_poles_rface"},
+    "move_surface_poles_rface": {"status": "replayable", "op": "move_surface_poles_rface"},
+    "set_surface_weights_rface": {"status": "replayable", "op": "set_surface_weights_rface"},
+    "insert_surface_knot_rface": {"status": "replayable", "op": "insert_surface_knot_rface"},
+    "elevate_surface_degree_rface": {"status": "replayable", "op": "elevate_surface_degree_rface"},
+    "rebuild_curve_redge": {"status": "replayable", "op": "rebuild_curve_redge"},
+    "rebuild_surface_rface": {"status": "replayable", "op": "rebuild_surface_rface"},
+    "inspect_curve_rcurvedata": {
+        "status": "diagnostic",
+        "reason": "Reads the NURBS data of an edge for inspection only; an edit that uses it is the recorded node.",
+    },
+    "inspect_surface_rsurfacedata": {
+        "status": "diagnostic",
+        "reason": "Reads the NURBS data of a face for inspection only; an edit that uses it is the recorded node.",
+    },
+    "sample_curve_rcurvature": {
+        "status": "diagnostic",
+        "reason": "Samples curvature along an edge for display (a curvature comb); nothing to replay.",
+    },
+    "sample_surface_risocurves": {
+        "status": "diagnostic",
+        "reason": "Samples isocurves of a face for display; nothing to replay.",
+    },
     "sew_faces_rshell": {"status": "replayable", "op": "sew_faces_rshell"},
     "make_solid_from_shell_rsolid": {
         "status": "replayable",
@@ -529,6 +607,13 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "make_wire_from_edges_rwire",
     "make_face_from_wire_rface",
     "make_face_from_wires_rface",
+    "make_workplane_rworkplane",
+    "make_workplane_from_face_rworkplane",
+    "make_workplane_from_points_rworkplane",
+    "make_workplane_from_axis_rworkplane",
+    "make_workplane_midplane_rworkplane",
+    "make_workplane_normal_to_curve_rworkplane",
+    "make_workplane_offset_rworkplane",
     "make_sketch_rsketch",
     "add_point_rsketch",
     "add_line_rsketch",
@@ -536,6 +621,14 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "add_arc_rsketch",
     "add_bspline_rsketch",
     "add_ellipse_rsketch",
+    "trim_rsketch",
+    "extend_rsketch",
+    "fillet_corner_rsketch",
+    "chamfer_corner_rsketch",
+    "project_rsketch",
+    "insert_spline_anchor_rsketch",
+    "remove_spline_anchor_rsketch",
+    "convert_spline_to_anchors_rsketch",
     "make_constrain_coincident_rsketch",
     "make_constrain_point_on_rsketch",
     "make_constrain_horizontal_rsketch",
@@ -576,10 +669,12 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "make_identity_placement_rplacement",
     "make_part_rpart",
     "make_assign_material_rpart",
+    "make_set_body_appearance_rpart",
     "make_assembly_rassembly",
     "reference_definition",
     "make_add_component_rassembly",
     "make_place_component_rassembly",
+    "explode_rassembly",
     "make_compound_from_assembly_rcompound",
     "make_face_connector_rconnector",
     "make_edge_connector_rconnector",
@@ -614,6 +709,7 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "make_sweep_multisection_rsolid",
     "make_extrude_until_rsolid",
     "make_draft_rsolid",
+    "make_inset_face_rsolid",
     "make_mirror_rshape",
     "make_cut_rsolid",
     "make_cut_rsolid_list",
@@ -632,6 +728,20 @@ CANONICAL_CORE_OP_SET: Tuple[str, ...] = (
     "make_gordon_surface_rface",
     "make_surface_patch_rface",
     "trim_surface_rface",
+    "convert_to_bspline_redge",
+    "convert_to_bspline_rface",
+    "set_curve_poles_redge",
+    "move_curve_poles_redge",
+    "set_curve_weights_redge",
+    "insert_curve_knot_redge",
+    "elevate_curve_degree_redge",
+    "set_surface_poles_rface",
+    "move_surface_poles_rface",
+    "set_surface_weights_rface",
+    "insert_surface_knot_rface",
+    "elevate_surface_degree_rface",
+    "rebuild_curve_redge",
+    "rebuild_surface_rface",
     "make_loft_rshell",
     "sew_faces_rshell",
     "make_solid_from_shell_rsolid",
@@ -656,6 +766,36 @@ _CANONICAL_2_1_ONLY_OPS = {
     "load_brep_region_rshell",
     "load_brep_region_rsolid",
     "make_solid_from_shell_rsolid",
+    "trim_rsketch",
+    "extend_rsketch",
+    "fillet_corner_rsketch",
+    "chamfer_corner_rsketch",
+    "project_rsketch",
+    "insert_spline_anchor_rsketch",
+    "remove_spline_anchor_rsketch",
+    "convert_spline_to_anchors_rsketch",
+    "make_workplane_rworkplane",
+    "make_workplane_from_face_rworkplane",
+    "make_workplane_from_points_rworkplane",
+    "make_workplane_from_axis_rworkplane",
+    "make_workplane_midplane_rworkplane",
+    "make_workplane_normal_to_curve_rworkplane",
+    "make_workplane_offset_rworkplane",
+    "explode_rassembly",
+    "convert_to_bspline_redge",
+    "convert_to_bspline_rface",
+    "set_curve_poles_redge",
+    "move_curve_poles_redge",
+    "set_curve_weights_redge",
+    "insert_curve_knot_redge",
+    "elevate_curve_degree_redge",
+    "set_surface_poles_rface",
+    "move_surface_poles_rface",
+    "set_surface_weights_rface",
+    "insert_surface_knot_rface",
+    "elevate_surface_degree_rface",
+    "rebuild_curve_redge",
+    "rebuild_surface_rface",
 }
 CANONICAL_CORE_OP_SET_2_0: Tuple[str, ...] = tuple(
     op for op in CANONICAL_CORE_OP_SET if op not in _CANONICAL_2_1_ONLY_OPS
@@ -2003,8 +2143,9 @@ def _resolve_feature_selection(
     selection_query = params.get("selection_query")
     if isinstance(selection_query, dict):
         scope = _resolve_selector_scope(selection_query, solid, outputs)
-        resolved = list(selector_from_dict(selection_query).resolve(scope))
-        return resolved
+        if not (selected_refs and _references_need_history(selection_query, scope)):
+            resolved = list(selector_from_dict(selection_query).resolve(scope))
+            return resolved
 
     if selected_refs:
         resolved = resolve_refs(solid, selected_refs)
@@ -2179,6 +2320,227 @@ def _ordered_input_shapes(
     return resolved
 
 
+_SHAPE_EDIT_OPS = frozenset(
+    {
+        "convert_to_bspline_redge",
+        "convert_to_bspline_rface",
+        "set_curve_poles_redge",
+        "move_curve_poles_redge",
+        "set_curve_weights_redge",
+        "insert_curve_knot_redge",
+        "elevate_curve_degree_redge",
+        "set_surface_poles_rface",
+        "move_surface_poles_rface",
+        "set_surface_weights_rface",
+        "insert_surface_knot_rface",
+        "elevate_surface_degree_rface",
+        "rebuild_curve_redge",
+        "rebuild_surface_rface",
+    }
+)
+"""The curve / surface edits: one ordered Edge or Face input, recorded parameters, a new shape of the same kind."""
+
+
+def _optional_int(value: Any) -> Optional[int]:
+    return None if value is None else int(value)
+
+
+def _replay_shape_edit(
+    ctx: _ReplayContext,
+    graph: OperationGraph,
+    outputs: Dict[str, List[Any]],
+    node: Any,
+    params: Dict[str, Any],
+) -> AnyShape:
+    op_name = node.op
+    ordered = _ordered_input_shapes(ctx, graph, outputs, node, params)
+    kind = Edge if op_name.endswith("_redge") else Face
+    if len(ordered) != 1 or not isinstance(ordered[0], kind):
+        ctx.fail(
+            f"Graph node '{node.node_id}' ({op_name}) requires exactly one {kind.__name__} input"
+        )
+    source = ordered[0]
+    tag_prefix = cast(Optional[str], params.get("tag_prefix"))
+    fn = getattr(ops, op_name)
+    required = {
+        "set_curve_poles_redge": ("poles",),
+        "move_curve_poles_redge": ("moves",),
+        "set_curve_weights_redge": ("weights",),
+        "insert_curve_knot_redge": ("parameter", "multiplicity"),
+        "elevate_curve_degree_redge": ("degree",),
+        "set_surface_poles_rface": ("poles",),
+        "move_surface_poles_rface": ("moves",),
+        "set_surface_weights_rface": ("weights",),
+        "insert_surface_knot_rface": ("direction", "parameter", "multiplicity"),
+        "elevate_surface_degree_rface": ("u_degree", "v_degree"),
+        "rebuild_curve_redge": ("degree", "pole_count", "tolerance"),
+        "rebuild_surface_rface": ("u_degree", "v_degree", "u_pole_count", "v_pole_count", "tolerance"),
+    }.get(op_name, ())
+    ctx.require_params(node.node_id, op_name, params, required)
+    if op_name.startswith("convert_to_bspline_"):
+        return fn(source, tag_prefix=tag_prefix)
+    if op_name in ("set_curve_poles_redge", "set_surface_poles_rface"):
+        return fn(source, params["poles"], tag_prefix=tag_prefix)
+    if op_name in ("set_curve_weights_redge", "set_surface_weights_rface"):
+        return fn(source, params["weights"], tag_prefix=tag_prefix)
+    if op_name == "move_curve_poles_redge":
+        moves = {int(index): tuple(point) for index, point in params["moves"]}
+        return fn(source, moves, tag_prefix=tag_prefix)
+    if op_name == "move_surface_poles_rface":
+        moves = {(int(row), int(column)): tuple(point) for row, column, point in params["moves"]}
+        return fn(source, moves, tag_prefix=tag_prefix)
+    if op_name == "insert_curve_knot_redge":
+        return fn(source, float(params["parameter"]), int(params["multiplicity"]), tag_prefix=tag_prefix)
+    if op_name == "insert_surface_knot_rface":
+        return fn(source, str(params["direction"]), float(params["parameter"]), int(params["multiplicity"]),
+                  tag_prefix=tag_prefix)
+    if op_name == "elevate_curve_degree_redge":
+        return fn(source, int(params["degree"]), tag_prefix=tag_prefix)
+    if op_name == "elevate_surface_degree_rface":
+        return fn(source, _optional_int(params["u_degree"]), _optional_int(params["v_degree"]), tag_prefix=tag_prefix)
+    if op_name == "rebuild_curve_redge":
+        return fn(source, int(params["degree"]), _optional_int(params["pole_count"]),
+                  tolerance=float(params["tolerance"]), tag_prefix=tag_prefix)
+    return fn(source, int(params["u_degree"]), int(params["v_degree"]), _optional_int(params["u_pole_count"]),
+              _optional_int(params["v_pole_count"]), tolerance=float(params["tolerance"]), tag_prefix=tag_prefix)
+
+
+_WORKPLANE_OPS = frozenset(
+    {
+        "make_workplane_rworkplane",
+        "make_workplane_from_face_rworkplane",
+        "make_workplane_from_points_rworkplane",
+        "make_workplane_from_axis_rworkplane",
+        "make_workplane_midplane_rworkplane",
+        "make_workplane_normal_to_curve_rworkplane",
+    "make_workplane_offset_rworkplane",
+    }
+)
+"""The workplane constructors: a Workplane value made from numbers or from ordered geometry inputs."""
+
+
+def _replay_workplane(
+    ctx: _ReplayContext,
+    graph: OperationGraph,
+    outputs: Dict[str, List[Any]],
+    node: Any,
+    params: Dict[str, Any],
+) -> Any:
+    """Build the workplane again from its recorded op: from the replayed geometry, so it follows a moved face."""
+
+    op_name = node.op
+    fn = getattr(ops, op_name)
+    if op_name == "make_workplane_rworkplane":
+        ctx.require_params(node.node_id, op_name, params, ("origin", "normal", "x_dir"))
+        return fn(tuple(params["origin"]), tuple(params["normal"]), tuple(params["x_dir"]))
+    if op_name == "make_workplane_offset_rworkplane":
+        # placed on a replayed workplane (it follows that one), else on the named plane or the recorded base frame
+        base = _input_workplane(outputs, node) or params.get("base_plane") or params.get("base")
+        ctx.require_params(node.node_id, op_name, params, ("offset", "rx", "ry", "rz"))
+        return fn(base, tuple(params["offset"]), params["rx"], params["ry"], params["rz"])
+    if not isinstance(params.get("input_refs"), list):
+        # Made from geometry no recorder could name: the frame it made is all there is.
+        ctx.require_params(node.node_id, op_name, params, ("frame",))
+        frame = params["frame"]
+        return SimpleWorkplane._from_frame(frame["origin"], frame["x_axis"], frame["y_axis"])
+    shapes = _ordered_input_shapes(ctx, graph, outputs, node, params)
+
+    def value(name: str) -> Any:
+        item = params.get(name)
+        if isinstance(item, dict) and "input" in item:
+            index = int(item["input"])
+            if index < 0 or index >= len(shapes):
+                ctx.fail(f"Graph node '{node.node_id}' ({op_name}) parameter '{name}' names a missing input")
+            return shapes[index]
+        if isinstance(item, (list, tuple)):
+            return tuple(item)
+        return item
+
+    if op_name == "make_workplane_from_face_rworkplane":
+        return fn(
+            shapes[0],
+            origin=value("origin"),
+            x_edge=value("x_edge"),
+            x_dir=value("x_dir"),
+            offset=params.get("offset", 0.0),
+            flip=bool(params.get("flip", False)),
+        )
+    if op_name == "make_workplane_from_points_rworkplane":
+        ctx.require_params(node.node_id, op_name, params, ("a", "b", "c"))
+        return fn(value("a"), value("b"), value("c"))
+    if op_name == "make_workplane_from_axis_rworkplane":
+        return fn(shapes[0], params.get("angle", 0.0), face=value("face"))
+    if op_name == "make_workplane_midplane_rworkplane":
+        if len(shapes) != 2:
+            ctx.fail(f"Graph node '{node.node_id}' ({op_name}) requires two face inputs")
+        return fn(shapes[0], shapes[1])
+    return fn(shapes[0], params.get("at", 0.0), x_dir=value("x_dir"))
+
+
+def _input_workplane(outputs: Dict[str, List[Any]], node: Any) -> Any:
+    """The replayed Workplane among a node's inputs (a sketch made on one), or None."""
+
+    for input_node in node.inputs:
+        for item in outputs.get(input_node.node_id, ()):
+            if isinstance(item, SimpleWorkplane):
+                return item
+    return None
+
+
+def _context_workplane(outputs: Dict[str, List[Any]], context: Any) -> Any:
+    """The replayed Workplane a node's context names (the node was made inside ``with wp:``), or None."""
+
+    if not isinstance(context, dict):
+        return None
+    ref = context.get("workplane")
+    if not isinstance(ref, dict):
+        return None
+    made = outputs.get(str(ref.get("node_id", "")), [])
+    slot = int(ref.get("output_slot", 0) or 0)
+    item = made[slot] if 0 <= slot < len(made) else None
+    return item if isinstance(item, SimpleWorkplane) else None
+
+
+def _frame_ordered(order: List[Any]) -> List[Any]:
+    """*order* with every node made inside ``with wp:`` after the node that made ``wp``.
+
+    The context names the workplane node without an input edge, so the graph's own order may put the node first.
+    Kahn's algorithm over the inputs plus those links, taking the earliest node of *order* first.
+    """
+
+    import heapq
+
+    index = {node.node_id: position for position, node in enumerate(order)}
+    extra: Dict[str, str] = {}
+    for node in order:
+        context = node.context if isinstance(node.context, dict) else {}
+        ref = context.get("workplane")
+        source = str(ref.get("node_id", "")) if isinstance(ref, dict) else ""
+        if source in index and index[source] > index[node.node_id]:
+            extra[node.node_id] = source
+    if not extra:
+        return order
+    deps = {node.node_id: {item.node_id for item in node.inputs if item.node_id in index} for node in order}
+    for node_id, source in extra.items():
+        deps[node_id].add(source)
+    users: Dict[str, List[str]] = {}
+    for node_id, sources in deps.items():
+        for source in sources:
+            users.setdefault(source, []).append(node_id)
+    remaining = {node_id: len(sources) for node_id, sources in deps.items()}
+    heap = [index[node_id] for node_id, count in remaining.items() if count == 0]
+    heapq.heapify(heap)
+    out: List[Any] = []
+    while heap:
+        node = order[heapq.heappop(heap)]
+        out.append(node)
+        for user in users.get(node.node_id, ()):
+            remaining[user] -= 1
+            if remaining[user] == 0:
+                heapq.heappush(heap, index[user])
+    return out if len(out) == len(order) else order
+
+
 def _feature_input_shapes(ctx, graph, outputs, node, params):
     # New features preserve order and output slots, including repeated inputs.
     # Older graphs only carried distinct upstream nodes.
@@ -2229,6 +2591,27 @@ def _semantic_view_origin(
     )
 
 
+def _selector_uses_references(payload: Any) -> bool:
+    """Whether a serialized selector holds a ``ql.ref`` predicate (a stable reference, ``simplecadapi.ref``)."""
+    if isinstance(payload, dict):
+        if payload.get("kind") == "ref" and isinstance(payload.get("data"), dict) and "ref" in payload["data"]:
+            return True
+        return any(_selector_uses_references(item) for item in payload.values())
+    if isinstance(payload, list):
+        return any(_selector_uses_references(item) for item in payload)
+    return False
+
+
+def _references_need_history(selector: Any, scope: Any) -> bool:
+    """A selector with stable references, replayed on a shape without recorded history (replay runs no session).
+
+    A reference resolves through the history of the shape it is resolved in; a replay rebuilds the very graph the
+    payload recorded, so the entities the reference resolved to then (the recorded evidence) are the answer.
+    """
+    getter = getattr(scope, "_get_runtime", None)
+    return _selector_uses_references(selector) and (getter is None or getter("graph.node", None) is None)
+
+
 def _resolve_tag_binding_targets(
     scope: AnyShape, binding: TagBinding
 ) -> List[AnyShape]:
@@ -2237,6 +2620,9 @@ def _resolve_tag_binding_targets(
     if binding.target.kind == TagTargetKind.SELECTION_QUERY:
         if binding.target.selector is None:
             raise ValueError("selection_query tag target is missing its selector")
+        recorded = binding.evidence.data.get("selected_refs")
+        if _references_need_history(binding.target.selector, scope) and isinstance(recorded, list):
+            return _resolve_explicit_refs(scope, recorded)
         return cast(
             List[AnyShape],
             selector_from_dict(binding.target.selector).resolve(scope),
@@ -2245,9 +2631,12 @@ def _resolve_tag_binding_targets(
         raise ValueError(
             f"tag target kind '{binding.target.kind.value}' is not replayable"
         )
+    return _resolve_explicit_refs(scope, binding.target.refs)
 
+
+def _resolve_explicit_refs(scope: AnyShape, refs: Sequence[Dict[str, Any]]) -> List[AnyShape]:
     resolved: List[AnyShape] = []
-    for ref in binding.target.refs:
+    for ref in refs:
         topo_id = str(ref.get("topo_id", ""))
         kind = str(ref.get("kind", "")).lower()
         if not topo_id or not kind:
@@ -2502,7 +2891,7 @@ def _execute_graph(
     if graph.node_count == 0:
         return []
 
-    topo_order = graph.topological_order()
+    topo_order = _frame_ordered(list(graph.topological_order()))
 
     # Store per-node outputs
     outputs: Dict[str, List[Any]] = {}
@@ -2544,8 +2933,11 @@ def _execute_graph(
         for node in topo_order:
             op_name = node.op
             params = node.params
+            context_workplane = _context_workplane(outputs, node.context)
             context_manager = (
-                use_coordinate_system(node.context)
+                use_coordinate_system(context_workplane.cs)
+                if context_workplane is not None
+                else use_coordinate_system(node.context)
                 if isinstance(node.context, dict)
                 else nullcontext()
             )
@@ -2829,6 +3221,109 @@ def _execute_graph(
                             _store_outputs(node, result)
                         continue
 
+                    if op_name == "trim_rsketch":
+                        ctx.require_params(
+                            node.node_id, op_name, params, ("entity", "at")
+                        )
+                        sketch_outputs = _input_outputs(ctx, outputs, node, 0)
+                        if sketch_outputs:
+                            at = params["at"]
+                            result = ops.trim_rsketch(
+                                cast(Sketch, sketch_outputs[0]),
+                                str(params["entity"]),
+                                at if isinstance(at, str) else tuple(at),
+                                against=cast(Any, params.get("against")),
+                            )
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "extend_rsketch":
+                        ctx.require_params(
+                            node.node_id, op_name, params, ("entity", "end")
+                        )
+                        sketch_outputs = _input_outputs(ctx, outputs, node, 0)
+                        if sketch_outputs:
+                            result = ops.extend_rsketch(
+                                cast(Sketch, sketch_outputs[0]),
+                                str(params["entity"]),
+                                str(params["end"]),
+                                to=cast(Any, params.get("to")),
+                            )
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name in {"insert_spline_anchor_rsketch", "remove_spline_anchor_rsketch", "convert_spline_to_anchors_rsketch"}:
+                        extra = {"insert_spline_anchor_rsketch": ("at",), "remove_spline_anchor_rsketch": ("anchor",)}.get(op_name, ())
+                        ctx.require_params(node.node_id, op_name, params, ("spline", *extra))
+                        sketch_outputs = _input_outputs(ctx, outputs, node, 0)
+                        if sketch_outputs:
+                            anchor_args: list[Any] = [str(params["spline"])]
+                            if op_name == "insert_spline_anchor_rsketch":
+                                at = params["at"]
+                                anchor_args.append(at if isinstance(at, str) else tuple(at))
+                            elif op_name == "remove_spline_anchor_rsketch":
+                                anchor_args.append(str(params["anchor"]))
+                            result = getattr(ops, op_name)(cast(Sketch, sketch_outputs[0]), *anchor_args)
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name in {"fillet_corner_rsketch", "chamfer_corner_rsketch"}:
+                        size_param = (
+                            "radius" if op_name == "fillet_corner_rsketch" else "distance"
+                        )
+                        ctx.require_params(
+                            node.node_id, op_name, params, ("a", "b", size_param)
+                        )
+                        sketch_outputs = _input_outputs(ctx, outputs, node, 0)
+                        if sketch_outputs:
+                            corner_op = getattr(ops, op_name)
+                            result = corner_op(
+                                cast(Sketch, sketch_outputs[0]),
+                                str(params["a"]),
+                                str(params["b"]),
+                                params[size_param],
+                            )
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "project_rsketch":
+                        ctx.require_params(
+                            node.node_id, op_name, params, ("source_kind",)
+                        )
+                        input_values = [
+                            value
+                            for index in range(len(node.inputs))
+                            for value in _input_outputs(ctx, outputs, node, index)
+                        ]
+                        input_sketches = [v for v in input_values if isinstance(v, Sketch)]
+                        if params["source_kind"] == "sketch":
+                            if len(input_sketches) >= 2:
+                                result = ops.project_rsketch(
+                                    input_sketches[0],
+                                    input_sketches[1],
+                                    entities=cast(Any, params.get("entities")),
+                                    construction=bool(params.get("construction", True)),
+                                )
+                                _store_outputs(node, result)
+                            elif ctx.strict:
+                                ctx.fail(
+                                    f"Graph node '{node.node_id}' ({op_name}) needs the target sketch and the source sketch as inputs"
+                                )
+                        else:
+                            shapes = [v for v in input_values if not isinstance(v, Sketch)]
+                            if input_sketches and shapes:
+                                result = ops.project_rsketch(
+                                    input_sketches[0],
+                                    shapes,
+                                    construction=bool(params.get("construction", True)),
+                                )
+                                _store_outputs(node, result)
+                            elif ctx.strict:
+                                ctx.fail(
+                                    f"Graph node '{node.node_id}' ({op_name}) needs the target sketch and the projected shapes as inputs"
+                                )
+                        continue
+
                     if op_name in _SKETCH_CONSTRAINT_KIND_BY_OP:
                         ctx.require_params(node.node_id, op_name, params, ("targets",))
                         sketch_outputs = _input_outputs(ctx, outputs, node, 0)
@@ -2953,7 +3448,24 @@ def _execute_graph(
                     if op_name == "make_part_rpart":
                         ctx.require_params(node.node_id, op_name, params, ("part_id",))
                         body_outputs = _feature_input_shapes(ctx, graph, outputs, node, params)
-                        if body_outputs:
+                        rows = params.get("bodies")
+                        if body_outputs and isinstance(rows, list) and len(rows) > 1:
+                            # a multi-body part: one recorded input per body, in the order of the rows
+                            if len(body_outputs) != len(rows):
+                                raise ValueError(
+                                    f"make_part_rpart node {node.node_id}: {len(rows)} bodies recorded, "
+                                    f"{len(body_outputs)} inputs resolved"
+                                )
+                            result = ops.make_part_rpart(
+                                str(params["part_id"]),
+                                name=cast(Optional[str], params.get("name")),
+                                bodies=[
+                                    Body(str(row["body_id"]), cast(Solid, shape), row.get("name"))
+                                    for row, shape in zip(rows, body_outputs)
+                                ],
+                            )
+                            _store_outputs(node, result)
+                        elif body_outputs:
                             result = ops.make_part_rpart(
                                 str(params["part_id"]),
                                 cast(Solid, body_outputs[0]),
@@ -3011,6 +3523,22 @@ def _execute_graph(
                             result = ops.assign_material_rpart(
                                 cast(Part, part_outputs[0]),
                                 cast(Material, material_outputs[0]),
+                            )
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "make_set_body_appearance_rpart":
+                        ctx.require_params(node.node_id, op_name, params, ("body_id",))
+                        part_outputs = _input_outputs(ctx, outputs, node, 0)
+                        if part_outputs:
+                            color = params.get("color")
+                            result = ops.set_body_appearance_rpart(
+                                cast(Part, part_outputs[0]),
+                                str(params["body_id"]),
+                                color=cast(Any, tuple(color)) if color is not None else None,
+                                opacity=cast(Optional[float], params.get("opacity")),
+                                name=cast(Optional[str], params.get("name")),
+                                reset=bool(params.get("reset", False)),
                             )
                             _store_outputs(node, result)
                         continue
@@ -3083,6 +3611,33 @@ def _execute_graph(
                                 cast(Assembly, assembly_outputs[0]),
                                 str(params["component_id"]),
                                 placement,
+                            )
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "explode_rassembly":
+                        ctx.require_params(node.node_id, op_name, params, ("factor",))
+                        assembly_outputs = _input_outputs(ctx, outputs, node, 0)
+                        if assembly_outputs:
+
+                            def _vector(value: Any) -> Any:
+                                return None if value is None else tuple(value)
+
+                            result = ops.explode_rassembly(
+                                cast(Assembly, assembly_outputs[0]),
+                                params["factor"],
+                                center=_vector(params.get("center")),
+                                axis=_vector(params.get("axis")),
+                                directions={
+                                    str(k): tuple(v)
+                                    for k, v in (params.get("directions") or {}).items()
+                                }
+                                or None,
+                                weights={
+                                    str(k): float(v)
+                                    for k, v in (params.get("weights") or {}).items()
+                                }
+                                or None,
                             )
                             _store_outputs(node, result)
                         continue
@@ -3583,6 +4138,31 @@ def _execute_graph(
                         _store_outputs(node, result)
                         continue
 
+                    if op_name in _WORKPLANE_OPS:
+                        _store_outputs(node, _replay_workplane(ctx, graph, outputs, node, params))
+                        continue
+
+                    if op_name == "make_sketch_rsketch":
+                        plane = params.get("plane")
+                        workplane = (
+                            _input_workplane(outputs, node)
+                            if isinstance(plane, dict) and plane.get("workplane") is True
+                            else None
+                        )
+                        if workplane is not None:
+                            ctx.require_params(node.node_id, op_name, params, ("sketch_id",))
+                            _store_outputs(
+                                node,
+                                ops.make_sketch_rsketch(
+                                    params.get("name"), plane=workplane, sketch_id=str(params["sketch_id"])
+                                ),
+                            )
+                            continue
+
+                    if op_name in _SHAPE_EDIT_OPS:
+                        _store_outputs(node, _replay_shape_edit(ctx, graph, outputs, node, params))
+                        continue
+
                     if op_name == "trim_surface_rface":
                         ctx.require_params(
                             node.node_id,
@@ -3639,14 +4219,15 @@ def _execute_graph(
                         ordered = _ordered_input_shapes(
                             ctx, graph, outputs, node, params
                         )
+                        # the pieces given: faces, and shells sewn as their faces
                         if len(ordered) != int(params["face_count"]) or not all(
-                            isinstance(item, Face) for item in ordered
+                            isinstance(item, (Face, Shell)) for item in ordered
                         ):
                             ctx.fail(
                                 f"Graph node '{node.node_id}' ({op_name}) face inputs do not match face_count"
                             )
                         result = ops.sew_faces_rshell(
-                            cast(Sequence[Face], ordered),
+                            cast(Sequence[Face | Shell], ordered),
                             tolerance=float(params["tolerance"]),
                             tag_prefix=cast(Optional[str], params.get("tag_prefix")),
                         )
@@ -3769,14 +4350,22 @@ def _execute_graph(
                                     f"Graph node '{node.node_id}' ({op_name}) requires at least two inputs"
                                 )
                             continue
-                        result = ops.cut_rsolid_list(
-                            cast(Solid, inputs[0]),
-                            [cast(Solid, tool) for tool in inputs[1:]],
-                            skip_non_intersecting=bool(
+                        cut_options = {
+                            "skip_non_intersecting": bool(
                                 _param(ctx, node.node_id, op_name, params, "skip_non_intersecting", False)
                             ),
-                            tracking_policy=str(params.get("tracking_policy", "full")),
-                        )
+                            "tracking_policy": str(params.get("tracking_policy", "full")),
+                        }
+                        if params.get("piece_order") == "centroid":
+                            # a split recorded by cut_rsolid(on_split="pieces"): the pieces in centroid order
+                            pieces = ops.cut_rsolid(
+                                cast(Solid, inputs[0]), [cast(Solid, tool) for tool in inputs[1:]], **cut_options
+                            )
+                            result = pieces if isinstance(pieces, list) else [pieces]
+                        else:
+                            result = ops.cut_rsolid_list(
+                                cast(Solid, inputs[0]), [cast(Solid, tool) for tool in inputs[1:]], **cut_options
+                            )
                         _store_outputs(node, result)
                         continue
 
@@ -3973,6 +4562,19 @@ def _execute_graph(
                                 ctx.fail(f"Graph node '{node.node_id}' expected {params['selected_face_count']} draft faces, got {len(faces)}")
                             result = ops.draft_rsolid(solid=solid, faces_to_draft=faces, angle=params["angle"],
                                 plane_origin=params["plane_origin"], plane_normal=params["plane_normal"])
+                            _store_outputs(node, result)
+                        continue
+
+                    if op_name == "make_inset_face_rsolid":
+                        ctx.require_params(node.node_id, op_name, params, ("distance", "selected_face_count"))
+                        values = _input_outputs(ctx, outputs, node, 0)
+                        if values:
+                            solid = values[0]
+                            faces = _resolve_feature_selection(ctx, node=node, solid=solid,
+                                params=params, kind="face", outputs=outputs)
+                            if ctx.strict and len(faces) != params["selected_face_count"]:
+                                ctx.fail(f"Graph node '{node.node_id}' expected {params['selected_face_count']} inset face, got {len(faces)}")
+                            result = ops.inset_face_rsolid(solid=solid, face=faces, distance=params["distance"])
                             _store_outputs(node, result)
                         continue
 

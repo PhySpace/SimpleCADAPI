@@ -1,5 +1,7 @@
 # Task Domain: Standard Parts
 
+**Read when:** the request names gears, ring gears, racks, cycloidal discs or ball bearings, or a mechanism built from them (details under "Use when").
+
 Use the parameterized standard-library factories before hand-modeling standard
 mechanical components.
 

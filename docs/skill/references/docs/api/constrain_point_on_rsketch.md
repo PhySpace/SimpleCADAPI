@@ -14,4 +14,4 @@ def constrain_point_on_rsketch(sketch, point, entity, *, constraint_id=None)
 
 ## Description
 
-Constrain a sketch point to lie on a line, circle, or circular arc.
+Constrain a sketch point to lie on a line, circle, circular arc, ellipse or (non-periodic) B-spline.

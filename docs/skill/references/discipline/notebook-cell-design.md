@@ -1,7 +1,7 @@
 # Discipline: Notebook Cell Design
 
-Where the cell boundaries go, and when a number is a `scad.var`. Read it with
-`feature-tree-convention.md`: that file says what a feature block is and how it
+Where the cell boundaries go, and when a number is a `scad.var`. **Read when:** you cut a notebook into cells, split or merge cells, or decide whether a number is a `scad.var`.
+Read it with `feature-tree-convention.md`: that file says what a feature block is and how it
 is headed; this one says how to cut a notebook into cells and why. Every rule
 carries its reason and the symptom you see when you break it, so you can
 decide the cases the rules do not name.
@@ -49,7 +49,9 @@ Fillets, chamfers, shells, large booleans, patterns: follow
 cached, and you retry only that cell.
 
 **C4. Merge cells only for things that are cheap and always edited together**
-— a sketch and the extrusion of that same sketch are one feature anyway. Do
+— a sketch and the extrusion of that same sketch are one feature anyway. Several
+small blocks that always change together may share one cell, rebinding the body inside it; the cell returns the body
+under the last block's slug, and they are cached and re-run as one unit, so keep this the exception. Do
 not merge two features to save a cell. *Why:* a cell costs one cache lookup,
 which is small; a merged cell re-runs both features on every edit, and a
 failure names neither.
@@ -61,8 +63,8 @@ that, and returning it clutters the namespace with names that are not part of
 the feature tree.
 
 **C6. Whatever another cell needs is public, returned, and named for what it
-is.** `base_plate`, not `body` or `shape2`; the slug of the block in
-snake_case. *Why:* every top-level name has one defining cell (fact 3), and
+is.** `base_plate`, not `body` or `shape2`; the naming rule (the block's slug in
+snake_case) is in `feature-tree-convention.md`. *Why:* every top-level name has one defining cell (fact 3), and
 the names are the feature tree that a person and the next edit read.
 
 **C7. Do not change a value you received.** `apply_tag(...)`,
@@ -76,13 +78,23 @@ disk copy instead, so a cell that tags what it received costs you the
 speed-up of the cell it tagged.
 
 **C8. Parameters live in their own cell(s) at the top, and hold no geometry.**
-Group them by meaning (`# ---- params: flange ----`). *Why:* each reader
+Group them by meaning (`# ---- params: flange ----`), because an override replaces every
+variable of its cell. A trailing `# ui: slider(min, max, step=, unit=, label=)`
+comment (or `number(...)`, `toggle()`) on a parameter's line chooses the control an
+editor offers (`docs/guides/notebook-runtime.md`). *Why:* each reader
 depends only on the parameters it reads, so many parameters in one cell cost
 nothing; a geometry line in the params cell would re-run with every parameter
 change.
 
-**C9. The product is made in the last cell.** Its id is the notebook id
-(`scad.notebook_id()`); a family of parts uses `scad.use(path, id=...)`.
+**C9. A part notebook (`kind = "part"`) needs no product cell: the runtime
+makes the Part from its open bodies** (each public top-level solid no other cell
+reads becomes a body named by its variable; the pieces of a split cut become
+`<name>_1..n`). Write the product cell (last, id `scad.notebook_id()`) only for
+connectors, a material, or to choose and name the bodies yourself:
+`make_part_rpart(part_id=scad.notebook_id(), bodies={"base": base, "lid": lid})`;
+solids left out of it (tools, construction) are not part of the product. An
+assembly notebook ends with its layout cell. A family of parts uses
+`scad.use(path, id=...)`.
 
 **C10. In an assembly notebook, one `scad.use(...)` per child, the mates in
 their own cell, the solve in its own cell.** Do not carry the whole assembly
@@ -90,13 +102,17 @@ through a chain of cells that each return it. *Why:* every cell that returns
 the assembly caches a full copy of it (fact 2).
 
 **C11. Make every edit step leave the names consistent.** A cell that reads a
-name nothing defines fails, and so do all cells after it. The `sca new`
-template has a params cell with `RADIUS` and `HEIGHT`, a `base` cell that
-reads them, and a product cell that reads `base`. Replacing the params cell
+name nothing defines fails, and so do all cells after it. The `sca new --kind sample`
+notebook has a params cell with `RADIUS` and `HEIGHT` and a `base` cell that
+reads them (the Part is implicit). Replacing the params cell
 with `sca cell put 1` while `base` still reads `RADIUS` fails with `NameError:
 name 'RADIUS' is not defined` until `base` is replaced too. Replace or delete
 the cells that read a name before, or in the same step as, the cell that
 defines it; when no editor is running, write the whole file once.
+
+**C12. Import local modules in the cell that uses them, or in the setup cell.**
+Either way, editing the module invalidates the notebook's cache
+(`docs/guides/notebook-composition-and-cache.md`).
 
 ## `Var` or a plain value
 

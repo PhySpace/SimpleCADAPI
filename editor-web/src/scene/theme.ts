@@ -10,8 +10,10 @@ export interface ScenePalette {
   clearBoost: number;
   /** Outline color of the model's edges. */
   edge: string;
-  gridMinor: string;
-  gridMajor: string;
+  /** The ground grid's lines; the finer level is drawn at `gridMinorAlpha`, the coarser at `gridMajorAlpha`. */
+  grid: string;
+  gridMinorAlpha: number;
+  gridMajorAlpha: number;
   /** X, Y, Z. */
   axes: [string, string, string];
   /** The negative end of each axis. */
@@ -26,8 +28,9 @@ export const PALETTES: Record<SceneTheme, ScenePalette> = {
     clear: '#000000',
     clearBoost: 1,
     edge: '#3a414d',
-    gridMinor: '#262626',
-    gridMajor: '#444444',
+    grid: '#9aa0a8',
+    gridMinorAlpha: 0.16,
+    gridMajorAlpha: 0.42,
     axes: ['#ff4d5e', '#3ddc84', '#4aa3ff'],
     axisTail: '#555555',
     vertex: '#d8ff83',
@@ -37,8 +40,9 @@ export const PALETTES: Record<SceneTheme, ScenePalette> = {
     clear: '#ffffff',
     clearBoost: 8,
     edge: '#1b1f27',
-    gridMinor: '#e0e0e0',
-    gridMajor: '#bdbdbd',
+    grid: '#4a4f57',
+    gridMinorAlpha: 0.14,
+    gridMajorAlpha: 0.38,
     axes: ['#d12b3c', '#12803f', '#1a62c4'],
     axisTail: '#9a9a9a',
     vertex: '#2a7a00',

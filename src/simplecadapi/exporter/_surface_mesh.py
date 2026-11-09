@@ -42,7 +42,7 @@ class TessellatedSurfaceMesh:
 
 def _product_solids(value: Part | Assembly) -> tuple[Any, ...]:
     if isinstance(value, Part):
-        return (value.body,)
+        return tuple(body.solid for body in value.bodies)  # every body of a multi-body part
     projection = make_compound_from_assembly_rcompound(assembly=value)
     solids = tuple(projection.solids())
     if not solids:

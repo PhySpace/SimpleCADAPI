@@ -48,6 +48,13 @@ class Face;
 class Shell;
 class Solid;
 class Compound;
+class Shape;
+
+// Tags as a view over recorded history: the reactive layer installs a provider that answers, for an entity of a
+// recorded output, the bindings of upstream tag assignments the operations' deltas carry to it (as lineage
+// witnesses).  None installed (a bare kernel): only the witnesses stored on the entity count.
+using HistoryWitnessProvider = std::vector<TagLineageWitness> (*)(const Shape& entity);
+void set_history_witness_provider(HistoryWitnessProvider provider) noexcept;
 
 class Shape {
  public:
@@ -74,6 +81,8 @@ class Shape {
   bool is_same(const Shape& other) const noexcept;
   // Same entity: same root and same topology.
   bool same_entity(const Shape& other) const noexcept;
+  // A handle on this handle's root (the shape whose entity table this one shares).
+  Shape root() const;
   // The graph node that produced this output, as an opaque pointer (the reactive layer knows its type).
   void set_graph_node(std::shared_ptr<const void> node) const;
   std::shared_ptr<const void> graph_node() const;
@@ -112,7 +121,14 @@ class Shape {
   // Mutators keep the tag-name caches in step.
   const std::vector<TagBinding>& local_bindings() const;
   void add_binding(TagBinding binding);
-  const std::vector<TagLineageWitness>& lineage_witnesses() const;
+  // The lineage witnesses of this entity: those stored on it, then those the history-witness provider derives
+  // from the recorded graph (tags carried through the operations' deltas; see set_history_witness_provider), each
+  // fact once: a derived witness equal to a stored one (a restored snapshot of it) is not repeated.
+  std::vector<TagLineageWitness> lineage_witnesses() const;
+  // Only the witnesses stored on the entity (add_lineage_witness, a restored snapshot).
+  const std::vector<TagLineageWitness>& stored_lineage_witnesses() const;
+  // Only the witnesses the history-witness provider derives (none without a provider or a recorded graph).
+  std::vector<TagLineageWitness> history_lineage_witnesses() const;
   // Skipped when the same (binding, derivation, source, target) witness is already stored.
   void add_lineage_witness(TagLineageWitness witness);
 

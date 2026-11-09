@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { t } from "@/i18n";
 
 /** Cells of the 3x3 spinner that form its ring, clockwise from the top left. */
 const RING = [0, 1, 2, 5, 8, 7, 6, 3];
@@ -50,7 +51,7 @@ export function LoadingMask({ active, message, theme }: { active: boolean; messa
       <Ripple theme={theme} />
       <div className="relative w-[280px] border-2 border-foreground/80 bg-background shadow-[6px_6px_0_0_var(--shadow-hard)]">
         <div className="flex h-6 items-center justify-between bg-foreground/85 px-2 text-[11px] font-bold uppercase tracking-[0.18em] text-background">
-          <span>loading</span>
+          <span>{t("loading")}</span>
           <span className="tabular-nums">
             {minutes}:{seconds}
           </span>

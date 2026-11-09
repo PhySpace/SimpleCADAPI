@@ -1,5 +1,7 @@
 # Discipline: Mechanical Modeling
 
+**Read when:** you choose a construction strategy or decompose a mechanical part or product before selecting SimpleCADAPI operations.
+
 How to choose a construction strategy before selecting SimpleCADAPI operations.
 This document separates SDK contracts from mechanical design guidance.
 
@@ -20,7 +22,9 @@ This document separates SDK contracts from mechanical design guidance.
 - **Decide part vs assembly before modeling.** Bodies that are separately
   manufactured, purchased, or movable belong in an assembly with connectors
   and placements; monolithic manufacturing intent gets a single fused solid.
-  Never leave a multi-body result where one labeled product was intended.
+  Several bodies of one part are deliberate: name them in
+  `make_part_rpart(bodies={...})`. Never leave stray solids out of the product,
+  or overlapping bodies, where one labeled product was intended.
 - **Pick the origin and orientation from the functional datum** — the mating
   interface, mounting plane, or symmetry axis — not from wherever the first
   primitive happened to land. See `datums-and-coordinate-systems.md`.

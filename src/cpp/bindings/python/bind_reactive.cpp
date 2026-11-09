@@ -79,4 +79,5 @@ void bind_reactive(py::module_& m) {
   bind_reactive_graph(m);
   bind_reactive_session(m);
   bind_reactive_math(m);
+  bind_element_ref(m);
 }
