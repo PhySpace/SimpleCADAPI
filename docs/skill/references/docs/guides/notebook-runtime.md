@@ -86,10 +86,11 @@ if __name__ == "__main__":
   that no other cell reads and that no other such value was built from; a cell
   that only makes construction geometry -- workplanes, wires, edges, e.g. a path
   through the body's vertices -- does not count as reading it), with
-  the notebook id. One open body is a one-body Part (body id `"body"`); several
-  are the bodies of one Part, named by their variables (pieces `<name>_1..n`).
-  Write a `make_part_rpart` cell only to add connectors or a material, or to
-  choose and name the bodies yourself; it then wins. The headless run and the
+  the notebook id. One open body is the Part (body id `"body"`). A Part holds
+  exactly one solid, so with several open bodies the runtime does not choose:
+  see the bullet "A Part holds exactly one solid" below.
+  Write a `make_part_rpart` cell to add connectors or a material, or to
+  choose the solid that is the part; it then wins. The headless run and the
   editor use the same rule (`runtime/projection.py`, `find_product`).
   A notebook with no Part, Assembly or solid yet (a new one, or only sketches,
   curves and workplanes so far) raises `NoProductYetError` (a
@@ -105,12 +106,15 @@ if __name__ == "__main__":
   (`run_notebook(..., id=...)`, `scad.use(..., id=...)`, `sca run --id`);
   cells read the id of their run with `scad.notebook_id()` — see
   [Part families](notebook-composition-and-cache.md#part-families).
-- **A part with several bodies** is one product:
-  `scad.make_part_rpart(part_id=scad.notebook_id(), bodies={"base": base, "lid": lid})`.
-  Each body keeps its own BRep, topology snapshot and tags in the package, whose
-  part definition then has profile `simplecad-part-definition-3` (an older SDK
-  refuses it instead of reading one body). One-body parts are unchanged.
-  The cell cache restores a multi-body part like any other value.
+- **A Part holds exactly one solid.** A part notebook (`kind = "part"`) that ends
+  with one open solid needs no product cell. With several open solids (a tool
+  left next to the body it cut) and no cell making the Part, `find_product` raises
+  `SeveralOpenBodiesError` naming them (`sca run` and export stop with it; the
+  editor draws them side by side, "N open solids", and its `use_as_product` makes
+  the Part from the one you choose). Make the Part from the solid that is the part,
+  `scad.make_part_rpart(part_id=scad.notebook_id(), body=base)`, or make one Part
+  per solid and an Assembly of them. The part definition is always profile
+  `simplecad-part-definition-2` with one solid.
 - **Parameters** are ordinary top-level variables. Overriding one replaces it,
   and the cell that defines it does not run, so all variables of that cell
   must be overridden together. Group parameters into cells by what changes
