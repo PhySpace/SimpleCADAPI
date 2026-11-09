@@ -32,7 +32,7 @@ code. If the remaining work is inside the Part/Assembly MVP lake, boil it in the
 same implementation pass.
 
 The ocean boundary is different: full assembly mate solving, full physical
-simulation, multi-body part authoring, editable feature trees, or rewriting the
+simulation, editable feature trees, or rewriting the
 kernel around XCAF/OCAF are out of scope for this MVP and should be handled as
 separate future lakes.
 

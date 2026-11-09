@@ -3,7 +3,7 @@
 ## Class Definition
 
 ```python
-class Part(part_id, body=None, name=None, material=None, connectors=(), bodies=None)
+class Part(part_id, body, name=None, material=None, connectors=())
 ```
 
 *Source: product/part.py*
@@ -14,11 +14,11 @@ class Part(part_id, body=None, name=None, material=None, connectors=(), bodies=N
 
 ## Description
 
-Product item holding one Solid (``body``) or several named bodies (``bodies``).
+Product item holding exactly one Solid (``body``).
 
-A one-body Part is the common case: ``part.body`` is its Solid. A multi-body
-Part keeps several solids apart inside one product item (a case and its lid
-modelled side by side, the pieces of a split cut): ``part.bodies`` lists them
-as ``Body`` values in order, ``part.get_body(body_id)`` finds one, and
-``part.body`` raises ``TypeError``. Bodies of one Part are never placed
-relative to each other and carry no joints; use an Assembly for that.
+A Part is the unit an Assembly places, mates and gives connectors to, so it is one
+solid. ``part.body`` is its Solid; ``part.bodies`` is that body as a one-element tuple
+of ``Body`` values (a ``Body`` carries the display name, colour and opacity,
+``set_body_appearance_rpart``). ``body`` also takes a ``Body``. Several solids are
+refused (ValueError): make one Part per solid in an Assembly, or union / cut them
+into one solid first.
