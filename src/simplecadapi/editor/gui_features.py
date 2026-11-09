@@ -167,9 +167,10 @@ class FeatureService:
                         "normal_vec": sketch_doc.plane_normal(plane),
                     }
                 )
-        if product is None and open_bodies and self._implicit_part():
-            # no cell builds the Part: the runtime makes it from the open bodies (several are the bodies of one Part)
-            product = {"cell": None, "body": open_bodies[-1], "bodies": list(open_bodies), "implicit": True}
+        if product is None and len(open_bodies) == 1 and self._implicit_part():
+            # no cell builds the Part: the runtime makes it from the one open body.  Several open solids have no product
+            # yet (a Part holds exactly one solid): they are shown side by side and the author picks (use_as_product).
+            product = {"cell": None, "body": open_bodies[0], "implicit": True}
         return {
             "features": features,
             "bodies": [{"name": name, "produces": bodies[name]} for name in order],
@@ -370,6 +371,12 @@ class FeatureService:
             name = str(request.get("body", ""))
             if name not in {b["name"] for b in snap["bodies"]}:
                 raise GuiError(f"{name!r} is not a body in this notebook")
+            if not snap["product"] and self._implicit_part() and name in snap["open"]:
+                # several solids are open and no cell makes the Part: the author's choice is the Part (a Part holds one solid)
+                made = self._product_cell(snap, name)
+                steps = [self._create(made["after"], f"{made['variable']} = scad.make_part_rpart(part_id=scad.notebook_id(), body={name})", run=True)]
+                self._record(steps)
+                return self._result(steps[0]["id"], steps, name)
             if not snap["product"]:
                 raise GuiError("this notebook has no product cell that builds a Part from a body")
             if not snap["product"]["cell"]:

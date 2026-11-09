@@ -132,16 +132,19 @@ export function parsePreview(buffer: ArrayBuffer, cache: ReadonlyMap<string, Pre
 }
 
 
-/** What the header says about a preview: parts (a multi-body part's bodies are scene nodes `<part node>/body:<id>`) and bodies. */
 /** The node id of a surface value of the notebook (a face or shell that is not part of the product): `node/surface/<name>`
  * (simplecadapi/scene/preview.py: drawn from both sides, picked whole with the sketches and curves). */
 export const SURFACE_NODE_PREFIX = "node/surface/";
 export const isSurfaceNode = (nodeId: string): boolean => nodeId.startsWith(SURFACE_NODE_PREFIX);
 
+/** What the header says about a preview: its parts, and the open solids of the notebook drawn beside them (scene nodes
+ * `node/<notebook id>/body:<name>`: a Part holds one solid, so these are loose values, not parts). */
 export function previewSummary(all: readonly { nodeId: string }[]): string {
   const nodes = all.filter((node) => !isSurfaceNode(node.nodeId));
-  const parts = new Set(nodes.map((node) => node.nodeId.replace(/\/body:[^/]+$/, "")));
-  const partCount = parts.size === 1 ? t("1 part") : t("{{count}} parts", { count: parts.size });
-  const bodyCount = nodes.length === 1 ? t("1 body") : t("{{count}} bodies", { count: nodes.length });
-  return nodes.length > parts.size ? `${partCount} · ${bodyCount}` : partCount;
+  const open = nodes.filter((node) => /\/body:[^/]+$/.test(node.nodeId)).length;
+  const placed = nodes.length - open;
+  const partCount = placed === 1 ? t("1 part") : t("{{count}} parts", { count: placed });
+  if (open === 0) return partCount;
+  const openCount = open === 1 ? t("1 open solid") : t("{{count}} open solids", { count: open });
+  return placed > 0 ? `${partCount} · ${openCount}` : openCount;
 }

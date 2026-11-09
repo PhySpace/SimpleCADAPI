@@ -866,7 +866,7 @@ class ApiIndexTest(unittest.TestCase):
         self.assertEqual(part["k"], "c")
         names = [p["n"] for p in part["p"]]
         # a Part takes one ``body`` or several ``bodies`` (multi-body parts), so only part_id is required
-        self.assertEqual([p["n"] for p in part["p"] if p["r"]], ["part_id"])
+        self.assertEqual([p["n"] for p in part["p"] if p["r"]], ["part_id", "body"])
         self.assertIn("body", names)
         self.assertIn("bodies", names)
         self.assertFalse([n for n in names if n.startswith("_")])
