@@ -15,7 +15,9 @@ the durable export call `capture(result, path)`, whose two required arguments ar
 notebook; one assembly notebook per product, composing children with `scad.use(...)`; parameters live in the notebook that
 consumes them. Cell boundaries, `_private` names and `var()` follow `discipline/notebook-cell-design.md`; block structure
 and the mandatory header `# ---- feature: <slug> (<role>) ----` follow `discipline/feature-tree-convention.md`. Read both
-before writing any cell.
+before writing any cell. The one exception is a task that itself asks for a single script
+(`python model.py --output part.step`, an unattended batch): that is a plain script, see "One-shot script" in
+`domains/export-and-translation.md`; the notebook rules do not apply to it.
 
 **R4. Sketch first.** 2D profiles and planar paths go through the sketch API; primitives only when the shape is entirely
 the basic form.

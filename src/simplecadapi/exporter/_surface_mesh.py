@@ -10,7 +10,7 @@ import numpy as np
 from ..artifacts.assembly_io import materialize_definition
 from simplecadapi._cpp import Assembly, make_compound_from_assembly_rcompound, Part
 from ..translator.package_units import (
-    ProductPackageInput,
+    ProductInput,
     read_product_package_translation_units,
 )
 
@@ -122,7 +122,7 @@ def tessellate_solid(
 
 
 def tessellate_product_surface(
-    data: ProductPackageInput,
+    data: ProductInput,
     *,
     linear_deflection: float,
     angular_deflection_degrees: float,

@@ -13,6 +13,7 @@ import importlib
 import importlib.metadata
 import io
 import json
+import os
 import pickle
 import re
 import sys
@@ -325,6 +326,33 @@ class TestRunNotebook(NotebookTestCase):
         self.assertEqual(self.statuses(run), ["ran", "ran", "ran", "ran"])
         self.assertFalse((state_dir(run.config) / "cache").exists())
         self.assertEqual(self.statuses(run_notebook(self.bracket)), ["ran"] * 4)
+
+    def test_without_the_cache_the_source_directory_is_left_alone(self) -> None:
+        """Issue #89: a run that keeps no state must not create the state directory (``__marimo__``) next to the source,
+        so a notebook can run where the source directory is read-only (a container's ``-v src:/src:ro``)."""
+
+        run_notebook(self.bracket, cache=False)
+        self.assertFalse((self.root / "__marimo__").exists())
+        self.assertFalse(state_dir(read_notebook_config(self.bracket)).exists())
+
+    @unittest.skipUnless(
+        os.name == "posix" and hasattr(os, "geteuid") and os.geteuid() != 0, "needs a non-root POSIX user to make a directory read-only"
+    )
+    def test_without_the_cache_a_read_only_source_directory_runs(self) -> None:
+        directories = [self.root, self.root / "lib"]
+        modes = [directory.stat().st_mode for directory in directories]
+        for directory in directories:
+            directory.chmod(0o555)
+        try:
+            run = run_notebook(self.bracket, cache=False)
+        finally:
+            for directory, mode in zip(directories, modes):
+                directory.chmod(mode)
+        self.assertEqual(run.definition.definition_id, "bracket")
+
+    def test_with_the_cache_the_dependency_record_is_still_written(self) -> None:
+        run = run_notebook(self.bracket)
+        self.assertTrue((state_dir(run.config) / "deps.json").is_file())
 
     def test_overrides_skip_the_defining_cell(self) -> None:
         plain = run_notebook(self.bracket)

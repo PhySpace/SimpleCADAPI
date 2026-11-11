@@ -8,7 +8,7 @@ import struct
 
 import numpy as np
 
-from ..translator.package_units import ProductPackageInput
+from ..translator.package_units import ProductInput
 from ._surface_mesh import TessellatedSurfaceMesh, tessellate_product_surface
 
 
@@ -51,7 +51,7 @@ def _write_binary_stl(path: Path, mesh: TessellatedSurfaceMesh) -> None:
 
 
 def export_product_package_to_stl(
-    data: ProductPackageInput,
+    data: ProductInput,
     output_path: str | Path,
     *,
     linear_deflection: float = 0.1,

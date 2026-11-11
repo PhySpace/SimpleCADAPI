@@ -20,7 +20,7 @@ from ..artifacts.part_definition import PartDefinition
 from simplecadapi._cpp import Assembly, Part
 from ..product.placement import Placement, relative_placement
 from ..translator.package_units import (
-    ProductPackageInput,
+    ProductInput,
     read_product_package_translation_units,
 )
 from ._surface_mesh import tessellate_solid
@@ -339,7 +339,7 @@ def _part_materials(units: tuple[Any, ...]) -> dict[str, tuple[Part, float, bool
 
 
 def export_product_package_to_mjcf(
-    data: ProductPackageInput,
+    data: ProductInput,
     output_path: str | Path,
     *,
     mesh_directory: str | Path | None = None,

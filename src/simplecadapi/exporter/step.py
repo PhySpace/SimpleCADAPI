@@ -13,7 +13,7 @@ from typing import Any
 from ..artifacts import materialize_definition
 from simplecadapi._cpp import Assembly, Part
 from ..translator.package_units import (
-    ProductPackageInput,
+    ProductInput,
     read_product_package_translation_units,
 )
 
@@ -152,10 +152,11 @@ def _native_definitions(root_value: Part | Assembly, units: Any) -> list[dict[st
 
 
 def export_product_package_to_step(
-    data: ProductPackageInput,
+    data: ProductInput,
     output_path: str | Path,
 ) -> ProductSTEPExportReport:
-    """Export a validated `.scadpkg` closure as XCAF-backed AP242 STEP."""
+    """Export a product as XCAF-backed AP242 STEP: a validated `.scadpkg` closure (package, bytes or path), or the result of
+    a build (``@scad.part`` / ``@scad.assemble``) or its definition, which is packaged in memory without a scene."""
 
     import simplecadapi._cpp as native
 
