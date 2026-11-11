@@ -54,10 +54,12 @@ std::string input_role(std::size_t index) {
 // body op tool, with history.  `Solid(result)` of the Python SDK is the first
 // solid of the kernel's answer (empty when there is none); the history filter
 // is the whole answer.
-TrackedBooleanResult track_boolean(kernel::BooleanOp op, const Solid& body, const Solid& tool, const char* failure) {
+TrackedBooleanResult track_boolean(kernel::BooleanOp op, const Solid& body, const Solid& tool, const char* failure,
+                                   bool clean) {
   return occt_guard([&] {
     kernel::BooleanOptions options;
     options.fill_history = true;
+    options.clean = clean;
     const kernel::BooleanResult run = kernel::run_boolean(op, body.wrapped(), {tool.wrapped()}, options);
     if (!run.done)
       throw ValueError(failure);
@@ -87,12 +89,13 @@ TrackedBooleanResult track_boolean(kernel::BooleanOp op, const Solid& body, cons
 
 }  // namespace
 
-TrackedBooleanResult tracked_cut(const Solid& body, const Solid& tool) {
-  return track_boolean(kernel::BooleanOp::Cut, body, tool, "Boolean cut failed: OCC build did not complete");
+TrackedBooleanResult tracked_cut(const Solid& body, const Solid& tool, bool clean) {
+  return track_boolean(kernel::BooleanOp::Cut, body, tool, "Boolean cut failed: OCC build did not complete", clean);
 }
 
-TrackedBooleanResult tracked_intersect(const Solid& body, const Solid& tool) {
-  return track_boolean(kernel::BooleanOp::Common, body, tool, "Boolean intersect failed: OCC build did not complete");
+TrackedBooleanResult tracked_intersect(const Solid& body, const Solid& tool, bool clean) {
+  return track_boolean(kernel::BooleanOp::Common, body, tool, "Boolean intersect failed: OCC build did not complete",
+                       clean);
 }
 
 TrackedBooleanResult tracked_union(const Solid& body, const Solid& tool, bool glue, double tol) {

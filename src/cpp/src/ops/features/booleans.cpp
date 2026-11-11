@@ -323,12 +323,12 @@ CutRun run_cuts(const std::vector<Solid>& solids, const CutOptions& options, Tra
 
       std::vector<Solid> cut_pieces;
       if (policy == TrackingPolicy::Full) {
-        TrackedBooleanResult tracked = tracked_cut(piece, candidate);
+        TrackedBooleanResult tracked = tracked_cut(piece, candidate, options.clean);
         cut_pieces = std::move(tracked.solids);
         run.deltas.push_back(std::move(tracked.delta));
         merge_entries(run.entries, std::move(tracked.delta_entries));
       } else {
-        for (const TopoDS_Solid& part : kernel::solids_of(kernel::cut_shapes(s1, {s2})))
+        for (const TopoDS_Solid& part : kernel::solids_of(kernel::cut_shapes(s1, {s2}, options.clean)))
           cut_pieces.emplace_back(part);
       }
       run.intermediates.push_back(piece);
@@ -350,6 +350,7 @@ void record_cut(const std::vector<Solid>& solids, const CutOptions& options, Tra
                 FeatureRecord& rec) {
   rec.param("tool_count", Value(static_cast<std::int64_t>(solids.size() - 1)))
       .param("skip_non_intersecting", Value(options.skip_non_intersecting))
+      .param("clean", Value(options.clean))
       .param("tracking_policy", Value(std::string(to_string(policy))));
   add_operands(rec, solids);
 }
@@ -485,7 +486,7 @@ std::vector<Solid> cut_rsolid_list(const std::vector<Solid>& solids, const CutOp
 // ---------------------------------------------------------------------------
 // intersect
 // ---------------------------------------------------------------------------
-Solid intersect_rsolid(const std::vector<Solid>& solids) {
+Solid intersect_rsolid(const std::vector<Solid>& solids, bool clean) {
   bool empty_result = false;
   try {
     return occt_guard([&]() -> Solid {
@@ -503,7 +504,7 @@ Solid intersect_rsolid(const std::vector<Solid>& solids) {
         const Solid& candidate = solids[i];
         if (result_solid.wrapped().IsNull() || candidate.wrapped().IsNull())
           throw ValueError("The input solid is invalid; the intersection cannot be computed.");
-        TrackedBooleanResult tracked = tracked_intersect(result_solid, candidate);
+        TrackedBooleanResult tracked = tracked_intersect(result_solid, candidate, clean);
         if (!tracked.solid) {
           empty_result = true;
           throw ValueError("The intersection is empty or OCC returned no valid solid");
@@ -522,7 +523,7 @@ Solid intersect_rsolid(const std::vector<Solid>& solids) {
       result_solid.apply_tag("solid.boolean.intersect", false);
 
       FeatureRecord rec(kIntersectOp);
-      rec.param("input_count", Value(static_cast<std::int64_t>(solids.size())));
+      rec.param("input_count", Value(static_cast<std::int64_t>(solids.size()))).param("clean", Value(clean));
       add_operands(rec, solids);
       FinalizeSpec spec;
       spec.record = std::move(rec).take();

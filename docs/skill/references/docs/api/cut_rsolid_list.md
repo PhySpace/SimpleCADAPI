@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def cut_rsolid_list(*solids, skip_non_intersecting=True, tracking_policy='full')
+def cut_rsolid_list(*solids, skip_non_intersecting=True, tracking_policy='full', clean=True)
 ```
 
 *Source: operators/boolean.py*
@@ -38,6 +38,10 @@ a through slot. Use ``cut_rsolid`` when the result must be one solid.
 ### tracking_policy
 
 - **Description**: FULL computes topology history and lineage. GRAPH keeps the replayable operation node without computing a TopoDelta.
+
+### clean
+
+- **Description**: When True (the default) the faces and edges the cut leaves split are unified, as union does: a cylinder wall cut along its seam stays one face, so a later fillet or chamfer of its edges works. False keeps the raw kernel result.
 
 ## Returns
 

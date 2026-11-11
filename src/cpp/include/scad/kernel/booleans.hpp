@@ -22,6 +22,10 @@ struct BooleanOptions {
   bool fill_history = false;    // keep BRepTools_History + section edges
   std::optional<double> fuzzy;  // fuzzy tolerance (SetFuzzyValue)
   bool glue = false;            // BOPAlgo_GlueShift instead of GlueOff
+  // Unify the same-domain faces and edges of the result (what a cut leaves behind: a cylinder wall split along its
+  // seam, an edge split in two).  The history, when kept, and the section edges follow the clean-up.  A clean-up that
+  // fails, or that turns a valid result into an invalid one, is dropped: the raw result is the answer.
+  bool clean = false;
 };
 
 struct BooleanResult {
@@ -55,10 +59,10 @@ FuseHistoryResult fuse_shapes_with_history(const std::vector<TopoDS_Shape>& shap
 TopoDS_Shape fuse_shapes(const std::vector<TopoDS_Shape>& shapes, bool glue = false,
                          std::optional<double> tol = std::nullopt, bool clean = true);
 
-// body - every tool.  `body` itself when there are no tools.
-TopoDS_Shape cut_shapes(const TopoDS_Shape& body, const std::vector<TopoDS_Shape>& tools);
+// body - every tool.  `body` itself when there are no tools.  With `clean`, the result is unified (see BooleanOptions).
+TopoDS_Shape cut_shapes(const TopoDS_Shape& body, const std::vector<TopoDS_Shape>& tools, bool clean = false);
 
-// Intersection of all shapes, folded left to right.
-TopoDS_Shape common_shapes(const std::vector<TopoDS_Shape>& shapes);
+// Intersection of all shapes, folded left to right.  With `clean`, each step's result is unified.
+TopoDS_Shape common_shapes(const std::vector<TopoDS_Shape>& shapes, bool clean = false);
 
 }  // namespace scad::kernel

@@ -1,5 +1,13 @@
 // Why a fillet or chamfer failed: the probes of operators/_diagnostics.py, in its order.
 #include <BRepAdaptor_Surface.hxx>
+#include <BRepCheck_Analyzer.hxx>
+#include <BRepFilletAPI_MakeChamfer.hxx>
+#include <BRepFilletAPI_MakeFillet.hxx>
+#include <BRepTools_History.hxx>
+#include <ShapeUpgrade_UnifySameDomain.hxx>
+#include <TopExp.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
+#include <TopTools_MapOfShape.hxx>
 #include <GeomAbs_SurfaceType.hxx>
 #include <TopoDS.hxx>
 
@@ -151,6 +159,77 @@ std::optional<BlendDiagnosis> classify_tangent_adjacency(const Case& c) {
     return out;
   }
   return std::nullopt;
+}
+
+// A boolean that was not cleaned leaves faces that lie on one surface split (a cylinder wall cut along its seam is two
+// faces).  The blend of an edge along such a face fails, or goes wrong, and the room probe below then blames the radius:
+// the "face room" it measures is only the half the seam cut off.  Unify the same-domain faces, carry the selected edges
+// over with the history, and blend again: when that works, the split faces are the cause (issue #88).
+std::optional<BlendDiagnosis> classify_split_faces(const Case& c) {
+  ShapeUpgrade_UnifySameDomain unifier(c.solid.wrapped(), /*UnifyEdges=*/true, /*UnifyFaces=*/true,
+                                       /*ConcatBSplines=*/true);
+  unifier.Build();
+  const TopoDS_Shape unified = unifier.Shape();
+  if (unified.IsNull())
+    return std::nullopt;
+  const auto faces_in = [](const TopoDS_Shape& shape) {
+    TopTools_IndexedMapOfShape faces;
+    TopExp::MapShapes(shape, TopAbs_FACE, faces);
+    return faces.Extent();
+  };
+  const int split = faces_in(c.solid.wrapped()) - faces_in(unified);
+  if (split <= 0)
+    return std::nullopt;
+
+  const opencascade::handle<BRepTools_History> history = unifier.History();
+  TopTools_MapOfShape carried;
+  std::vector<TopoDS_Edge> edges;
+  for (const Edge& edge : c.edges) {
+    std::vector<TopoDS_Shape> now;
+    for (const TopoDS_Shape& s : history->Modified(edge.wrapped()))
+      now.push_back(s);
+    if (now.empty() && !history->IsRemoved(edge.wrapped()))
+      now.push_back(edge.wrapped());
+    for (const TopoDS_Shape& s : now) {
+      if (s.ShapeType() == TopAbs_EDGE && carried.Add(s))
+        edges.push_back(TopoDS::Edge(s));
+    }
+  }
+  if (edges.empty())
+    return std::nullopt;
+
+  const bool chamfer = c.words.size == "distance";
+  const char* kind = chamfer ? "chamfer" : "fillet";
+  bool works = false;
+  if (chamfer) {
+    BRepFilletAPI_MakeChamfer blend(unified);
+    for (const TopoDS_Edge& edge : edges)
+      blend.Add(c.size_value, edge);
+    blend.Build();
+    works = blend.IsDone() && BRepCheck_Analyzer(blend.Shape()).IsValid() == Standard_True;
+  } else {
+    BRepFilletAPI_MakeFillet blend(unified);
+    for (const TopoDS_Edge& edge : edges)
+      blend.Add(c.size_value, edge);
+    blend.Build();
+    works = blend.IsDone() && BRepCheck_Analyzer(blend.Shape()).IsValid() == Standard_True;
+  }
+  if (!works)
+    return std::nullopt;
+
+  BlendDiagnosis out;
+  out.failure_kind = "faces_split_on_one_surface";
+  out.what_happened = std::to_string(split) + " face(s) of the solid are split on a surface they share with a neighbour " +
+                      "(typically a boolean made without clean, or a cylinder wall cut along its seam); the same " + kind +
+                      " " + c.words.size + " " + g4(c.size_value) +
+                      " mm succeeds once those faces are unified, so the " + c.words.size + " is not the limit";
+  out.possible_causes = {"A cut or intersection ran with clean=False and left a face split along its seam.",
+                         "The solid came from a source that does not unify faces (an imported or hand-built shape)."};
+  out.measurements = {{"split_faces", static_cast<double>(split), "faces"}, {c.words.size, c.size_value, "mm"}};
+  out.repair = {"Make the cut / intersect with clean=True (the default), or pass the solid through union_rsolid(solid, "
+                "clean=True) before the " + std::string(kind) + ".",
+                std::string("Keep the ") + c.words.size + " as it is: it is not too large."};
+  return out;
 }
 
 std::optional<BlendDiagnosis> classify_blend_room(const Case& c) {
@@ -336,6 +415,8 @@ std::optional<BlendDiagnosis> diagnose_blend_failure(const Solid& solid, const s
       return found;
     if (auto found = classify_tangent_adjacency(c))
       return found;
+    if (auto found = classify_split_faces(c))
+      return found;
     if (auto found = classify_blend_room(c))
       return found;
     if (auto found = classify_partial_smooth_chain(c))
@@ -424,6 +505,22 @@ void assert_blend_volume_monotonic(const Solid& source, const Solid& result, std
                                "geometry" +
                                where);
   }
+}
+
+void assert_blend_valid(const Solid& source, const Solid& result, std::string_view operation_kind,
+                        std::optional<double> size_value, const std::vector<Edge>& edges) {
+  // The cheap side first: a valid result is the normal case; the input is checked only to tell "OCCT broke it" from
+  // "it came in broken" (an imported solid that was already invalid is not the blend's fault).
+  const bool result_valid = occt_guard([&] { return BRepCheck_Analyzer(result.wrapped()).IsValid() == Standard_True; });
+  if (result_valid)
+    return;
+  const bool source_valid = occt_guard([&] { return BRepCheck_Analyzer(source.wrapped()).IsValid() == Standard_True; });
+  if (!source_valid)
+    return;
+  throw BlendValidityViolation(std::string(operation_kind) +
+                               " result is not a valid solid (BRepCheck_Analyzer) although the input was: the kernel "
+                               "returned broken geometry (size=" +
+                               size_text(size_value) + ", selected_edges=" + std::to_string(edges.size()) + ")");
 }
 
 }  // namespace scad

@@ -179,8 +179,9 @@ ModificationHistory modification_history(const BRepTools_History& history, const
 // tracked_cut.  Face history of body ("body") and tool ("tool"), plus the
 // section edges.  `solid` of the result is the *first* solid of the kernel's
 // result, empty when the cut left none; membership is judged against the whole
-// kernel result.  ValueError when the algorithm did not complete.
-TrackedBooleanResult tracked_cut(const Solid& body, const Solid& tool);
+// kernel result.  ValueError when the algorithm did not complete.  With `clean` the result is unified (same-domain
+// faces and edges merged, see kernel::BooleanOptions::clean) and the history follows the clean-up.
+TrackedBooleanResult tracked_cut(const Solid& body, const Solid& tool, bool clean = false);
 
 // tracked_union: a two-solid fuse with `track_union_history` on top.  ValueError
 // unless the fuse yields exactly one solid.  Glue is opt-in (see kernel::fuse_shapes_with_history).
@@ -195,8 +196,8 @@ TrackedBooleanResult track_union_history(const std::vector<Solid>& solids, const
                                          const BRepTools_History& history,
                                          const std::vector<TopoDS_Shape>& section_edges = {});
 
-// tracked_intersect.
-TrackedBooleanResult tracked_intersect(const Solid& body, const Solid& tool);
+// tracked_intersect.  `clean` as for tracked_cut.
+TrackedBooleanResult tracked_intersect(const Solid& body, const Solid& tool, bool clean = false);
 
 namespace tracking {
 // How many topology-history queries the tracked operations have made in this process.  A graph-policy
