@@ -52,11 +52,11 @@ struct BlendAttempt {
     spec.possible_causes = diagnosis->possible_causes;
 
   const std::string details =
-      violation != nullptr ? std::string(dynamic_cast<const BlendValidityViolation*>(&error) != nullptr
-                                             ? "BlendValidityViolation: "
-                                             : "BlendVolumeViolation: ") +
-                                 violation->what()
-                           : technical_details_of(error);
+      violation != nullptr
+          ? std::string(dynamic_cast<const BlendValidityViolation*>(&error) != nullptr ? "BlendValidityViolation: "
+                                                                                       : "BlendVolumeViolation: ") +
+                violation->what()
+          : technical_details_of(error);
   std::vector<ErrorEvidence> evidence;
   if (diagnosis && !diagnosis->evidence_edges.empty()) {
     // The solid with the implicated edges in orange; the same failure at the same size is drawn once per process

@@ -162,9 +162,9 @@ std::optional<BlendDiagnosis> classify_tangent_adjacency(const Case& c) {
 }
 
 // A boolean that was not cleaned leaves faces that lie on one surface split (a cylinder wall cut along its seam is two
-// faces).  The blend of an edge along such a face fails, or goes wrong, and the room probe below then blames the radius:
-// the "face room" it measures is only the half the seam cut off.  Unify the same-domain faces, carry the selected edges
-// over with the history, and blend again: when that works, the split faces are the cause (issue #88).
+// faces).  The blend of an edge along such a face fails, or goes wrong, and the room probe below then blames the
+// radius: the "face room" it measures is only the half the seam cut off.  Unify the same-domain faces, carry the
+// selected edges over with the history, and blend again: when that works, the split faces are the cause (issue #88).
 std::optional<BlendDiagnosis> classify_split_faces(const Case& c) {
   ShapeUpgrade_UnifySameDomain unifier(c.solid.wrapped(), /*UnifyEdges=*/true, /*UnifyFaces=*/true,
                                        /*ConcatBSplines=*/true);
@@ -200,35 +200,38 @@ std::optional<BlendDiagnosis> classify_split_faces(const Case& c) {
 
   const bool chamfer = c.words.size == "distance";
   const char* kind = chamfer ? "chamfer" : "fillet";
-  bool works = false;
-  if (chamfer) {
-    BRepFilletAPI_MakeChamfer blend(unified);
-    for (const TopoDS_Edge& edge : edges)
-      blend.Add(c.size_value, edge);
-    blend.Build();
-    works = blend.IsDone() && BRepCheck_Analyzer(blend.Shape()).IsValid() == Standard_True;
-  } else {
+  const bool works = occt_guard([&] {
+    if (chamfer) {
+      BRepFilletAPI_MakeChamfer blend(unified);
+      for (const TopoDS_Edge& edge : edges)
+        blend.Add(c.size_value, edge);
+      blend.Build();
+      return blend.IsDone() && BRepCheck_Analyzer(blend.Shape()).IsValid() == Standard_True;
+    }
     BRepFilletAPI_MakeFillet blend(unified);
     for (const TopoDS_Edge& edge : edges)
       blend.Add(c.size_value, edge);
     blend.Build();
-    works = blend.IsDone() && BRepCheck_Analyzer(blend.Shape()).IsValid() == Standard_True;
-  }
+    return blend.IsDone() && BRepCheck_Analyzer(blend.Shape()).IsValid() == Standard_True;
+  });
   if (!works)
     return std::nullopt;
 
   BlendDiagnosis out;
   out.failure_kind = "faces_split_on_one_surface";
-  out.what_happened = std::to_string(split) + " face(s) of the solid are split on a surface they share with a neighbour " +
-                      "(typically a boolean made without clean, or a cylinder wall cut along its seam); the same " + kind +
-                      " " + c.words.size + " " + g4(c.size_value) +
+  out.what_happened = std::to_string(split) +
+                      " face(s) of the solid are split on a surface they share with a neighbour " +
+                      "(typically a boolean made without clean, or a cylinder wall cut along its seam); the same " +
+                      kind + " " + c.words.size + " " + g4(c.size_value) +
                       " mm succeeds once those faces are unified, so the " + c.words.size + " is not the limit";
   out.possible_causes = {"A cut or intersection ran with clean=False and left a face split along its seam.",
                          "The solid came from a source that does not unify faces (an imported or hand-built shape)."};
   out.measurements = {{"split_faces", static_cast<double>(split), "faces"}, {c.words.size, c.size_value, "mm"}};
-  out.repair = {"Make the cut / intersect with clean=True (the default), or pass the solid through union_rsolid(solid, "
-                "clean=True) before the " + std::string(kind) + ".",
-                std::string("Keep the ") + c.words.size + " as it is: it is not too large."};
+  out.repair = {
+      "Make the cut / intersect with clean=True (the default), or pass the solid through union_rsolid(solid, "
+      "clean=True) before the " +
+          std::string(kind) + ".",
+      std::string("Keep the ") + c.words.size + " as it is: it is not too large."};
   return out;
 }
 
