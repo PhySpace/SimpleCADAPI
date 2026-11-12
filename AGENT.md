@@ -35,7 +35,13 @@ BAD: Quoting only human-team effort: "This would take 2 weeks." (Say: "2 weeks h
 Why this is written down: changing anything under `src/cpp` needs a rebuilt `_native` module, and the obvious command
 failed three times before it worked. Each failure had a cause that is not visible from the error text.
 
-- Use the project's own path, `uv pip install --python .venv/Scripts/python.exe -e . --no-deps -v`. It reuses
+- UPDATE (2026-11-10, later): none of the flags below are needed any more. `pyproject.toml` builds with
+  `tools/build_backend/scad_build.py`, which on Windows picks Ninja + the gcc on PATH when Visual Studio is absent, finds
+  OCCT (`SCAD_OCCT_PREFIX`, `C:/occt`, or `%LOCALAPPDATA%/simplecadapi/occt-<tag>`, building it there once if missing) and
+  limits the job count by RAM. A bare `uv sync` / `uv run` works; anything you set yourself (CMAKE_GENERATOR, CC, CXX,
+  CMAKE_ARGS, CMAKE_BUILD_PARALLEL_LEVEL) still wins. `[tool.uv] cache-keys` makes uv rebuild only when `src/cpp` changes,
+  not on a version bump. What remains true: a running editor locks the installed `.pyd` (rename it aside, see below).
+- (Older note) Use the project's own path, `uv pip install --python .venv/Scripts/python.exe -e . --no-deps -v`. It reuses
   `src/cpp/build/wheel/<tag>/` (incremental when the compiler flags did not change). Plain `ninja _native` in that
   directory fails: its CMakeCache points into a temporary isolated build environment (ninja, pybind11, python) that was
   deleted when the last build ended, so CMake cannot regenerate.
