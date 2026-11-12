@@ -11,7 +11,7 @@ using doctest::Approx;
 TEST_CASE("sprocket: ISO 606 12B candidate") {
   const Solid sprocket = make_roller_chain_sprocket_rsolid(18, 19.05, 12.07, 11.1, 10.2);
   CHECK(sprocket.volume() == Approx(98201.67369173263).epsilon(1e-6));
-  CHECK(sprocket.faces().size() == 54);
+  CHECK(sprocket.faces().size() == 39);  // 54 before cut unified the faces a cylinder seam split (issue #88)
   const Value meta = sprocket.get_metadata("std.chain.roller_sprocket");
   CHECK(meta.find("n_teeth")->as_int() == 18);
   CHECK(number(meta, "pitch_radius") == Approx(19.05 / (2.0 * std::sin(kPi / 18))));

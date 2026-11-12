@@ -24,7 +24,7 @@ operation with the picked faces as ``targets``.
 
 ``block = scad.apply_tag_rselection(block, scad.ql.faces().where(scad.ql.prop("geom.normal.z", ">=", 0.999)), "lid_seat")``
 names the top face; ``scad.ql.faces().where(scad.ql.tag("lid_seat"))`` selects it
-later. A body of a Part is named with ``set_body_appearance_rpart(part, body_id, name=...)``.
+later. The body of a Part is named with ``set_body_appearance_rpart(part, name=...)``.
 
 ## Parameters
 

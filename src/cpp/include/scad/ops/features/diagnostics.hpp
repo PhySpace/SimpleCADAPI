@@ -21,7 +21,8 @@ namespace scad {
 // A classified fillet / chamfer failure.
 struct BlendDiagnosis {
   // "tangent_adjacent_faces" | "sliver_edges_in_selection" | "size_exceeds_face" |
-  // "partial_smooth_chain_on_periodic_face" | "blends_tangency_critical" | "vertex_blend_conflict"
+  // "partial_smooth_chain_on_periodic_face" | "blends_tangency_critical" | "vertex_blend_conflict" |
+  // "faces_split_on_one_surface"
   std::string failure_kind;
   std::string what_happened;
   std::vector<std::string> possible_causes;
@@ -53,6 +54,16 @@ class BlendVolumeViolation : public ValueError {
 // that grew the solid.  Volumes that cannot be measured pass.
 void assert_blend_volume_monotonic(const Solid& source, const Solid& result, std::string_view operation_kind,
                                    std::optional<double> size_value, const std::vector<Edge>& edges);
+
+// Exit check of a blend, next to the volume check: the result must be a valid solid (BRepCheck_Analyzer) whenever
+// the input was.  OCCT reports `IsDone` for fillets it got wrong (a face split along a seam, issue #88) and hands back
+// an invalid solid with a wrong volume, which only a later boolean or an export finds.  Throws BlendValidityViolation.
+class BlendValidityViolation : public BlendVolumeViolation {
+ public:
+  using BlendVolumeViolation::BlendVolumeViolation;
+};
+void assert_blend_valid(const Solid& source, const Solid& result, std::string_view operation_kind,
+                        std::optional<double> size_value, const std::vector<Edge>& edges);
 
 // A classified boolean failure.
 struct BooleanDiagnosis {

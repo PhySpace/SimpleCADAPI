@@ -154,17 +154,19 @@ void register_booleans(reactive::ExecutorRegistry& registry) {
     return one(union_rsolid(rest<Solid>(in, 0, in.size()), options));
   });
   registry.add("make_cut_rsolid", [](Params p, Inputs in, const ScalarValues&) {
-    return one(
-        cut_rsolid(rest<Solid>(in, 0, in.size()), {flag(p, "skip_non_intersecting"), text(p, "tracking_policy")}));
+    CutOptions options{flag(p, "skip_non_intersecting"), text(p, "tracking_policy")};
+    options.clean = flag(p, "clean");
+    return one(cut_rsolid(rest<Solid>(in, 0, in.size()), options));
   });
   registry.add("make_cut_rsolid_list", [](Params p, Inputs in, const ScalarValues&) {
     CutOptions options{flag(p, "skip_non_intersecting"), text(p, "tracking_policy")};
+    options.clean = flag(p, "clean");
     const Value* order = p.find("piece_order");  // absent on records made before ordered pieces
     options.order_pieces = order != nullptr && order->is_string() && order->as_string() == "centroid";
     return many(cut_rsolid_list(rest<Solid>(in, 0, in.size()), options));
   });
-  registry.add("make_intersect_rsolid", [](Params, Inputs in, const ScalarValues&) {
-    return one(intersect_rsolid(rest<Solid>(in, 0, in.size())));
+  registry.add("make_intersect_rsolid", [](Params p, Inputs in, const ScalarValues&) {
+    return one(intersect_rsolid(rest<Solid>(in, 0, in.size()), flag(p, "clean")));
   });
   registry.add("make_boolean_rsolidlist", [](Params p, Inputs in, const ScalarValues&) {
     const auto left = static_cast<std::size_t>(param(p, "left_count").as_int());

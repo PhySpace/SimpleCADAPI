@@ -44,7 +44,7 @@ A reference to a face born in *feature* by *op*.
 
 ### slot
 
-- **Description**: The output of that operation (a multi-body result has one per body).
+- **Description**: The output of that operation (an operation that makes several solids has one per solid).
 
 ### piece
 

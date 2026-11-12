@@ -22,16 +22,15 @@ deliver `.scadpkg` packages.
 
 - Monolithic single-body manufacturing intent: fuse with `union_rsolid` in
   `domains/part-modeling.md`.
-- Several bodies of one part that never move apart and are one BOM item
-  (a multi-body part, `make_part_rpart(bodies=...)`): `domains/part-modeling.md`.
 - Export or translation decisions: they branch from the package in
   `domains/export-and-translation.md`.
 ## Structure model
 
-- `Part` wraps one `Solid` (or several named bodies, `bodies=`) plus identity
-  and optional material (`make_part_rpart`, `assign_material_rpart`,
-  `make_material_rmaterial`). In an assembly a multi-body part is one component;
-  its bodies are never placed or jointed separately.
+- `Part` wraps exactly one `Solid` plus identity and optional material
+  (`make_part_rpart`, `assign_material_rpart`, `make_material_rmaterial`). Every
+  Part can be placed, mated and given connectors because it is one solid; several
+  solids that belong together are one Part each, as components of an Assembly
+  (identity placements when they only sit side by side).
 - Display colour: `Material.color` is the default for every body of a part;
   `set_body_appearance_rpart(part, body_id, color=..., opacity=..., name=...)`
   overrides it per body for display (preview, package scene node

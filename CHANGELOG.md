@@ -4,7 +4,43 @@ All notable changes to SimpleCADAPI are documented here. Per-version
 user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 中文).
 
-## Unreleased
+## 2.3.0 — 2026-11-12
+
+Follows 2.2.7. 2.2.8 was withdrawn (yanked on PyPI) and the 2.2.9 prepared to replace it was never published: both are in
+2.3.0. User-facing notes: [`docs/updates/2.3.0.md`](docs/updates/2.3.0.md).
+
+### Changed
+- `cut_rsolid`, `cut_rsolid_list` and `intersect_rsolid` unify the same-domain faces and edges of their result by default
+  (`clean=True`, as `union_rsolid` always did; history and tags follow; the raw result is kept when the unified one would be
+  invalid; `clean=False` returns the raw result). A cut through the side of a box with a cylinder left the cylinder wall split
+  along its seam, and OCCT fillets an edge along such a face wrongly (#88). `clean` is a recorded parameter of the three
+  operations: a graph recorded before 2.3.0 has none and is rejected on replay (record it again). Bodies built with such a cut
+  have fewer faces and edges, and different fingerprints.
+- The exporters (`export_product_package_to_step / stl / obj / mjcf`, the FreeCAD translator) also take the result of a build or
+  its definition, packaged in memory without the scene projection (#89): 1.85 s -> 0.26 s for a 36-hole plate.
+- `run_notebook(path, cache=False)` writes nothing beside the notebook: no `deps.json`, no state directory, so it runs where the
+  source directory is read-only (#89). The skill allows a plain script for a task that asks for a single script (R3 exception).
+- Geometry fingerprints quantize through a noise-tolerant `_q` (#87); a fingerprint of a body with a value on a quantization
+  boundary changes once, and a topology snapshot recorded before does not restore.
+- The build backend is `tools/build_backend/scad_build.py` (scikit-build-core plus toolchain and OpenCASCADE detection on
+  Windows): a plain `uv sync` builds without Visual Studio or hand-set `CMAKE_*` variables; `uv` rebuilds only when `src/cpp`
+  changes.
+- A `Part` holds exactly one solid again. The multi-body Part of the withdrawn 2.2.8 release (`make_part_rpart(bodies=...)`,
+  `Part.multi_body`, `scad.part_shape`, `inspect_body_overlaps_rlist`, `BodyOverlapWarning`, part definition profile
+  `simplecad-part-definition-3` with `solid_cache.bodies`) is removed: a Part is the unit an assembly places, mates and gives
+  connectors to, and a Part of several bodies could do none of that (no connectors, `explode_rassembly` raised). Several
+  solids that exist side by side while a model is built (a tool next to its body) are ordinary notebook values: a part
+  notebook with one open solid still gets the implicit Part; with several there is no product and the run raises
+  `SeveralOpenBodiesError` naming them. The editor draws them side by side ("N open solids") and its `use_as_product`
+  makes the Part from the one you choose. Several solids as a deliverable are one Part each in an Assembly.
+
+### Fixed
+- `fillet_rsolid` / `chamfer_rsolid` raise when OCCT returns a solid it calls invalid while the input was valid (they used to
+  return it, #88); a fillet that fails on split faces says so instead of blaming the radius.
+- On Windows `sca cell` no longer kills the editor it talks to: the editor pid is probed without signalling it
+  (`os.kill(pid, 0)` terminates the process on Windows).
+- Building from source with GCC 14 (`operators_promote.cpp` includes `<algorithm>`) and MinGW (`_USE_MATH_DEFINES`; `build_occt.py`
+  picks Ninja when a MinGW `g++` is the compiler); the macOS wheels are built on `macos-15` (still targeting macOS 14.0).
 
 ## 2.2.8 — 2026-11-09
 

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def export_product_package_to_step(data: ProductPackageInput, output_path: str | Path) -> ProductSTEPExportReport
+def export_product_package_to_step(data: ProductInput, output_path: str | Path) -> ProductSTEPExportReport
 ```
 
 *Source: exporter/step.py*
@@ -14,4 +14,5 @@ def export_product_package_to_step(data: ProductPackageInput, output_path: str |
 
 ## Description
 
-Export a validated `.scadpkg` closure as XCAF-backed AP242 STEP.
+Export a product as XCAF-backed AP242 STEP: a validated `.scadpkg` closure (package, bytes or path), or the result of
+a build (``@scad.part`` / ``@scad.assemble``) or its definition, which is packaged in memory without a scene.

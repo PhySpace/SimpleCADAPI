@@ -2,17 +2,16 @@
 
 Model one physical mechanical part with the core geometry API: primitives,
 profiles, 3D features, booleans, detail features, and transforms. A part is
-usually one solid body; it may hold several named bodies (see "Multi-body
-parts" below).
+one solid body: a Part holds exactly one solid (see "One Part, one solid"
+below).
 
-**Read when:** the deliverable is one physical part (one body or several bodies kept apart in one product item), or an
+**Read when:** the deliverable is one physical part (one solid body), or an
 existing part source needs a geometry edit (Role 4 of `workflows/single-part-modeling.md`).
 
 ## Use when
 
 - The deliverable is one physical part that will be manufactured or exported as
-  one product item: normally a single solid body, or several bodies of one part
-  (a case and its lid modelled side by side, the pieces of a split cut).
+  one product item: a single solid body.
 - The request names brackets, plates, enclosures bodies, shafts, spacers,
     bosses, flanges, blades, or any monolithic part geometry.
 - An existing part source needs a geometry edit: new features, dimension
@@ -40,8 +39,7 @@ existing part source needs a geometry edit (Role 4 of `workflows/single-part-mod
 ## Outputs
 
 - A positive-volume, closed `Solid`, or a `Part` via `make_part_rpart` when the
-  product boundary is needed (`body=solid`, or `bodies={"base": base, "lid": lid}`
-  for a multi-body part).
+  product boundary is needed (`body=solid`).
 - Semantic tags on mating/role surfaces and numeric facts in metadata.
 - A replayable `GraphSession` model JSON when the flow must be replayable or
   interchange-exported.
@@ -101,10 +99,11 @@ consult their own documentation before the first call.
   `list[Solid]` ordered by centroid (x, then y, then z); it never drops a piece.
   Pass `on_split="error"` where exactly one Solid is required. A tool that
   consumes the body still raises. `cut_rsolid_list(base, tools)` always returns
-  a list (empty when nothing is left). The pieces become bodies of the part:
-  `make_part_rpart(part_id=..., body=pieces)` gives `body_1 .. body_n`,
-  `bodies={"bar": pieces}` gives `bar_1 .. bar_n`. A body is one closed volume:
-  OCCT and STEP have no valid "one solid with several lumps".
+  a list (empty when nothing is left). The pieces are notebook values: a Part holds one solid, so
+  `make_part_rpart(part_id=..., body=pieces)` with several pieces is an error;
+  make one Part per piece in an Assembly, or union the pieces if they are one
+  body. A solid is one closed volume: OCCT and STEP have no valid "one solid
+  with several lumps".
 - The pieces are a `scad.Pieces` (a list) and keep flowing: an operation that
   takes one shape (`translate_shape`, `shell_rsolid`, a further `cut_rsolid(pieces, tool)`,
   fillet, chamfer ...) runs on every piece and returns `Pieces` in the same order.
@@ -113,36 +112,33 @@ consult their own documentation before the first call.
   `union_rsolid(pieces)` joins them. A plain list passed to `cut_rsolid` is still
   base-then-tools.
 
-## Multi-body parts
+## One Part, one solid
 
-- `make_part_rpart(part_id=scad.notebook_id(), bodies={"base": base, "lid": lid})`
-  keeps several solids apart in one Part. The dict order is the body order;
-  body ids are identifiers, unique within the part.
-- Read them with `part.bodies` (`Body.body_id`, `Body.solid`, `Body.name`),
-  `part.get_body("lid")`, `part.body_ids()`. `part.body` is the Solid of a
-  one-body part (id `"body"`) and raises `TypeError` on a multi-body part.
-- Bodies have no placements, joints or connectors: anything that moves, or is
-  bought or made separately, is a component of an assembly
-  (`domains/assembly-and-product.md`). Connectors on a multi-body part are
-  refused for now.
-- Tool and construction solids are not bodies: leave them as notebook values
-  and do not pass them to the Part.
-- Overlapping bodies are allowed but warned (`BodyOverlapWarning` when the
-  definition is built); check with `inspect_body_overlaps_rlist(part)`. Union
-  bodies that are one piece of material.
-- Mass per body and in total: `measure_part_mass_rmassreport(part)` (density
-  from the part's material, or `density=`).
-- The preview draws one node per body (`node/<part>/body:<id>`); STEP export
-  writes one product holding every body.
+- `make_part_rpart(part_id=scad.notebook_id(), body=bracket)`. A Part is the unit
+  an assembly places, mates and gives connectors to, so it holds exactly one
+  solid. Several solids (`bodies=`, a list of several pieces) are refused with a
+  ValueError: make one Part per solid and put them in an Assembly (identity
+  placements when they only sit together), or union / cut them into one solid.
+- `part.body` is the Solid; `part.bodies` is that body as a one-element tuple
+  (`Body.body_id` is `"body"`, `Body.solid`, `Body.name`).
+- Solids that sit side by side while the model is built (a tool next to the body
+  it cuts, the tools of a pattern before the cut, the pieces of a split cut) are
+  ordinary notebook values, not a Part. A part notebook that ends with one open
+  solid needs no product cell; with several open solids and no cell making the
+  Part there is no product (`SeveralOpenBodiesError` names them): make the Part
+  from the solid that is the part. The editor draws the open solids side by side
+  ("N open solids") and its `use_as_product` makes the Part from the chosen one.
+- Mass: `measure_part_mass_rmassreport(part)` (density from the part's material,
+  or `density=`).
 
 ## Colours and names for people
 
-- A body's display colour, opacity and name are one recorded operation:
-  `part = scad.set_body_appearance_rpart(part, "lid", color=(0.9, 0.3, 0.2), opacity=0.6, name="Lid")`
-  (a one-body part: leave `body_id` out, it is `"body"`). Colours are RGB floats
+- A part's display colour, opacity and name are one recorded operation:
+  `part = scad.set_body_appearance_rpart(part, color=(0.9, 0.3, 0.2), opacity=0.6, name="Lid")`
+  (the body id is `"body"`, the default). Colours are RGB floats
   in [0, 1], linear like `Material.color`. `None` keeps a value, `reset=True`
-  clears all three first. Read back with `part.get_body("lid").color` / `.opacity` / `.name`.
-- The material colour is the default; a body colour overrides it for display
+  clears all three first. Read back with `part.bodies[0].color` / `.opacity` / `.name`.
+- The material colour is the default; the body colour overrides it for display
   only (preview, package scene, STEP surface colour of that solid). Mass and
   density never read it. STEP writes the colour and the body name, not the opacity.
 - Name a face, an edge or a vertex with a tag; there is no second naming system:

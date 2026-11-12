@@ -315,7 +315,7 @@ def test_a_blank_notebook_gets_its_product_with_the_first_feature(tmp_path):
         snap = service.snapshot()
         assert [f["slug"] for f in snap["features"]] == ["base"]
         # the header says kind = "part": the runtime makes the Part from the open body, no product cell is written
-        assert snap["product"] == {"cell": None, "body": "base", "bodies": ["base"], "implicit": True}
+        assert snap["product"] == {"cell": None, "body": "base", "implicit": True}
         assert "make_part_rpart" not in path.read_text()
         # a part holds one solid: the new cylinder says how it meets the body, so no second body is left behind
         assert service.snapshot()["defaults"]["cylinder"]["operation"] == "join"
@@ -538,7 +538,7 @@ def test_a_cell_written_as_code_makes_what_the_kernel_says_it_made():
     service._implicit_part = lambda: True  # type: ignore[method-assign]
     snap = service.snapshot()
     assert snap["bodies"] == [{"name": "path", "produces": "wire"}, {"name": "base", "produces": "solid"}]
-    assert snap["open"] == ["base"] and snap["product"]["bodies"] == ["base"]
+    assert snap["open"] == ["base"] and snap["product"]["body"] == "base"
     assert snap["defaults"]["op.sweep_rsolid"]["path"] == "path"
 
 
@@ -562,3 +562,49 @@ def test_curves_to_a_flat_face_a_sewn_shell_and_a_solid_run():
         exec("\n".join(rendered.params + [rendered.feature]), scope)
         bodies[slug] = made
     assert scope["tray"].get_volume() == pytest.approx(40 * 30 * 20, rel=1e-3)
+
+
+def test_several_open_solids_have_no_product_until_the_author_picks_one(tmp_path):
+    """A Part holds exactly one solid: with a tool left next to its body there is no implicit product, and the editor's
+    `use_as_product` makes the Part of the solid the author chooses (a make_part_rpart cell)."""
+    import threading
+
+    import uvicorn
+
+    from simplecadapi.editor.server import WorkspaceState, create_app
+    from simplecadapi.editor.templates import create_notebook
+    from simplecadapi.runtime import run_notebook
+    from simplecadapi.runtime.projection import SeveralOpenBodiesError
+
+    path = create_notebook(tmp_path, "plate", "blank")
+    state = WorkspaceState(tmp_path)
+    state.port = 17734
+    server = uvicorn.Server(uvicorn.Config(create_app(state), port=state.port, log_level="error"))
+    threading.Thread(target=server.run, daemon=True).start()
+    state.hub.attach_loop(__import__("asyncio").new_event_loop())
+    try:
+        state.start_kernel(path)
+        service = state.features
+        service.add({"spec": "box", "name": "base", "values": {}})
+        _wait_idle(state)
+        service.add({"spec": "cylinder", "name": "tool", "values": {"radius": 3.0, "height": 30.0, "operation": "new"}})  # stays beside the body
+        _wait_idle(state)
+        snap = service.snapshot()
+        assert snap["open"] == ["base", "tool"], snap
+        assert snap["product"] is None  # no guess: the author says which solid is the part
+        assert "make_part_rpart" not in path.read_text()
+        try:
+            run_notebook(path, cache=False)
+        except SeveralOpenBodiesError as error:
+            assert sorted(error.names) == ["base", "tool"] and "exactly one solid" in str(error)
+        else:
+            raise AssertionError("a headless run must not pick a solid for the author")
+        service.use_as_product({"body": "base"})
+        _wait_idle(state)
+        snap = service.snapshot()
+        assert snap["product"] is not None and snap["product"]["body"] == "base" and snap["product"]["cell"], snap
+        assert "make_part_rpart(part_id=scad.notebook_id(), body=base)" in path.read_text()
+        assert run_notebook(path, cache=False).product.part_id == "plate"
+    finally:
+        if state.kernel is not None:
+            state.kernel.stop()

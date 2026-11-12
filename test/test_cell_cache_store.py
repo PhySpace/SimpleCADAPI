@@ -163,7 +163,7 @@ SPLIT = notebook_text(
         reads="pieces",
         returns="moved, kind",
     ),
-    cell("part = scad.make_part_rpart(part_id='split', body=moved)", reads="moved", returns="part"),
+    cell("part = scad.make_part_rpart(part_id='split', body=moved[0])", reads="moved", returns="part"),  # a Part holds one solid: one piece
     table='id = "split"',
 )
 
@@ -179,4 +179,5 @@ class TestPiecesComeBackAsPieces(NotebookTestCase):
         second = run_notebook(nb)
         self.assertEqual(self.statuses(second), ["ran", "cached", "ran", "ran"])
         self.assertEqual(second.values["kind"], "Pieces")
-        self.assertEqual(len(second.definition.bodies), len(first.definition.bodies))
+        self.assertEqual(second.product.body_ids(), first.product.body_ids())  # one piece is the Part (a Part holds one solid)
+        self.assertAlmostEqual(second.product.body.get_center().z, first.product.body.get_center().z + 1.0, places=6)

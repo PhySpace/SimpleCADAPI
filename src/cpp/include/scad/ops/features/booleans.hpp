@@ -27,6 +27,9 @@ struct CutOptions {
   // cut_rsolid_list: order the pieces by centroid (x, then y, then z) instead of kernel order, so piece i is the same
   // piece on every OCCT version.  Recorded as params.piece_order = "centroid" only when set.
   bool order_pieces = false;
+  // Unify the faces and edges the cut leaves split (a cylinder wall cut along its seam), as union does: OCCT fails to
+  // fillet such a split face, or returns an invalid solid.  Recorded as params.clean.
+  bool clean = true;
 };
 
 // What a cut that may split leaves: one Solid, or (`solid` empty) every piece, ordered by centroid.
@@ -47,8 +50,8 @@ std::vector<Solid> cut_rsolid_list(const std::vector<Solid>& solids, const CutOp
 // cut_rsolid_list with order_pieces (recorded as make_cut_rsolid_list).  An empty result is still an error.
 CutOutcome cut_rsolid_keep_split(const std::vector<Solid>& solids, const CutOptions& options = {});
 
-// The overlap of all `solids`.  Error "intersect_rsolid".
-Solid intersect_rsolid(const std::vector<Solid>& solids);
+// The overlap of all `solids`; `clean` as for CutOptions.  Error "intersect_rsolid".
+Solid intersect_rsolid(const std::vector<Solid>& solids, bool clean = true);
 
 // The error a non-Solid argument of union_rsolid / cut_rsolid / intersect_rsolid raises
 // (a binding that flattens Python arguments throws it for an item that is not a solid).

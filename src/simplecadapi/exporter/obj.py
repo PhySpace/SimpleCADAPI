@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..translator.package_units import ProductPackageInput
+from ..translator.package_units import ProductInput
 from ._surface_mesh import tessellate_product_surface
 
 
@@ -26,7 +26,7 @@ class ProductOBJExportReport:
 
 
 def export_product_package_to_obj(
-    data: ProductPackageInput,
+    data: ProductInput,
     output_path: str | Path,
     *,
     linear_deflection: float = 0.1,

@@ -147,7 +147,7 @@ def _build_nested_package():
     return scad.build_product_package(build_root())
 
 
-def _build_cylinder_package():
+def _build_cylinder_result():
     @scad.part(
         id="cylinder",
         project_root=Path(__file__).parent,
@@ -156,7 +156,11 @@ def _build_cylinder_package():
         body = scad.make_cylinder_rsolid(radius=4.0, height=8.0)
         return scad.make_part_rpart("cylinder", body)
 
-    return scad.build_product_package(build_cylinder())
+    return build_cylinder()
+
+
+def _build_cylinder_package():
+    return scad.build_product_package(_build_cylinder_result())
 
 
 class TestProductExporter(unittest.TestCase):
@@ -181,6 +185,39 @@ class TestProductExporter(unittest.TestCase):
         self.assertFalse(hasattr(scad, "export_stl"))
         self.assertFalse(hasattr(scad, "export_obj"))
         self.assertFalse(hasattr(scad.translator, "ap242_translator"))
+
+    def test_a_build_result_exports_in_one_step_without_a_scene(self):
+        """Issue #89: a script that only wants a file need not capture a ``.scadpkg`` first, nor pay for the scene
+        (the tessellated projection no exporter reads)."""
+
+        from unittest import mock
+
+        from simplecadapi.product import packages
+
+        result = _build_cylinder_result()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            with mock.patch.object(packages, "_scene_projection", side_effect=AssertionError("the scene was built")):
+                step = scad.exporter.export_product_package_to_step(result, root / "one.step")
+                stl = scad.exporter.export_product_package_to_stl(result, root / "one.stl")
+            self.assertEqual(step.definition_ids, ("cylinder",))
+            self.assertGreater((root / "one.step").stat().st_size, 0)
+            self.assertGreater((root / "one.stl").stat().st_size, 0)
+            self.assertEqual(stl.output_path, (root / "one.stl").resolve())
+
+    def test_a_definition_exports_like_its_build_result(self):
+        result = _build_cylinder_result()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            from_result = scad.exporter.export_product_package_to_step(result, root / "a.step")
+            from_definition = scad.exporter.export_product_package_to_step(result.definition, root / "b.step")
+        self.assertEqual(from_result.definition_ids, from_definition.definition_ids)
+        self.assertEqual(from_result.metadata_item_count, from_definition.metadata_item_count)
+
+    def test_a_value_that_is_no_product_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with self.assertRaises(TypeError):
+                scad.exporter.export_product_package_to_step(object(), Path(tmp_dir) / "x.step")
 
     def test_nested_package_preserves_ap242_product_structure_and_placements(self):
         with tempfile.TemporaryDirectory() as tmp_dir:

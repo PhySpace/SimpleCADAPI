@@ -99,7 +99,7 @@ _held_lock = threading.Lock()
 
 
 @contextmanager
-def exclusive(config: NotebookConfig) -> Iterator[None]:
+def exclusive(config: NotebookConfig, *, enabled: bool = True) -> Iterator[None]:
     """Hold the notebook's state directory against other processes.
 
     Worker processes may run the same notebook at once (two notebooks that
@@ -107,9 +107,13 @@ def exclusive(config: NotebookConfig) -> Iterator[None]:
     lock is between processes only: a run of a notebook this process is
     already running (a ``use`` cycle, an editor next to a headless run) goes
     on without it, as it always did.  Without ``fcntl`` (Windows) it is a
-    no-op.
+    no-op.  With ``enabled=False`` (a run that keeps no state: nothing to
+    prune, nothing to protect) it is a no-op too, and creates nothing.
     """
 
+    if not enabled:
+        yield
+        return
     directory = state_dir(config)
     key = str(directory)
     with _held_lock:

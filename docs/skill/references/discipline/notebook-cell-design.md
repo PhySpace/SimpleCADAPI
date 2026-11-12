@@ -86,15 +86,18 @@ depends only on the parameters it reads, so many parameters in one cell cost
 nothing; a geometry line in the params cell would re-run with every parameter
 change.
 
-**C9. A part notebook (`kind = "part"`) needs no product cell: the runtime
-makes the Part from its open bodies** (each public top-level solid no other cell
-reads becomes a body named by its variable; the pieces of a split cut become
-`<name>_1..n`). Write the product cell (last, id `scad.notebook_id()`) only for
-connectors, a material, or to choose and name the bodies yourself:
-`make_part_rpart(part_id=scad.notebook_id(), bodies={"base": base, "lid": lid})`;
-solids left out of it (tools, construction) are not part of the product. An
-assembly notebook ends with its layout cell. A family of parts uses
-`scad.use(path, id=...)`.
+**C9. A part notebook (`kind = "part"`) needs no product cell when it ends with
+one open solid: the runtime makes the Part from it** (the one public top-level
+solid no other cell reads). A Part holds exactly one solid. When several solids
+are open at the end (a tool left next to its body, the pieces of a split cut) and
+no cell makes the Part, there is no product: the run raises
+`SeveralOpenBodiesError` naming them, and the editor draws them side by side
+("N open solids"). Choose the one that is the part: write the product cell (last,
+id `scad.notebook_id()`), also needed for connectors or a material:
+`make_part_rpart(part_id=scad.notebook_id(), body=base)`; solids left out of it
+(tools, construction) are not part of the product. Solids that are separate parts
+are one Part each in an Assembly. An assembly notebook ends with its layout cell.
+A family of parts uses `scad.use(path, id=...)`.
 
 **C10. In an assembly notebook, one `scad.use(...)` per child, the mates in
 their own cell, the solve in its own cell.** Do not carry the whole assembly

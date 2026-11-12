@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def export_product_package_to_mjcf(data: ProductPackageInput, output_path: str | Path, *, mesh_directory: str | Path | None = None, mapping_path: str | Path | None = None, linear_deflection: float = 0.15, angular_deflection_degrees: float = _DEFAULT_MJCF_ANGULAR_DEFLECTION_DEGREES, default_density_kg_m3: float | None = None) -> ProductMJCFExportReport
+def export_product_package_to_mjcf(data: ProductInput, output_path: str | Path, *, mesh_directory: str | Path | None = None, mapping_path: str | Path | None = None, linear_deflection: float = 0.15, angular_deflection_degrees: float = _DEFAULT_MJCF_ANGULAR_DEFLECTION_DEGREES, default_density_kg_m3: float | None = None) -> ProductMJCFExportReport
 ```
 
 *Source: exporter/mjcf.py*

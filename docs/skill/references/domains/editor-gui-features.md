@@ -41,10 +41,11 @@ HOLE_DIAMETER = scad.var(name="hole_diameter", default=6.0, unit="mm", comment="
   (`_x_by_tag`, `_x_by_geometry`) still runs and its form keeps the block; a pick the kernel cannot name (a body
   without recorded history, `sca feature add` with geometry only) is still written that way.
 - A new part notebook (`sca new NAME`, or the editor's "new") has no cells and a `kind = "part"` header: no product cell is written,
-  the runtime makes the Part from the open bodies (see `docs/guides/notebook-runtime.md`; a solid made with "New body"
-  is one more body of the same Part, not an assembly), so every new feature previews
-  and a deleted cell cannot leave the notebook without a product. Setting connectors (or "use as product" on a body
-  that is not the last) writes an explicit `make_part_rpart` cell, which then wins.
+  the runtime makes the Part from the one open body (see `docs/guides/notebook-runtime.md`), so every new feature previews
+  and a deleted cell cannot leave the notebook without a product. A solid made with "New body" stays beside the
+  first one as a loose solid (the header says "N open solids"); a Part holds exactly one solid, so with several open
+  solids there is no product until you choose: "use as product" on a body writes an explicit `make_part_rpart` cell
+  for it. Setting connectors (or "use as product" on a body that is not the last) also writes that cell, which then wins.
 - Besides the curated features (box, hole, pull face, extrude of a sketch ...), every SDK and standard-library operation
   the forms can offer is a feature of its own, `op.<operation>` (`# gui: {"spec": "op.make_spur_gear_rsolid", ...}`): the
   form is made from the operation's signature (`sca ops NAME`), and the cell is one plain call

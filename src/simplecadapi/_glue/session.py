@@ -54,8 +54,7 @@ _PRODUCT_KINDS = frozenset({"Part", "Assembly", "Component", "Connector"})
 def _children(item: Any) -> Iterable[Any]:
     kind = type(item).__name__
     if kind == "Part":
-        for body in item.bodies:  # one Solid, or every body of a multi-body part
-            yield body.solid
+        yield item.body
         yield from item.connectors
         if item.material is not None:
             yield item.material
@@ -90,8 +89,7 @@ def walk_values(value: Any, *, deep: bool, seen: Optional[Set[int]] = None) -> I
         for item in value:
             yield from walk_values(item, deep=deep, seen=seen)
     elif deep:
-        # a result wrapped in the caller's own dataclass (the product values have their own children: a multi-body Part's
-        # `body` field refuses to name one body)
+        # a result wrapped in the caller's own dataclass (the product values have their own children, listed in _children)
         if dataclasses.is_dataclass(value) and not isinstance(value, type) and type(value).__name__ not in _PRODUCT_KINDS:
             for field in dataclasses.fields(value):
                 if not field.name.startswith("_"):

@@ -22,9 +22,10 @@ This document separates SDK contracts from mechanical design guidance.
 - **Decide part vs assembly before modeling.** Bodies that are separately
   manufactured, purchased, or movable belong in an assembly with connectors
   and placements; monolithic manufacturing intent gets a single fused solid.
-  Several bodies of one part are deliberate: name them in
-  `make_part_rpart(bodies={...})`. Never leave stray solids out of the product,
-  or overlapping bodies, where one labeled product was intended.
+  A Part holds exactly one solid: several solids that belong together are one
+  Part per solid in an Assembly (identity placements if they only sit side by
+  side). Never leave stray solids (tools, construction) out of the product where
+  one labeled product was intended.
 - **Pick the origin and orientation from the functional datum** — the mating
   interface, mounting plane, or symmetry axis — not from wherever the first
   primitive happened to land. See `datums-and-coordinate-systems.md`.

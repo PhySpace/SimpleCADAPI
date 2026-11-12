@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def export_product_package_to_obj(data: ProductPackageInput, output_path: str | Path, *, linear_deflection: float = 0.1, angular_deflection_degrees: float = 20.0, relative: bool = False) -> ProductOBJExportReport
+def export_product_package_to_obj(data: ProductInput, output_path: str | Path, *, linear_deflection: float = 0.1, angular_deflection_degrees: float = 20.0, relative: bool = False) -> ProductOBJExportReport
 ```
 
 *Source: exporter/obj.py*

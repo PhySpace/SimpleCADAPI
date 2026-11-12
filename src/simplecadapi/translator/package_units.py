@@ -11,6 +11,7 @@ from ..artifacts.feature_graph import FeatureGraphArtifact, load_feature_graph_a
 from ..artifacts.part_definition import PartDefinition
 from ..product.packages import (
     ProductPackage,
+    build_product_package,
     read_product_package,
     validate_product_package,
 )
@@ -18,6 +19,8 @@ from simplecadapi._cpp import OperationGraph
 
 Definition = PartDefinition | AssemblyDefinition
 ProductPackageInput = ProductPackage | bytes | bytearray | memoryview | str | Path
+# What an exporter takes besides a package: the result of a build (``@scad.part`` / ``@scad.assemble``) or its definition.
+ProductInput = ProductPackageInput | Definition | Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,15 +73,22 @@ class ProductPackageTranslationUnit:
 
 
 def read_product_package_translation_units(
-    data: ProductPackageInput,
+    data: ProductInput,
 ) -> tuple[ProductPackage, tuple[ProductPackageTranslationUnit, ...]]:
-    """Return a validated package and dependency-first definition units."""
+    """Return a validated package and dependency-first definition units.
+
+    *data* is a package, the bytes or path of one, or (issue #89) the result of a build or a definition: a script that
+    only wants a STEP file need not write a ``.scadpkg`` first.  That package is built in memory without the scene
+    projection (tessellated meshes), which no exporter reads and which took most of the time of a default capture.
+    """
 
     if isinstance(data, ProductPackage):
         validate_product_package(data)
         package = data
-    else:
+    elif isinstance(data, (bytes, bytearray, memoryview, str, Path)):
         package = read_product_package(data)
+    else:
+        package = build_product_package(data, include_scene=False)
     ordered: list[Definition] = []
     visited: set[tuple[str, str]] = set()
 
@@ -122,5 +132,6 @@ def read_product_package_translation_units(
 __all__ = [
     "ProductPackageInput",
     "ProductPackageTranslationUnit",
+    "ProductInput",
     "read_product_package_translation_units",
 ]

@@ -170,7 +170,7 @@ def run_notebook(
         # Errors still come through.  "marimo" is the logger every marimo
         # module shares (lazy.py's record shows its file name, "lazy", which
         # is not the logger's name).
-        with suppress_warnings_logs("marimo"), exclusive(config):
+        with suppress_warnings_logs("marimo"), exclusive(config, enabled=cache):
             return _run(config, values, cache=cache, through=through, product=product)
 
     # marimo keeps its runtime context per thread, and a notebook run needs
@@ -322,7 +322,10 @@ def _run(
     # Cells restored from the cache ran no ``use`` this time; the files they
     # depend on are among those the previous run recorded.
     recorded = frozenset(used) | (previous if restored else frozenset())
-    write_dependencies(config, recorded)
+    if cache:
+        # The record belongs to the cache: its entries are keyed on the files it lists, so a run that keeps no entries must
+        # not move it (and a run without the cache must work where the source directory is read-only, issue #89).
+        write_dependencies(config, recorded)
     dependencies = module_files | recorded
     if cache and cell_cache is not None:
         # A cell that runs a child notebook depends on the record just written:

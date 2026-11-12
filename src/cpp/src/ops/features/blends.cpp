@@ -52,7 +52,11 @@ struct BlendAttempt {
     spec.possible_causes = diagnosis->possible_causes;
 
   const std::string details =
-      violation != nullptr ? "BlendVolumeViolation: " + std::string(violation->what()) : technical_details_of(error);
+      violation != nullptr
+          ? std::string(dynamic_cast<const BlendValidityViolation*>(&error) != nullptr ? "BlendValidityViolation: "
+                                                                                       : "BlendVolumeViolation: ") +
+                violation->what()
+          : technical_details_of(error);
   std::vector<ErrorEvidence> evidence;
   if (diagnosis && !diagnosis->evidence_edges.empty()) {
     // The solid with the implicated edges in orange; the same failure at the same size is drawn once per process
@@ -85,6 +89,7 @@ Solid finish_blend(const Solid& solid, TrackedResult tracked, const BlendAttempt
                    double check_size, FeatureRecord& rec, const BlendTags& tags, std::string_view patch_role,
                    const std::function<void()>& between = {}) {
   assert_blend_volume_monotonic(solid, Solid(tracked.shape), kind, check_size, attempt.edges);
+  assert_blend_valid(solid, Solid(tracked.shape), kind, check_size, attempt.edges);
   inherit_metadata(tracked.shape, {&solid});
 
   rec.param("edge_count", Value(static_cast<std::int64_t>(attempt.edges.size())));

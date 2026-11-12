@@ -1,6 +1,6 @@
 [project]
 name = "simplecadapi"
-version = "2.2.8"
+version = "2.3.0"
 description = "A simplified OpenCASCADE-native CAD modeling Python API"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -79,7 +79,10 @@ Issues = "https://github.com/PhySpace/SimpleCADAPI/issues"
 [build-system]
 # One distribution: the Python package and the compiled C++ module (``simplecadapi._cpp``, src/cpp/) it runs on.
 requires = ["scikit-build-core>=0.10", "pybind11>=2.13", "ninja>=1.11; platform_system == 'Windows'"]
-build-backend = "scikit_build_core.build"
+# scad_build (tools/build_backend) is scikit-build-core plus toolchain/OpenCASCADE detection on Windows, so that a plain
+# `uv sync` builds without hand-set CMAKE_GENERATOR / CC / CXX / CMAKE_ARGS.
+build-backend = "scad_build"
+backend-path = ["tools/build_backend"]
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"
@@ -92,6 +95,7 @@ build-dir = "src/cpp/build/wheel/{wheel_tag}"
 wheel.packages = ["src/simplecadapi"]
 wheel.exclude = ["**/__pycache__/**", "**/*.pyc"]
 sdist.include = [
+  "/tools/build_backend",
   "/src/simplecadapi/editor/webui",
   "/skillproj.toml",
   "/docs/skill",
@@ -160,6 +164,18 @@ dev = [
     "trimesh>=4.11.3",
     "datamodel-code-generator==0.32.0",
     "ty>=0.0.18",
+]
+
+[tool.uv]
+# `uv run` / `uv sync` rebuild the editable install (the C++ module, minutes of compiling, and a C++ toolchain + OCCT on the
+# machine) whenever a cache key changed.  uv's default key is pyproject.toml, so a version bump or a dependency edit forced
+# a rebuild nobody needed.  Rebuild only when the C++ module's inputs change.
+cache-keys = [
+  { file = "src/cpp/CMakeLists.txt" },
+  { file = "src/cpp/cmake/**" },
+  { file = "src/cpp/include/**" },
+  { file = "src/cpp/src/**" },
+  { file = "src/cpp/bindings/**" },
 ]
 
 [tool.ty.environment]

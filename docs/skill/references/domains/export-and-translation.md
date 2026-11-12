@@ -60,8 +60,10 @@ Read the exact page under `references/docs/api/` for every API used:
 
 ## Export rules
 
-- Translate only from a validated `.scadpkg` package: `capture` the product
-  first, then export from the package path.
+- Translate only from a validated product package: `capture` the product
+  first, then export from the package path. In a one-shot script (below) the
+  exporters also take the build result itself and package it in memory, with
+  the same validation and without the scene projection nobody reads.
 - STL and OBJ share one direct OpenCASCADE tessellation of the evaluated BREP;
   both contain the same oriented triangles. Control curved-surface accuracy
   with `linear_deflection` (chordal deviation in product units) and
@@ -74,6 +76,38 @@ Read the exact page under `references/docs/api/` for every API used:
   as fixed-tendon equality constraints.
 - Use `validate_step_roundtrip_rdescriptor` when a STEP export must survive
   re-import (roundtrip-sensitive consumers).
+
+## One-shot script (no notebook, no `.scadpkg` on disk)
+
+For a batch or unattended task whose deliverable is "one script, run as
+`python model.py --output part.step`" (read-only source directory, no editor),
+a plain script is the supported entry. A notebook is still the form for
+anything a person will open, edit or reuse (core rule R3). The runtime keeps
+no state next to the source when it runs without the cache.
+
+```python
+import argparse
+from pathlib import Path
+
+import simplecadapi as scad
+
+
+@scad.part(id="plate", project_root=Path(__file__).parent)
+def build_plate() -> scad.Part:
+    body = scad.make_box_rsolid(width=120.0, height=120.0, depth=10.0)
+    return scad.make_part_rpart("plate", body)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", required=True)
+    args = parser.parse_args()
+    report = scad.exporter.export_product_package_to_step(build_plate(), args.output)
+    print(report.output_path, report.definition_ids)
+```
+
+A notebook run unattended in a read-only directory uses
+`run_notebook(path, cache=False)`.
 
 ## Validation gates
 

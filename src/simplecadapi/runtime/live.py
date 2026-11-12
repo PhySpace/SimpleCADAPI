@@ -29,12 +29,31 @@ from typing import Any
 from ..artifacts.assembly_io import attached_definition
 from ..product.packages import build_product_package, encode_product_package
 from .._cpp import Face, Shell
-from ..scene.preview import PreviewScene, add_surfaces, compile_preview, encode_preview, entity_info, refine_preview
+from ..scene.preview import (
+    PreviewScene,
+    add_surfaces,
+    compile_open_bodies,
+    compile_preview,
+    encode_preview,
+    entity_info,
+    refine_preview,
+)
 from ._marimo import safe_get_context
 from .cells import NotebookCells
 from .config import NotebookConfig, read_notebook_config
 from .executor import finish_kernel_cache
-from .projection import NoProductYetError, Product, ProductNotFoundError, find_product, open_bodies, product_reads, project_product
+from .projection import (
+    NoProductYetError,
+    OpenBodies,
+    Product,
+    ProductNotFoundError,
+    SeveralOpenBodiesError,
+    find_product,
+    loose_solids,
+    open_bodies,
+    product_reads,
+    project_product,
+)
 from .workspace import features_in_cell
 
 PACKAGE_MEDIA_TYPE = "application/vnd.simplecad.scadpkg"
@@ -221,7 +240,7 @@ def preview_product(
     failed: Iterable[FailedCell] = (),
     skipped: Iterable[str] = (),
     lost_reads: AbstractSet[str] = frozenset(),
-) -> tuple[Product, dict[str, Any] | None]:
+) -> tuple[Product | OpenBodies, dict[str, Any] | None]:
     """The product to preview from *values* (the cells that are left, see :class:`LiveScope`), and whether it is partial.
 
     With no failed cell this is :func:`~.projection.find_product`.  With one, the product is found the same way among the
@@ -230,6 +249,9 @@ def preview_product(
     failing step.  The second item says what is shown (``None`` when the product is whole): ``{"failed": [...], "skipped":
     [cell ids], "shown": [names]}``.  A product no failed cell would have built on (an explicit product upstream of none of
     them) is whole.  Raises :class:`~.projection.ProductNotFoundError` when nothing is left to show, naming the failed cell.
+
+    A part notebook that ends with several open solids and no cell making the Part of one of them has no product yet (a
+    Part holds exactly one solid): what is shown is :class:`~.projection.OpenBodies`, the solids side by side.
     """
 
     failed = tuple(failed)
@@ -237,6 +259,9 @@ def preview_product(
     read = product_reads(cells, values)
     try:
         product = find_product(config, values, read)
+    except SeveralOpenBodiesError as error:
+        # the model is the solids themselves: a tool and its target, shown before a cell makes the Part of one of them
+        product = OpenBodies(config.id, loose_solids(values, error.names))
     except ProductNotFoundError as error:
         if not failed:
             raise
@@ -284,7 +309,12 @@ def _live_scene() -> PreviewScene:
     except NoProductYetError:
         # no solid yet (only sketches, curves, workplanes): the model is empty, which is no fault
         product, partial = None, None
-    scene = compile_preview(product) if product is not None else PreviewScene(parts={}, nodes=[], solids={}, definitions={})
+    if product is None:
+        scene = PreviewScene(parts={}, nodes=[], solids={}, definitions={})
+    elif isinstance(product, OpenBodies):
+        scene = compile_open_bodies(product.part_id, product.bodies)
+    else:
+        scene = compile_preview(product)
     # the surfaces no later cell builds on (a loft, a patch, a shell sewn so far) are shown with the model
     add_surfaces(scene, open_surfaces(scope.values, product_reads(scope.cells, scope.values)))
     last_timings["compile_ms"] = round((time.perf_counter() - started) * 1000, 1)

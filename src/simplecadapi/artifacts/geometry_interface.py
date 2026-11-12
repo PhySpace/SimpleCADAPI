@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections import Counter, OrderedDict
 from typing import Any, Dict, List, Tuple
 
@@ -31,7 +32,23 @@ def _enum_suffix(value: Any, prefix: str) -> str:
 
 
 def _q(value: float, tolerance: float) -> int:
-    return int(round(float(value) / tolerance))
+    """``value`` in units of ``tolerance``, rounded to an integer, the same integer for values that differ by noise.
+
+    A plain ``round(value / tolerance)`` splits a value that sits on a boundary, ``(k + 0.5) * tolerance`` (a design value
+    such as -3.34690815 mm does): the value computed one way is a unit in the last place under the boundary, the same
+    value after a BREP round trip is one over it, and the two quantize to neighbouring integers (issue #87: a body's
+    fingerprint changed and restoring its snapshot raised ``geometry_mismatch``).  So the ratio is first snapped to a
+    binary grid that is far coarser than the noise (about 2**-46 of the ratio, at least 2**-24) and far finer than a
+    quantum, and a half-integer is exactly representable on it; every value within noise of a boundary snaps onto it and
+    then rounds, half to even, to one integer.  A value farther from a boundary than the grid keeps the integer it had.
+    """
+    scaled = float(value) / tolerance
+    if not math.isfinite(scaled):
+        return int(round(scaled))
+    grid = math.ldexp(1.0, max(math.frexp(scaled)[1] - 46, -24))
+    if grid < 0.5:  # beyond 2**46 quanta the noise is itself half a quantum: there is nothing to snap
+        scaled = round(scaled / grid) * grid
+    return int(round(scaled))
 
 
 def _qvec(values: Any, tolerance: float) -> tuple[int, ...]:

@@ -18,10 +18,9 @@ from ..artifacts.assembly_io import materialize_definition
 from ..artifacts.canonical import parse_canonical_json
 from ..artifacts.part_definition import PartDefinition
 from simplecadapi._cpp import Assembly, Part
-from ..product.bodies import part_shape
 from ..product.placement import Placement, relative_placement
 from ..translator.package_units import (
-    ProductPackageInput,
+    ProductInput,
     read_product_package_translation_units,
 )
 from ._surface_mesh import tessellate_solid
@@ -340,7 +339,7 @@ def _part_materials(units: tuple[Any, ...]) -> dict[str, tuple[Part, float, bool
 
 
 def export_product_package_to_mjcf(
-    data: ProductPackageInput,
+    data: ProductInput,
     output_path: str | Path,
     *,
     mesh_directory: str | Path | None = None,
@@ -678,7 +677,7 @@ def export_product_package_to_mjcf(
         mesh_path = mesh_root / f"{mesh_name}.obj"
         _write_obj(
             mesh_path,
-            part_shape(part),
+            part.body,
             linear_deflection=float(linear_deflection),
             angular_deflection_degrees=float(angular_deflection_degrees),
         )
