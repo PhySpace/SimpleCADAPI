@@ -1567,12 +1567,14 @@ Notes:
 | --- | --- | --- |
 | `tool_count` | `int` | number of subtractive tool solids |
 | `skip_non_intersecting` | `bool` | whether non-intersecting tools are skipped |
+| `clean` | `bool` | whether the faces and edges the cut leaves split were unified |
 
 Notes:
 
 - Public `cut_rsolid(...)` defaults this flag to `true` for interactive convenience.
 - Graph replay defaults missing `skip_non_intersecting` to `false` so malformed or drifting graphs fail diagnostically instead of silently skipping tools.
 - Multi-tool cut preserves the full topology delta chain across all performed tool cuts.
+- `clean` has no replay default: a graph without it is rejected like one without `tool_count`.
 
 #### `make_intersect_rsolid`
 
@@ -1583,6 +1585,7 @@ Notes:
 | Key | Type | Meaning |
 | --- | --- | --- |
 | `input_count` | `int` | number of intersected solids |
+| `clean` | `bool` | whether the faces and edges the intersection leaves split were unified |
 
 Notes:
 

@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def intersect_rsolid(*solids)
+def intersect_rsolid(*solids, clean=True)
 ```
 
 *Source: operators/boolean.py*
@@ -25,6 +25,10 @@ error instead of returning an empty list.
 ### solids
 
 - **Description**: One or more Solid objects or sequences of Solid. Nested sequences are flattened before processing.
+
+### clean
+
+- **Description**: When True (the default) the faces and edges the intersection leaves split are unified, as union does: a cylinder wall cut along its seam stays one face, so a later fillet or chamfer of its edges works. False keeps the raw kernel result.
 
 ## Returns
 

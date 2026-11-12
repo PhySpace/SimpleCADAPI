@@ -4290,7 +4290,7 @@ def _execute_graph(
 
                     if op_name == "make_cut_rsolid":
                         ctx.require_params(
-                            node.node_id, op_name, params, ("tool_count",)
+                            node.node_id, op_name, params, ("tool_count", "clean")
                         )
                         if len(node.inputs) < 2:
                             if ctx.strict:
@@ -4320,13 +4320,14 @@ def _execute_graph(
                                 )
                             ),
                             tracking_policy=str(params.get("tracking_policy", "full")),
+                            clean=bool(params.get("clean")),
                         )
                         _store_outputs(node, result)
                         continue
 
                     if op_name == "make_cut_rsolid_list":
                         ctx.require_params(
-                            node.node_id, op_name, params, ("tool_count", "input_refs")
+                            node.node_id, op_name, params, ("tool_count", "input_refs", "clean")
                         )
                         inputs = _ordered_input_shapes(ctx, graph, outputs, node, params)
                         if len(inputs) < 2:
@@ -4340,6 +4341,7 @@ def _execute_graph(
                                 _param(ctx, node.node_id, op_name, params, "skip_non_intersecting", False)
                             ),
                             "tracking_policy": str(params.get("tracking_policy", "full")),
+                            "clean": bool(params.get("clean")),
                         }
                         if params.get("piece_order") == "centroid":
                             # a split recorded by cut_rsolid(on_split="pieces"): the pieces in centroid order
@@ -4405,14 +4407,16 @@ def _execute_graph(
 
                     if op_name == "make_intersect_rsolid":
                         ctx.require_params(
-                            node.node_id, op_name, params, ("input_count",)
+                            node.node_id, op_name, params, ("input_count", "clean")
                         )
                         all_solids = [
                             cast(Solid, shape)
                             for shape in _all_input_outputs(ctx, outputs, node)
                         ]
                         if len(all_solids) >= 2:
-                            result = ops.intersect_rsolid(all_solids[0], all_solids[1:])
+                            result = ops.intersect_rsolid(
+                                all_solids[0], all_solids[1:], clean=bool(params.get("clean"))
+                            )
                             _store_outputs(node, result)
                         elif ctx.strict:
                             ctx.fail(
