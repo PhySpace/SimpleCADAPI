@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def export_product_package_to_stl(data: ProductPackageInput, output_path: str | Path, *, linear_deflection: float = 0.1, angular_deflection_degrees: float = 20.0, relative: bool = False) -> ProductSTLExportReport
+def export_product_package_to_stl(data: ProductInput, output_path: str | Path, *, linear_deflection: float = 0.1, angular_deflection_degrees: float = 20.0, relative: bool = False) -> ProductSTLExportReport
 ```
 
 *Source: exporter/stl.py*
