@@ -35,7 +35,7 @@ Standing discipline, binding for every role:
 | --- | --- | --- | --- | --- |
 | 1 | Drawing Requirement Confirmer | `domains/requirement-refinement.md`, `domains/engineering-drawing.md`, model requirements (`REQUIREMENTS.md`/`BUILD_PLAN.md` if present) | `<part-dir>/DRAWING.md` | ⛔ user consent received |
 | 2 | Sheet Planner | `DRAWING.md`, `discipline/datums-and-coordinate-systems.md` | per-sheet view/datum/dimension roster + R5 coverage ledger | plan presented |
-| 3 | Layout Arbiter | sheet plan, `domains/engineering-drawing.md`, declaration/action API pages | sheet declarations, action-log JSONs, solver-clean report | `report()` R1–R7 ok or accepted-with-reason, R5 no `MISS`, no open warnings |
+| 3 | Layout Arbiter | sheet plan, `domains/engineering-drawing.md`, declaration/action API pages | sheet declarations, action-log JSONs, solver-clean report | `report()` Issues: no errors, every warning fixed or accepted-with-reason |
 | 4 | Visual Reviewer | rendered PNG only | structured verdict | verdict pass; failures become `repair:` items for Role 3 |
 | 5 | Drawing Exporter | verdict-passed action logs, `domains/engineering-drawing.md` | final DXF + PNG + archived action logs | artifacts re-open cleanly |
 
