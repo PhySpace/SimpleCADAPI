@@ -87,7 +87,8 @@ class TestRadOneDOF(unittest.TestCase):
         self.assertGreater(math.dist(mpt, dr["tail"]), w)
 
     def test_inner_variant_via_action(self):
-        at, c, r = 60.0, (0.0, 10.0), 8.0
+        # 圆心移到图形上方: 文字不得压本视图图线 (新规则), 弧内文字须离开盒顶边
+        at, c, r = 60.0, (0.0, 40.0), 8.0
         plan = SheetPlan(_sheet(dims=[
             DimDecl("size", "front", "radius", "r", center=c, radius=r,
                     value=r, at=at)])).solve()
@@ -148,7 +149,7 @@ class TestLinearSlide(unittest.TestCase):
         dcl = DimDecl("size", "front", "linear", "w", value=20.0,
                       p1=(-10.0, 0.0), p2=(10.0, 0.0), side="bottom", row=0)
         plan = SheetPlan(_sheet(dims=[dcl])).solve()
-        text = "20 (w)"
+        text = "20"
         g = plan._lin_geometry(dcl, "bottom", 0, 25.0, text)
         w = _text_width(text, TEXT_H)
         self.assertTrue(g["extended"])
@@ -184,32 +185,54 @@ class TestLinearSlide(unittest.TestCase):
 
 
 class TestDiameterAnchors(unittest.TestCase):
-    """直径: insert=基线锚(0.75r 线上方), anchor=OBB 中心; 动作换位重算。"""
+    """直径: 尺寸线过圆心, 箭头恒在圆上; 文字放得下在圆内, 放不下沿线引到圆外; insert/anchor 由同一推导给出。"""
 
-    def test_anchor_split(self):
-        at, c, r = 35.0, (0.0, 10.0), 8.0
+    def test_inside_when_it_fits(self):
+        at, c, r = 35.0, (0.0, 40.0), 12.0
         plan = SheetPlan(_sheet(dims=[
             DimDecl("size", "front", "diameter", "d", center=c, radius=r,
-                    value=16.0, at=at)])).solve()
+                    value=24.0, at=at)])).solve()
         dr = _rad(plan, "d")
         u = (math.cos(math.radians(at)), math.sin(math.radians(at)))
-        rot = _norm_rot(at)
-        n = (-math.sin(math.radians(rot)), math.cos(math.radians(rot)))
+        n = (-u[1], u[0])
         cc = (ANCHOR[0] + c[0], ANCHOR[1] + c[1])
         w = _text_width(dr["text"], TEXT_H)
-        insert = (cc[0] + 0.75 * r * u[0] + n[0],
-                  cc[1] + 0.75 * r * u[1] + n[1])
-        anchor = (insert[0] + u[0] * w / 2 + n[0] * TEXT_H * 0.35,
-                  insert[1] + u[1] * w / 2 + n[1] * TEXT_H * 0.35)
+        self.assertEqual(dr["mode"], "inside")
+        # 文字居中于圆心, 基线在线上方 1 mm; anchor = OBB 中心
+        insert = (cc[0] - u[0] * w / 2 + n[0], cc[1] - u[1] * w / 2 + n[1])
+        anchor = (cc[0] + n[0] * (1.0 + TEXT_H * 0.35), cc[1] + n[1] * (1.0 + TEXT_H * 0.35))
         for key, want in (("insert", insert), ("anchor", anchor),
                           ("m1", (cc[0] + r * u[0], cc[1] + r * u[1])),
                           ("m2", (cc[0] - r * u[0], cc[1] - r * u[1]))):
             self.assertAlmostEqual(dr[key][0], want[0], places=6, msg=key)
             self.assertAlmostEqual(dr[key][1], want[1], places=6, msg=key)
 
+    def test_outside_when_too_small(self):
+        plan = SheetPlan(_sheet(dims=[
+            DimDecl("size", "front", "diameter", "d", center=(0.0, 40.0), radius=2.0, at=0.0)])).solve()
+        dr = _rad(plan, "d")
+        self.assertEqual(dr["mode"], "outside")
+        self.assertTrue(dr["arrows_out"])
+        # 文字整体在圆外: 文本框中心到圆心的距离大于半径 + 半个字宽
+        w = _text_width(dr["text"], TEXT_H)
+        self.assertGreater(math.dist(dr["anchor"], (ANCHOR[0], ANCHOR[1] + 40.0)), 2.0 + w / 2)
+
+    def test_text_reads_upright_when_line_points_left(self):
+        # at=135°: 线指向左上, 文字仍从左下读到右上; 检查过的框 = 画出的字 (旧实现两者方向相反)
+        plan = SheetPlan(_sheet(dims=[
+            DimDecl("size", "front", "diameter", "d", center=(0.0, 40.0), radius=2.0, at=135.0)])).solve()
+        dr = _rad(plan, "d")
+        w = _text_width(dr["text"], TEXT_H)
+        rr = math.radians(dr["rot"])
+        ru, n = (math.cos(rr), math.sin(rr)), (-math.sin(rr), math.cos(rr))
+        mid = (dr["insert"][0] + ru[0] * w / 2 + n[0] * TEXT_H * 0.35,
+               dr["insert"][1] + ru[1] * w / 2 + n[1] * TEXT_H * 0.35)
+        self.assertAlmostEqual(mid[0], dr["anchor"][0], places=6)
+        self.assertAlmostEqual(mid[1], dr["anchor"][1], places=6)
+
     def test_apply_dia_at(self):
         plan = SheetPlan(_sheet(dims=[
-            DimDecl("size", "front", "diameter", "d", center=(0, 10),
+            DimDecl("size", "front", "diameter", "d", center=(0, 40),
                     radius=8.0, value=16.0, at=35.0)])).solve()
         res = plan.apply([{"op": "dia", "name": "d", "at": 120.0}])
         self.assertTrue(res["results"][0]["ok"], res["results"][0])

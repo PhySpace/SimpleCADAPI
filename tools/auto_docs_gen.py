@@ -48,6 +48,8 @@ DEFAULT_SOURCE_FILENAMES: tuple[str, ...] = (
     "dxf_engine/model.py",
     "dxf_engine/planner.py",
     "dxf_engine/render.py",
+    "dxf_engine/checks.py",
+    "dxf_engine/refs.py",
     "build/assembly_builder.py",
     "build/dependencies.py",
     "build/part_builder.py",
@@ -630,8 +632,11 @@ class APIDocumentGenerator:
                 "DatumDecl",
                 "CenterDecl",
                 "LeaderDecl",
+                "RoughDecl",
                 "SheetPlan",
                 "Resolved",
+                "Issue",
+                "RefError",
             }
         if name in exported_names:
             return True
