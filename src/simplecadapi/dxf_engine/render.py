@@ -235,6 +235,7 @@ def render_plan(plan, dxf_path, png_path):
     for multimodal cross-checking. A text action log that diffs well between versions is written too.
     """
     t0 = time.time()
+    dxf_path, png_path = Path(dxf_path), Path(png_path)   # a str path is as good as a Path
     import matplotlib
     matplotlib.use("Agg")
 
