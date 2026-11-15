@@ -70,9 +70,11 @@ this gate closes.
 
 1. Carry over the model's settled facts (geometry validated, parameters
    named). Do not reopen modeling decisions here.
-2. Decide-or-ask the drawing-level choices: sheet scale, view set (which
+2. Decide-or-ask the drawing-level choices: sheet size, view set (which
    views, which sheet each lives on), datum letters, which parameters are
-   manufacturing-critical, and the notes/parameter-table split.
+   manufacturing-critical, and the notes/parameter-table split. Leave the
+   scale to the engine (`scale=None`: the largest GB/T 14690 scale that fits)
+   unless the request or a standard fixes it.
 3. Batch every blocking ambiguity into ONE ask round with conservative
    defaults first (`domains/requirement-refinement.md`). Record the rest in
    the Ask-or-Record ledger with basis.
@@ -104,8 +106,10 @@ From `DRAWING.md` only — no API detail, no coordinates.
 2. Fix the datum scheme consistent with the model's functional interfaces
    (`discipline/datums-and-coordinate-systems.md`).
 3. Produce the dimension roster: for each parameter, its carrier dimension
-   (kind, semantic, view, reference datum) or its notes/parameter-table
-   destination. This roster IS the R5 coverage ledger.
+   (kind, semantic, view, reference datum) and what that dimension measures
+   (a reference to model geometry: `of` / `between` / `extent`, never typed
+   coordinates) or its notes/parameter-table destination. This roster IS the
+   R5 coverage ledger.
 4. Flag parameters the engine cannot express yet (engine boundaries in the
    domain page) and route them to notes explicitly — never silently.
 
@@ -116,18 +120,25 @@ Present the plan in ≤10 lines. No approval gate; enter the Role 3/4 loop.
 Owns declarations and the agent-in-the-loop refinement cycle.
 
 **Phase A — declare.** Author the `SheetDecl` per sheet from the roster:
-`ViewDecl`s with `align`, `DatumDecl`s first, `DimDecl`s with `covers`,
-`CenterDecl`/`LeaderDecl` as planned. Solve, print `report()`, and read it
-line by line: fix declaration-level problems (wrong view, missing datum
-reference, duplicate measurement) by re-declaring, not by actions.
+`ViewDecl`s with `align` (pass the solid as `shape`, so that selector
+references resolve against it), `DatumDecl`s first, `DimDecl`s that reference
+the model (`of` / `between` / `extent`) with `covers`, `LeaderDecl` as
+planned. Centre lines come from the model's cylinders; declare a `CenterDecl`
+only for what the model does not have. Solve, print `report()`, and read it
+line by line, down to the "Not checked" list: fix declaration-level problems
+(wrong view, a reference that does not resolve to one entity, missing datum
+reference, duplicate measurement, `DIM_VALUE_MISMATCH`) by re-declaring, not by
+actions.
 
 **Phase B — the action loop.** For everything the solver placed with
 warnings or left unsolved, iterate:
 
-1. **See.** Render the annotated review image (`viz`): gray = placed ok,
-   blue = unsolved, red = warning, orange = accepted-with-reason; green
-   arrows show each element's free movement corridors (how far it can
-   translate, per direction). Read the red and blue elements first.
+1. **See.** Declare `SheetDecl.diag_png`: every solve and apply then refreshes
+   the diagnostic picture. Grey = placed ok, red = warning, orange =
+   accepted-with-reason, blue = the obstacle a red element hits; the badge
+   `[N]` is the element's id in `evaluate()`, and a close-up
+   `<stem>__<id>.png` is saved for every warning. Read the red elements and
+   their blue obstacles first.
 2. **Measure.** Call `plan.evaluate()` and read the exact, digested numbers
    for the failing elements: per-element `violations` (what it hits, where,
    by how much) and `corridors` (free translation distances). Work from
@@ -141,14 +152,17 @@ warnings or left unsolved, iterate:
    action and rejects bad ones with `violations`/`corridors` residuals,
    rolling the sheet back to the last consistent state. A rejection is data,
    not failure: read the residuals, revise the action, resubmit.
-5. **Verify blast radius.** Diff the previous and new action logs (pixel
-   diff of the two replays): red = newly covered, blue = vacated, gray =
-   untouched. Confirm the action moved only what you intended.
-6. Loop 1–5 until every element is gray or orange (warn = 0), then run the
+5. **Verify blast radius.** Compare `plan.issues()` before and after the
+   action (the issue list is the one truth, so a neighbour that the action
+   pushed into a conflict appears as a new issue) and look at the refreshed
+   picture. Confirm the action moved only what you intended.
+6. Loop 1–5 until every element is grey or orange (warn = 0), then run the
    full `report()` audit once more.
 
-Exit gate: `report()` shows R1–R7 ok or accepted-with-reason, the R5
-coverage table has no `MISS`, and no red/blue elements remain. Drive the
+Exit gate: `report()` shows no error, R1–R7 ok or accepted-with-reason, every
+model parameter has a carrier (a figure dimension that names it in `covers`,
+or a deliberate parameter-table entry: `PARAM_ONLY_IN_TABLE` is an info you
+decide), and no red elements remain. Drive the
 loop directly against `SheetPlan` (solve / evaluate / apply / render);
 declaring `SheetDecl.diag_png` makes every solve/apply auto-refresh the
 annotated conflict image and return a must-read instruction with it.
@@ -165,11 +179,14 @@ check list below, and its structured verdict quotes what it observed per item.
 The report says the review was not independent.
 
 1. Read the PNG rendered from the final DXF (both sheets if multiple).
-2. Check, in order: views aligned as planned; hidden lines (虚线) and center
-   lines present; arrows touch their geometry; texts sit clear of lines;
-   datum boxes legible; the dimension arrangement communicates design intent
-   (a formally clean sheet can still mislead — e.g. dimensioning a derived
-   length instead of the functional one).
+2. Check, in order: views aligned as planned; hidden lines (虚线) in the
+   projected views (a section view shows none, and carries hatching, its title
+   and the cutting-plane symbol in the view that names it) and centre lines
+   present; arrows touch their geometry; texts sit clear of lines; datum boxes
+   legible; the dimension arrangement communicates design intent (a formally
+   clean sheet can still mislead — e.g. dimensioning a derived length instead
+   of the functional one). The engine has already checked that every
+   dimension equals the model; the reviewer checks what it cannot.
 3. Emit a structured verdict: pass, or an itemized list where each item
    names the owning artifact (declaration or action log).
 
@@ -179,16 +196,22 @@ A failed item becomes a `repair:` item for Role 3. Never patch the DXF.
 
 1. Final render: `plan.render(dxf, png)` per sheet from the verdict-passed
    state (declarations + replayed action logs).
-2. Re-open the DXF (e.g. via `ezdxf`) and check the entity count matches the
+2. `render()` reads the written DXF back and compares every dimension with the
+   model: `issues()` must show no `DIM_RENDER_MISMATCH` or `DIM_MISSING_IN_FILE`.
+   Re-open the DXF (e.g. via `ezdxf`) and check the entity count matches the
    render report; confirm both artifacts regenerate deterministically from
-   the same inputs.
+   the same inputs. The engine cannot see how another CAD program plots the
+   file (fonts, line weights): say in the delivery that it was or was not opened
+   in the target program.
 3. Deliver: DXF + PNG paths plus the archived action-log JSONs (they are
    part of the deliverable — the reproducible decision history).
 
 ## Acceptance
 
-- `report()`: R1–R7 all ok, or accepted with recorded reasons.
-- R5: every model parameter has a carrier; no `MISS`.
+- `report()`: no error, R1–R7 all ok, or accepted with recorded reasons; no
+  `DIM_VALUE_MISMATCH`.
+- R5: every model parameter has a carrier (a dimension that names it, or a
+  recorded parameter-table decision).
 - Visual verdict passed; DXF re-opens with expected entity count; the sheet
   regenerates byte-for-byte from declarations + action log.
 - Engine boundaries routed explicitly (notes/table), never silently dropped.
@@ -204,9 +227,12 @@ A failed item becomes a `repair:` item for Role 3. Never patch the DXF.
   action silently relocates a neighbor.
 - Losing the action log: without it the sheet is not reproducible; treat it
   as a deliverable, not scratch.
-- Hitting engine boundaries (no sections/hatching; horizontal/vertical
-  linear dims only; radius labels same-side outward): restructure the view
-  set or record the limitation; do not simulate missing features with
+- Typing coordinates where the model has the geometry: the dimension then does
+  not follow the model and is checked against the figure lines only
+  (`DIM_NOT_ATTACHED`). Reference it with `of` / `between` / `extent`.
+- Hitting engine boundaries (no aligned, angular or chamfer dimensions; no
+  threads, welds or geometrical tolerances; see the domain page): restructure
+  the view set or record the limitation; do not simulate missing features with
   leader-note spam.
 
 ## Read now (one parallel batch)
