@@ -135,3 +135,26 @@ def test_the_skill_page_code_runs(monkeypatch):
     shape = namespace["shape"]
     assert namespace["contains"](TopoDS.Solid_s(shape), 4, 5, 6)
     assert namespace["gap"](shape, verify.to_ocp(scad.make_box_rsolid(2, 2, 2, bottom_face_center=(20, 0, 0)))) == pytest.approx(14.0)
+
+
+@pytest.mark.parametrize("wrapped", ["ocp", "native"])
+def test_the_drawing_engine_takes_a_solid_and_its_wrapped_shape_of_either_kind(monkeypatch, wrapped):
+    """The drawing engine works on the SDK's own OCCT, as `inspect` and the translators do, so a view takes the solid, its
+    `.wrapped` (an OCP shape with the extra installed) or an explicit OCP shape: none of them may break it.
+    (`SCA_WRAPPED` only simulates the user's environment here; the engine reads nothing from it.)"""
+    from simplecadapi import ql
+    from simplecadapi.dxf_engine import DimDecl, SheetDecl, SheetPlan, ViewDecl
+
+    monkeypatch.setenv("SCA_WRAPPED", wrapped)
+    solid = part()
+    overall = [DimDecl("overall", "top", "linear", "W", extent="x"), DimDecl("overall", "top", "linear", "H", extent="y")]
+    bore = DimDecl("size", "top", "diameter", "d", of=ql.faces().where(ql.prop("geom.type", "==", "CYLINDER")))
+    # a selector is resolved against the solid itself, so only the solid can carry the diameter of the bore
+    cases = [(solid, overall + [bore]), (solid.wrapped, overall), (verify.to_ocp(solid), overall)]
+    for shape, dims in cases:
+        sheet = SheetDecl(title="P", dwg_no="P-1", scale=None, front="top", anchor=None,
+                          views=[ViewDecl("top", shape, (0, 0, 1), (1, 0, 0))], dims=dims)
+        plan = SheetPlan(sheet).solve()
+        expected = {"W": 10.0, "H": 20.0, "d": 6.0}
+        assert {d.caption: round(d._measured, 6) for d in plan.dims} == {d.caption: expected[d.caption] for d in dims}
+        assert [i for i in plan.issues() if i.severity == "error"] == []

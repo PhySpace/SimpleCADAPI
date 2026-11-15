@@ -23,6 +23,7 @@ from simplecadapi._cpp.occt.GeomAbs import (GeomAbs_Circle, GeomAbs_Cylinder, Ge
 from simplecadapi._cpp.occt.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_VERTEX
 from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
 from simplecadapi._cpp.occt.TopoDS import TopoDS
+from simplecadapi._glue.bridge import native_occt
 
 PAR = 1e-6          # |a · b| above 1 - PAR: parallel; below PAR: perpendicular
 
@@ -71,8 +72,11 @@ def project(p, frame):
 
 
 def raw_shape(obj):
-    """The OCCT shape of an SDK entity (`.wrapped`) or the shape itself."""
-    return getattr(obj, "wrapped", obj)
+    """The OCCT shape the engine works on, whatever the caller hands over: an SDK entity (its own OCCT shape, nothing
+    copied), an OCP shape (what `.wrapped` is with the `verify` extra installed; converted) or an OCCT shape of
+    `simplecadapi._cpp.occt` (kept). The engine's Python layers work on the SDK's own OCCT, as `inspect` and the
+    translators do (`simplecadapi._glue.bridge`), so this is the one place a shape enters it."""
+    return native_occt(getattr(obj, "_native_wrapped", obj))
 
 
 def _xyz(p):
@@ -115,7 +119,7 @@ def _entity(ref, view):
             raise RefError(
                 f"view {view.name!r}: the selector resolves to {len(found)} entities, a reference needs exactly 1. "
                 "Narrow it with one more predicate (position, size, tag), or pass the entity you mean")
-        return found[0].wrapped
+        return raw_shape(found[0])
     return raw_shape(ref)
 
 
