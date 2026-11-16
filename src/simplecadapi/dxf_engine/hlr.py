@@ -12,6 +12,7 @@ from simplecadapi._cpp.occt.TopAbs import TopAbs_EDGE
 from simplecadapi._cpp.occt.TopExp import TopExp_Explorer
 from simplecadapi._cpp.occt.TopoDS import TopoDS
 from simplecadapi._cpp.occt.gp import gp_Ax2, gp_Dir, gp_Pnt
+from simplecadapi._glue.bridge import native_occt
 
 DEG = 180.0 / math.pi
 
@@ -23,7 +24,7 @@ def hlr_project(shape, view_dir, x_dir):
     Tangent transition lines (Rg1/RgN) are not taken — an engineering drawing does not draw smooth seams.
     """
     algo = HLRBRep_Algo()
-    algo.Add(shape)
+    algo.Add(native_occt(shape))
     algo.Projector(HLRAlgo_Projector(
         gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(*view_dir), gp_Dir(*x_dir))))
     algo.Update()
