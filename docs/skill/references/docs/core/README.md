@@ -40,11 +40,6 @@ A closed 3D body with volume, faces, edges, tags, and metadata.
 #### [Compound](compound.md)
 A collection wrapper for multiple geometry objects.
 
-### Product semantics roadmap
-
-#### [Part and Assembly Development Plan](part_assembly_development_plan.md)
-Planned single-body `Part`, material assignment, component placement, and `Assembly` semantics layered above the current topology/geometry and operation graph model.
-
 ## Relationship Diagram
 
 ```text
