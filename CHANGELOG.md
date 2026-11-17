@@ -4,9 +4,18 @@ All notable changes to SimpleCADAPI are documented here. Per-version
 user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 中文).
 
-## Unreleased
+## 2.3.0.post1 — 2026-11-17
 
 ### Changed
+- The editor is found by its own answer, not by a process id. `sca cell` and the other editor commands ask `/api/health`, and
+  its workspace must be the record's directory; a pid (invisible from a sandbox with its own pid namespace) only sharpens the
+  error when the server does not answer. A port another project's editor now holds is refused, not written to.
+- Each editor has an instance id and its own record, `.sca-editor/editors/<instance>.json` (`server.json` is gone), and removes
+  only its own. Several live editors on one workspace are listed, never chosen; `--editor URL --instance ID` (or
+  `SCA_EDITOR_URL` and `SCA_EDITOR_INSTANCE`, both needed) pins one. `sca cell`, `sca feature` and `sca sketch` reports carry
+  `editor: {url, workspace, instance}`.
+- `sca edit --port` defaults to `0`: the system picks a free port, the editor binds it itself, and `SCA_EDITOR_READY {url,
+  instance, workspace, pid}` goes to stdout once it listens. A port that is taken fails with a message. (It was 7180.)
 - The drawing engine (`simplecadapi.dxf_engine`) measures the model. A dimension says what it measures with a geometry
   reference (`DimDecl(of=...)`, `between=(a, b)`, `extent="x"|"y"`; an SDK entity, a QL selector or a 3D point) and the number
   on the sheet is the measurement; `value` is the expected value and a difference is an error. Typed `p1`/`p2`,
