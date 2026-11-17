@@ -20,7 +20,7 @@ import argparse
 from pathlib import Path
 from typing import Any
 
-DEFAULT_PORT = 7180
+DEFAULT_PORT = 0  # the system picks a free port; the real one is in the READY line and the record
 
 
 def configure(subparsers: argparse._SubParsersAction) -> None:
@@ -33,7 +33,11 @@ def configure(subparsers: argparse._SubParsersAction) -> None:
     )
     parser.add_argument("workspace", type=Path, nargs="?", default=Path.cwd())
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    parser.add_argument(
+        "--port", type=int, default=DEFAULT_PORT,
+        help="the port to listen on (default 0: a free one the system picks).  Once listening, one line "
+        "`SCA_EDITOR_READY {json}` on stdout gives the url, instance id and workspace of this editor",
+    )
     parser.add_argument("--no-browser", action="store_true", help="do not open a browser tab")
     parser.set_defaults(handler=_execute, printer=lambda report: None)
 
@@ -76,6 +80,7 @@ def configure(subparsers: argparse._SubParsersAction) -> None:
     cell_sub = cell.add_subparsers(dest="cell_command", required=True)
 
     def common(parser: argparse.ArgumentParser) -> None:
+        _pin_options(parser)
         parser.add_argument("--notebook", "-n", type=Path, default=None, help="the notebook (default: the one the editor has open)")
         parser.add_argument("--workspace", "-w", type=Path, default=None, help="the workspace the editor serves (default: found from the current directory)")
 
@@ -128,6 +133,7 @@ def configure(subparsers: argparse._SubParsersAction) -> None:
         "kernel restarts, so `sca cell` writes go to it.  Waits until the kernel is "
         "up so a following write does not race the boot.",
     )
+    _pin_options(open_)
     open_.add_argument("notebook", type=Path, help="the notebook file (workspace-relative, or absolute inside the workspace)")
     open_.add_argument("--workspace", "-w", type=Path, default=None, help="the workspace the editor serves (default: found from the current directory)")
     open_.add_argument("--wait", type=float, default=None, help="seconds to wait for the notebook's kernel (default: SCA_EDITOR_OPEN_WAIT or 120)")
@@ -140,6 +146,7 @@ def configure(subparsers: argparse._SubParsersAction) -> None:
         "current directory).  A running editor on that workspace lists it without a reload.",
     )
     new.add_argument("name")
+    _pin_options(new)
     new.add_argument("--kind", choices=("part", "assembly", "sample", "blank"), default="part")
     new.add_argument("--workspace", "-w", type=Path, default=None)
     new.set_defaults(handler=_new_notebook, printer=_print_json)
@@ -150,6 +157,7 @@ def _configure_features(subparsers: argparse._SubParsersAction) -> None:
     """``sca feature`` and ``sca sketch``: what the GUI does, for an agent (JSON in, JSON out, same rules as the buttons)."""
 
     def where(parser: argparse.ArgumentParser) -> None:
+        _pin_options(parser)
         parser.add_argument("--workspace", "-w", type=Path, default=None, help="the workspace the editor serves (default: found from the current directory)")
         parser.add_argument("--notebook", "-n", type=Path, default=None)
 
@@ -234,13 +242,16 @@ def _configure_features(subparsers: argparse._SubParsersAction) -> None:
 
 
 def _editor_url(args: argparse.Namespace) -> str:
-    url, _notebook, _name = _session(_cell_args(args), write=True)
+    url, _notebook, _name, _editor = _session(_cell_args(args), write=True)
     assert url is not None
     return url
 
 
 def _cell_args(args: argparse.Namespace) -> argparse.Namespace:
-    return argparse.Namespace(workspace=args.workspace, notebook=args.notebook, open=False, wait=None)
+    return argparse.Namespace(
+        workspace=args.workspace, notebook=args.notebook, open=False, wait=None,
+        editor=getattr(args, "editor", None), instance=getattr(args, "instance", None),
+    )
 
 
 def _json_arg(value: str | None, what: str) -> Any:
@@ -487,48 +498,129 @@ def _pid_alive(pid: int) -> bool:
     return True
 
 
-def _find_editor(start: Path) -> tuple[Path, str] | None:
-    """The running editor whose workspace holds *start*: ``(workspace, base url)``.
+def _pin_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--editor", metavar="URL", default=None,
+        help="talk to this editor, not the one found from the workspace (default: SCA_EDITOR_URL); needs --instance",
+    )
+    parser.add_argument(
+        "--instance", metavar="ID", default=None,
+        help="the instance id of that editor, from its SCA_EDITOR_READY line (default: SCA_EDITOR_INSTANCE)",
+    )
 
-    A record whose server does not answer is an error, not a stale record to
-    skip quietly: "an editor was running here" is exactly the belief that
-    must not be dropped in silence.  The one definite stale case is a record
-    whose process is gone (a crashed editor leaves its server.json behind).
+
+def _pinned(args: argparse.Namespace) -> tuple[str, str] | None:
+    """``(url, instance)`` the caller named, or None to find the editor from the workspace.
+
+    Both are required: a url alone can be another process after a restart, and that
+    is the mistake pinning exists to prevent.
+    """
+    import os
+
+    url = getattr(args, "editor", None) or os.environ.get("SCA_EDITOR_URL")
+    instance = getattr(args, "instance", None) or os.environ.get("SCA_EDITOR_INSTANCE")
+    if not url and not instance:
+        return None
+    if not (url and instance):
+        raise ValueError(
+            "pin an editor with both its url and its instance id "
+            "(--editor and --instance, or SCA_EDITOR_URL and SCA_EDITOR_INSTANCE)"
+        )
+    return url.rstrip("/"), instance
+
+
+def _health(opener: Any, url: str) -> dict[str, Any]:
+    """The editor's own answer, or ``OSError``/``ValueError`` when it gives none."""
+    import json
+
+    with opener.open(f"{url}/api/health", timeout=1.5) as response:
+        health = json.loads(response.read())
+    if not isinstance(health, dict):
+        raise ValueError("the health answer is not a report")
+    return health
+
+
+def _check_editor(opener: Any, url: str, workspace: Path, instance: str | None) -> str | None:
+    """Why *url* is not the editor of *workspace* (and *instance*, when known), or None when it is."""
+    try:
+        health = _health(opener, url)
+    except (OSError, ValueError) as error:
+        return f"{url} does not answer ({error})"
+    served = health.get("workspace")
+    if not isinstance(served, str) or Path(served).resolve() != workspace.resolve():
+        return f"{url} answers for workspace {served!r}, not {workspace}: another editor holds that port"
+    if instance is not None and health.get("instance") != instance:
+        return f"{url} is instance {health.get('instance')!r}, not {instance!r}: the editor was restarted or replaced"
+    return None
+
+
+def _find_editor(start: Path, pin: tuple[str, str] | None = None) -> tuple[Path, str, str] | None:
+    """The running editor: ``(workspace, base url, instance id)``.
+
+    The editor's own answer is the truth.  With *pin* (url and instance id) that
+    editor is used wherever *start* is.  Otherwise each editor writes a record,
+    ``.sca-editor/editors/<instance>.json``, and the nearest workspace above
+    *start* with a live one wins; ``/api/health`` must answer with that record's
+    workspace and instance.  A pid says nothing reliable -- a sandbox with its
+    own pid namespace cannot see the editor's process while the editor answers
+    -- so it only sharpens the error when the server does not answer.
+
+    Several live editors on one workspace is an error that lists them: choosing
+    one silently is how a write lands in the wrong editor.  Records that do not
+    answer are an error only when no live editor is found: "an editor was
+    running here" must not be dropped in silence.
     """
     import json
-    import os
-    import urllib.error
+
+    opener = _opener()
+    if pin is not None:
+        url, instance = pin
+        try:
+            health = _health(opener, url)
+        except (OSError, ValueError) as error:
+            raise ValueError(f"the pinned editor {url} does not answer ({error})") from error
+        if health.get("instance") != instance:
+            raise ValueError(
+                f"{url} is instance {health.get('instance')!r}, not the pinned {instance!r}: "
+                "the editor was restarted or replaced"
+            )
+        served = health.get("workspace")
+        if not isinstance(served, str):
+            raise ValueError(f"the pinned editor {url} did not say which workspace it serves")
+        return Path(served).resolve(), url, instance
 
     here = start.expanduser().resolve()
-    unreachable: list[str] = []
-    opener = _opener()
+    problems: list[str] = []
     for directory in (here, *here.parents):
-        record = directory / ".sca-editor" / "server.json"
-        if not record.is_file():
-            continue
-        try:
-            body = json.loads(record.read_text(encoding="utf-8"))
-            url = body["url"]
-        except (OSError, ValueError, KeyError) as error:
-            unreachable.append(f"{record}: unreadable ({error})")
-            continue
-        pid = body.get("pid")
-        if isinstance(pid, int) and not _pid_alive(pid):
-            unreachable.append(
-                f"stale record {record} (pid {pid} is gone); delete it or restart the editor"
+        records = directory / ".sca-editor" / "editors"
+        live: list[tuple[str, str]] = []
+        for record in sorted(records.glob("*.json")) if records.is_dir() else []:
+            try:
+                body = json.loads(record.read_text(encoding="utf-8"))
+                url, instance = body["url"], body["instance"]
+            except (OSError, ValueError, KeyError) as error:
+                problems.append(f"{record}: unreadable ({error})")
+                continue
+            reason = _check_editor(opener, url, directory, instance)
+            if reason is None:
+                live.append((url, instance))
+                continue
+            pid = body.get("pid")
+            if "does not answer" in reason and isinstance(pid, int) and not _pid_alive(pid):
+                reason = f"stale record {record} (pid {pid} is gone); {reason}; delete it"
+            else:
+                reason = f"record {record}: {reason}"
+            problems.append(reason)
+        if len(live) == 1:
+            return directory, live[0][0], live[0][1]
+        if len(live) > 1:
+            listed = ", ".join(f"{url} (instance {instance})" for url, instance in live)
+            raise ValueError(
+                f"{len(live)} editors serve {directory}: {listed}; "
+                "name one with --editor URL --instance ID (or SCA_EDITOR_URL and SCA_EDITOR_INSTANCE)"
             )
-            continue
-        try:
-            with opener.open(f"{url}/api/health", timeout=1.5):
-                pass
-        except urllib.error.HTTPError:
-            pass  # an editor that answers at all is running
-        except OSError as error:
-            unreachable.append(f"found {record} but {url} is unreachable: {error}")
-            continue
-        return directory, str(url)
-    if unreachable:
-        raise ValueError("; ".join(unreachable))
+    if problems:
+        raise ValueError("; ".join(problems))
     return None
 
 
@@ -609,10 +701,10 @@ def _open_notebook(url: str, relative: str, wait: float | None = None) -> dict[s
 
 def _cell_open(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     start = (args.workspace or Path.cwd()).expanduser().resolve()
-    found = _find_editor(start)
+    found = _find_editor(start, _pinned(args))
     if found is None:
         raise ValueError("no editor is running on this workspace (start `sca edit`)")
-    workspace, url = found
+    workspace, url, _instance = found
     notebook = args.notebook.expanduser().resolve()
     if not notebook.is_relative_to(workspace):
         raise ValueError(f"{args.notebook} is not in the editor's workspace ({workspace})")
@@ -620,13 +712,18 @@ def _cell_open(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     return report, 0 if report.get("ok") else 1
 
 
-def _session(args: argparse.Namespace, *, write: bool) -> tuple[str | None, Path | None, str]:
-    """``(editor url or None, notebook path or None, relative notebook name)`` for a cell command."""
+def _session(
+    args: argparse.Namespace, *, write: bool
+) -> tuple[str | None, Path | None, str, dict[str, str] | None]:
+    """``(editor url or None, notebook path or None, relative notebook name, editor identity or None)``
+    for a cell command; the identity (``url`` and ``workspace``) goes into the report so the output says
+    which editor answered."""
     start = args.workspace or (args.notebook.parent if args.notebook else Path.cwd())
+    pin = _pinned(args)
     try:
-        found = _find_editor(start)
+        found = _find_editor(start, pin)
     except ValueError as error:
-        if write:
+        if write or pin is not None:  # a named editor that cannot be reached is no reason to read a file instead
             raise
         _warn(f"editor not reached: {error}")
         found = None
@@ -640,21 +737,22 @@ def _session(args: argparse.Namespace, *, write: bool) -> tuple[str | None, Path
         if notebook is None:
             raise ValueError("no editor is running here; name the notebook with --notebook")
         _warn(f"no editor is running on this workspace; reading the file: {notebook.name}")
-        return None, notebook, notebook.name
-    workspace, url = found
+        return None, notebook, notebook.name, None
+    workspace, url, instance = found
+    editor = {"url": url, "workspace": str(workspace), "instance": instance}
     open_path = _call(url, "/api/cells").get("notebook")
     if notebook is None:
         if open_path is None:
             raise ValueError("the editor has no notebook open")
-        return url, workspace / open_path, open_path
+        return url, workspace / open_path, open_path, editor
     relative = notebook.relative_to(workspace).as_posix() if notebook.is_relative_to(workspace) else notebook.name
     if relative == open_path:
-        return url, notebook, relative
+        return url, notebook, relative, editor
     if write:
         if getattr(args, "open", False):
             report = _open_notebook(url, relative, wait=getattr(args, "wait", None))
             if report.get("ok"):
-                return url, workspace / relative, relative
+                return url, workspace / relative, relative, editor
             raise ValueError(report.get("error") or f"could not open {relative} in the editor")
         raise ValueError(
             f"the editor has {open_path} open, not {relative}: run `sca cell open {relative}` "
@@ -662,7 +760,7 @@ def _session(args: argparse.Namespace, *, write: bool) -> tuple[str | None, Path
             "— nothing else holds it"
         )
     _warn(f"the editor has {open_path} open; reading {relative} from the file")
-    return None, notebook, relative
+    return None, notebook, relative, None
 
 
 def _warn(message: str) -> None:
@@ -698,15 +796,15 @@ def _slim(report: dict[str, Any], *, code: bool) -> dict[str, Any]:
 
 
 def _cell_ls(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
-    url, notebook, name = _session(args, write=False)
+    url, notebook, name, editor = _session(args, write=False)
     if url is None:
         assert notebook is not None
         return {"notebook": name, "source": "file", "cells": _cells_from_file(notebook)}, 0
-    return _slim(_call(url, "/api/cells"), code=args.code), 0
+    return {"editor": editor, **_slim(_call(url, "/api/cells"), code=args.code)}, 0
 
 
 def _cell_get(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
-    url, notebook, name = _session(args, write=False)
+    url, notebook, name, editor = _session(args, write=False)
     if url is None:
         assert notebook is not None
         cells = _cells_from_file(notebook)
@@ -716,7 +814,7 @@ def _cell_get(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     report = _call(url, "/api/cells")
     for cell in report.get("cells", []):
         if args.cell in (str(cell["index"]), cell.get("key"), cell["id"]):
-            return {"notebook": report.get("notebook"), **cell}, 0
+            return {"editor": editor, "notebook": report.get("notebook"), **cell}, 0
     raise ValueError(f"no cell {args.cell!r}; run `sca cell ls`")
 
 
@@ -731,7 +829,7 @@ def _read_code(args: argparse.Namespace) -> str:
 
 
 def _write_op(args: argparse.Namespace, op: str, body: dict[str, Any]) -> tuple[dict[str, Any], int]:
-    url, _notebook, _name = _session(args, write=True)
+    url, _notebook, _name, editor = _session(args, write=True)
     assert url is not None
     try:
         report = _call(url, f"/api/cells/{op}", body)
@@ -743,9 +841,9 @@ def _write_op(args: argparse.Namespace, op: str, body: dict[str, Any]) -> tuple[
             "`sca cell ls` (SCA_EDITOR_CALL_TIMEOUT raises the wait)"
         }, 1
     if "error" in report:
-        return _slim(report, code=False), 1
+        return {"editor": editor, **_slim(report, code=False)}, 1
     touched = set(report.get("touched", []))
-    report = _slim(report, code=False)
+    report = {"editor": editor, **_slim(report, code=False)}
     # What the change did: the touched cells with their state, plus any cell
     # that is not healthy after the run — a rerun dependent failing is the
     # feedback the edit was after, hiding it once read as "the edit was fine".
@@ -775,7 +873,7 @@ def _new_notebook(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     from .templates import create_notebook
 
     start = (args.workspace or Path.cwd()).expanduser().resolve()
-    found = _find_editor(start)
+    found = _find_editor(start, _pinned(args))
     root = found[0] if found is not None else start
     # Only the file is written: the running editor lists it on its own and the
     # person's current notebook stays open.

@@ -1123,32 +1123,224 @@ class EndpointDiscoveryTest(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name).resolve()
 
-    def test_server_json_pins_the_loopback_even_for_a_wildcard_host(self) -> None:
+    def _record(self, root: Path, instance: str, url: str, **more) -> Path:
+        directory = root / ".sca-editor" / "editors"
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / f"{instance}.json"
+        path.write_text(json.dumps({"url": url, "instance": instance, **more}))
+        return path
+
+    def test_the_record_pins_the_loopback_even_for_a_wildcard_host(self) -> None:
         state = WorkspaceState(self.root)
         state.port = 17611
         state.write_endpoint("0.0.0.0")
-        record = json.loads((self.root / ".sca-editor" / "server.json").read_text())
+        record = json.loads(state.endpoint_record.read_text())
         # The record is read on this machine; a 0.0.0.0 url is no address and
         # walks into a container's proxy.
         self.assertEqual(record["url"], "http://127.0.0.1:17611")
+        self.assertEqual(record["instance"], state.instance)
+
+    def test_an_editor_removes_only_its_own_record(self) -> None:
+        first, second = WorkspaceState(self.root), WorkspaceState(self.root)
+        first.port, second.port = 17618, 17619
+        first.write_endpoint("127.0.0.1")
+        second.write_endpoint("127.0.0.1")
+        self.assertNotEqual(first.instance, second.instance)
+        first.remove_endpoint()
+        self.assertFalse(first.endpoint_record.exists())
+        self.assertTrue(second.endpoint_record.exists())
 
     def test_a_stale_record_is_an_error_that_names_the_record_and_url(self) -> None:
         from simplecadapi.editor.cli import _find_editor
 
-        directory = self.root / ".sca-editor"
-        directory.mkdir()
-        (directory / "server.json").write_text(json.dumps({"url": "http://127.0.0.1:17612"}))
-        with self.assertRaisesRegex(ValueError, "server.json.*17612.*unreachable"):
+        self._record(self.root, "ghost", "http://127.0.0.1:17612")
+        with self.assertRaisesRegex(ValueError, "ghost.json.*17612.*does not answer"):
             _find_editor(self.root)
 
     def test_a_record_whose_process_is_gone_names_the_stale_pid(self) -> None:
         from simplecadapi.editor.cli import _find_editor
 
-        directory = self.root / ".sca-editor"
-        directory.mkdir()
-        (directory / "server.json").write_text(json.dumps({"url": "http://127.0.0.1:17615", "pid": 2**22}))
+        self._record(self.root, "gone", "http://127.0.0.1:17615", pid=2**22)
         with self.assertRaisesRegex(ValueError, r"pid \d+ is gone"):
             _find_editor(self.root)
+
+    def _serve(self, root: Path, port: int):
+        import threading
+
+        import uvicorn
+
+        from simplecadapi.editor.server import create_app
+
+        path = create_notebook(root, "bracket", "sample")
+        state = WorkspaceState(root, path)
+        state.port = port
+        server = uvicorn.Server(uvicorn.Config(create_app(state), port=port, log_level="error"))
+        threading.Thread(target=server.run, daemon=True).start()
+        self.addCleanup(setattr, server, "should_exit", True)
+        from simplecadapi.editor.cli import _opener
+
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            try:
+                with _opener().open(f"http://127.0.0.1:{port}/api/health", timeout=1):
+                    return state
+            except OSError:
+                time.sleep(0.1)
+        self.fail("the test editor did not come up")
+
+    def test_an_answering_editor_is_found_although_its_pid_is_not_visible(self) -> None:
+        from simplecadapi.editor.cli import _find_editor
+
+        state = self._serve(self.root, 17616)
+        # a pid the probing process cannot see: another pid namespace, as in a sandbox
+        self._record(self.root, state.instance, "http://127.0.0.1:17616", pid=2**22)
+        found = _find_editor(self.root)
+        self.assertEqual(found, (self.root, "http://127.0.0.1:17616", state.instance))
+
+    def test_a_port_held_by_another_workspaces_editor_is_refused(self) -> None:
+        from simplecadapi.editor.cli import _find_editor
+
+        other = self.root / "other"
+        other.mkdir()
+        mine = self.root / "mine"
+        mine.mkdir()
+        state = self._serve(other, 17617)
+        self._record(mine, state.instance, "http://127.0.0.1:17617")
+        with self.assertRaisesRegex(ValueError, "answers for workspace .*other.*not .*mine"):
+            _find_editor(mine)
+
+    def test_cell_reports_name_the_editor_that_answered(self) -> None:
+        import argparse
+        from unittest import mock
+
+        from simplecadapi.editor import cli
+
+        editor = {"url": "http://127.0.0.1:1", "workspace": str(self.root), "instance": "i"}
+        args = argparse.Namespace(notebook=None, workspace=self.root, code=False)
+        with mock.patch("simplecadapi.editor.cli._session", return_value=("http://127.0.0.1:1", None, "nb.py", editor)):
+            with mock.patch("simplecadapi.editor.cli._call", return_value={"notebook": "nb.py", "cells": []}):
+                report, code = cli._cell_ls(args)
+        self.assertEqual(code, 0)
+        self.assertEqual(report["editor"], editor)
+
+    def test_two_live_editors_on_one_workspace_are_listed_not_chosen(self) -> None:
+        import threading
+
+        import uvicorn
+
+        from simplecadapi.editor.cli import _find_editor, _health, _opener
+        from simplecadapi.editor.server import create_app
+
+        first = self._serve(self.root, 17620)
+        second = WorkspaceState(self.root, first.notebook)
+        second.port = 17621
+        server = uvicorn.Server(uvicorn.Config(create_app(second), port=17621, log_level="error"))
+        threading.Thread(target=server.run, daemon=True).start()
+        self.addCleanup(setattr, server, "should_exit", True)
+        for _ in range(100):
+            try:
+                _health(_opener(), "http://127.0.0.1:17621")
+                break
+            except OSError:
+                time.sleep(0.1)
+        self._record(self.root, first.instance, "http://127.0.0.1:17620")
+        self._record(self.root, second.instance, "http://127.0.0.1:17621")
+        with self.assertRaises(ValueError) as caught:
+            _find_editor(self.root)
+        message = str(caught.exception)
+        self.assertIn("2 editors serve", message)
+        for editor in (first, second):
+            self.assertIn(f"http://127.0.0.1:{editor.port} (instance {editor.instance})", message)
+        self.assertIn("--editor URL --instance ID", message)
+
+    def test_a_pinned_editor_is_used_wherever_the_command_runs(self) -> None:
+        from simplecadapi.editor.cli import _find_editor
+
+        state = self._serve(self.root, 17622)
+        elsewhere = self.root / "elsewhere"
+        elsewhere.mkdir()
+        found = _find_editor(elsewhere, ("http://127.0.0.1:17622", state.instance))
+        self.assertEqual(found, (self.root, "http://127.0.0.1:17622", state.instance))
+
+    def test_a_pin_to_a_replaced_editor_is_refused(self) -> None:
+        from simplecadapi.editor.cli import _find_editor
+
+        self._serve(self.root, 17623)
+        with self.assertRaisesRegex(ValueError, "not the pinned 'old'.*restarted or replaced"):
+            _find_editor(self.root, ("http://127.0.0.1:17623", "old"))
+
+    def test_a_pin_needs_both_the_url_and_the_instance(self) -> None:
+        import argparse
+        from unittest import mock
+
+        from simplecadapi.editor.cli import _pinned
+
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("SCA_EDITOR_URL", None)
+            os.environ.pop("SCA_EDITOR_INSTANCE", None)
+            self.assertIsNone(_pinned(argparse.Namespace(editor=None, instance=None)))
+            with self.assertRaisesRegex(ValueError, "both its url and its instance id"):
+                _pinned(argparse.Namespace(editor="http://127.0.0.1:1", instance=None))
+            os.environ["SCA_EDITOR_URL"] = "http://127.0.0.1:1/"
+            os.environ["SCA_EDITOR_INSTANCE"] = "abc"
+            self.assertEqual(_pinned(argparse.Namespace(editor=None, instance=None)), ("http://127.0.0.1:1", "abc"))
+
+    def test_a_pin_that_cannot_be_reached_does_not_fall_back_to_the_file(self) -> None:
+        import argparse
+
+        from simplecadapi.editor import cli
+
+        path = create_notebook(self.root, "bracket", "sample")
+        args = argparse.Namespace(
+            notebook=path, workspace=self.root, code=False, editor="http://127.0.0.1:1", instance="x"
+        )
+        with self.assertRaisesRegex(ValueError, "pinned editor .* does not answer"):
+            cli._cell_ls(args)
+
+    def test_port_zero_gets_a_free_port_and_the_ready_line_says_which(self) -> None:
+        import subprocess
+        import sys
+
+        code = "import sys; from simplecadapi.cli import main; sys.exit(main(['edit', sys.argv[1], '--port', '0', '--no-browser']))"
+        process = subprocess.Popen(
+            [sys.executable, "-c", code, str(self.root)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        self.addCleanup(process.kill)
+        ready = None
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline and ready is None:
+            line = process.stdout.readline()
+            if not line and process.poll() is not None:
+                break
+            if line.startswith("SCA_EDITOR_READY "):
+                ready = json.loads(line.split(" ", 1)[1])
+        self.assertIsNotNone(ready, process.stderr.read() if process.poll() is not None else "no READY line")
+        port = int(ready["url"].rsplit(":", 1)[1])
+        self.assertGreater(port, 0)
+        self.assertEqual(ready["workspace"], str(self.root))
+        from simplecadapi.editor.cli import _find_editor
+
+        self.assertEqual(_find_editor(self.root, (ready["url"], ready["instance"])), (self.root, ready["url"], ready["instance"]))
+        self.assertEqual(_find_editor(self.root), (self.root, ready["url"], ready["instance"]))
+        process.terminate()
+        process.wait(timeout=30)
+        self.assertEqual(list((self.root / ".sca-editor" / "editors").glob("*.json")), [])
+
+    def test_a_taken_port_fails_loudly(self) -> None:
+        import socket
+        import subprocess
+        import sys
+
+        with socket.socket() as held:
+            held.bind(("127.0.0.1", 0))
+            held.listen()
+            port = held.getsockname()[1]
+            code = "import sys; from simplecadapi.cli import main; sys.exit(main(['edit', sys.argv[1], '--port', sys.argv[2], '--no-browser']))"
+            done = subprocess.run(
+                [sys.executable, "-c", code, str(self.root), str(port)], capture_output=True, text=True, timeout=60
+            )
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("cannot listen", done.stderr)
 
     def test_a_write_that_outlives_its_call_says_the_edit_landed(self) -> None:
         import argparse
@@ -1157,7 +1349,7 @@ class EndpointDiscoveryTest(unittest.TestCase):
         from simplecadapi.editor import cli
 
         args = argparse.Namespace(notebook=None, workspace=self.root, cell="1", file=None, no_run=False)
-        with mock.patch("simplecadapi.editor.cli._session", return_value=("http://127.0.0.1:1", None, "nb.py")):
+        with mock.patch("simplecadapi.editor.cli._session", return_value=("http://127.0.0.1:1", None, "nb.py", None)):
             with mock.patch(
                 "simplecadapi.editor.cli._call", side_effect=TimeoutError("the editor did not answer")
             ):
@@ -1171,7 +1363,7 @@ class EndpointDiscoveryTest(unittest.TestCase):
 
         import uvicorn
 
-        from simplecadapi.editor.cli import _find_editor
+        from simplecadapi.editor.cli import _find_editor, _opener
         from simplecadapi.editor.server import create_app
 
         path = create_notebook(self.root, "bracket", "sample")
@@ -1184,15 +1376,13 @@ class EndpointDiscoveryTest(unittest.TestCase):
             healthy = False
             while time.monotonic() < deadline:
                 try:
-                    with urllib.request.urlopen(f"http://127.0.0.1:{state.port}/api/health", timeout=1):
+                    with _opener().open(f"http://127.0.0.1:{state.port}/api/health", timeout=1):
                         healthy = True
                         break
                 except OSError:
                     time.sleep(0.1)
             self.assertTrue(healthy, "the test editor did not come up")
-            directory = self.root / ".sca-editor"
-            directory.mkdir(exist_ok=True)
-            (directory / "server.json").write_text(json.dumps({"url": f"http://127.0.0.1:{state.port}"}))
+            self._record(self.root, state.instance, f"http://127.0.0.1:{state.port}")
             # The old code let urllib honor this proxy for a 127.0.0.1 url and
             # read the resulting failure as "no editor is running".
             environment = {"http_proxy": "http://127.0.0.1:1", "https_proxy": "http://127.0.0.1:1"}
@@ -1231,7 +1421,7 @@ class EndpointDiscoveryTest(unittest.TestCase):
         # must say the editor was found but not reached.
         directory = self.root / ".sca-editor"
         directory.mkdir()
-        (directory / "server.json").write_text(json.dumps({"url": "http://127.0.0.1:17614"}))
+        self._record(self.root, "ghost", "http://127.0.0.1:17614")
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
             report, code = cli._cell_ls(args)
@@ -1307,7 +1497,7 @@ class CellOpenAndViewportTest(unittest.TestCase):
             {"notebook": "other.py", "kernel": False},  # flipping, kernel still booting
             {"notebook": "other.py", "kernel": True},  # ready
         ]
-        with mock.patch("simplecadapi.editor.cli._find_editor", return_value=(self.root, "http://127.0.0.1:1")):
+        with mock.patch("simplecadapi.editor.cli._find_editor", return_value=(self.root, "http://127.0.0.1:1", "i")):
             with self._fake_call(responses):
                 report, code = cli._cell_open(args)
         self.assertEqual(code, 0)
@@ -1322,7 +1512,7 @@ class CellOpenAndViewportTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as elsewhere:
             args = argparse.Namespace(notebook=Path(elsewhere) / "elsewhere.py", workspace=self.root, wait=5)
-            with mock.patch("simplecadapi.editor.cli._find_editor", return_value=(self.root, "http://127.0.0.1:1")):
+            with mock.patch("simplecadapi.editor.cli._find_editor", return_value=(self.root, "http://127.0.0.1:1", "i")):
                 with self.assertRaisesRegex(ValueError, "not in the editor's workspace"):
                     cli._cell_open(args)
 
@@ -1345,7 +1535,7 @@ class CellOpenAndViewportTest(unittest.TestCase):
             args = argparse.Namespace(
                 notebook=self.other, workspace=self.root, open=kwargs.get("open", False), wait=5
             )
-            with mock.patch("simplecadapi.editor.cli._find_editor", return_value=(self.root, "http://127.0.0.1:1")):
+            with mock.patch("simplecadapi.editor.cli._find_editor", return_value=(self.root, "http://127.0.0.1:1", "i")):
                 with self._fake_call(kwargs["responses"]):
                     return cli._session(args, write=True)
 
@@ -1357,7 +1547,7 @@ class CellOpenAndViewportTest(unittest.TestCase):
                 ]
             )
         # With --open the editor switches first, then the write goes through.
-        url, notebook, name = session(
+        url, notebook, name, _editor = session(
             open=True,
             responses=[
                 {"notebook": "gripper.py", "kernel": True},  # refusal would fire here
@@ -1382,7 +1572,7 @@ class CellOpenAndViewportTest(unittest.TestCase):
             {"ok": True, "opening": "other.py"},
             *[{"notebook": "gripper.py", "kernel": True}] * 10,  # the switch never lands
         ]
-        with mock.patch("simplecadapi.editor.cli._find_editor", return_value=(self.root, "http://127.0.0.1:1")):
+        with mock.patch("simplecadapi.editor.cli._find_editor", return_value=(self.root, "http://127.0.0.1:1", "i")):
             with self._fake_call(responses):
                 report, code = cli._cell_open(args)
         self.assertEqual(code, 1)
@@ -1436,7 +1626,7 @@ class CellOpenAndViewportTest(unittest.TestCase):
         child = self.root / "sub"
         child.mkdir()
         args = argparse.Namespace(workspace=child, out=None)
-        with mock.patch("simplecadapi.editor.cli._find_editor", return_value=(self.root, "http://127.0.0.1:1")):
+        with mock.patch("simplecadapi.editor.cli._find_editor", return_value=(self.root, "http://127.0.0.1:1", "i")):
             report, code = cli._viewport(args)
         self.assertEqual(code, 0)
         self.assertEqual(report["path"], str(directory / "viewport.png"))

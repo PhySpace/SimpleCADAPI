@@ -2,48 +2,48 @@
 
 **Read when:** a person has the code-first editor open (`sca edit`) and you edit the same notebooks (a selection, a cell reference or a tuned value arrives).
 
-Use this domain when a person has the code-first editor open (`sca edit`) and
-you work on the same notebooks: they click, drag and tune; you read files and
-edit code. It is not a workflow. The modeling you do still follows the workflow
-you selected; this page says how to see what the person sees and how to hand
-work back.
+This is not a workflow: the modeling you do follows the workflow you selected. This page says how to see what the person sees
+and how to hand work back. The rules that matter:
 
-**Unattended:** there is no person and no editor. Do not start `sca edit`; edit the notebook file directly, check it with
-`sca run <notebook>` and read its report instead of the snapshot, the viewport image or a selection cell. A selection
-you were handed in the task is resolved and checked like any selector. Never wait for a person to run, pick or tune
-anything (`discipline/operating-modes.md`).
+1. **Unattended** (no person, no editor): do not start `sca edit`. Edit the notebook file directly, check it with
+   `sca run <notebook>` and read its report instead of the snapshot, the viewport image or a selection cell. Never wait for
+   a person to run, pick or tune anything (`discipline/operating-modes.md`).
+2. **A person has the editor open:** it holds the open notebook in memory and is the one writer of its file, so **`sca cell`
+   is the only way to change a regular cell** (`sca cell ls|get|put|insert|rm|run|open`, below). Writing the file behind its
+   back races its next save and the page's version or yours is lost. Edit the file directly only when no editor runs, or for
+   the setup cell and `@app.function` cells, which `sca cell` refuses: the editor takes those file changes in.
+3. **`sca cell` finds the editor itself**, from the current directory. The editor's own `/api/health` answer is the truth
+   (a process id is never consulted for a live one; a sandbox cannot see it). If it cannot, read the message:
+   - `… does not answer`: no editor listens at that url. Start one (`sca edit`); do not delete records or reuse its port.
+   - `answers for workspace X, not Y`: that port now belongs to another project's editor. Never send it your edits.
+   - `N editors serve …`: several are live and none is chosen for you; pin one (next point).
+4. **Pin an editor** when more than one can run: `--editor URL --instance ID` on any `sca cell`, `sca feature`, `sca sketch`
+   or `sca new` command, or `SCA_EDITOR_URL` and `SCA_EDITOR_INSTANCE` (both are needed). The values are the editor's
+   `SCA_EDITOR_READY {"url","instance","workspace","pid"}` line, printed once it listens. A pinned editor is used wherever
+   the command runs, checked against its instance id, and never replaced by reading the file.
+5. **Every report says which editor answered** (`editor`: url, workspace, instance). With several editors, read it before
+   you trust a write.
+6. **The notebook file is the shared state**, and the editor autosaves every edit to it. Never rely on what the person
+   says they selected when the file or the snapshot can tell you.
+7. **Your version wins** over a cell the person has open with unsaved typing: their text is dropped and kept in the editor's
+   log for them. Do not rewrite a cell the person is typing in without telling them.
 
-The notebook file is the shared state. The editor autosaves every edit to
-it, and every message the person gives you (a selection, a cell reference, a
-tuned value) is also something you can read from disk. Never rely on what the
-person says they selected when the file or the snapshot can tell you.
+```bash
+sca edit <workspace> --no-browser     # port 0 (default): the system picks a free one; --port N fixes it
+sca cell ls --editor http://127.0.0.1:41233 --instance 3f9c2a7d41b0
+```
 
-The editor holds the open notebook in memory and is the one writer of its
-file. While it runs, **`sca cell` is the only way to change a regular cell**:
-writing the file behind the editor's back races its next save, and the page's
-version or yours is lost. Edit the file directly only when no editor is
-running (then nothing else holds it), or for the cells `sca cell` refuses
-(the setup cell and `@app.function` cells): the editor takes those file
-changes in.
+### What the editor does with a file edit
 
-1. **`sca cell` (always, for regular cells).** It edits through the editor: the page shows the
-   change live (no reload, no flicker), the cell runs, and you get its state back.
-2. **Edit the file** — only with no editor running, or for a setup / `@app.function` cell. The
-   editor notices a saved change within a second, compares
-   it with its cells and applies only what differs (changed cells are edited in
-   place and run again, added or removed cells appear or go away). A change to the
-   setup cell or an `@app.function` cell restarts the kernel instead. A file that
-   does not parse is ignored until the next save that does.
-
-If the person has the same cell open with unsaved typing, **your version wins**:
-their text is dropped and kept in the editor's log for them. Do not rewrite a
-cell the person is typing in without telling them.
+The editor notices a saved change within a second, compares it with its cells and applies only what differs (changed cells
+are edited in place and run again, added or removed cells appear or go away). A change to the setup cell or an
+`@app.function` cell restarts the kernel instead. A file that does not parse is ignored until the next save that does.
 
 ## Start the editor for a person
 
 ```bash
 sca edit <workspace>          # a directory of notebooks, or one notebook
-sca edit <workspace> --no-browser --port 7180
+sca edit <workspace> --no-browser --port 7180   # a fixed port; the default 0 lets the system pick a free one
 ```
 
 - Needs the `editor` extra (`pip install "simplecadapi[editor]"`); without it
@@ -56,10 +56,21 @@ sca edit <workspace> --no-browser --port 7180
   anything under `node_modules`, `venv`, `site-packages`, `build` or `dist`,
   are not listed and are never a candidate at boot. Keep notebooks and the
   modules they import in normally named paths.
-- The URL is printed (default `http://127.0.0.1:7180`). Give it to the person.
+- The URL is printed, and once the editor listens one line `SCA_EDITOR_READY {"url", "instance", "workspace", "pid"}`
+  goes to stdout (the port is whatever the system picked unless `--port` is given). Give the URL to the person.
+
 - To try it: `sca example u_link` copies a motor-mount workspace (two parts and
   the assembly that fixes them together) to `./u_link_motor_mount`, then
   `sca edit ./u_link_motor_mount`.
+
+### Several editors at once
+
+Each editor has its own instance id and its own record, `.sca-editor/editors/<instance>.json`, so editors never share or
+delete one another's file (an editor removes only its own when it stops). Discovery takes the nearest workspace above the
+current directory that has a live editor; a record counts only if `/api/health` answers with that record's workspace and
+instance. Records that do not answer are an error only when no live editor is found. Editors on one workspace are allowed,
+but they write the same notebooks: two writers is the person's decision, and `sca snapshot` / `sca viewport` read files
+per workspace, not per editor, so the last editor to write wins there.
 
 ## Edit cells through the editor: `sca cell`
 
@@ -80,7 +91,7 @@ sca new bracket --kind part          # a new, empty notebook; the open editor li
   feedback: read it before the next step, as with any other operation.
 - `put` fails with a conflict if you pass a base that is out of date; without one it
   replaces the cell, so `get` first when the person may have changed it.
-- The commands find the running editor through `<workspace>/.sca-editor/server.json`. With no
+- The commands find the running editor as in rule 3 above. With no
   editor running, or with another notebook open, `ls` and `get` read the file and the write
   commands refuse: run `sca cell open NOTEBOOK` (or pass `--open` to switch and write in one
   step), or edit the file directly, nothing else holds it.
