@@ -1,6 +1,8 @@
 name: Release
 
-# A release is one distribution, `simplecadapi`, built as four platform wheels per Python version (3.10-3.13):
+# A release is one distribution, `simplecadapi`, built as four platform wheels per Python version (3.10-3.13), each of the
+# sixteen wheels in a job of its own so that they build in parallel (the Windows wheels, the slowest, took 1.5 hours one
+# after the other):
 #
 #   linux-x86_64   manylinux_2_28
 #   linux-aarch64  manylinux_2_28
@@ -24,6 +26,11 @@ on:
         type: string
       platforms:
         description: "Wheel platforms to build: all, or a comma list of linux-x86_64, linux-aarch64, macos-arm64, windows-x86_64"
+        required: false
+        default: all
+        type: string
+      pythons:
+        description: "Pythons to build wheels for: all, or a comma list of cp310, cp311, cp312, cp313"
         required: false
         default: all
         type: string
@@ -121,7 +128,8 @@ jobs:
           if-no-files-found: error
 
   plan:
-    # Which wheels to build.  A release builds all four; a dry run may pick some (to iterate on one platform).
+    # Which wheels to build.  A release builds all sixteen (4 platforms x 4 Pythons); a dry run may pick some (to iterate on
+    # one platform or one Python).
     name: Plan the wheels
     needs: validate
     runs-on: ubuntu-latest
@@ -134,6 +142,7 @@ jobs:
         shell: bash
         env:
           PLATFORMS: ${{ github.event_name == 'workflow_dispatch' && inputs.platforms || 'all' }}
+          PYTHONS: ${{ github.event_name == 'workflow_dispatch' && inputs.pythons || 'all' }}
         run: |
           set -euo pipefail
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
@@ -144,16 +153,27 @@ jobs:
               {"name": "macos-arm64", "os": "macos-15", "archs": "arm64", "occt_cache": "/tmp/occt"},
               {"name": "windows-x86_64", "os": "windows-2022", "archs": "AMD64", "occt_cache": "C:\\occt"},
           ]
+          pythons = ["cp310", "cp311", "cp312", "cp313"]
           wanted = [p.strip() for p in os.environ["PLATFORMS"].split(",") if p.strip()]
           chosen = every if wanted in ([], ["all"]) else [e for e in every if e["name"] in wanted]
           unknown = [p for p in wanted if p != "all" and p not in {e["name"] for e in every}]
           if unknown or not chosen:
               raise SystemExit(f"unknown platforms {unknown}; choose from {[e['name'] for e in every]}")
-          print("matrix=" + json.dumps({"include": chosen}))
+          wanted_pythons = [p.strip() for p in os.environ["PYTHONS"].split(",") if p.strip()]
+          chosen_pythons = pythons if wanted_pythons in ([], ["all"]) else [p for p in pythons if p in wanted_pythons]
+          unknown = [p for p in wanted_pythons if p != "all" and p not in pythons]
+          if unknown or not chosen_pythons:
+              raise SystemExit(f"unknown pythons {unknown}; choose from {pythons}")
+          # one job per platform and Python: the wheels of a platform build side by side, not one after the other
+          include = [{**e, "python": py} for e in chosen for py in chosen_pythons]
+          print("matrix=" + json.dumps({"include": include}))
           PY
 
   wheels:
-    name: Wheels (${{ matrix.name }})
+    # One job per platform and Python.  Each restores the same static OpenCASCADE prefix; when build_occt.py changed (the
+    # cache key is its hash) the four jobs of a platform each build OCCT at the same time, which costs four times the runner
+    # minutes but no more wall-clock time than one job did, and the first to finish saves the cache.
+    name: Wheels (${{ matrix.name }}, ${{ matrix.python }})
     needs: [webui, plan]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 240
@@ -200,6 +220,7 @@ jobs:
         uses: pypa/cibuildwheel@b9e566a2b284570af229f6c2a33673410d0389a3 # v4.3.4
         env:
           CIBW_ARCHS: ${{ matrix.archs }}
+          CIBW_BUILD: ${{ matrix.python }}-*
           # share the cached prefix with the container (before-all in pyproject.toml builds OCCT only if it is absent)
           CIBW_CONTAINER_ENGINE: "docker; create_args: --volume ${{ matrix.occt_cache }}:/opt/occt"
 
@@ -208,12 +229,14 @@ jobs:
         uses: pypa/cibuildwheel@b9e566a2b284570af229f6c2a33673410d0389a3 # v4.3.4
         env:
           CIBW_ARCHS: ${{ matrix.archs }}
+          CIBW_BUILD: ${{ matrix.python }}-*
 
       - name: Build the wheels (Windows)
         if: runner.os == 'Windows'
         uses: pypa/cibuildwheel@b9e566a2b284570af229f6c2a33673410d0389a3 # v4.3.4
         env:
           CIBW_ARCHS: ${{ matrix.archs }}
+          CIBW_BUILD: ${{ matrix.python }}-*
           # the MSVC environment is active (above): Ninja, every translation unit in parallel, and keep going after a
           # failure so one run reports all the compiler errors rather than the first
           CIBW_ENVIRONMENT_WINDOWS: >-
@@ -233,7 +256,7 @@ jobs:
       - name: Keep the wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: wheels-${{ matrix.name }}
+          name: wheels-${{ matrix.name }}-${{ matrix.python }}
           path: wheelhouse/*.whl
           if-no-files-found: error
 
@@ -280,17 +303,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          - {python-version: "3.10", tag: cp310}
+          - {python-version: "3.11", tag: cp311}
+          - {python-version: "3.12", tag: cp312}
+          - {python-version: "3.13", tag: cp313}
     steps:
       - name: Check out tagged revision
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ env.RELEASE_TAG }}
 
-      - name: Fetch the Linux x86_64 wheels
+      - name: Fetch the Linux x86_64 wheel of this Python
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: wheels-linux-x86_64
+          name: wheels-linux-x86_64-${{ matrix.tag }}
           path: dist
 
       - name: Install uv and Python

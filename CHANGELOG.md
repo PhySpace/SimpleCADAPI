@@ -4,6 +4,41 @@ All notable changes to SimpleCADAPI are documented here. Per-version
 user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 中文).
 
+## 2.3.0.post1 — 2026-11-17
+
+### Changed
+- The editor is found by its own answer, not by a process id. `sca cell` and the other editor commands ask `/api/health`, and
+  its workspace must be the record's directory; a pid (invisible from a sandbox with its own pid namespace) only sharpens the
+  error when the server does not answer. A port another project's editor now holds is refused, not written to.
+- Each editor has an instance id and its own record, `.sca-editor/editors/<instance>.json` (`server.json` is gone), and removes
+  only its own. Several live editors on one workspace are listed, never chosen; `--editor URL --instance ID` (or
+  `SCA_EDITOR_URL` and `SCA_EDITOR_INSTANCE`, both needed) pins one. `sca cell`, `sca feature` and `sca sketch` reports carry
+  `editor: {url, workspace, instance}`.
+- `sca edit --port` defaults to `0`: the system picks a free port, the editor binds it itself, and `SCA_EDITOR_READY {url,
+  instance, workspace, pid}` goes to stdout once it listens. A port that is taken fails with a message. (It was 7180.)
+- The drawing engine (`simplecadapi.dxf_engine`) measures the model. A dimension says what it measures with a geometry
+  reference (`DimDecl(of=...)`, `between=(a, b)`, `extent="x"|"y"`; an SDK entity, a QL selector or a 3D point) and the number
+  on the sheet is the measurement; `value` is the expected value and a difference is an error. Typed `p1`/`p2`,
+  `center`/`radius` remain and are checked against the figure lines.
+- One issue list (`SheetPlan.issues()`, also in `report()` and behind the diagnostic picture): placement, truth
+  (`DIM_VALUE_MISMATCH`, `DIM_NOT_ATTACHED`), completeness (`UNDIMENSIONED_CYLINDER`, `OVERALL_SIZE_MISSING`, ...), sheet, and
+  what is not checked. Text over a figure line of its own view is now a conflict.
+- Dimensions are native DXF `DIMENSION` entities (style `GB`); the written file is read back and compared with the model.
+- `scale=None` / `anchor=None` choose a standard scale and centre the views; `sheet="A4".."A0"`; the title block shows only
+  declared fields (`designer`, `material`, `revision`); `align` gap is the clear distance between views.
+- Defaults: no `(caption)` in dimension text (`show_captions=True`), `dec=None` shows the value's own decimals, small
+  dimensions take the inner rows.
+
+### Added
+- Section views (`ViewDecl(section=(x, y, z), label="A", mark_in="top")`: hatch, title, cutting-plane symbol), centre lines
+  from the model's cylinders, tolerances and fits (`tol=(upper, lower)`, `fit="H7"`), `count=4` (`4×`), surface texture
+  (`RoughDecl`, `SheetDecl.general_rough`), a diameter on a cylinder seen from the side.
+
+### Fixed
+- `SheetPlan.render()` with str paths; a report that said "ok" while the evaluation found conflicts; the checked text box
+  and the drawn text pointing opposite ways on lines running left; `prefix` ignored on diameters; a linear dimension without a
+  free row vanishing from the DXF; text boxes narrower than the text.
+
 ## 2.3.0 — 2026-11-12
 
 Follows 2.2.7. 2.2.8 was withdrawn (yanked on PyPI) and the 2.2.9 prepared to replace it was never published: both are in

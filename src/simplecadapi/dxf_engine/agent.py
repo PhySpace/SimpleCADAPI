@@ -11,7 +11,11 @@ from __future__ import annotations
 
 import math
 
-from .planner import BASE_OFF, Box, ROW_PITCH, TEXT_H, _text_width
+from . import dims as _dims
+from .collide import conflicts as _conflicts
+from .collide import corridors as _corridors
+from .collide import proper_cross as _proper_cross
+from .geom2d import BASE_OFF, ROW_PITCH, TEXT_H, Box, _text_width, norm_rot
 
 
 def _r(v, nd=1):
@@ -19,20 +23,18 @@ def _r(v, nd=1):
 
 
 def _element_geom(r):
-    """Resolved → (key, view, cx, cy, w, h, rot, segs); None when the geometry is incomplete."""
+    """Resolved → (key, view, cx, cy, w, h, rot, segs): the box and the lines that were placed, exactly as drawn;
+    None when the geometry is incomplete."""
     dr = r.draw
     if r.kind == "dim":
-        text = dr.get("text", "")
-        w = _text_width(text, TEXT_H)
-        if dr.get("kind") == "lin" and "insert" in dr:
-            ins = dr["insert"]
-            return (f"dim:{r.name}", r.view, ins[0], ins[1], w, TEXT_H, dr["rot"],
+        w = _text_width(dr.get("text", ""), TEXT_H)
+        if dr.get("kind") == "lin" and "center" in dr:
+            c = dr["center"]
+            return (f"dim:{r.name}", r.view, c[0], c[1], w, TEXT_H, dr["rot"],
                     [tuple(dr["line"])] + [tuple(s) for s in dr["exts"]])
         if dr.get("kind") == "dia-man":
             a = dr["anchor"]
-            return (f"dim:{r.name}", r.view, a[0], a[1], w, TEXT_H, dr["rot"],
-                    [(tuple(dr["m1"]), tuple(dr["m2"])),
-                     (tuple(dr["m1"]), tuple(dr["insert"]))])
+            return (f"dim:{r.name}", r.view, a[0], a[1], w, TEXT_H, dr["rot"], _dims.dia_segs(dr))
         if dr.get("kind") == "rad-man":
             a = dr["anchor"]
             return (f"dim:{r.name}", r.view, a[0], a[1], w, TEXT_H, dr["rot"],
@@ -47,76 +49,15 @@ def _element_geom(r):
                 [(tuple(p[i]), tuple(p[i + 1])) for i in range(len(p) - 1)])
     if r.kind == "datum":
         bc = dr["bc"]
-        return (f"datum:{r.name}", r.view, bc[0], bc[1], 6.0, 4.4, 0.0, [])
+        return (f"datum:{r.name}", r.view, bc[0], bc[1], 6.0, 4.4, 0.0, [(tuple(dr["at"]), tuple(bc))])
+    if r.kind == "rough":
+        a = dr["anchor"]
+        return (f"rough:{r.name}", r.view, a[0], a[1], dr["w"], dr["h"], dr["rot"], [])
     return None
 
 
-def _proper_cross(a, b, c, d, eps=0.5):
-    """Strict X crossing: two segments straddle each other and share no endpoint. A shared endpoint (shared measured point) / collinear (shared
-    extension line) / T-junction (an extension-line end on another line) are normal GB drawing practice and do not count as conflicts."""
-    if min(math.dist(a, c), math.dist(a, d),
-           math.dist(b, c), math.dist(b, d)) < eps:
-        return False
-
-    def ori(p, q, r):
-        v = (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
-        return 0 if abs(v) < 1e-9 else (1 if v > 0 else -1)
-
-    o1, o2 = ori(a, b, c), ori(a, b, d)
-    o3, o4 = ori(c, d, a), ori(c, d, b)
-    return o1 == -o2 and o3 == -o4 and o1 != 0 and o3 != 0
-
-
-def _conflicts(plan, key, view, cx, cy, w, h, rot, segs):
-    """Deterministic conflict check of one element placement; returns structured obstacle data (sheet coordinates, mm)."""
-    out = []
-    for i, z in enumerate(plan._zones):
-        if plan._obb_sat(cx, cy, w, h, rot, z.inflate(1.0)):
-            out.append({"rule": "R1", "type": "keep-out zone", "id": f"zone{i}",
-                        "bbox": [_r(z.x0), _r(z.y0), _r(z.x1), _r(z.y1)]})
-    for n, vw in plan.views.items():
-        bb = vw["bbox"]
-        if n != view and plan._obb_sat(cx, cy, w, h, rot, bb.inflate(0.5)):
-            out.append({"rule": "R1", "type": "view bbox", "id": f"view:{n}",
-                        "bbox": [_r(bb.x0), _r(bb.y0), _r(bb.x1), _r(bb.y1)]})
-        if n != view:
-            nh = sum(1 for sp, _sq in vw["pairs"]
-                     if plan._pt_in_obb(sp[0], sp[1], cx, cy, w, h, rot))
-            if nh:
-                out.append({"rule": "R1", "type": "figure line", "id": f"figure:{n}",
-                            "points": nh})
-    for k2, cx2, cy2, w2, h2, r2 in plan.text_obbs:
-        if k2 != key and plan._obb_obb(cx, cy, w, h, rot, cx2, cy2, w2, h2, r2):
-            out.append({"rule": "R1", "type": "text", "id": k2,
-                        "center": [_r(cx2), _r(cy2)], "w": _r(w2), "h": _r(h2),
-                        "rot": _r(r2)})
-    for k2, sp, sq in plan.segments:
-        if k2 == key:
-            continue
-        if (plan._seg_obb(sp, sq, cx, cy, w, h, rot)
-                or any(_proper_cross(s[0], s[1], sp, sq) for s in segs)):
-            out.append({"rule": "R1", "type": "dimension line", "id": k2,
-                        "seg": [[_r(sp[0]), _r(sp[1])], [_r(sq[0]), _r(sq[1])]]})
-    for s in segs:
-        for n in plan._seg_vs_views(s, view):
-            out.append({"rule": "R1", "type": "dimension line crosses another view's figure line", "id": f"figure:{n}"})
-    return out
-
-
-def _corridors(plan, key, view, cx, cy, w, h, rot, maxd=60.0, step=1.0):
-    """Largest conflict-free distance a text OBB can be translated along ±x/±y (text collisions only, dimension lines excluded)."""
-    res = {}
-    for label, dx, dy in (("+x", 1, 0), ("-x", -1, 0), ("+y", 0, 1), ("-y", 0, -1)):
-        d = 0.0
-        while d < maxd and not _conflicts(plan, key, view,
-                                          cx + dx * (d + step), cy + dy * (d + step),
-                                          w, h, rot, []):
-            d += step
-        res[label] = _r(d)
-    return res
-
-
 def evaluate_plan(plan):
+    """Every placed element with its conflicts, tested by `collide.conflicts` (the test the solver used)."""
     accepted = getattr(plan, "accepted", {})
     elements = []
     for r in plan.resolved:
@@ -132,7 +73,7 @@ def evaluate_plan(plan):
         _k, view, cx, cy, w, h, rot, segs = g
         conf = _conflicts(plan, key, view, cx, cy, w, h, rot, segs)
         rules = sorted({c["rule"] for c in conf})
-        if (60.0 < rot % 180.0 < 90.0) or (90.0 < rot % 180.0 < 120.0):
+        if r.kind == "dim" and ((60.0 < rot % 180.0 < 90.0) or (90.0 < rot % 180.0 < 120.0)):
             rules.append("R3")                    # exactly vertical 90° is legal (GB figure 17)
         entry.update(text=r.draw.get("text")
                      or (r.draw.get("lines") and " / ".join(r.draw["lines"])),
@@ -155,7 +96,7 @@ def evaluate_plan(plan):
 
 
 def _find_dim(plan, caption):
-    for d in plan.d.dims:
+    for d in plan.dims:
         if d.caption == caption:
             return d
     raise KeyError(f"dim {caption}")
@@ -193,9 +134,24 @@ def _reject(plan, act, key, view, conf, cx, cy, w, h, rot):
             "corridors": _corridors(plan, key, view, cx, cy, w, h, rot)}
 
 
-def _norm_rot(at):
-    rot = (at % 180.0 + 180.0) % 180.0
-    return rot - 180.0 if rot > 90.0 else rot
+_norm_rot = norm_rot
+
+
+def _place(plan, act, key, dcl, g, segs, desc):
+    """Validate one derived geometry against everything else on the sheet; land it, or reject and roll back."""
+    r = _find_resolved(plan, key)
+    w = _text_width(g["text"], TEXT_H)
+    cx, cy = g["center"] if g["kind"] == "lin" else g["anchor"]
+    old = _unregister(plan, key)
+    conf = _conflicts(plan, key, dcl.view, cx, cy, w, TEXT_H, g["rot"], segs)
+    if conf and not act.get("force"):
+        _restore(plan, old)
+        return None, _reject(plan, act, key, dcl.view, conf, cx, cy, w, TEXT_H, g["rot"])
+    r.draw.clear()
+    r.draw.update(g)
+    _commit(plan, key, cx, cy, w, TEXT_H, g["rot"], segs)
+    _log(plan, key, desc)
+    return g, {"op": act["op"], "element": key, "ok": True, "anchor": [_r(cx), _r(cy)], "rot": _r(g["rot"])}
 
 
 def _apply_rad(plan, act):
@@ -205,113 +161,51 @@ def _apply_rad(plan, act):
     dcl = _find_dim(plan, act["name"])
     key = f"dim:{dcl.caption}"
     dr = _find_resolved(plan, key).draw
-    c = plan.tx(dcl.view, dcl.center)
-    rr = dcl.radius * plan.s
-    at0 = math.degrees(math.atan2(dr["mpt"][1] - c[1], dr["mpt"][0] - c[0]))
-    at = act.get("at", at0)
-    u = (math.cos(math.radians(at)), math.sin(math.radians(at)))
-    rot = _norm_rot(at)
-    n = (-math.sin(math.radians(rot)), math.cos(math.radians(rot)))
+    at = act.get("at", dr.get("at", dcl.at))
     w = _text_width(dr["text"], TEXT_H)
-    mpt = (c[0] + rr * u[0], c[1] + rr * u[1])
-    if "s" in act:
-        cands = [float(act["s"])]
-    else:
-        cands = list(3.0 + 6.0 * k for k in range(5)) + [-(w + 4.0),
-                                                         -(w + 10.0),
-                                                         -(w + 18.0)]
-    old = _unregister(plan, key)
-    conf = anchor = None
+    cands = [float(act["s"])] if "s" in act else list(_dims.rad_candidates(w))
+    res = None
     for s0 in cands:
-        inner = (s0 + w) < 0.0
-        tail_k = s0 - 1.5 if inner else s0 + w + 1.5
-        insert = (mpt[0] + s0 * u[0] + n[0] * 1.0,
-                  mpt[1] + s0 * u[1] + n[1] * 1.0)
-        anchor = (insert[0] + u[0] * w / 2 + n[0] * TEXT_H * 0.35,
-                  insert[1] + u[1] * w / 2 + n[1] * TEXT_H * 0.35)
-        tail = (mpt[0] + tail_k * u[0], mpt[1] + tail_k * u[1])
-        segs = [(mpt, tail)]
-        conf = _conflicts(plan, key, dcl.view, anchor[0], anchor[1], w, TEXT_H,
-                          rot, segs)
-        if not conf or act.get("force"):
-            arrow_deg = math.degrees(math.atan2(u[1], u[0]))
-            if not inner:
-                arrow_deg += 180.0
-            dr.update(mpt=mpt, tail=tail, insert=insert, anchor=anchor, rot=rot,
-                      arrow_deg=arrow_deg)
-            _commit(plan, key, anchor[0], anchor[1], w, TEXT_H, rot, segs)
-            _log(plan, key, f"at={at:g}° {'inside the arc' if inner else 'outside the arc'} s={s0:g}")
-            return {"op": "rad", "element": key, "ok": True,
-                    "anchor": [_r(anchor[0]), _r(anchor[1])], "rot": _r(rot)}
-    if anchor is None:
-        anchor = (0.0, 0.0)
-    _restore(plan, old)
-    return _reject(plan, act, key, dcl.view, conf, anchor[0], anchor[1], w,
-                   TEXT_H, rot)
+        g = _dims.rad_geometry(plan, dcl, at, s0, dr["text"])
+        where = "inside the arc" if g["inner"] else "outside the arc"
+        done, res = _place(plan, act, key, dcl, g, [(g["mpt"], g["tail"])], f"at={at:g}° {where} s={s0:g}")
+        if done:
+            return res
+    return res
 
 
 def _apply_dia(plan, act):
-    """Diameter: `at` (dimension-line azimuth). The dimension line passes through the centre, the text anchors above the line at 0.75r
-    (insert=left end of the baseline, anchor=OBB centre), rot always equals the line direction (R2)."""
+    """Diameter: `at` (dimension-line azimuth) and optionally mode ("inside" | "outside"). The dimension line passes
+    through the centre, the arrows touch the circle, rot always equals the line direction (R2)."""
     dcl = _find_dim(plan, act["name"])
     key = f"dim:{dcl.caption}"
     dr = _find_resolved(plan, key).draw
-    c = plan.tx(dcl.view, dcl.center)
-    rr = dcl.radius * plan.s
-    at0 = math.degrees(math.atan2(dr["m1"][1] - c[1], dr["m1"][0] - c[0]))
-    at = act.get("at", at0)
-    u = (math.cos(math.radians(at)), math.sin(math.radians(at)))
-    m1 = (c[0] + rr * u[0], c[1] + rr * u[1])
-    m2 = (c[0] - rr * u[0], c[1] - rr * u[1])
-    rot = _norm_rot(at)
-    n = (-math.sin(math.radians(rot)), math.cos(math.radians(rot)))
-    w = _text_width(dr["text"], TEXT_H)
-    insert = (c[0] + 0.75 * rr * u[0] + n[0] * 1.0,
-              c[1] + 0.75 * rr * u[1] + n[1] * 1.0)
-    anchor = (insert[0] + u[0] * w / 2 + n[0] * TEXT_H * 0.35,
-              insert[1] + u[1] * w / 2 + n[1] * TEXT_H * 0.35)
-    segs = [(m1, m2), (m1, insert)]
-    old = _unregister(plan, key)
-    conf = _conflicts(plan, key, dcl.view, anchor[0], anchor[1], w, TEXT_H, rot, segs)
-    if conf and not act.get("force"):
-        _restore(plan, old)
-        return _reject(plan, act, key, dcl.view, conf, anchor[0], anchor[1], w, TEXT_H, rot)
-    dr.update(m1=m1, m2=m2, insert=insert, anchor=anchor, rot=rot)
-    _commit(plan, key, anchor[0], anchor[1], w, TEXT_H, rot, segs)
-    _log(plan, key, f"at={at:g}°")
-    return {"op": "dia", "element": key, "ok": True,
-            "anchor": [_r(anchor[0]), _r(anchor[1])], "rot": _r(rot)}
+    at = act.get("at", dr.get("at", dcl.at))
+    modes = [act["mode"]] if "mode" in act else list(_dims.dia_modes(plan, dcl, dr["text"]))
+    res = None
+    for mode in modes:
+        if mode not in ("inside", "outside"):
+            raise KeyError(f"dia mode {mode!r} (inside | outside)")
+        g = _dims.dia_geometry(plan, dcl, at, mode, dr["text"])
+        done, res = _place(plan, act, key, dcl, g, _dims.dia_segs(g), f"at={at:g}° {mode}")
+        if done:
+            return res
+    return res
 
 
 def _apply_lin(plan, act):
     """Linear: side/row structural slot + slide along the line (1 DOF). Geometry is derived with the solver through
-    _lin_geometry (when the text slides out of the measured segment the dimension line extends sideways automatically); there is no free text position."""
+    lin_geometry (when the text slides out of the measured segment the dimension line extends sideways automatically); there is no free text position."""
     dcl = _find_dim(plan, act["name"])
     key = f"dim:{dcl.caption}"
     dr = _find_resolved(plan, key).draw
-    p1, p2 = plan.tx(dcl.view, dcl.p1), plan.tx(dcl.view, dcl.p2)
-    vertical = abs(p2[1] - p1[1]) >= abs(p2[0] - p1[0])
-    side = act.get("side", dcl.side or ("right" if vertical else "bottom"))
-    row = act.get("row", dcl.row)
+    side = act.get("side", dr.get("side", dcl.side))
+    row = act.get("row", dr.get("row", dcl.row))
     slide = float(act.get("slide", 0.0))
-    g = plan._lin_geometry(dcl, side, row, slide, dr["text"])
-    w = _text_width(dr["text"], TEXT_H)
-    segs = [g["line"]] + g["exts"]
-    old = _unregister(plan, key)
-    conf = _conflicts(plan, key, dcl.view, g["center"][0], g["center"][1],
-                      w, TEXT_H, g["rot"], segs)
-    if conf and not act.get("force"):
-        _restore(plan, old)
-        return _reject(plan, act, key, dcl.view, conf, g["center"][0],
-                       g["center"][1], w, TEXT_H, g["rot"])
-    dr.update(kind="lin", line=g["line"], arrows=g["arrows"], exts=g["exts"],
-              insert=g["insert"], rot=g["rot"])
-    _commit(plan, key, g["center"][0], g["center"][1], w, TEXT_H, g["rot"], segs)
-    _log(plan, key, f"{side} row{row} slide{slide:+g}"
-         + (" line extended" if g["extended"] else ""))
-    return {"op": "lin", "element": key, "ok": True,
-            "anchor": [_r(g["center"][0]), _r(g["center"][1])],
-            "rot": _r(g["rot"])}
+    g = _dims.lin_draw(_dims.lin_geometry(plan, dcl, side, row, slide, dr["text"]))
+    _done, res = _place(plan, act, key, dcl, g, [g["line"]] + g["exts"],
+                        f"{side} row{row} slide{slide:+g}" + (" line extended" if g["extended"] else ""))
+    return res
 
 
 def _apply_lead(plan, act):

@@ -20,9 +20,11 @@ import hashlib
 import json
 import os
 import re
+import socket
 import sys
 import threading
 import time
+import uuid
 import webbrowser
 from collections import OrderedDict
 from pathlib import Path
@@ -132,6 +134,9 @@ class WorkspaceState:
         self.kernel: MarimoKernel | None = None
         self.notebook: Path | None = pick_notebook(self.workspace, notebook)
         self.port = 0
+        # Who this editor is: a url can be reused by another process, an id is not.  It is in the
+        # health answer and the record, and ``sca cell`` pins to it.
+        self.instance = uuid.uuid4().hex[:12]
         self.lock = threading.Lock()
         self.latest: dict[str, dict] = {}
         self._workplanes: list[dict] | None = None  # the frames last sent (see _push_workplanes)
@@ -1703,25 +1708,42 @@ class WorkspaceState:
             ],
         }
 
+    @property
+    def endpoint_url(self) -> str:
+        # The record is read on this machine, so the url is always the loopback:
+        # a 0.0.0.0 url is no address (and walks into proxies).
+        return f"http://127.0.0.1:{self.port}"
+
+    @property
+    def endpoint_record(self) -> Path:
+        """This editor's own record; editors on one workspace never share a file."""
+        return self.snapshot_dir / "editors" / f"{self.instance}.json"
+
     def write_endpoint(self, host: str) -> None:
         """Say where this editor listens, so ``sca cell`` and other tools find it."""
         try:
-            directory = self.snapshot_dir
-            directory.mkdir(parents=True, exist_ok=True)
-            import os
-
-            # The record is read on this machine, so the url is always the
-            # loopback: a 0.0.0.0 url is no address (and walks into proxies).
-            (directory / "server.json").write_text(
-                json.dumps({"url": f"http://127.0.0.1:{self.port}", "pid": os.getpid(), "workspace": str(self.workspace)}),
+            record = self.endpoint_record
+            record.parent.mkdir(parents=True, exist_ok=True)
+            partial = record.with_suffix(".tmp")
+            partial.write_text(
+                json.dumps(
+                    {
+                        "url": self.endpoint_url,
+                        "pid": os.getpid(),
+                        "workspace": str(self.workspace),
+                        "instance": self.instance,
+                    }
+                ),
                 encoding="utf-8",
             )
+            os.replace(partial, record)
         except OSError:
             pass
 
     def remove_endpoint(self) -> None:
+        """Remove this editor's record -- only its own: another editor's stays."""
         try:
-            (self.snapshot_dir / "server.json").unlink()
+            self.endpoint_record.unlink()
         except OSError:
             pass
 
@@ -1973,6 +1995,7 @@ def create_app(state: WorkspaceState) -> Starlette:
         return JSONResponse(
             {
                 "ok": True,
+                "instance": state.instance,
                 "workspace": str(state.workspace),
                 "notebook": state.notebook.name if state.notebook else None,
                 "kernel": state.kernel is not None and state.kernel.alive,
@@ -2429,6 +2452,19 @@ def serve_workspace(
         print(f"[sca edit] workspace directory does not exist: {workspace}", file=sys.stderr)
         return 2
 
+    # Bind here, not in uvicorn: port 0 asks the system for a free one, and the socket that holds
+    # it is the one served on, so nothing can take the port between choosing and listening.
+    sock = socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        if sys.platform != "win32":  # there it would let another process share the port
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind((host, port))
+    except OSError as error:
+        sock.close()
+        print(f"[sca edit] cannot listen on {host}:{port}: {error}", file=sys.stderr)
+        return 1
+    port = sock.getsockname()[1]
+
     state = WorkspaceState(workspace, notebook)
     state.port = port
     app = create_app(state)
@@ -2443,6 +2479,19 @@ def serve_workspace(
         hub.attach_loop(asyncio.get_running_loop())
         print(f"[sca edit] workspace {state.workspace}")
         state.write_endpoint(host)
+        # One line a launcher can parse: where the editor really listens and which one it is.
+        print(
+            "SCA_EDITOR_READY "
+            + json.dumps(
+                {
+                    "url": state.endpoint_url,
+                    "instance": state.instance,
+                    "workspace": str(state.workspace),
+                    "pid": os.getpid(),
+                }
+            ),
+            flush=True,
+        )
         threading.Thread(target=state._watch_workspace, name="workspace-watch", daemon=True).start()
 
         if state.notebook is None:
@@ -2482,5 +2531,5 @@ def serve_workspace(
         await original_shutdown(sockets=sockets)
 
     server.shutdown = shutdown
-    server.run()
+    server.run(sockets=[sock])
     return 0

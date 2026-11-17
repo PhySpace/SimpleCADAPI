@@ -314,8 +314,11 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [CenterDecl](CenterDecl.md) *(from dxf_engine/model.py)* `submodule:dxf_engine/model`
 - [DatumDecl](DatumDecl.md) *(from dxf_engine/model.py)* `submodule:dxf_engine/model`
 - [DimDecl](DimDecl.md) *(from dxf_engine/model.py)* `submodule:dxf_engine/model`
+- [Issue](Issue.md) *(from dxf_engine/checks.py)* `submodule:dxf_engine/checks`
 - [LeaderDecl](LeaderDecl.md) *(from dxf_engine/model.py)* `submodule:dxf_engine/model`
+- [RefError](RefError.md) *(from dxf_engine/refs.py)* `submodule:dxf_engine/refs`
 - [Resolved](Resolved.md) *(from dxf_engine/planner.py)* `submodule:dxf_engine/planner`
+- [RoughDecl](RoughDecl.md) *(from dxf_engine/model.py)* `submodule:dxf_engine/model`
 - [SheetDecl](SheetDecl.md) *(from dxf_engine/model.py)* `submodule:dxf_engine/model`
 - [SheetPlan](SheetPlan.md) *(from dxf_engine/planner.py)* `submodule:dxf_engine/planner`
 - [ViewDecl](ViewDecl.md) *(from dxf_engine/model.py)* `submodule:dxf_engine/model`

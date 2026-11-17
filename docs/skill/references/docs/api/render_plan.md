@@ -14,8 +14,8 @@ def render_plan(plan, dxf_path, png_path)
 
 ## Description
 
-Render the solved SheetPlan as a GB-layer DXF + PNG pair.
+Render the solved SheetPlan as a GB-layer DXF + PNG pair, then read the DXF back and verify its dimensions.
 
-The DXF goes through ezdxf (hand-made primitives: thin solid dimension/extension lines, solid arrows, rotation-normalised text,
-GB layers 01_THICK_SOLID/08_DASHED/05_CENTER/DIMENSION/TEXT); the PNG is produced from the DXF through PyMuPdf
-for multimodal cross-checking. A text action log that diffs well between versions is written too.
+The DXF goes through ezdxf (GB layers 01_THICK_SOLID/08_DASHED/05_CENTER/DIMENSION/TEXT, native DIMENSION
+entities in style "GB"); the PNG is produced from the DXF through PyMuPdf for multimodal cross-checking.
+Returns {"dxf", "png", "entities", "dimensions", "issues"}; the issues also enter `plan.issues()` and `report()`.
