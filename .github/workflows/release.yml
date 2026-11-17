@@ -79,7 +79,7 @@ jobs:
             echo "dry run of $RELEASE_TAG: no tag or version check, nothing will be published"
             exit 0
           fi
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([ab]|rc)?[0-9]*$ ]]; then
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(\.post|[ab]|rc)?[0-9]*$ ]]; then
             echo "Invalid release tag: $RELEASE_TAG" >&2
             exit 1
           fi
