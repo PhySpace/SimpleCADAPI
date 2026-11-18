@@ -327,18 +327,8 @@ def verify_dxf(plan, dxf_path, handles):
     return out
 
 
-def render_plan(plan, dxf_path, png_path):
-    """Render the solved SheetPlan as a GB-layer DXF + PNG pair, then read the DXF back and verify its dimensions.
-
-    The DXF goes through ezdxf (GB layers 01_THICK_SOLID/08_DASHED/05_CENTER/DIMENSION/TEXT, native DIMENSION
-    entities in style "GB"); the PNG is produced from the DXF through PyMuPdf for multimodal cross-checking.
-    Returns {"dxf", "png", "entities", "dimensions", "issues"}; the issues also enter `plan.issues()` and `report()`.
-    """
-    t0 = time.time()
-    dxf_path, png_path = Path(dxf_path), Path(png_path)   # a str path is as good as a Path
-    import matplotlib
-    matplotlib.use("Agg")
-
+def build_dxf(plan):
+    """Build the editable vector drawing and return it with dimension handles."""
     doc = ezdxf.new("R2010", setup=True)
     doc.header["$INSUNITS"] = 4
     doc.header["$LWDISPLAY"] = 1
@@ -372,7 +362,17 @@ def render_plan(plan, dxf_path, png_path):
     _sheet.draw_frame(msp, plan)
     _sheet.draw_notes(msp, plan)
     _render_general_rough(msp, plan)
+    return doc, handles
 
+
+def render_plan(plan, dxf_path, png_path):
+    """Render the solved SheetPlan as a GB-layer DXF + PNG pair and verify it."""
+    t0 = time.time()
+    dxf_path, png_path = Path(dxf_path), Path(png_path)
+    import matplotlib
+    matplotlib.use("Agg")
+
+    doc, handles = build_dxf(plan)
     doc.saveas(dxf_path)
     plan.render_issues = verify_dxf(plan, dxf_path, handles)
     chk = ezdxf.readfile(dxf_path)
