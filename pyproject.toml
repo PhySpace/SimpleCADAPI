@@ -99,6 +99,8 @@ sdist.include = [
   "/src/simplecadapi/editor/webui",
   "/skillproj.toml",
   "/docs/skill",
+  "/examples/dxf_exporter/README.md",
+  "/examples/dxf_exporter/stepped_mount.py",
   "/examples/u_link_motor_mount/u_link.py",
   "/examples/u_link_motor_mount/shell.py",
   "/examples/u_link_motor_mount/u_link_motor_mount.py",
