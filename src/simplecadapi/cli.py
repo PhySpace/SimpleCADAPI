@@ -7,6 +7,7 @@ Groups, each owned by its module and registered here at parser level so
     sca addon add|update|remove|list|use
     sca skill targets|where|install
     sca export <package.scadpkg> [--format ...]
+    sca drawing --step part.step --out part.dxf
     sca run <notebook.py> [--set NAME=VALUE] [--out ...]
     sca ls [DIR]  |  sca params <notebook.py>
     sca ops [NAME] [--json]       # every SDK operation and what its parameters mean
@@ -37,6 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
     from . import catalog as catalog_cli
     from .addon import cli as addon_cli
     from .editor import cli as editor_cli
+    from .dxf_engine.workflow import cli as drawing_cli
     from .example import cli as example_cli
     from .exporter import cli as exporter_cli
     from .runtime import cli as runtime_cli
@@ -53,6 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="group", required=True)
     addon_cli.configure(subparsers)
     catalog_cli.configure(subparsers)
+    drawing_cli.configure(subparsers)
     editor_cli.configure(subparsers)
     example_cli.configure(subparsers)
     exporter_cli.configure(subparsers)

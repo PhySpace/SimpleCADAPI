@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "verified_on": "2026-11-18",
+  "renderer_scope": "Single part. Metric A-series sheet. Layout presets and drafting guidance only.",
+  "templates": {
+    "gb-machining": {
+      "label": "GB 通用机加工零件",
+      "options": {"projection": "first", "layout": "aligned", "section_view": "full"},
+      "sources": ["GB/T 14692-2008", "GB/T 4458.4-2003", "GB/T 17452-1998", "GB/T 1182-2018"],
+      "review": ["按功能面确认主视图和尺寸基准", "复核孔深、孔组定位、配合及表面要求"]
+    },
+    "iso-machining": {
+      "label": "ISO GPS 通用机加工零件",
+      "options": {"projection": "first", "layout": "aligned", "section_view": "full"},
+      "sources": ["ISO 128-3:2022", "ISO 129-1:2018/Amd 1:2020", "ISO 1101:2017", "ISO 5459:2024", "ISO 21920-1:2021"],
+      "review": ["按合同确认投影法和图幅", "基准、公差及表面纹理由图纸要求提供"]
+    },
+    "iso-sheet-metal": {
+      "label": "板金与冲压零件",
+      "options": {"projection": "first", "layout": "compact", "section_view": "removed"},
+      "sources": ["ISO 128-3:2022", "DIN 6930-2:2011-10", "DIN 6935:2011-10", "ISO 9013:2017/Amd 1:2024"],
+      "review": ["区分成形图与经验证的展开图，记录板厚和弯曲方向", "仅在工艺和合同适用时引用冲压、弯曲或热切割标准", "展开放样及折弯补偿需从经批准的数据取得"]
+    },
+    "iso-casting": {
+      "label": "铸坯与机加工铸件",
+      "options": {"projection": "first", "layout": "aligned", "section_view": "full"},
+      "sources": ["ISO 128-3:2022", "ISO 8062-3:2023", "ASME Y14.8-2022"],
+      "review": ["用剖视核对壁厚、内腔和孔道", "区分铸坯和加工完成状态，复核哪些表面留加工余量", "ASME Y14.8 属于另一个合同体系选项"]
+    },
+    "iso-weld-prep": {
+      "label": "单件坡口及焊前加工",
+      "options": {"projection": "first", "layout": "compact", "section_view": "removed"},
+      "sources": ["ISO 128-3:2022", "ISO 2553:2019", "AWS A2.4:2020"],
+      "review": ["用端面或断面核对单件坡口、钝边和根部尺寸", "焊接符号体系按合同确定，AWS A2.4 可作为另一体系参考", "本模板用于单件准备图"]
+    },
+    "asme-machining": {
+      "label": "北美机加工项目的公制审阅草图",
+      "options": {"projection": "third", "layout": "aligned", "section_view": "full"},
+      "sources": ["ASME Y14.3-2012", "ASME Y14.5-2018 (R2024)", "ASME Y14.1-2020", "ASME Y14.100-2017"],
+      "review": ["用合同约定核对图幅、单位、投影和标注", "当前预设输出公制 A 系列，正式交付前如需 ANSI 图幅或英寸应另用获准模板"]
+    },
+    "asme-aerospace": {
+      "label": "航空或高追溯单件的公制审阅草图",
+      "options": {"projection": "third", "layout": "aligned", "section_view": "full"},
+      "sources": ["ASME Y14.5-2018 (R2024)", "ASME Y14.41-2026", "ASME Y14.100-2017"],
+      "review": ["确认受控图纸、数据集和客户要求的优先顺序及版本", "复核关键特性、材料批次要求、特殊工艺及检验说明", "Y14.41 适用于被合同援引的数字定义流程"]
+    },
+    "asme-additive": {
+      "label": "增材制造单件的公制审阅草图",
+      "options": {"projection": "third", "layout": "aligned", "section_view": "full"},
+      "sources": ["ASME Y14.46-2022", "ASME Y14.5-2018 (R2024)"],
+      "review": ["剖视检查内流道及可检验区域", "明确打印态与后处理态，按批准数据提供成形方向和表面处理要求"]
+    }
+  }
+}
