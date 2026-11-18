@@ -30,12 +30,16 @@ def overrides_from_args(entries):
 def parameter_value(value, unit, name):
     from simplecadapi.params.expr import Var, get_unit
 
-    if isinstance(value, Var):
+    if isinstance(value, Var) and value.unit is not None:
         return (
             float(value),
             value.unit.symbol,
             (value.dimension.length == 1 and value.dimension.angle == 0),
         )
+    if isinstance(value, Var):
+        if unit is None:
+            return float(value), None, False
+        value = float(value)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return (
             value if isinstance(value, (bool, str, int, float)) else None,
@@ -141,6 +145,8 @@ def prepare_notebook(path, step, overrides):
         item = ledger.setdefault(
             name, dict(name=name, group="", unit=unit, evaluated_mm=expected)
         )
+        item.pop("evaluated", None)
+        item.update(unit=unit, evaluated_mm=expected)
         item["status"] = "declared"
         item.setdefault("dimensions", []).append(
             dict(caption=values["caption"], expected_mm=values["value"], factor=factor)

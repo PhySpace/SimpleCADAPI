@@ -9,6 +9,21 @@ import ezdxf
 
 
 class NotebookDrawingTests(unittest.TestCase):
+    def test_dimensionless_vars_and_explicit_units(self):
+        import simplecadapi as scad
+        from simplecadapi.dxf_engine.workflow.notebook import parameter_value
+
+        count = scad.var("bolt_count", 8)
+        self.assertEqual(parameter_value(count, None, "BOLT_COUNT"), (8.0, None, False))
+        legacy_length = scad.var("slot_width", 34.0)
+        self.assertEqual(
+            parameter_value(legacy_length, "mm", "SLOT_W"), (34.0, "mm", True)
+        )
+        metric_value = scad.var("bearing_width", 2.0, unit="cm")
+        self.assertEqual(
+            parameter_value(metric_value, None, "bearing_width"), (20.0, "cm", True)
+        )
+
     def test_notebook_overrides_rebuild_native_dimensions_and_audit_unbound_parameter(
         self,
     ):
