@@ -1,5 +1,28 @@
 # Workflow: Engineering Drawing Generation
 
+## Start from STEP or a single-part notebook
+
+Install `simplecadapi[drawing]`, then use `sca drawing --step part.step --out part.dxf --plan-only` to
+propose orthographic views, a useful planar cut, a sheet and core dimensions. The plan records geometry
+evidence, placement warnings and unbound design inputs. Review the generated `part.drawing.json`
+and replay it with `sca drawing --mode engineering --step part.step --drawing-json part.drawing.json
+--out reviewed.dxf`. `--pdf` adds a true-scale vector print page. `--mode inspection` produces the seven
+geometry inspection views at model scale, with optional shared `--layout-json`.
+
+`sca drawing --notebook part.py --out part.dxf` executes a trusted notebook and keeps a STEP snapshot.
+In `DRAWING_INTENT`, a `dimensions` entry connects a top-level `parameter` to existing geometry with
+`of`, `between` or `extent`. Use `view` and `semantic` to select the drawing view and measurement.
+`cylinder` identifies one bounded cylindrical face, `plane` uses a point on the trimmed face and a
+normal, and `circle` uses a center, axis and radius. Dimensions and optional presentation requirements
+such as a fit or tolerance come from explicit inputs. The planner checks the measured value against
+the evaluated notebook value and reports each parameter's status. The [stepped mount example](../../../../examples/dxf_exporter/README.md)
+shows an override and an independent replay.
+
+Auto mode selects the ordinary exact hidden-line method for most parts. For spline-heavy profiles,
+install `simplecadapi[drawing,verify]` to use polygonal review views with the original B-Rep envelope
+dimensions. Check the reported method. Use `--hlr exact` when the output needs analytic contours in
+all views, or `--hlr polygonal` to explicitly request the review path.
+
 Produce a GB-standard engineering drawing sheet set (DXF + PNG) from an
 already-validated part or product. This is a preliminary workflow; drawing is
 an output stage, so geometry must be final before entry. Layout follows the
