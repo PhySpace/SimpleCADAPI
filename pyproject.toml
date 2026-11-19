@@ -57,7 +57,7 @@ editor = [
 # simplecadapi.inspect.brep is part of the default install; this extra is kept empty so that
 # `pip install "simplecadapi[inspect]"` from older instructions still works.
 inspect = []
-# Verifier scripts measure models with OCP; the SDK itself never imports it (simplecadapi.verify bridges the two).
+# Verification and the optional polygonal drawing projection import OCP on demand.
 # The build without VTK (same `OCP` import, no 100 MB VTK) and the OCCT generation the SDK ships (7.9): OCP 8 renames
 # the casts and changes signatures.
 verify = [
@@ -99,6 +99,8 @@ sdist.include = [
   "/src/simplecadapi/editor/webui",
   "/skillproj.toml",
   "/docs/skill",
+  "/examples/dxf_exporter/README.md",
+  "/examples/dxf_exporter/stepped_mount.py",
   "/examples/u_link_motor_mount/u_link.py",
   "/examples/u_link_motor_mount/shell.py",
   "/examples/u_link_motor_mount/u_link_motor_mount.py",

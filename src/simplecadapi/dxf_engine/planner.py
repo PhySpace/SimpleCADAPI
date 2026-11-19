@@ -115,12 +115,16 @@ class SheetPlan(Geom2D):
         self.segments.append((key, p, q))
 
     # ---------- views ----------
+    def _build_view(self, view):
+        """Project one declared view. Higher-level workflows may cache this step."""
+        return _views.build_view(view)
+
     def _solve_views(self):
         d = self.d
         if d.front not in self.by_name:
             raise ValueError(f"front={d.front!r} is not one of the declared views {sorted(self.by_name)}")
         order = [d.front] + [v.name for v in d.views if v.name != d.front]
-        built = {name: _views.build_view(self.by_name[name]) for name in order}
+        built = {name: self._build_view(self.by_name[name]) for name in order}
         lay = {name: (built[name]["lbox"], self.by_name[name].align) for name in order}
         if self.s is None:
             self.s = _sheet.choose_scale(lay, d.front, self.fmt)
@@ -140,7 +144,7 @@ class SheetPlan(Geom2D):
             for _ad, pts, _vis in b["edges"]:
                 sh = [(p[0] * s + ox, p[1] * s + oy) for p in pts]
                 pairs.extend(zip(sh, sh[1:]))
-            self.views[name] = {"ox": ox, "oy": oy,
+            self.views[name] = {**b, "ox": ox, "oy": oy,
                                 "bbox": Box(ox + lb[0] * s, oy + lb[1] * s, ox + lb[2] * s, oy + lb[3] * s),
                                 "edges": b["edges"], "pairs": pairs, "lbox": lb, "hatch": b["hatch"],
                                 "frame": b["frame"],
