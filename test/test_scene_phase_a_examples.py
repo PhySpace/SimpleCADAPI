@@ -83,7 +83,9 @@ if path.name == "hydraulic_rod_assembly.py":
             for item in nodes
             if not isinstance(item, Assembly) and item.part_id == part_id
         )
-        faces = part.body._iter_faces()
+        # The examples name primitive faces before the booleans. Query the
+        # finished part as its connector builders do, using effective names.
+        faces = scad.ql.faces().resolve(part.body)
         face_naming[part_id] = {
             "face_count": len(faces),
             "unnamed_indices": [
@@ -91,14 +93,14 @@ if path.name == "hydraulic_rod_assembly.py":
                 for index, face in enumerate(faces)
                 if not any(
                     tag.startswith(prefix)
-                    for tag in scad.list_tags(face, scope="local")
+                    for tag in scad.list_tags(face, scope="effective")
                 )
             ],
             "connector_face_count": len(
                 scad.select_faces_by_tag(
                     part.body,
                     connector_face_tag,
-                    scope="local",
+                    scope="effective",
                 )
             ),
         }
