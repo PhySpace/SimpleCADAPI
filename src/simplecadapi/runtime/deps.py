@@ -27,6 +27,7 @@ to the file when that cannot be digested.
 from __future__ import annotations
 
 import ast
+import errno
 import hashlib
 import json
 import os
@@ -106,9 +107,9 @@ def exclusive(config: NotebookConfig, *, enabled: bool = True) -> Iterator[None]
     use a third), and a run prunes the cache directories it did not use.  The
     lock is between processes only: a run of a notebook this process is
     already running (a ``use`` cycle, an editor next to a headless run) goes
-    on without it, as it always did.  Without ``fcntl`` (Windows) it is a
-    no-op.  With ``enabled=False`` (a run that keeps no state: nothing to
-    prune, nothing to protect) it is a no-op too, and creates nothing.
+    on without it, as it always did. With ``enabled=False`` (a run that
+    keeps no state: nothing to prune, nothing to protect) it is a no-op too,
+    and creates nothing.
     """
 
     if not enabled:
@@ -122,16 +123,33 @@ def exclusive(config: NotebookConfig, *, enabled: bool = True) -> Iterator[None]
     handle = None
     try:
         if not nested:
-            try:
-                import fcntl
+            if os.name == "nt":
+                import msvcrt
 
+                # Byte ranges may extend beyond EOF. Every contender locks
+                # offset zero, without having to initialize or truncate the file.
                 directory.mkdir(parents=True, exist_ok=True)
-                handle = open(directory / "run.lock", "a")  # noqa: SIM115
-                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-            except (ImportError, OSError):
-                if handle is not None:
-                    handle.close()
-                handle = None
+                handle = open(directory / "run.lock", "a+b")  # noqa: SIM115
+                handle.seek(0)
+                while True:
+                    try:
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                        break
+                    except OSError as exc:
+                        if exc.errno != errno.EACCES:
+                            raise
+                        time.sleep(0.05)
+            else:
+                try:
+                    import fcntl
+
+                    directory.mkdir(parents=True, exist_ok=True)
+                    handle = open(directory / "run.lock", "a")  # noqa: SIM115
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                except (ImportError, OSError):
+                    if handle is not None:
+                        handle.close()
+                    handle = None
         yield
     finally:
         if handle is not None:

@@ -181,7 +181,7 @@ def integrate_shell(home: Path | None = None) -> dict[str, Any]:
     directory.mkdir(parents=True, exist_ok=True)
     if sys.platform == "win32":
         shim = directory / "sca.cmd"
-        shim.write_text(render_cmd_shim(target), encoding="utf-8")
+        shim.write_bytes(render_cmd_shim(target).encode("utf-8"))
         report.update(_windows_user_path(directory))
     else:
         shim = directory / "sca"

@@ -17,17 +17,18 @@ def test_with_binary_flag_passes_through_when_attribute_missing(monkeypatch):
 
 
 def _spy_binary_open(monkeypatch):
-    fake = 1 << 28
+    native_binary = getattr(os, "O_BINARY", 0)
+    binary = native_binary or (1 << 28)
     real_open = os.open
     seen = []
 
     def spy(path, flags, *args, **kwargs):
         seen.append(flags)
-        return real_open(path, flags, *args, **kwargs)
+        return real_open(path, flags if native_binary else flags & ~binary, *args, **kwargs)
 
     monkeypatch.setattr(os, "open", spy)
-    monkeypatch.setattr(os, "O_BINARY", fake, raising=False)
-    return seen, fake
+    monkeypatch.setattr(os, "O_BINARY", binary, raising=False)
+    return seen, binary
 
 
 def test_read_stable_file_opens_in_binary_mode(tmp_path, monkeypatch):

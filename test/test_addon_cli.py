@@ -67,19 +67,17 @@ def _make_addon_repo(
         rendered = ", ".join(f'"{item}"' for item in platforms)
         lines.append(f"platforms = [{rendered}]")
     if check_cmd is not None:
-        escaped = check_cmd.replace('"', '\\"')
-        lines.append(f'check_cmd = "{escaped}"')
+        lines.append(f'check_cmd = {json.dumps(check_cmd, ensure_ascii=False)}')
     if overrides:
         lines.append("[runtime.check_overrides]")
         for key, value in overrides.items():
-            escaped = value.replace('"', '\\"')
-            lines.append(f'"{key}" = "{escaped}"')
+            lines.append(f'"{key}" = {json.dumps(value, ensure_ascii=False)}')
     (repo / "sca-addon.toml").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return repo
 
 
 def _init(tmp_path) -> dict:
-    report, code = run(["init"])
+    report, code = run(["init", "--no-shell"])
     assert code == 0
     return report
 
@@ -396,7 +394,8 @@ def test_use_runs_prefixed_command_with_addon_dir_env(tmp_path):
     source = _make_addon_repo(tmp_path)
     # add the prefix to the installed descriptor by rewriting the source first
     body = (source / "sca-addon.toml").read_text()
-    body = body.replace('kind = "none"', 'kind = "none"\ncommand_prefix = "DEMO_VAR=42"')
+    prefix = 'set "DEMO_VAR=42" &&' if sys.platform == "win32" else "DEMO_VAR=42"
+    body = body.replace('kind = "none"', f'kind = "none"\ncommand_prefix = {json.dumps(prefix)}')
     (source / "sca-addon.toml").write_text(body)
     run(["addon", "add", str(source)])
     report, code = run([
@@ -413,9 +412,22 @@ def test_use_propagates_exit_code(tmp_path):
     _init(tmp_path)
     source = _make_addon_repo(tmp_path)
     run(["addon", "add", str(source)])
-    report, code = run(["addon", "use", "demo-addon", "false"])
+    report, code = run(["addon", "use", "demo-addon", sys.executable, "-c", "raise SystemExit(1)"])
     assert code == 1
     assert report["exit_code"] == 1
+
+
+def test_use_preserves_literal_arguments(tmp_path):
+    _init(tmp_path)
+    source = _make_addon_repo(tmp_path)
+    run(["addon", "add", str(source)])
+    arguments = ["", "a b", 'say "hello"', "%PATH%", "!x!", "x&y|z", "a\nb", "end \\"]
+    report, code = run([
+        "addon", "use", "--capture", "demo-addon", sys.executable, "-c",
+        "import json,sys; print(json.dumps(sys.argv[1:]))", *arguments,
+    ])
+    assert code == 0
+    assert json.loads(report["output"]) == arguments
 
 
 def test_use_without_command_reports_prefix(tmp_path):
@@ -439,30 +451,29 @@ def test_use_unknown_name_lists_installed(tmp_path):
 
 def test_check_cmd_receives_command_prefix_and_placeholder(tmp_path):
     _init(tmp_path)
+    windows = sys.platform == "win32"
+    filename = "probe.cmd" if windows else "probe.sh"
+    prefix = 'set "PATH={addon_dir}\\tools;%PATH%" &&' if windows else 'PATH="{addon_dir}/tools:$PATH"'
     source = _make_addon_repo(
         tmp_path,
         name="probed",
         kind="binary",
         platforms=[detect_platform()],
-        check_cmd="probe.sh",
+        check_cmd=filename,
     )
     tools = source / "tools"
     tools.mkdir()
-    probe = tools / "probe.sh"
-    probe.write_text("#!/bin/sh\nexit 0\n")
+    probe = tools / filename
+    probe.write_text("@exit /b 0\n" if windows else "#!/bin/sh\nexit 0\n")
     probe.chmod(0o755)
     body = (source / "sca-addon.toml").read_text()
-    body = body.replace(
-        'check_cmd = "probe.sh"',
-        "check_cmd = \"probe.sh\"\n"
-        "command_prefix = 'PATH=\"{addon_dir}/tools:$PATH\"'",
-    )
+    body += f"command_prefix = {json.dumps(prefix)}\n"
     (source / "sca-addon.toml").write_text(body)
     report, code = run(["addon", "add", str(source)])
     assert code == 0, report
     assert report["runtime_check"]["passed"] is True
     record = _registry(tmp_path / ".sca" / "addons")["addons"]["probed"]
-    assert record["runtime"]["command_prefix"] == 'PATH="{addon_dir}/tools:$PATH"'
+    assert record["runtime"]["command_prefix"] == prefix
     assert '{addon_dir}' not in record["runtime_check"]["effective_cmd"]
 
 
@@ -471,7 +482,7 @@ def test_skill_dir_name_avoids_double_prefix(tmp_path):
     source = _make_addon_repo(tmp_path, name="sca-prefixed")
     report, code = run(["addon", "add", str(source)])
     assert code == 0
-    assert report["skill_dir"].endswith("/sca-prefixed")
+    assert Path(report["skill_dir"]) == tmp_path / ".agents/skills/sca-prefixed"
 
 
 def test_add_local_skips_virtualenvs_and_caches(tmp_path):

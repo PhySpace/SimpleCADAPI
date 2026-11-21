@@ -2,10 +2,12 @@
 
 from importlib.metadata import entry_points
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from simplecadapi.cli import run
+from simplecadapi.addon import shell
 
 
 @pytest.fixture(autouse=True)
@@ -20,6 +22,10 @@ def test_init_group_runs_with_shell_integration(tmp_path, monkeypatch):
     # Pin the shell: the integration targets zsh only when SHELL says so
     # (or ~/.zshenv already exists); CI runners run bash.
     monkeypatch.setenv("SHELL", "/bin/zsh")
+    venv_bin = tmp_path / "venv/bin"
+    venv_bin.mkdir(parents=True)
+    (venv_bin / "sca").touch()
+    monkeypatch.setattr(shell, "sys", SimpleNamespace(platform="darwin", executable=str(venv_bin / "python")))
     report, code, printer = run(["init"])
     assert code == 0
     assert Path(report["home"]) == tmp_path / ".sca" / "addons"
@@ -36,7 +42,7 @@ def test_init_no_shell_writes_no_shim(tmp_path):
 
 
 def test_addon_group_dispatches(tmp_path):
-    run(["init"])
+    run(["init", "--no-shell"])
     report, code, _ = run(["addon", "list"])
     assert code == 0
     assert report["addons"] == []

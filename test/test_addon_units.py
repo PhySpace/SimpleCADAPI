@@ -418,18 +418,17 @@ def test_command_prefix_rejects_unknown_placeholder(tmp_path):
     assert "{addon_dir}" in str(err.value)
 
 
-def test_effective_command_joins_prefix_and_substitutes_both_dirs():
+def test_effective_command_joins_prefix_and_substitutes_both_dirs(tmp_path):
     from simplecadapi.addon.install import effective_command
 
     prefix = 'PATH="{addon_dir}/.venv/bin:$PATH" SCA_RUNTIME_DIR="{runtime_dir}"'
-    effective = effective_command(
-        prefix, Path("/addons/demo"), Path("/sca/runtimes/demo"), "python -V"
-    )
+    addon, runtime = tmp_path / "addons/demo", tmp_path / "sca/runtimes/demo"
+    effective = effective_command(prefix, addon, runtime, "python -V")
     assert effective == (
-        'PATH="/addons/demo/.venv/bin:$PATH" '
-        'SCA_RUNTIME_DIR="/sca/runtimes/demo" python -V'
+        f'PATH="{addon}/.venv/bin:$PATH" '
+        f'SCA_RUNTIME_DIR="{runtime}" python -V'
     )
     assert (
-        effective_command("", Path("/addons/demo"), Path("/sca/runtimes/demo"), "python -V")
+        effective_command("", addon, runtime, "python -V")
         == "python -V"
     )
