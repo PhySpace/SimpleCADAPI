@@ -1,0 +1,8 @@
+# Geometry throughput (2026-11-22)
+
+Owner request: branch from latest dev, retain tolerances and behavior, measure actual BLDC and standard parts, use the new kernel without replacing the reference installation. Base: fetched `origin/dev` at `389d4306`.
+
+1. Keep raw batch timings and cold model construction separate from a profiler trace. Copy example inputs only to an empty folder, run the notebook and capture the validated package. Use every part definition's geometry interface hash and tolerance profile, plus assembly counts, as A/B controls. Do not infer universal speedup from a subset of operations.
+2. Profile of the unmodified BLDC found 38,366 label calls, 29.09 s cumulative, and repeated integration of mass/centroid, plus 53.17 s in package validation under cProfile. Fuse the *measurement*, not the CAD bodies: use the same OCCT quadratures and degenerate-center fallback; reuse the body label. Use the existing native JCS encoder on parsed builtin JSON and retain the original fallback.
+3. Extract the connected components of sketch edges with one endpoint index. Preserve edge order and component order; do not use distances or change the solver. Avoid copying witness trees for read-only traversals and avoid traversing topology kinds absent from the delta.
+4. Use the new prefix as a separately selected development installation. Shared Windows builds need DLL resolution before native import; `SCAD_OCCT_PREFIX` also selects that runtime in subprocesses. Preserve the stock build as a detached reference. Existing Windows portability failures must be distinguished from numerical regressions, never removed by broadening numeric tolerances.
