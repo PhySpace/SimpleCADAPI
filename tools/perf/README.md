@@ -51,7 +51,7 @@ $env:SCAD_GOLDEN_STRICT='1'
 
 `C:/OCCT-modified` 另有动态库。新补面 / Y 圆角由显式 C++ 入口调用；性能分支保留原有操作的几何策略。Windows wheel 使用静态子前缀，运行时只依赖 Python 与系统 DLL。
 
-本机已构建包：`out/perf/wheel/simplecadapi-2.3.0.post1-cp310-cp310-win_amd64.whl`。SHA-256 `f5d1c6dca432a6157965e3ce657032f6886ff3db61547c1f95e39d9ca6f64e71`；其 `_native.pyd` 的 SHA-256 为 `368b5391d7ba392df5161a755a298bc201911a969a860e79f402d26793a8ecde`。
+本机已构建包：`out/perf/wheel/simplecadapi-2.3.0.post1-cp310-cp310-win_amd64.whl`。包含 Windows 长路径缓存修复的交付包 SHA-256 为 `01d7f34865086173fb02a5b8997d6a35629d20c84fc13d446b54a5a634d19db0`，`_native.pyd` 为 `b4a542cd0b978db5302d4e2dbc2eeb801cefb007f9f3b5b6588ffa188caa6b20`。计时批次的前一版 `.pyd` 为 `368b5391d7ba392df5161a755a298bc201911a969a860e79f402d26793a8ecde`；两个 PE 的 `.text`（`b4363bcf6c55b59e3412634ead7b100368314799c5a64db7035df34dc2b27598`）、`.data`、`.rdata`、导入表和重定位节均逐字节一致。
 
 ## 测试结果
 
