@@ -91,8 +91,16 @@ def state_dir(config: NotebookConfig) -> Path:
     """
 
     # The native backend pickles other classes: its entries live apart from the ocp backend's.
-    root = "simplecad-native"
-    return notebook_output_dir(config.path) / root / config.path.name / config.id
+    directory = notebook_output_dir(config.path) / "simplecad-native" / config.path.name / config.id
+    if os.name == "nt":
+        # The state directory itself can fit in MAX_PATH while a cell's
+        # manifest, value or lineage record beneath it does not. Address the
+        # same directory through the extended-length namespace for all I/O.
+        path = os.path.abspath(directory)
+        if not path.startswith(("\\\\?\\", "\\\\.\\")):
+            path = "\\\\?\\UNC\\" + path[2:] if path.startswith("\\\\") else "\\\\?\\" + path
+        return Path(path)
+    return directory
 
 
 _held: set[str] = set()
