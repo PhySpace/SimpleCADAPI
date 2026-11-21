@@ -36,7 +36,7 @@ TEST_CASE("bolt with a modeled thread: default hex bolt") {
   // The topology of a modeled thread depends on the platform's OCCT build: the 2.2.6.post2 SDK (OCP) gives 54 faces /
   // 116 edges on macOS arm64 and 56 / 117 on Linux x86-64 (volume equal to 1e-8), and so does this engine on each.
   // Each platform is held to the value 2.2.6 gives there; a platform not measured is held to the macOS one.
-#if defined(__linux__) && defined(__x86_64__)
+#if (defined(__linux__) || defined(__MINGW64__)) && defined(__x86_64__)
   CHECK(bolt.faces().size() == 56);
   CHECK(bolt.edges().size() == 117);
 #else

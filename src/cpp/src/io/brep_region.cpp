@@ -943,7 +943,7 @@ std::string checked_region_path(std::string_view path, bool for_graph) {
   const fs::path source = path_from_utf8(path);
   if (path_to_utf8(source.filename()).find(':') != std::string::npos)
     throw ValueError(".scadbrep filenames must not contain ':'");
-  if (for_graph && source.is_absolute())
+  if (for_graph && source.has_root_directory())
     throw ValueError(
         "GraphSession requires a relative .scadbrep path so model JSON does not record machine-specific absolute "
         "paths");

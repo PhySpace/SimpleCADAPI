@@ -70,11 +70,12 @@ def test_failures(artifacts):
             "shell_as_solid": failure(lambda: scad.load_brep_region_rsolid(sidecar(TOP, "top.scadbrep"), TOP_SHA)),
             "solid_as_shell": failure(lambda: scad.load_brep_region_rshell(good, BOX_SHA)),
             "extension": failure(lambda: scad.load_brep_region_rsolid(sidecar(BOX, "region.step"), BOX_SHA)),
-            "colon": failure(lambda: scad.load_brep_region_rsolid(sidecar(BOX, "a:b.scadbrep"), BOX_SHA)),
+            "colon": failure(lambda: scad.load_brep_region_rsolid(folder + "/bad:name.scadbrep", BOX_SHA)),
             "bad_prefix": failure(lambda: scad.load_brep_region_rsolid(good, BOX_SHA, tag_prefix="Bad Prefix")),
         }
         missing = failure(lambda: scad.load_brep_region_rsolid(os.path.join(folder, "none.scadbrep"), BOX_SHA))
-        result["missing"] = json.loads(json.dumps(missing).replace(folder, "<dir>"))
+        missing["what_happened"] = missing["what_happened"].replace(os.path.join(folder, "none.scadbrep"), "<dir>/none.scadbrep")
+        result["missing"] = missing
     """)
 
 

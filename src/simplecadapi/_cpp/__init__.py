@@ -3,6 +3,14 @@
 The public names mirror ``simplecadapi``; see PORTING_STATUS.md for what exists.
 """
 
+import os as _os
+
+# A development prefix can be shared OCCT; Windows deliberately ignores PATH when
+# resolving extension dependencies. Keep this handle alive for delayed toolkit loads.
+_prefix = _os.environ.get("SCAD_OCCT_PREFIX")
+if _os.name == "nt" and _prefix and _os.path.isdir(_bin := _os.path.join(_prefix, "bin")):
+    _occt_dll_directory = _os.add_dll_directory(_os.path.abspath(_bin))
+
 from . import errors
 from .errors import SimpleCADError
 from ._native import *  # noqa: F401,F403
