@@ -56,3 +56,5 @@ $env:SCAD_GOLDEN_STRICT='1'
 ## 测试结果
 
 静态 wheel 默认 `pytest test tests` 为 **2762 passed、126 skipped、0 failed**。`SCAD_GOLDEN_STRICT=1` 的绑定对照为 **558 passed、1 skipped、0 failed**；C++ Release CTest 为 **14/14**。额外把本机 `D:/Application/FreeCAD/bin` 加入 PATH，整个 FreeCAD 翻译测试为 **107 passed、0 skipped**。跳过数按各自运行记录列示（例如外部工具、参考解释器或单独启用的慢测试）。JUnit 汇总及文件摘要见 [verification.json](results/verification.json)。
+
+重打交付 wheel 后，在同一次全套 `pytest test tests` 中同时启用 `SCA_EDITOR_E2E=1`、`SIMPLECADAPI_RUN_SLOW_SCENE_EXAMPLES=1` 和 FreeCAD，结果为 **2830 passed、58 skipped、0 failed**。其中包含真实编辑器启动、预览、局部重算、中断恢复，以及液压缸、两级行星减速器、BLDC 三个大型装配。
