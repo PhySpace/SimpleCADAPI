@@ -88,6 +88,29 @@ double volume_estimate(const TopoDS_Shape& shape) {
   });
 }
 
+std::pair<double, Vec3> mass_and_center(const TopoDS_Shape& shape) {
+  return occt_guard([&] {
+    GProp_GProps props;
+    switch (shape.ShapeType()) {
+      case TopAbs_SOLID:
+        BRepGProp::VolumePropertiesGK(shape, props, tol::kVolumeIntegration, true, true);
+        break;
+      case TopAbs_FACE:
+        BRepGProp::SurfaceProperties(shape, props);
+        break;
+      case TopAbs_EDGE:
+        BRepGProp::LinearProperties(shape, props);
+        break;
+      default:
+        throw ValueError("mass_and_center needs a solid, face or edge");
+    }
+    Vec3 center;
+    if (!mass_point(props, center))
+      center = bounding_box(shape).center();
+    return std::make_pair(props.Mass(), center);
+  });
+}
+
 BoundingBox bounding_box(const TopoDS_Shape& shape) {
   return occt_guard([&] {
     Bnd_Box box;

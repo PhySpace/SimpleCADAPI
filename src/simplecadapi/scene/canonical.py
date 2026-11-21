@@ -104,7 +104,13 @@ def parse_canonical_json(data: bytes | bytearray | memoryview | str) -> Any:
     else:
         raw = bytes(data)
     value = parse_strict_json(raw, _jcs_numbers=True)
-    canonical = canonical_json_bytes(value)
+    # Parsed trees contain only builtin JSON values. Reuse the same RFC 8785
+    # encoder used to write artifacts, retaining the Python error path outside its domain.
+    from simplecadapi._cpp import canonical_bytes as native_bytes
+
+    canonical = native_bytes(value)
+    if canonical is None:
+        canonical = canonical_json_bytes(value)
     if raw != canonical:
         raise ValueError("JSON bytes are not RFC 8785 canonical")
     return value

@@ -128,27 +128,29 @@ def _bounds(handle: Any, tolerance: float, cache: Dict[Any, Tuple[float, ...]] |
 
 def _label(kind: str, handle: Any, tolerance: float, cache: Dict[Any, Tuple[float, ...]] | None = None) -> Tuple[Any, ...]:
     q, qvec = _q, _qvec
+    if kind in ("body", "face", "edge"):
+        mass, center = handle._mass_and_center()
     if kind == "body":
-        return ("body", q(handle.get_volume(), tolerance), qvec(_vec(handle.get_center()), tolerance), _bounds(handle, tolerance, cache))
+        return ("body", q(mass, tolerance), qvec(center, tolerance), _bounds(handle, tolerance, cache))
     if kind == "face":
         return (
             "face",
             handle._geom_type(),
-            q(handle.get_area(), tolerance),
-            qvec(_vec(handle.get_center()), tolerance),
+            q(mass, tolerance),
+            qvec(center, tolerance),
             qvec(_vec(handle.get_normal_at()), tolerance),
             _bounds(handle, tolerance, cache),
         )
     if kind == "edge":
         ends = sorted(
-            qvec(_vec(v.get_coordinates()) if not isinstance(v.get_coordinates(), tuple) else v.get_coordinates(), tolerance)
-            for v in handle._iter_vertices()
+            qvec(xyz if isinstance(xyz, tuple) else _vec(xyz), tolerance)
+            for xyz in (v.get_coordinates() for v in handle._iter_vertices())
         )
         return (
             "edge",
             handle._geom_type(),
-            q(handle.get_length(), tolerance),
-            qvec(_vec(handle.get_center()), tolerance),
+            q(mass, tolerance),
+            qvec(center, tolerance),
             _bounds(handle, tolerance, cache),
             tuple(ends),
         )
@@ -205,7 +207,9 @@ def geometry_interface_descriptor(solid: Any, *, tolerance_profile: str = "simpl
 
     body = ("body", solid.topo_id)
     add(body, "body", solid)
-    for face in solid._iter_faces():
+    unique_edges = {}
+    faces = solid._iter_faces()
+    for face in faces:
         face_key = ("face", face.topo_id)
         add(face_key, "face", face)
         link(body, face_key)
@@ -213,17 +217,12 @@ def geometry_interface_descriptor(solid: Any, *, tolerance_profile: str = "simpl
             edge_key = ("edge", edge.topo_id)
             add(edge_key, "edge", edge)
             link(face_key, edge_key)
-    for key in [key for key in nodes if key[0] == "edge"]:
-        pass
-    seen_edges = {key[1] for key in nodes if key[0] == "edge"}
-    for face in solid._iter_faces():
-        for edge in face._iter_edges():
-            if ("edge", edge.topo_id) in adjacency and edge.topo_id in seen_edges:
-                seen_edges.discard(edge.topo_id)
-                for vertex in edge._iter_vertices():
-                    vertex_key = ("vertex", vertex.topo_id)
-                    add(vertex_key, "vertex", vertex)
-                    link(("edge", edge.topo_id), vertex_key)
+            unique_edges.setdefault(edge_key, edge)
+    for edge_key, edge in unique_edges.items():
+        for vertex in edge._iter_vertices():
+            vertex_key = ("vertex", vertex.topo_id)
+            add(vertex_key, "vertex", vertex)
+            link(edge_key, vertex_key)
 
     refined: Dict[Tuple[str, str], str] = {
         key: _hash({"kind": value["kind"], "geometry": value["label"]}) for key, value in nodes.items()
@@ -255,7 +254,8 @@ def geometry_interface_descriptor(solid: Any, *, tolerance_profile: str = "simpl
     ]
     records.sort(key=canonical_bytes)
     counts = Counter(value["kind"] for value in nodes.values())
-    area = sum(float(face.get_area()) for face in solid._iter_faces())
+    area = sum(float(face.get_area()) for face in faces)
+    _, volume, center, bounds = nodes[body]["label"]
     return _json_safe(
         {
             "profile": _GEOMETRY_INTERFACE_PROFILE,
@@ -265,10 +265,10 @@ def geometry_interface_descriptor(solid: Any, *, tolerance_profile: str = "simpl
             "face_count": counts["face"],
             "edge_count": counts["edge"],
             "vertex_count": counts["vertex"],
-            "bounds": _bounds(solid, tolerance, cache),
-            "volume": _q(solid.get_volume(), tolerance),
+            "bounds": bounds,
+            "volume": volume,
             "surface_area": _q(area, tolerance),
-            "centroid": _qvec(_vec(solid.get_center()), tolerance),
+            "centroid": center,
             "nodes": records,
         }
     )
