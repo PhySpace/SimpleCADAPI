@@ -498,13 +498,19 @@ void write_depth_and_ids(const BandInputs& in, int y0, int y1, const std::vector
   }
 }
 
+// Reused across bands by one worker, destroyed before that worker exits. In particular,
+// these vectors must not depend on DLL thread-local destructors during MinGW thread teardown.
+struct BandScratch {
+  std::vector<float> depth, bw1, bw2;
+  std::vector<std::uint32_t> id;
+};
+
 // Renders one band of rows: background, opaque visibility + deferred shading, ink, translucent blend.
-void render_band(const BandInputs& in, int band) {
+void render_band(const BandInputs& in, int band, BandScratch& scratch) {
   const PanelGeom& g = in.g;
   const int pw = g.pw;
   const int y0 = band * g.band_h, y1 = std::min(g.ph, y0 + g.band_h), rows = y1 - y0;
-  thread_local std::vector<float> depth, bw1, bw2;
-  thread_local std::vector<std::uint32_t> id;
+  auto& [depth, bw1, bw2, id] = scratch;
   const std::size_t count = static_cast<std::size_t>(rows) * static_cast<std::size_t>(pw);
   depth.assign(count, kInf);
   id.assign(count, kNone);
@@ -667,7 +673,8 @@ void draw_panel(const Scene& scene, const PanelParams& P, const Target& T,
 
   const BandInputs in{P,        T,   g,     lighting, views, opaque, translucent, segs, opaque_bins, translucent_bins,
                       seg_bins, top, bottom};
-  parallel_for(g.bands, P.threads, [&](int band) { render_band(in, band); });
+  parallel_for(g.bands, P.threads,
+               [&in, scratch = BandScratch{}](int band) mutable { render_band(in, band, scratch); });
 
   if (P.show_axes)
     draw_corner_axes(P, T, g, axes_tips);
