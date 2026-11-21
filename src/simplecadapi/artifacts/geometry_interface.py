@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 from collections import Counter, OrderedDict
+from contextvars import ContextVar
+from functools import wraps
 from typing import Any, Dict, List, Tuple
 
 import simplecadapi._cpp as _n
@@ -126,7 +128,35 @@ def _bounds(handle: Any, tolerance: float, cache: Dict[Any, Tuple[float, ...]] |
     return tuple(_q(v, _BOUNDS_QUANTUM) for v in _raw_bounds(handle, cache))
 
 
+_labels: ContextVar[dict | None] = ContextVar("shape_measurements", default=None)
+
+
+def shared_measurements(fn):
+    """One snapshot traversal, including both its body hash and its entity hashes."""
+    @wraps(fn)
+    def measured(*args, **kwargs):
+        token = _labels.set({})
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            _labels.reset(token)
+    return measured
+
+
 def _label(kind: str, handle: Any, tolerance: float, cache: Dict[Any, Tuple[float, ...]] | None = None) -> Tuple[Any, ...]:
+    labels = _labels.get()
+    if labels is None:
+        return _measure_label(kind, handle, tolerance, cache)
+    # topo_id is registry-local. _shape_key includes orientation and the complete
+    # location; retain the handle so an address cannot be recycled in this scope.
+    key = (kind, tolerance, handle._shape_key())
+    hit = labels.get(key)
+    if hit is None:
+        hit = labels[key] = (handle, _measure_label(kind, handle, tolerance, cache))
+    return hit[1]
+
+
+def _measure_label(kind: str, handle: Any, tolerance: float, cache: Dict[Any, Tuple[float, ...]] | None = None) -> Tuple[Any, ...]:
     q, qvec = _q, _qvec
     if kind in ("body", "face", "edge"):
         mass, center = handle._mass_and_center()
