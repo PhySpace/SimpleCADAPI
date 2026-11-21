@@ -1,5 +1,6 @@
 """Review reproductions cross the two isolated kernel environments end to end."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -14,7 +15,7 @@ from b3ftc._validate_worker import run
 
 
 def capture(source):
-    python = ROOT.parent / ".venv/bin/python"
+    python = Path(os.environ.get("SCAD_BUILD123D_PYTHON", ROOT.parent / ".venv/bin/python"))
     if not python.is_file():
         pytest.skip("isolated build123d environment is unavailable")
     worker = "import json,sys; sys.path.insert(0,'tools/research/build123dftc'); from b3ftc.tracer import trace_source; print(json.dumps(trace_source(sys.stdin.read())))"
