@@ -37,7 +37,15 @@ def main():
         print(f"| {field} | {a:.3f} | {b:.3f} | {a/b:.3f} |")
     print("\n| Factory (ms) | dev | optimized | dev/optimized |")
     print("|---|---:|---:|---:|")
-    ref, mod = data("ab-dev", "operators"), data("ab-final", "operators")
+    ref, mod = (
+        [
+            json.loads((ROOT / "results" / f"operators-{label}-{n}.json").read_text())[
+                "data"
+            ]
+            for n in (1, 2)
+        ]
+        for label in ("dev", "final")
+    )
     for field in ref[0]:
         a, b = (median(median(x[field]) for x in group) for group in (ref, mod))
         print(f"| {field} | {a:.4f} | {b:.4f} | {a/b:.3f} |")

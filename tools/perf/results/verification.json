@@ -40,5 +40,12 @@
     "failures": 0,
     "skipped": 0,
     "junit_sha256": "8108505d87729f2325d23f91bd26743b6636a0494f43ef1db6f1c5ee5504ec51"
+  },
+  "build123d": {
+    "tests": 17,
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0,
+    "junit_sha256": "79fe574d20556677880ff1f3999671a84de7896c96d46920c83a9b7df3778f95"
   }
 }
