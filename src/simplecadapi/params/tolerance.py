@@ -1423,6 +1423,10 @@ def analyze_tolerance(
         ) from exc
     if not math.isfinite(nominal):
         raise ToleranceAnalysisError("Expression nominal value must be finite")
+    if not interval.varies and interval.lower == interval.upper:
+        # A point has no input uncertainty. Native and Python libm can use different
+        # argument reductions at huge angles; that difference is not a tolerance.
+        interval = _Interval(nominal, nominal, varies=False)
     interval = _Interval(
         min(interval.lower, nominal), max(interval.upper, nominal)
     )

@@ -196,7 +196,7 @@ def _files(directory: Path) -> dict[str, bytes]:
     if not directory.is_dir():
         return {}
     return {
-        path.relative_to(directory).as_posix(): path.read_bytes()
+        path.relative_to(directory).as_posix(): path.read_bytes().replace(b"\r\n", b"\n")
         for path in sorted(directory.rglob("*"))
         if path.is_file() and path.suffix != ".pyc" and "__pycache__" not in path.parts
     }
