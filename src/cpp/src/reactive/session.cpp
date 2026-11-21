@@ -188,6 +188,10 @@ template <class Make>
 void index_entities(RefIndex& index, const Shape& root, const std::set<std::pair<Kind, std::string>>& wanted,
                     const Make& make, bool strict, bool overwrite = false) {
   for (const Kind kind : {Kind::Vertex, Kind::Edge, Kind::Wire, Kind::Face, Kind::Shell, Kind::Solid, Kind::Compound}) {
+    // Do not traverse unrequested topology (most deltas name only faces and edges).
+    const auto first = wanted.lower_bound({kind, {}});
+    if (first == wanted.end() || first->first != kind)
+      continue;
     TopTools_IndexedMapOfShape map;
     TopExp::MapShapes(root.wrapped(), topabs(kind), map);
     for (int i = 1; i <= map.Extent(); ++i) {
