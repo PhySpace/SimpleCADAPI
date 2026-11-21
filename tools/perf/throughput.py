@@ -29,13 +29,15 @@ def notebook():
         capture(run.definition, path, include_scene=False)
         elapsed = time.perf_counter() - start
         checks = {}
+        bodies = {}
         with zipfile.ZipFile(path) as archive:
             for name in archive.namelist():
                 if name.startswith("definitions/part/"):
                     d = json.loads(archive.read(name))
                     checks[d["definition_id"]] = [d["interface_hashes"]["geometry"], d["tolerance_profile"]]
+                    bodies[d["definition_id"]] = d["solid_cache"]["body_ref"]["sha256"]
         return dict(build_s=built-start, capture_s=elapsed-(built-start), total_s=elapsed,
-                    parts=checks, components=len(run.product.component_ids()), constraints=len(run.product.constraint_ids()),
+                    parts=checks, brep_sha256=bodies, components=len(run.product.component_ids()), constraints=len(run.product.constraint_ids()),
                     root_cells=dict(Counter(cell.status for cell in run.cells)))
 
 
@@ -55,6 +57,11 @@ def operators():
         'helical': (1, lambda: s.std.gear.make_helical_gear_rsolid(12,2.0,helix_angle=25,gear_height=8)),
         'herringbone': (1, lambda: s.std.gear.make_herringbone_gear_rsolid(12,2.0,helix_angle=25,gear_height=10)),
         'ring': (1, lambda: s.std.gear.make_spur_ring_gear_rsolid(20,2.0,gear_height=5,rim_thickness=4)),
+        'ring_helical': (1, lambda: s.std.gear.make_helical_ring_gear_rsolid(20,2.,helix_angle=20.,gear_height=8.)),
+        'ring_herringbone': (1, lambda: s.std.gear.make_herringbone_ring_gear_rsolid(20,2.,helix_angle=20.,gear_height=10.)),
+        'rack': (1, lambda: s.std.gear.make_spur_rack_rsolid(module=2.,n_teeth=10)),
+        'rack_helical': (1, lambda: s.std.gear.make_helical_rack_rsolid(module=2.,n_teeth=10)),
+        'rack_herringbone': (1, lambda: s.std.gear.make_herringbone_rack_rsolid(module=2.,n_teeth=10)),
         'bevel': (1, lambda: s.std.gear.make_straight_bevel_gear_rsolid(18,4.0,45.0,20.,18.)),
         'cycloidal': (1, lambda: s.std.gear.make_cycloidal_disc_rsolid(8,15.,1.2,.7,4.)),
     }

@@ -91,6 +91,7 @@ sandbox-envs/
 design-docs/
 
 # local, not part of the SDK
+/out/
 examples/workspace/
 phase2-contract-review.md
 
