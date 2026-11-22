@@ -34,11 +34,39 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/occt
-          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py') }}
+          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py', 'src/cpp/tools/occt_patches.py', 'src/cpp/patches/occt/**', 'src/cpp/cmake/ScadOcct.cmake') }}
+
+      - name: Install compiler cache on a kernel-prefix miss
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: sudo apt-get update -qq && sudo apt-get install -y ccache
+
+      - name: Reuse individual OCCT translation units
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.cache/scad-occt-ccache
+          key: occt-objects-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/cpp/tools/build_occt.py', 'src/cpp/tools/occt_patches.py', 'src/cpp/patches/occt/**', 'src/cpp/cmake/ScadOcct.cmake') }}
+          restore-keys: occt-objects-v1-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Build OpenCASCADE
         if: steps.cache.outputs.cache-hit != 'true'
-        run: python3 src/cpp/tools/build_occt.py --prefix "$HOME/occt"
+        env:
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
+          CCACHE_COMPILERCHECK: content
+          CCACHE_MAXSIZE: 2G
+        run: |
+          export CCACHE_DIR="$HOME/.cache/scad-occt-ccache"
+          export CCACHE_BASEDIR="$RUNNER_TEMP/scad-occt"
+          ccache --zero-stats
+          python3 src/cpp/tools/build_occt.py --prefix "$HOME/occt" --work "$CCACHE_BASEDIR"
+          ccache --show-stats
+
+      - name: Link the installed kernel and exercise native surface operators
+        run: |
+          cmake -S src/cpp/tools/occt-smoke -B build/kernel-check -G Ninja -DCMAKE_BUILD_TYPE=Release -DOpenCASCADE_DIR="$HOME/occt/lib/cmake/opencascade"
+          cmake --build build/kernel-check
+          ctest --test-dir build/kernel-check --output-on-failure
 
   format:
     # No OpenCASCADE needed: runs in seconds, ahead of the heavy jobs.
@@ -82,7 +110,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/occt
-          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py') }}
+          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py', 'src/cpp/tools/occt_patches.py', 'src/cpp/patches/occt/**', 'src/cpp/cmake/ScadOcct.cmake') }}
           fail-on-cache-miss: true
 
       - name: Configure
@@ -112,7 +140,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/occt
-          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py') }}
+          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py', 'src/cpp/tools/occt_patches.py', 'src/cpp/patches/occt/**', 'src/cpp/cmake/ScadOcct.cmake') }}
           fail-on-cache-miss: true
 
       - name: Configure
@@ -151,7 +179,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/occt
-          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py') }}
+          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py', 'src/cpp/tools/occt_patches.py', 'src/cpp/patches/occt/**', 'src/cpp/cmake/ScadOcct.cmake') }}
           fail-on-cache-miss: true
 
       - name: Install clang-tidy
@@ -203,7 +231,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/occt
-          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py') }}
+          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py', 'src/cpp/tools/occt_patches.py', 'src/cpp/patches/occt/**', 'src/cpp/cmake/ScadOcct.cmake') }}
           fail-on-cache-miss: true
 
       - name: Install locked dependencies and build the C++ module
@@ -259,7 +287,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/occt
-          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py') }}
+          key: occt-ci-linux-${{ hashFiles('src/cpp/tools/build_occt.py', 'src/cpp/tools/occt_patches.py', 'src/cpp/patches/occt/**', 'src/cpp/cmake/ScadOcct.cmake') }}
           fail-on-cache-miss: true
 
       - name: Install locked dependencies and build the C++ module

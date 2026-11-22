@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cstdint>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "scad/render/render.hpp"
@@ -12,8 +13,9 @@ namespace scad::render::detail {
 
 // Runs f(i) for i in [0, n) on `threads` workers, items handed out dynamically.  f must only touch
 // state private to item i (or disjoint output), which is what makes results independent of `threads`.
+// Each worker owns its callable: captures by value can be used for worker-lifetime scratch.
 template <class F>
-void parallel_for(int n, int threads, F&& f) {
+void parallel_for(int n, int threads, F f) {
   if (n <= 0)
     return;
   threads = std::max(1, std::min(threads, n));
@@ -23,9 +25,9 @@ void parallel_for(int n, int threads, F&& f) {
     return;
   }
   std::atomic<int> next{0};
-  auto worker = [&] {
+  auto worker = [&next, n, task = std::move(f)]() mutable {
     for (int i = next.fetch_add(1); i < n; i = next.fetch_add(1))
-      f(i);
+      task(i);
   };
   std::vector<std::thread> pool;
   pool.reserve(static_cast<std::size_t>(threads - 1));

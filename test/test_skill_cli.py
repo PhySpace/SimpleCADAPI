@@ -66,7 +66,7 @@ def test_install_default_location_without_init(project, tmp_path):
 def test_install_location_precedence(project, tmp_path, monkeypatch):
     home = tmp_path / "home/.sca"
     home.mkdir(parents=True)
-    (home / "config.toml").write_text(f'skills_dir="{tmp_path / "configured"}"\n')
+    (home / "config.toml").write_text(f'skills_dir="{(tmp_path / "configured").as_posix()}"\n')
     report, _, _ = run(install_args())
     assert Path(report["output"]) == tmp_path / "configured/demo"
     monkeypatch.setenv("SCA_SKILLS_DIR", str(tmp_path / "env"))

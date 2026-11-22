@@ -5356,7 +5356,7 @@ with open(OUT_PATH, 'w', encoding='utf-8') as fh:
         def fake_exists(path: str) -> bool:
             return path in {
                 "/Applications/FreeCAD.app/Contents/Resources/bin/freecadcmd",
-                "/tmp/out.FCStd",
+                os.path.abspath("/tmp/out.FCStd"),
             }
 
         with (

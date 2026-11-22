@@ -21,6 +21,9 @@ SketchPoint2 xy_of(const Sketch& s, const std::string& id) {
   return {point.number("x"), point.number("y")};
 }
 
+#ifdef near
+#undef near  // legacy Windows SDK memory-model macro
+#endif
 bool near(const SketchPoint2& p, double x, double y) {
   return std::hypot(p.first - x, p.second - y) < 1e-6;
 }

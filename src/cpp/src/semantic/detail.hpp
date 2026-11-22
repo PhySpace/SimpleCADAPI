@@ -19,6 +19,7 @@ namespace scad::detail {
 // {"a": 1, "b": "x"} in insertion order.
 inline Value object(std::initializer_list<std::pair<std::string, Value>> members) {
   Value out = Value::object();
+  out.as_object().reserve(members.size());
   for (const auto& [key, value] : members)
     out.set(key, value);
   return out;

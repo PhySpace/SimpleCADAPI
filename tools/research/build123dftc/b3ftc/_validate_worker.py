@@ -198,11 +198,11 @@ def _returned_shapes(value, placement=None):
                 for shape in _returned_shapes(component.item, parent.compose(component.placement))]
     if isinstance(value, Solid):
         if placement is None or placement == identity_placement():
-            return [value.wrapped]
+            return [value._native_wrapped]
         x, y, z, o = placement.x_axis, placement.y_axis, placement.z_axis, placement.origin
         transform = gp_Trsf()
         transform.SetValues(x[0], y[0], z[0], o[0], x[1], y[1], z[1], o[1], x[2], y[2], z[2], o[2])
-        return [BRepBuilderAPI_Transform(value.wrapped, transform, True).Shape()]
+        return [BRepBuilderAPI_Transform(value._native_wrapped, transform, True).Shape()]
     raise ValueError("build() must return an actual Solid, Part or Assembly build result")
 
 
@@ -229,8 +229,10 @@ def run(ftc_path, staging_dir, reference_step=None, export_step=None, export_opt
     if not isinstance(bodies, (list, tuple)) or not bodies:
         return {"status": "ok", "body_count": 0, "solid_count": 0,
                 "is_valid": False, "volume": None, "bbox": None}
-    for index, body in enumerate(bodies):
-        wrapped = getattr(body, "wrapped", None)
+    # .wrapped may be an independent OCP copy; validation uses the SDK's
+    # own OCCT for identity, placement, and all numeric comparisons.
+    body_shapes = [getattr(body, "_native_wrapped", None) for body in bodies]
+    for index, wrapped in enumerate(body_shapes):
         if not isinstance(wrapped, TopoDS_Shape) or wrapped.IsNull():
             raise ValueError(f"BODIES[{index}] is not actual nonempty CAD topology")
         if _solid_count(wrapped) < 1:
@@ -240,9 +242,9 @@ def run(ftc_path, staging_dir, reference_step=None, export_step=None, export_opt
         raise ValueError("build() result body count does not match BODIES")
     if any(shape.IsNull() or not _solid_count(shape) for shape in shapes):
         raise ValueError("build() returned empty CAD topology")
-    if not all(body.wrapped.IsSame(shape) for body, shape in zip(bodies, shapes)):
+    if not all(body.IsSame(shape) for body, shape in zip(body_shapes, shapes)):
         from simplecadapi.kernel.ocp_export import make_compound_always
-        consistency = _compare_shapes(shapes, make_compound_always([body.wrapped for body in bodies]))
+        consistency = _compare_shapes(shapes, make_compound_always(body_shapes))
         if (consistency["reference_status"] != "ok" or
                 consistency["symmetric_difference_volume"] > max(1e-7, abs(consistency["reference_volume"]) * 1e-7)):
             raise ValueError("BODIES geometry does not match the actual build() result")

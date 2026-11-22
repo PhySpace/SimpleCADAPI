@@ -93,12 +93,19 @@ void unify_result(BooleanResult& result) {
   try {
     ShapeUpgrade_UnifySameDomain unifier(result.shape, /*UnifyEdges=*/true, /*UnifyFaces=*/true,
                                          /*ConcatBSplines=*/true);
+    if (result.history.IsNull())
+      unifier.History().Nullify();
     unifier.Build();
     const TopoDS_Shape cleaned = unifier.Shape();
-    if (cleaned.IsNull() || solids_of(cleaned).size() != solids_of(result.shape).size())
+    if (cleaned.IsNull())
       return;
-    if (!is_valid_shape(cleaned) && is_valid_shape(result.shape))
-      return;
+    // IsEqual includes TShape, location and orientation. Comparing a shape with itself cannot reject a clean-up.
+    if (!cleaned.IsEqual(result.shape)) {
+      if (solids_of(cleaned).size() != solids_of(result.shape).size())
+        return;
+      if (!is_valid_shape(cleaned) && is_valid_shape(result.shape))
+        return;
+    }
     if (!result.history.IsNull()) {
       const opencascade::handle<BRepTools_History> clean_history = unifier.History();
       result.history->Merge(clean_history);
@@ -153,6 +160,7 @@ TopoDS_Shape clean_shape(const TopoDS_Shape& shape) {
   return occt_guard([&] {
     ShapeUpgrade_UnifySameDomain unifier(shape, /*UnifyEdges=*/true, /*UnifyFaces=*/true,
                                          /*ConcatBSplines=*/true);
+    unifier.History().Nullify();  // Only the shape escapes this helper.
     unifier.Build();
     return unifier.Shape();
   });

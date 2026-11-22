@@ -3,6 +3,8 @@
 import stat
 import sys
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -14,6 +16,7 @@ from simplecadapi.addon.shell import (
     render_cmd_shim,
     render_posix_shim,
 )
+from simplecadapi.addon import shell
 
 
 @pytest.fixture(autouse=True)
@@ -33,17 +36,22 @@ def _fake_install(root: Path, name: str = "venv") -> Path:
 
 
 def _patch_interpreter(monkeypatch, python: Path) -> None:
-    monkeypatch.setattr(sys, "executable", str(python))
+    monkeypatch.setattr(shell, "sys", SimpleNamespace(platform="linux", executable=str(python)))
 
 
 def test_integrate_writes_shim_and_zshenv_for_zsh(tmp_path, monkeypatch):
     _patch_interpreter(monkeypatch, _fake_install(tmp_path))
     monkeypatch.setenv("SHELL", "/bin/zsh")
+    chmod = Path.chmod
+    calls = Mock(side_effect=chmod)
+    monkeypatch.setattr(Path, "chmod", lambda path, mode: calls(path, mode))
 
     report = integrate_shell()
     shim = Path(report["shim"])
     assert shim == tmp_path / ".sca" / "bin" / "sca"
-    assert shim.stat().st_mode & stat.S_IXUSR
+    calls.assert_called_once_with(shim, 0o755)
+    if sys.platform != "win32":  # NTFS does not expose a POSIX execute bit
+        assert shim.stat().st_mode & stat.S_IXUSR
     assert shim.read_text(encoding="utf-8").startswith("#!/bin/sh")
     assert str(tmp_path / "venv" / "bin" / "sca") in shim.read_text(encoding="utf-8")
 
@@ -65,7 +73,7 @@ def test_integrate_is_idempotent_and_refreshes_stale_shim(tmp_path, monkeypatch)
     _patch_interpreter(monkeypatch, _fake_install(tmp_path, "venv-b"))
     integrate_shell()
     shim = Path(first["shim"]).read_text(encoding="utf-8")
-    assert "venv-b/bin/sca" in shim and "venv-a" not in shim
+    assert str(tmp_path / "venv-b/bin/sca") in shim and "venv-a" not in shim
 
 
 def test_bash_users_get_bashrc_and_no_zshenv(tmp_path, monkeypatch):
@@ -123,6 +131,23 @@ def test_cmd_shim_references_target_and_passes_args(tmp_path):
     assert "%*" in text
 
 
+def test_windows_integration_installs_cmd_shim(tmp_path, monkeypatch):
+    scripts = tmp_path / "venv/Scripts"
+    scripts.mkdir(parents=True)
+    target = scripts / "sca.exe"
+    target.touch()
+    monkeypatch.setattr(shell, "sys", SimpleNamespace(platform="win32", executable=str(scripts / "python.exe")))
+    user_path = Mock(return_value={"windows_path": "appended"})
+    monkeypatch.setattr(shell, "_windows_user_path", user_path)
+    report = integrate_shell()
+    shim = tmp_path / ".sca/bin/sca.cmd"
+    assert report["shim"] == str(shim)
+    assert shim.read_bytes() == render_cmd_shim(target).encode("utf-8")
+    user_path.assert_called_once_with(shim.parent)
+    assert report["windows_path"] == "appended"
+    assert report["shell_blocks"] == {}
+
+
 def test_ensure_path_entry_is_idempotent_and_case_insensitive():
     entries, changed = _ensure_path_entry(["C:\\Tools"], "C:\\Users\\x\\.sca\\bin")
     assert changed and entries == ["C:\\Users\\x\\.sca\\bin", "C:\\Tools"]
@@ -136,5 +161,6 @@ def test_console_script_target_stays_inside_the_venv(tmp_path, monkeypatch):
     # stay next to the invoked path, not the resolved one
     venv_bin = tmp_path / "venv" / "bin"
     venv_bin.mkdir(parents=True)
+    _patch_interpreter(monkeypatch, venv_bin / "python3")
     target = console_script_target(venv_bin / "python3")
     assert target == venv_bin / "sca"

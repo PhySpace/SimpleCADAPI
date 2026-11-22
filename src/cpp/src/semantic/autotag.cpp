@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <map>
+#include <ranges>
+#include <span>
 #include <set>
 
 #include "detail.hpp"
@@ -99,17 +101,13 @@ const Value* by_key(const DeltaEntries& entries, std::string_view key) {
 }
 
 // _normalized_witnesses
-std::vector<Value> normalized_witnesses(const Value& entry) {
-  std::vector<Value> out;
+auto normalized_witnesses(const Value& entry) {
+  std::span<const Value> items(&entry, 1);
   const Value* raw = member(entry, "witnesses");
-  if (raw != nullptr && raw->is_array() && raw->size() != 0) {
-    for (const Value& item : raw->as_array())
-      if (item.is_object())
-        out.push_back(item);
-    return out;
-  }
-  out.push_back(entry);
-  return out;
+  const bool list = raw != nullptr && raw->is_array() && raw->size() != 0;
+  if (list)
+    items = raw->as_array();
+  return items | std::views::filter([list](const Value& item) { return !list || item.is_object(); });
 }
 
 // _matching_entry
@@ -119,12 +117,12 @@ std::optional<Value> matching_entry(const DeltaEntries& entries, std::string_vie
     return std::nullopt;
   const std::string expected = kind_token(kind);
   std::vector<Value> witnesses;
-  for (Value& witness : normalized_witnesses(*entry)) {
+  for (const Value& witness : normalized_witnesses(*entry)) {
     const Value* own = member(witness, "kind");
     const Value* fallback = member(*entry, "kind");
     const std::string actual = own != nullptr ? py_str(*own) : (fallback != nullptr ? py_str(*fallback) : expected);
     if (upper(actual) == expected)
-      witnesses.push_back(std::move(witness));
+      witnesses.push_back(witness);
   }
   if (witnesses.empty())
     return std::nullopt;
@@ -639,7 +637,8 @@ void tag_result_edges(Shape& result, const DeltaEntries& entries, const std::str
 
 Shape apply_tracking_tags(Shape result, const TopoDelta& delta, const DeltaEntries& given_entries,
                           const TrackingContext& context) {
-  const DeltaEntries entries = given_entries.empty() ? entries_from_delta(delta) : given_entries;
+  const DeltaEntries fallback = given_entries.empty() ? entries_from_delta(delta) : DeltaEntries{};
+  const DeltaEntries& entries = given_entries.empty() ? fallback : given_entries;
   const std::string& op = context.op;
 
   TopologyIndex source_faces, source_edges;

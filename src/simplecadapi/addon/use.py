@@ -26,8 +26,20 @@ from typing import Any, Sequence
 from . import AddonError
 from .descriptor import load_descriptor
 from .home import ResolvedPaths, require_initialized, runtime_dir_for
-from .install import effective_command
+from .install import _shell_invocation, effective_command
 from .registry import get_record, load_registry
+
+
+def _windows_dispatch(cmd: Sequence[str], env: dict[str, str]) -> str:
+    # Expand argv only *after* cmd has parsed operators, quotes, %VAR% and
+    # newlines. A child cmd enables delayed expansion just for this final
+    # dispatch; the descriptor prelude keeps ordinary cmd /c semantics.
+    env["_SCA_USE_PROGRAM"] = cmd[0]
+    env["_SCA_USE_ARGS"] = subprocess.list2cmdline(cmd[1:])
+    program = "!_SCA_USE_PROGRAM!"
+    if any(c.isspace() for c in cmd[0]):
+        program = f'"{program}"'
+    return f'"%ComSpec%" /d /v:on /s /c "{program} !_SCA_USE_ARGS!"'
 
 
 def use_addon(
@@ -73,18 +85,20 @@ def use_addon(
 
     # Shell-quote each argv element so the joined line re-parses to exactly
     # the requested argv, even for arguments with spaces or shell metachars.
-    effective = effective_command(
-        prefix, addon_dir, runtime_dir,
-        " ".join(shlex.quote(part) for part in cmd),
-    )
     env = dict(os.environ)
     env["SCA_ADDON_DIR"] = str(addon_dir)
     env["SCA_RUNTIME_DIR"] = str(runtime_dir)
-    argv = ["cmd", "/c", effective] if sys.platform == "win32" else ["sh", "-c", effective]
+    windows = sys.platform == "win32"
+    command = subprocess.list2cmdline(cmd) if windows else shlex.join(cmd)
+    effective = effective_command(prefix, addon_dir, runtime_dir, command)
+    dispatch = (
+        effective_command(prefix, addon_dir, runtime_dir, _windows_dispatch(cmd, env))
+        if windows else effective
+    )
     try:
         completed = subprocess.run(
-            argv, env=env, capture_output=capture_output,
-            text=capture_output,
+            _shell_invocation(dispatch), env=env, capture_output=capture_output,
+            text=capture_output, errors="replace" if capture_output else None,
         )
     except FileNotFoundError as exc:
         raise AddonError(f"cannot launch the shell for {effective!r}: {exc}") from exc

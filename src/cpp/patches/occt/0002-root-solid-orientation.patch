@@ -1,0 +1,54 @@
+diff --git a/src/ChFi3d/ChFi3d_Builder_1.cxx b/src/ChFi3d/ChFi3d_Builder_1.cxx
+index ca92eef1..f4e40aa1 100644
+--- a/src/ChFi3d/ChFi3d_Builder_1.cxx
++++ b/src/ChFi3d/ChFi3d_Builder_1.cxx
+@@ -20,6 +20,7 @@
+ #include <Blend_FuncInv.hxx>
+ #include <Blend_RstRstFunction.hxx>
+ #include <BRepBlend_Line.hxx>
++#include <BRep_Builder.hxx>
+ #include <BRepLProp_SLProps.hxx>
+ #include <BRepTopAdaptor_TopolTool.hxx>
+ #include <ChFi3d.hxx>
+@@ -55,6 +56,8 @@
+ #include <TopoDS_Edge.hxx>
+ #include <TopoDS_Face.hxx>
+ #include <TopoDS_Shape.hxx>
++#include <TopoDS_Solid.hxx>
++#include <TopoDS_Iterator.hxx>
+ #include <TopoDS_Vertex.hxx>
+ #include <TopOpeBRepBuild_HBuilder.hxx>
+ #include <TopOpeBRepDS_HDataStructure.hxx>
+@@ -316,11 +319,27 @@ ChFi3d_Builder::ChFi3d_Builder(const TopoDS_Shape& S, const Standard_Real Ta)
+ {
+   myDS   = new TopOpeBRepDS_HDataStructure();
+   myCoup = new TopOpeBRepBuild_HBuilder(mkbuildtool());
+-  myEFMap.Fill(S, TopAbs_EDGE, TopAbs_FACE);
+-  myESoMap.Fill(S, TopAbs_EDGE, TopAbs_SOLID);
+-  myEShMap.Fill(S, TopAbs_EDGE, TopAbs_SHELL);
+-  myVFMap.Fill(S, TopAbs_VERTEX, TopAbs_FACE);
+-  myVEMap.Fill(S, TopAbs_VERTEX, TopAbs_EDGE);
++  // The reconstruction merges material with TopAbs_IN and assumes a forward
++  // solid container. A valid solid may instead carry its orientation at the
++  // root (e.g. BRepLib::OrientClosedSolid after sewing). Distribute that root
++  // orientation to its shells without reversing the material or copying any
++  // geometry. All face/edge TShapes and their cumulative orientations survive.
++  if (S.ShapeType() == TopAbs_SOLID && S.Orientation() == TopAbs_REVERSED)
++  {
++    BRep_Builder aBuilder;
++    TopoDS_Solid aSolid;
++    aBuilder.MakeSolid(aSolid);
++    for (TopoDS_Iterator anIt(S); anIt.More(); anIt.Next())
++    {
++      aBuilder.Add(aSolid, anIt.Value());
++    }
++    myShape = aSolid;
++  }
++  myEFMap.Fill(myShape, TopAbs_EDGE, TopAbs_FACE);
++  myESoMap.Fill(myShape, TopAbs_EDGE, TopAbs_SOLID);
++  myEShMap.Fill(myShape, TopAbs_EDGE, TopAbs_SHELL);
++  myVFMap.Fill(myShape, TopAbs_VERTEX, TopAbs_FACE);
++  myVEMap.Fill(myShape, TopAbs_VERTEX, TopAbs_EDGE);
+   SetParams(Ta, 1.0e-4, 1.e-5, 1.e-4, 1.e-5, 1.e-3);
+   SetContinuity(GeomAbs_C1, Ta);
+ }

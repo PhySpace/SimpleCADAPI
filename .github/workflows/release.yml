@@ -201,7 +201,7 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.occt_cache }}
-          key: occt-${{ matrix.name }}-${{ hashFiles('src/cpp/tools/build_occt.py') }}
+          key: occt-${{ matrix.name }}-${{ hashFiles('src/cpp/tools/build_occt.py', 'src/cpp/tools/occt_patches.py', 'src/cpp/patches/occt/**', 'src/cpp/cmake/ScadOcct.cmake') }}
 
       - name: Prepare the OpenCASCADE cache directory (Linux)
         if: runner.os == 'Linux'
@@ -246,12 +246,12 @@ jobs:
             SKBUILD_BUILD_TOOL_ARGS="-k;0"
 
       - name: Save the static OpenCASCADE build
-        if: always() && steps.occt.outputs.cache-hit != 'true'
+        if: success() && steps.occt.outputs.cache-hit != 'true'
         continue-on-error: true
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.occt_cache }}
-          key: occt-${{ matrix.name }}-${{ hashFiles('src/cpp/tools/build_occt.py') }}
+          key: occt-${{ matrix.name }}-${{ hashFiles('src/cpp/tools/build_occt.py', 'src/cpp/tools/occt_patches.py', 'src/cpp/patches/occt/**', 'src/cpp/cmake/ScadOcct.cmake') }}
 
       - name: Keep the wheels
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

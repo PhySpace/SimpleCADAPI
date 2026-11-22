@@ -242,11 +242,18 @@ class MarimoKernel:
     def stop(self) -> None:
         self._stop.set()
         if self._process is not None and self._process.poll() is None:
-            self._process.terminate()
+            if os.name == "nt":
+                # The worker inherits the log handle. Terminating just the marimo
+                # launcher leaves a live notebook and locks the workspace on Windows.
+                subprocess.run(["taskkill", "/T", "/F", "/PID", str(self._process.pid)],
+                               capture_output=True, check=False)
+            else:
+                self._process.terminate()
             try:
                 self._process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 self._process.kill()
+                self._process.wait()
         if getattr(self, "_log_file", None) is not None:
             try:
                 self._log_file.close()
