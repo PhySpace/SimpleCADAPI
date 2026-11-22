@@ -10,9 +10,20 @@
 #include <TColgp_Array2OfPnt.hxx>
 #include <TopoDS.hxx>
 
+#include <vector>
+
+// The patched kernel (src/cpp/patches/occt) installs the graph patch as a separate entry point.
+#if __has_include(<BRepOffsetAPI_GraphPatch.hxx>)
+#include <BRepOffsetAPI_GraphPatch.hxx>
+#define SCAD_KERNEL_GRAPH_PATCH 1
+#else
+#define SCAD_KERNEL_GRAPH_PATCH 0
+#endif
+
 #include "gordon.hpp"
 #include "internal.hpp"
 #include "scad/kernel/convert.hpp"
+#include "scad/kernel/membership.hpp"
 #include "scad/kernel/topology.hpp"
 
 namespace scad::surface {
@@ -55,6 +66,8 @@ class OcctSurfaceFitter final : public SurfaceFitter {
   // occt_guard: the caller fill_face is only called from operator_scope bodies (faces_from_edges.cpp, shell_ops.cpp),
   // which are guarded.
   TopoDS_Face fill(const FillingProblem& problem) const override {
+    if (problem.graph_patch)
+      return graph_patch(problem);
     const SurfaceFillingSettings& s = problem.settings;
     BRepOffsetAPI_MakeFilling builder(s.degree, s.points_per_curve, s.iterations, s.anisotropic, s.tolerance_2d,
                                       s.tolerance_3d, s.angular_tolerance, s.curvature_tolerance, s.max_degree,
@@ -72,6 +85,48 @@ class OcctSurfaceFitter final : public SurfaceFitter {
     if (!builder.IsDone())
       throw ValueError("OCP constrained surface filling did not converge");
     return detail::single_face(builder.Shape(), "filling");
+  }
+
+  // The ordered loop as BRepOffsetAPI_GraphPatch takes it: each edge from its support face, with
+  // its continuity as the numeric order 0/1/2 (GeomAbs_G2 is not the integer 2).
+  static TopoDS_Face graph_patch(const FillingProblem& problem) {
+#if SCAD_KERNEL_GRAPH_PATCH
+    const std::size_t count = problem.boundaries.size();
+    if (count < 3 || count > 64)
+      throw ValueError("strategy_graph_patch takes one ordered loop of 3 to 64 boundaries, got " +
+                       std::to_string(count));
+    if (!problem.points.empty())
+      throw ValueError("strategy_graph_patch takes no interior points");
+    std::vector<TopoDS_Edge> edges;
+    std::vector<TopoDS_Face> supports;
+    std::vector<int> orders;
+    for (std::size_t i = 0; i < count; ++i) {
+      const FillingBoundary& b = problem.boundaries[i];
+      if (b.support.IsNull())
+        throw ValueError("strategy_graph_patch needs a support face on every boundary (boundary " + std::to_string(i) +
+                         " has none)");
+      if (!kernel::SubShapeIndex(b.support).contains(b.edge))
+        throw ValueError(
+            "strategy_graph_patch needs each boundary edge to be an edge of its support face "
+            "(boundary " +
+            std::to_string(i) + ")");
+      edges.push_back(b.edge);
+      supports.push_back(b.support);
+      orders.push_back(b.continuity == "G2" ? 2 : b.continuity == "G1" ? 1 : 0);
+    }
+    TopoDS_Face face;
+    if (!BRepOffsetAPI_GraphPatch::TryBuild(static_cast<int>(count), edges.data(), supports.data(), orders.data(),
+                                            face))
+      throw ValueError(
+          "the graph patch was refused: the loop is not ordered and closed, cannot be represented "
+          "over one plane, or the fitted patch failed its boundary or topology checks");
+    return face;
+#else
+    (void)problem;
+    throw ValueError(
+        "strategy_graph_patch needs an OpenCASCADE kernel built with the SimpleCADAPI patch set "
+        "fillet-robustness-4 (src/cpp/patches/occt); this build links one without it");
+#endif
   }
 
   Handle(Geom_BSplineSurface) gordon(const std::vector<Handle(Geom_Curve)>& profiles,
@@ -95,6 +150,10 @@ Registry& registry() {
 
 std::shared_ptr<const SurfaceFitter> occt_surface_fitter() {
   return registry().occt;
+}
+
+bool kernel_has_graph_patch() {
+  return SCAD_KERNEL_GRAPH_PATCH != 0;
 }
 
 std::shared_ptr<const SurfaceFitter> surface_fitter() {

@@ -106,10 +106,13 @@ Face make_surface_patch_rface(const std::vector<SurfaceBoundary>& boundaries, co
       throw ValueError("boundaries must be a non-empty SurfaceBoundary sequence");
     const SurfaceFillingSettings settings = options.settings.value_or(SurfaceFillingSettings{});
     settings.validate();
+    if (options.strategy_graph_patch && (!options.holes.empty() || options.settings))
+      throw ValueError("strategy_graph_patch takes no holes and no filling settings");
 
     OperationRecord record{.op = "make_surface_patch_rface"};
     FillingProblem problem;
     problem.settings = settings;
+    problem.graph_patch = options.strategy_graph_patch;
     std::int64_t support_count = 0;
     Value boundary_dicts = Value::array();
     for (const SurfaceBoundary& boundary : boundaries) {
@@ -140,6 +143,8 @@ Face make_surface_patch_rface(const std::vector<SurfaceBoundary>& boundaries, co
     record.params.set("points", to_value(options.points));
     record.params.set("settings", settings.as_dict());
     record.params.set("tag_prefix", to_value(options.tag_prefix));
+    if (options.strategy_graph_patch)  // only when on: records of the plate filling stay as they were
+      record.params.set("strategy_graph_patch", Value(true));
     return finalize_surface_output(Face(face),
                                    FaceOutput{.record = std::move(record), .tag_prefix = options.tag_prefix});
   });

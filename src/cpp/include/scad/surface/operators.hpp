@@ -62,6 +62,9 @@ struct SurfacePatchOptions {
   std::optional<SurfaceFillingSettings> settings;
   std::vector<Wire> holes;
   TagPrefix tag_prefix;
+  // Kernel graph patch instead of the plate filling (see FillingProblem::graph_patch): one ordered
+  // loop, every boundary an edge of its support face, no points, holes or settings.
+  bool strategy_graph_patch = false;
 };
 
 // A constrained boundary network filled into one Face, optionally with holes.  The filling kernel

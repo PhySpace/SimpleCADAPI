@@ -15,6 +15,13 @@
 #include <cmath>
 #include <unordered_set>
 
+// The patched kernel installs BRepFilletAPI_YPatch.hxx together with MakeFillet::SetYPatch.
+#if __has_include(<BRepFilletAPI_YPatch.hxx>)
+#define SCAD_KERNEL_Y_PATCH 1
+#else
+#define SCAD_KERNEL_Y_PATCH 0
+#endif
+
 #include "scad/core/error.hpp"
 #include "scad/kernel/cast.hpp"
 #include "scad/kernel/membership.hpp"
@@ -76,9 +83,22 @@ TrackedResult track_blend(BRepFilletAPI_LocalOperation& op, const Solid& solid, 
 
 }  // namespace
 
-TrackedResult tracked_fillet(const Solid& solid, const std::vector<Edge>& edges, double radius) {
+bool kernel_has_y_patch() {
+  return SCAD_KERNEL_Y_PATCH != 0;
+}
+
+TrackedResult tracked_fillet(const Solid& solid, const std::vector<Edge>& edges, double radius, bool auto_y_patch) {
   return occt_guard([&] {
     BRepFilletAPI_MakeFillet fillet(solid.wrapped());
+    if (auto_y_patch) {
+#if SCAD_KERNEL_Y_PATCH
+      fillet.SetYPatch(Standard_True);
+#else
+      throw ValueError(
+          "strategy_auto_y_patch needs an OpenCASCADE kernel built with the SimpleCADAPI patch set "
+          "fillet-robustness-4 (src/cpp/patches/occt); this build links one without it");
+#endif
+    }
     for (const Edge& edge : edges)
       fillet.Add(radius, TopoDS::Edge(edge.wrapped()));
     fillet.Build();

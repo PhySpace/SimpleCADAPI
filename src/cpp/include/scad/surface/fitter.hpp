@@ -45,6 +45,11 @@ struct FillingProblem {
   std::vector<FillingBoundary> boundaries;
   std::vector<Vec3> points;  // extra points the surface must pass through (global frame)
   SurfaceFillingSettings settings;
+  // Graph patch (kernel patch set fillet-robustness-4, BRepOffsetAPI_GraphPatch): the boundaries
+  // are one ordered closed loop, each edge an edge of its support face; a degree-8 variational
+  // patch meets every support in its order 0/1/2 (C0/G1/G2) and is trimmed by the projected
+  // boundary.  No points, no holes.  `settings` do not apply.
+  bool graph_patch = false;
 };
 
 class SurfaceFitter {
@@ -66,6 +71,9 @@ class SurfaceFitter {
 
 // The provider in use; the OpenCASCADE one unless replaced.
 std::shared_ptr<const SurfaceFitter> surface_fitter();
+
+// True when the linked kernel carries BRepOffsetAPI_GraphPatch (FillingProblem::graph_patch).
+bool kernel_has_graph_patch();
 std::shared_ptr<const SurfaceFitter> occt_surface_fitter();
 // nullptr restores the OpenCASCADE provider.
 void set_surface_fitter(std::shared_ptr<const SurfaceFitter> fitter);

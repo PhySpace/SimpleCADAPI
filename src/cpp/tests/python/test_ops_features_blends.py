@@ -107,7 +107,7 @@ def test_offset_and_draft():
 
 def test_signatures_match_python():
     expected = {
-        "fillet_rsolid": ["solid", "edges", "radius", "result_tag", "generated_faces_tag"],
+        "fillet_rsolid": ["solid", "edges", "radius", "result_tag", "generated_faces_tag", "strategy_auto_y_patch"],
         "chamfer_rsolid": ["solid", "edges", "distance", "angle", "reference_direction", "result_tag", "generated_faces_tag"],
         "shell_rsolid": ["solid", "faces_to_remove", "thickness", "result_tag", "body_faces_tag", "offset_faces_tag",
                          "closing_faces_tag", "wall_edges_tag"],

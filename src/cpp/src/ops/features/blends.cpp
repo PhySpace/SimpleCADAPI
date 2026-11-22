@@ -113,7 +113,8 @@ Solid finish_blend(const Solid& solid, TrackedResult tracked, const BlendAttempt
 
 }  // namespace
 
-Solid fillet_rsolid(const Solid& solid, const EdgeSelection& edges, const Scalar& radius, const BlendTags& tags) {
+Solid fillet_rsolid(const Solid& solid, const EdgeSelection& edges, const Scalar& radius, const BlendTags& tags,
+                    const FilletOptions& options) {
   static const ErrorSpec spec{"fillet_rsolid",
                               "Failed to apply the fillet operation.",
                               {"The radius is not a positive finite scalar.", "No valid edges were selected.",
@@ -140,7 +141,10 @@ Solid fillet_rsolid(const Solid& solid, const EdgeSelection& edges, const Scalar
       if (attempt.edges.empty())
         throw ValueError("At least one edge should be selected as the target for fillet");
 
-      TrackedResult tracked = tracked_fillet(solid, attempt.edges, radius_value);
+      // Recorded only when on, so records of the standard algorithm stay as they were.
+      if (options.strategy_auto_y_patch)
+        rec.param("strategy_auto_y_patch", Value(true));
+      TrackedResult tracked = tracked_fillet(solid, attempt.edges, radius_value, options.strategy_auto_y_patch);
       return finish_blend(solid, std::move(tracked), attempt, "fillet", radius_value, rec, tags, "fillet.patch");
     });
   } catch (const std::exception& error) {
