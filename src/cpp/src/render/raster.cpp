@@ -49,8 +49,7 @@ struct Lighting {
   Material studio{0.17f, 0.62f, 0.50f, {1.0f, 0.97f, 0.92f}, &studio_lut};
 };
 
-Lighting make_lighting(const Camera& cam, Style style) {
-  Lighting l;
+void setup_lighting(Lighting& l, const Camera& cam, Style style) {
   const Vec3 view = -cam.forward;
   l.view[0] = static_cast<float>(view.x);
   l.view[1] = static_cast<float>(view.y);
@@ -62,7 +61,7 @@ Lighting make_lighting(const Camera& cam, Style style) {
   };
   if (style == Style::Standard) {
     add(view, {1, 1, 1}, 1.0f);  // VTK's automatic headlight
-    return l;
+    return;
   }
   // render.py _studio_lights: warm key, cool fill, cool rim, derived from the camera pose.
   const Vec3 world_up{0, 0, 1};
@@ -72,7 +71,6 @@ Lighting make_lighting(const Camera& cam, Style style) {
   add(view * 0.55 + right * 0.60 + up * 0.70, {1.00f, 0.96f, 0.90f}, 1.55f);
   add(view * 0.35 - right * 0.95 + up * 0.05, {0.60f, 0.70f, 0.85f}, 0.68f);
   add(-view * 0.90 + up * 0.60 - right * 0.15, {0.88f, 0.93f, 1.00f}, 1.05f);
-  return l;
 }
 
 // ---------------------------------------------------------------------------
@@ -195,10 +193,22 @@ void raster_tri(const Tri& t, int y_lo, int y_hi, Emit&& emit) {
           empty = true;
       } else {
         const double bound = (-eps - k[i]) / a - 0.5;  // x such that w_i(x + 0.5) = -eps
-        if (a > 0)
-          lo = std::max(lo, static_cast<int>(std::floor(bound)) - 1);
-        else
-          hi = std::min(hi, static_cast<int>(std::ceil(bound)) + 1);
+        // A nearly horizontal triangle edge can intersect this scanline far outside
+        // the viewport. Intersect in floating point first; an out-of-range cast to
+        // int is undefined (and can differ between optimized worker code paths).
+        if (a > 0) {
+          const double left = std::max<double>(lo, std::floor(bound) - 1.0);
+          if (left > hi)
+            empty = true;
+          else
+            lo = static_cast<int>(left);
+        } else {
+          const double right = std::min<double>(hi, std::ceil(bound) + 1.0);
+          if (right < lo)
+            empty = true;
+          else
+            hi = static_cast<int>(right);
+        }
       }
     }
     if (empty)
@@ -649,7 +659,8 @@ void draw_panel(const Scene& scene, const PanelParams& P, const Target& T,
   const Screen screen{&cam, static_cast<double>(pw), static_cast<double>(ph),
                       1.0 / (2.0 * cam.half_height * cam.aspect), 1.0 / (2.0 * cam.half_height)};
   const double px_per_world = ph / (2.0 * cam.half_height);
-  const Lighting lighting = make_lighting(cam, P.style);
+  Lighting lighting;
+  setup_lighting(lighting, cam, P.style);
 
   // Backgrounds are drawn per band.
   const Rgb top = P.bg_top ? *P.bg_top : (P.style == Style::Studio ? Rgb{0, 0, 0} : Rgb{0.78f, 0.84f, 0.90f});
