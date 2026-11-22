@@ -3,7 +3,7 @@
 ## API Definition
 
 ```python
-def make_surface_patch_rface(boundaries, *, points=[], settings=None, holes=[], tag_prefix=None)
+def make_surface_patch_rface(boundaries, *, points=[], settings=None, holes=[], tag_prefix=None, strategy_graph_patch=False)
 ```
 
 *Source: operators/geometry.py*
@@ -21,3 +21,5 @@ with this operation do not keep identical shared boundary curves. When
 several patches must share exact boundary edges and sew into one closed
 shell, build each patch with ``make_gordon_surface_rface`` from a shared
 profile/guide edge network instead.
+
+``strategy_graph_patch=True`` fills with the kernel's graph patch instead: ``boundaries`` must be one ordered closed loop of 3 to 64 edges, each an edge of its ``support`` face, with continuity C0, G1 or G2 per edge; ``points``, ``holes`` and ``settings`` are not accepted. The patch is a degree-8 variational surface trimmed by the projected boundary, which keeps the boundary positions to model precision, so the face can be sewn to its supports. Loops that cannot be represented over one plane (seen along the fitted normal) are refused with ``ValueError``. Needs a kernel built with the SDK's OCCT patch set (``fillet-robustness-4``).

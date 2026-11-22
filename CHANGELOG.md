@@ -4,6 +4,29 @@ All notable changes to SimpleCADAPI are documented here. Per-version
 user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 中文).
 
+## Unreleased
+
+### Added
+- `fillet_rsolid(..., strategy_auto_y_patch=True)`: the Y transition. Where a concave and a convex selected edge meet
+  tangentially or nearly so (a post flush with a plate side, a wall a few degrees off it), two rolling-ball fillets cannot
+  meet — one ball lies outside the material, the other inside — and the standard kernel fails or returns a
+  self-intersecting solid. With the flag both bands stop where they touch the shared face and two G1 ribbons, tangent to
+  each other and to both supports, close the junction. Everything else is the standard algorithm; without such a junction,
+  or if the transition fails its validity, self-interference and continuity checks, the standard algorithm runs alone.
+  Off by default; results without the flag are unchanged.
+
+  ![A post flush with both plate sides, r = 5, shaded and zebra](img/y-patch/flush-post-overview.png)
+- `make_surface_patch_rface(..., strategy_graph_patch=True)`: fill one ordered loop of edges, each an edge of its support
+  face, with C0/G1/G2 per edge, with the kernel's degree-8 graph patch instead of plate filling; the boundary is kept to
+  model precision. No points, holes or settings with this strategy.
+- `simplecadapi._cpp._kernel_capabilities()` reports which kernel strategies the linked OpenCASCADE carries; requesting one
+  the kernel lacks raises `ValueError` naming the patch set.
+- `tools/render/zebra.py`: zebra (reflection-line) renderings of BREP files, side by side, to judge surface continuity.
+
+### Changed
+- OpenCASCADE patch set `fillet-robustness-4`: patch `0004` adds `BRepFilletAPI_MakeFillet::SetYPatch` and the
+  `BRepFilletAPI_YPatch` overlay; the kernel's own checks (48 cases) live in `src/cpp/patches/occt/tests`.
+
 ## 2.3.0.post1 — 2026-11-17
 
 ### Changed
