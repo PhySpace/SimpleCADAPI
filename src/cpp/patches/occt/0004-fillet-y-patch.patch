@@ -1,0 +1,166 @@
+diff --git a/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.hxx b/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.hxx
+--- a/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.hxx
++++ b/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.hxx
+@@ -32,6 +32,8 @@
+ #include <TopTools_ListOfShape.hxx>
+ #include <ChFiDS_SecHArray1.hxx>
+ #include <ChFiDS_ErrorStatus.hxx>
++#include <BRepFilletAPI_YPatch.hxx>
++#include <BRepTools_History.hxx>
+ class TopoDS_Shape;
+ class TopoDS_Edge;
+ class Law_Function;
+@@ -324,6 +326,23 @@
+   //! contours and fillet parameters in order to rebuild the shape.
+   Standard_EXPORT void Reset() Standard_OVERRIDE;
+ 
++  //! Y-patch strategy for mixed-convexity junctions; off by default, and then Build() is the
++  //! standard algorithm, unchanged.  When on and every contour has a constant radius, Build()
++  //! first looks for junctions where a concave and a convex contour meet tangentially or
++  //! nearly so between two (nearly) tangent supports (see BRepFilletAPI_YPatch).  When there
++  //! is one and its transition is built and verified, that is the result; otherwise the
++  //! standard algorithm runs.
++  Standard_EXPORT void SetYPatch(const Standard_Boolean theOn);
++
++  Standard_EXPORT Standard_Boolean YPatch() const;
++
++  //! Number of junctions joined by a Y transition in the last Build() (0: standard result).
++  Standard_EXPORT Standard_Integer NbYPatches() const;
++
++  //! Junction I (1 <= I <= NbYPatches()) with its measured continuity.
++  Standard_EXPORT const BRepFilletAPI_YPatch::Junction& YPatchJunction(
++    const Standard_Integer I) const;
++
+   //! Returns the internal topology building algorithm.
+   Standard_EXPORT Handle(TopOpeBRepBuild_HBuilder) Builder() const;
+ 
+@@ -398,6 +417,11 @@
+ private:
+   ChFi3d_FilBuilder   myBuilder;
+   TopTools_MapOfShape myMap;
++  // Y-patch strategy
++  TopoDS_Shape                                 myInput;
++  Standard_Boolean                             myYPatch;
++  Handle(BRepTools_History)                    myYHistory;
++  NCollection_Vector<BRepFilletAPI_YPatch::Junction> myYReport;
+ };
+ 
+ #endif // _BRepFilletAPI_MakeFillet_HeaderFile
+diff --git a/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.cxx b/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.cxx
+--- a/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.cxx
++++ b/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.cxx
+@@ -31,12 +31,43 @@
+ 
+ BRepFilletAPI_MakeFillet::BRepFilletAPI_MakeFillet(const TopoDS_Shape&      S,
+                                                    const ChFi3d_FilletShape FShape)
+-    : myBuilder(S, FShape)
++    : myBuilder(S, FShape),
++      myInput(S),
++      myYPatch(Standard_False)
+ {
+ }
+ 
+ //=================================================================================================
+ 
++void BRepFilletAPI_MakeFillet::SetYPatch(const Standard_Boolean theOn)
++{
++  myYPatch = theOn;
++}
++
++//=================================================================================================
++
++Standard_Boolean BRepFilletAPI_MakeFillet::YPatch() const
++{
++  return myYPatch;
++}
++
++//=================================================================================================
++
++Standard_Integer BRepFilletAPI_MakeFillet::NbYPatches() const
++{
++  return myYReport.Length();
++}
++
++//=================================================================================================
++
++const BRepFilletAPI_YPatch::Junction& BRepFilletAPI_MakeFillet::YPatchJunction(
++  const Standard_Integer I) const
++{
++  return myYReport.Value(I - 1);
++}
++
++//=================================================================================================
++
+ void BRepFilletAPI_MakeFillet::SetParams(const Standard_Real Tang,
+                                          const Standard_Real Tesp,
+                                          const Standard_Real T2d,
+@@ -372,6 +403,30 @@
+ 
+ void BRepFilletAPI_MakeFillet::Build(const Message_ProgressRange& /*theRange*/)
+ {
++  myYHistory.Nullify();
++  myYReport.Clear();
++  if (myYPatch)
++  {
++    // The Y strategy takes constant-radius contours only.
++    TopTools_DataMapOfShapeReal radii;
++    Standard_Boolean            constant = Standard_True;
++    for (Standard_Integer ic = 1; ic <= NbContours() && constant; ++ic)
++    {
++      constant = myBuilder.IsConstant(ic);
++      for (Standard_Integer ie = 1; ie <= NbEdges(ic) && constant; ++ie)
++        radii.Bind(Edge(ic, ie), myBuilder.Radius(ic));
++    }
++    TopoDS_Shape result;
++    if (constant && !radii.IsEmpty()
++        && BRepFilletAPI_YPatch::Perform(myInput, radii, result, myYHistory, myYReport))
++    {
++      myShape = result;
++      Done();
++      return;
++    }
++    myYHistory.Nullify();
++    myYReport.Clear();
++  }
+   myBuilder.Compute();
+   if (myBuilder.IsDone())
+   {
+@@ -394,6 +449,8 @@
+   NotDone();
+   myBuilder.Reset();
+   myMap.Clear();
++  myYHistory.Nullify();
++  myYReport.Clear();
+ }
+ 
+ //=================================================================================================
+@@ -436,6 +493,8 @@
+ 
+ const TopTools_ListOfShape& BRepFilletAPI_MakeFillet::Generated(const TopoDS_Shape& EorV)
+ {
++  if (!myYHistory.IsNull())
++    return myYHistory->Generated(EorV);
+   return myBuilder.Generated(EorV);
+ }
+ 
+@@ -444,6 +503,11 @@
+ const TopTools_ListOfShape& BRepFilletAPI_MakeFillet::Modified(const TopoDS_Shape& F)
+ {
+   myGenerated.Clear();
++  if (!myYHistory.IsNull())
++  {
++    myGenerated = myYHistory->Modified(F);
++    return myGenerated;
++  }
+ 
+   if (myBuilder.Builder()->IsSplit(F, TopAbs_OUT))
+   {
+@@ -476,6 +540,8 @@
+ 
+ Standard_Boolean BRepFilletAPI_MakeFillet::IsDeleted(const TopoDS_Shape& F)
+ {
++  if (!myYHistory.IsNull())
++    return myYHistory->IsRemoved(F);
+   if (myMap.Contains(F) || myBuilder.Builder()->IsSplit(F, TopAbs_OUT)
+       || myBuilder.Builder()->IsSplit(F, TopAbs_IN) || myBuilder.Builder()->IsSplit(F, TopAbs_ON))
+     return Standard_False;

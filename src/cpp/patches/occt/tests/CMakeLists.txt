@@ -1,0 +1,26 @@
+# Kernel-level checks of the OCCT patch set, built against an installed patched prefix:
+#   cmake -S src/cpp/patches/occt/tests -B <build> -G Ninja -DOpenCASCADE_DIR=<prefix>/lib/cmake/opencascade
+# With -DYPATCH_DEV=ON the overlay sources of this checkout are compiled in, so kernel edits
+# can be tried without rebuilding the prefix (the prefix's own copies are then shadowed).
+cmake_minimum_required(VERSION 3.20)
+project(occt_patch_tests LANGUAGES CXX)
+find_package(OpenCASCADE CONFIG REQUIRED)
+option(YPATCH_DEV "compile the checkout's Y-patch overlay sources into the tools" OFF)
+set(overlay ${CMAKE_CURRENT_SOURCE_DIR}/../overlay)
+set(dev_sources)
+if(YPATCH_DEV)
+  set(dev_sources ${overlay}/BRepFilletAPI_YPatch.cxx ${overlay}/BRepFilletAPI_YPatchBuild.cxx)
+endif()
+foreach(name cases inspect check shellfillet wires)
+  add_executable(${name} ${name}.cxx ${dev_sources})
+  target_compile_features(${name} PRIVATE cxx_std_17)
+  if(YPATCH_DEV)
+    target_include_directories(${name} BEFORE PRIVATE ${overlay})
+    target_compile_definitions(${name} PRIVATE YPATCH_TRACE)
+  endif()
+  target_include_directories(${name} PRIVATE ${OpenCASCADE_INCLUDE_DIR})
+  if(NOT OpenCASCADE_BUILD_SHARED_LIBS)
+    target_compile_definitions(${name} PRIVATE OCCT_STATIC_BUILD _USE_MATH_DEFINES)
+  endif()
+  target_link_libraries(${name} PRIVATE TKOffset TKFillet TKDESTEP TKBool TKBO)
+endforeach()
