@@ -1,0 +1,53 @@
+diff --git a/src/ChFi3d/ChFi3d_Builder_0.cxx b/src/ChFi3d/ChFi3d_Builder_0.cxx
+index 18354eee..808d85ee 100644
+--- a/src/ChFi3d/ChFi3d_Builder_0.cxx
++++ b/src/ChFi3d/ChFi3d_Builder_0.cxx
+@@ -418,7 +418,19 @@ ChFiDS_State ChFi3d_EdgeState(TopoDS_Edge* E, const ChFiDS_Map& EFMap)
+     if (o01 == o11 && o02 == o21 && o12 == o22)
+       sst = ChFiDS_AllSame;
+     else if (o12 == o22 || i == 10 || j == 10)
++    {
+       sst = ChFiDS_OnDiff;
++      // Backport of OCCT PR #1642: a tangent end has no intrinsic
++      // convexity. Its extended end face trims one free contact point.
++      if (i != 10 && j != 10
++          && (ChFi3d::IsTangentFaces(E[0], F1, F2) ? 1 : 0)
++                 + (ChFi3d::IsTangentFaces(E[1], F3, F4) ? 1 : 0)
++                 + (ChFi3d::IsTangentFaces(E[2], F5, F6) ? 1 : 0)
++               == 1)
++      {
++        sst = ChFiDS_OnSame;
++      }
++    }
+     else
+       sst = ChFiDS_OnSame;
+   }
+diff --git a/src/ChFi3d/ChFi3d_Builder_C1.cxx b/src/ChFi3d/ChFi3d_Builder_C1.cxx
+index 90d1a1ab..4fc4b8ab 100644
+--- a/src/ChFi3d/ChFi3d_Builder_C1.cxx
++++ b/src/ChFi3d/ChFi3d_Builder_C1.cxx
+@@ -1320,6 +1320,8 @@ void ChFi3d_Builder::PerformOneCorner(const Standard_Integer Index,
+       throw Standard_ConstructionError("Failed to get p-curve of edge");
+     pop1 = Hc->Value(parVtx);
+     pop2 = Fiop.PCurveOnFace()->Value(Fiop.Parameter(isfirst));
++    // Keep both ends in the same periodic chart (OCCT PR #1642).
++    ChFi3d_Recale(Bop, pop1, pop2, Standard_False);
+     Hc   = BRep_Tool::CurveOnSurface(Arcprol, Fv, Ubid, Ubid);
+     if (Hc.IsNull())
+       throw Standard_ConstructionError("Failed to get p-curve of edge");
+@@ -1373,11 +1375,13 @@ void ChFi3d_Builder::PerformOneCorner(const Standard_Integer Index,
+       BRepLib_MakeEdge  Bedge(zob3d);
+       TopoDS_Edge       edg = Bedge.Edge();
+       BRepExtrema_ExtCC extCC(edgecouture, edg);
+-      if (extCC.IsDone() && extCC.NbExt() != 0)
++      if (extCC.IsDone() && !extCC.IsParallel() && extCC.NbExt() != 0)
+       {
+         for (Standard_Integer i = 1; i <= extCC.NbExt() && !intcouture; i++)
+         {
+-          if (extCC.SquareDistance(i) <= 1.e-8)
++          if (extCC.SquareDistance(i) <= 1.e-8
++              && extCC.PointOnE1(i).Distance(zob3d->Value(Udeb)) > tolapp3d
++              && extCC.PointOnE1(i).Distance(zob3d->Value(Ufin)) > tolapp3d)
+           {
+             par1                  = extCC.ParameterOnE1(i);
+             par2                  = extCC.ParameterOnE2(i);
