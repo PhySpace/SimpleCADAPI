@@ -7,6 +7,7 @@ import math
 import pytest
 
 import simplecadapi as s
+from simplecadapi import _cpp
 from simplecadapi._cpp import _kernel_capabilities
 from simplecadapi.recording.graph import GraphSession
 
@@ -75,6 +76,18 @@ def test_y_patch_off_is_the_standard_algorithm():
 
 
 @needs_y
+@pytest.mark.parametrize("radius", [2.5, 5.0])
+def test_a_plain_fillet_of_the_tangent_junction_falls_back_to_the_y_transition(radius):
+    # Without the flag the kernel runs its standard algorithm first; it fails on this junction, so the kernel
+    # takes the Y transition instead of failing (where the standard result is valid, it is kept).
+    body = plate_post()
+    out = s.fillet_rsolid(body, junction_edges(body), radius, generated_faces_tag="round")
+    assert len(s.ql.faces().where(s.ql.tag("round")).resolve(out)) >= 4
+    flagged = s.fillet_rsolid(body, junction_edges(body), radius, strategy_auto_y_patch=True)
+    assert out.get_volume() == pytest.approx(flagged.get_volume(), rel=1e-9)
+
+
+@needs_y
 def test_y_patch_is_recorded_and_replayed():
     with GraphSession() as session:
         body = plate_post()
@@ -125,6 +138,57 @@ def test_graph_patch_continues_its_support(continuity):
     assert patch.get_area() == pytest.approx(100.0, rel=1e-6)
     assert abs(patch.get_normal_at().z) == pytest.approx(1.0, abs=1e-9)
     assert patch.get_center().z == pytest.approx(5.0, abs=1e-9)
+
+
+def tube_window():
+    """A tube (radius 30 outside, 26 inside, height 60) with a 40 x 24 window cut through its wall at +y, away from the
+    seam: the outer cylinder face and the four edges of the window on it, ordered around the window."""
+    tube = s.cut_rsolid(s.make_cylinder_rsolid(30, 60), s.make_cylinder_rsolid(26, 60))
+    holed = s.cut_rsolid(tube, s.make_box_rsolid(40, 30, 24, bottom_face_center=(0, 30, 18)))
+    cylinders = s.ql.faces().where(s.ql.prop("geom.type", "==", "CYLINDER")).resolve(holed)
+    outer = max(cylinders, key=lambda f: f.get_area())
+    window = [e for e in s.ql.edges().resolve(outer) if _at(e)[1] > 20 and 17 < _at(e)[2] < 43]
+    window.sort(key=lambda e: math.atan2(_at(e)[2] - 30, _at(e)[0]))
+    assert len(window) == 4
+    return outer, window
+
+
+def off_cylinder(face, radius=30.0):
+    """How far a face is from the cylinder r = radius about z, over the nodes of a fine mesh: the largest distance and
+    the largest angle (rad) between the face normal and the radial direction."""
+    mesh = _cpp.mesh(face, 0.01, 0.05)
+    distance = angle = 0.0
+    for p, n in zip(mesh.vertices, mesh.normals):
+        r = math.hypot(p[0], p[1])
+        distance = max(distance, abs(r - radius))
+        cos = abs(n[0] * p[0] + n[1] * p[1]) / r / math.sqrt(n[0] ** 2 + n[1] ** 2 + n[2] ** 2)
+        angle = max(angle, math.acos(min(1.0, cos)))
+    return distance, angle
+
+
+@needs_graph
+@pytest.mark.parametrize("continuity", ["C0", "G1", "G2"])
+def test_graph_patch_fills_a_window_in_a_cylinder(continuity):
+    outer, window = tube_window()
+    patch = s.make_surface_patch_rface(
+        [s.SurfaceBoundary(edge, continuity, outer) for edge in window], strategy_graph_patch=True
+    )
+    # the patch continues the cylinder it was cut from, to what a degree-8 graph represents (~1e-4 mm here)
+    distance, angle = off_cylinder(patch)
+    assert distance < 1e-3
+    assert angle < 2e-3
+    # the piece of the cylinder: radius x opening angle x height
+    assert patch.get_area() == pytest.approx(30 * 2 * math.asin(2 / 3) * 24, rel=1e-4)
+
+
+@needs_graph
+def test_graph_patch_is_far_closer_to_a_cylinder_than_the_plate_filling():
+    outer, window = tube_window()
+    boundaries = [s.SurfaceBoundary(edge, "G1", outer) for edge in window]
+    plate, _ = off_cylinder(s.make_surface_patch_rface(boundaries))  # about 0.39 mm off
+    graph, _ = off_cylinder(s.make_surface_patch_rface(boundaries, strategy_graph_patch=True))
+    assert graph < 1e-3 < plate
+    assert graph < plate / 100
 
 
 @needs_graph

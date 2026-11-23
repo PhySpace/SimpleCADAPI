@@ -119,7 +119,8 @@ class OcctSurfaceFitter final : public SurfaceFitter {
                                             face))
       throw ValueError(
           "the graph patch was refused: the loop is not ordered and closed, cannot be represented "
-          "over one plane, or the fitted patch failed its boundary or topology checks");
+          "over one plane, or no degree-8 graph meets its supports within 1e-3 mm, 1e-3 rad (G1) "
+          "and 5% of their curvature (G2)");
     return face;
 #else
     (void)problem;

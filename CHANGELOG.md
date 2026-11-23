@@ -13,12 +13,16 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   self-intersecting solid. With the flag both bands stop where they touch the shared face and two G1 ribbons, tangent to
   each other and to both supports, close the junction. Everything else is the standard algorithm; without such a junction,
   or if the transition fails its validity, self-interference and continuity checks, the standard algorithm runs alone.
-  Off by default; results without the flag are unchanged.
+  Without the flag the kernel still falls back to the transition at such a junction when its standard result
+  fails, is invalid or self-intersects; a valid standard result is kept, and fillets without such a junction are
+  unchanged.
 
   ![A post flush with both plate sides, r = 5, shaded and zebra](img/y-patch/flush-post-overview.png)
 - `make_surface_patch_rface(..., strategy_graph_patch=True)`: fill one ordered loop of edges, each an edge of its support
-  face, with C0/G1/G2 per edge, with the kernel's degree-8 graph patch instead of plate filling; the boundary is kept to
-  model precision. No points, holes or settings with this strategy.
+  face, with C0/G1/G2 per edge, with the kernel's degree-8 graph patch instead of plate filling; the boundary is met
+  exactly where a degree-8 graph can, and on curved supports (a window in a cylinder, a sphere, a B-spline sheet) the
+  patch continues the support's own surface within 1e-3 mm (a 40 x 24 window in an R30 tube: 2e-4 mm off the
+  cylinder, the plate filling 0.39 mm). No points, holes or settings with this strategy.
 - `simplecadapi._cpp._kernel_capabilities()` reports which kernel strategies the linked OpenCASCADE carries; requesting one
   the kernel lacks raises `ValueError` naming the patch set.
 - `tools/render/zebra.py`: zebra (reflection-line) renderings of BREP files, side by side, to judge surface continuity.

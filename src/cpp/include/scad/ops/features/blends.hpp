@@ -17,8 +17,10 @@ struct FilletOptions {
   // Y transition (kernel patch set fillet-robustness-4, BRepFilletAPI_YPatch): where a concave
   // and a convex selected edge meet tangentially or nearly so between two (nearly) tangent
   // supports, both bands stop where they touch the common face and two G1 ribbons join them.
-  // Without such a junction, or when the transition fails its checks, the standard algorithm
-  // runs.  Off: the standard algorithm only.  A kernel without the patch raises ValueError.
+  // On: the transition first at every such junction (the standard algorithm when it fails its
+  // checks).  Off: the kernel still falls back to the transition at a junction where the standard
+  // result fails, is invalid or self-intersects; a valid standard result is kept.  A kernel
+  // without the patch raises ValueError for `true`.
   bool strategy_auto_y_patch = false;
 };
 

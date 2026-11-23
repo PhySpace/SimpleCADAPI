@@ -117,3 +117,19 @@ standard shapes were not compared visually. Pictures (`tools/render/zebra.py`): 
 - Only MinGW static builds were run. CI builds the kernel from this patch set on Linux; MSVC was not compiled here.
 - The graph patch is exposed with its research acceptance (C0/G1/G2 loops, planar-representable); the SDK tests cover a
   wall loop (C0) and a hole in a plane (G1, G2).
+
+## Addendum (2026-11-23, evening)
+
+**D8. A plain fillet falls back to the Y transition.** The owner asked that the tangent post/wall case work without the
+flag. `MakeFillet::Build` runs the standard algorithm; at a detected junction, a standard result that is not done,
+invalid or self-intersecting is replaced by the Y transition (`YPatchFallback()`). A valid standard result is kept: at a
+wall 10° off the plate side the standard algorithm merges both bands into one tapering band whose zebra stripes are
+smooth, while the Y transition is G1 only. The non-Y "pinch" corner (Plasticity with Y-Blend off) was built as research
+code, off: valid on near-tangent cases, self-intersecting on exact tangency.
+
+**D9. The graph patch continues curved supports.** A tube window was refused because the exact boundary solve demanded
+1e-5 that a degree-8 graph cannot meet on a cylinder. The patch now follows the supports' surfaces over the hole, fits
+boundary and support together when the exact solve fails, and accepts on the built face (gap ≤ 1e-3 mm, angle ≤ 1e-3 rad,
+G2 cross-curvature within 5 %). Tube window G1: 2.3e-4 mm from the cylinder (plate filling: 0.39 mm).
+
+Comparison report with code pairs and pictures: `out/report/REPORT.pdf` (local).

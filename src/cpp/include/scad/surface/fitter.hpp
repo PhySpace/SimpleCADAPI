@@ -48,7 +48,9 @@ struct FillingProblem {
   // Graph patch (kernel patch set fillet-robustness-4, BRepOffsetAPI_GraphPatch): the boundaries
   // are one ordered closed loop, each edge an edge of its support face; a degree-8 variational
   // patch meets every support in its order 0/1/2 (C0/G1/G2) and is trimmed by the projected
-  // boundary.  No points, no holes.  `settings` do not apply.
+  // boundary: exactly where a degree-8 graph can, otherwise (curved supports) within the
+  // kernel's limits (1e-3 mm, 1e-3 rad, 5% of the curvature), continuing the supports' own
+  // surfaces over the hole.  No points, no holes.  `settings` do not apply.
   bool graph_patch = false;
 };
 
