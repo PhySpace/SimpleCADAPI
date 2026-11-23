@@ -405,9 +405,9 @@ struct Work
   // T's wedge; h, g ~ s^2 at V make it leave V regularly between the two edges.  At P* a
   // law with zero slope makes that band G1 to its constant-radius band (a ball tangent to T at
   // q has a radius fixed by q and the two contact lines cross at P*, so not both can be):
-  // pinchDir 0 (default): convex G1, as in Plasticity's Y-off;
-  // 1: balanced slopes; 2: concave G1.
-  int pinchDir = 1;
+  // pinchDir 0 (default, the owner's choice, as in Plasticity's Y-off): the convex band is G1, the
+  // crease goes to the concave side; 1: balanced slopes (smallest largest crease); 2: concave G1.
+  int pinchDir = 0;
 
   static void law(int kind, double s, double& f)
   {
@@ -1200,7 +1200,8 @@ static Standard_Boolean performOn(const TopoDS_Shape&                           
                                   TopoDS_Shape&                                       theResult,
                                   Handle(BRepTools_History)&                          theHistory,
                                   NCollection_Vector<BRepFilletAPI_YPatch::Junction>& theReport,
-                                  const Standard_Boolean                              thePinch)
+                                  const Standard_Boolean                              thePinch,
+                                  const int                                           thePinchDir)
 {
   using Junction = BRepFilletAPI_YPatch::Junction;
   try
@@ -1213,7 +1214,8 @@ static Standard_Boolean performOn(const TopoDS_Shape&                           
     {
       works.push_back(std::make_unique<Work>(j));
       Work& w = *works.back();
-      w.pinch = thePinch;
+      w.pinch    = thePinch;
+      w.pinchDir = thePinchDir;
 #ifdef YPATCH_TRACE
       if (const char* d = std::getenv("YPATCH_PINCH_DIR"))
         w.pinchDir = std::atoi(d);
@@ -2198,25 +2200,27 @@ static Handle(BRepTools_History) compose(const TopoDS_Shape&              input,
   return out;
 }
 
-Standard_Boolean BRepFilletAPI_YPatch::Perform(const TopoDS_Shape&               theShape,
-                                               const TopTools_DataMapOfShapeReal& theRadii,
-                                               TopoDS_Shape&                      theResult,
-                                               Handle(BRepTools_History)&         theHistory,
-                                               NCollection_Vector<Junction>&      theReport,
-                                               const Standard_Boolean             thePinch)
+// One attempt with a given pinch law: periodic supports re-seated first, then the shape as it is.
+static Standard_Boolean attempt(const TopoDS_Shape&                                 theShape,
+                                const TopTools_DataMapOfShapeReal&                  theRadii,
+                                TopoDS_Shape&                                       theResult,
+                                Handle(BRepTools_History)&                          theHistory,
+                                NCollection_Vector<BRepFilletAPI_YPatch::Junction>& theReport,
+                                const Standard_Boolean                              thePinch,
+                                const int                                           thePinchDir)
 {
   try
   {
     Reseated r;
-    if (!Detect(theShape, theRadii).IsEmpty() && reseat(theShape, theRadii, r))
+    if (!BRepFilletAPI_YPatch::Detect(theShape, theRadii).IsEmpty() && reseat(theShape, theRadii, r))
     {
-      TopoDS_Shape                 result;
-      Handle(BRepTools_History)    h;
-      NCollection_Vector<Junction> report;
+      TopoDS_Shape                                       result;
+      Handle(BRepTools_History)                          h;
+      NCollection_Vector<BRepFilletAPI_YPatch::Junction> report;
 #ifdef YPATCH_TRACE
       std::printf("YPatch: periodic supports re-seated\n");
 #endif
-      if (performOn(r.shape, r.radii, result, h, report, thePinch))
+      if (performOn(r.shape, r.radii, result, h, report, thePinch, thePinchDir))
       {
         theResult  = result;
         theHistory = compose(theShape, r.history, h, result);
@@ -2232,5 +2236,42 @@ Standard_Boolean BRepFilletAPI_YPatch::Perform(const TopoDS_Shape&              
 #endif
     (void)ex;
   }
-  return performOn(theShape, theRadii, theResult, theHistory, theReport, thePinch);
+  return performOn(theShape, theRadii, theResult, theHistory, theReport, thePinch, thePinchDir);
+}
+
+Standard_Boolean BRepFilletAPI_YPatch::Perform(const TopoDS_Shape&               theShape,
+                                               const TopTools_DataMapOfShapeReal& theRadii,
+                                               TopoDS_Shape&                      theResult,
+                                               Handle(BRepTools_History)&         theHistory,
+                                               NCollection_Vector<Junction>&      theReport,
+                                               const Standard_Boolean             thePinch)
+{
+  if (!thePinch)
+    return attempt(theShape, theRadii, theResult, theHistory, theReport, Standard_False, 0);
+  // The pinch: the convex band G1 at P*'s section first (Plasticity's layout); where the cusp is too
+  // narrow for that law (r = 1 on a flush post, a curved side) or the crease it leaves on the other
+  // side is unacceptable (an inclined common face measured 90 degrees), the balanced law.
+  constexpr double kMaxCrease = 30. * 3.14159265358979323846 / 180.;
+  for (const int dir : {0, 1})
+  {
+    TopoDS_Shape                 result;
+    Handle(BRepTools_History)    history;
+    NCollection_Vector<Junction> report;
+    if (!attempt(theShape, theRadii, result, history, report, Standard_True, dir))
+      continue;
+    bool creased = false;
+    for (const Junction& j : report)
+      creased = creased || j.EndAngle[0] > kMaxCrease || j.EndAngle[1] > kMaxCrease;
+#ifdef YPATCH_TRACE
+    if (creased)
+      std::printf("YPatch: pinch law %d rejected: crease above 30 degrees\n", dir);
+#endif
+    if (creased)
+      continue;
+    theResult  = result;
+    theHistory = history;
+    theReport  = report;
+    return Standard_True;
+  }
+  return Standard_False;
 }
