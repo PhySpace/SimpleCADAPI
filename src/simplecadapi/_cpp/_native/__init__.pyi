@@ -781,6 +781,10 @@ def _interpolated_bspline_edge(points: collections.abc.Sequence[typing.Annotated
     """
     An interpolating B-spline edge through the points (GeomAPI_Interpolate).
     """
+def _kernel_capabilities() -> dict:
+    """
+    Kernel strategies the linked OpenCASCADE carries: y_patch (fillet_rsolid strategy_auto_y_patch), graph_patch (make_surface_patch_rface strategy_graph_patch).
+    """
 def _locate_anchor(within: OperationNode, stable: typing.Any) -> typing.Any:
     """
     The anchor {node_id, output_slot, kind, topo_id} a stable anchor names upstream of `within`, or None.
