@@ -146,3 +146,9 @@ sections, cannot be G1 to both constant-radius bands, whose T-contacts cross at 
 be distributed. Default `pinchDir = 1` balances it (7.5° / 8.0° at flush r5); `0` makes the convex side G1 (17.3° on the
 concave side), which Plasticity's face layout suggests it does. Against Plasticity Y-off (exact sample points to ours):
 0.078 / 0.262 mm RMS / max at r5, about a third of the distance to its Y-on result.
+
+**D11. The pinch crease goes to the concave side, as in Plasticity (owner, 2026-11-24).** The pinch tries the law that
+keeps the convex band G1 at P*'s section first (concave crease ≈ 17° at flush r5); where the cusp is too narrow for it
+(r = 1, the curved side) or it would leave a crease above 30° (the inclined top measured 90°), the balanced law. Case
+family: failures 0; 33 junctions convex-G1, 10 balanced, largest crease 23.6°; every case whose standard result fails
+takes the pinch.

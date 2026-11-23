@@ -15,7 +15,8 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   or if the transition fails its validity, self-interference and continuity checks, the standard algorithm runs alone.
   Without the flag the kernel falls back at such a junction, when its standard result fails, is invalid or
   self-intersects, to the pinch corner (both bands taper along one shared curve to a point at the junction vertex,
-  like Plasticity with Y-Blend off; a crease of about 8 degrees remains where the taper starts), then to the Y
+  like Plasticity with Y-Blend off: the convex band stays G1 and the concave one keeps a crease of about 17 degrees
+  where the taper starts, shared between both sides where that layout does not fit), then to the Y
   transition. A valid standard result is kept, and fillets without such a junction are unchanged.
 
   ![A post flush with both plate sides, r = 5, shaded and zebra](img/y-patch/flush-post-overview.png)
