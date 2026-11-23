@@ -8,10 +8,18 @@
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepLib.hxx>
+#include <BRep_Builder.hxx>
+#include <Geom2dAPI_Interpolate.hxx>
+#include <Geom2d_BSplineCurve.hxx>
 #include <Geom2d_BezierCurve.hxx>
 #include <Geom_BezierSurface.hxx>
+#include <Precision.hxx>
+#include <TColStd_HArray1OfReal.hxx>
+#include <TColgp_HArray1OfPnt2d.hxx>
 #include <TopExp.hxx>
+#include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
+#include <TopoDS.hxx>
 #include <math.hxx>
 #include <math_Jacobi.hxx>
 #include <math_Recipes.hxx>
@@ -21,6 +29,7 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 namespace
 {
@@ -28,11 +37,27 @@ constexpr int N = 8, n = N + 1, samples = 2 * N + 1, dim = n * n;
 using Basis = std::array<double, n>;
 using Row   = std::array<double, dim>;
 
-void require(bool b)
+// Acceptance of a patch whose boundary data are not exactly polynomial (curved supports): the
+// largest distance to a support edge (model units), the largest normal angle to a G1/G2 support
+// (radians) and the cross-boundary normal curvature difference to a G2 support, relative to
+// max(|curvature|, 1 / patch size). Measured on the built face, densely along every edge.
+constexpr double TolGap = 1e-3, TolAngle = 1e-3, TolCurvature = 0.05;
+// Best fit of inexact data: position rows weigh this much more than derivative rows (which are
+// scaled to lengths by the patch size); the prior enters with this weight relative to the data.
+constexpr double PositionWeight = 10, PriorWeight = 0.1;
+
+void check(bool b, int line)
 {
   if (!b)
+  {
+#ifdef GRAPHPATCH_TRACE
+    printf("[graphpatch] check at line %d refused\n", line);
+#endif
+    (void)line;
     throw Standard_ConstructionError("GraphPatch: outside graph or fit domain");
+  }
 }
+#define require(b) check(b, __LINE__)
 
 double binom(int a, int b)
 {
@@ -70,8 +95,9 @@ Row row(double u, double v, int du, int dv)
 
 struct Jet
 {
-  gp_Pnt p;
-  double z[6];
+  gp_Pnt   p;
+  double   z[6];
+  gp_Pnt2d uv; // on the support
 };
 
 Jet jet(const BRepAdaptor_Curve2d& c,
@@ -83,6 +109,7 @@ Jet jet(const BRepAdaptor_Curve2d& c,
   auto   uv = c.Value(c.FirstParameter() * (1 - t) + c.LastParameter() * t);
   gp_Vec u, v, uu, vv, uvv;
   Jet    s{};
+  s.uv = uv;
   if (order == 0)
     s.p = surf.Value(uv.X(), uv.Y());
   else if (order == 1)
@@ -164,69 +191,166 @@ gp_Trsf plane(int count, const TopoDS_Edge* edges)
   return f;
 }
 
-math_Vector solve(const std::vector<Row>& rows, const std::vector<double>& values)
+double dot(const Row& r, const math_Vector& x)
 {
-  int         m = std::max(dim, int(rows.size()));
-  math_Matrix A(1, m, 1, dim, 0.), V(1, dim, 1, dim);
-  math_Vector W(1, dim), b(1, m, 0.), x(1, dim);
-  for (size_t i = 0; i < rows.size(); ++i)
+  double s = 0;
+  for (int j = 0; j < dim; ++j)
+    s += r[j] * x(j + 1);
+  return s;
+}
+
+double norm(const std::vector<Row>& rows)
+{
+  double s = 0;
+  for (auto& r : rows)
+    for (double v : r)
+      s += v * v;
+  return sqrt(s);
+}
+
+// What decides the freedom the boundary data leave: least-squares rows with target values.
+// Rows that are height targets carry the factor turning their residual into model units.
+struct Prior
+{
+  std::vector<Row>    rows;
+  std::vector<double> values, units;
+
+  void add(const std::vector<Row>&    r,
+           const std::vector<double>& v,
+           double                     scale,
+           const std::vector<double>* u = nullptr)
   {
-    b(1 + i) = values[i];
-    for (int j = 0; j < dim; ++j)
-      A(i + 1, j + 1) = rows[i][j];
-  }
-  require(SVD_Decompose(A, W, V) == 0);
-  double           eps = W(W.Max()) * 1e-11;
-  std::vector<int> null;
-  for (int i = 1; i <= dim; ++i)
-    if (W(i) <= eps)
+    for (size_t i = 0; i < r.size(); ++i)
     {
-      W(i) = 0.;
-      null.push_back(i);
+      Row s = r[i];
+      for (double& c : s)
+        c *= scale;
+      rows.push_back(s);
+      values.push_back(v[i] * scale);
+      units.push_back(u ? (*u)[i] / scale : 0.);
     }
-  SVD_Solve(A, W, V, b, x);
-  // Remaining freedom minimizes the integrated squared Hessian in the exact
-  // null space, so fairing cannot trade away any accepted boundary constraint.
-  if (!null.empty())
+  }
+
+  // The largest distance of the graph x from the height targets.
+  double stray(const math_Vector& x) const
   {
-    int         q = int(null.size());
-    math_Matrix D(1, 3 * n * n, 1, q);
-    math_Vector rhs(1, 3 * n * n), delta(1, q), t(1, n), w(1, n);
-    math::GaussPoints(n, t);
-    math::GaussWeights(n, w);
-    int i = 0;
-    for (int a = 1; a <= n; ++a)
-      for (int b_ = 1; b_ <= n; ++b_)
-        for (int k = 0; k <= 2; ++k)
+    double d = 0;
+    for (size_t i = 0; i < rows.size(); ++i)
+      d = std::max(d, std::abs(dot(rows[i], x) - values[i]) * units[i]);
+    return d;
+  }
+};
+
+// The integrated squared Hessian of the graph over the domain square.
+Prior hessian()
+{
+  Prior       p;
+  math_Vector t(1, n), w(1, n);
+  math::GaussPoints(n, t);
+  math::GaussWeights(n, w);
+  for (int a = 1; a <= n; ++a)
+    for (int b = 1; b <= n; ++b)
+      for (int k = 0; k <= 2; ++k)
+      {
+        auto   r      = row((t(a) + 1) / 2, (t(b) + 1) / 2, 2 - k, k);
+        double weight = sqrt(w(a) * w(b) * (k == 1 ? 2. : 1.));
+        for (double& c : r)
+          c *= weight;
+        p.rows.push_back(r);
+        p.values.push_back(0.);
+        p.units.push_back(0.);
+      }
+  return p;
+}
+
+// The boundary rows (kind = derivative order) and a prior for what they leave free. Interpolating
+// (the research solver), the data are met exactly when they allow it and the prior only decides
+// the exact null space, so it cannot trade away an accepted constraint. Data no degree-eight
+// graph meets (curved supports) are instead fitted together with the prior, positions weighted
+// and the prior weak. When the prior is the supports' continuation, a target in itself, that fit
+// also decides the directions the data barely determine (which an interpolant fills with
+// whatever meets the data); an exact interpolant is then kept only if it strays from the
+// continuation at most twice as far as the fit. `exact` reports whether the data were met.
+math_Vector solve(const std::vector<Row>&    rows,
+                  const std::vector<double>& values,
+                  const std::vector<int>&    kinds,
+                  const Prior&               prior,
+                  bool                       continued,
+                  bool&                      exact)
+{
+  math_Vector x(1, dim);
+  auto        met = [&](const math_Vector& y) {
+    bool ok = true;
+    for (size_t i = 0; i < rows.size(); ++i)
+      ok = ok && std::abs(dot(rows[i], y) - values[i]) <= 1e-5;
+    return ok;
+  };
+  {
+    int         m = std::max(dim, int(rows.size()));
+    math_Matrix A(1, m, 1, dim, 0.), V(1, dim, 1, dim);
+    math_Vector W(1, dim), b(1, m, 0.);
+    for (size_t i = 0; i < rows.size(); ++i)
+    {
+      b(1 + i) = values[i];
+      for (int j = 0; j < dim; ++j)
+        A(i + 1, j + 1) = rows[i][j];
+    }
+    require(SVD_Decompose(A, W, V) == 0);
+    double           eps = W(W.Max()) * 1e-11;
+    std::vector<int> null;
+    for (int i = 1; i <= dim; ++i)
+      if (W(i) <= eps)
+      {
+        W(i) = 0.;
+        null.push_back(i);
+      }
+    SVD_Solve(A, W, V, b, x);
+    if (!null.empty())
+    {
+      int         q = int(null.size()), p = int(prior.rows.size());
+      math_Matrix D(1, p, 1, q);
+      math_Vector rhs(1, p), delta(1, q);
+      for (int i = 0; i < p; ++i)
+      {
+        rhs(i + 1) = prior.values[i] - dot(prior.rows[i], x);
+        for (int c = 0; c < q; ++c)
         {
-          auto r = row((t(a) + 1) / 2, (t(b_) + 1) / 2, 2 - k, k);
-          ++i;
-          double weight = sqrt(w(a) * w(b_) * (k == 1 ? 2. : 1.));
-          rhs(i)        = 0;
+          double sum = 0;
           for (int j = 0; j < dim; ++j)
-            rhs(i) -= weight * r[j] * x(j + 1);
-          for (int c = 0; c < q; ++c)
-          {
-            double sum = 0;
-            for (int j = 0; j < dim; ++j)
-              sum += r[j] * V(j + 1, null[c]);
-            D(i, c + 1) = sum * weight;
-          }
+            sum += prior.rows[i][j] * V(j + 1, null[c]);
+          D(i + 1, c + 1) = sum;
         }
-    math_SVD svd(D);
-    require(svd.IsDone());
-    svd.Solve(rhs, delta, 1e-11);
-    for (int j = 1; j <= dim; ++j)
-      for (int c = 0; c < q; ++c)
-        x(j) += V(j, null[c]) * delta(c + 1);
+      }
+      math_SVD svd(D);
+      require(svd.IsDone());
+      svd.Solve(rhs, delta, 1e-11);
+      for (int j = 1; j <= dim; ++j)
+        for (int c = 0; c < q; ++c)
+          x(j) += V(j, null[c]) * delta(c + 1);
+    }
+    if ((exact = met(x)) && !continued)
+      return x;
   }
-  for (size_t i = 0; i < rows.size(); ++i)
+  const math_Vector interpolant = x;
+  const double scale = PriorWeight * norm(rows) / norm(prior.rows);
+  const int    total = int(rows.size() + prior.rows.size());
+  math_Matrix  M(1, std::max(dim, total), 1, dim, 0.);
+  math_Vector  r(1, std::max(dim, total), 0.);
+  for (int i = 0; i < total; ++i)
   {
-    double err = -values[i];
+    bool        data = i < int(rows.size());
+    const Row&  row_ = data ? rows[i] : prior.rows[i - rows.size()];
+    double      w    = data ? (kinds[i] ? 1. : PositionWeight) : scale;
+    r(i + 1)         = w * (data ? values[i] : prior.values[i - rows.size()]);
     for (int j = 0; j < dim; ++j)
-      err += rows[i][j] * x(j + 1);
-    require(std::abs(err) <= 1e-5);
+      M(i + 1, j + 1) = w * row_[j];
   }
+  math_SVD fit(M);
+  require(fit.IsDone());
+  fit.Solve(r, x, 1e-13);
+  if (exact && prior.stray(interpolant) <= 2 * prior.stray(x) + Precision::Confusion())
+    return interpolant;
+  exact = met(x);
   return x;
 }
 
@@ -400,7 +524,8 @@ bool rectangle(const std::vector<std::array<Jet, samples>>& ss,
           double err = -s.z[k] * pow(w, du[k]) * pow(h, dv[k]);
           for (int j = 0; j < dim; ++j)
             err += r[j] * x(j + 1);
-          require(std::abs(err) <= 1e-6);
+          if (std::abs(err) > 1e-6)
+            return false; // not a polynomial trace: the general fit decides
         }
     }
   TColgp_Array2OfPnt p(1, n, 1, n);
@@ -409,9 +534,155 @@ bool rectangle(const std::vector<std::array<Jet, samples>>& ss,
       p(a + 1, b_ + 1) =
         gp_Pnt(xmin + w * a / N, ymin + h * b_ / N, x(1 + n * a + b_)).Transformed(f);
   auto face = BRepBuilderAPI_MakeFace(new Geom_BezierSurface(p), 1e-7).Face();
-  require(BRepCheck_Analyzer(face).IsValid());
+  if (!BRepCheck_Analyzer(face).IsValid())
+    return false;
   out = face;
   return true;
+}
+
+// Height over the frame point (x, y) of the surface carrying a support, continued by Newton from
+// uv; false where that surface is no graph over the frame plane.
+bool height(const BRepAdaptor_Surface& s,
+            const gp_Trsf&             inv,
+            double                     x,
+            double                     y,
+            gp_Pnt2d                   uv,
+            double                     tol,
+            double&                    z)
+{
+  for (int it = 0; it < 30; ++it)
+  {
+    gp_Pnt p;
+    gp_Vec du, dv;
+    s.D1(uv.X(), uv.Y(), p, du, dv);
+    p.Transform(inv);
+    du.Transform(inv);
+    dv.Transform(inv);
+    const double ex = p.X() - x, ey = p.Y() - y;
+    if (std::hypot(ex, ey) <= tol)
+    {
+      z = p.Z();
+      return true;
+    }
+    const double det = du.X() * dv.Y() - du.Y() * dv.X();
+    if (std::abs(det) <= 1e-9 * du.Magnitude() * dv.Magnitude())
+      return false;
+    uv.SetCoord(uv.X() - (dv.Y() * ex - dv.X() * ey) / det,
+                uv.Y() - (du.X() * ey - du.Y() * ex) / det);
+  }
+  return false;
+}
+
+bool inside(const std::vector<gp_Pnt2d>& polygon, double x, double y)
+{
+  bool in = false;
+  for (size_t i = 0, j = polygon.size() - 1; i < polygon.size(); j = i++)
+  {
+    const gp_Pnt2d &a = polygon[i], &b = polygon[j];
+    if ((a.Y() > y) != (b.Y() > y) && x < b.X() + (a.X() - b.X()) * (y - b.Y()) / (a.Y() - b.Y()))
+      in = !in;
+  }
+  return in;
+}
+
+// The supports continued over the loop: the height of each support's surface, from the nearest
+// sample of its edges, blended by inverse distance to those edges. A hole cut in one surface
+// is so filled by (the best degree-eight graph of) that surface. Empty when some interior point
+// has no such height (supports that are no graphs over the frame, as walls under a lid).
+Prior reference(int                                          count,
+                const TopoDS_Face*                           fs,
+                const std::vector<std::array<Jet, samples>>& ss,
+                const std::vector<gp_Pnt2d>&                 polygon,
+                const gp_Trsf&                               inv,
+                double                                       xmin,
+                double                                       ymin,
+                double                                       L)
+{
+  std::vector<int> group(count);
+  std::vector<std::unique_ptr<BRepAdaptor_Surface>> surfaces(count);
+  for (int i = 0; i < count; ++i)
+  {
+    group[i] = i;
+    for (int j = 0; j < i && group[i] == i; ++j)
+      if (fs[j].IsSame(fs[i]))
+        group[i] = group[j];
+    if (group[i] == i)
+      surfaces[i] = std::make_unique<BRepAdaptor_Surface>(fs[i]);
+  }
+  constexpr int    G = 2 * N;
+  math_Vector      t(1, G), w(1, G);
+  std::vector<Row> rows;
+  std::vector<double> values, units;
+  math::GaussPoints(G, t);
+  math::GaussWeights(G, w);
+  for (int a = 1; a <= G; ++a)
+    for (int b = 1; b <= G; ++b)
+    {
+      const double u = (t(a) + 1) / 2, v = (t(b) + 1) / 2, x = xmin + L * u, y = ymin + L * v;
+      if (!inside(polygon, u, v))
+        continue;
+      double sum = 0, weights = 0;
+      for (int g = 0; g < count; ++g)
+      {
+        if (group[g] != g)
+          continue;
+        double   d = 1e100, z;
+        gp_Pnt2d start;
+        for (int i = 0; i < count; ++i)
+          for (const auto& s : ss[i])
+            if (group[i] == g && std::hypot(s.p.X() - x, s.p.Y() - y) < d)
+            {
+              d     = std::hypot(s.p.X() - x, s.p.Y() - y);
+              start = s.uv;
+            }
+        if (height(*surfaces[g], inv, x, y, start, 1e-10 * L, z))
+        {
+          const double weight = 1 / pow(d / L + 1e-6, 4);
+          sum += weight * z;
+          weights += weight;
+        }
+      }
+      if (weights == 0)
+        return {};
+      auto         r     = row(u, v, 0, 0);
+      const double scale = sqrt(w(a) * w(b));
+      for (double& c : r)
+        c *= scale;
+      rows.push_back(r);
+      values.push_back(scale * sum / weights);
+      units.push_back(1 / scale);
+    }
+  Prior p;
+  if (rows.empty())
+    return p;
+  p.add(rows, values, 1 / norm(rows), &units);
+  // keeps the part of the square outside the loop determined
+  Prior h = hessian();
+  p.add(h.rows, h.values, 1e-6 / norm(h.rows));
+  return p;
+}
+
+void setPole(const Handle(Geom2d_BoundedCurve)& c, bool first, const gp_Pnt2d& p)
+{
+  if (auto b = Handle(Geom2d_BezierCurve)::DownCast(c))
+    b->SetPole(first ? 1 : b->NbPoles(), p);
+  else if (auto s = Handle(Geom2d_BSplineCurve)::DownCast(c))
+    s->SetPole(first ? 1 : s->NbPoles(), p);
+}
+
+// Normal curvature along the tangent d of a surface with derivatives su .. suv and unit normal nn.
+double curvature(const gp_Vec& su,
+                 const gp_Vec& sv,
+                 const gp_Vec& suu,
+                 const gp_Vec& svv,
+                 const gp_Vec& suv,
+                 const gp_Vec& d,
+                 const gp_Vec& nn)
+{
+  const double E = su.Dot(su), F = su.Dot(sv), G = sv.Dot(sv), det = E * G - F * F;
+  const double a = (G * d.Dot(su) - F * d.Dot(sv)) / det, b = (E * d.Dot(sv) - F * d.Dot(su)) / det;
+  return (suu.Dot(nn) * a * a + 2 * suv.Dot(nn) * a * b + svv.Dot(nn) * b * b)
+         / (E * a * a + 2 * F * a * b + G * b * b);
 }
 } // namespace
 
@@ -469,11 +740,13 @@ bool BRepOffsetAPI_GraphPatch::TryBuild(int                count,
     }
     math_SVD trim(B);
     require(trim.IsDone());
-    std::vector<Row>                        A;
-    std::vector<double>                     rhs;
-    std::vector<Handle(Geom2d_BezierCurve)> curves;
-    gp_Pnt2d                                start, last;
-    const int                               du[] = {0, 1, 0, 2, 1, 0}, dv[] = {0, 0, 1, 0, 1, 2};
+    std::vector<Row>                         A;
+    std::vector<double>                      rhs;
+    std::vector<int>                         kinds;
+    std::vector<Handle(Geom2d_BoundedCurve)> curves;
+    std::vector<bool>                        reversed;
+    gp_Pnt2d                                 start, last;
+    const int                                du[] = {0, 1, 0, 2, 1, 0}, dv[] = {0, 0, 1, 0, 1, 2};
     for (int i = 0; i < count; ++i)
     {
       TColgp_Array1OfPnt2d p(1, n);
@@ -489,15 +762,41 @@ bool BRepOffsetAPI_GraphPatch::TryBuild(int                count,
           {
             A.push_back(row(u, v, du[k], dv[k]));
             rhs.push_back(s.z[k] * pow(L, du[k] + dv[k]));
+            kinds.push_back(du[k] + dv[k]);
           }
       }
       trim.Solve(bx, x);
       trim.Solve(by, y);
       for (int k = 1; k <= n; ++k)
         p(k) = {x(k), y(k)};
-      Handle(Geom2d_BezierCurve) c = new Geom2d_BezierCurve(p);
+      Handle(Geom2d_BoundedCurve) c = new Geom2d_BezierCurve(p);
+      bool polynomial = true;
       for (int j = 0; j < samples; ++j)
-        require(c->Value(double(j) / (samples - 1)).Distance({bx(j + 1), by(j + 1)}) * L <= 1e-7);
+        polynomial = polynomial
+                     && c->Value(double(j) / (samples - 1)).Distance({bx(j + 1), by(j + 1)}) * L <= 1e-7;
+      if (!polynomial)
+      {
+        // The projected edge is no degree-eight polynomial in its parameter (an intersection
+        // curve, an oblique arc): interpolate it densely on the same parameter instead.
+        BRepAdaptor_Curve2d             pc(es[i], fs[i]);
+        BRepAdaptor_Surface             surf(fs[i]);
+        const int                       m = 8 * N + 1;
+        Handle(TColgp_HArray1OfPnt2d)   pts = new TColgp_HArray1OfPnt2d(1, m);
+        Handle(TColStd_HArray1OfReal)   prm = new TColStd_HArray1OfReal(1, m);
+        for (int j = 0; j < m; ++j)
+        {
+          const double t  = double(j) / (m - 1);
+          const auto   uv = pc.Value(pc.FirstParameter() * (1 - t) + pc.LastParameter() * t);
+          const gp_Pnt q  = surf.Value(uv.X(), uv.Y()).Transformed(inv);
+          pts->SetValue(j + 1, gp_Pnt2d((q.X() - xmin) / L, (q.Y() - ymin) / L));
+          prm->SetValue(j + 1, t);
+        }
+        Geom2dAPI_Interpolate interpolate(pts, prm, false, Precision::Confusion() / L);
+        interpolate.Perform();
+        require(interpolate.IsDone());
+        c = interpolate.Curve();
+      }
+      bool flip = false;
       if (!i)
       {
         auto nextDist = [&](gp_Pnt2d pt) {
@@ -505,32 +804,108 @@ bool BRepOffsetAPI_GraphPatch::TryBuild(int                count,
             pt.Distance({(ss[1][0].p.X() - xmin) / L, (ss[1][0].p.Y() - ymin) / L}),
             pt.Distance({(ss[1].back().p.X() - xmin) / L, (ss[1].back().p.Y() - ymin) / L}));
         };
-        if (nextDist(c->StartPoint()) < nextDist(c->EndPoint()))
-          c->Reverse();
-        start = c->StartPoint();
+        flip = nextDist(c->StartPoint()) < nextDist(c->EndPoint());
       }
       else
-      {
-        if (last.Distance(c->EndPoint()) < last.Distance(c->StartPoint()))
-          c->Reverse();
+        flip = last.Distance(c->EndPoint()) < last.Distance(c->StartPoint());
+      if (flip)
+        c->Reverse();
+      if (!i)
+        start = c->StartPoint();
+      else
         require(last.Distance(c->StartPoint()) * L <= 1e-6);
-      }
       last = c->EndPoint();
       curves.push_back(c);
+      reversed.push_back(flip);
     }
     require(start.Distance(last) * L <= 1e-6);
-    auto               z = solve(A, rhs);
+    // Consecutive trims end exactly where the next starts, so the wire closes on their vertices.
+    for (int i = 0; i < count; ++i)
+    {
+      const auto& a = curves[i];
+      const auto& b = curves[(i + 1) % count];
+      gp_Pnt2d    p((a->EndPoint().XY() + b->StartPoint().XY()) / 2);
+      setPole(a, false, p);
+      setPole(b, true, p);
+    }
+    std::vector<gp_Pnt2d> polygon;
+    for (auto& c : curves)
+      for (int j = 0; j < 4 * N; ++j)
+        polygon.push_back(c->Value(c->FirstParameter() + (c->LastParameter() - c->FirstParameter()) * j / (4. * N)));
+    // Without supports to continue, the freedom left is faired by the squared Hessian.
+    Prior prior     = reference(count, fs, ss, polygon, inv, xmin, ymin, L);
+    bool  continued = !prior.rows.empty(), exact;
+    if (!continued)
+      prior = hessian();
+    auto               z = solve(A, rhs, kinds, prior, continued, exact);
     TColgp_Array2OfPnt poles(1, n, 1, n);
     for (int i = 0; i < n; ++i)
       for (int j = 0; j < n; ++j)
         poles(i + 1, j + 1) =
           gp_Pnt(xmin + L * i / N, ymin + L * j / N, z(1 + i * n + j)).Transformed(f);
     Handle(Geom_BezierSurface) base = new Geom_BezierSurface(poles);
-    BRepBuilderAPI_MakeWire    wire;
+    // Validate the built patch against its supports, densely along every edge.
+    double gap = 0, angle = 0, bend = 0;
+    for (int i = 0; i < count; ++i)
+    {
+      BRepAdaptor_Curve2d pc(es[i], fs[i]);
+      BRepAdaptor_Surface s(fs[i]);
+      for (int j = 0; j <= 4 * N; ++j)
+      {
+        const double t = j / (4. * N), te = reversed[i] ? 1 - t : t;
+        gp_Pnt2d     uv;
+        gp_Vec2d     duv;
+        pc.D1(pc.FirstParameter() * (1 - te) + pc.LastParameter() * te, uv, duv);
+        gp_Pnt   P, Q;
+        gp_Vec   su, sv, suu, svv, suv, bu, bv, buu, bvv, buv;
+        gp_Pnt2d q = curves[i]->Value(curves[i]->FirstParameter() * (1 - t) + curves[i]->LastParameter() * t);
+        s.D2(uv.X(), uv.Y(), P, su, sv, suu, svv, suv);
+        base->D2(q.X(), q.Y(), Q, bu, bv, buu, bvv, buv);
+        gap = std::max(gap, P.Distance(Q));
+        if (orders[i] == 0)
+          continue;
+        gp_Vec ns = su.Crossed(sv).Normalized(), nb = bu.Crossed(bv).Normalized();
+        if (ns.Dot(nb) < 0)
+          nb.Reverse();
+        angle = std::max(angle, ns.Angle(nb));
+        if (orders[i] == 1)
+          continue;
+        const gp_Vec d  = ns.Crossed(su * duv.X() + sv * duv.Y()).Normalized();
+        const double ks = curvature(su, sv, suu, svv, suv, d, ns);
+        const double kb = curvature(bu, bv, buu, bvv, buv, d, nb);
+        bend            = std::max(bend, std::abs(ks - kb) / std::max(std::abs(ks), 1 / L));
+      }
+    }
+#ifdef GRAPHPATCH_TRACE
+    printf("[graphpatch] %s fit, %s; gap %.3g angle %.3g curvature %.3g\n",
+           exact ? "exact" : "best",
+           continued ? "supports continued" : "Hessian faired",
+           gap,
+           angle,
+           bend);
+#endif
+    require(gap <= TolGap && angle <= TolAngle && bend <= TolCurvature);
+    BRepBuilderAPI_MakeWire wire;
     for (auto& c : curves)
       wire.Add(BRepBuilderAPI_MakeEdge(c, base).Edge());
     auto face = BRepBuilderAPI_MakeFace(base, wire.Wire(), true).Face();
-    require(BRepLib::BuildCurves3d(face, 1e-8) && BRepCheck_Analyzer(face).IsValid());
+    require(BRepLib::BuildCurves3d(face, 1e-8));
+    // The edges are on the patch; their tolerance covers the gap to the supports' edges.
+    if (gap > Precision::Confusion())
+    {
+      BRep_Builder builder;
+      for (TopExp_Explorer ex(face, TopAbs_EDGE); ex.More(); ex.Next())
+      {
+        const auto& e = TopoDS::Edge(ex.Current());
+        builder.UpdateEdge(e, std::max(gap, BRep_Tool::Tolerance(e)));
+      }
+      for (TopExp_Explorer ex(face, TopAbs_VERTEX); ex.More(); ex.Next())
+      {
+        const auto& v = TopoDS::Vertex(ex.Current());
+        builder.UpdateVertex(v, std::max(gap, BRep_Tool::Tolerance(v)));
+      }
+    }
+    require(BRepCheck_Analyzer(face).IsValid());
     out = face;
     return true;
   }
