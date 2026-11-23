@@ -10,7 +10,7 @@ diff --git a/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.hxx b/src/BRepFilletAPI/
  class TopoDS_Shape;
  class TopoDS_Edge;
  class Law_Function;
-@@ -324,6 +326,30 @@
+@@ -324,6 +326,32 @@
    //! contours and fillet parameters in order to rebuild the shape.
    Standard_EXPORT void Reset() Standard_OVERRIDE;
  
@@ -20,9 +20,11 @@ diff --git a/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.hxx b/src/BRepFilletAPI/
 +  //! On: Build() tries the Y transition first; when it cannot be built and verified, the
 +  //! standard algorithm runs.
 +  //! Off (default): the standard algorithm runs.  Only when the contours hold such a junction
-+  //! and the standard result is not done, invalid or self-interfering, the Y transition
-+  //! replaces it (YPatchFallback() then answers true).  Without a junction nothing is checked
-+  //! and the result is the standard one, unchanged.
++  //! and the standard result is not done, invalid or self-interfering, a pinch replaces it
++  //! (both bands narrow to the junction vertex along one shared curve), or, when the pinch
++  //! cannot be built and verified, the Y transition; YPatchFallback() then answers true and
++  //! YPatchJunction(i).Pinch tells which.  Without a junction nothing is checked and the
++  //! result is the standard one, unchanged.
 +  Standard_EXPORT void SetYPatch(const Standard_Boolean theOn);
 +
 +  Standard_EXPORT Standard_Boolean YPatch() const;
@@ -41,7 +43,7 @@ diff --git a/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.hxx b/src/BRepFilletAPI/
    //! Returns the internal topology building algorithm.
    Standard_EXPORT Handle(TopOpeBRepBuild_HBuilder) Builder() const;
  
-@@ -398,6 +424,12 @@
+@@ -398,6 +426,12 @@
  private:
    ChFi3d_FilBuilder   myBuilder;
    TopTools_MapOfShape myMap;
@@ -120,7 +122,7 @@ diff --git a/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.cxx b/src/BRepFilletAPI/
  void BRepFilletAPI_MakeFillet::SetParams(const Standard_Real Tang,
                                           const Standard_Real Tesp,
                                           const Standard_Real T2d,
-@@ -372,13 +414,85 @@
+@@ -372,13 +414,89 @@
  
  void BRepFilletAPI_MakeFillet::Build(const Message_ProgressRange& /*theRange*/)
  {
@@ -189,16 +191,20 @@ diff --git a/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.cxx b/src/BRepFilletAPI/
 +  }
 +  if (!sound)
 +  {
-+    TopoDS_Shape result;
-+    if (BRepFilletAPI_YPatch::Perform(myInput, radii, result, myYHistory, myYReport))
++    // the pinch first (no faces of its own between the bands), then the Y transition
++    for (const Standard_Boolean pinch : {Standard_True, Standard_False})
 +    {
-+      myShape     = result;
-+      myYFallback = Standard_True;
-+      Done();
-+      return;
++      TopoDS_Shape result;
++      if (BRepFilletAPI_YPatch::Perform(myInput, radii, result, myYHistory, myYReport, pinch))
++      {
++        myShape     = result;
++        myYFallback = Standard_True;
++        Done();
++        return;
++      }
++      myYHistory.Nullify();
++      myYReport.Clear();
 +    }
-+    myYHistory.Nullify();
-+    myYReport.Clear();
 +  }
    if (myBuilder.IsDone())
    {
@@ -209,7 +215,7 @@ diff --git a/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.cxx b/src/BRepFilletAPI/
      TopExp_Explorer ex;
      for (ex.Init(myShape, TopAbs_FACE); ex.More(); ex.Next())
      {
-@@ -394,6 +508,9 @@
+@@ -394,6 +512,9 @@
    NotDone();
    myBuilder.Reset();
    myMap.Clear();
@@ -219,7 +225,7 @@ diff --git a/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.cxx b/src/BRepFilletAPI/
  }
  
  //=================================================================================================
-@@ -436,6 +553,8 @@
+@@ -436,6 +557,8 @@
  
  const TopTools_ListOfShape& BRepFilletAPI_MakeFillet::Generated(const TopoDS_Shape& EorV)
  {
@@ -228,7 +234,7 @@ diff --git a/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.cxx b/src/BRepFilletAPI/
    return myBuilder.Generated(EorV);
  }
  
-@@ -444,6 +563,11 @@
+@@ -444,6 +567,11 @@
  const TopTools_ListOfShape& BRepFilletAPI_MakeFillet::Modified(const TopoDS_Shape& F)
  {
    myGenerated.Clear();
@@ -240,7 +246,7 @@ diff --git a/src/BRepFilletAPI/BRepFilletAPI_MakeFillet.cxx b/src/BRepFilletAPI/
  
    if (myBuilder.Builder()->IsSplit(F, TopAbs_OUT))
    {
-@@ -476,6 +600,8 @@
+@@ -476,6 +604,8 @@
  
  Standard_Boolean BRepFilletAPI_MakeFillet::IsDeleted(const TopoDS_Shape& F)
  {

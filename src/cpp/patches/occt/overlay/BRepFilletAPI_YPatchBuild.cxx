@@ -14,6 +14,9 @@
 #include <BRepClass_FaceClassifier.hxx>
 #include <BRepFilletAPI_MakeFillet.hxx>
 #include <BRepLib.hxx>
+#include <ShapeBuild_ReShape.hxx>
+#include <ShapeFix_Wireframe.hxx>
+#include <TopTools_DataMapOfShapeShape.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
 #include <Geom2d_Line.hxx>
 #include <Geom_ElementarySurface.hxx>
@@ -47,6 +50,7 @@
 #include <Geom_Curve.hxx>
 #include <Standard_Failure.hxx>
 #include <TColgp_Array2OfPnt.hxx>
+#include <TColStd_Array2OfReal.hxx>
 #include <TColStd_Array1OfInteger.hxx>
 #include <TColStd_Array1OfReal.hxx>
 #include <TopExp.hxx>
@@ -272,10 +276,16 @@ struct Work
   std::array<Row, 4>                    nrms[2];
   V                                     seam0, seam1;
   Handle(Geom_Surface)                  bandSurf[2]; // the band each ribbon was fitted to (if refitted)
+  double                                endGap = 0;  // pinch: canal end section vs the band end built
   gp_Pnt2d                              keepOutT, keepOutA, keepOutB;
   std::vector<TopoDS_Edge>              cuts;
   std::vector<TopoDS_Face>              fillers, fillerOf; // margin mode: strip faces and their supports
   bool                                  pinch = false; // pinch instead of Y (see PinchSections)
+  // margin mode, per side (0 convex, 1 concave): the offset points and the offset cut edge,
+  // and the filler's index, so that a pinch can rebuild its filler after refitting its end
+  std::vector<gp_Pnt2d>                 marginOffset[2];
+  TopoDS_Edge                           marginCut[2];
+  int                                   fillerIndex[2] = {-1, -1};
 
   explicit Work(const BRepFilletAPI_YPatch::Junction& jj)
       : j(jj),
@@ -367,65 +377,252 @@ struct Work
     return false;
   }
 
-  // Pinch sections: between V and P* both bands are rolling balls whose radius shrinks to
-  // zero at V, and whose contacts on T coincide (they divide the wedge of T in the ratio of
-  // the radii).  The two bands then touch T, and so each other, along one curve: G1, no
-  // ribbon between them, and T's wedge is consumed.  At P* the radii are the bands' own.
+  // The concave ball tangent to T at uvq (centre outside the material) and to A.
+  bool ConcaveAt(const gp_Pnt2d& uvq, double& rho, gp_Pnt2d& uvA) const
+  {
+    const gp_Pnt q  = T.P(uvq);
+    const gp_Vec nT = T.N(uvq);
+    for (int it = 0; it < 80; ++it)
+    {
+      const gp_Pnt c  = q.Translated(nT * rho);
+      uvA             = A.UVNear(c, uvA);
+      const gp_Vec nA = A.N(uvA);
+      const double f  = gp_Vec(A.P(uvA), c).Dot(nA) - rho, df = nT.Dot(nA) - 1;
+      if (std::abs(f) < 1e-12 * (1 + rho))
+        return rho > 0;
+      if (std::abs(df) < 1e-9)
+        return false;
+      rho = std::max(0.5 * rho, rho - f / df);
+    }
+    return false;
+  }
+
+  // Pinch: between V and P* the two bands are rolling balls of variable radius whose contacts
+  // on T coincide along one shared curve.  The curve is defined by the radius laws
+  //   rho_in = r_in h(s),  rho_out = r_out g(s),  s in [0, 1] from V to P*,
+  // each point being the one on T whose concave ball (tangent to T there and to A) and convex
+  // ball (tangent to T there and to B) have these radii.  Both radii positive keeps it inside
+  // T's wedge; h, g ~ s^2 at V make it leave V regularly between the two edges.  At P* a
+  // law with zero slope makes that band G1 to its constant-radius band (a ball tangent to T at
+  // q has a radius fixed by q and the two contact lines cross at P*, so not both can be):
+  // pinchDir 0 (default): convex G1, as in Plasticity's Y-off;
+  // 1: balanced slopes; 2: concave G1.
+  int pinchDir = 1;
+
+  static void law(int kind, double s, double& f)
+  {
+    // kind 0: zero slope at 1; kind 1: slope 1 at 1.  Both ~ s^2 at 0 (the two radii add up
+    // to the wedge's width, ~ x^2 / 2R at a tangent junction), f(1) = 1, increasing.
+    f = kind == 0 ? s * s * (1 + 2 * s - 2 * s * s) : s * s * (1 + s - s * s);
+  }
+
   void PinchSections()
   {
     in.assign(n, Ball());
     out.assign(n, Ball());
-    const double ratio = bo.r / bi.r;
-    double       rho   = 0;
-    gp_Pnt2d     uvB   = ro.UV(B.face, 0);
-    for (int i = n - 1; i >= 1; --i) // from P* back to V, warm-started
+    Ball a, b;
+    require(bi.Solve(l1, a) && bo.Solve(l2, b), "YPatch: pinch end balls");
+    const int kIn  = pinchDir == 2 ? 0 : 1;
+    const int kOut = pinchDir == 0 ? 0 : 1;
+    gp_Pnt2d  uv = a.uvT, uvA = a.uvX, uvB = b.uvX;
+    double    rIn = bi.r, rOut = bo.r;
+    for (int i = n - 2; i >= 1; --i) // from P* back to V, warm-started
     {
-      const double lambda = t[i] * l1;
-      if (i == n - 1)
-        rho = bi.r;
-      // g(rho) = rho_out(contact of the concave ball of radius rho) - ratio * rho
-      auto g    = [&](double r, Ball& ball, double& rOut, gp_Pnt2d& uv) {
-        Band band{ri, T, A, r, +1.};
-        require(band.Solve(lambda, ball), "YPatch: pinch concave ball"); // (guess at the scale of r)
-        rOut = ratio * r;
-        require(ConvexAt(ball.uvT, rOut, uv), "YPatch: pinch convex ball");
-        return rOut - ratio * r;
+      double h, g;
+      law(kIn, t[i], h);
+      law(kOut, t[i], g);
+      const double wantIn = bi.r * h, wantOut = bo.r * g;
+      // Newton on uv: (rho_in / wantIn - 1, rho_out / wantOut - 1) = 0
+      auto F = [&](const gp_Pnt2d& x, double& ri, double& ro, gp_Pnt2d& ua, gp_Pnt2d& ub, gp_XY& f) {
+        const double ri0 = ri, ro0 = ro;
+        const bool   okA = ConcaveAt(x, ri, ua), okB = okA && ConvexAt(x, ro, ub);
+#ifdef YPATCH_TRACE
+        if (!okB)
+          std::printf("YPatch: pinch node %d uv (%g %g) concave %d (%g -> %g) convex (%g -> %g)\n", i, x.X(), x.Y(),
+                      (int)okA, ri0, ri, ro0, ro);
+#endif
+        if (!okB)
+          return false;
+        f = gp_XY(ri / wantIn - 1, ro / wantOut - 1);
+        return true;
       };
-      Ball     ball;
-      double   rOut = 0;
-      gp_Pnt2d uv   = uvB;
-      for (int it = 0; it < 60; ++it)
+      // first guess: the previous point drawn towards V by the square root of the radius ratio
+      // (exact at a tangent junction; elsewhere it errs away from V, where the wedge is wider)
+      const gp_Pnt2d uvV = ri.UV(T.face, 0);
+      if (i < n - 2)
       {
-        uv             = uvB;
-        const double f = g(rho, ball, rOut, uv);
-        if (std::abs(f) < 1e-11 * (1 + bi.r))
-          break;
-        Ball         b2;
-        double       r2;
-        gp_Pnt2d     uv2 = uv;
-        const double h   = 1e-7 * (1 + rho);
-        const double df  = (g(rho + h, b2, r2, uv2) - f) / h;
-        require(std::abs(df) > 1e-14, "YPatch: pinch law");
-        rho = std::max(0.25 * rho, rho - f / df);
-        require(it < 59, "YPatch: pinch law did not converge");
+        double h1, g1;
+        law(kIn, t[i + 1], h1);
+        law(kOut, t[i + 1], g1);
+        const double ratio = std::sqrt((h + g) / (h1 + g1));
+        // along the bisector of the edges linearly, across it quadratically: the wedge of a
+        // tangent junction narrows like x^2, so a straight scaling would leave it
+        gp_XY along = toUV(T, uvV, unit(ri.T(0) + ro.T(0))).XY();
+        along /= along.Modulus();
+        const gp_XY across(-along.Y(), along.X());
+        const gp_XY d = in[i + 1].uvT.XY() - uvV.XY();
+        uv = gp_Pnt2d(uvV.XY() + along * (d * along * ratio) + across * (d * across * ratio * ratio));
       }
-      uvB     = uv;
-      in[i]   = ball;
-      out[i]  = Ball();
-      out[i].lambda = t[i];
-      out[i].uvT    = ball.uvT;
-      out[i].uvX    = uv;
-      out[i].pT     = ball.pT;
-      out[i].pX     = B.P(uv);
-      out[i].c      = ball.pT.Translated(T.N(ball.uvT) * -rOut);
-      rho *= t[i - 1] * t[i - 1] / (t[i] * t[i]); // the tangent-case law, as the next guess
+      rIn  = wantIn;
+      rOut = wantOut;
+      gp_XY f;
+      bool  done = false;
+      for (int it = 0; it < 60 && !done; ++it)
+      {
+        double   ri = rIn, ro = rOut;
+        gp_Pnt2d ua = uvA, ub = uvB;
+        require(F(uv, ri, ro, ua, ub, f), "YPatch: pinch balls");
+        rIn  = ri;
+        rOut = ro;
+        uvA  = ua;
+        uvB  = ub;
+#ifdef YPATCH_TRACE
+        if (std::getenv("YPATCH_PINCH_TRACE"))
+          std::printf("YPatch: node %d it %d |f| %.3e uv (%.9g %.9g) r %.4g %.4g\n", i, it, f.Modulus(), uv.X(), uv.Y(), rIn, rOut);
+#endif
+        if (f.Modulus() < 1e-8) // (relative to radii: 1e-11 mm near V)
+        {
+          done = true;
+          break;
+        }
+        // finite-difference jacobian in uv, step at the scale of the radii
+        gp_Pnt  p;
+        gp_Vec  du, dv;
+        T.s.D1(uv.X(), uv.Y(), p, du, dv);
+        const double hs = 1e-4 * std::max(1e-9, std::min(wantIn, wantOut));
+        const double hu = hs / std::max(du.Magnitude(), 1e-12), hv = hs / std::max(dv.Magnitude(), 1e-12);
+        gp_XY        fu, fv;
+        double       r1 = rIn, r2 = rOut;
+        gp_Pnt2d     a1 = uvA, b1 = uvB;
+        require(F(gp_Pnt2d(uv.X() + hu, uv.Y()), r1, r2, a1, b1, fu), "YPatch: pinch jacobian");
+        r1 = rIn, r2 = rOut, a1 = uvA, b1 = uvB;
+        require(F(gp_Pnt2d(uv.X(), uv.Y() + hv), r1, r2, a1, b1, fv), "YPatch: pinch jacobian");
+        const gp_XY  ju = (fu - f) / hu, jv = (fv - f) / hv;
+        const double det = ju.X() * jv.Y() - ju.Y() * jv.X();
+        require(std::abs(det) > 1e-300, "YPatch: pinch jacobian singular");
+        double dx = -(f.X() * jv.Y() - f.Y() * jv.X()) / det, dy = -(ju.X() * f.Y() - ju.Y() * f.X()) / det;
+        // stay at the scale of the radii per step
+        const double step = (du * dx + dv * dy).Magnitude(),
+                     cap  = std::max(0.5 * (wantIn + wantOut), 0.25 * p.Distance(this->ri.P(0)));
+        if (step > cap)
+        {
+          dx *= cap / step;
+          dy *= cap / step;
+        }
+        // backtrack until both balls exist (the wedge is narrow near V)
+        bool moved = false;
+        for (int bt = 0; bt < 40 && !moved; ++bt, dx *= 0.5, dy *= 0.5)
+        {
+          double   r1 = rIn, r2 = rOut;
+          gp_Pnt2d a1 = uvA, b1 = uvB;
+          gp_XY    ft;
+          const gp_Pnt2d next(uv.X() + dx, uv.Y() + dy);
+          if (ConcaveAt(next, r1, a1) && ConvexAt(next, r2, b1))
+          {
+            uv    = next;
+            moved = true;
+          }
+        }
+        require(moved, "YPatch: pinch step");
+      }
+      require(done, "YPatch: pinch curve did not converge");
+      const gp_Pnt q  = T.P(uv);
+      const gp_Vec nT = T.N(uv);
+      in[i].lambda = out[i].lambda = t[i];
+      in[i].uvT = out[i].uvT = uv;
+      in[i].pT = out[i].pT = q;
+      in[i].uvX            = uvA;
+      in[i].pX             = A.P(uvA);
+      in[i].c              = q.Translated(nT * rIn);
+      out[i].uvX           = uvB;
+      out[i].pX            = B.P(uvB);
+      out[i].c             = q.Translated(nT * -rOut);
     }
+    in[n - 1]      = a; // (the same balls: keep the band ends bit-exact)
+    out[n - 1]     = b;
+    out[n - 1].pT  = a.pT;
+    out[n - 1].uvT = a.uvT;
     // V: both sections are the point V
     const gp_Pnt v = ri.P(0);
     in[0].uvT = out[0].uvT = ri.UV(T.face, 0);
     in[0].uvX              = ri.UV(A.face, 0);
     out[0].uvX             = ro.UV(B.face, 0);
     in[0].pT = in[0].pX = in[0].c = out[0].pT = out[0].pX = out[0].c = v;
+  }
+
+  // Exact canal surface of one pinch band: every u-section is the circular arc of its ball
+  // from the contact on the support (v = 0) to the shared point on T (v = 1), a rational
+  // quadratic.  Only 1D data are interpolated along u (the homogeneous rows: both contacts,
+  // and weight * middle pole with the weight), so nothing folds where the radius vanishes;
+  // the side u = 0 is the apex V.
+  Handle(Geom_BSplineSurface) Canal(int k) const
+  {
+    const std::vector<Ball>& bs = k ? in : out;
+    const Support&           X  = k ? A : B;
+    const double             sg = k ? 1. : -1.; // centre side of T
+    Row P0(n), WP1(n), P2(n), W(n);
+    for (int i = 0; i < n; ++i)
+    {
+      gp_Vec eq, ex;
+      double rho;
+      if (i == 0)
+      {
+        eq  = T.N(bs[0].uvT) * -sg;
+        ex  = X.N(bs[0].uvX) * -sg;
+        rho = 0;
+      }
+      else
+      {
+        rho = bs[i].c.Distance(bs[i].pT);
+        eq  = gp_Vec(bs[i].c, bs[i].pT) / rho;
+        ex  = gp_Vec(bs[i].c, bs[i].pX) / rho;
+      }
+      const double th = eq.Angle(ex), w = std::cos(th / 2);
+      require(w > 1e-3, "YPatch: pinch section too open");
+      const gp_Vec mid = unit(eq + ex);
+      const gp_XYZ m   = bs[i].c.XYZ() + mid.XYZ() * (rho / w);
+      P0[i]            = bs[i].pX.XYZ();
+      P2[i]            = bs[i].pT.XYZ();
+      WP1[i]           = m * w;
+      W[i]             = V(w, 0, 0);
+    }
+    Spline basic(t, false);
+    const Row c0 = basic.fit(P0), c1 = basic.fit(WP1), c2 = basic.fit(P2), cw = basic.fit(W);
+    const int m = int(c0.size());
+    TColgp_Array2OfPnt   poles(1, m, 1, 3);
+    TColStd_Array2OfReal weights(1, m, 1, 3);
+    for (int i = 0; i < m; ++i)
+    {
+      const double w = cw[i].X();
+      require(w > 1e-6, "YPatch: pinch weight");
+      poles(i + 1, 1)   = gp_Pnt(c0[i]);
+      poles(i + 1, 2)   = gp_Pnt(c1[i] / w);
+      poles(i + 1, 3)   = gp_Pnt(c2[i]);
+      weights(i + 1, 1) = 1;
+      weights(i + 1, 2) = w;
+      weights(i + 1, 3) = 1;
+    }
+    // the not-a-knot knots of Spline (clamped = false)
+    std::vector<double> ku{0.};
+    std::vector<int>    mu{4};
+    for (int j = 2; j < n - 2; ++j)
+    {
+      ku.push_back(t[j]);
+      mu.push_back(1);
+    }
+    ku.push_back(1.);
+    mu.push_back(4);
+    TColStd_Array1OfReal    uk(1, int(ku.size())), vk(1, 2);
+    TColStd_Array1OfInteger um(1, int(mu.size())), vm(1, 2);
+    for (int j = 0; j < int(ku.size()); ++j)
+    {
+      uk(j + 1) = ku[j];
+      um(j + 1) = mu[j];
+    }
+    vk(1) = 0;
+    vk(2) = 1;
+    vm(1) = vm(2) = 3;
+    return new Geom_BSplineSurface(poles, weights, uk, vk, um, vm, 3, 2);
   }
 
   void Sections()
@@ -446,6 +643,12 @@ struct Work
 
   void Ribbons()
   {
+    if (pinch)
+    {
+      rib[0] = Canal(0);
+      rib[1] = Canal(1);
+      return;
+    }
     const gp_Pnt   v   = ri.P(0);
     const gp_Pnt2d uvV = ri.UV(T.face, 0), uvS = in[n - 1].uvT;
     const gp_Pnt   pS  = T.P(uvS);
@@ -627,6 +830,124 @@ struct Work
   // which the cuts already use, keep their data.
   void FitBandEnds(const TopoDS_Shape& filleted)
   {
+    if (pinch)
+    {
+      // On a non-analytic support the standard algorithm builds an approximated band whose end
+      // misses the exact section (its foot by ~1e-3 r): end the canals on the band ends built
+      // (circle through their ends and middle; one common point on T), and rebuild the fillers
+      // along the new contact lines.
+      {
+        TopTools_IndexedDataMapOfShapeListOfShape ef;
+        TopExp::MapShapesAndAncestors(filleted, TopAbs_EDGE, TopAbs_FACE, ef);
+        gp_Pnt foot[2], top[2], middle[2];
+        bool   found[2] = {false, false};
+        for (int k = 0; k < 2; ++k)
+        {
+          const Ball& b    = (k ? in : out)[n - 1];
+          const double tol = 1e-2 * (k ? bi.r : bo.r);
+          double       bulge = 0;
+          for (int i = 1; i <= ef.Extent(); ++i)
+          {
+            if (ef(i).Extent() != 1)
+              continue;
+            BRepAdaptor_Curve c(TopoDS::Edge(ef.FindKey(i)));
+            const gp_Pnt a = c.Value(c.FirstParameter()), z = c.Value(c.LastParameter());
+            const gp_Pnt mm = c.Value((c.FirstParameter() + c.LastParameter()) / 2);
+            const double bl = mm.Distance(gp_Pnt((a.XYZ() + z.XYZ()) / 2));
+            for (int flip = 0; flip < 2; ++flip)
+            {
+              const gp_Pnt& f = flip ? z : a;
+              const gp_Pnt& q = flip ? a : z;
+              if (f.Distance(b.pX) < tol && q.Distance(b.pT) < tol && bl > bulge)
+              {
+                bulge     = bl;
+                foot[k]   = f;
+                top[k]    = q;
+                middle[k] = mm;
+                found[k]  = true;
+              }
+            }
+          }
+        }
+        bool moved = false;
+        for (int k = 0; k < 2; ++k)
+          moved = moved || (found[k] && (foot[k].Distance((k ? in : out)[n - 1].pX) > 1e-7
+                                         || top[k].Distance((k ? in : out)[n - 1].pT) > 1e-7));
+        if (moved && found[0] && found[1])
+        {
+          const gp_Pnt q((top[0].XYZ() + top[1].XYZ()) / 2);
+          for (int k = 0; k < 2; ++k)
+          {
+            Ball& b = (k ? in : out)[n - 1];
+            // circumcentre of foot, middle, q
+            const gp_Vec ab(foot[k], middle[k]), ac(foot[k], q);
+            const gp_Vec nn = ab.Crossed(ac);
+            require(nn.SquareMagnitude() > 1e-20, "YPatch: pinch end circle");
+            const gp_XYZ cc = foot[k].XYZ()
+                              + (nn.Crossed(ab) * ac.SquareMagnitude() + ac.Crossed(nn) * ab.SquareMagnitude()).XYZ()
+                                  / (2 * nn.SquareMagnitude());
+            b.pX = foot[k];
+            b.pT = q;
+            b.c  = gp_Pnt(cc);
+          }
+          rib[0] = Canal(0);
+          rib[1] = Canal(1);
+          // fillers along the new contact lines (margin mode)
+          for (int k = 0; k < 2; ++k)
+          {
+            if (fillerIndex[k] < 0)
+              continue;
+            const Support&        X = k ? A : B;
+            const std::vector<Ball>& bs = k ? in : out;
+            Handle(Geom_Curve)    C = rib[k]->VIso(0.);
+            const auto&           o = marginOffset[k];
+            const int             m = int(o.size());
+            std::vector<gp_Pnt2d> c(m);
+            for (int i = 0; i < m; ++i)
+              c[i] = X.UVNear(C->Value(double(i) / (m - 1)), bs[std::min(n - 1, int(double(i) / (m - 1) * (n - 1)))].uvX);
+            auto onX = [&](const Handle(Geom2d_Curve)& cv) {
+              TopoDS_Edge e = BRepBuilderAPI_MakeEdge(cv, BRep_Tool::Surface(X.face)).Edge();
+              BRepLib::BuildCurves3d(e);
+              return e;
+            };
+            Handle(TColgp_HArray1OfPnt2d) h = new TColgp_HArray1OfPnt2d(1, m);
+            for (int i = 0; i < m; ++i)
+              h->SetValue(i + 1, c[i]);
+            Geom2dAPI_Interpolate ip(h, Standard_False, 1e-12);
+            ip.Perform();
+            require(ip.IsDone(), "YPatch: pinch filler curve");
+            BRepBuilderAPI_MakeWire mw;
+            mw.Add(onX(ip.Curve()));
+            mw.Add(onX(GCE2d_MakeSegment(c[m - 1], o[m - 1]).Value()));
+            mw.Add(marginCut[k]);
+            mw.Add(onX(GCE2d_MakeSegment(o[0], c[0]).Value()));
+            require(mw.IsDone(), "YPatch: pinch filler wire");
+            TopoDS_Face f = BRepBuilderAPI_MakeFace(BRep_Tool::Surface(X.face), mw.Wire(), Standard_True).Face();
+            ShapeFix_Face fix(f);
+            fix.Perform();
+            fillers[fillerIndex[k]] = fix.Face();
+          }
+        }
+      }
+      // the canals end on the exact end sections: measure how far the band ends the standard
+      // algorithm built (approximated on non-analytic supports) are from them
+      endGap = 0;
+      for (int k = 0; k < 2; ++k)
+      {
+        // distance of the canal's end section to the shell built: the band end is on it
+        Handle(Geom_Curve) end = rib[k]->UIso(1.);
+        for (int j = 0; j <= 16; ++j)
+        {
+          BRepExtrema_DistShapeShape d(BRepBuilderAPI_MakeVertex(end->Value(j / 16.)).Vertex(), filleted);
+          require(d.IsDone(), "YPatch: pinch end gap");
+          endGap = std::max(endGap, d.Value());
+        }
+      }
+#ifdef YPATCH_TRACE
+      std::printf("YPatch: pinch end gap %.3e\n", endGap);
+#endif
+      return;
+    }
     TopTools_IndexedDataMapOfShapeListOfShape ef;
     TopExp::MapShapesAndAncestors(filleted, TopAbs_EDGE, TopAbs_FACE, ef);
     const gp_Pnt split = in[n - 1].pT;
@@ -797,6 +1118,8 @@ struct Work
         // line from V beyond the ribbon's foot
         cuts.push_back(segment(X, rail.UV(X.face, l), o[m - 1]));
         cuts.push_back(through(X, o));
+        marginOffset[k] = o;
+        marginCut[k]    = cuts.back();
         if (!pinch) // (a pinch's foot is the point V)
           cuts.push_back(iso(rib[k]->UIso(0.))); // the ribbon's foot, V to the contact line
         cuts.push_back(segment(X, c[0], o[0]));
@@ -810,6 +1133,7 @@ struct Work
         TopoDS_Face f = BRepBuilderAPI_MakeFace(BRep_Tool::Surface(X.face), mw.Wire(), Standard_True).Face();
         ShapeFix_Face fix(f);
         fix.Perform();
+        fillerIndex[k] = int(fillers.size());
         fillers.push_back(fix.Face());
         fillerOf.push_back(X.face);
       }
@@ -833,10 +1157,11 @@ struct Work
 double boundaryAngle(const Handle(Geom_Surface)& s,
                      bool                         alongU,
                      double                       fixed,
-                     const std::function<gp_Vec(const gp_Pnt&)>& target)
+                     const std::function<gp_Vec(const gp_Pnt&)>& target,
+                     bool                         skipApex = false)
 {
   double worst = 0;
-  for (int i = 0; i <= 100; ++i)
+  for (int i = skipApex && alongU ? 1 : 0; i <= 100; ++i) // (a pinch's u = 0 side is a point)
   {
     const double      x = i / 100., u = alongU ? x : fixed, v = alongU ? fixed : x;
     GeomLProp_SLProps pr(s, u, v, 1, 1e-12);
@@ -889,6 +1214,10 @@ static Standard_Boolean performOn(const TopoDS_Shape&                           
       works.push_back(std::make_unique<Work>(j));
       Work& w = *works.back();
       w.pinch = thePinch;
+#ifdef YPATCH_TRACE
+      if (const char* d = std::getenv("YPATCH_PINCH_DIR"))
+        w.pinchDir = std::atoi(d);
+#endif
       w.Split();
       w.Sections();
       w.Ribbons();
@@ -1147,8 +1476,15 @@ static Standard_Boolean performOn(const TopoDS_Shape&                           
     for (auto& w : works)
       rmax = std::max({rmax, w->bi.r, w->bo.r});
     std::unique_ptr<BRepBuilderAPI_Sewing> sewing;
-    for (const double tol : {1e-5, 1e-4 * std::max(1., rmax)})
+    double gap = 0; // pinch: the measured end gap, bounded
+    for (auto& w : works)
+      if (w->pinch)
+        gap = std::max(gap, w->endGap);
+    require(gap < 1e-3 * std::max(1., rmax), "YPatch: pinch end too far from the band end built");
+    double sewTol = 0;
+    for (const double tol : {1e-5, 1e-4 * std::max(1., rmax), 2 * gap})
     {
+      sewTol = tol;
       sewing = std::make_unique<BRepBuilderAPI_Sewing>(tol);
       sewing->Add(filleted);
       for (const TopoDS_Face& f : ribbons)
@@ -1182,6 +1518,76 @@ static Standard_Boolean performOn(const TopoDS_Shape&                           
     require(!sh.More(), "YPatch: several shells");
     TopoDS_Solid solid = BRepBuilderAPI_MakeSolid(closed).Solid();
     require(BRepLib::OrientClosedSolid(solid), "YPatch: cannot orient the solid");
+    // A pinch sewn at the looser tolerance (approximated band ends) can leave an edge shorter
+    // than that tolerance where a band end meets the shared point: merge it.
+    Handle(ShapeBuild_ReShape) fixContext = new ShapeBuild_ReShape();
+    TopTools_DataMapOfShapeShape fixedFace; // faces the fix rebuilt (it records edges only)
+    auto interferes = [](const TopoDS_Shape& x) {
+      BOPAlgo_CheckerSI c;
+      c.SetLevelOfCheck(5);
+      c.AddArgument(x);
+      c.Perform();
+      return c.HasErrors() || !c.DS().Interferences().IsEmpty();
+    };
+    if (sewTol > 1e-5 && std::any_of(works.begin(), works.end(), [](const auto& w) { return w->pinch; })
+        && interferes(solid))
+    {
+      const TopoDS_Solid before = solid;
+      ShapeFix_Wireframe fix(solid);
+      fix.SetContext(fixContext);
+      fix.SetPrecision(sewTol);
+      fix.SetMaxTolerance(sewTol);
+      fix.ModeDropSmallEdges() = Standard_True;
+      fix.FixSmallEdges();
+      TopExp_Explorer one(fix.Shape(), TopAbs_SOLID);
+      require(one.More(), "YPatch: small-edge fix lost the solid");
+      solid = TopoDS::Solid(one.Current());
+      // a face before -> the face after with the same surface sharing an untouched edge
+      TopTools_IndexedDataMapOfShapeListOfShape edgeFaces;
+      TopExp::MapShapesAndAncestors(solid, TopAbs_EDGE, TopAbs_FACE, edgeFaces);
+      TopTools_IndexedMapOfShape afterFaces;
+      TopExp::MapShapes(solid, TopAbs_FACE, afterFaces);
+      for (TopExp_Explorer f(before, TopAbs_FACE); f.More(); f.Next())
+      {
+        const Handle(Geom_Surface) sf = BRep_Tool::Surface(TopoDS::Face(f.Current()));
+        if (afterFaces.Contains(f.Current()))
+          continue; // untouched
+        for (TopExp_Explorer e(f.Current(), TopAbs_EDGE); e.More() && !fixedFace.IsBound(f.Current()); e.Next())
+        {
+          if (!edgeFaces.Contains(e.Current()))
+            continue;
+          for (TopTools_ListOfShape::Iterator g(edgeFaces.FindFromKey(e.Current())); g.More(); g.Next())
+            if (BRep_Tool::Surface(TopoDS::Face(g.Value())) == sf)
+            {
+              fixedFace.Bind(f.Current(), g.Value());
+              break;
+            }
+        }
+        if (fixedFace.IsBound(f.Current()))
+          continue;
+        // no untouched edge left: the face on the same surface nearest to its edges' middles
+        double       best = 1e300;
+        TopoDS_Shape pick;
+        for (int i = 1; i <= afterFaces.Extent(); ++i)
+        {
+          if (BRep_Tool::Surface(TopoDS::Face(afterFaces(i))) != sf)
+            continue;
+          double worst = 0;
+          for (TopExp_Explorer e(f.Current(), TopAbs_EDGE); e.More(); e.Next())
+          {
+            BRepExtrema_DistShapeShape d(BRepBuilderAPI_MakeVertex(midPoint(TopoDS::Edge(e.Current()))).Vertex(), afterFaces(i));
+            worst = std::max(worst, d.IsDone() ? d.Value() : 1e300);
+          }
+          if (worst < best)
+          {
+            best = worst;
+            pick = afterFaces(i);
+          }
+        }
+        if (!pick.IsNull() && best < 10 * sewTol)
+          fixedFace.Bind(f.Current(), pick);
+      }
+    }
 #ifdef YPATCH_TRACE
     BRepTools::Write(solid, "trace-solid.brep");
 #endif
@@ -1206,14 +1612,14 @@ static Standard_Boolean performOn(const TopoDS_Shape&                           
         pr.LowerDistanceParameters(u, v);
         GeomLProp_SLProps lp(R1, u, v, 1, 1e-12);
         return lp.IsNormalDefined() ? gp_Vec(lp.Normal()) : gp_Vec();
-      });
-      double band = 0;
+      }, w->pinch);
+      double band = 0, contact = 0;
       for (int k = 0; k < 2; ++k)
       {
         const Support& X  = k ? w->A : w->B;
         const gp_Pnt   c1 = (k ? w->in : w->out)[n - 1].c;
         const Handle(Geom_Surface)& bs = w->bandSurf[k];
-        band = std::max(band, boundaryAngle(w->rib[k], false, 1., [&](const gp_Pnt& p) {
+        j.EndAngle[k] = boundaryAngle(w->rib[k], false, 1., [&](const gp_Pnt& p) {
           if (bs.IsNull())
             return gp_Vec(c1, p);
           GeomAPI_ProjectPointOnSurf pr(p, bs);
@@ -1221,10 +1627,12 @@ static Standard_Boolean performOn(const TopoDS_Shape&                           
           pr.LowerDistanceParameters(u, v);
           GeomLProp_SLProps lp(bs, u, v, 1, 1e-12);
           return lp.IsNormalDefined() ? gp_Vec(lp.Normal()) : gp_Vec();
-        }));
-        band = std::max(band, boundaryAngle(w->rib[k], true, 0., [&](const gp_Pnt& p) { return X.N(X.UV(p)); }));
+        });
+        band    = std::max(band, j.EndAngle[k]);
+        contact = std::max(contact, boundaryAngle(w->rib[k], true, 0., [&](const gp_Pnt& p) { return X.N(X.UV(p)); }, w->pinch));
       }
-      j.BandAngle = band;
+      j.BandAngle    = std::max(band, contact);
+      j.ContactAngle = contact;
       theReport.Append(j);
     }
     // 5. History: splitter, then fillet, then sewing.
@@ -1237,7 +1645,11 @@ static Standard_Boolean performOn(const TopoDS_Shape&                           
     TopExp::MapShapes(solid, outputs);
     auto after = [&](const TopoDS_Shape& x) {
       const TopoDS_Shape y = reshape->Value(x);
-      return sew.IsModifiedSubShape(y) ? sew.ModifiedSubShape(y) : y; // (IsModified knows added shapes only)
+      const TopoDS_Shape z = sew.IsModifiedSubShape(y) ? sew.ModifiedSubShape(y) : y; // (IsModified knows added shapes only)
+      if (z.ShapeType() == TopAbs_FACE)
+        return fixedFace.IsBound(z) ? fixedFace.Find(z) : z;
+      const TopoDS_Shape f = fixContext->Value(z);
+      return f.IsNull() ? z : f;
     };
     // through both passes, the stray-edge cleanup and the sewing, into the solid
     auto finalOf = [&](const TopoDS_Shape& s, int from, TopTools_ListOfShape& to) {
@@ -1321,6 +1733,7 @@ static Standard_Boolean performOn(const TopoDS_Shape&                           
       {
         TopoDS_Shape r = ribbons[2 * w + k];
         r              = sew.IsModifiedSubShape(r) ? sew.ModifiedSubShape(r) : r;
+        r              = fixedFace.IsBound(r) ? fixedFace.Find(r) : r;
         h->AddGenerated(k ? works[w]->j.Concave : works[w]->j.Convex, r);
       }
     for (auto& w : works)
@@ -1328,6 +1741,7 @@ static Standard_Boolean performOn(const TopoDS_Shape&                           
       {
         TopoDS_Shape r = w->fillers[k];
         r              = sew.IsModifiedSubShape(r) ? sew.ModifiedSubShape(r) : r;
+        r              = fixedFace.IsBound(r) ? fixedFace.Find(r) : r;
         h->AddModified(w->fillerOf[k], r);
       }
         theResult  = solid;

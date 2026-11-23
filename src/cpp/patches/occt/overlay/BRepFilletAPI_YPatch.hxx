@@ -39,6 +39,8 @@ public:
     Standard_Boolean Pinch     = Standard_False; //!< built as a pinch, not a Y
     Standard_Real SeamAngle    = -1.;    //!< max normal angle across the ribbon seam (radians)
     Standard_Real BandAngle    = -1.;    //!< max normal angle ribbon/band and ribbon/support
+    Standard_Real EndAngle[2]  = {-1., -1.}; //!< max normal angle at the band end: convex, concave
+    Standard_Real ContactAngle = -1.;    //!< max normal angle ribbon/support along the contacts
   };
 
   //! Largest A/B support angle (radians) still treated as a junction (near tangency).
