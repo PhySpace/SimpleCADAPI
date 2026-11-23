@@ -13,9 +13,10 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
   self-intersecting solid. With the flag both bands stop where they touch the shared face and two G1 ribbons, tangent to
   each other and to both supports, close the junction. Everything else is the standard algorithm; without such a junction,
   or if the transition fails its validity, self-interference and continuity checks, the standard algorithm runs alone.
-  Without the flag the kernel still falls back to the transition at such a junction when its standard result
-  fails, is invalid or self-intersects; a valid standard result is kept, and fillets without such a junction are
-  unchanged.
+  Without the flag the kernel falls back at such a junction, when its standard result fails, is invalid or
+  self-intersects, to the pinch corner (both bands taper along one shared curve to a point at the junction vertex,
+  like Plasticity with Y-Blend off; a crease of about 8 degrees remains where the taper starts), then to the Y
+  transition. A valid standard result is kept, and fillets without such a junction are unchanged.
 
   ![A post flush with both plate sides, r = 5, shaded and zebra](img/y-patch/flush-post-overview.png)
 - `make_surface_patch_rface(..., strategy_graph_patch=True)`: fill one ordered loop of edges, each an edge of its support

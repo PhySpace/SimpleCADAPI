@@ -133,3 +133,16 @@ boundary and support together when the exact solve fails, and accepts on the bui
 G2 cross-curvature within 5 %). Tube window G1: 2.3e-4 mm from the cylinder (plate filling: 0.39 mm).
 
 Comparison report with code pairs and pictures: `out/report/REPORT.pdf` (local).
+
+**D10. The pinch corner is the default fallback (2026-11-24).** Owner: a qualified engine must make the non-Y corner
+(Plasticity's Y-Blend off: both bands taper to one point, 10 faces) work, exact tangency included. The first attempt
+folded near V because it fitted sampled positions with the ribbons' tensor Hermite fit, while the section radius
+collapses like x²/4R. Each pinch band is now an exact variable-radius rolling-ball surface: exact circular sections
+(rational quadratic, weight cos θ/2), only 1D data interpolated along the rail, a degenerated edge at V; the shared
+curve on T is solved from radius laws h, g ~ s² whose sum fills the cusp width. All 47 non-refused cases succeed
+as pinch (valid, SI(5) = 0, strict history); the plain `MakeFillet` rescues all 21 cases whose standard result fails,
+none needing the Y. Geometric limit: at P*'s section a pinch band, tangent to T along the shared curve with circular
+sections, cannot be G1 to both constant-radius bands, whose T-contacts cross at P* (≈35° at r = 5): the crease can only
+be distributed. Default `pinchDir = 1` balances it (7.5° / 8.0° at flush r5); `0` makes the convex side G1 (17.3° on the
+concave side), which Plasticity's face layout suggests it does. Against Plasticity Y-off (exact sample points to ours):
+0.078 / 0.262 mm RMS / max at r5, about a third of the distance to its Y-on result.

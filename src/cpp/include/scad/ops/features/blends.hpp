@@ -18,8 +18,9 @@ struct FilletOptions {
   // and a convex selected edge meet tangentially or nearly so between two (nearly) tangent
   // supports, both bands stop where they touch the common face and two G1 ribbons join them.
   // On: the transition first at every such junction (the standard algorithm when it fails its
-  // checks).  Off: the kernel still falls back to the transition at a junction where the standard
-  // result fails, is invalid or self-intersects; a valid standard result is kept.  A kernel
+  // checks).  Off: at a junction where the standard result fails, is invalid or self-intersects, the
+  // kernel falls back to the pinch corner (both bands taper to the vertex), then to the Y transition;
+  // a valid standard result is kept.  A kernel
   // without the patch raises ValueError for `true`.
   bool strategy_auto_y_patch = false;
 };

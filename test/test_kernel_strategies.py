@@ -77,14 +77,16 @@ def test_y_patch_off_is_the_standard_algorithm():
 
 @needs_y
 @pytest.mark.parametrize("radius", [2.5, 5.0])
-def test_a_plain_fillet_of_the_tangent_junction_falls_back_to_the_y_transition(radius):
-    # Without the flag the kernel runs its standard algorithm first; it fails on this junction, so the kernel
-    # takes the Y transition instead of failing (where the standard result is valid, it is kept).
+def test_a_plain_fillet_of_the_tangent_junction_falls_back_to_the_pinch_corner(radius):
+    # Without the flag the kernel runs its standard algorithm first; it fails on this junction, so the kernel closes
+    # it with the pinch corner: both bands taper to one point at the junction vertex, no ribbons.  The flag asks for
+    # the Y transition instead: same bands far from the junction, a different corner.
     body = plate_post()
-    out = s.fillet_rsolid(body, junction_edges(body), radius, generated_faces_tag="round")
-    assert len(s.ql.faces().where(s.ql.tag("round")).resolve(out)) >= 4
-    flagged = s.fillet_rsolid(body, junction_edges(body), radius, strategy_auto_y_patch=True)
-    assert out.get_volume() == pytest.approx(flagged.get_volume(), rel=1e-9)
+    plain = s.fillet_rsolid(body, junction_edges(body), radius, generated_faces_tag="round")
+    flagged = s.fillet_rsolid(body, junction_edges(body), radius, strategy_auto_y_patch=True, generated_faces_tag="round")
+    assert len(s.ql.faces().where(s.ql.tag("round")).resolve(plain)) >= 3
+    assert plain.get_volume() != pytest.approx(flagged.get_volume(), rel=1e-9)
+    assert plain.get_volume() == pytest.approx(flagged.get_volume(), rel=1e-3)  # differ only near the junction
 
 
 @needs_y
