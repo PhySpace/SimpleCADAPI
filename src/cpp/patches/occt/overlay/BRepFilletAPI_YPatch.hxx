@@ -36,6 +36,7 @@ public:
     Standard_Real RConcave = 0., RConvex = 0.;
     Standard_Real SupportAngle = 0.;     //!< angle between the A and B normals at V (radians)
     gp_Pnt        Split;                 //!< P*, where both bands touch T
+    Standard_Boolean Pinch     = Standard_False; //!< built as a pinch, not a Y
     Standard_Real SeamAngle    = -1.;    //!< max normal angle across the ribbon seam (radians)
     Standard_Real BandAngle    = -1.;    //!< max normal angle ribbon/band and ribbon/support
   };
@@ -47,6 +48,9 @@ public:
   Standard_EXPORT static NCollection_Vector<Junction> Detect(const TopoDS_Shape&               theShape,
                                                              const TopTools_DataMapOfShapeReal& theRadii);
 
+  //! Pinch instead of Y (thePinch): between V and P* both bands become rolling balls whose
+  //! radius shrinks to zero at V and whose contacts on T coincide, so they touch T and each
+  //! other along one curve (G1) and end together in V; no ribbon of their own.
   //! Builds the filleted solid: theRadii holds every requested edge (each constant radius).
   //! Returns false, leaving theResult untouched, when no junction exists or any step fails
   //! (construction, sewing, validity, self-interference, continuity gate).  theHistory maps
@@ -55,7 +59,8 @@ public:
                                                   const TopTools_DataMapOfShapeReal& theRadii,
                                                   TopoDS_Shape&                      theResult,
                                                   Handle(BRepTools_History)&         theHistory,
-                                                  NCollection_Vector<Junction>&      theReport);
+                                                  NCollection_Vector<Junction>&      theReport,
+                                                  const Standard_Boolean             thePinch = Standard_False);
 };
 
 #endif

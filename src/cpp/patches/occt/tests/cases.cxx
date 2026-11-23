@@ -1,9 +1,11 @@
-// Runs the Y-junction case family: the standard algorithm, then the Y patch.
+// Runs the Y-junction case family: the standard algorithm, a plain MakeFillet (the default
+// Y fallback), then the Y patch.
 //   cases [name-filter | =exact-name]
-// Environment: YPATCH_NO_STANDARD skips the standard run; YPATCH_SRC_ROUNDTRIP reads each input
+// Environment: YPATCH_SRC_ROUNDTRIP reads each input
 // back from BREP first.  Writes src-<case>.brep and, on success, case-<case>.brep.
 #include "cases.hxx"
 #include <BRepFilletAPI_MakeFillet.hxx>
+#include <ChFi3d_FilBuilder.hxx>
 #include <BRepFilletAPI_YPatch.hxx>
 #include <BRep_Builder.hxx>
 #include <chrono>
@@ -57,16 +59,21 @@ int main(int argc, char** argv)
       picked.emplace_back(edge_at(c.shape, p), r);
       radii.Bind(picked.back().first, r);
     }
-    if (!std::getenv("YPATCH_NO_STANDARD"))
+    // the standard algorithm alone (ChFi3d, as MakeFillet runs it, without any Y strategy)
+    bool standardSound = false;
     {
-      BRepFilletAPI_MakeFillet f(c.shape);
+      ChFi3d_FilBuilder f(c.shape);
       for (auto& [e, r] : picked)
         f.Add(r, e);
       try
       {
-        f.Build();
+        f.Compute();
         if (f.IsDone())
-          std::printf("  standard: done valid %d si %d\n", valid(f.Shape()), si_count(f.Shape()));
+        {
+          const int si   = si_count(f.Shape());
+          standardSound  = valid(f.Shape()) && si == 0;
+          std::printf("  standard: done valid %d si %d\n", valid(f.Shape()), si);
+        }
         else
           std::printf("  standard: not done\n");
       }
@@ -74,6 +81,33 @@ int main(int argc, char** argv)
       {
         std::printf("  standard: throws %s\n", e.GetMessageString());
       }
+    }
+    // a plain MakeFillet (no SetYPatch): with a junction it must succeed; where the standard
+    // result is sound it must be that result
+    const bool hasJunction = !BRepFilletAPI_YPatch::Detect(c.shape, radii).IsEmpty();
+    {
+      BRepFilletAPI_MakeFillet plain(c.shape);
+      for (auto& [e, r] : picked)
+        if (plain.Contour(e) == 0)
+          plain.Add(r, e);
+      bool ok = false, sound = false;
+      try
+      {
+        plain.Build();
+        ok    = plain.IsDone();
+        sound = ok && valid(plain.Shape()) && si_count(plain.Shape()) == 0;
+      }
+      catch (Standard_Failure&)
+      {
+      }
+      const char* path = !ok ? "-" : plain.YPatchFallback() ? "Y fallback" : plain.NbYPatches() ? "Y" : "standard";
+      bool        pass = true;
+      if (hasJunction && !c.expect_refusal)
+        pass = sound;
+      if (standardSound)
+        pass = pass && ok && !plain.YPatchFallback() && plain.NbYPatches() == 0;
+      std::printf("  plain: done %d sound %d path %s%s\n", (int)ok, (int)sound, path, pass ? "" : " FAILED");
+      failures += pass ? 0 : 1;
     }
     auto js = BRepFilletAPI_YPatch::Detect(c.shape, radii);
     std::printf("  junctions %d", js.Length());
@@ -84,7 +118,7 @@ int main(int argc, char** argv)
     Handle(BRepTools_History)                            h;
     NCollection_Vector<BRepFilletAPI_YPatch::Junction> rep;
     auto t0 = std::chrono::steady_clock::now();
-    bool ok = BRepFilletAPI_YPatch::Perform(c.shape, radii, out, h, rep);
+    bool ok = BRepFilletAPI_YPatch::Perform(c.shape, radii, out, h, rep, std::getenv("YPATCH_PINCH") != nullptr);
     double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
     std::printf("  ypatch: ok %d %.0f ms", ok, ms);
     if (ok == c.expect_refusal)
@@ -172,13 +206,25 @@ int main(int argc, char** argv)
           }
         return good;
       };
-      const bool historyOk =
+      bool historyOk =
         strict("perform", out, [&](const TopoDS_Shape& s) { return h->IsRemoved(s); },
                [&](const TopoDS_Shape& s) { return h->Modified(s); }, [&](const TopoDS_Shape& s) { return h->Generated(s); })
         && (!viaMakeFillet
             || strict("makefillet", mf.Shape(), [&](const TopoDS_Shape& s) { return mf.IsDeleted(s); },
                       [&](const TopoDS_Shape& s) { return mf.Modified(s); },
                       [&](const TopoDS_Shape& s) { return mf.Generated(s); }));
+      // the default fallback (no SetYPatch) answers the same history when it takes the Y path
+      BRepFilletAPI_MakeFillet plain(c.shape);
+      for (auto& [e, r] : picked)
+        if (plain.Contour(e) == 0)
+          plain.Add(r, e);
+      plain.Build();
+      const bool fallbackOk =
+        !plain.IsDone() || !plain.YPatchFallback()
+        || strict("fallback", plain.Shape(), [&](const TopoDS_Shape& s) { return plain.IsDeleted(s); },
+                  [&](const TopoDS_Shape& s) { return plain.Modified(s); },
+                  [&](const TopoDS_Shape& s) { return plain.Generated(s); });
+      historyOk = historyOk && fallbackOk;
       std::printf(" history %s\n", historyOk ? "ok" : "BROKEN");
       failures += historyOk ? 0 : 1;
       for (auto& j : rep)

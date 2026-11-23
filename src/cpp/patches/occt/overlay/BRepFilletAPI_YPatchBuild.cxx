@@ -40,6 +40,7 @@
 #include <Geom2d_BSplineCurve.hxx>
 #include <TColgp_HArray1OfPnt2d.hxx>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
+#include <Extrema_ExtPC.hxx>
 #include <functional>
 #include <GeomLProp_SLProps.hxx>
 #include <Geom_BSplineSurface.hxx>
@@ -274,6 +275,7 @@ struct Work
   gp_Pnt2d                              keepOutT, keepOutA, keepOutB;
   std::vector<TopoDS_Edge>              cuts;
   std::vector<TopoDS_Face>              fillers, fillerOf; // margin mode: strip faces and their supports
+  bool                                  pinch = false; // pinch instead of Y (see PinchSections)
 
   explicit Work(const BRepFilletAPI_YPatch::Junction& jj)
       : j(jj),
@@ -344,8 +346,95 @@ struct Work
   }
 
   // Sections at the u nodes (u=0: V, u=1: P*).
+  // The convex ball tangent to T at uvq (centre inside the material) and to B: its radius
+  // and its contact on B.
+  bool ConvexAt(const gp_Pnt2d& uvq, double& rho, gp_Pnt2d& uvB) const
+  {
+    const gp_Pnt q  = T.P(uvq);
+    const gp_Vec nT = T.N(uvq);
+    for (int it = 0; it < 80; ++it)
+    {
+      const gp_Pnt c  = q.Translated(nT * -rho);
+      uvB             = B.UVNear(c, uvB);
+      const gp_Vec nB = B.N(uvB);
+      const double f  = gp_Vec(B.P(uvB), c).Dot(nB) + rho, df = 1 - nT.Dot(nB);
+      if (std::abs(f) < 1e-12 * (1 + rho))
+        return rho > 0;
+      if (std::abs(df) < 1e-9)
+        return false;
+      rho = std::max(0.5 * rho, rho - f / df);
+    }
+    return false;
+  }
+
+  // Pinch sections: between V and P* both bands are rolling balls whose radius shrinks to
+  // zero at V, and whose contacts on T coincide (they divide the wedge of T in the ratio of
+  // the radii).  The two bands then touch T, and so each other, along one curve: G1, no
+  // ribbon between them, and T's wedge is consumed.  At P* the radii are the bands' own.
+  void PinchSections()
+  {
+    in.assign(n, Ball());
+    out.assign(n, Ball());
+    const double ratio = bo.r / bi.r;
+    double       rho   = 0;
+    gp_Pnt2d     uvB   = ro.UV(B.face, 0);
+    for (int i = n - 1; i >= 1; --i) // from P* back to V, warm-started
+    {
+      const double lambda = t[i] * l1;
+      if (i == n - 1)
+        rho = bi.r;
+      // g(rho) = rho_out(contact of the concave ball of radius rho) - ratio * rho
+      auto g    = [&](double r, Ball& ball, double& rOut, gp_Pnt2d& uv) {
+        Band band{ri, T, A, r, +1.};
+        require(band.Solve(lambda, ball), "YPatch: pinch concave ball"); // (guess at the scale of r)
+        rOut = ratio * r;
+        require(ConvexAt(ball.uvT, rOut, uv), "YPatch: pinch convex ball");
+        return rOut - ratio * r;
+      };
+      Ball     ball;
+      double   rOut = 0;
+      gp_Pnt2d uv   = uvB;
+      for (int it = 0; it < 60; ++it)
+      {
+        uv             = uvB;
+        const double f = g(rho, ball, rOut, uv);
+        if (std::abs(f) < 1e-11 * (1 + bi.r))
+          break;
+        Ball         b2;
+        double       r2;
+        gp_Pnt2d     uv2 = uv;
+        const double h   = 1e-7 * (1 + rho);
+        const double df  = (g(rho + h, b2, r2, uv2) - f) / h;
+        require(std::abs(df) > 1e-14, "YPatch: pinch law");
+        rho = std::max(0.25 * rho, rho - f / df);
+        require(it < 59, "YPatch: pinch law did not converge");
+      }
+      uvB     = uv;
+      in[i]   = ball;
+      out[i]  = Ball();
+      out[i].lambda = t[i];
+      out[i].uvT    = ball.uvT;
+      out[i].uvX    = uv;
+      out[i].pT     = ball.pT;
+      out[i].pX     = B.P(uv);
+      out[i].c      = ball.pT.Translated(T.N(ball.uvT) * -rOut);
+      rho *= t[i - 1] * t[i - 1] / (t[i] * t[i]); // the tangent-case law, as the next guess
+    }
+    // V: both sections are the point V
+    const gp_Pnt v = ri.P(0);
+    in[0].uvT = out[0].uvT = ri.UV(T.face, 0);
+    in[0].uvX              = ri.UV(A.face, 0);
+    out[0].uvX             = ro.UV(B.face, 0);
+    in[0].pT = in[0].pX = in[0].c = out[0].pT = out[0].pX = out[0].c = v;
+  }
+
   void Sections()
   {
+    if (pinch)
+    {
+      PinchSections();
+      return;
+    }
     in.resize(n);
     out.resize(n);
     for (int i = 0; i < n; ++i)
@@ -407,6 +496,23 @@ struct Work
     }
     q[0]     = v;
     q[n - 1] = pS;
+    if (pinch)
+    {
+      // the seam is the common contact curve on T, and the ribbons are tangent to T along it
+      Spline basic(t, false);
+      Row    qs(n);
+      for (int i = 0; i < n; ++i)
+      {
+        q[i]  = in[i].pT;
+        qs[i] = q[i].XYZ();
+        N[i]  = T.N(in[i].uvT);
+      }
+      const Row c = basic.fit(qs);
+      qd0         = gp_Vec(basic.jet(c, 0));
+      qd1         = gp_Vec(basic.jet(c, 1));
+      for (int i = 0; i < n; ++i)
+        Qd[i] = i == 0 ? qd0 : i == n - 1 ? qd1 : gp_Vec(q[i - 1], q[i + 1]) / (t[i + 1] - t[i - 1]);
+    }
     for (int k = 0; k < 2; ++k)
     {
       const Support&           X  = k ? A : B;
@@ -419,6 +525,14 @@ struct Work
         const gp_Pnt p  = bs[i].pX;
         const gp_Vec ns = X.N(bs[i].uvX);
         const gp_Vec D(p, q[i]);
+        if (pinch && D.Magnitude() < 1e-12) // V: the section is a point
+        {
+          for (int jj = 0; jj < n; ++jj)
+            ref[i][jj] = p.XYZ();
+          nrm[2][i] = ns.XYZ();
+          nrm[3][i] = N[i].XYZ();
+          continue;
+        }
         gp_Pnt       m = gp_Pnt((p.XYZ() + q[i].XYZ()) / 2);
         double       w = std::sqrt(.5);
         bool         exact = false; // the circular section exists (tangent lines meet ahead)
@@ -467,9 +581,11 @@ struct Work
         const double th    = cubic ? std::min(tp.Angle(tq), 2.5) : 0.;
         const double alpha = th > 1e-4 ? 4. / 3. * std::tan(th / 4) * D.Magnitude() / (2 * std::sin(th / 2))
                                        : D.Magnitude() / 3;
-        const double u = t[i], s = !exact ? 0. : u <= .6 ? 0. : u >= 1. ? 1. : [](double x) {
+        // (pinch sections are exact circles all along)
+        const double u = t[i], s = !exact ? 0. : pinch || u >= 1. ? 1. : u <= .6 ? 0. : [](double x) {
           return x * x * (3 - 2 * x);
         }((u - .6) / .4);
+        require(!pinch || exact, "YPatch: pinch section is not circular");
         require(cubic || exact, "YPatch: degenerate ribbon section");
         for (int jj = 0; jj < n; ++jj)
         {
@@ -493,7 +609,7 @@ struct Work
       {
         const gp_Pnt2d uv = X.UVNear(gp_Pnt(ref[0][jj]), bs[0].uvX);
         ref[0][jj]        = X.P(uv).XYZ();
-        nrm[0][jj]        = X.N(uv).XYZ();
+        nrm[0][jj]        = pinch ? V() : X.N(uv).XYZ(); // (pinch: the foot is the point V)
         nrm[1][jj]        = unit(gp_Vec(c1, gp_Pnt(ref[n - 1][jj]))).XYZ();
       }
       rib[k]  = ribbon(t, ref, nrm, qd0.XYZ(), qd1.XYZ());
@@ -612,10 +728,26 @@ struct Work
       cuts.push_back(segment(A, ri.UV(A.face, l1), a.uvX));
       cuts.push_back(segment(B, ro.UV(B.face, l2), b.uvX));
       // ribbon boundaries on the supports: v = 0 (contact curve) and u = 0 (back to V)
-      cuts.push_back(iso(rib[1]->VIso(0.)));
-      cuts.push_back(iso(rib[1]->UIso(0.)));
-      cuts.push_back(iso(rib[0]->VIso(0.)));
-      cuts.push_back(iso(rib[0]->UIso(0.)));
+      if (pinch)
+      {
+        // the contact curves leave V tangentially to the edges: start them on V itself, so
+        // that the cut need not be found by intersection there
+        for (int k = 1; k >= 0; --k)
+        {
+          Handle(Geom_Curve) C = rib[k]->VIso(0.);
+          cuts.push_back(BRepBuilderAPI_MakeEdge(C, j.Vertex, BRepBuilderAPI_MakeVertex(C->Value(1.)).Vertex()).Edge());
+        }
+      }
+      else
+      {
+        cuts.push_back(iso(rib[1]->VIso(0.)));
+        cuts.push_back(iso(rib[0]->VIso(0.)));
+      }
+      if (!pinch) // (a pinch has no foot: its ribbons end in the point V)
+      {
+        cuts.push_back(iso(rib[1]->UIso(0.)));
+        cuts.push_back(iso(rib[0]->UIso(0.)));
+      }
     }
     else
       for (int k = 0; k < 2; ++k)
@@ -627,29 +759,52 @@ struct Work
         Handle(Geom_Curve)       C    = rib[k]->VIso(0.);
         const int                m    = 33;
         std::vector<gp_Pnt2d>    c(m), o(m);
-        for (int i = 0; i < m; ++i)
+        gp_XY                    lastAway; // (a pinch's contact meets its edge at V)
+        for (int i = m - 1; i >= 0; --i)
         {
           const double u = double(i) / (m - 1);
           c[i]           = X.UVNear(C->Value(u), bs[std::min(n - 1, int(u * (n - 1)))].uvX);
-          gp_XY  away    = c[i].XY() - rail.UV(X.face, u * l).XY();
+          // away from the edge: from its nearest point (a pinch's contacts are not indexed
+          // by the convex rail's own parameter)
+          double lam = u * l;
+          if (pinch)
+          {
+            Extrema_ExtPC ext(C->Value(u), rail.c);
+            double        best = 1e300;
+            for (int e = 1; ext.IsDone() && e <= ext.NbExt(); ++e)
+              if (ext.SquareDistance(e) < best)
+              {
+                best = ext.SquareDistance(e);
+                lam  = (ext.Point(e).Parameter() - rail.first) / (rail.last - rail.first);
+              }
+          }
+          gp_XY  away    = c[i].XY() - rail.UV(X.face, lam).XY();
           gp_Pnt p;
           gp_Vec du, dv;
           X.s.D1(c[i].X(), c[i].Y(), p, du, dv);
-          const double s = (du * away.X() + dv * away.Y()).Magnitude();
+          double s = (du * away.X() + dv * away.Y()).Magnitude();
+          if (pinch && s < 1e-6 * d && lastAway.Modulus() > 0)
+          {
+            away = lastAway;
+            s    = (du * away.X() + dv * away.Y()).Magnitude();
+          }
           require(s > 1e-12, "YPatch: margin direction");
-          o[i] = gp_Pnt2d(c[i].XY() + away * (d / s));
+          away /= s;
+          lastAway = away;
+          o[i]     = gp_Pnt2d(c[i].XY() + away * d);
         }
         // the cuts: section line beyond the band end, the offset of the contact line, the
         // line from V beyond the ribbon's foot
         cuts.push_back(segment(X, rail.UV(X.face, l), o[m - 1]));
         cuts.push_back(through(X, o));
-        cuts.push_back(iso(rib[k]->UIso(0.))); // the ribbon's foot, V to the contact line
+        if (!pinch) // (a pinch's foot is the point V)
+          cuts.push_back(iso(rib[k]->UIso(0.))); // the ribbon's foot, V to the contact line
         cuts.push_back(segment(X, c[0], o[0]));
         // the strip between the contact line and the cut, on X's surface
         BRepBuilderAPI_MakeWire mw;
         mw.Add(through(X, c));
         mw.Add(segment(X, c[m - 1], o[m - 1]));
-        mw.Add(cuts[cuts.size() - 3]);
+        mw.Add(cuts[cuts.size() - (pinch ? 2 : 3)]);
         mw.Add(segment(X, o[0], c[0]));
         require(mw.IsDone(), "YPatch: margin wire");
         TopoDS_Face f = BRepBuilderAPI_MakeFace(BRep_Tool::Surface(X.face), mw.Wire(), Standard_True).Face();
@@ -658,9 +813,16 @@ struct Work
         fillers.push_back(fix.Face());
         fillerOf.push_back(X.face);
       }
+    keepOutT = gp_Pnt2d((ri.UV(T.face, l1 / 2).XY() + ro.UV(T.face, l2 / 2).XY()) / 2);
+    if (pinch) // the strips narrow towards V: probe at a node, between edge and contact
+    {
+      const int i = n / 2;
+      keepOutA    = gp_Pnt2d((ri.UV(A.face, t[i] * l1).XY() + in[i].uvX.XY()) / 2);
+      keepOutB    = gp_Pnt2d((B.UVNear(out[i].pT, out[i].uvX).XY() + out[i].uvX.XY()) / 2);
+      return;
+    }
     Ball m1, m2;
     require(bi.Solve(l1 / 2, m1, &in[n / 2]) && bo.Solve(l2 / 2, m2, &out[n / 2]), "YPatch: probe");
-    keepOutT = gp_Pnt2d((ri.UV(T.face, l1 / 2).XY() + ro.UV(T.face, l2 / 2).XY()) / 2);
     keepOutA = gp_Pnt2d((ri.UV(A.face, l1 / 2).XY() + m1.uvX.XY()) / 2);
     keepOutB = gp_Pnt2d((ro.UV(B.face, l2 / 2).XY() + m2.uvX.XY()) / 2);
   }
@@ -712,7 +874,8 @@ static Standard_Boolean performOn(const TopoDS_Shape&                           
                                   const TopTools_DataMapOfShapeReal&                  theRadii,
                                   TopoDS_Shape&                                       theResult,
                                   Handle(BRepTools_History)&                          theHistory,
-                                  NCollection_Vector<BRepFilletAPI_YPatch::Junction>& theReport)
+                                  NCollection_Vector<BRepFilletAPI_YPatch::Junction>& theReport,
+                                  const Standard_Boolean                              thePinch)
 {
   using Junction = BRepFilletAPI_YPatch::Junction;
   try
@@ -725,6 +888,7 @@ static Standard_Boolean performOn(const TopoDS_Shape&                           
     {
       works.push_back(std::make_unique<Work>(j));
       Work& w = *works.back();
+      w.pinch = thePinch;
       w.Split();
       w.Sections();
       w.Ribbons();
@@ -1032,6 +1196,7 @@ static Standard_Boolean performOn(const TopoDS_Shape&                           
     for (auto& w : works)
     {
       Junction j  = w->j;
+      j.Pinch     = w->pinch;
       j.Split     = w->in[n - 1].pT;
       const auto& R0 = w->rib[0];
       const auto& R1 = w->rib[1];
@@ -1623,7 +1788,8 @@ Standard_Boolean BRepFilletAPI_YPatch::Perform(const TopoDS_Shape&              
                                                const TopTools_DataMapOfShapeReal& theRadii,
                                                TopoDS_Shape&                      theResult,
                                                Handle(BRepTools_History)&         theHistory,
-                                               NCollection_Vector<Junction>&      theReport)
+                                               NCollection_Vector<Junction>&      theReport,
+                                               const Standard_Boolean             thePinch)
 {
   try
   {
@@ -1636,7 +1802,7 @@ Standard_Boolean BRepFilletAPI_YPatch::Perform(const TopoDS_Shape&              
 #ifdef YPATCH_TRACE
       std::printf("YPatch: periodic supports re-seated\n");
 #endif
-      if (performOn(r.shape, r.radii, result, h, report))
+      if (performOn(r.shape, r.radii, result, h, report, thePinch))
       {
         theResult  = result;
         theHistory = compose(theShape, r.history, h, result);
@@ -1652,5 +1818,5 @@ Standard_Boolean BRepFilletAPI_YPatch::Perform(const TopoDS_Shape&              
 #endif
     (void)ex;
   }
-  return performOn(theShape, theRadii, theResult, theHistory, theReport);
+  return performOn(theShape, theRadii, theResult, theHistory, theReport, thePinch);
 }
