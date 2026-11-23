@@ -1,4 +1,6 @@
-# OCCT fillet-robustness-3 (candidate)
+# OCCT fillet-robustness-4
+
+How to modify the kernel systematically (layout, strategy branches, SDK exposure, workflow, pitfalls): [GUIDE.md](GUIDE.md).
 
 Base: OCCT V7_9_3, commit `a016080bf6738d6aeae020badee4e888ad1540a5`.
 
@@ -24,6 +26,22 @@ generated spline corner faces and exact output validity. These checks are
 numerical diagnostics, not a proof that every possible self-intersection is
 excluded. The same-radius nonfolding construction, material semantics, general
 inset handling and production release remain unfinished.
+
+`0004-fillet-y-patch.patch` adds the strategy entry points to `BRepFilletAPI_MakeFillet`: `SetYPatch` (Y transition
+first), a default fallback (standard algorithm first; at a detected concave/convex tangent junction whose standard
+result fails, is invalid or self-intersects, the junction strategy replaces it), `NbYPatches`, `YPatchJunction`,
+`YPatchFallback`, and history (`Generated`/`Modified`/`IsDeleted`) answered from the strategy's own history.
+
+Overlay classes (compiled into their toolkits by `occt_patches.install_overlay`):
+
+| Class | Toolkit | Role |
+| --- | --- | --- |
+| `BRepFilletAPI_YPatch` (+ `YPatchGeom`, `YPatchBuild`) | TKFillet | junction detection, Y transition and pinch corner, gates, history |
+| `BRepOffsetAPI_GraphPatch` | TKOffset | degree-8 graph patch over an ordered C0/G1/G2 loop, continuing curved supports |
+| `BRepFilletAPI_RibbonFit` | TKFillet | four-sided fairing on callbacks (research API) |
+| `BRepFilletAPI_TangentY` | TKFillet | canonical plate/post Y (research sample; superseded by `BRepFilletAPI_YPatch`) |
+
+Kernel-level checks: `tests/` (see `tests/CMakeLists.txt`).
 
 `manifest.json` locks every input and output file. `tools/occt_patches.py` checks those digests, validates all hunks, and only then writes. Reapplying is harmless; applying to another release or a locally modified target refuses explicitly.
 

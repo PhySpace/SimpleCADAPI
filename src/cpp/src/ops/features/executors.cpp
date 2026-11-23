@@ -117,7 +117,10 @@ void register_sweeps(reactive::ExecutorRegistry& registry) {
 
 void register_blends(reactive::ExecutorRegistry& registry) {
   registry.add("make_fillet_rsolid", [](Params p, Inputs in, const ScalarValues&) {
-    return one(fillet_rsolid(Solid(input(in, 0)), rest<Edge>(in, 1, in.size()), number(p, "radius")));
+    FilletOptions options;
+    if (const Value* y = p.find("strategy_auto_y_patch"); y != nullptr && y->is_bool())
+      options.strategy_auto_y_patch = y->as_bool();
+    return one(fillet_rsolid(Solid(input(in, 0)), rest<Edge>(in, 1, in.size()), number(p, "radius"), {}, options));
   });
   registry.add("make_chamfer_rsolid", [](Params p, Inputs in, const ScalarValues&) {
     ChamferOptions options;

@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 
+#include "scad/surface/fitter.hpp"
 #include "scad/core/tolerance.hpp"
 #include "scad/core/error.hpp"
 #include "scad/ops/features/features.hpp"
@@ -281,22 +282,34 @@ void bind_blends(py::module_& m) {
   m.def(
       "fillet_rsolid",
       [](const AnyOf<SolidOrPiecesTag>& solid, const EdgesOrQuery& edges, const Length& radius,
-         OptionalString result_tag, OptionalString generated_faces_tag) -> AnyOf<SolidOrPiecesTag> {
+         OptionalString result_tag, OptionalString generated_faces_tag,
+         bool strategy_auto_y_patch) -> AnyOf<SolidOrPiecesTag> {
         const BlendTags tags{std::move(result_tag), std::move(generated_faces_tag)};
+        const FilletOptions options{strategy_auto_y_patch};
         if (!py::isinstance<Solid>(solid.value)) {
           return {
               blend_pieces(solid.value, edges, "fillet_rsolid", [&](const Solid& piece, const EdgeSelection& picked) {
-                return fillet_rsolid(piece, picked, radius, tags);
+                return fillet_rsolid(piece, picked, radius, tags, options);
               })};
         }
         const Solid body = solid.value.cast<Solid>();
         const EdgeSelection selection = selection_from<Edge>(edges);
-        return {
-            py::cast(unlocked(selection.is_selector(), [&] { return fillet_rsolid(body, selection, radius, tags); }))};
+        return {py::cast(
+            unlocked(selection.is_selector(), [&] { return fillet_rsolid(body, selection, radius, tags, options); }))};
       },
       py::arg("solid"), py::arg("edges"), py::arg("radius"), py::kw_only(), py::arg("result_tag") = py::none(),
-      py::arg("generated_faces_tag") = py::none(),
+      py::arg("generated_faces_tag") = py::none(), py::arg("strategy_auto_y_patch") = false,
       "Apply fillets, with optional tagging of kernel-proven patch faces.");
+  m.def(
+      "_kernel_capabilities",
+      [] {
+        py::dict caps;
+        caps["y_patch"] = kernel_has_y_patch();
+        caps["graph_patch"] = surface::kernel_has_graph_patch();
+        return caps;
+      },
+      "Kernel strategies the linked OpenCASCADE carries: y_patch (fillet_rsolid strategy_auto_y_patch), "
+      "graph_patch (make_surface_patch_rface strategy_graph_patch).");
 
   m.def(
       "chamfer_rsolid",

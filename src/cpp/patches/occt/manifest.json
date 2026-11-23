@@ -2,8 +2,13 @@
   "tag": "V7_9_3",
   "commit": "a016080bf6738d6aeae020badee4e888ad1540a5",
   "archive_sha256": "5ecf094ec6b12d5413dfb851d8c3590c354058aee556e32e408bdfbf8c357d57",
-  "patchset": "fillet-robustness-3",
-  "patches": ["0001-tangent-end.patch", "0002-root-solid-orientation.patch", "0003-tangent-corner-boundaries.patch"],
+  "patchset": "fillet-robustness-4",
+  "patches": [
+    "0001-tangent-end.patch",
+    "0002-root-solid-orientation.patch",
+    "0003-tangent-corner-boundaries.patch",
+    "0004-fillet-y-patch.patch"
+  ],
   "files": {
     "src/ChFi3d/ChFi3d_Builder_0.cxx": {
       "before": "e33baec19d427c2967a427a5a9f0872be23840e4a3a3697039f15b20001203d1",
@@ -20,6 +25,14 @@
     "src/ChFi3d/ChFi3d_Builder_1.cxx": {
       "before": "99fd57fe50475f21ee13d298742ce48585829bf4b9624377a78795795db46335",
       "after": "8fc97dcf851901e68728d756d387a98a8c94b1e4f8449698fe8057fc9f7a4e50"
+    },
+    "src/BRepFilletAPI/BRepFilletAPI_MakeFillet.hxx": {
+      "before": "74bd7a1218cae8511c83bbbf666a57b793215af6f05fed2407340233f6ffabe7",
+      "after": "e876b2fef89b84807551f47588a1b826ed92063ddd23fc9ee0e93168d054bb01"
+    },
+    "src/BRepFilletAPI/BRepFilletAPI_MakeFillet.cxx": {
+      "before": "a2d4c91fb233859eaafa9c80a652c1a6ea66578da931966b14cb0c7f48892a8f",
+      "after": "06e4c04f185f8a665f4a0e87b61d0ff94137fbe8dbf7a8e12717d62fa7efa402"
     }
   }
 }
