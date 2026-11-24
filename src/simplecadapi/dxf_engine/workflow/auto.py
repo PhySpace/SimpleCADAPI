@@ -669,23 +669,31 @@ def auto_drawing(
         views=list(plan.views),
         dimension_count=len(plan.dims),
     )
+    render_error = None
     if not plan_only and status != "needs_revision":
-        metadata = write_engineering_sheet(
-            step, output, spec, plan, transform=transform, pdf=pdf
-        )
-        report["issues"] = metadata["issues"]
-        result.update(
-            dxf=str(output),
-            preview=str(output.with_suffix(".png")),
-            audit=metadata["reopen_audit"],
-        )
-        if pdf:
-            result["pdf"] = metadata["output_pdf"]
-        report["render"] = {
-            key: result[key]
-            for key in ("dxf", "preview", "pdf", "audit")
-            if key in result
-        }
+        try:
+            metadata = write_engineering_sheet(
+                step, output, spec, plan, transform=transform, pdf=pdf
+            )
+        except Exception as error:
+            # The declaration and the plan are still written below: they are what the
+            # reviewer edits and replays after a rendering failure.
+            render_error = error
+            report["render"] = {"error": str(error)}
+        else:
+            report["issues"] = metadata["issues"]
+            result.update(
+                dxf=str(output),
+                preview=str(output.with_suffix(".png")),
+                audit=metadata["reopen_audit"],
+            )
+            if pdf:
+                result["pdf"] = metadata["output_pdf"]
+            report["render"] = {
+                key: result[key]
+                for key in ("dxf", "preview", "pdf", "audit")
+                if key in result
+            }
     with TemporaryDirectory(dir=output.parent) as folder:
         for path, data in ((spec_path, spec), (report_path, report)):
             staged = Path(folder) / path.name
@@ -694,4 +702,6 @@ def auto_drawing(
                 encoding="utf-8",
             )
             staged.replace(path)
+    if render_error is not None:
+        raise render_error
     return result
