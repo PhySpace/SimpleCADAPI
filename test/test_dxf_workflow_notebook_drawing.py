@@ -24,6 +24,25 @@ class NotebookDrawingTests(unittest.TestCase):
             parameter_value(metric_value, None, "bearing_width"), (20.0, "cm", True)
         )
 
+    def test_compact_layout_section_keeps_the_replaced_view_for_design_intent(self):
+        # With the compact layout a full section replaces one of the views; the notebook's design
+        # intent names that view, so the section must keep its name for the dimensions to resolve.
+        directory = Path(__file__).resolve().parent
+        sample = directory.parent / "examples/dxf_exporter/stepped_mount.py"
+        with TemporaryDirectory() as tmp:
+            out = Path(tmp) / "compact.dxf"
+            result = subprocess.run(
+                [sys.executable, "-m", "simplecadapi.cli", "drawing", "--notebook", str(sample),
+                 "--layout", "compact", "--out", str(out)],
+                capture_output=True, text=True, encoding="utf-8", timeout=120,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            spec = json.loads(out.with_suffix(".drawing.json").read_text(encoding="utf-8"))
+            sections = [view for view in spec["views"] if "section" in view]
+            self.assertEqual(len(sections), 1)
+            self.assertIn(sections[0]["name"], {"top", "right"})
+            self.assertTrue(out.exists())
+
     def test_notebook_overrides_rebuild_native_dimensions_and_audit_unbound_parameter(
         self,
     ):

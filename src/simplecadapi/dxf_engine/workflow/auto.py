@@ -561,6 +561,9 @@ def auto_drawing(
         if layout_preset == "compact" and section_view == "full":
             index = next(i for i, row in enumerate(views) if row["name"] == sibling)
             cut["align"] = views[index]["align"].copy()
+            # The section is that view, cut: it keeps the view's name so dimensions and datums
+            # declared on it (notebook design intent included) still resolve.
+            cut["name"] = sibling
             views[index] = cut
             section_decision["replaces_view"] = sibling
         else:
