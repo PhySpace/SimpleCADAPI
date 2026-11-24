@@ -15,7 +15,7 @@ In `DRAWING_INTENT`, a `dimensions` entry connects a top-level `parameter` to ex
 `cylinder` identifies one bounded cylindrical face, `plane` uses a point on the trimmed face and a
 normal, and `circle` uses a center, axis and radius. Dimensions and optional presentation requirements
 such as a fit or tolerance come from explicit inputs. The planner checks the measured value against
-the evaluated notebook value and reports each parameter's status. The [stepped mount example](../../../../examples/dxf_exporter/README.md)
+the evaluated notebook value and reports each parameter's status. The [stepped mount example](../../../../examples/dxf_exporter/)
 shows an override and an independent replay.
 
 Auto mode selects the ordinary exact hidden-line method for most parts. For spline-heavy profiles,
