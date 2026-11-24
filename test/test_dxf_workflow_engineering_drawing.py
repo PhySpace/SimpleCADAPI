@@ -1,4 +1,6 @@
 import copy
+import subprocess
+import sys
 import math
 import tempfile
 import unittest
@@ -247,6 +249,25 @@ class EngineeringDrawingTests(unittest.TestCase):
         self.assertAlmostEqual(
             plan.projection_bounds()["front"]["max_outline_gap_mm"], 0
         )
+
+    def test_a_transform_without_translation_is_a_clear_error(self):
+        block = scad.make_box_rsolid(width=30, height=20, depth=10)
+        with self.assertRaisesRegex(ValueError, "translation_mm"):
+            rigid_shape(block.wrapped, dict(rotation=[[1, 0, 0], [0, 1, 0], [0, 0, 1]]))
+
+    def test_an_inspection_sheet_reuses_the_layout_the_cli_wrote(self):
+        block = scad.make_box_rsolid(width=30, height=20, depth=10)
+        step = self.root / "block.step"
+        export_step_shapes([block.wrapped], str(step))
+        first, second = self.root / "first.dxf", self.root / "second.dxf"
+        for out, extra in ((first, []), (second, ["--layout-json", str(first.with_suffix(".json"))])):
+            result = subprocess.run(
+                [sys.executable, "-m", "simplecadapi.cli", "drawing", "--mode", "inspection",
+                 "--step", str(step), "--out", str(out)] + extra,
+                capture_output=True, text=True, encoding="utf-8", timeout=120,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertTrue(second.exists())
 
     def test_face_auxiliary_and_explicit_annotations_export_in_third_angle(self):
         from simplecadapi._cpp.occt.BRepAdaptor import BRepAdaptor_Surface

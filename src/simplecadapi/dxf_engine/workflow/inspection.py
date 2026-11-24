@@ -53,6 +53,9 @@ def rigid_shape(shape, transform):
     from simplecadapi._cpp.occt.gp import gp_Trsf
     from simplecadapi._glue.bridge import native_occt
 
+    missing = [key for key in ("rotation", "translation_mm") if key not in transform]
+    if missing:
+        raise ValueError(f"Transform needs {', '.join(missing)} (rotation: 3x3, translation_mm: 3 values)")
     r = np.asarray(transform["rotation"], float)
     t = np.asarray(transform["translation_mm"], float)
     if (
@@ -380,6 +383,9 @@ def export_sheet(project, output, *, layout=None, projection="first", title=None
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
     layout = layout or sheet_layout([project], projection)
+    # Accept the metadata this exporter writes (layout nested under "layout"), so a layout can be
+    # shared by passing one sheet's .json to the next (--layout-json).
+    layout = layout.get("layout", layout)
     if layout.get("scale") != 1:
         raise ValueError("This exporter keeps DXF modelspace at 1:1")
     doc = new_document(layout)
