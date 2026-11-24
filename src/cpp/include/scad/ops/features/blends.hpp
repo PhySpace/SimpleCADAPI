@@ -12,11 +12,28 @@
 
 namespace scad {
 
+// Kernel strategies a fillet may use instead of the standard rolling-ball algorithm.
+struct FilletOptions {
+  // Y transition (kernel patch set fillet-robustness-4, BRepFilletAPI_YPatch): where a concave
+  // and a convex selected edge meet tangentially or nearly so between two (nearly) tangent
+  // supports, both bands stop where they touch the common face and two G1 ribbons join them.
+  // On: the transition first at every such junction (the standard algorithm when it fails its
+  // checks).  Off: at a junction where the standard result fails, is invalid or self-intersects, the
+  // kernel falls back to the pinch corner (both bands taper to the vertex), then to the Y transition;
+  // a valid standard result is kept.  A kernel
+  // without the patch raises ValueError for `true`.
+  bool strategy_auto_y_patch = false;
+};
+
 // Round `edges` (explicit, or a ql selector resolved in `solid`) by `radius`.  Role:
 // fillet.patch.  A failing blend is explained with measurements (size against face room,
 // tangent faces, ...), and a result no convex blend can produce is rejected.
 // Error "fillet_rsolid".
-Solid fillet_rsolid(const Solid& solid, const EdgeSelection& edges, const Scalar& radius, const BlendTags& tags = {});
+Solid fillet_rsolid(const Solid& solid, const EdgeSelection& edges, const Scalar& radius, const BlendTags& tags = {},
+                    const FilletOptions& options = {});
+
+// True when the linked kernel carries the Y transition (BRepFilletAPI_YPatch).
+bool kernel_has_y_patch();
 
 struct ChamferOptions {
   // Degrees between the chamfer face and the reference face; the second leg is

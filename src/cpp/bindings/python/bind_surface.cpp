@@ -256,12 +256,16 @@ void bind_surface(py::module_& m) {
       "make_surface_patch_rface",
       [](const std::vector<SurfaceBoundary>& boundaries, const std::vector<PointVec3>& points,
          const std::optional<SurfaceFillingSettings>& settings, const std::vector<Wire>& holes,
-         const TagPrefix& tag_prefix) {
-        return make_surface_patch_rface(
-            boundaries, {.points = points_of(points), .settings = settings, .holes = holes, .tag_prefix = tag_prefix});
+         const TagPrefix& tag_prefix, bool strategy_graph_patch) {
+        return make_surface_patch_rface(boundaries, {.points = points_of(points),
+                                                     .settings = settings,
+                                                     .holes = holes,
+                                                     .tag_prefix = tag_prefix,
+                                                     .strategy_graph_patch = strategy_graph_patch});
       },
       py::arg("boundaries"), py::kw_only(), py::arg("points") = std::vector<PointVec3>{},
       py::arg("settings") = py::none(), py::arg("holes") = std::vector<Wire>{}, py::arg("tag_prefix") = py::none(),
+      py::arg("strategy_graph_patch") = false,
       "Fill a constrained boundary network into one Face, optionally with holes.");
 
   m.def(

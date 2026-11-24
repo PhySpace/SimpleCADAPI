@@ -23,7 +23,7 @@ from test_use_digests import ASSEMBLE, child, parent
 
 
 class TestPlan(unittest.TestCase):
-    root = Path("/proj")
+    root = Path("/proj").resolve()
 
     def plan(self, code: str, scope: dict | None = None):
         return prefetch.plan_uses(code, scope or {}, self.root)

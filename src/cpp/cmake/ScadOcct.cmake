@@ -33,7 +33,7 @@ set(SCAD_OCCT_TOOLKITS
   # Modeling algorithms
   TKGeomAlgo TKTopAlgo TKPrim TKBO TKBool TKShHealing TKFillet TKOffset TKFeat TKMesh TKHLR
   # Data exchange: STEP / STL / BREP-adjacent readers and writers
-  TKDE TKXSBase TKDESTEP TKDESTL TKDEIGES
+  TKDE TKXSBase TKDESTEP TKDESTL
   # XCAF is what STEP assemblies read into.
   TKXCAF TKCAF TKLCAF TKCDF TKService TKRWMesh TKXmlXCAF TKBinXCAF TKBin TKBinL TKXml TKXmlL TKStd TKStdL TKVCAF TKV3d)
 

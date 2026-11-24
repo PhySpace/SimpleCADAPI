@@ -22,7 +22,7 @@ def make_project(tmp_path, files, targets=("omp", "generic"), outputs=None):
     for relative, content in files.items():
         target = source / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8")
+        target.write_bytes(content.encode("utf-8"))
     output_table = outputs or {name: f"out/{name}" for name in targets}
     output_lines = "\n".join(
         f'{name} = "{value}"' for name, value in output_table.items()
@@ -116,8 +116,8 @@ class TestOutputShape:
         _, omp = build_one(root, "omp")
         assert read(omp / "a.md") == "above\n\nbelow\n"
 
-    def test_files_without_directives_copied_verbatim(self, tmp_path):
-        plain = "byte\nidentical\ntext\n"
+    @pytest.mark.parametrize("plain", ["byte\nidentical\ntext\n", "byte\r\nidentical\r\ntext\r\n"])
+    def test_files_without_directives_copied_verbatim(self, tmp_path, plain):
         root = make_project(tmp_path, {"plain.md": plain, "a.md": SIMPLE})
         project, files = load(root)
         skillbuild.build_target(project, files, "omp")

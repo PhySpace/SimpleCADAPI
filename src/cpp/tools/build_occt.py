@@ -13,6 +13,7 @@ Standard library only (runs inside manylinux, a macOS runner, or a Windows runne
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import shutil
 import subprocess
@@ -21,6 +22,7 @@ import tarfile
 import tempfile
 import urllib.request
 from pathlib import Path
+import occt_patches as patches
 
 DEFAULT_TAG = "V7_9_3"
 URL = "https://github.com/Open-Cascade-SAS/OCCT/archive/refs/tags/{tag}.tar.gz"
@@ -62,9 +64,15 @@ def main() -> int:
 
     prefix = args.prefix.resolve()
     marker = prefix / "lib" / "cmake" / "opencascade"
+    signature = patches.recipe()
+    stamp = prefix / 'share' / 'simplecadapi' / 'occt-recipe.sha256'
+    if args.tag != patches.manifest()['tag']:
+        ap.error('the kernel patch set requires ' + DEFAULT_TAG)
     if marker.exists() and not args.force:
-        print(f"OCCT already installed in {prefix}; use --force to rebuild")
-        return 0
+        if stamp.is_file() and stamp.read_text().strip() == signature:
+            print(f"Matching modified OCCT already installed in {prefix}")
+            return 0
+        ap.error('existing prefix contains another OCCT build; select an empty prefix or use --force')
 
     work = (args.work or Path(tempfile.mkdtemp(prefix="occt-build-"))).resolve()
     work.mkdir(parents=True, exist_ok=True)
@@ -76,12 +84,15 @@ def main() -> int:
         if not tarball.exists():
             print(f"downloading {URL.format(tag=args.tag)}", flush=True)
             download(URL.format(tag=args.tag), tarball)
+        if hashlib.sha256(tarball.read_bytes()).hexdigest() != patches.manifest()['archive_sha256']:
+            raise ValueError(f'upstream OCCT archive checksum mismatch: {tarball}')
         with tarfile.open(tarball) as tar:
             top = tar.getnames()[0].split("/")[0]
             if not (work / top).exists():
                 tar.extractall(work)
         src = work / top
 
+    patches.install_overlay(src)
     build = work / "build"
     build.mkdir(exist_ok=True)
 
@@ -119,6 +130,10 @@ def main() -> int:
         "INSTALL_DIR_LAYOUT": "Unix",
     }
     cmd = ["cmake", "-S", str(src), "-B", str(build)]
+    for module in (src / 'adm/MODULES').read_text().splitlines():
+        options['BUILD_MODULE_' + module.split()[0]] = 'OFF'
+    options['BUILD_ADDITIONAL_TOOLKITS'] = ' '.join(patches.toolkits())
+    options['INSTALL_DIR_CMAKE'] = 'lib/cmake/opencascade'
     # Ninja where a compiler is already on the path (Linux, macOS).  On Windows when the MSVC environment is active
     # (`cl` on the path: the release workflow activates it) or a MinGW g++ is (with cl absent CMake falls back to
     # gcc); otherwise the default Visual Studio generator finds MSVC by itself, which a bare Ninja would not.
@@ -133,6 +148,8 @@ def main() -> int:
     if not ninja:  # a multi-config generator (Visual Studio) takes the configuration at build time
         build_cmd += ["--config", "Release"]
     run(build_cmd)
+    stamp.parent.mkdir(parents=True, exist_ok=True)
+    stamp.write_text(signature + '\n', encoding='ascii')
     print(f"OCCT {args.tag} installed to {prefix}")
     return 0
 

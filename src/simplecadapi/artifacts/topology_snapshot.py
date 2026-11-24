@@ -10,6 +10,7 @@ from ..topology.tagging import normalize_tag
 from ..topology import TopoKind, TopoRef, topo_ref_to_dict
 from .geometry_interface import (
     geometry_interface_fingerprint,
+    shared_measurements,
     stable_topology_entity_hash,
 )
 from .canonical import (
@@ -339,6 +340,7 @@ def _topology_descriptor_from_keys(
     }
 
 
+@shared_measurements
 def topology_descriptor(solid: Solid) -> dict[str, Any]:
     """Return a traversal-independent descriptor for all wrapped topology entities."""
 
@@ -356,6 +358,7 @@ def topology_fingerprint(solid: Solid) -> str:
     return content_hash(topology_descriptor(solid), omit=())
 
 
+@shared_measurements
 def capture_topology_snapshot(solid: Solid) -> dict[str, Any]:
     """Capture exact semantic state keyed by stable normalized geometry."""
 
@@ -583,6 +586,7 @@ def _validate_snapshot(snapshot: Mapping[str, Any]) -> None:
         )
 
 
+@shared_measurements
 def restore_topology_snapshot(
     solid: Solid,
     snapshot: Mapping[str, Any] | bytes | bytearray | memoryview,

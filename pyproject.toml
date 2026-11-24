@@ -95,6 +95,9 @@ build-dir = "src/cpp/build/wheel/{wheel_tag}"
 wheel.packages = ["src/simplecadapi"]
 wheel.exclude = ["**/__pycache__/**", "**/*.pyc"]
 sdist.include = [
+  "/src/cpp/patches",
+  "/src/cpp/tools/build_occt.py",
+  "/src/cpp/tools/occt_patches.py",
   "/tools/build_backend",
   "/src/simplecadapi/editor/webui",
   "/skillproj.toml",
@@ -173,6 +176,9 @@ dev = [
 # machine) whenever a cache key changed.  uv's default key is pyproject.toml, so a version bump or a dependency edit forced
 # a rebuild nobody needed.  Rebuild only when the C++ module's inputs change.
 cache-keys = [
+  { file = "src/cpp/patches/**" },
+  { file = "src/cpp/tools/build_occt.py" },
+  { file = "src/cpp/tools/occt_patches.py" },
   { file = "src/cpp/CMakeLists.txt" },
   { file = "src/cpp/cmake/**" },
   { file = "src/cpp/include/**" },

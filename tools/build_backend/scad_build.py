@@ -61,7 +61,14 @@ def _total_memory_gb() -> float:
 
 def _find_occt() -> Path | None:
     """An OCCT install prefix (the directory holding lib/cmake/opencascade), looked up in the usual places."""
-    candidates = [os.environ.get("SCAD_OCCT_PREFIX"), "C:/occt", str(_occt_cache_dir())]
+    explicit = os.environ.get("SCAD_OCCT_PREFIX")
+    if explicit:
+        if not (Path(explicit) / "lib/cmake/opencascade").is_dir():
+            raise RuntimeError(f"SCAD_OCCT_PREFIX does not contain an OCCT installation: {explicit}")
+        return Path(explicit)
+    # The local C:/OCCT-modified/static install uses MinGW archives, not MSVC .lib files.
+    candidates = [] if _has_msvc() else ["C:/OCCT-modified/static"]
+    candidates.append(str(_occt_cache_dir()))
     for c in candidates:
         if c and (Path(c) / "lib" / "cmake" / "opencascade").is_dir():
             return Path(c)
@@ -70,7 +77,13 @@ def _find_occt() -> Path | None:
 
 def _occt_cache_dir() -> Path:
     base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
-    return Path(base) / "simplecadapi" / f"occt-{OCCT_TAG}"
+    import hashlib
+    cpp = REPO / 'src/cpp'
+    files = [cpp/'tools/build_occt.py', cpp/'tools/occt_patches.py', cpp/'cmake/ScadOcct.cmake',
+             *sorted(p for p in (cpp/'patches/occt').rglob('*') if p.is_file())]
+    key = hashlib.sha256(b'\0'.join(p.read_bytes() for p in files)).hexdigest()[:12]
+    abi = 'msvc' if _has_msvc() else 'mingw'
+    return Path(base) / "simplecadapi" / f"occt-{OCCT_TAG}-{abi}-{key}"
 
 
 def _build_occt(prefix: Path) -> None:

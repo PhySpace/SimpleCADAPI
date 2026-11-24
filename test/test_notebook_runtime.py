@@ -813,7 +813,7 @@ class TestPartialRuns(NotebookTestCase):
         self.sleepy = self.write(
             "sleepy.py",
             notebook_text(
-                cell("import time\ntime.sleep(30)\nwidth = 1.0", returns="width"),
+                cell("import time\ntime.sleep(2)\nwidth = 1.0", returns="width"),
                 table='id = "sleepy"',
             ),
         )
@@ -843,8 +843,16 @@ class TestPartialRuns(NotebookTestCase):
         self.assertIsNone(run.product)
 
     def test_timeout_fails_the_run_and_names_the_knob(self) -> None:
+        import threading
+        previous = set(threading.enumerate())
         with self.assertRaisesRegex(TimeoutError, "timeout"):
             run_notebook(self.sleepy, timeout=0.5)
+        # A timeout releases the caller, not an in-flight kernel operation. Let
+        # this fixture's worker release run.lock before deleting its workspace.
+        for thread in threading.enumerate():
+            if thread not in previous and thread.name == "notebook-run":
+                thread.join(timeout=30)
+                self.assertFalse(thread.is_alive())
 
 
 class TestRunNoise(unittest.TestCase):

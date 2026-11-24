@@ -21,6 +21,7 @@ Contract highlights (see ``docs/skill/references/domains/addon-development.md``)
 from __future__ import annotations
 
 import io
+import os
 import re
 import shutil
 import subprocess
@@ -333,18 +334,28 @@ def _fetch(source: Source, dest: Path, *, method: str) -> None:
         _fetch_github_tarball(source, dest)
 
 
+def _shell_invocation(line: str) -> str | list[str]:
+    if sys.platform == "win32":
+        # /s strips precisely the outer pair of quotes. Passing line as an
+        # argv element would apply C-runtime escaping to cmd.exe syntax.
+        shell = os.environ.get("ComSpec") or os.path.join(
+            os.environ["SystemRoot"], "System32", "cmd.exe"
+        )
+        return f'"{shell}" /d /v:off /s /c "{line}"'
+    return ["sh", "-c", line]
+
+
 def run_check_cmd(cmd: str, *, timeout: float = _CHECK_TIMEOUT_SECONDS) -> dict[str, Any]:
     """Run a runtime probe: exit 0 means usable; name the failure otherwise."""
-    argv = ["cmd", "/c", cmd] if sys.platform == "win32" else ["sh", "-c", cmd]
     try:
         completed = subprocess.run(
-            argv, capture_output=True, text=True, timeout=timeout
+            _shell_invocation(cmd), capture_output=True, text=True, errors="replace", timeout=timeout
         )
     except FileNotFoundError as exc:
         return {
             "passed": False,
             "exit_code": None,
-            "output_tail": f"could not launch {argv[0]!r}: {exc}",
+            "output_tail": f"could not launch the shell: {exc}",
         }
     except subprocess.TimeoutExpired:
         return {

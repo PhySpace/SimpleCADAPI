@@ -124,6 +124,6 @@ TEST_CASE("make_wire_from_edges_rwire chains edges and carries identity tags") {
   const auto empty = failure_of([] { make_wire_from_edges_rwire({}); });
   REQUIRE(empty);
   CHECK(empty->operation() == "make_wire_from_edges_rwire");
-  const Edge far = make_line_redge(scalar3(9, 9, 0), scalar3(10, 9, 0));
-  CHECK(failure_of([&] { make_wire_from_edges_rwire({a, far}); }));
+  const Edge distant = make_line_redge(scalar3(9, 9, 0), scalar3(10, 9, 0));
+  CHECK(failure_of([&] { make_wire_from_edges_rwire({a, distant}); }));
 }

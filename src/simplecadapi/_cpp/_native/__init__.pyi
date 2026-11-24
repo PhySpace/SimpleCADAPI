@@ -397,6 +397,8 @@ class AnyShape:
         ...
     def _local_tag_bindings(self) -> list[TagBinding]:
         ...
+    def _mass_and_center(self) -> tuple[float, tuple[float, float, float]]:
+        ...
     def _metadata_dict(self) -> typing.Any:
         ...
     def _orientation(self) -> str:
@@ -778,6 +780,10 @@ def _guided_loft_recipe(shape: AnyShape) -> typing.Any:
 def _interpolated_bspline_edge(points: collections.abc.Sequence[typing.Annotated[collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], "FixedSize(3)"]], *, periodic: bool = False, tolerance: typing.SupportsFloat | typing.SupportsIndex = 1e-06) -> Edge:
     """
     An interpolating B-spline edge through the points (GeomAPI_Interpolate).
+    """
+def _kernel_capabilities() -> dict:
+    """
+    Kernel strategies the linked OpenCASCADE carries: y_patch (fillet_rsolid strategy_auto_y_patch), graph_patch (make_surface_patch_rface strategy_graph_patch).
     """
 def _locate_anchor(within: OperationNode, stable: typing.Any) -> typing.Any:
     """

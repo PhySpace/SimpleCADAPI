@@ -1,0 +1,331 @@
+--- a/src/ChFi3d/ChFi3d_Builder_CnCrn.cxx
++++ b/src/ChFi3d/ChFi3d_Builder_CnCrn.cxx
+@@ -72,6 +72,19 @@
+ #include <Geom_Curve.hxx>
+ #include <Geom_Surface.hxx>
+ #include <GeomAdaptor_Surface.hxx>
++#include <GeomAdaptor_Curve.hxx>
++#include <BRepAlgoAPI_Check.hxx>
++#include <BRepBuilderAPI_MakeFace.hxx>
++#include <GeomAPI_ProjectPointOnCurve.hxx>
++#include <Geom2dAPI_Interpolate.hxx>
++#include <GeomFill_BoundWithSurf.hxx>
++#include <GeomFill_ConstrainedFilling.hxx>
++#include <GeomLib_CheckCurveOnSurface.hxx>
++#include <TColgp_HArray1OfPnt2d.hxx>
++#include <TColStd_HArray1OfReal.hxx>
++#include <map>
++#include <vector>
++#include <cmath>
+ #include <GeomInt_IntSS.hxx>
+ #include <GeomLib.hxx>
+ #include <GeomPlate_BuildPlateSurface.hxx>
+@@ -1035,6 +1048,212 @@
+ //           can be even twisted (grid tests cfi900 B1)
+ //=======================================================================
+ 
++// A cubic Hermite parameter law preserves the given boundary, endpoint
++// derivatives and reversal. Unlike a sampled arc-length law, its inverse is
++// well defined at the zero-speed ends of a tangent two-fillet corner.
++class ChFi3d_CornerBoundary : public GeomFill_Boundary
++{
++public:
++  ChFi3d_CornerBoundary(const Adaptor3d_CurveOnSurface& theCurve)
++      : GeomFill_Boundary(Precision::Confusion(), 1.e-6),
++        myBoundary(theCurve, Precision::Confusion(), 1.e-6),
++        myFirst(theCurve.FirstParameter()), myLast(theCurve.LastParameter()),
++        myLower(myFirst), myUpper(myLast), myOrigin(myFirst), myA(myLast-myFirst) {}
++
++  Standard_Real Parameter(Standard_Real u) const
++  {
++    const Standard_Real x = (u-myLower)/(myUpper-myLower);
++    return myOrigin+x*(myA+x*(myB+x*myC));
++  }
++  Standard_Real Derivative(Standard_Real u) const
++  {
++    const Standard_Real x = (u-myLower)/(myUpper-myLower);
++    return (myA+x*(2*myB+3*x*myC))/(myUpper-myLower);
++  }
++  Standard_Real Inverse(Standard_Real value) const
++  {
++    const Standard_Boolean increasing = Parameter(myUpper)>Parameter(myLower);
++    if ((value<=Parameter(myLower))==increasing) return myLower;
++    if ((value>=Parameter(myUpper))==increasing) return myUpper;
++    Standard_Real lower=myLower, upper=myUpper;
++    for (Standard_Integer i=0;i<64;++i)
++    {
++      const Standard_Real middle=(lower+upper)/2;
++      if ((Parameter(middle)<value)==increasing) lower=middle;
++      else upper=middle;
++    }
++    return (lower+upper)/2;
++  }
++  Standard_Boolean IsMonotone() const
++  {
++    const Standard_Real direction=Parameter(myUpper)>Parameter(myLower)?1.:-1.;
++    Standard_Real minimum=Min(direction*myA,direction*(myA+2*myB+3*myC));
++    if (Abs(myC)>1.e-30)
++    {
++      const Standard_Real x=-myB/(3*myC);
++      if (x>0 && x<1) minimum=Min(minimum,direction*(myA+x*(2*myB+3*x*myC)));
++    }
++    return minimum>=-Precision::PConfusion();
++  }
++  gp_Pnt Value(Standard_Real u) const override { return myBoundary.Value(Parameter(u)); }
++  void D1(Standard_Real u,gp_Pnt& p,gp_Vec& v) const override
++  { myBoundary.D1(Parameter(u),p,v); v*=Derivative(u); }
++  Standard_Boolean HasNormals() const override { return Standard_True; }
++  gp_Vec Norm(Standard_Real u) const override { return myBoundary.Norm(Parameter(u)); }
++  void D1Norm(Standard_Real u,gp_Vec& n,gp_Vec& dn) const override
++  { myBoundary.D1Norm(Parameter(u),n,dn); dn*=Derivative(u); }
++  void Reparametrize(Standard_Real lower,Standard_Real upper,Standard_Boolean hf,
++                     Standard_Boolean hl,Standard_Real df,Standard_Real dl,Standard_Boolean reverse) override
++  {
++    myLower=lower; myUpper=upper; myOrigin=reverse?myLast:myFirst;
++    const Standard_Real length=reverse?myFirst-myLast:myLast-myFirst;
++    const Standard_Real d0=hf?(reverse?-df:df)*(upper-lower):length;
++    const Standard_Real d1=hl?(reverse?-dl:dl)*(upper-lower):length;
++    myA=d0; myB=3*length-2*d0-d1; myC=-2*length+d0+d1;
++  }
++  void Bounds(Standard_Real& lower,Standard_Real& upper) const override { lower=myLower; upper=myUpper; }
++  Standard_Boolean IsDegenerated() const override { return Standard_False; }
++private:
++  GeomFill_BoundWithSurf myBoundary;
++  Standard_Real myFirst,myLast,myLower,myUpper,myOrigin,myA,myB=0,myC=0;
++};
++
++static Standard_Boolean ChFi3d_FillTangentCorner(
++  GeomPlate_BuildPlateSurface& plate,TopOpeBRepDS_DataStructure& ds,
++  const TColStd_Array1OfInteger& curveIds,Handle(Geom_Surface)& result,
++  Handle(TColGeom2d_HArray1OfCurve)& pcurves,Standard_Real& error)
++{
++  const Standard_Real budget=Precision::Confusion();
++  const auto order=plate.Order();
++  Standard_Integer index[4]={0,0,0,0};
++  for (Standard_Integer j=1;j<=4;++j)
++  {
++    if (order->Value(j)<1 || order->Value(j)>4) return Standard_False;
++    index[order->Value(j)-1]=j;
++  }
++  Handle(ChFi3d_CornerBoundary) bounds[4];
++  for (Standard_Integer j=0;j<4;++j)
++  {
++    if (index[j]==0) return Standard_False;
++    const auto constraint=plate.CurveConstraint(index[j]);
++    const auto curve=Handle(Adaptor3d_CurveOnSurface)::DownCast(constraint->Curve3d());
++    if (curve.IsNull()) return Standard_False;
++    bounds[j]=new ChFi3d_CornerBoundary(*curve);
++  }
++  GeomFill_ConstrainedFilling filling(11,20);
++  filling.Init(bounds[0],bounds[1],bounds[2],bounds[3],Standard_False);
++  Handle(Geom_Surface) surface=filling.Surface();
++  if (surface.IsNull()) return Standard_False;
++  for (const auto& bound:bounds) if (!bound->IsMonotone()) return Standard_False;
++  Standard_Real u0,u1,v0,v1;
++  surface->Bounds(u0,u1,v0,v1);
++  Handle(Geom_Curve) iso[4]={surface->UIso(u0),surface->UIso(u1),surface->VIso(v0),surface->VIso(v1)};
++  Standard_Boolean used[4]={false,false,false,false};
++  Handle(TColGeom2d_HArray1OfCurve) pcs=new TColGeom2d_HArray1OfCurve(1,4);
++  Standard_Real maximum=0;
++  for (Standard_Integer j=0;j<4;++j)
++  {
++    const auto constraint=plate.CurveConstraint(index[j]);
++    const Handle(Geom_Curve) curve=ds.Curve(curveIds.Value(j+1)).Curve();
++    if (curve.IsNull()) return Standard_False;
++    const Standard_Real first=constraint->FirstParameter(),last=constraint->LastParameter();
++    Standard_Integer selected=-1;
++    Standard_Real best=RealLast();
++    for (Standard_Integer k=0;k<4;++k)
++    {
++      Standard_Real sum=0;
++      for (Standard_Integer n=0;n<=4;++n)
++      {
++        GeomAPI_ProjectPointOnCurve project(curve->Value(first+(last-first)*n/4),iso[k]);
++        if (project.NbPoints()==0) { sum=RealLast(); break; }
++        sum+=project.LowerDistance();
++      }
++      if (sum<best) { best=sum; selected=k; }
++    }
++    if (selected<0 || used[selected]) return Standard_False;
++    used[selected]=Standard_True;
++    const Standard_Real lower=selected<2?v0:u0,upper=selected<2?v1:u1;
++    const Standard_Boolean reverse=bounds[j]->Value(0).Distance(iso[selected]->Value(lower))>
++                                   bounds[j]->Value(0).Distance(iso[selected]->Value(upper));
++    const auto point=[&](Standard_Real w)
++    { return selected==0?gp_Pnt2d(u0,w):selected==1?gp_Pnt2d(u1,w):selected==2?gp_Pnt2d(w,v0):gp_Pnt2d(w,v1); };
++    std::map<Standard_Real,gp_Pnt2d> samples;
++    const auto add=[&](Standard_Real t)
++    {
++      const Standard_Real s=bounds[j]->Inverse(t);
++      const gp_Pnt2d uv=point(lower+(upper-lower)*(reverse?1-s:s));
++      if (surface->Value(uv.X(),uv.Y()).Distance(curve->Value(t))>budget) return false;
++      samples.emplace(t,uv); return true;
++    };
++    for (Standard_Integer n=0;n<=64;++n)
++      if (!add(first+(last-first)*(1-std::cos(M_PI*n/64))/2)) return Standard_False;
++    Handle(Geom2d_Curve) pc;
++    Standard_Real deviation=RealLast();
++    const Handle(GeomAdaptor_Curve) c3d=new GeomAdaptor_Curve(curve,first,last);
++    const Handle(GeomAdaptor_Surface) support=new GeomAdaptor_Surface(surface);
++    for (Standard_Integer iteration=0;iteration<24 && samples.size()<8193;++iteration)
++    {
++      const Standard_Integer count=static_cast<Standard_Integer>(samples.size());
++      Handle(TColgp_HArray1OfPnt2d) points=new TColgp_HArray1OfPnt2d(1,count);
++      Handle(TColStd_HArray1OfReal) parameters=new TColStd_HArray1OfReal(1,count);
++      Standard_Integer n=0;
++      for (const auto& item:samples) { ++n; points->SetValue(n,item.second); parameters->SetValue(n,item.first); }
++      Geom2dAPI_Interpolate interpolate(points,parameters,Standard_False,1.e-12);
++      interpolate.Perform();
++      if (!interpolate.IsDone()) return Standard_False;
++      pc=interpolate.Curve();
++      std::vector<Standard_Real> refine;
++      deviation=0;
++      for (auto it=samples.begin(),next=std::next(it);next!=samples.end();++it,++next)
++        for (Standard_Integer part=1;part<4;++part)
++        {
++          const Standard_Real t=it->first+(next->first-it->first)*part/4;
++          const gp_Pnt2d uv=pc->Value(t);
++          const Standard_Real d=surface->Value(uv.X(),uv.Y()).Distance(curve->Value(t));
++          deviation=Max(deviation,d);
++          if (d>budget) refine.push_back(t);
++        }
++      const Handle(Geom2dAdaptor_Curve) c2d=new Geom2dAdaptor_Curve(pc,first,last);
++      const Handle(Adaptor3d_CurveOnSurface) onSurface=new Adaptor3d_CurveOnSurface(c2d,support);
++      GeomLib_CheckCurveOnSurface check(c3d);
++      check.Perform(onSurface);
++      if (!check.IsDone()) return Standard_False;
++      deviation=Max(deviation,check.MaxDistance());
++      if (check.MaxDistance()>budget) refine.push_back(check.MaxParameter());
++      if (deviation<=budget) break;
++      const auto prior=samples.size();
++      for (Standard_Real t:refine) if (!add(t)) return Standard_False;
++      if (samples.size()==prior) return Standard_False;
++    }
++    if (pc.IsNull() || deviation>budget) return Standard_False;
++    pcs->SetValue(j+1,pc);
++    maximum=Max(maximum,deviation);
++    // Check actual support normals on an endpoint-dense distribution. The
++    // metric is independent of the parameter speed, which vanishes at corners.
++    for (Standard_Integer n=1;n<512;++n)
++    {
++      const Standard_Real t=first+(last-first)*(1-std::cos(M_PI*n/512))/2;
++      const gp_Pnt2d uv=pc->Value(t);
++      gp_Pnt p; gp_Vec du,dv;
++      surface->D1(uv.X(),uv.Y(),p,du,dv);
++      gp_Vec normal=du.Crossed(dv);
++      if (normal.SquareMagnitude()<1.e-30) return Standard_False;
++      normal.Normalize();
++      const gp_Vec expected=bounds[j]->Norm(bounds[j]->Inverse(t));
++      if (Abs(normal.Dot(expected))<std::cos(2.e-4)) return Standard_False;
++    }
++  }
++  // Boundary agreement and exact BREP validity do not detect a regular
++  // double cover inside a single face. Check the constructed corner itself
++  // before inserting it into the operation's data structure (Y01).
++  BRepBuilderAPI_MakeFace face(surface,budget);
++  if (!face.IsDone()) return Standard_False;
++  BRepAlgoAPI_Check interference(face.Face(),Standard_False,Standard_True);
++  if (interference.HasErrors() || !interference.IsValid()) return Standard_False;
++  result=surface; pcurves=pcs; error=Max(2*maximum,budget);
++  return Standard_True;
++}
++
+ static TopAbs_Orientation PlateOrientation(const Handle(Geom_Surface)&              thePlateSurf,
+                                            const Handle(TColGeom2d_HArray1OfCurve)& thePCArr,
+                                            const gp_Vec&                            theRefDir)
+@@ -1450,6 +1669,8 @@
+   }
+ 
+   deuxcgnontg = nconges == 2 && nedge == 3 && !deuxconges; // pro12305
++  if (deuxconges && nedge == 3 && !bordlibre)
++    tolapp = Precision::Confusion();
+ 
+   if (deuxconges)
+     for (ic = 0; ic < nedge; ic++)
+@@ -3140,6 +3361,23 @@
+     Handle(Geom_Surface)       Surf(Mapp.Surface());
+     Standard_Real              coef = 1.1, apperror;
+     apperror                        = Mapp.CriterionError() * coef;
++    Handle(TColGeom2d_HArray1OfCurve) cornerPC=PSurf.Curves2d();
++    Standard_Boolean filled=Standard_False;
++    const Standard_Boolean needsCornerRepair =
++      n3d==4 && nedge==3 && deuxconges && !bordlibre && Mapp.ApproxError()>tolapp;
++    if (needsCornerRepair)
++    {
++      try
++      {
++        filled=ChFi3d_FillTangentCorner(PSurf,DStr,indcurve3d,Surf,cornerPC,apperror);
++      }
++      catch (const Standard_Failure&)
++      {
++        filled=Standard_False;
++      }
++      if (!filled)
++        throw Standard_ConstructionError("Tangent fillet corner failed geometry validation");
++    }
+ 
+ #ifdef OCCT_DEBUG
+     ChFi3d_ResultChron(ch, t_approxplate); // result performances for approxplate
+@@ -3157,7 +3395,7 @@
+     //     gp_Pnt2d uv;
+     //     Standard_Real scal;
+ 
+-    TopOpeBRepDS_Surface Tsurf(Surf, Mapp.ApproxError());
++    TopOpeBRepDS_Surface Tsurf(Surf, filled?apperror:Mapp.ApproxError());
+     Standard_Integer     Isurf = DStr.AddSurface(Tsurf);
+     // lbo : historique QDF.
+     if (!myEVIMap.IsBound(V1))
+@@ -3225,7 +3463,7 @@
+     orsurfdata = Fd->Orientation();
+     //     if (scal>0) orplate=orsurfdata;
+     //     else  orplate=TopAbs::Reverse(orsurfdata);
+-    orplate = PlateOrientation(Surf, PSurf.Curves2d(), SumFaceNormalAtV1);
++    orplate = PlateOrientation(Surf, cornerPC, SumFaceNormalAtV1);
+ 
+     //  creation of solidinterderence for Plate
+     Handle(TopOpeBRepDS_SolidSurfaceInterference) SSI =
+@@ -3346,7 +3584,7 @@
+         isfirst = (sens.Value(ic) == 1);
+         //   calculate curves interference relative to stripes
+ 
+-        apperror = Mapp.CriterionError() * coef;
++        if (!filled) apperror = Mapp.CriterionError() * coef;
+         pardeb   = CD.Value(ic)->PCurve(isfirst)->FirstParameter();
+         parfin   = CD.Value(ic)->PCurve(isfirst)->LastParameter();
+ 
+@@ -3368,7 +3606,7 @@
+ 
+         // calculate surfaceinterference
+         Interfc =
+-          ChFi3d_FilCurveInDS(indcurve3d.Value(n3d), Isurf, PSurf.Curves2d()->Value(n3d), orien);
++          ChFi3d_FilCurveInDS(indcurve3d.Value(n3d), Isurf, cornerPC->Value(n3d), orien);
+         DStr.ChangeSurfaceInterferences(Isurf).Append(Interfc);
+         regular.SetCurve(indcurve3d.Value(n3d));
+         regular.SetS1(Isurf, Standard_False);
+@@ -3421,7 +3659,7 @@
+             }
+             Interfc = ChFi3d_FilCurveInDS(indcurve3d.Value(n3d),
+                                           Isurf,
+-                                          PSurf.Curves2d()->Value(n3d),
++                                           cornerPC->Value(n3d),
+                                           orien);
+             DStr.ChangeSurfaceInterferences(Isurf).Append(Interfc);
+             if (Order.Value(n3d) == 1)
+@@ -3455,7 +3693,7 @@
+             }
+             Interfc = ChFi3d_FilCurveInDS(indcurve3d.Value(n3d),
+                                           Isurf,
+-                                          PSurf.Curves2d()->Value(n3d),
++                                           cornerPC->Value(n3d),
+                                           orien);
+             DStr.ChangeSurfaceInterferences(Isurf).Append(Interfc);
+             if (Order.Value(n3d) == 1)
+@@ -3482,7 +3720,7 @@
+           TopOpeBRepDS_Curve& tcourb1 = DStr.ChangeCurve(indcurve3d.Value(n3d));
+           tcourb1.Tolerance(tcourb1.Tolerance() + apperror);
+           Interfc =
+-            ChFi3d_FilCurveInDS(indcurve3d.Value(n3d), Isurf, PSurf.Curves2d()->Value(n3d), orien);
++            ChFi3d_FilCurveInDS(indcurve3d.Value(n3d), Isurf, cornerPC->Value(n3d), orien);
+           DStr.ChangeSurfaceInterferences(Isurf).Append(Interfc);
+         }
+       }

@@ -4119,6 +4119,7 @@ def _execute_graph(
                             settings=ops.SurfaceFillingSettings(**settings_payload),
                             holes=cast(Sequence[Wire], holes),
                             tag_prefix=cast(Optional[str], params.get("tag_prefix")),
+                            strategy_graph_patch=bool(params.get("strategy_graph_patch", False)),
                         )
                         _store_outputs(node, result)
                         continue
@@ -4782,7 +4783,12 @@ def _execute_graph(
                                 ctx.fail(
                                     f"Graph node '{node.node_id}' ({op_name}) expected {expected} selected edge(s), got {len(edges)}"
                                 )
-                            result = ops.fillet_rsolid(solid, edges, params["radius"])
+                            result = ops.fillet_rsolid(
+                                solid,
+                                edges,
+                                params["radius"],
+                                strategy_auto_y_patch=bool(params.get("strategy_auto_y_patch", False)),
+                            )
                             _store_outputs(node, result)
                         continue
 

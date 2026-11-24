@@ -169,7 +169,18 @@ class ServerSendsPagesWhatTheyLackTest(unittest.TestCase):
                 self.assertEqual(reply.status_code, 400, reply.text)
                 self.assertNotIn("missing", reply.json())
         self.assertIsNone(state.latest_preview_bytes)  # nothing was taken
-        self.assertEqual(client.post("/api/runtime/preview", content=full).status_code, 200)
+        import threading
+        from unittest.mock import patch
+        published = threading.Event()
+        finish = state.after_publish
+        def observed(*args):
+            try:
+                finish(*args)
+            finally:
+                published.set()
+        with patch.object(state, "after_publish", observed):
+            self.assertEqual(client.post("/api/runtime/preview", content=full).status_code, 200)
+            self.assertTrue(published.wait(10), "preview snapshot writer did not finish")
 
     def test_bytes_that_are_no_preview_at_all_are_still_kept_whole(self) -> None:
         state = self.state()

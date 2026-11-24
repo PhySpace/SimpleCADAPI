@@ -178,14 +178,14 @@ TEST_CASE("an evidence provider is asked once per failure and its views reach th
   const Solid part = ql_test::split_band_solid();
   int calls = 0;
   std::string seen_key, seen_kind, seen_mode;
-  std::size_t matched = 0, near = 0;
+  std::size_t matched = 0, near_count = 0;
   const ProviderGuard guard([&](const ql::EvidenceRequest& request) {
     ++calls;
     seen_key = request.dedup_key;
     seen_kind = request.target_kind;
     seen_mode = request.mode;
     matched = request.matched.size();
-    near = request.near_misses.size();
+    near_count = request.near_misses.size();
     ErrorEvidence evidence;
     evidence.kind = "render";
     evidence.path = "/tmp/ql_face_resolve.png";
@@ -206,7 +206,7 @@ TEST_CASE("an evidence provider is asked once per failure and its views reach th
   CHECK(seen_kind == "face");
   CHECK(seen_mode == "exactly");
   CHECK(matched == 3);
-  CHECK(near == 3);  // capped at three
+  CHECK(near_count == 3);  // capped at three
 }
 
 TEST_CASE("a throwing evidence provider never masks the failure") {

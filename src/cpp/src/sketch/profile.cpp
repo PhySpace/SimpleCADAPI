@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 #include <set>
+#include <unordered_map>
 
 #include "scad/core/error.hpp"
 
@@ -28,43 +30,39 @@ std::vector<std::string> edge_entity_ids(const Sketch& sketch) {
   return ids;
 }
 
-std::size_t entity_position(const Sketch& sketch, const std::string& id) {
-  std::size_t position = 0;
-  for (const auto& item : sketch.entities()) {
-    if (item.first == id)
-      return position;
-    ++position;
-  }
-  return position;
-}
-
-// _edge_component: the entities connected to `first_edge` through shared points,
-// in entity order.
-std::vector<std::string> edge_component(const Sketch& sketch, const std::string& first_edge,
-                                        const std::set<std::string>& candidates) {
-  std::vector<std::string> queue{first_edge};
-  std::set<std::string> seen_edges;
-  std::set<std::string> seen_points;
-  for (std::size_t cursor = 0; cursor < queue.size(); ++cursor) {
-    const std::string edge_id = queue[cursor];
-    if (!seen_edges.insert(edge_id).second)
-      continue;
-    const auto [start, end] = edge_endpoints(sketch.entities().at(edge_id));
-    for (const std::string& point_id : {start, end}) {
-      if (!seen_points.insert(point_id).second)
-        continue;
-      for (const std::string& other_id : candidates) {
-        const auto [other_start, other_end] = edge_endpoints(sketch.entities().at(other_id));
-        if (point_id == other_start || point_id == other_end)
-          queue.push_back(other_id);
-      }
+// Connect by entity id, never by coordinates. Emit groups and their members in original
+// insertion order independently of the hash table order (profile indices and diagnostics use it).
+std::vector<std::vector<std::string>> edge_components(const Sketch& sketch) {
+  const auto ids = edge_entity_ids(sketch);
+  std::vector<std::size_t> parent(ids.size());
+  std::iota(parent.begin(), parent.end(), std::size_t{0});
+  const auto root = [&](std::size_t i) {
+    while (parent[i] != i) {
+      parent[i] = parent[parent[i]];
+      i = parent[i];
+    }
+    return i;
+  };
+  std::unordered_map<std::string, std::size_t> first;
+  for (std::size_t i = 0; i < ids.size(); ++i) {
+    const auto [start, end] = edge_endpoints(sketch.entities().at(ids[i]));
+    for (const auto* point : {&start, &end}) {
+      const auto [it, inserted] = first.try_emplace(*point, i);
+      if (!inserted)
+        parent[root(i)] = root(it->second);
     }
   }
-  std::vector<std::string> component(seen_edges.begin(), seen_edges.end());
-  std::sort(component.begin(), component.end(), [&sketch](const std::string& a, const std::string& b) {
-    return entity_position(sketch, a) < entity_position(sketch, b);
-  });
-  return component;
+  std::vector<std::vector<std::string>> groups;
+  std::vector<std::size_t> slot(ids.size(), ids.size());
+  for (std::size_t i = 0; i < ids.size(); ++i) {
+    auto& index = slot[root(i)];
+    if (index == ids.size()) {
+      index = groups.size();
+      groups.emplace_back();
+    }
+    groups[index].push_back(ids[i]);
+  }
+  return groups;
 }
 
 struct OrderedPath {
@@ -192,16 +190,8 @@ std::string describe_edge_component(const Sketch& sketch, const std::vector<std:
 
 std::vector<SketchProfile> edge_path_profiles(const Sketch& sketch,
                                               const std::shared_ptr<const SketchSolveResult>& result) {
-  const std::vector<std::string> edge_ids = edge_entity_ids(sketch);
-  std::set<std::string> unused(edge_ids.begin(), edge_ids.end());
   std::vector<SketchProfile> profiles;
-  while (!unused.empty()) {
-    // The unused edge that comes first in entity order.
-    const std::string first_edge = *std::find_if(edge_ids.begin(), edge_ids.end(),
-                                                 [&unused](const std::string& id) { return unused.count(id) != 0; });
-    const std::vector<std::string> component = edge_component(sketch, first_edge, unused);
-    for (const std::string& id : component)
-      unused.erase(id);
+  for (const auto& component : edge_components(sketch)) {
     const std::optional<OrderedPath> ordered = ordered_edge_path(sketch, component);
     if (!ordered)
       continue;
@@ -225,15 +215,8 @@ std::vector<SketchProfile> edge_path_profiles(const Sketch& sketch,
 }  // namespace
 
 std::vector<std::string> describe_edge_components(const Sketch& sketch) {
-  const std::vector<std::string> edge_ids = edge_entity_ids(sketch);
-  std::set<std::string> unused(edge_ids.begin(), edge_ids.end());
   std::vector<std::string> descriptions;
-  while (!unused.empty()) {
-    const std::string first_edge = *std::find_if(edge_ids.begin(), edge_ids.end(),
-                                                 [&unused](const std::string& id) { return unused.count(id) != 0; });
-    const std::vector<std::string> component = edge_component(sketch, first_edge, unused);
-    for (const std::string& id : component)
-      unused.erase(id);
+  for (const auto& component : edge_components(sketch)) {
     descriptions.push_back(describe_edge_component(sketch, component));
   }
   return descriptions;

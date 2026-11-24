@@ -456,11 +456,11 @@ class KernelCacheTest(unittest.TestCase):
         "# /// script\n# [tool.simplecadapi]\n# id = \"two\"\n# ///\n"
         "import marimo\n\napp = marimo.App()\n\nwith app.setup:\n    import simplecadapi as scad\n\n\n"
         "@app.cell\ndef _():\n    from lib.alpha import A\n"
-        "    open('/tmp/_sca_cache_log.txt', 'a').write('A')\n    return (A,)\n\n\n"
+        "    open(LOG_PATH, 'a').write('A')\n    return (A,)\n\n\n"
         "@app.cell\ndef _():\n    from lib.beta import B\n"
-        "    open('/tmp/_sca_cache_log.txt', 'a').write('B')\n    return (B,)\n\n\n"
+        "    open(LOG_PATH, 'a').write('B')\n    return (B,)\n\n\n"
         "@app.cell\ndef _(A, B):\n    part = scad.Part(part_id='two', body=scad.make_box_rsolid(A, B, 1.0))\n"
-        "    open('/tmp/_sca_cache_log.txt', 'a').write('P')\n    return (part,)\n"
+        "    open(LOG_PATH, 'a').write('P')\n    return (part,)\n"
     )
 
     def test_only_the_cells_that_read_a_changed_module_run_again(self) -> None:
@@ -470,15 +470,14 @@ class KernelCacheTest(unittest.TestCase):
 
         from simplecadapi.editor.server import create_app
 
-        log = Path("/tmp/_sca_cache_log.txt")
-        log.unlink(missing_ok=True)
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
+            log = root / "_sca_cache_log.txt"
             (root / "lib").mkdir()
             (root / "lib" / "alpha.py").write_text("A = 10.0\n")
             (root / "lib" / "beta.py").write_text("B = 6.0\n")
             path = root / "two.py"
-            path.write_text(self.NOTEBOOK)
+            path.write_text(self.NOTEBOOK.replace("LOG_PATH", repr(str(log))))
             state = WorkspaceState(root)
             state.port = 17733
             app = create_app(state)
@@ -1303,7 +1302,8 @@ class EndpointDiscoveryTest(unittest.TestCase):
 
         code = "import sys; from simplecadapi.cli import main; sys.exit(main(['edit', sys.argv[1], '--port', '0', '--no-browser']))"
         process = subprocess.Popen(
-            [sys.executable, "-c", code, str(self.root)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            [sys.executable, "-c", code, str(self.root)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
         )
         self.addCleanup(process.kill)
         ready = None
@@ -1322,7 +1322,11 @@ class EndpointDiscoveryTest(unittest.TestCase):
 
         self.assertEqual(_find_editor(self.root, (ready["url"], ready["instance"])), (self.root, ready["url"], ready["instance"]))
         self.assertEqual(_find_editor(self.root), (self.root, ready["url"], ready["instance"]))
-        process.terminate()
+        if os.name == "nt":
+            import signal
+            process.send_signal(signal.CTRL_BREAK_EVENT)  # terminate() skips the lifespan cleanup on Windows
+        else:
+            process.terminate()
         process.wait(timeout=30)
         self.assertEqual(list((self.root / ".sca-editor" / "editors").glob("*.json")), [])
 

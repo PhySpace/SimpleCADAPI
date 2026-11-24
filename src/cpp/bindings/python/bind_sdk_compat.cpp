@@ -176,6 +176,10 @@ void bind_shape_internals(py::module_& m) {
   add_state_dicts<sp::Constraint>(m, "Constraint");
   add_state_dicts<sp::ScalarLimit>(m, "ScalarLimit");
   py::class_<Shape> any = py::reinterpret_borrow<py::class_<Shape>>(m.attr("AnyShape"));
+  any.def("_mass_and_center", [](const Shape& s) {
+    const auto [mass, c] = kernel::mass_and_center(s.wrapped());
+    return py::make_tuple(mass, py::make_tuple(c.x, c.y, c.z));
+  });
   any.def("_metadata_dict", [](const Shape& s) { return pybind::value_to_python(s.metadata()); });
   any.def("_runtime_dict", [](const Shape& s) { return pybind::value_to_python(s.runtime()); });
   any.def(

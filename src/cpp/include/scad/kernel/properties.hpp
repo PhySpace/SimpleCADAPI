@@ -4,6 +4,7 @@
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
+#include <utility>
 
 #include "scad/core/vec.hpp"
 
@@ -25,6 +26,7 @@ double volume(const TopoDS_Shape& solid);
 // comparisons that only need the answer when it is not close to a threshold.  `volume` stays the
 // precise one.
 double volume_estimate(const TopoDS_Shape& shape);
+std::pair<double, Vec3> mass_and_center(const TopoDS_Shape& solid_face_or_edge);
 
 // Centre of mass using the routine that matches the shape's own dimension.
 Vec3 center_of_mass(const TopoDS_Shape& shape);

@@ -1,0 +1,164 @@
+{
+  "data": {
+    "brep_sha256": {
+      "circular_controller_pcb": "sha256:a81a8593bd23ec944c829973d9a8371dd35fd948e54102a7d5b48b6c710d3fbd",
+      "front_motor_8x19x6_inner_ring": "sha256:78c71113fa9d40a49fe322ede4645752cae564ec68341d5bdbe9bc5067225255",
+      "front_motor_8x19x6_outer_ring": "sha256:3d93cf513019c46aae519bb5e82ef519687e20526190ff30533b8de55e6d51ce",
+      "interstage_5x10x3_inner_ring": "sha256:84b525f4fa7be528a983821f96f8c38a7a771c4f4b5eabf74074b8c8b5b77ac5",
+      "interstage_5x10x3_outer_ring": "sha256:9d679d42da4e4125b6c13b6d7f097c2ee7c303d1680f875eee74abd2ba744602",
+      "motor_shell": "sha256:3cd96b8655b57d69c7be63bfe8dca85305c4b83c8d2cca10d35d0230a3c18d11",
+      "output_16x24x5_inner_ring": "sha256:513707ababfc82c9be5aa369ed8a14e2221e0ab269ba9f9a626ce7e45d7baf70",
+      "output_16x24x5_outer_ring": "sha256:2fd542eeb49789ba01c570c7860a0d5539b0386d09c9225335c46bf472870f95",
+      "output_bearing_cap": "sha256:9105b5322f63ebed56121998659bdebd558a5be510a175cebfb4d28a05eee7df",
+      "planet_3x6x3_inner_ring": "sha256:5ab7646bd2badf560e69e0d8dc6028cc3a3f6abd02c72645bd6aac6921fae589",
+      "planet_3x6x3_outer_ring": "sha256:00fc7678f962025d68ddb6f329d213ef0f0edce62715beb136afd2acadd38a02",
+      "power_can_terminal": "sha256:3e3c7199b6ee9c75eb2165d6cb2e25b07ec99b7a68c28320f8b7653be1e19552",
+      "rear_bearing_spider": "sha256:6c4ff6cf050239a27390e1ae8f864418907db85f326476329e4e728b73f9d2c2",
+      "rear_electronics_cover": "sha256:55e558929c71d9df4ccf2ae21abe9a6f1c513a67e594f289a9cfaad18c611ffe",
+      "rear_motor_8x16x5_inner_ring": "sha256:86326588e89323a30beb629d9cbb42a0202931c82fd462051693aed36993ad20",
+      "rear_motor_8x16x5_outer_ring": "sha256:820cf1233cd60c3239817a88339e5ce81b27aede71039c9eb91a4e479f1b6a5d",
+      "reducer_housing": "sha256:7596e83d29ac7b1fc536e7753a3128e98428efde7f09c3f931b315fe2d4abb24",
+      "reusable_power_mosfet": "sha256:2033d635df5286cb6ba67bfacfd76e51e2fb25c1d146442f4ce226b11f46f5c8",
+      "reusable_rotor_magnet": "sha256:810bddc06dd8b1e3a759d8cbf2751a485a41c349de9bd67e878e675e83bb96e3",
+      "reusable_slot_winding": "sha256:d99cc8ff4aac5563110d9f4ea82d3c56da423e2b334704d8aa108f50a5954f78",
+      "rotor_core_shaft_sun": "sha256:a5518242015981ce2513e15a0a51d98ab19c2cd828c6aeb0bcc8aa93172dd097",
+      "stage1_carrier_integral_stage2_sun": "sha256:60ace79a41a9147900d133251bf14c9797a13a92508024f7f5e2e2cb05ac7e16",
+      "stage1_fixed_ring": "sha256:ef14c47d200ad0746bab21afe744c6c71f0dc0108c88c75d5858db8dd58f135e",
+      "stage1_reusable_planet": "sha256:5146faccbd67310b79ddeb75699ff2a775f79d8a641644b808bb44ce0a7d1ae7",
+      "stage2_fixed_ring": "sha256:cc31c8643edddb115990b378aedbe15017437a72bd088c41c9f239af25ad485a",
+      "stage2_output_carrier_flange": "sha256:a9bcd98912ba37fb27553cbce080bb62edc9ce7dfa8f174487acac2203ab5bcb",
+      "stage2_reusable_planet": "sha256:1edb314c02f708d124f77595b2603ef9e77f94c276afc0367185d8d2b88111f9",
+      "stator_core": "sha256:c13c26dd2530784a3b2c134486c458a1e92b448407a36d984d3a1e6489dc0bb5",
+      "three_phase_terminal": "sha256:37b3a6db884eae0f00d4b33c9e11c9b1d4d9af0715226e005e3f9ebe828cd467"
+    },
+    "build_s": 81.4246584999928,
+    "capture_s": 11.017462000003434,
+    "components": 29,
+    "constraints": 51,
+    "parts": {
+      "circular_controller_pcb": [
+        "sha256:d753a4fe086031c6decc6eff4af9c19cf8d5f790c5c46bed0aeff99c74fab1b3",
+        "simplecad-default"
+      ],
+      "front_motor_8x19x6_inner_ring": [
+        "sha256:91da0030f968e5491a5fe84d48c3580a918c7b36ac2f0cd0f0ee0a9f5d51a528",
+        "simplecad-default"
+      ],
+      "front_motor_8x19x6_outer_ring": [
+        "sha256:923865aed5cf3ce727e920e446df72d8d4a957190e8c8988dd41b0461419c0db",
+        "simplecad-default"
+      ],
+      "interstage_5x10x3_inner_ring": [
+        "sha256:c5b0eb8de762ba3571194c4eaac056c970db422a60de770c8864bfed22cab5e4",
+        "simplecad-default"
+      ],
+      "interstage_5x10x3_outer_ring": [
+        "sha256:e86c6458b3d776b0779c2d8c3040c9af4806c9931956db7a5aeaff14ca95e473",
+        "simplecad-default"
+      ],
+      "motor_shell": [
+        "sha256:654a62dd24c4599ce273205dac800c257343f02337274ea879fb69b45e038b57",
+        "simplecad-default"
+      ],
+      "output_16x24x5_inner_ring": [
+        "sha256:ee3704502d71921033f67f5e5079b7979adc058cdd3a26179463335347281536",
+        "simplecad-default"
+      ],
+      "output_16x24x5_outer_ring": [
+        "sha256:ca673026337833e7a0b5b8b53711bb6d672b7ec7ea26252a85084563f391945e",
+        "simplecad-default"
+      ],
+      "output_bearing_cap": [
+        "sha256:db16900ecf96f9df7f71f5ffb2db5839a8b321db5a68a9349ef7f1fba388eb5f",
+        "simplecad-default"
+      ],
+      "planet_3x6x3_inner_ring": [
+        "sha256:f74fc3eecac58457671d5f08b1fb06c6b732b3a6da88533c9574037baa68d91e",
+        "simplecad-default"
+      ],
+      "planet_3x6x3_outer_ring": [
+        "sha256:9839512eb271485a1e2c2f57eda63d19ee951118925209931f3db73f9dcca286",
+        "simplecad-default"
+      ],
+      "power_can_terminal": [
+        "sha256:0fa7c5b3123a3f6c852548b6aef3e423a29c57f1d6b405192b76e65af6e504e6",
+        "simplecad-default"
+      ],
+      "rear_bearing_spider": [
+        "sha256:fd9eb471fa9eb8dcd5dfc6efca886a2716c3e55c47811ba2b639dc9e9d01d1bb",
+        "simplecad-default"
+      ],
+      "rear_electronics_cover": [
+        "sha256:e2fc7441e33628a2f71e2a60d9e19a8c1f24eaa335145e13dd1cd34f30d83c5f",
+        "simplecad-default"
+      ],
+      "rear_motor_8x16x5_inner_ring": [
+        "sha256:56bb492b448568f0fbb12d49b70d9bbff5eb8ce9a129b84ef6b1c5efa0adb4da",
+        "simplecad-default"
+      ],
+      "rear_motor_8x16x5_outer_ring": [
+        "sha256:74aaba1273fc83dbd6382320036f19091df637638b9ff06b9b8549695951313e",
+        "simplecad-default"
+      ],
+      "reducer_housing": [
+        "sha256:176e673cdc8324fd604000f38b181cd6302ae89539fefa1ee1cbba1cb7f0ddf8",
+        "simplecad-default"
+      ],
+      "reusable_power_mosfet": [
+        "sha256:d861227bfe5867056c0e79dd482666c580ee2e7df37d09eb8acfb15cdcc3f630",
+        "simplecad-default"
+      ],
+      "reusable_rotor_magnet": [
+        "sha256:78426b5e8d494a3b4f77ebd2f31cfb2cac196312b0ac0f150c26c61de4af6988",
+        "simplecad-default"
+      ],
+      "reusable_slot_winding": [
+        "sha256:7859cc9664216edc823e892c75553ad4de394a35f3fdc7d61351066c9a1456d9",
+        "simplecad-default"
+      ],
+      "rotor_core_shaft_sun": [
+        "sha256:edece21a4436f0eba911cb7fbcd77a33284ed30b9bfe2a6b4d8c4fb422e2983c",
+        "simplecad-default"
+      ],
+      "stage1_carrier_integral_stage2_sun": [
+        "sha256:2fad339b73beb1be800244b80a639a09c585e06e4a83997b368326f835d1bf3a",
+        "simplecad-default"
+      ],
+      "stage1_fixed_ring": [
+        "sha256:0249159770e0b842f91976bed9c6ad83fc0abdbd266d95cff71bb99899f0b374",
+        "simplecad-default"
+      ],
+      "stage1_reusable_planet": [
+        "sha256:c7e7f04b6f4567fcdcf96f6e2825bdeea8ca443027e5fd73404a4bc3402b96f2",
+        "simplecad-default"
+      ],
+      "stage2_fixed_ring": [
+        "sha256:fe149dac92392999e93e161761c196178191d19230e803d5c2a578e6bf6f8b6d",
+        "simplecad-default"
+      ],
+      "stage2_output_carrier_flange": [
+        "sha256:8253c5b6fe165e350d3a371f937b8ff3280d213858d4ff87c3fd925b44b003ae",
+        "simplecad-default"
+      ],
+      "stage2_reusable_planet": [
+        "sha256:493fb6496db0388e2a314408f5dbb4a6ec15b181634d93a3c6337fc0439e7f42",
+        "simplecad-default"
+      ],
+      "stator_core": [
+        "sha256:65d8b678ba9150008521a80f2b842cb243c1ab65c4246a751fccfb5aa4c9a12b",
+        "simplecad-default"
+      ],
+      "three_phase_terminal": [
+        "sha256:7bd2c2047ab9c743f9e06251a3afe122295cc687306daa77c72391aaec9d917c",
+        "simplecad-default"
+      ]
+    },
+    "root_cells": {
+      "ran": 15
+    },
+    "total_s": 92.44212049999624
+  },
+  "native_sha256": "368b5391d7ba392df5161a755a298bc201911a969a860e79f402d26793a8ecde",
+  "platform": "Windows-10-10.0.26100-SP0",
+  "python": "3.10.22 (main, Oct  9 2026, 15:18:58) [MSC v.1944 64 bit (AMD64)]"
+}
