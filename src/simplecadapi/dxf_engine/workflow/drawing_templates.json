@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "verified_on": "2026-11-18",
+  "renderer_scope": "Single part. Metric A-series sheet. Layout presets and drafting guidance only.",
+  "templates": {
+    "gb-machining": {
+      "label": "GB general machined part",
+      "options": {"projection": "first", "layout": "aligned", "section_view": "full"},
+      "sources": ["GB/T 14692-2008", "GB/T 4458.4-2003", "GB/T 17452-1998", "GB/T 1182-2018"],
+      "review": ["Confirm the primary view and the dimension datums from the functional faces", "Review hole depths, hole-pattern positions, fits and surface requirements"]
+    },
+    "iso-machining": {
+      "label": "ISO GPS general machined part",
+      "options": {"projection": "first", "layout": "aligned", "section_view": "full"},
+      "sources": ["ISO 128-3:2022", "ISO 129-1:2018/Amd 1:2020", "ISO 1101:2017", "ISO 5459:2024", "ISO 21920-1:2021"],
+      "review": ["Confirm the projection method and sheet size against the contract", "Datums, tolerances and surface texture come from the drawing requirements"]
+    },
+    "iso-sheet-metal": {
+      "label": "Sheet-metal and stamped part",
+      "options": {"projection": "first", "layout": "compact", "section_view": "removed"},
+      "sources": ["ISO 128-3:2022", "DIN 6930-2:2011-10", "DIN 6935:2011-10", "ISO 9013:2017/Amd 1:2024"],
+      "review": ["Distinguish the formed drawing from a verified flat pattern; record thickness and bend direction", "Cite stamping, bending or thermal-cutting standards only where the process and contract apply", "Flat-pattern layout and bend allowances must come from approved data"]
+    },
+    "iso-casting": {
+      "label": "Casting blank and machined casting",
+      "options": {"projection": "first", "layout": "aligned", "section_view": "full"},
+      "sources": ["ISO 128-3:2022", "ISO 8062-3:2023", "ASME Y14.8-2022"],
+      "review": ["Check wall thickness, cavities and passages in section", "Distinguish the casting blank from the machined state; review which surfaces keep machining allowance", "ASME Y14.8 belongs to another contract system option"]
+    },
+    "iso-weld-prep": {
+      "label": "Single-part bevel and weld preparation",
+      "options": {"projection": "first", "layout": "compact", "section_view": "removed"},
+      "sources": ["ISO 128-3:2022", "ISO 2553:2019", "AWS A2.4:2020"],
+      "review": ["Check the single-part bevel, land and root dimensions on an end view or section", "The welding-symbol system is set by the contract; AWS A2.4 can serve as the other system's reference", "This template is for single-part preparation drawings"]
+    },
+    "asme-machining": {
+      "label": "Metric review sketch for North American machining projects",
+      "options": {"projection": "third", "layout": "aligned", "section_view": "full"},
+      "sources": ["ASME Y14.3-2012", "ASME Y14.5-2018 (R2024)", "ASME Y14.1-2020", "ASME Y14.100-2017"],
+      "review": ["Check sheet size, units, projection and annotation against the contract", "The preset writes metric A-series sheets; use an approved template for ANSI sheets or inches before formal delivery"]
+    },
+    "asme-aerospace": {
+      "label": "Metric review sketch for aerospace or high-traceability single parts",
+      "options": {"projection": "third", "layout": "aligned", "section_view": "full"},
+      "sources": ["ASME Y14.5-2018 (R2024)", "ASME Y14.41-2026", "ASME Y14.100-2017"],
+      "review": ["Confirm the precedence and revisions of the controlled drawing, data set and customer requirements", "Review key characteristics, material lot requirements, special processes and inspection notes", "Y14.41 applies to digital product definition processes the contract invokes"]
+    },
+    "asme-additive": {
+      "label": "Metric review sketch for additively manufactured single parts",
+      "options": {"projection": "third", "layout": "aligned", "section_view": "full"},
+      "sources": ["ASME Y14.46-2022", "ASME Y14.5-2018 (R2024)"],
+      "review": ["Check internal channels and inspectable regions in section", "Distinguish as-printed from post-processed states; give build orientation and surface finish from approved data"]
+    }
+  }
+}

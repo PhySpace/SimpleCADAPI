@@ -4,6 +4,9 @@ Every example is a self-contained folder: the model notebooks, the plain
 modules they import, export and verification scripts, and fresh artifacts in
 its own `out/` folder (`examples/<example>/out/`, ignored by git).
 
+[Single-part drawing](dxf_exporter/README.md) shows automatic STEP drafting and
+geometry-checked notebook dimensions on a stepped mounting plate.
+
 ## How an example is laid out
 
 - **Part notebooks** (`<part>.py`): one marimo notebook per part, one FTC
