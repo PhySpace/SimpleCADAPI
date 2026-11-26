@@ -5,7 +5,7 @@
 The model is the ``dimension_tolerance_chain.py`` notebook. This script
 restores the session recorded in the product's definition, re-runs the
 worst-case and RSS analyses on the requirement's target expression, and
-writes the model/session JSON, the product package, STEP and FreeCAD files to
+writes the model/session JSON, the product package and STEP files to
 ``out/``.
 """
 
@@ -51,12 +51,6 @@ def main() -> None:
     step_report = scad.exporter.export_product_package_to_step(
         package_path, OUT_DIR / "dimension_tolerance_chain.step"
     )
-    fcstd_path = OUT_DIR / "dimension_tolerance_chain.FCStd"
-    scad.translator.freecad_translator.translate_product_package_to_fcstd(
-        package_path,
-        str(fcstd_path),
-        document_name="DimensionToleranceChain",
-    )
 
     print("housing_volume", round(run.product.body.get_volume(), 3))
     print(
@@ -72,7 +66,6 @@ def main() -> None:
     print("content_hash", definition.content_hash)
     print("product_package", package_path)
     print("ap242_step", step_report.output_path)
-    print("fcstd", fcstd_path)
 
 
 if __name__ == "__main__":

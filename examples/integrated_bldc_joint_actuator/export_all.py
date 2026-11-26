@@ -1,4 +1,4 @@
-"""Capture the BLDC actuator package once, then export STEP, FCStd and MJCF in parallel.
+"""Capture the BLDC actuator package once, then export STEP and MJCF in parallel.
 
     uv run python examples/integrated_bldc_joint_actuator/export_all.py
 """
@@ -14,7 +14,7 @@ from pathlib import Path
 from export import capture_package
 
 HERE = Path(__file__).resolve().parent
-SCRIPTS = tuple(str(HERE / name) for name in ("export_mjcf.py", "export_step.py", "export_fcstd.py"))
+SCRIPTS = tuple(str(HERE / name) for name in ("export_mjcf.py", "export_step.py"))
 
 
 def run(script: str) -> tuple[str, int, float, str, str]:
@@ -29,7 +29,7 @@ def run(script: str) -> tuple[str, int, float, str, str]:
 
 
 def main() -> None:
-    """Export MJCF, STEP, and FCStd from one captured package in parallel."""
+    """Export MJCF and STEP from one captured package in parallel."""
 
     start = time.perf_counter()
     capture_package()

@@ -14,13 +14,9 @@ EXAMPLE_DIR = ROOT / "examples" / "ap242_gmsh_volume_mesh"
 NOTEBOOK_EXAMPLE = EXAMPLE_DIR / "bracket.py"
 PACKAGE_EXAMPLE = EXAMPLE_DIR / "bracket_package.py"
 DOWNSTREAM_EXAMPLES = {
-    "fcstd": EXAMPLE_DIR / "export_fcstd.py",
     "step": EXAMPLE_DIR / "export_step.py",
     "stl": EXAMPLE_DIR / "export_stl.py",
     "obj": EXAMPLE_DIR / "export_obj.py",
-    "freecad_script": EXAMPLE_DIR / "translate_freecad_script.py",
-    "fusion360_script": EXAMPLE_DIR / "translate_fusion360_script.py",
-    "solidworks_script": EXAMPLE_DIR / "translate_solidworks_script.py",
 }
 MESH_EXAMPLE = EXAMPLE_DIR / "export_fem_mesh.py"
 CALCULIX_EXAMPLE = EXAMPLE_DIR / "run_calculix.py"
@@ -231,48 +227,13 @@ class TestAP242GmshExample(unittest.TestCase):
             {EXAMPLE_DIR / "out"},
         )
 
-    def test_example_covers_every_package_exporter_and_translator(self):
+    def test_example_covers_every_package_exporter(self):
         import simplecadapi as scad
 
-        self.assertEqual(
-            set(DOWNSTREAM_EXAMPLES),
-            {
-                "fcstd",
-                "step",
-                "stl",
-                "obj",
-                "freecad_script",
-                "fusion360_script",
-                "solidworks_script",
-            },
-        )
+        self.assertEqual(set(DOWNSTREAM_EXAMPLES), {"step", "stl", "obj"})
         self.assertTrue(hasattr(scad.exporter, "export_product_package_to_step"))
         self.assertTrue(hasattr(scad.exporter, "export_product_package_to_stl"))
         self.assertTrue(hasattr(scad.exporter, "export_product_package_to_obj"))
-        self.assertTrue(
-            hasattr(
-                scad.translator.freecad_translator,
-                "translate_product_package_to_fcstd",
-            )
-        )
-        self.assertTrue(
-            hasattr(
-                scad.translator.freecad_translator,
-                "translate_product_package_to_freecad_script",
-            )
-        )
-        self.assertTrue(
-            hasattr(
-                scad.translator.fusion360_translator,
-                "translate_product_package_to_fusion360_script",
-            )
-        )
-        self.assertTrue(
-            hasattr(
-                scad.translator.solidworks_translator,
-                "translate_product_package_to_solidworks_script",
-            )
-        )
 
     def test_mesh_step_uses_occ_volume_mesh_and_reports_counts(self):
         module = _load_example(MESH_EXAMPLE, "ap242_mesh_success_example")

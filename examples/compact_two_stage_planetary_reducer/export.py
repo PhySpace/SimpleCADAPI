@@ -1,4 +1,4 @@
-"""Export the compact two-stage planetary reducer: package, AP242 STEP, FCStd.
+"""Export the compact two-stage planetary reducer: package and AP242 STEP.
 
     uv run python examples/compact_two_stage_planetary_reducer/export.py
 
@@ -34,12 +34,6 @@ def main() -> None:
     step_report = scad.exporter.export_product_package_to_step(
         PACKAGE_PATH, OUT_DIR / "compact_two_stage_planetary_reducer.step"
     )
-    fcstd_path = OUT_DIR / "compact_two_stage_planetary_reducer.FCStd"
-    scad.translator.freecad_translator.translate_product_package_to_fcstd(
-        PACKAGE_PATH,
-        str(fcstd_path),
-        document_name="CompactTwoStagePlanetaryReducer",
-    )
     print(
         f"reducer: od={HOUSING_OUTER_RADIUS * 2.0:.1f} height={HOUSING_HEIGHT:.1f} "
         f"ratio={TOTAL_REDUCTION:.1f}:1 components={len(reducer.component_ids())} "
@@ -48,7 +42,6 @@ def main() -> None:
     )
     print("product package", PACKAGE_PATH)
     print("step", step_report.output_path)
-    print(f"fcstd {fcstd_path} ({fcstd_path.stat().st_size} bytes)")
 
 
 if __name__ == "__main__":

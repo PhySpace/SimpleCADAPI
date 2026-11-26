@@ -1,4 +1,4 @@
-"""Check and export the hydraulic rod assembly: package, STEP and FreeCAD.
+"""Check and export the hydraulic rod assembly: package and STEP.
 
     uv run python examples/hydraulic_rod_assembly/export.py
 
@@ -64,12 +64,6 @@ def main() -> None:
     step_report = scad.exporter.export_product_package_to_step(
         package_path, OUT_DIR / "hydraulic_rod_assembly.step"
     )
-    fcstd_path = OUT_DIR / "hydraulic_rod_assembly.FCStd"
-    scad.translator.freecad_translator.translate_product_package_to_fcstd(
-        package_path,
-        str(fcstd_path),
-        document_name="HydraulicRodAssembly",
-    )
     print("assembly", assembly.assembly_id)
     print("components", assembly.component_ids())
     print("preview_solids", len(ql.solids().resolve(preview)))
@@ -78,7 +72,6 @@ def main() -> None:
     print("content hash", run.definition.content_hash)
     print("product package", package_path)
     print("step", step_report.output_path)
-    print("fcstd", fcstd_path)
 
 
 if __name__ == "__main__":

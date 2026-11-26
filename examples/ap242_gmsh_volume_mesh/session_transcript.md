@@ -1,5 +1,9 @@
 # OpenCode Session Transcript
 
+> Recorded session, kept as it ran. The FreeCAD export and its check
+> (`export_fcstd.py`, `verify/s4_fcstd_check.py`) it mentions were removed
+> with the translators, which moved out of the SDK.
+
 - Session ID: `ses_ap242formalize9kQzWb4LnE`
 - Title: L 形直角连接件 single-part-modeling 正式化重建（AP242/Gmsh FEM 主模型）
 - Directory: /Users/lildino/Project/ocws/SCAD-Open

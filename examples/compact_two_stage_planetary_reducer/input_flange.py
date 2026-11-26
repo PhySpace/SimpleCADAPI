@@ -10,7 +10,7 @@
 A flat disk with a short center boss, a through bore and six counterbored
 bolt holes. It is built at the origin and moved to its axial seat at
 ``INPUT_FLANGE_BOTTOM_Z``; the ``axis`` connector sits on the boss's top face.
-No edge picks (fillets/chamfers) so the FreeCAD export stays stable.
+No edge picks (fillets/chamfers) so the export stays stable.
 
     sca run examples/compact_two_stage_planetary_reducer/input_flange.py
 """

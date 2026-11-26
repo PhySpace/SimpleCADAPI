@@ -19,7 +19,7 @@ six planet bores. Gear meshes are gear (sun-planet) and belt (ring-planet)
 constraints on the planet revolutes; the solve is strict.
 
     sca run examples/compact_two_stage_planetary_reducer/compact_two_stage_planetary_reducer.py
-    uv run python examples/compact_two_stage_planetary_reducer/export.py       # package, STEP, FCStd
+    uv run python examples/compact_two_stage_planetary_reducer/export.py       # package, STEP
     uv run python examples/compact_two_stage_planetary_reducer/export_mjcf.py  # MuJoCo
 """
 

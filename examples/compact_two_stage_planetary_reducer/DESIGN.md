@@ -56,7 +56,7 @@ tracks them.
 | `ring_gear.py`, `sun_gear.py`, `planet_gear.py`, `carrier.py` | part families | one notebook per gear/carrier, used once per stage: `scad.use("planet_gear.py", id="stage2_planet_gear", STAGE="stage2")` |
 | `dimensions.py` | plain module | envelope, `StageSpec` / `CarrierSpec` per stage, bearing spec |
 | `common.py`, `materials.py` | plain modules | connector, bore and placement helpers; materials |
-| `export.py`, `export_mjcf.py` | scripts | product package, AP242 STEP, FCStd; MuJoCo MJCF |
+| `export.py`, `export_mjcf.py` | scripts | product package, AP242 STEP; MuJoCo MJCF |
 
 The bearing is `scad.std.bearing.build_ball_bearing(...)`, called once in the
 assembly notebook and instanced at all nine seats.

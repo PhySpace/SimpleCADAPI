@@ -2,10 +2,6 @@ out/
 *.step
 *.stl
 *.json
-*.FCStd
-*.FCBak
-*.fcstd
-*.fcbak
 *.scadpkg
 *.zip
 *.log
