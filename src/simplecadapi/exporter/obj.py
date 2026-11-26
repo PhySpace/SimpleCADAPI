@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..translator.package_units import ProductInput
+from .package_units import ProductInput
 from ._surface_mesh import tessellate_product_surface
 
 

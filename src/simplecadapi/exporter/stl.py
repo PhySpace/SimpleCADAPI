@@ -8,7 +8,7 @@ import struct
 
 import numpy as np
 
-from ..translator.package_units import ProductInput
+from .package_units import ProductInput
 from ._surface_mesh import TessellatedSurfaceMesh, tessellate_product_surface
 
 

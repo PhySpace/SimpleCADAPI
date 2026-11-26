@@ -19,7 +19,7 @@ from ..artifacts.canonical import parse_canonical_json
 from ..artifacts.part_definition import PartDefinition
 from simplecadapi._cpp import Assembly, Part
 from ..product.placement import Placement, relative_placement
-from ..translator.package_units import (
+from .package_units import (
     ProductInput,
     read_product_package_translation_units,
 )

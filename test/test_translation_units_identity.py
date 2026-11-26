@@ -71,7 +71,7 @@ class TestSameContentDistinctIdUnits(unittest.TestCase):
             root = Path(tmp_dir)
             package = _build_two_id_package()
 
-            from simplecadapi.translator.package_units import (
+            from simplecadapi.exporter.package_units import (
                 read_product_package_translation_units,
             )
 

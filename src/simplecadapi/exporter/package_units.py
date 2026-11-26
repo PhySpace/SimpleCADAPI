@@ -1,4 +1,4 @@
-"""Validated product-package translation units shared by CAD backends."""
+"""Validated product-package units shared by the exporters (STEP, OBJ, STL, MJCF)."""
 
 from __future__ import annotations
 
