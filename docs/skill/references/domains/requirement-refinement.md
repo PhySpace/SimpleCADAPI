@@ -30,7 +30,7 @@ first, and whenever inputs conflict, are ambiguous, or mix modalities.
   patterns.
 - Positioning control: faces, axes, origins, connectors, constraints,
   interfaces.
-- Output files requested: package, STEP, STL, OBJ, MJCF, FCStd, scripts.
+- Output files requested: package, STEP, STL, OBJ, MJCF, scripts.
 - Mounting and service conditions when the part fastens to anything or
   carries load: fastener type/size, head side and insertion direction,
   mounting face, and the load direction with a magnitude class.

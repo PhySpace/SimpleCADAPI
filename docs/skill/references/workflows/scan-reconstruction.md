@@ -8,7 +8,7 @@ likely run unattended; the report and the evidence tiers are first-class.
 
 Use when the deliverable is an editable, replayable model of a part and the only source is scan data or pictures. Not
 for a STEP/BREP source (`workflows/step-reconstruction.md`), not for a vector-PDF drawing
-(`workflows/drawing-reconstruction.md`), not for exporting a model to STL (`workflows/export-and-translation.md`).
+(`workflows/drawing-reconstruction.md`), not for exporting a model to STL (`workflows/export.md`).
 
 ## Read now (one parallel batch)
 
@@ -31,7 +31,7 @@ for a STEP/BREP source (`workflows/step-reconstruction.md`), not for a vector-PD
 | step 6: comparing, or a comparison fails | `discipline/geometric-validation.md`, `discipline/failure-and-repair.md` |
 | the part is a standard component | `domains/standard-parts.md` |
 | the scan is one part of a product | `workflows/assembly-product-build.md` |
-| delivering a package or STL | `docs/guides/product-export.md`, `domains/export-and-translation.md` |
+| delivering a package or STL | `docs/guides/product-export.md`, `domains/export.md` |
 
 ## Unattended mode
 

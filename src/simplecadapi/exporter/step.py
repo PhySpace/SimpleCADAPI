@@ -12,7 +12,7 @@ from typing import Any
 
 from ..artifacts import materialize_definition
 from simplecadapi._cpp import Assembly, Part
-from ..translator.package_units import (
+from .package_units import (
     ProductInput,
     read_product_package_translation_units,
 )

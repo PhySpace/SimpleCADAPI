@@ -13,7 +13,7 @@ The file Role 1 writes (`workflows/single-part-modeling/role-1-requirements.md` 
 - Fastening & mounting: <fastener, axis, head side, insertion path>
   Envelope math: <head+shaft+wall -> min land / boss / offset>
 - Service conditions: <load direction and class | none stated>
-- Export targets: .scadpkg always; STEP/STL/OBJ/MJCF/FCStd if requested
+- Export targets: .scadpkg always; STEP/STL/OBJ/MJCF if requested
 - Verification intent: <what the user's words require proving>
 - Ask-or-Record ledger: | item | asked/assumed | answer/value |
 - Assumption ledger (unattended; interactive runs use the Ask-or-Record ledger above):

@@ -72,7 +72,7 @@ judgment, not a table:
 ## Format responsibilities
 
 Each export target carries only its own contract
-(`../domains/export-and-translation.md`):
+(`../domains/export.md`):
 
 - `.scadpkg` is the editable, replayable SimpleCAD boundary — never treat STL
   or OBJ as an editable CAD source.

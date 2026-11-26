@@ -86,10 +86,6 @@ class TestAngledChamfer(unittest.TestCase):
 
     def test_angle_params_recorded_in_graph(self):
         from simplecadapi.recording.graph import GraphSession
-        from simplecadapi.recording.serializer import import_model_json
-        from simplecadapi.translator.freecad_translator.translator import (
-            _FreeCADCompiler,
-        )
 
         with GraphSession() as session:
             box = scad.make_box_rsolid(width=10.0, height=10.0, depth=10.0)
@@ -102,11 +98,8 @@ class TestAngledChamfer(unittest.TestCase):
             )
             payload = scad.export_model_json(session)
 
-        script = _FreeCADCompiler().translate_model_payload_to_script(
-            import_model_json(payload)
-        )
-        self.assertIn("'distance2'", script)
-        self.assertIn("'angle'", script)
+        self.assertIn('"angle"', payload)
+        self.assertIn('"distance"', payload)
 
 
 if __name__ == "__main__":

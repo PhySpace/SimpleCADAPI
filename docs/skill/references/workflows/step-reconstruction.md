@@ -30,7 +30,7 @@ Use when the deliverable is an editable/replayable model reproducing a target
 | splitting the candidate into cells | `discipline/notebook-cell-design.md` |
 | constraints represent the evidence | `domains/sketch-and-features.md` |
 | the target has several components | `domains/assembly-and-product.md`, `workflows/assembly-product-build.md` |
-| re-exporting for comparison or delivery | `domains/export-and-translation.md` |
+| re-exporting for comparison or delivery | `domains/export.md` |
 | a comparison fails or a feature is falsified | `discipline/failure-and-repair.md` |
 | the source is a mesh, point cloud or photos, not a STEP | `workflows/scan-reconstruction.md` |
 
@@ -59,7 +59,7 @@ required_domains:
 optional_domains:
   - sketch-and-features
   - assembly-and-product     # multi-component targets
-  - export-and-translation   # re-export for comparison or delivery
+  - export   # re-export for comparison or delivery
 artifacts:
   - target evidence notes (summaries, entity descriptors, sections)
   - feature-tree hypothesis with provenance rows

@@ -148,10 +148,9 @@ Repeated non-improvement changes the feature hypothesis instead of tuning
 the same parameters again. Stop only per the acceptance hierarchy — and
 record the evidence for the stop.
 
-### Export/translation failure
+### Export failure
 
-Missing external backend (FreeCAD/FreeCADCmd) → report; offer the neutral
-fallback explicitly. Over-coarse tessellation → tighten deflection
+Over-coarse tessellation → tighten deflection
 parameters and re-export. Missing joints in MJCF → the assembly lacked
 explicit constraints; fix the source, never the exported file.
 

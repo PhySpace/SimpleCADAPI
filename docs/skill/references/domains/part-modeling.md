@@ -56,7 +56,7 @@ Read the exact page under `references/docs/api/` for every API used.
 Before the first call, extract each page's signature, return type, and
 documented failure modes into working notes — a method absent from the
 page does not exist, however plausible it looks. Non-SDK dependencies
-(Gmsh, CalculiX, VTK, FreeCAD scripting) are outside these pages:
+(Gmsh, CalculiX, VTK) are outside these pages:
 consult their own documentation before the first call.
 
 - Primitives: `make_box_rsolid`, `make_cylinder_rsolid`, `make_sphere_rsolid`,

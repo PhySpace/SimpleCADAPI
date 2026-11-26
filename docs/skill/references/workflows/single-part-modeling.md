@@ -29,7 +29,7 @@ stage-by-stage TDD loop; Role 5 exports only after every stage gate passes.
 | a stage's profiles are sketch tier | `domains/sketch-and-features.md` |
 | the requirement is a standard part (gear, bearing, fastener) | `domains/standard-parts.md` |
 | a mechanism mating several standard parts | `workflows/assembly-product-build.md` |
-| Role 5 starts | `domains/export-and-translation.md`, `domains/assembly-and-product.md`, `docs/guides/product-export.md` |
+| Role 5 starts | `domains/export.md`, `domains/assembly-and-product.md`, `docs/guides/product-export.md` |
 | a check or a build keeps failing | `discipline/failure-and-repair.md` |
 
 ## Unattended mode
@@ -100,7 +100,7 @@ Standing discipline, binding for every role:
 | 2 | Master Planner | `REQUIREMENTS.md`, `discipline/mechanical-modeling.md`, `discipline/datums-and-coordinate-systems.md` | `<part-dir>/BUILD_PLAN.md` + base TODOs | plan presented |
 | 3 | Verifier Planner | `REQUIREMENTS.md`, `BUILD_PLAN.md`, `discipline/geometric-validation.md`, exact API/diagnostic pages used by the check | current-stage verification contract, hypothesis snippets, executable verification script, `plan verifier` and `run verifier` TODO items | verification artifact is ready before modeling |
 | 4 | Detail Modeling Planner & Builder | current stage's verifier contract, `domains/part-modeling.md`, `discipline/feature-ordering.md`, `discipline/feature-tree-convention.md`, `discipline/notebook-cell-design.md`, exact modeling API pages | current-stage model, operation hypotheses, rendered evidence inputs | model runs and the prepared verifier passes |
-| 5 | Exporter | `REQUIREMENTS.md` export rows, `domains/export-and-translation.md`, `domains/assembly-and-product.md` | `.scadpkg` + requested exports, readability check | artifacts re-open cleanly |
+| 5 | Exporter | `REQUIREMENTS.md` export rows, `domains/export.md`, `domains/assembly-and-product.md` | `.scadpkg` + requested exports, readability check | artifacts re-open cleanly |
 
 ## Role-switch protocol
 
@@ -135,7 +135,7 @@ artifact and repeats the same Role 3/4 loop.
 Read the export rows from `REQUIREMENTS.md`. Durable canonical delivery is
 `sca run <part>.py --out out/<part>.scadpkg` (or
 `capture(run.definition, ...)` after `run_notebook`); external formats go through
-`domains/export-and-translation.md` capabilities. Post-export gate:
+`domains/export.md` capabilities. Post-export gate:
 re-open the package in a fresh process (`validate_product_package` /
 definition materialization) and confirm definition/solid counts; list every
 produced file with size.

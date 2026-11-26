@@ -116,7 +116,7 @@ Replay rebuilds using width `24.0`, because that is the value stored in `params`
 
 Even though replay uses snapshots today, `param_exprs` and `expression_graph` are important for external tools:
 
-- FreeCAD or CAD translators can reconstruct spreadsheet bindings.
+- CAD exporters and importers can reconstruct spreadsheet bindings.
 - UI tools can display which dimensions are driven by variables.
 - Future parametric replay can use the same expression references.
 - Diffs can distinguish numeric constants from expression-derived values.

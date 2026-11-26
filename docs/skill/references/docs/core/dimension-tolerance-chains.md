@@ -161,7 +161,6 @@ Automatic validation occurs when:
 1. `validate_tolerances(raise_on_failure=True)` is called.
 2. A session or model JSON payload is exported.
 3. A model JSON payload is imported or replayed.
-4. A model is translated to FreeCAD through the model importer.
 
 A failed requirement raises `ToleranceValidationError` at the tolerance layer. Model import, export, and replay expose it through the existing structured `SimpleCADError` harness where applicable.
 
@@ -221,16 +220,6 @@ Payloads created before units or `tolerance_graph` existed remain valid as legac
 unitless expressions and import with an empty tolerance graph when it is absent.
 
 Nominal geometry replay still uses the numeric snapshots in operation-node `params`. Tolerance validation does not sample or regenerate worst-case geometry.
-
-## FreeCAD Translation
-
-FreeCAD translation keeps the full tolerance graph as document metadata. The
-`SimpleCADExpressions` spreadsheet stores lower/upper deviations in columns E/F,
-nominal unit in G, tolerance unit in H, and inferred dimension in I. Spreadsheet
-values and formulas use canonical CAD values so inch/radian declarations remain
-consistent with operation-node snapshots. The translator preserves tolerance
-intent but does not convert it into FreeCAD geometric-tolerance objects or
-statistical solvers.
 
 ## Failure Conditions
 

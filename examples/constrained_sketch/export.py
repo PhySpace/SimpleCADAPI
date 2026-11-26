@@ -4,7 +4,7 @@
 
 The model is the ``constrained_sketch.py`` notebook. This script writes the
 model/session JSON of the product's recorded feature graph, the product
-package, STEP and FreeCAD files to ``out/``, and prints what the graph holds:
+package and STEP files to ``out/``, and prints what the graph holds:
 the sketch operations, their promotions with solve snapshots, and the
 constraints of the guided profiles.
 """
@@ -48,12 +48,6 @@ def main() -> None:
     step_report = scad.exporter.export_product_package_to_step(
         package_path, OUT_DIR / "constrained_sketch.step"
     )
-    fcstd_path = OUT_DIR / "constrained_sketch.FCStd"
-    scad.translator.freecad_translator.translate_product_package_to_fcstd(
-        package_path,
-        str(fcstd_path),
-        document_name="SimpleCADConstrainedSketchDemo",
-    )
 
     nodes = json.loads(model_json)["graph"]["nodes"]
     ops = [node["op"] for node in nodes]
@@ -88,7 +82,6 @@ def main() -> None:
     print("wrote", model_path)
     print("wrote", session_path)
     print("wrote", step_report.output_path)
-    print("wrote", fcstd_path)
     print("product_package", package_path)
 
 

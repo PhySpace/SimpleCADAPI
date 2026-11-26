@@ -17,5 +17,5 @@ def capture(result: Any, path: str | Path, /, *, include_scene: bool = True) -> 
 Capture a durable product and write its canonical `.scadpkg`.
 
 ``include_scene=False`` skips the optional Scene projection (tessellated
-geometry/entity assets). STEP, MJCF, and FreeCAD exports read meshes and
+geometry/entity assets). STEP and MJCF exports read meshes and
 feature graphs from the definition closure, so they do not need it.

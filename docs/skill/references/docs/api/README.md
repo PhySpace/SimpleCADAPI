@@ -8,7 +8,6 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - Entries marked `submodule` are public through the listed submodule, such as `simplecadapi.ql`.
 - Entries marked `inspection namespace` are available through `simplecadapi.inspect.brep` and cannot run inside `GraphSession`.
 - Entries marked `drawing-inspection namespace` are available through `simplecadapi.inspect.drawing` and cannot run inside `GraphSession`.
-- Entries marked `translator backend` are public only through `simplecadapi.translator.<backend>`.
 - Entries marked `reverse-engineering evaluator` are available through `simplecadapi.inverse_engineer.brep`; their acceptance inputs and reports belong to the trusted harness, not participant code.
 
 ## Basic Creation
@@ -118,21 +117,6 @@ This index includes generated docs for the public SimpleCAD API surface, includi
 - [export_product_package_to_obj](export_product_package_to_obj.md) *(from exporter/obj.py)* `exporter namespace`
 - [export_product_package_to_step](export_product_package_to_step.md) *(from exporter/step.py)* `exporter namespace`
 - [export_product_package_to_stl](export_product_package_to_stl.md) *(from exporter/stl.py)* `exporter namespace`
-
-## Translator Backends
-
-- [FreeCADTranslator](FreeCADTranslator.md) *(from translator/freecad_translator/translator.py)* `translator backend`
-- [Fusion360Translator](Fusion360Translator.md) *(from translator/fusion360_translator/translator.py)* `translator backend`
-- [SolidWorksTranslator](SolidWorksTranslator.md) *(from translator/solidworks_translator/translator.py)* `translator backend`
-- [export_model_json_to_solidworks_step](export_model_json_to_solidworks_step.md) *(from translator/solidworks_translator/api.py)* `translator backend`
-- [make_interpolated_bspline_edge](make_interpolated_bspline_edge.md) *(from translator/solidworks_translator/translator.py)* `translator backend`
-- [translate_model_json_to_fcstd](translate_model_json_to_fcstd.md) *(from translator/freecad_translator/api.py)* `translator backend`
-- [translate_model_json_to_freecad_script](translate_model_json_to_freecad_script.md) *(from translator/freecad_translator/api.py)* `translator backend`
-- [translate_model_json_to_solidworks_script](translate_model_json_to_solidworks_script.md) *(from translator/solidworks_translator/api.py)* `translator backend`
-- [translate_product_package_to_fcstd](translate_product_package_to_fcstd.md) *(from translator/freecad_translator/api.py)* `translator backend`
-- [translate_product_package_to_freecad_script](translate_product_package_to_freecad_script.md) *(from translator/freecad_translator/api.py)* `translator backend`
-- [translate_product_package_to_fusion360_script](translate_product_package_to_fusion360_script.md) *(from translator/fusion360_translator/api.py)* `translator backend`
-- [translate_product_package_to_solidworks_script](translate_product_package_to_solidworks_script.md) *(from translator/solidworks_translator/api.py)* `translator backend`
 
 ## Math Helpers
 

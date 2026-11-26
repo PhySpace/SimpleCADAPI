@@ -6,6 +6,20 @@ user-facing notes live in [`docs/updates/`](docs/updates/) (English and
 
 ## Unreleased
 
+### Removed (breaking)
+- The FreeCAD, Fusion 360 and SolidWorks translators are no longer part of the SDK, and the SDK no longer maintains
+  them. Gone: the package `simplecadapi.translator` (and `simplecadapi.translator` as a lazy submodule),
+  `translate_model_json_to_*`, `translate_product_package_to_*`, `export_model_json_to_solidworks_step`, the
+  `FreeCADTranslator`, `Fusion360Translator` and `SolidWorksTranslator` classes, and the `fcstd`, `freecad-script`,
+  `fusion360-script` and `solidworks-script` formats and the `--freecad-cmd` and `--document-name` options of
+  `sca export`. They were used by few people and follow the operation-graph format closely, which may change a lot; the
+  translators now live in a separate private repository.
+- Kept: `sca export` writes STEP, STL, OBJ and MJCF; the model JSON (`export_model_json`) and the operation graph stay the
+  contract for any out-of-tree consumer. `package_units` (the validated product-package units the exporters use) moves
+  to `simplecadapi.exporter.package_units`.
+- The examples lose their FCStd export steps (`export_fcstd.py` and the FCStd parts of the `export.py` scripts), and the
+  skill pages `export-and-translation` are now `export`.
+
 ### Added
 - `fillet_rsolid(..., strategy_auto_y_patch=True)`: the Y transition. Where a concave and a convex selected edge meet
   tangentially or nearly so (a post flush with a plate side, a wall a few degrees off it), two rolling-ball fillets cannot

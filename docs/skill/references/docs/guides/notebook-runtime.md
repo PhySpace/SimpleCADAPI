@@ -255,4 +255,4 @@ The editor and a coding agent share the notebook file:
 ## Composing notebooks, the cell cache, library parts, export
 
 - Composing notebooks (`scad.use`), part families (`scad.notebook_id()`), the cell cache, and library parts (`@scad.part`, `@scad.assemble`): `notebook-composition-and-cache.md`.
-- Product package export (`scad.capture`), downstream targets (`.FCStd`, STEP, STL, OBJ) and the Gmsh meshing example: `product-export.md`.
+- Product package export (`scad.capture`), downstream targets (STEP, STL, OBJ) and the Gmsh meshing example: `product-export.md`.

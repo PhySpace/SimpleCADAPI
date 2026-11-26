@@ -1,16 +1,13 @@
-# Task Domain: Export and Translation
+# Task Domain: Export
 
-**Read when:** a validated `.scadpkg` must be delivered as STEP, STL, OBJ, MJCF or an editable external CAD document.
+**Read when:** a validated `.scadpkg` must be delivered as STEP, STL, OBJ or MJCF.
 
-Export validated product packages to neutral and mesh formats, and translate
-them into editable external CAD backends.
+Export validated product packages to neutral and mesh formats.
 
 ## Use when
 
 - The deliverable is a STEP, STL, OBJ, or MJCF file from a validated
   `.scadpkg` product package.
-- An external CAD user needs an editable FreeCAD, Fusion 360, or SolidWorks
-  document or script.
 - A robotics/simulation consumer needs MJCF with the assembled kinematic tree.
 
 ## Do not use
@@ -26,7 +23,6 @@ Choose the downstream target from the consumer contract:
 | Target | Use when | Preserved contract | Boundary |
 | --- | --- | --- | --- |
 | `.scadpkg` | Rebuild, replay, or further SimpleCAD tooling | Definition closure, occurrence graph, feature graphs, source snapshots, topology, connectors, constraints, materials | SimpleCAD-specific archive |
-| `.FCStd` | A FreeCAD user needs an editable native document | Definition-owned dependency-first feature graphs, repeated instances, nested assemblies, names, solved placements, materials, connectors, constraints, grounding, revision, content hashes | Requires FreeCAD/FreeCADCmd |
 | AP242 `.step` | Neutral CAD exchange or OpenCASCADE tooling | Evaluated BREP, product hierarchy, shared definitions, occurrence names/placements, materials, colors, density, named property payloads | Feature history is not reconstructed as AP242 features |
 | `.obj` | Surface inspection or DCC exchange | Direct OpenCASCADE tessellation, shared vertices, oriented triangles | Evaluated surface mesh only |
 | `.stl` | Additive manufacturing or triangle-only consumers | Same direct tessellation | Facet soup; no shared vertices or hierarchy |
@@ -48,19 +44,13 @@ Read the exact page under `references/docs/api/` for every API used:
   `ProductMJCFExportReport` (mesh/body/joint/equality/closure/grounded/site
   counts, default density, limitations). Never assume mesh counts exist on the
   STEP report or vice versa.
-- Translators (`scad.translator.<backend>`):
-  `translate_product_package_to_fcstd`,
-  `translate_product_package_to_freecad_script`,
-  `translate_product_package_to_fusion360_script`,
-  `translate_product_package_to_solidworks_script`, plus
-  `FreeCADTranslator`, `Fusion360Translator`, `SolidWorksTranslator`.
 - Package reading when downstream tools consume packages directly:
   `read_product_package`, `load_product_package`,
   `validate_product_package`.
 
 ## Export rules
 
-- Translate only from a validated product package: `capture` the product
+- Export only from a validated product package: `capture` the product
   first, then export from the package path. In a one-shot script (below) the
   exporters also take the build result itself and package it in memory, with
   the same validation and without the scene projection nobody reads.
@@ -113,16 +103,12 @@ A notebook run unattended in a read-only directory uses
 
 - Read the returned export report and print its actual fields per format
   (see API groups above); never assume success from a missing exception.
-- For `.FCStd`, confirm the translation ran against the intended package
-  revision (units are deduplicated by definition identity).
 - For MJCF, confirm every intended joint appears, loop-closing movable joints
   are equality/connect, and gear/belt/rack-pinion couplings are fixed-tendon
   equalities.
 
 ## Failure modes
 
-- Missing FreeCAD/FreeCADCmd: `.FCStd` translation fails; report the missing
-  backend instead of falling back to STEP-only silently.
 - Over-coarse tessellation on curved parts: tighten `linear_deflection` /
   `angular_deflection_degrees` and re-export.
 - Exporting a stale package: re-capture after source changes before export;

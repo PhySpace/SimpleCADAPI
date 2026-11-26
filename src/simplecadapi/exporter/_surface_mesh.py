@@ -9,7 +9,7 @@ from typing import Any, Sequence
 import numpy as np
 from ..artifacts.assembly_io import materialize_definition
 from simplecadapi._cpp import Assembly, make_compound_from_assembly_rcompound, Part
-from ..translator.package_units import (
+from .package_units import (
     ProductInput,
     read_product_package_translation_units,
 )

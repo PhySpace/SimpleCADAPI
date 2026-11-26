@@ -12,7 +12,7 @@ The models are the notebooks (``l_link.py``, ``shell.py``, ``adapter_plate.py`` 
   render_assembly_<preset>.png, render_parts.png    delivered-state views
   export_facts.json                                 reference volumes + export reports (read by verify/export_artifacts.py)
 
-STEP / STL are written from the captured package (never from live solids) -- export-and-translation.md.
+STEP / STL are written from the captured package (never from live solids) -- export.md.
 """
 
 import json

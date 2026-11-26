@@ -1,4 +1,4 @@
-# Workflow: Export and Translation
+# Workflow: Export
 
 Take a validated product package and produce the requested downstream
 deliverables.
@@ -14,15 +14,13 @@ when an optional target is unavailable:
 uv run sca export out/product.scadpkg --output-dir out/exports
 ```
 
-Without `--format`, this writes AP242 STEP, binary STL, and OBJ. Add unusual
-or backend-dependent outputs deliberately; `--check` performs all package,
+Without `--format`, this writes AP242 STEP, binary STL, and OBJ. Add the
+non-default output (MJCF) deliberately; `--check` performs all package,
 output-path, and selected-target prerequisite checks without writing files:
 
 ```bash
-uv run sca export out/product.scadpkg \
-  --format fcstd --format mjcf --output-dir out/exports --check
-uv run sca export out/product.scadpkg \
-  --format fcstd --freecad-cmd /path/to/FreeCADCmd --output-dir out/exports
+uv run sca export out/product.scadpkg --format mjcf --output-dir out/exports --check
+uv run sca export out/product.scadpkg --format mjcf --output-dir out/exports
 ```
 
 Use the lower-level Python APIs only when a workflow needs behavior the CLI
@@ -39,10 +37,10 @@ modeling workflow first — exports are deliverables, never validation.
 
 ```yaml
 goal: requested export files from a validated .scadpkg
-primary_domain: export-and-translation
+primary_domain: export
 required_domains:
   - requirement-refinement   # which formats and why
-  - export-and-translation
+  - export
 optional_domains:
   - step-inspection          # roundtrip validation of exports
 artifacts:
@@ -55,7 +53,7 @@ validation_gates:
 repair_routes:
   - stale export -> re-capture, re-export
   - coarse mesh -> tighten deflection parameters
-  - backend missing -> report; no silent format substitution
+  - target unavailable (MJCF from a non-assembly package) -> report; no silent format substitution
 ```
 
 ## Steps
@@ -66,16 +64,14 @@ repair_routes:
    making it current, the edit follows
    `discipline/feature-tree-convention.md` block structure.
 2. **Select targets by consumer contract**
-   (`domains/export-and-translation.md` table): editable FreeCAD document →
-   `.FCStd`; neutral exchange → AP242 `.step`; DCC/surface inspection →
-   `.obj`; additive manufacturing → `.stl`; MuJoCo simulation → MJCF.
+   (`domains/export.md` table): neutral exchange → AP242 `.step`;
+   DCC/surface inspection → `.obj`; additive manufacturing → `.stl`; MuJoCo simulation → MJCF.
    **Unattended:** when the request names no format, export the default
    STEP/STL/OBJ and record that choice as an assumption in the report.
 3. **Preflight and export from the package path**. Start with
    `uv run sca export <package>.scadpkg --output-dir <dir> --check`.
    It checks the package and default STEP/STL/OBJ targets. Add each non-default
-   target with `--format`; FCStd requires FreeCADCmd (or `--freecad-cmd`) and
-   MJCF requires an assembly-rooted package. Re-run without `--check` to write
+   target with `--format`; MJCF requires an assembly-rooted package. Re-run without `--check` to write
    the files. Use `--output FORMAT=PATH` for a non-conventional file name and
    `--overwrite` only when replacement is intentional.
 4. **Read the JSON report**: definition ids, occurrence/solid/triangle counts,
@@ -86,14 +82,13 @@ repair_routes:
 5. **Validate roundtrip when it matters**: consumers that re-import STEP →
    `validate_step_roundtrip_rdescriptor` on the exported file.
 6. **Report**: file paths, per-format report facts, parameters chosen
-   (deflection values), and any backend that was unavailable.
+   (deflection values), and any target that was unavailable.
 
 ## API pages to read
 
 `capture` (when re-capturing), this workflow's CLI command contract, the
 exporter page(s) for every format requested when using APIs or interpreting
-format-specific reports, the translator page(s) for every backend requested,
-and `validate_step_roundtrip_rdescriptor` when roundtrip validation applies.
+format-specific reports, and `validate_step_roundtrip_rdescriptor` when roundtrip validation applies.
 
 ## Validation gates
 
@@ -104,18 +99,11 @@ and `validate_step_roundtrip_rdescriptor` when roundtrip validation applies.
   curved parts, looser for large simple geometry when size matters.
 - MJCF: every intended joint present; loop-closing constraints emitted as
   equality/connect; public connectors only expose sites/endpoints.
-- `.FCStd`: translation consumed the intended package revision.
 - `sca export --check` passes before delivery export; the final JSON
   report records every requested target as successful.
 
 ## Failure routes
 
-- FreeCAD/FreeCADCmd missing → `sca export --check --format fcstd`
-  reports the missing backend before writing. Export default STEP/STL/OBJ if
-  requested, offer STEP as the neutral fallback, and say so explicitly.
-  **Unattended:** do not offer; export the default STEP/STL/OBJ if requested,
-  record the missing backend and the fallback in the report, and never present
-  the fallback as the requested format.
 - STL/OBJ too coarse or too large → adjust deflection parameters, re-export;
   both formats share one tessellation pass.
 - MJCF joints missing → the assembly lacked explicit constraints; return to
@@ -124,7 +112,7 @@ and `validate_step_roundtrip_rdescriptor` when roundtrip validation applies.
 ## Deliverables
 
 Exported file paths, report facts per format, chosen parameters, unavailable
-backends, and checks not run.
+targets, and checks not run.
 
 **Required reading before authoring or editing any part source in this
 workflow:** `discipline/feature-tree-convention.md` — the block-structured
@@ -139,8 +127,8 @@ load its product from verification scripts with
 
 | File | Why |
 | --- | --- |
-| `workflows/export-and-translation.md` | the command path, steps and gates (this page) |
-| `domains/export-and-translation.md` | the consumer-contract table and format reports |
+| `workflows/export.md` | the command path, steps and gates (this page) |
+| `domains/export.md` | the consumer-contract table and format reports |
 
 ## Read when
 
@@ -161,6 +149,5 @@ decisions are recorded in the report.
 | Interactive gate | Unattended replacement |
 | --- | --- |
 | Step 2: which formats and why (Ask-or-Record in `domains/requirement-refinement.md`) | Take the formats the request names, else the default STEP/STL/OBJ; ledger the choice |
-| Failure route: backend missing, offer STEP as the neutral fallback | Export the default targets if requested, record the missing backend and the fallback in the report, no silent substitution |
 | Package not current or the model needs work (route to the owning modeling workflow) | Record the blocker in the report, export nothing as validated, never invent geometry |
-| Closing report to the person | The report (`discipline/operating-modes.md`): file paths, per-format facts, parameters, unavailable backends, checks not run |
+| Closing report to the person | The report (`discipline/operating-modes.md`): file paths, per-format facts, parameters, unavailable targets, checks not run |

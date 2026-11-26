@@ -1,4 +1,4 @@
-"""Export the 7EP-CAPLCD rear enclosure tray: package, STEP and FreeCAD.
+"""Export the 7EP-CAPLCD rear enclosure tray: package and STEP.
 
     uv run python examples/caplcd_enclosure/export.py
 
@@ -23,18 +23,11 @@ def main() -> None:
     step_report = scad.exporter.export_product_package_to_step(
         package_path, OUT_DIR / "caplcd_enclosure_7ep.step"
     )
-    fcstd_path = OUT_DIR / "caplcd_enclosure_7ep.FCStd"
-    scad.translator.freecad_translator.translate_product_package_to_fcstd(
-        package_path,
-        str(fcstd_path),
-        document_name="CaplcdEnclosure7EP",
-    )
     print("tray volume", round(run.product.body.get_volume(), 1))
     print("content hash", run.definition.content_hash)
     print("geometry interface", run.definition.interface_hashes.geometry)
     print("product package", package_path)
     print("step", step_report.output_path)
-    print("fcstd", fcstd_path)
 
 
 if __name__ == "__main__":

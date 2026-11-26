@@ -1,6 +1,6 @@
 # Product Package Export and Downstream Targets
 
-**Read when:** a notebook's product must be written as a `.scadpkg` or delivered to FreeCAD, STEP, STL, OBJ or a mesher. Running a notebook and parameters are in `notebook-runtime.md`.
+**Read when:** a notebook's product must be written as a `.scadpkg` or delivered to STEP, STL, OBJ or a mesher. Running a notebook and parameters are in `notebook-runtime.md`.
 
 ## Product package export
 
@@ -31,7 +31,6 @@ downstream target from the consumer contract:
 | Target | Use when | Preserved contract | Boundary |
 | --- | --- | --- | --- |
 | `.scadpkg` | Rebuild, replay, or further SimpleCAD tooling is required | Complete durable definition closure, feature graphs, source snapshots, topology, connectors, constraints, and materials | SimpleCAD-specific archive |
-| `.FCStd` | A FreeCAD user needs an editable native document | Definition-owned, dependency-first native feature graphs; final body links; repeated instances; nested assemblies; names; solved placements; materials; connectors; constraints; grounding; revision; and content hashes | Requires FreeCADCmd/FreeCAD |
 | AP242 `.step` | Neutral CAD exchange or downstream OpenCASCADE tooling is required | Evaluated BREP, product hierarchy, shared definitions, occurrence names/placements, materials, colors, density, and named SimpleCAD property payloads | Canonical feature history is not reconstructed as AP242 features |
 | Triangle `.obj` | Surface inspection or DCC exchange needs an indexed mesh | Direct OpenCASCADE tessellation of evaluated BREP with shared vertices and oriented triangles | Evaluated surface mesh only; no CAD hierarchy, feature semantics, quads, or materials |
 | Binary `.stl` | Additive manufacturing or triangle-only consumers | The same direct OpenCASCADE BREP triangles | Facet soup only; no shared vertices, CAD hierarchy, feature semantics, or materials |
@@ -40,10 +39,6 @@ downstream target from the consumer contract:
 package_path = "out/product.scadpkg"
 scad.capture(run.definition, package_path)
 
-fcstd_path = scad.translator.freecad_translator.translate_product_package_to_fcstd(
-    package_path,
-    "out/product.FCStd",
-)
 step_report = scad.exporter.export_product_package_to_step(
     package_path,
     "out/product.step",

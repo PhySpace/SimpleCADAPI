@@ -4,7 +4,7 @@
 
 The model is the ``integrated_bldc_joint_actuator.py`` notebook. This script
 loads its product and writes ``out/integrated_bldc_joint_actuator.scadpkg``.
-The STEP, FCStd and MJCF scripts translate that package; ``export_all.py``
+The STEP and MJCF scripts export that package; ``export_all.py``
 captures it once and runs them in parallel.
 """
 
@@ -25,7 +25,7 @@ HERE = Path(__file__).resolve().parent
 OUT_DIR = HERE / "out"
 PACKAGE_PATH = OUT_DIR / "integrated_bldc_joint_actuator.scadpkg"
 
-# STEP, MJCF and FreeCAD read meshes and feature graphs from the definition
+# STEP and MJCF read meshes and feature graphs from the definition
 # closure, so the tessellated scene projection is left out of the package.
 INCLUDE_SCENE = False
 

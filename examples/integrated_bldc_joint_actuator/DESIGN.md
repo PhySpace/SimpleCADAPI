@@ -91,7 +91,7 @@ Bearing rolling elements are decorative geometry fused into each outer-ring Part
 Each bearing subassembly therefore exposes only the outer ring and inner ring as
 solver bodies, with one revolute joint between them. This intentionally omits
 ball/cage contact kinematics while ensuring the visible balls follow the bearing
-through FreeCAD assembly simulation instead of becoming unconstrained bodies.
+through assembly simulation instead of becoming unconstrained bodies.
 
 ## Electronics Packaging
 
@@ -141,7 +141,7 @@ live in plain modules that the notebooks import, so the cell cache tracks them.
 | `dimensions.py` | plain module | envelope, `StageSpec` per stage, `BearingSpec` per bearing size, `validate_design_dimensions()` |
 | `common.py`, `materials.py`, `bearings.py` | plain modules | geometry, placement and connector helpers; materials; standard-bearing factory and placements |
 | `export.py` | script | runs the notebook and writes `out/integrated_bldc_joint_actuator.scadpkg` |
-| `export_step.py`, `export_fcstd.py`, `export_mjcf.py`, `export_all.py` | scripts | AP242 STEP, FCStd, MuJoCo MJCF; `export_all.py` captures once and runs the three in parallel |
+| `export_step.py`, `export_mjcf.py`, `export_all.py` | scripts | AP242 STEP, MuJoCo MJCF; `export_all.py` captures once and runs the two in parallel |
 | `render_showcase.py` | script | assembled, front and exploded studio renders plus the exploded GIF |
 
 ## Strength And Thermal Notes

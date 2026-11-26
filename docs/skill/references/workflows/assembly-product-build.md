@@ -10,7 +10,7 @@ subassemblies, motion semantics, or product package delivery — including
 mechanisms composed of standard-library components (gearboxes, reducers,
 rack drives, cycloidal drives): standard-part usage lives here. Not for
 monolithic parts (`single-part-modeling.md`) or export-only requests
-(`export-and-translation.md` runs from an existing package).
+(`export.md` runs from an existing package).
 
 ## Read now (one parallel batch)
 
@@ -35,7 +35,7 @@ monolithic parts (`single-part-modeling.md`) or export-only requests
 | the constraint solve fails or placement is wrong | `discipline/failure-and-repair.md` |
 | a validation gate needs a check script | `discipline/geometric-validation.md` |
 | defaults for clearances, backlash or walls are needed | `discipline/manufacturing-boundaries.md` |
-| capturing the package and exporting (steps 9-10) | `docs/guides/product-export.md`, `domains/export-and-translation.md` |
+| capturing the package and exporting (steps 9-10) | `docs/guides/product-export.md`, `domains/export.md` |
 
 ## Unattended mode
 
@@ -65,7 +65,7 @@ required_domains:
 optional_domains:
   - sketch-and-features
   - standard-parts
-  - export-and-translation
+  - export
 artifacts:
   - one part notebook per physical part
   - one assembly notebook composing them with scad.use
@@ -133,7 +133,7 @@ repair_routes:
    `sca run <assembly>.py --out out/<product>.scadpkg`, or
    `capture(run.definition, ...)` from `run_notebook` — the single delivery
    boundary.
-10. **Export** (`domains/export-and-translation.md`) only after validation.
+10. **Export** (`domains/export.md`) only after validation.
 
 ## API pages to read
 

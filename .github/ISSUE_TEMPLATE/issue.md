@@ -12,7 +12,7 @@ assignees: ""
 
 ## Area
 
-<!-- Examples: modeling API, geometry/topology, STEP/BREP inspection, serialization, FreeCAD/Fusion 360/SolidWorks translation, documentation -->
+<!-- Examples: modeling API, geometry/topology, STEP/BREP inspection, serialization, export, documentation -->
 
 ## Reproduction
 

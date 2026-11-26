@@ -8,15 +8,19 @@
 > - `bracket.py`: the part notebook, one cell per feature block (the S1
 >   boundary is the `gusset_ribs` cell).
 > - `bracket_package.py`: runs the notebook and writes
->   `out/ap242_gmsh_bracket.scadpkg`; every `export_*.py` and
->   `translate_*_script.py` starts from it.
+>   `out/ap242_gmsh_bracket.scadpkg`; every `export_*.py`
+>   starts from it.
 > - `export_fem_mesh.py`, `run_calculix.py`, `visualize_calculix.py`,
 >   `study_mesh_convergence.py`: plain FEM modules that read the STEP and
 >   the package (run `export_step.py` first).
 > - `render_views.py`: the demo gallery renders.
 > - `verify/acceptance.py`: the S1–S3 contracts below against the legacy
->   facts, plus the parameter guards; `verify/fcstd_check.py`: the S4
->   FreeCAD check.
+>   facts, plus the parameter guards.
+>
+> The FreeCAD translation (`export_fcstd.py`, `verify/fcstd_check.py`) that
+> stage S4 and its evidence describe was removed together with the
+> translators (they moved out of the SDK); S4 below is kept as the record of
+> what was done then.
 
 Datum（来自功能基准）: 沿用 legacy 原点 = 竖壁底面中心（X 壁厚中面 / Y 宽度中面 / Z 底面）；+X 壁厚方向（fixed_support 背面 x=-2），+Y 宽度方向（零件关于 XZ 面 y=0 对称），+Z 高度方向。等价重建不改基准——下游 interface 面坐标（x=-2 / z=4 / z=22.32）全部锚定此系。
 

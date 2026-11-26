@@ -1,6 +1,6 @@
 ---
 name: simplecadapi
-description: Build, assemble, inspect, reconstruct, and export parametric CAD models with the SimpleCADAPI Python SDK. Use for SimpleCAD geometry modeling, constrained sketches, parts and assemblies, standard gears and bearings, STEP/BREP inspection and reconstruction, mesh or image based reconstruction, vector-PDF drawing reconstruction, durable product packages, model JSON replay, and CAD backend translation.
+description: Build, assemble, inspect, reconstruct, and export parametric CAD models with the SimpleCADAPI Python SDK. Use for SimpleCAD geometry modeling, constrained sketches, parts and assemblies, standard gears and bearings, STEP/BREP inspection and reconstruction, mesh or image based reconstruction, vector-PDF drawing reconstruction, durable product packages, model JSON replay, and export to STEP, STL, OBJ and MJCF.
 license: Apache-2.0
 metadata:
   project: simplecadapi
@@ -57,7 +57,7 @@ Each row's batch is the workflow page plus its `Read now` set (the workflow page
 | Rebuild a model from a mesh, point cloud or photos | `references/workflows/scan-reconstruction.md` | `references/workflows/scan-reconstruction.md` `references/domains/step-inspection.md` `references/domains/part-modeling.md` |
 | Rebuild a model from a vector-PDF drawing | `references/workflows/drawing-reconstruction.md` | `references/workflows/drawing-reconstruction.md` `references/workflows/drawing-reconstruction/role-1-drawing-confirmer.md` `references/domains/drawing-inspection.md` `references/domains/requirement-refinement.md` |
 | Produce a GB engineering drawing (DXF) from validated geometry | `references/workflows/engineering-drawing.md` | `references/workflows/engineering-drawing.md` `references/domains/engineering-drawing.md` `references/domains/requirement-refinement.md` |
-| Export or translate a validated package | `references/workflows/export-and-translation.md` | `references/workflows/export-and-translation.md` `references/domains/export-and-translation.md` |
+| Export a validated package | `references/workflows/export.md` | `references/workflows/export.md` `references/domains/export.md` |
 
 Routes without a workflow (no lifecycle, read the page and answer):
 

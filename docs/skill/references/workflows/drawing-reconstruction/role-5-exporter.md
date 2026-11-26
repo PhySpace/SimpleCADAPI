@@ -7,7 +7,7 @@ Part of `workflows/drawing-reconstruction.md`. Load when the roundtrip has passe
 Read the export rows from `REQUIREMENTS.md`. Durable canonical delivery is
 `sca run <part>.py --out out/<part>.scadpkg` (or
 `capture(run.definition, ...)` after `run_notebook`); external formats through
-`domains/export-and-translation.md`. Post-export gate: re-open the package
+`domains/export.md`. Post-export gate: re-open the package
 in a fresh process and confirm definition/solid counts; list every produced
 file with size.
 

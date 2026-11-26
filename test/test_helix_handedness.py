@@ -76,33 +76,6 @@ class TestHelixHandedness(unittest.TestCase):
             solid.get_volume(), spring.get_volume(), places=6
         )
 
-    def test_left_handed_freecad_script_uses_makehelix(self):
-        from simplecadapi.recording.graph import GraphSession
-        from simplecadapi.recording.serializer import import_model_json
-        from simplecadapi.translator.freecad_translator.translator import (
-            _FreeCADCompiler,
-        )
-
-        with GraphSession() as session:
-            scad.make_helix_redge(
-                pitch=2.0, height=10.0, radius=3.0, handedness="Left"
-            )
-            payload = scad.export_model_json(session)
-
-        script = _FreeCADCompiler().translate_model_payload_to_script(
-            import_model_json(payload)
-        )
-        self.assertIn("Part.makeHelix", script)
-        self.assertIn("True", script)
-
-        with GraphSession() as session:
-            scad.make_helix_redge(pitch=2.0, height=10.0, radius=3.0)
-            payload = scad.export_model_json(session)
-        script = _FreeCADCompiler().translate_model_payload_to_script(
-            import_model_json(payload)
-        )
-        self.assertIn("Part::Helix", script)
-
 
 if __name__ == "__main__":
     unittest.main()

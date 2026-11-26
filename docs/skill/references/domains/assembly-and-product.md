@@ -23,7 +23,7 @@ deliver `.scadpkg` packages.
 - Monolithic single-body manufacturing intent: fuse with `union_rsolid` in
   `domains/part-modeling.md`.
 - Export or translation decisions: they branch from the package in
-  `domains/export-and-translation.md`.
+  `domains/export.md`.
 ## Structure model
 
 - `Part` wraps exactly one `Solid` plus identity and optional material

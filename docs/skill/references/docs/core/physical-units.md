@@ -2,8 +2,7 @@
 
 SimpleCADAPI attaches physical meaning at `Var` declarations and infers the
 dimension of every derived scalar expression. This catches invalid formulas before
-they reach geometry, tolerance analysis, model export, replay, or FreeCAD
-translation.
+they reach geometry, tolerance analysis, model export, or replay.
 
 ## Canonical CAD Units
 
@@ -184,7 +183,7 @@ Unit and dimension validation runs when:
 2. An expression is directly evaluated.
 3. An expression is registered or imported through `ExpressionGraph`.
 4. A tolerance is analyzed or a requirement is declared.
-5. Session/model JSON is imported, exported, replayed, or translated.
+5. Session/model JSON is imported, exported, or replayed.
 
 Malformed units, cyclic graphs, duplicate expression IDs, mixed legacy/typed
 variables, incompatible dimensions, invalid roots, and invalid trigonometric inputs

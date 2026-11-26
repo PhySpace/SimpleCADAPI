@@ -20,7 +20,7 @@ six planets; all have their balls fused to the outer ring. The solve is
 strict.
 
     sca run examples/integrated_bldc_joint_actuator/integrated_bldc_joint_actuator.py
-    uv run python examples/integrated_bldc_joint_actuator/export_all.py  # package, STEP, FCStd, MJCF
+    uv run python examples/integrated_bldc_joint_actuator/export_all.py  # package, STEP, MJCF
 """
 
 import marimo
