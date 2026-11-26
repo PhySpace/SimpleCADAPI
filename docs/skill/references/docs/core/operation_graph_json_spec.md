@@ -69,7 +69,6 @@ source API 名字不等于 canonical graph op 名字。Composite source API 可�
 - 必须限制在冻结的 canonical op set 内
 - 不能泄漏 convenience-only 或 macro-only op
 - composite builtin 可以内部构造表达式和 low-level 调用，但最终写入图中的节点只能是 low-level op
-- FreeCAD translator 可以对安全的单消费者 transform 做 lowering 优化，例如把 `make_translate_rshape` 折叠进上游 `Part::Extrusion.Placement`，但 canonical graph 节点仍然保留，并在 `.FCStd` 对象的 `SimpleCADFoldedOps` 中记录 evidence
 
 典型结果：
 

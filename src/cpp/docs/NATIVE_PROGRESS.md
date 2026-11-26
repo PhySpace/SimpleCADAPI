@@ -145,7 +145,6 @@ Kept features that still need OCP (they import it when used), by OCP class count
 | `inspect/brep` (18 files) | 79 | per-entity geometry dump (`inspect_shape_rbrepinspection`: validity, shell/solid counts, face/edge parameters, mass properties), BRep check, boolean probes: native `check`/`analyze` entry points |
 | `exporter` (step, mjcf, `_surface_mesh`) | 34 | STEP with assembly structure and names (native `export_step` exists for one shape, not the XCAF product tree), mesh export |
 | `artifacts/topology_snapshot` restore on foreign bodies, `_internal/brep_region` | 23 + 13 | `from_brep` already; region archives need the OCP-free reader of `ocp_brep_snapshot` |
-| `translator` (FreeCAD, Fusion, SolidWorks) | 23 | boolean/offset helpers on native shapes |
 | `dxf_engine` | 13 | section/projection on native shapes |
 | `inspect/brep/render*.py` (screenshots) | (VTK) | the C++ software renderer in progress (not touched) |
 

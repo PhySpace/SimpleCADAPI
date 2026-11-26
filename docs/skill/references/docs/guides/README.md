@@ -8,7 +8,7 @@
 - [Notebook Runtime](notebook-runtime.md): models as marimo notebooks, `sca run`, parameters, the editor.
 - [Notebook Composition and Cache](notebook-composition-and-cache.md): `scad.use` composition, part families, the cell
   cache, `@part`/`@assemble` library parts.
-- [Product Export](product-export.md): `.scadpkg` delivery, FreeCAD/AP242 targets, STL/OBJ, optional Gmsh volume meshing.
+- [Product Export](product-export.md): `.scadpkg` delivery, AP242 target, STL/OBJ, optional Gmsh volume meshing.
 
 The corresponding runnable module and examples live in:
 

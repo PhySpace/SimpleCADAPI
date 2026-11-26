@@ -72,7 +72,7 @@ Standing discipline, binding for every role:
 | 2 | Master Planner | `report_A.md`, `REQUIREMENTS.md`, `discipline/mechanical-modeling.md`, `discipline/datums-and-coordinate-systems.md` | feature hypothesis list + `<part-dir>/BUILD_PLAN.md` + base TODOs | plan presented |
 | 3 | Verifier Planner | `report_A.md`, `BUILD_PLAN.md`, `discipline/geometric-validation.md`, check-specific API pages | per-stage verification contracts, the roundtrip contract, executable checks | verification artifact ready before modeling |
 | 4 | Detail Modeling Planner & Builder | stage contract, `domains/part-modeling.md`, `discipline/feature-ordering.md`, `discipline/feature-tree-convention.md`, modeling API pages | stage models, operation hypotheses, rendered inputs | model runs and the prepared verifier passes |
-| 5 | Exporter | `REQUIREMENTS.md` export rows, `domains/export-and-translation.md`, `domains/assembly-and-product.md` | `.scadpkg` + exports + evidence pack | artifacts re-open cleanly |
+| 5 | Exporter | `REQUIREMENTS.md` export rows, `domains/export.md`, `domains/assembly-and-product.md` | `.scadpkg` + exports + evidence pack | artifacts re-open cleanly |
 
 ## Role-switch protocol
 
@@ -136,7 +136,7 @@ owning artifact and repeats the same Role 3/4 loop.
 | the last stage closes | `workflows/drawing-reconstruction/roundtrip-acceptance.md` |
 | sheet B is generated | `domains/engineering-drawing.md` |
 | the roundtrip has passed | `workflows/drawing-reconstruction/role-5-exporter.md` |
-| Role 5 exports | `domains/export-and-translation.md` |
+| Role 5 exports | `domains/export.md` |
 | Role 5 exports an assembly-rooted package | `domains/assembly-and-product.md` |
 | a check fails twice for the same cause, or repeated dead ends | `discipline/failure-and-repair.md` |
 

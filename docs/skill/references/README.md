@@ -27,7 +27,7 @@ Load top-down and only what the task triggers; read each batch in one parallel r
 | `workflows/scan-reconstruction.md` | rebuild from a mesh, point cloud or photos: what the SDK supports and what it does not |
 | `workflows/drawing-reconstruction.md` | editable rebuild from vector-PDF dimensions (outline; stage pages in `workflows/drawing-reconstruction/`) |
 | `workflows/engineering-drawing.md` | GB engineering drawing (DXF) from validated geometry |
-| `workflows/export-and-translation.md` | downstream formats from a validated package |
+| `workflows/export.md` | downstream formats from a validated package |
 
 Stage and role pages of the long workflows:
 
@@ -60,7 +60,7 @@ Stage and role pages of the long workflows:
 | `domains/editor-collaboration.md` | a person has the code-first editor open (`sca edit`) and you edit the same notebooks (a selection, a cell reference or a tuned value arrives). |
 | `domains/editor-gui-features.md` | a person made features with the editor's buttons (`# gui:` cells, `scad.ref` selections, workplanes, canvas sketches), or you run the same operations with `sca feature` / `sca sketch`. |
 | `domains/engineering-drawing.md` | a validated part or product needs a GB-standard drawing sheet (DXF + PNG). |
-| `domains/export-and-translation.md` | a validated `.scadpkg` must be delivered as STEP, STL, OBJ, MJCF or an editable external CAD document. |
+| `domains/export.md` | a validated `.scadpkg` must be delivered as STEP, STL, OBJ or MJCF. |
 | `domains/part-modeling.md` | the deliverable is one physical single-solid part, or an existing part source needs a geometry edit (Role 4 of `workflows/single-part-modeling.md`). |
 | `domains/requirement-refinement.md` | every task starts here: any modeling, assembly, reconstruction, or export request is refined into a brief first, and whenever inputs conflict, are ambiguous, or mix modalities. |
 | `domains/sketch-and-features.md` | the part's controlling dimensions are geometric constraints, or an editable, constraint-driven profile is requested (sketch tier profiles and paths). |
@@ -109,4 +109,4 @@ Stage and role pages of the long workflows:
 - Every workflow has `Read now`, `Read when` and `Unattended mode`, with one unattended row for every gate that asks a person.
 - Every path written in a page must exist in the packaged skill.
 - Reading an API page is an action with an output: note the signature, return type and documented failures before the
-  first call. Non-SDK dependencies (Gmsh, CalculiX, VTK, FreeCAD scripting) are not covered by SDK pages.
+  first call. Non-SDK dependencies (Gmsh, CalculiX, VTK) are not covered by SDK pages.

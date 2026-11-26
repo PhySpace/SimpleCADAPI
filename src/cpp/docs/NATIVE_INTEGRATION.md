@@ -83,11 +83,10 @@ speed: `tools/bench/bench_native.py`; current: 77 KB per box vs a 15 KB OCCT flo
 - Python stays a thin binding layer. In C++: geometry, construction/computation, tagging, ql, the
   operation GRAPH (recording, model-JSON export/import/replay, `geo_selector`), a CAD-specific reactive
   runtime, rendering, and `.scadpkg` packaging.
-- **Translators (FreeCAD, Fusion360, SolidWorks) stay in Python** (decided by the owner): they consume the
-  C++ graph through the bindings, so the recorded graph and model JSON must match the original schema
-  exactly (`geo_selector`, `selected_*_node_ids`, `input_refs`, `semantic_delta_log`, ...). Acceptance for
-  graph work is identical translator OUTPUT on both backends, not only passing tests (measured: the
-  translator tests pass on native today although the schema differs).
+- **The CAD translators (FreeCAD, Fusion360, SolidWorks) are no longer part of the SDK** (decided by the
+  owner; they moved to a private repo). They consumed the recorded graph and model JSON, so that schema
+  (`geo_selector`, `selected_*_node_ids`, `input_refs`, `semantic_delta_log`, ...) must still match the
+  original exactly: it is the contract for those out-of-tree consumers and for the other model-JSON readers.
 - The notebook cells (user code) are executed by Python; the C++ reactive runtime schedules and caches
   them as external nodes and replays the recorded graph natively for everything else.
 - Order: (1) graph schema parity (docs/GRAPH_PARITY.md) -> (2) serializer/replay in C++ -> (3) C++ reactive

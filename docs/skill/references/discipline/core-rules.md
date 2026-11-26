@@ -17,7 +17,7 @@ consumes them. Cell boundaries, `_private` names and `var()` follow `discipline/
 and the mandatory header `# ---- feature: <slug> (<role>) ----` follow `discipline/feature-tree-convention.md`. Read both
 before writing any cell. The one exception is a task that itself asks for a single script
 (`python model.py --output part.step`, an unattended batch): that is a plain script, see "One-shot script" in
-`domains/export-and-translation.md`; the notebook rules do not apply to it.
+`domains/export.md`; the notebook rules do not apply to it.
 
 **R4. Sketch first.** 2D profiles and planar paths go through the sketch API; primitives only when the shape is entirely
 the basic form.

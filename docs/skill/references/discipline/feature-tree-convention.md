@@ -4,8 +4,8 @@
 
 Part sources are block-structured feature chains: every block is one feature
 in the sense of a commercial CAD feature tree (Onshape / SolidWorks /
-Fusion 360), readable by humans and LLMs, and translatable by the package
-translators. This convention is mandatory for every part source authored in
+Fusion 360), readable by humans and LLMs, and recorded as a replayable
+operation graph. This convention is mandatory for every part source authored in
 any workflow.
 
 A model is a marimo notebook (`docs/guides/notebook-runtime.md`), and each
@@ -99,7 +99,7 @@ wires at the point of use. Annotate `path=sketch`.
 `modify` blocks select through QL selectors — predicates plus cardinality
 (`.take(n).exactly(n)`) — or tags. Bare topology enumeration does not
 exist (plural getters are index-only); selections that escape the graph
-capture kernel artifacts and do not translate. Indexed picks are reserved
+capture kernel artifacts and do not replay. Indexed picks are reserved
 for intentional, named choices.
 
 ## Ordering and failure
@@ -152,7 +152,7 @@ the source itself:
 A builder never caches; each call builds afresh. How the calling cell is cached
 is in `docs/guides/notebook-composition-and-cache.md`.
 
-**Delivered sources state the anchor explicitly.** A translator-emitted
+**Delivered sources state the anchor explicitly.** A generated
 or standalone `.ftc.py` passes `project_root=Path(__file__).parent`
 explicitly so the anchor is legible from the source itself — even though
 it matches the default, the corpus states it rather than relying on

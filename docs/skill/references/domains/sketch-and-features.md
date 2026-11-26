@@ -233,6 +233,5 @@ print(plan.get_metadata("projections"))   # [{'source': 'front', 'entity': 'wall
 
 - Underconstrained sketch drifting on promotion: add evidence-backed
   constraints, or record the free DOF explicitly.
-- Unsupported or redundant constraints in downstream translation are recorded
-  as skipped, not silently dropped; check the solve snapshot when fidelity
-  matters.
+- Unsupported or redundant constraints are recorded in the solve snapshot,
+  not silently dropped; check it when fidelity matters.

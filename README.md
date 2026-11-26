@@ -69,7 +69,7 @@ The skill is how an agent learns the SDK. It is a router and a library of small 
 | Rebuild from a mesh, point cloud or photos | scan reconstruction |
 | Rebuild from a vector-PDF drawing | drawing reconstruction |
 | Produce a GB engineering drawing (DXF) | engineering drawing from validated geometry |
-| Hand the model to someone else | export and translation: STEP AP242, STL, FreeCAD, MJCF |
+| Hand the model to someone else | export: STEP AP242, STL, OBJ, MJCF |
 
 **How it is organized**
 
