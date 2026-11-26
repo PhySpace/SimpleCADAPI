@@ -94,8 +94,8 @@ def read_product_package_translation_units(
 
     def visit(definition: Definition) -> None:
         # Deduplicate by definition identity, not content hash: consumers
-        # (STEP label index, product-graph reference resolution, FreeCAD
-        # tokens) all look units up by definition_id, and a package may
+        # (STEP label index, product-graph reference resolution)
+        # all look units up by definition_id, and a package may
         # legitimately contain two same-content definitions with different
         # ids.
         key = (definition.definition_kind, definition.definition_id)

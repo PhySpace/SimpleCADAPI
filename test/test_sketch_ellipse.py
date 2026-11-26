@@ -1,5 +1,5 @@
 """Ellipse support tests: geometry tier, three-point sketch tier, radius
-constraints, promotion, and FreeCAD translation mapping."""
+constraints and promotion."""
 
 from __future__ import annotations
 
@@ -137,50 +137,6 @@ class TestSketchTierEllipse(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             scad.inspect_sketch_rsketchresult(sketch)
         self.assertIn("ellipse", str(ctx.exception))
-
-
-class TestEllipseFreecadTranslation(unittest.TestCase):
-    def test_ellipse_sketch_maps_to_freecad_geometry_and_radius(self):
-        from simplecadapi.recording.graph import GraphSession
-        from simplecadapi.recording.serializer import import_model_json
-        from simplecadapi.translator.freecad_translator.translator import (
-            _FreeCADCompiler,
-        )
-
-        with GraphSession() as session:
-            sketch = scad.make_sketch_rsketch(name="oval")
-            sketch = scad.add_point_rsketch(sketch, "c", 0.0, 0.0)
-            sketch = scad.add_point_rsketch(sketch, "M", 4.0, 0.0)
-            sketch = scad.add_point_rsketch(sketch, "m", 0.0, 2.0)
-            sketch = scad.add_ellipse_rsketch(sketch, "oval", "c", "M", "m")
-            sketch = scad.constrain_fix_rsketch(sketch, "c")
-            sketch = scad.constrain_major_radius_rsketch(sketch, "oval", 4.0)
-            sketch = scad.constrain_minor_radius_rsketch(sketch, "oval", 2.0)
-            scad.make_face_from_sketch_rface(sketch)
-            payload = scad.export_model_json(session)
-
-        script = _FreeCADCompiler().translate_model_payload_to_script(
-            import_model_json(payload)
-        )
-        self.assertIn("Part.Ellipse", script)
-        self.assertIn("add_ellipse_rsketch", script)
-        self.assertIn("major_radius", script)
-
-    def test_ellipse_geometry_tier_compiles(self):
-        from simplecadapi.recording.graph import GraphSession
-        from simplecadapi.recording.serializer import import_model_json
-        from simplecadapi.translator.freecad_translator.translator import (
-            _FreeCADCompiler,
-        )
-
-        with GraphSession() as session:
-            scad.make_ellipse_rface((0.0, 0.0, 0.0), 4.0, 2.0)
-            payload = scad.export_model_json(session)
-
-        script = _FreeCADCompiler().translate_model_payload_to_script(
-            import_model_json(payload)
-        )
-        self.assertIn("_kernel_ellipse_from_params", script)
 
 
 if __name__ == "__main__":

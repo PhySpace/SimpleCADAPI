@@ -101,7 +101,6 @@ def main() -> int:
     cat_count = collections.Counter()
     scen_rows = []
     errors = []
-    trans = collections.defaultdict(collections.Counter)
     for name in names:
         eo, en = (ocp / f"{name}.error").exists(), (native / f"{name}.error").exists()
         if eo or en:
@@ -129,18 +128,6 @@ def main() -> int:
             if i in diff_nodes:
                 per_op[n["op"]]["nodes_diff"] += 1
         scen_rows.append((name, len(a["graph"]["nodes"]), len(diff_nodes), len(d), ops_a == ops_b))
-        for kind in ("freecad", "fusion360", "solidworks"):
-            fa, fb = ocp / f"{name}.{kind}.py", native / f"{name}.{kind}.py"
-            ea, eb = ocp / f"{name}.{kind}.error", native / f"{name}.{kind}.error"
-            if fa.exists() and fb.exists():
-                same = norm_text(fa.read_text()) == norm_text(fb.read_text())
-                trans[kind]["identical" if same else "different"] += 1
-            elif ea.exists() and eb.exists():
-                same = norm_text(ea.read_text()) == norm_text(eb.read_text())
-                trans[kind]["same_error" if same else "different_error"] += 1
-            else:
-                trans[kind]["one_side_error"] += 1
-
     print("== scenarios (nodes, nodes with diffs, leaf diffs, same op sequence)")
     for name, n, nd, ld, same in scen_rows:
         print(f"{name:34s} {n:4d} {nd:4d} {ld:6d} {'' if same else 'OPS DIFFER'}")
@@ -153,9 +140,6 @@ def main() -> int:
         print(f"{op:40s} {c['nodes']:4d} {c['nodes_diff']:4d}   {c['only_ocp']:6d} {c['only_native']:6d} {c['value']:6d} {c['type']:6d}")
         tot.update(c)
     print(f"{'TOTAL':40s} {tot['nodes']:4d} {tot['nodes_diff']:4d}   {tot['only_ocp']:6d} {tot['only_native']:6d} {tot['value']:6d} {tot['type']:6d}")
-    print("\n== translator outputs (scenario count)")
-    for kind, c in trans.items():
-        print(f"{kind:12s} {dict(c)}")
     print(f"\n== top diff categories (op, kind, path)")
     for (op, kind, cat), n in cat_count.most_common(top * 3):
         print(f"{n:6d} {op:34s} {kind:12s} {cat}")

@@ -7,19 +7,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
 from ..product.packages import read_product_package
-from ..translator.freecad_translator import (
-    translate_product_package_to_fcstd,
-    translate_product_package_to_freecad_script,
-)
-from ..translator.freecad_translator.exporter import discover_freecad_executable
-from ..translator.fusion360_translator import translate_product_package_to_fusion360_script
-from ..translator.solidworks_translator import translate_product_package_to_solidworks_script
 from .mjcf import export_product_package_to_mjcf
 from .obj import export_product_package_to_obj
 from .step import export_product_package_to_step
@@ -31,11 +23,7 @@ _SUFFIXES = {
     "step": ".step",
     "stl": ".stl",
     "obj": ".obj",
-    "fcstd": ".FCStd",
     "mjcf": ".xml",
-    "freecad-script": ".freecad.py",
-    "fusion360-script": ".fusion360.py",
-    "solidworks-script": ".solidworks.py",
 }
 
 
@@ -67,8 +55,6 @@ def configure(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--linear-deflection", type=float, default=0.1)
     parser.add_argument("--angular-deflection-degrees", type=float, default=20.0)
     parser.add_argument("--relative", action="store_true", help="use relative mesh deflection")
-    parser.add_argument("--freecad-cmd", help="path to FreeCADCmd/FreeCAD for FCStd output")
-    parser.add_argument("--document-name", default="SimpleCADProduct")
     parser.set_defaults(handler=_execute, printer=_print_report)
 
 
@@ -106,13 +92,6 @@ def _output_paths(input_path: Path, output_dir: Path, overrides: dict[str, Path]
     }
 
 
-def _freecad_command(value: str | None) -> str | None:
-    if value is None:
-        return discover_freecad_executable()
-    path = Path(value).expanduser()
-    return str(path.resolve()) if path.is_file() else shutil.which(value)
-
-
 def _report_value(value: Any) -> Any:
     if is_dataclass(value):
         value = asdict(value)
@@ -141,12 +120,9 @@ def _execute(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     package = read_product_package(input_path)
     failures: dict[str, str] = {}
     checks: dict[str, dict[str, Any]] = {}
-    freecad_cmd = _freecad_command(args.freecad_cmd) if "fcstd" in formats else None
 
     for format_name in formats:
         issues: list[str] = []
-        if format_name == "fcstd" and freecad_cmd is None:
-            issues.append("FreeCADCmd/FreeCAD not found; install it or pass --freecad-cmd")
         if format_name == "mjcf" and package.root_kind != "assembly":
             issues.append("MJCF export requires an assembly-rooted .scadpkg")
         if not args.check and not args.overwrite and output_paths[format_name].exists():
@@ -171,21 +147,13 @@ def _execute(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         "step": lambda: export_product_package_to_step(input_path, output_paths["step"]),
         "stl": lambda: export_product_package_to_stl(input_path, output_paths["stl"], linear_deflection=args.linear_deflection, angular_deflection_degrees=args.angular_deflection_degrees, relative=args.relative),
         "obj": lambda: export_product_package_to_obj(input_path, output_paths["obj"], linear_deflection=args.linear_deflection, angular_deflection_degrees=args.angular_deflection_degrees, relative=args.relative),
-        "fcstd": lambda: translate_product_package_to_fcstd(input_path, str(output_paths["fcstd"]), document_name=args.document_name, freecad_cmd=freecad_cmd),
         "mjcf": lambda: export_product_package_to_mjcf(input_path, output_paths["mjcf"], linear_deflection=args.linear_deflection, angular_deflection_degrees=args.angular_deflection_degrees),
-        "freecad-script": lambda: translate_product_package_to_freecad_script(input_path, document_name=args.document_name),
-        "fusion360-script": lambda: translate_product_package_to_fusion360_script(input_path, document_name=args.document_name),
-        "solidworks-script": lambda: translate_product_package_to_solidworks_script(input_path, document_name=args.document_name),
     }
     for format_name in formats:
         if format_name in failures:
             continue
         try:
             result = exporters[format_name]()
-            if format_name.endswith("-script"):
-                output_paths[format_name].parent.mkdir(parents=True, exist_ok=True)
-                output_paths[format_name].write_text(str(result), encoding="utf-8")
-                result = {"output_path": str(output_paths[format_name])}
             report["exports"][format_name] = {"ok": True, "report": _report_value(result)}
         except Exception as exc:  # retain independent exports when one target fails
             failures[format_name] = f"{type(exc).__name__}: {exc}"

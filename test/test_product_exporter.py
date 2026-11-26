@@ -184,7 +184,6 @@ class TestProductExporter(unittest.TestCase):
         self.assertFalse(hasattr(scad, "export_step"))
         self.assertFalse(hasattr(scad, "export_stl"))
         self.assertFalse(hasattr(scad, "export_obj"))
-        self.assertFalse(hasattr(scad.translator, "ap242_translator"))
 
     def test_a_build_result_exports_in_one_step_without_a_scene(self):
         """Issue #89: a script that only wants a file need not capture a ``.scadpkg`` first, nor pay for the scene

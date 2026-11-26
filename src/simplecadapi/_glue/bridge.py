@@ -5,7 +5,7 @@ installed.  With OCP importable (the ``verify`` extra) it is an **OCP** ``TopoDS
 CadQuery and an agent's habits expect, so ``BRepGProp.VolumeProperties_s(solid.wrapped, props)`` works as written.  It is a
 copy made through OpenCASCADE's binary format (milliseconds for a part): changing it does not change the SDK shape.
 Without OCP it is the OCCT shape of ``simplecadapi._cpp.occt`` (the same OpenCASCADE the SDK computes with, nothing
-copied), which is what the SDK's own Python layers (inspect, drawings, translators, scene meshing) work on: they take
+copied), which is what the SDK's own Python layers (inspect, drawings, scene meshing) work on: they take
 ``shape._native_wrapped``, which is always that one.
 
 ``SCA_WRAPPED=native`` or ``SCA_WRAPPED=ocp`` chooses.  The SDK functions that take a raw shape (the ``inspect.brep``

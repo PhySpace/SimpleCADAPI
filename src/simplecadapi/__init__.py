@@ -9,7 +9,7 @@ Where things live:
   re-export those names under the paths the SDK has always had (each one lists its sources in its docstring).
 * ``simplecadapi/_native/`` is the Python glue around the C++ module (``compat.py`` wraps and documents it,
   ``session.py`` records graph nodes for the layers written in Python, ``glue.py`` lists the extra names).
-* Everything else (runtime, build, artifacts, editor, inspect, exporter, translators, scene) is Python.
+* Everything else (runtime, build, artifacts, editor, inspect, exporter, scene) is Python.
 """
 
 import sys
@@ -38,7 +38,7 @@ from . import ref
 from .ref import ElementRef, ElementRefError
 
 # Features that read OpenCASCADE shapes load on first use.
-_LAZY_SUBMODULES = ("exporter", "inspect", "translator")
+_LAZY_SUBMODULES = ("exporter", "inspect")
 
 
 def __getattr__(name: str) -> Any:
@@ -767,7 +767,6 @@ __all__ = [
     "radial_pattern_rsolidlist",
     "ql",
     "std",
-    "translator",
     "GraphSession",
     "get_active_session",
     "assemble",

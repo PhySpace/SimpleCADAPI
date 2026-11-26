@@ -211,25 +211,7 @@ def _default_source_files(package_root: Path) -> List[Path]:
         for path in sorted(operators_root.glob("*.py"))
         if not path.name.startswith("_") and path not in listed
     )
-    translator_root = package_root / "translator"
-    for backend_dir in sorted(translator_root.glob("*_translator")):
-        source_files.extend([backend_dir / "api.py", backend_dir / "translator.py"])
-        types_file = backend_dir / "types.py"
-        if types_file.is_file():
-            source_files.append(types_file)
     return source_files
-
-
-def _translator_backend_name(module_name: str) -> str | None:
-    parts = module_name.split("/")
-    if (
-        len(parts) == 3
-        and parts[0] == "translator"
-        and parts[1].endswith("_translator")
-        and parts[2] in {"api.py", "translator.py", "types.py"}
-    ):
-        return parts[1]
-    return None
 
 
 def _default_stdlib_source_files(package_root: Path) -> List[Path]:
@@ -535,8 +517,6 @@ class APIDocumentGenerator:
         if module_name.startswith("operators/") and exported_names:
             # a module nobody listed: what the package exports is the API
             return name in exported_names
-        if _translator_backend_name(module_name) is not None:
-            return True
         if module_name.startswith("inspect/brep/"):
             return name.endswith(
                 (
@@ -596,8 +576,6 @@ class APIDocumentGenerator:
         if name.startswith("_"):
             return False
         if module_name.startswith("exporter/"):
-            return True
-        if _translator_backend_name(module_name) is not None:
             return True
         if module_name.startswith("inspect/brep/"):
             return name in {
@@ -685,13 +663,6 @@ class APIDocumentGenerator:
             return (
                 f"exporter namespace: `from simplecadapi import exporter` "
                 f"then `exporter.{exporter_module}.{name}(...)`"
-            )
-
-        translator_backend = _translator_backend_name(module_name)
-        if translator_backend is not None:
-            return (
-                "translator backend: "
-                f"`from simplecadapi.translator.{translator_backend} import {name}`"
             )
 
         if module_name.startswith("inspect/brep/"):
@@ -871,7 +842,6 @@ class APIDocumentGenerator:
             "Tagging and Selection": [],
             "Boolean Operations": [],
             "Export": [],
-            "Translator Backends": [],
             "Math Helpers": [],
             "Modeling Graph and Replay": [],
             "Expressions and Parameters": [],
@@ -917,9 +887,6 @@ class APIDocumentGenerator:
 
             if api.source_file.startswith("exporter/"):
                 categories["Export"].append(api)
-                continue
-            if _translator_backend_name(api.source_file) is not None:
-                categories["Translator Backends"].append(api)
                 continue
 
             if api.source_file == "math.py":
@@ -968,7 +935,6 @@ class APIDocumentGenerator:
             "- Entries marked `submodule` are public through the listed submodule, such as `simplecadapi.ql`.",
             "- Entries marked `inspection namespace` are available through `simplecadapi.inspect.brep` and cannot run inside `GraphSession`.",
             "- Entries marked `drawing-inspection namespace` are available through `simplecadapi.inspect.drawing` and cannot run inside `GraphSession`.",
-            "- Entries marked `translator backend` are public only through `simplecadapi.translator.<backend>`.",
             "- Entries marked `reverse-engineering evaluator` are available through `simplecadapi.inverse_engineer.brep`; their acceptance inputs and reports belong to the trusted harness, not participant code.",
             "",
         ]
@@ -988,8 +954,6 @@ class APIDocumentGenerator:
                     surface_info = " `drawing-inspection namespace`"
                 elif api.source_file.startswith("exporter/"):
                     surface_info = " `exporter namespace`"
-                elif api.source_file.startswith("translator/"):
-                    surface_info = " `translator backend`"
                 elif api.source_file == "inverse_engineer/brep/evaluation.py":
                     surface_info = " `reverse-engineering evaluator`"
                 elif api.source_file.startswith("runtime/"):

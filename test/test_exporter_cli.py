@@ -22,17 +22,6 @@ def test_check_defaults_to_step_stl_and_obj(monkeypatch, tmp_path: Path):
     assert report["formats"]["obj"]["output"].endswith("bracket.obj")
 
 
-def test_check_fcstd_reports_missing_freecad(monkeypatch, tmp_path: Path):
-    monkeypatch.setattr(cli, "read_product_package", lambda value: _Package())
-    monkeypatch.setattr(cli, "discover_freecad_executable", lambda: None)
-
-    report, exit_code = cli.run(["export", str(tmp_path / "part.scadpkg"), "--format", "fcstd", "--check"])
-
-    assert exit_code == 1
-    assert report["formats"]["fcstd"]["ok"] is False
-    assert "FreeCADCmd" in report["formats"]["fcstd"]["issues"][0]
-
-
 def test_check_mjcf_requires_assembly(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(cli, "read_product_package", lambda value: _Package())
 
@@ -53,7 +42,7 @@ def test_check_rejects_unknown_package_extension(tmp_path: Path):
 
 def test_output_override_requires_selected_optional_format(tmp_path: Path):
     try:
-        cli.run(["export", str(tmp_path / "part.scadpkg"), "--check", "--output", "fcstd=part.FCStd"])
+        cli.run(["export", str(tmp_path / "part.scadpkg"), "--check", "--output", "mjcf=part.xml"])
     except ValueError as exc:
         assert "--format" in str(exc)
     else:
